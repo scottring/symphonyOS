@@ -114,6 +114,15 @@ Prepared on `claude/beta-readiness-program`, October 15.
 - **Durability (plan §4).** A change card still waiting survives a reload (per person, per tab); approve or dismiss clears it. Undo, receipts and voice state remain in memory.
 - **Bench (plan §10).** `scripts/conversation-bench`: scenarios J1 (the plumber week) and R1 (routine: this week vs from now on) as data; the contract layer replays them through the real validators and applier and passes; the live layer exists for synthetic accounts and has not been run.
 
+## Seventh implementation batch — every paid route metered, invited sign-up, mail consent separate
+
+Prepared on `claude/beta-readiness-program`, October 15.
+
+- **B03.** All nineteen interactive paid functions now reserve a provider call per attempt through the caller's own client and return the refusal (status, code, reset) without claiming success; `rhythms-parse` and `note-match` now verify the JWT they previously only required; `semantic-search` checks the user explicitly. Background routes (`email-scanner`, `extract-email`, `gmail-check`, `school-digest`, `proactive-engine`, `vault-sync`, `extract-capture`, `parse-page`'s worker path) get `reserve_ai_provider_call_for(p_user, p_route)` (migration `20261015120000`): service role only, the JWT role claim checked again inside, charging the person the job works for. Wiring of those eight is in progress (see inventory). Harness: 14 local checks. Still not a dollar ceiling: calls, not tokens; no realtime-duration cap; allowance numbers unchosen; hosted migrations unapplied.
+- **B04.** `signup_allowed` admits an address with a live, unaccepted household invitation (migration `20261015130000`; local check covers live / expired / used / waitlist / stranger). The invitation still has to be accepted after sign-in. A real signed-out invited adult has not been walked through on the hosted project.
+- **B05.** Google consent asks for calendar only by default; Gmail is an optional, separate "Also connect Gmail" in Settings; the callback records the granted scopes (migration `20261015140000`). Callback state binding/replay protection is unchanged and still needs review; Microsoft is untouched.
+- **Client.** An AI allowance refusal on the typed bar is shown in its own words with the reset time (not "Assistant offline"); the paper-plan reader maps the allowance codes and keeps the photos.
+
 ## Release blockers in order
 
 Owner labels are responsibilities, not additional staff. Scott retains scope, spending, external-claim, and release approval.
@@ -137,13 +146,13 @@ This is a source inventory, not proof that every endpoint is deployed or exposed
 | Group | Functions / shared path | Guard/audit status in this branch |
 | --- | --- | --- |
 | Main typed assistant and wall agent | `symphony-agent` | Verified caller JWT; each Anthropic request and OpenAI embedding attempt uses the new guard, including tool-loop follow-ups and task-context enrichment. Hosted web/container work inside a provider response is not separately counted. Maximum 14 model turns is an existing bound, not a dollar cap. |
-| Other conversation and planning | `planning-conversation`, `goal-planning-chat`, `tend-week`, `sharpen-goal`, `suggest-waiting-for`, `rhythms-parse` | Unguarded paid paths remain. The planning-conversation server enable switch is not a shared quota. The waiting-for endpoint's context embeddings do not yet use the new transport guard. |
+| Other conversation and planning | `planning-conversation`, `goal-planning-chat`, `tend-week`, `sharpen-goal`, `suggest-waiting-for`, `rhythms-parse` | Guarded (seventh batch): every provider attempt reserves, including suggest-waiting-for's context embeddings; rhythms-parse now verifies the JWT. |
 | Interactive voice and wall | `workspace-voice`, `wall-ask`, `wall-say` | Verified caller JWT; all three reserve before their paid HTTP attempt. Voice retains its allowlist and 12 starts/user/UTC-day counter. Realtime admission is not enforcement for ongoing audio use; wall fallback to local speech must be tested for clear recovery. |
-| Other wall work | `kiosk-agent`, `math-story` | Unguarded. Kiosk-agent authenticates then can call OpenAI and SerpAPI; both are separate paid routes to cover. |
-| Capture and documents | `analyze-capture`, `analyze-attachment`, `analyze-link`, `parse-page`, `plan-from-paper`, `extract-capture`, `routine-from-doc` | Unguarded. Attachment/page retries and document-driven work can multiply charges. Existing output limits differ substantially; they do not bound total input or combined spend. |
-| Email processing | `extract-email`, `email-scanner`, `gmail-check`, `school-digest` | Unguarded. Extract-email/school-digest use a shared-secret worker path, while scanner/check include user or service-role paths. School-digest can issue another model request for kids' work. All need validated household attribution and trigger/retry caps; the new authenticated-only RPC is not a background-job solution. |
-| Meals | `meal-planner-chat`, `meal-slot-suggest` | Unguarded direct provider calls; meal chat tool-loop follow-ups must each be covered. |
-| Knowledge and background work | `semantic-search`, `note-match`, `vault-sync`, `proactive-engine`, `_shared/context-graph/assemble.ts` | Unguarded except assembly invoked by the guarded main agent. Vault batches, semantic embeddings and proactive runs need independent coverage and trusted attribution. |
+| Other wall work | `kiosk-agent`, `math-story` | Guarded (seventh batch): OpenAI and each SerpAPI search reserve; a refusal cannot read as "no flights match". |
+| Capture and documents | `analyze-capture`, `analyze-attachment`, `analyze-link`, `parse-page`, `plan-from-paper`, `extract-capture`, `routine-from-doc` | Guarded (seventh batch) on every person-JWT path, refusal before any irreversible write. `extract-capture` and parse-page's worker path use the background reservation (in progress). Output limits still do not bound total input. |
+| Email processing | `extract-email`, `email-scanner`, `gmail-check`, `school-digest` | Background reservation (`reserve_ai_provider_call_for`, service role only) charging the person the job works for; wiring in progress. Trigger/retry caps still needed. |
+| Meals | `meal-planner-chat`, `meal-slot-suggest` | Guarded (seventh batch); each meal-chat tool-loop turn reserves, and a refusal mid-stream is an error event, never a done. |
+| Knowledge and background work | `semantic-search`, `note-match`, `vault-sync`, `proactive-engine`, `_shared/context-graph/assemble.ts` | `semantic-search` and `note-match` guarded (and now verify the JWT). `vault-sync` and `proactive-engine` use the background reservation (in progress). |
 
 Reconcile provider billing separately with SDK-based calls, other infrastructure, and external scheduled workers; a source search is not a complete billing inventory. Count each actual provider attempt once, including a shared embedding helper's attempt; do not reserve twice for the same outbound request. The deployed function inventory, enabled cron/webhook triggers and provider dashboards have not been checked by this batch.
 
