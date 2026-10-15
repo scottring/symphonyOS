@@ -14,8 +14,10 @@ import { CANVAS_WRITE_TOOLS, IDEMPOTENT_CREATES, stableRowId } from '../../supab
 import { applyChangeSet, plannedWeekStart, type ApplyDeps } from '@/lib/canvas/applyChangeSet'
 import type { ChangeSet } from '@/lib/canvas/changeCard'
 import type { Task } from '@/types/task'
+import type { Routine } from '@/types/actionable'
 
 interface StartTask { id: string; title: string; scheduledFor?: string; updatedAt: string }
+interface StartRoutine { id: string; name: string; days: string[]; time: string; updatedAt: string }
 interface Step {
   say?: string
   action?: 'approve' | 'retry' | 'undo-set'
@@ -25,10 +27,11 @@ interface Step {
     tools?: { name: string; input: Record<string, unknown> }[]
     card?: { ops: number; allDay?: string[] }
     records?: { created?: string[]; dated?: Record<string, string>; untouched?: string[]; count?: Record<string, number>; absent?: string[]; present?: string[] }
+    routines?: { unchanged?: string[]; skipped?: [string, string][]; rule?: Record<string, { days: string[]; time: string }> }
   }
   forbid?: { tools?: string[]; records?: { created?: 'any'; duplicateTitles?: boolean } }
 }
-interface Scenario { id: string; title: string; today: string; weekStart: string; start: { members: { id: string; name: string }[]; tasks: StartTask[] }; steps: Step[] }
+interface Scenario { id: string; title: string; today: string; weekStart: string; start: { members: { id: string; name: string }[]; tasks: StartTask[]; routines?: StartRoutine[] }; steps: Step[] }
 
 const dir = join(__dirname, 'scenarios')
 const scenarios: Scenario[] = readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))
@@ -36,11 +39,17 @@ const scenarios: Scenario[] = readdirSync(dir).filter((f) => f.endsWith('.json')
 /** The synthetic household's records, as the server reads them and the page holds them. */
 class Store {
   tasks = new Map<string, Task>()
+  routines = new Map<string, Routine>()
+  /** Skipped occurrences: "routineId|YYYY-MM-DD". */
+  skipped = new Set<string>()
   private seq = 0
-  constructor(start: StartTask[]) {
+  constructor(start: StartTask[], routines: StartRoutine[] = []) {
     for (const t of start) this.tasks.set(t.id, { id: t.id, title: t.title, completed: false, createdAt: new Date(t.updatedAt), updatedAt: new Date(t.updatedAt), bucket: t.scheduledFor ? 'timed' : 'week', scheduledFor: t.scheduledFor ? new Date(`${t.scheduledFor}T12:00:00`) : undefined } as Task)
+    for (const r of routines) this.routines.set(r.id, { id: r.id, name: r.name, user_id: 'u', assigned_to: null, assigned_to_all: null, visibility: 'active', paused_until: null, recurrence_pattern: { type: 'weekly', days: [...r.days], interval: 1 }, time_of_day: `${r.time}:00`, created_at: r.updatedAt, updated_at: r.updatedAt } as unknown as Routine)
   }
   serverRows() { return [...this.tasks.values()].map((t) => ({ id: t.id, title: t.title, updated_at: t.updatedAt.toISOString(), completed: t.completed })) }
+  serverRoutines() { return [...this.routines.values()].map((r) => ({ id: r.id, name: r.name, updated_at: r.updated_at, parent_routine_id: null })) }
+  ruleOf(id: string) { const r = this.routines.get(id)!; return { days: (r.recurrence_pattern as { days?: string[] }).days ?? [], time: r.time_of_day ?? '' } }
   deps(weekStart: Date): ApplyDeps {
     return {
       tasks: [...this.tasks.values()],
@@ -50,6 +59,15 @@ class Store {
       deleteTask: async (id) => { this.tasks.delete(id) },
       completeTask: async (id) => { const t = this.tasks.get(id); if (!t) return false; this.tasks.set(id, { ...t, completed: true }); return true },
       reopenTask: async (id) => { const t = this.tasks.get(id); if (!t) return false; this.tasks.set(id, { ...t, completed: false }); return true },
+      routines: [...this.routines.values()],
+      updateRoutine: async (id, input) => { const r = this.routines.get(id); if (!r) return false; this.routines.set(id, { ...r, ...input, updated_at: new Date().toISOString() } as Routine); return true },
+      addRoutine: async (input) => { const id = `r-new-${++this.seq}`; this.routines.set(id, { id, ...input, updated_at: new Date().toISOString() } as unknown as Routine); return id },
+      deleteRoutine: async (id) => { this.routines.delete(id) },
+      skipOccurrence: async (id, date) => { this.skipped.add(`${id}|${ymd(date)}`); return true },
+      undoSkip: async (id, date) => { this.skipped.delete(`${id}|${ymd(date)}`); return true },
+      moveOccurrence: async () => null,
+      undoMove: async () => true,
+      setOccurrenceAssignee: async () => null,
     }
   }
   titles() { return [...this.tasks.values()].map((t) => t.title) }
@@ -61,8 +79,9 @@ const ymd = (d: Date | undefined) => d ? `${d.getFullYear()}-${String(d.getMonth
 for (const sc of scenarios) {
   describe(`bench ${sc.id}: ${sc.title}`, () => {
     it('every step yields exactly the specified outcome and records', async () => {
-      const store = new Store(sc.start.tasks)
+      const store = new Store(sc.start.tasks, sc.start.routines)
       const snapshotBefore = new Map([...store.tasks].map(([id, t]) => [id, JSON.stringify(t)]))
+      const routinesBefore = new Map([...store.routines].map(([id, r]) => [id, JSON.stringify(r)]))
       const [y, m, d] = sc.weekStart.split('-').map(Number)
       const weekStart = new Date(y, m - 1, d)
       let card: ChangeSet | null = null
@@ -84,7 +103,7 @@ for (const sc of scenarios) {
               const parsed = changeSetFromInput(call.input, `${sc.id}:${i}`)
               expect('error' in parsed ? parsed.error : '', `${at}: propose must validate`).toBe('')
               if ('error' in parsed) throw new Error(parsed.error)
-              const resolved = resolveRefs(parsed.set, store.serverRows(), sc.start.members)
+              const resolved = resolveRefs(parsed.set, store.serverRows(), sc.start.members, store.serverRoutines())
               if ('error' in resolved) throw new Error(resolved.error)
               card = resolved.set
               proposal = { key: card.key, title: card.title, ops: card.ops.length }
@@ -140,6 +159,10 @@ for (const sc of scenarios) {
         for (const title of rec?.present ?? []) expect(store.titles(), `${at}: ${title} kept`).toContain(title)
         if (step.forbid?.records?.created === 'any') expect(store.tasks.size, `${at}: nothing created`).toBe(sc.start.tasks.length)
         if (step.forbid?.records?.duplicateTitles) expect(new Set(store.titles()).size, `${at}: no duplicate titles`).toBe(store.titles().length)
+        const ro = step.expect.routines
+        for (const id of ro?.unchanged ?? []) expect(JSON.stringify(store.routines.get(id)), `${at}: routine ${id} untouched`).toBe(routinesBefore.get(id))
+        for (const [id, date] of ro?.skipped ?? []) expect(store.skipped.has(`${id}|${date}`), `${at}: ${id} skipped on ${date}`).toBe(true)
+        for (const [id, rule] of Object.entries(ro?.rule ?? {})) expect(store.ruleOf(id), `${at}: ${id} rule`).toEqual(rule)
       }
     })
   })
