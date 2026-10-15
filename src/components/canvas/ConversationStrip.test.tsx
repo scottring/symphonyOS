@@ -56,7 +56,15 @@ describe('docked conversation bar (approved Season board, 2026-10-10)', () => {
     const talk = vi.fn(), done = vi.fn()
     const live = { ...voice, active: true, status: 'live', talk, done }
     const { rerender } = render(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...live, turn: 'listening' }} />)
-    expect(screen.getByText('Listening — take your time. Tap Done when you’re finished.')).toBeInTheDocument()
+    expect(screen.getByTestId('voice-state')).toHaveTextContent('Listening — your turn, take your time')
+    // The state line moves with the conversation: hearing, working, speaking.
+    rerender(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...live, turn: 'listening', speaking: 'you' }} />)
+    expect(screen.getByTestId('voice-state')).toHaveTextContent('Hearing you…')
+    rerender(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...live, turn: 'off', working: true }} />)
+    expect(screen.getByTestId('voice-state')).toHaveTextContent('Working on it…')
+    rerender(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...live, turn: 'off', speaking: 'symphony' }} />)
+    expect(screen.getByTestId('voice-state')).toHaveTextContent('Symphony is speaking')
+    rerender(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...live, turn: 'listening' }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Done talking — send to Symphony' }))
     expect(done).toHaveBeenCalled()
     rerender(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...live, turn: 'listening', heard: 'Add milk and' }} />)

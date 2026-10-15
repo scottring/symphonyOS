@@ -432,7 +432,7 @@ function ShellLayoutInner({ children }: Props) {
   }), [tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   const showStrip = conversationStripPath(location.pathname);
-  const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, error: voice.error, start: () => { void voice.start(); }, stop: voice.stop, heard: voice.heard, reply: voice.reply, turn: voice.turn, talk: voice.talk, done: voice.done };
+  const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, error: voice.error, speaking: voice.speaking, working: voice.working, start: () => { void voice.start(); }, stop: voice.stop, heard: voice.heard, reply: voice.reply, turn: voice.turn, talk: voice.talk, done: voice.done };
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };
 
   return (

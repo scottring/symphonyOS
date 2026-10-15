@@ -27,6 +27,9 @@ export interface StripVoice {
   start: () => void
   stop: () => void
   mute?: () => void
+  /** What is happening now, so the bar moves: who is speaking, or a save running. */
+  speaking?: 'you' | 'symphony' | null
+  working?: boolean
   /** Why the last start was refused, shown under the bar (2026-10-15). */
   error?: string | null
   /** Live voice's latest words each way, shown in the docked bar. */
@@ -88,15 +91,20 @@ function DockedTranscript({ messages, busy, voice }: { messages: ChatMessageType
   useEffect(() => { scroller.current?.scrollTo?.({ top: scroller.current.scrollHeight }) }, [end?.id, end?.content, earlier])
 
   const listening = voice.active && voice.turn === 'listening'
-  const live = voice.active && (voice.heard || voice.reply || listening)
+  // The state of the conversation, always visible and moving while it is on
+  // (Scott, 2026-10-15: "nothing visual happens to show what is occurring").
+  const state = !voice.active ? null
+    : voice.working ? { key: 'working', text: 'Working on it…' }
+    : voice.speaking === 'symphony' ? { key: 'symphony', text: 'Symphony is speaking' }
+    : voice.speaking === 'you' ? { key: 'you', text: 'Hearing you…' }
+    : listening ? { key: 'listening', text: 'Listening — your turn, take your time' }
+    : voice.status === 'connecting' ? { key: 'connecting', text: 'Connecting…' }
+    : { key: 'thinking', text: 'Thinking…' }
   // While it's your turn: your words as you say them, and no hurry.
-  if (live) return <div className="canvas-transcript" aria-live="polite">
-    {listening
-      ? <p className="canvas-transcript-voice is-listening"><small>You</small>{voice.heard || <span className="canvas-transcript-wait">Listening — take your time. Tap Done when you’re finished.</span>}</p>
-      : <>
-          {voice.heard && <p className="canvas-transcript-voice"><small>You</small>{voice.heard}</p>}
-          {voice.reply && <p className="canvas-transcript-voice"><small>Symphony</small>{voice.reply}</p>}
-        </>}
+  if (voice.active) return <div className="canvas-transcript" aria-live="polite">
+    {voice.heard && <p className="canvas-transcript-voice"><small>You</small>{voice.heard}</p>}
+    {voice.reply && !listening && <p className="canvas-transcript-voice"><small>Symphony</small>{voice.reply}</p>}
+    {state && <p className={`canvas-voice-state is-${state.key}`} data-testid="voice-state"><span className="canvas-voice-dot" aria-hidden="true" /><span className="canvas-voice-dot" aria-hidden="true" /><span className="canvas-voice-dot" aria-hidden="true" />{state.text}</p>}
   </div>
   if (said.length === 0 || closedAt === said.length) return null
   return <div className="canvas-transcript">

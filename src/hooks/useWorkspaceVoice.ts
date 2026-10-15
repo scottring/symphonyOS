@@ -20,6 +20,9 @@ const APPROVE=/^\s*(ok(ay)?[,.]?\s*)?(yes[,.]?\s*)?(approve|approved|approve (it
 export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>Promise<AskResult>, navigate:(url:string)=>void, enabled:boolean, accountId:string|null = null, approveCard?:ApproveCard) {
  const [status,setStatus]=useState<TransportStatus>('idle'),[error,setError]=useState<string|null>(null),[heard,setHeard]=useState(''),[reply,setReply]=useState('')
  const [turn,setTurn]=useState<'listening'|'off'>('off')
+ // What is happening right now, for the bar to show (Scott, 2026-10-15:
+ // "nothing visual happens to show what is occurring").
+ const [speaking,setSpeaking]=useState<'you'|'symphony'|null>(null),[working,setWorking]=useState(false)
  const transport=useRef<RealtimeTransport|null>(null)
  const current=useRef({context,ask,navigate,approveCard});current.current={context,ask,navigate,approveCard}
  const busy=useRef(false)
@@ -52,7 +55,9 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
     // was forwarded as text and answered "needs your approval in the app").
     const approve=async()=>{
      const fn=current.current.approveCard
-     const got=fn?await fn():'none'
+     setWorking(true)
+     const got=fn?await fn().finally(()=>setWorking(false)):'none'
+     setWorking(false)
      if(got==='none')return null
      if(busy.current)return {error:'A save is still running. Wait for it to finish.'}
      return got==='saved'?{reply:'Saved.',outcome:{state:'saved',say:'Saved.'}}:{reply:"Couldn't save it.",outcome:{state:'failed',say:'Not saved. The card on screen says why.'}}
@@ -64,7 +69,7 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
      if(typeof data.request!=='string'||!data.request.trim()||data.request.length>5000)return {error:'Invalid request'}
      if(APPROVE.test(data.request)){const r=await approve();if(r)return r}
      if(busy.current)return {error:'A save is still running. Wait for it to finish.'}
-     busy.current=true
+     busy.current=true;setWorking(true)
      try{
       const got=await current.current.ask(data.request)
       if(got===undefined)return {reply:'The request was not processed. Do not claim success.',outcome:{state:'failed',say:'Nothing saved.'}}
@@ -72,7 +77,7 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
       // The verdict travels beside the words: the voice says what `outcome.say`
       // means, never a stronger claim than `outcome.state` allows.
       return {reply:got.text,...(got.outcome?{outcome:{state:got.outcome.state,say:got.outcome.say,...(got.outcome.proposal?{proposal:got.outcome.proposal}:{})}}:{})}
-     }finally{busy.current=false}
+     }finally{busy.current=false;setWorking(false)}
     }
     return {error:'Unknown action'}
    }})
@@ -83,7 +88,8 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
    if(event.type==='turn')setTurn(event.turn)
    // The heard line stays until the person speaks again: the mic now re-opens
    // by itself after each answer, and clearing then hid what was heard (2026-10-15).
-   if(event.type==='speaking'&&event.who==='user'&&event.active)setHeard('')
+   if(event.type==='speaking'){setSpeaking(event.active?(event.who==='user'?'you':'symphony'):null);if(event.who==='user'&&event.active)setHeard('')}
+   if(event.type==='status'&&event.status!=='live'){setSpeaking(null);setWorking(false)}
    if(event.type==='error')setError(event.message)
    if(event.type==='user')setHeard(event.text)
    if(event.type==='assistant')setReply(event.text)
@@ -93,7 +99,7 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
   await voice.start(toContext())
  }
  const active=['connecting','live','muted'].includes(status)
- return {status,error,heard,reply,active,turn,start,stop:()=>transport.current?.stop(),
+ return {status,error,heard,reply,active,turn,speaking,working,start,stop:()=>transport.current?.stop(),
   /** Tap mode: the person's turn — opens the mic, and stops Symphony if it is talking. */
   talk:()=>transport.current?.listen(),
   /** Tap mode: Done — send the turn. */
