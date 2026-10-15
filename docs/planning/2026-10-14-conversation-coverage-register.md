@@ -1,6 +1,6 @@
 # Symphony conversation coverage register
 
-Version 2, October 15, 2026. Branch `claude/beta-readiness-program` (origin/main `d781b072` plus `codex/beta-readiness`). Companion to [beta-readiness.md](beta-readiness.md), which holds the release gates; this register holds the per-intent evidence the gates point at.
+Version 3, October 15, 2026. Branch `claude/beta-readiness-program` (origin/main `d781b072` plus `codex/beta-readiness`). Companion to [beta-readiness.md](beta-readiness.md), which holds the release gates; this register holds the per-intent evidence the gates point at.
 
 Status marks, per the reliability plan §1:
 
@@ -67,7 +67,7 @@ Columns: what the person wants · how they say it · context/permission needed �
 | Intent | Ways of asking | Needs | May | Tools | Approval | Screen | Says | Failure / Undo | Surfaces | Tests | Status |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | Read the lists | "what's on November", "what did I want this season" | period | read | `symphony_read_plan`, `list_intentions` | — | points | — | — | typed, voice; wall: U (private) | readPlan.test | IT |
-| Plan a month / season / year | "Plan November", "Plan this season with me" | the period that is ending | one card of plan ops (add, carry, let_go, done, merge, someday) | read_plan, propose_changes | Approve | card | period read back with counts; one question at a time; never invents goals | stale refuse; Undo set | typed, voice | readPlan.test, changeSet (plan ops), applyChangeSet (plan ops) | IT (contract) / IU |
+| Plan a month / season / year | "Plan November", "Plan this season with me" | the period that is ending | one card of plan ops (add, carry, let_go, done, merge, someday) | read_plan, propose_changes | Approve | card | period read back with counts; one question at a time; never invents goals | stale refuse; Undo set | typed, voice | bench M1 (year plan ops: carry, let go, done, add, Undo), readPlan.test, changeSet (plan ops), applyChangeSet (plan ops) | IT (contract) / IU |
 | Add one goal outside a session | "add a goal for the fall: finish the deck" | — | direct write | `symphony_create_plan_item` | none | row; receipt | — | Undo deletes | typed, voice | planSaved.test, stableRowId | IT |
 | Link a week task to a month goal | "that serves the deck goal" | both visible | link, never duplicate | `symphony_link_plan_item` | none | receipt | — | **P** Undo for links | typed | planning.test | IU |
 | Suggest missing goals/links | "where do these belong" | — | suggestions only, dashed | `symphony_propose_plan_items` | Keep / Leave out | dashed | — | nothing written until kept | typed | canvasEvents (proposalItems) | IT |
@@ -100,7 +100,7 @@ Columns: what the person wants · how they say it · context/permission needed �
 
 | Intent | Ways of asking | Needs | May | Tools | Approval | Screen | Says | Failure / Undo | Surfaces | Tests | Status |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| "What can I do here?" | "what is this page", "how do I…" | page guide (`src/lib/explain/pageGuides.ts`: year, season, month, week, today only) | point and explain, one part at a time | `symphony_show_on_page`, `symphony_point` | — | outlines + notes | one part per step | — | typed, voice | showOnPage.test, pointing.test | IT for the five guided pages; **P** inbox/routines/meals guides |
+| "What can I do here?" | "what is this page", "how do I…" | page guide (`src/lib/explain/pageGuides.ts`: year, season, month, week, today, inbox, routines, meals) | point and explain, one part at a time | `symphony_show_on_page`, `symphony_point` | — | outlines + notes | one part per step | — | typed, voice | showOnPage.test, pointing.test, explain.test | IT (contract) for all eight pages / IU (generated help on a real screen) |
 | Go to a page | "show me the week" | connected workspace | navigate | `symphony_show_workspace` | — | page changes | — | — | typed, voice | context.test (workspaceDestination) | IT |
 | Wall: ask about the day / add to a list / note on the scratchpad | spoken at the wall | a paired display (identity-derived wall; migration 20261015100000) or an adult login with `surface:'wall'` | family reads; scratchpad; family list items; task-op cards | wallMode allowlists, `fenceDb` | card: spoken "approve" | wall card; 30 s Undo | — | 20 s timeout → `wall-ask` fallback (agent may still finish server-side: **gap**) | wall | wallMode.test, wallTalk.test, useTellSymphony.test | IU |
 | Private assistant (work / personal) | — | separate identity (B01) | — | — | — | — | — | — | — | — | **P** (not in the first beta) |
@@ -121,7 +121,7 @@ Columns: what the person wants · how they say it · context/permission needed �
 | Household vocabulary (names, schools, places) | roster in the agent prompt; the voice transcriber is prompted with the family's names and routine names (bounded, never task text) | workspace-voice handler.test | IT (contract) / IU (does it help recognition: needs recorded audio) |
 | Durable session state across reload | chat text in `chat_sessions`; a waiting change card is kept per person in the tab's session storage and restored (approve/dismiss clears it); Undo, receipts and voice state are still in memory only | CanvasActivityContext.test (reload) | IT (card) / **P** (Undo, receipt, objective and unresolved questions) |
 | Authorization not inferred from the screen | every tool through RLS client; wall fence; a display's identity decides the wall server-side | wallMode.test (callerSurface), `scripts/test-household-displays.mjs` (8 SQL checks); integration privacy test (not run on this candidate) | IT (unit, local SQL) / P (real accounts, hosted migration) |
-| Spending limits | `reserve_ai_provider_call` on four routes; many paid routes unguarded; 27 orphaned functions deployed | aiUsage tests; `scripts/test-ai-usage-guard.mjs` | IU; see beta-readiness B03 |
+| Spending limits | every paid route reserves (interactive through the caller, background through the service role); spend ledger in cents with per-model prices and daily/monthly cent ceilings; refusals shown in the person's words; 27 orphaned functions still deployed (deletion script prepared) | aiUsage tests, aiUsageRoutes tests; `scripts/test-ai-usage-guard.mjs` (15 checks) | IT (local) / P (hosted: migrations, prices and ceilings unapplied; orphans not deleted) |
 
 ## Known gaps found while building (not yet in a row above)
 

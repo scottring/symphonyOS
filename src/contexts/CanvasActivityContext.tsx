@@ -30,6 +30,8 @@ export interface CanvasReceipt {
   key: number
   source: 'conversation' | 'manual'
   state: SaveState
+  /** The server's id for the turn, shown on a failure so a problem report can name it. No content. */
+  requestId?: string
   /** What was asked ("Add the plumber to today") or the command's label. */
   request: string
   /** One-line summary of the outcome. */
@@ -104,7 +106,7 @@ export interface CanvasActivity {
   turnStarted: (text: string, retry: boolean) => void
   toolUsed: (name: string) => void
   toolResult: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
-  turnEnded: (turn: { didWrite: boolean; error: string | null; text: string }) => void
+  turnEnded: (turn: { didWrite: boolean; error: string | null; text: string; requestId?: string }) => void
   /** Run a manual command with the same save states and Undo as conversation. */
   run: (label: string, command: () => Promise<boolean | void | string | undefined>, options?: CommandOptions) => Promise<boolean>
   undo: () => Promise<void>
@@ -267,10 +269,11 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   // After a writing turn ends, the refetched rows arrive as a new snapshot.
   useEffect(() => { if (turnRef.current?.awaitingDiff && turnRef.current.ended) finishDiff() }, [snapshot, finishDiff])
 
-  const turnEnded = useCallback((ended: { didWrite: boolean; error: string | null; text: string }) => {
+  const turnEnded = useCallback((ended: { didWrite: boolean; error: string | null; text: string; requestId?: string }) => {
     const turn = turnRef.current
     if (!turn) return
     turn.ended = { error: ended.error, text: ended.text }
+    if (ended.requestId) setReceipt((r) => r && r.key === turn.key ? { ...r, requestId: ended.requestId } : r)
     if (!ended.didWrite && !turn.wrote) {
       setReceipt((r) => r && r.key === turn.key
         ? { ...r, state: ended.error ? 'failed' : 'answered', summary: ended.error ? "Couldn't reach Symphony. Nothing changed." : '', canRetry: !!ended.error && !!retryRef.current }

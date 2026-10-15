@@ -27,6 +27,9 @@ export type TransportEvent =
   /** Tap mode: whose move it is. 'listening' = the mic is open for the person's turn. */
   | { type: 'turn'; turn: 'listening' | 'off' }
   | { type: 'speaking'; who: 'user' | 'assistant'; active: boolean }
+  /** Timing for the voice acceptance targets (plan §8): connect = Start to live;
+   *  first_reply = Done to the first spoken reply audio. Milliseconds. */
+  | { type: 'metric'; name: 'connect' | 'first_reply'; ms: number }
   /** `goal`: the goal it is for, as the guide named it (else the one on screen). */
   | { type: 'propose'; level: Horizon; text: string; goal?: string }
   | { type: 'error'; code: VoiceErrorCode; message: string }

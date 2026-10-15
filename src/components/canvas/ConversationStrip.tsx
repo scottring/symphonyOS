@@ -142,6 +142,9 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
           <SaveStateBadge state={receipt.state} />
           {receipt.request && <span className="canvas-receipt-request">{receipt.source === 'conversation' ? `“${receipt.request}”` : receipt.request}</span>}
           {receipt.summary && receipt.summary !== STATE_LABEL[receipt.state] && <span className="canvas-receipt-summary">{receipt.summary}</span>}
+          {receipt.requestId && (receipt.state === 'failed' || receipt.state === 'partial' || receipt.state === 'unverified') && (
+            <span className="canvas-receipt-summary" title="Quote this if you report the problem">Ref {receipt.requestId.slice(0, 8)}</span>
+          )}
           {receipt.changes.length > 0 && selection && (
             <span className="canvas-receipt-changes">
               {receipt.changes.filter((c) => c.kind !== 'removed' && c.entity === 'task').slice(0, 4).map((c) => (

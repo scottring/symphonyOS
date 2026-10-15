@@ -1,0 +1,61 @@
+{
+  "id": "m1-plan-november",
+  "title": "Plan November: carry one October goal forward, let one go, mark one done, add one in the person's words; one Approve; Undo of the set",
+  "surface": "desktop",
+  "page": "month",
+  "today": "2026-10-28",
+  "weekStart": "2026-10-25",
+  "start": {
+    "members": [{ "id": "m-a", "name": "Alex" }],
+    "tasks": [],
+    "yearGoals": [
+      { "id": "9a1b2c3d-0000-4000-8000-00000000b001", "name": "Get the house ready to sell", "year": 2026, "status": "active", "updatedAt": "2026-10-01T12:00:00Z" },
+      { "id": "9a1b2c3d-0000-4000-8000-00000000b002", "name": "Learn to bake bread", "year": 2026, "status": "active", "updatedAt": "2026-10-01T12:00:00Z" },
+      { "id": "9a1b2c3d-0000-4000-8000-00000000b003", "name": "Run a 10k", "year": 2026, "status": "active", "updatedAt": "2026-10-01T12:00:00Z" }
+    ]
+  },
+  "steps": [
+    {
+      "say": "Plan November. The house goal carries, bread I'm letting go, and the 10k is done. And add: plan the holiday trip.",
+      "expect": {
+        "outcome": ["proposed"],
+        "tools": [
+          { "name": "symphony_read_plan", "input": { "level": "year", "date": "2026-10-28" } },
+          { "name": "symphony_propose_changes", "input": { "title": "4 changes to 2027", "ops": [
+            { "op": "plan_carry", "item_id": "9a1b2c3d-0000-4000-8000-00000000b001", "to_period_start": "2027-01-01" },
+            { "op": "plan_let_go", "item_id": "9a1b2c3d-0000-4000-8000-00000000b002" },
+            { "op": "plan_done", "item_id": "9a1b2c3d-0000-4000-8000-00000000b003" },
+            { "op": "plan_add", "level": "year", "period_start": "2027-01-01", "title": "Plan the holiday trip" }
+          ] } }
+        ],
+        "card": { "ops": 4 },
+        "goals": { "unchanged": ["9a1b2c3d-0000-4000-8000-00000000b001", "9a1b2c3d-0000-4000-8000-00000000b002", "9a1b2c3d-0000-4000-8000-00000000b003"] }
+      },
+      "forbid": { "tools": ["symphony_create_plan_item", "symphony_update_intention"] },
+      "note": "Year-level plan ops on one card in the person's words; nothing written until Approve. (Month/season goals are tasks; the year list is used here because the contract store models goal rows.)"
+    },
+    {
+      "action": "approve",
+      "expect": {
+        "outcome": ["saved"],
+        "goals": {
+          "status": { "9a1b2c3d-0000-4000-8000-00000000b002": "archived", "9a1b2c3d-0000-4000-8000-00000000b003": "completed", "9a1b2c3d-0000-4000-8000-00000000b001": "active" },
+          "present": ["Get the house ready to sell", "Plan the holiday trip"],
+          "carriedCopies": { "Get the house ready to sell": 2027 }
+        }
+      },
+      "note": "Carry makes a 2027 copy and keeps the original as the record; let go archives; done completes; add creates in the person's words."
+    },
+    {
+      "action": "undo-set",
+      "expect": {
+        "outcome": ["saved"],
+        "goals": {
+          "status": { "9a1b2c3d-0000-4000-8000-00000000b002": "active", "9a1b2c3d-0000-4000-8000-00000000b003": "active" },
+          "absent": ["Plan the holiday trip"],
+          "carriedCopies": { "Get the house ready to sell": null }
+        }
+      }
+    }
+  ]
+}

@@ -15,9 +15,12 @@ import { applyChangeSet, plannedWeekStart, type ApplyDeps } from '@/lib/canvas/a
 import type { ChangeSet } from '@/lib/canvas/changeCard'
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
+import type { Goal } from '@/types/goal'
+import { DEFAULT_SEASONS } from '../../supabase/functions/symphony-agent/readPlan.ts'
 
 interface StartTask { id: string; title: string; scheduledFor?: string; updatedAt: string }
 interface StartRoutine { id: string; name: string; days: string[]; time: string; updatedAt: string }
+interface StartGoal { id: string; name: string; year: number; status: 'active' | 'completed' | 'archived'; updatedAt: string }
 interface Step {
   say?: string
   action?: 'approve' | 'retry' | 'undo-set'
@@ -28,10 +31,11 @@ interface Step {
     card?: { ops: number; allDay?: string[] }
     records?: { created?: string[]; dated?: Record<string, string>; untouched?: string[]; count?: Record<string, number>; absent?: string[]; present?: string[] }
     routines?: { unchanged?: string[]; skipped?: [string, string][]; rule?: Record<string, { days: string[]; time: string }> }
+    goals?: { unchanged?: string[]; status?: Record<string, string>; present?: string[]; absent?: string[]; carriedCopies?: Record<string, number | null> }
   }
   forbid?: { tools?: string[]; records?: { created?: 'any'; duplicateTitles?: boolean } }
 }
-interface Scenario { id: string; title: string; today: string; weekStart: string; start: { members: { id: string; name: string }[]; tasks: StartTask[]; routines?: StartRoutine[] }; steps: Step[] }
+interface Scenario { id: string; title: string; today: string; weekStart: string; start: { members: { id: string; name: string }[]; tasks: StartTask[]; routines?: StartRoutine[]; yearGoals?: StartGoal[] }; steps: Step[] }
 
 const dir = join(__dirname, 'scenarios')
 const scenarios: Scenario[] = readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))
@@ -43,12 +47,16 @@ class Store {
   /** Skipped occurrences: "routineId|YYYY-MM-DD". */
   skipped = new Set<string>()
   private seq = 0
-  constructor(start: StartTask[], routines: StartRoutine[] = []) {
+  goals = new Map<string, Goal>()
+  constructor(start: StartTask[], routines: StartRoutine[] = [], goals: StartGoal[] = []) {
+    for (const g of goals) this.goals.set(g.id, { id: g.id, name: g.name, year: g.year, status: g.status, updatedAt: new Date(g.updatedAt), createdAt: new Date(g.updatedAt) } as unknown as Goal)
     for (const t of start) this.tasks.set(t.id, { id: t.id, title: t.title, completed: false, createdAt: new Date(t.updatedAt), updatedAt: new Date(t.updatedAt), bucket: t.scheduledFor ? 'timed' : 'week', scheduledFor: t.scheduledFor ? new Date(`${t.scheduledFor}T12:00:00`) : undefined } as Task)
     for (const r of routines) this.routines.set(r.id, { id: r.id, name: r.name, user_id: 'u', assigned_to: null, assigned_to_all: null, visibility: 'active', paused_until: null, recurrence_pattern: { type: 'weekly', days: [...r.days], interval: 1 }, time_of_day: `${r.time}:00`, created_at: r.updatedAt, updated_at: r.updatedAt } as unknown as Routine)
   }
   serverRows() { return [...this.tasks.values()].map((t) => ({ id: t.id, title: t.title, updated_at: t.updatedAt.toISOString(), completed: t.completed })) }
   serverRoutines() { return [...this.routines.values()].map((r) => ({ id: r.id, name: r.name, updated_at: r.updated_at, parent_routine_id: null })) }
+  planRefs(today: string) { return { tasks: [], goals: [...this.goals.values()].map((g) => ({ id: g.id, name: g.name, updated_at: g.updatedAt.toISOString(), status: g.status, year: g.year })), seasons: DEFAULT_SEASONS, today } }
+  goalsByName(name: string) { return [...this.goals.values()].filter((g) => g.name === name) }
   ruleOf(id: string) { const r = this.routines.get(id)!; return { days: (r.recurrence_pattern as { days?: string[] }).days ?? [], time: r.time_of_day ?? '' } }
   deps(weekStart: Date): ApplyDeps {
     return {
@@ -68,6 +76,12 @@ class Store {
       moveOccurrence: async () => null,
       undoMove: async () => true,
       setOccurrenceAssignee: async () => null,
+      goals: [...this.goals.values()],
+      addGoal: async (name, opts) => { const id = `g-new-${++this.seq}`; this.goals.set(id, { id, name, year: opts.year, status: 'active', carriedFrom: opts.carriedFrom, updatedAt: new Date(), createdAt: new Date() } as unknown as Goal); return id },
+      updateGoal: async (id, updates) => { const g = this.goals.get(id); if (!g) return false; this.goals.set(id, { ...g, ...updates, updatedAt: new Date() } as Goal); return true },
+      deleteGoal: async (id) => { this.goals.delete(id) },
+      keepForward: async () => undefined,
+      dropCommitment: async () => false,
     }
   }
   titles() { return [...this.tasks.values()].map((t) => t.title) }
@@ -79,7 +93,8 @@ const ymd = (d: Date | undefined) => d ? `${d.getFullYear()}-${String(d.getMonth
 for (const sc of scenarios) {
   describe(`bench ${sc.id}: ${sc.title}`, () => {
     it('every step yields exactly the specified outcome and records', async () => {
-      const store = new Store(sc.start.tasks, sc.start.routines)
+      const store = new Store(sc.start.tasks, sc.start.routines, sc.start.yearGoals)
+      const goalsBefore = new Map([...store.goals].map(([id, g]) => [id, JSON.stringify(g)]))
       const snapshotBefore = new Map([...store.tasks].map(([id, t]) => [id, JSON.stringify(t)]))
       const routinesBefore = new Map([...store.routines].map(([id, r]) => [id, JSON.stringify(r)]))
       const [y, m, d] = sc.weekStart.split('-').map(Number)
@@ -103,7 +118,7 @@ for (const sc of scenarios) {
               const parsed = changeSetFromInput(call.input, `${sc.id}:${i}`)
               expect('error' in parsed ? parsed.error : '', `${at}: propose must validate`).toBe('')
               if ('error' in parsed) throw new Error(parsed.error)
-              const resolved = resolveRefs(parsed.set, store.serverRows(), sc.start.members, store.serverRoutines())
+              const resolved = resolveRefs(parsed.set, store.serverRows(), sc.start.members, store.serverRoutines(), store.planRefs(sc.today))
               if ('error' in resolved) throw new Error(resolved.error)
               card = resolved.set
               proposal = { key: card.key, title: card.title, ops: card.ops.length }
@@ -163,6 +178,16 @@ for (const sc of scenarios) {
         for (const id of ro?.unchanged ?? []) expect(JSON.stringify(store.routines.get(id)), `${at}: routine ${id} untouched`).toBe(routinesBefore.get(id))
         for (const [id, date] of ro?.skipped ?? []) expect(store.skipped.has(`${id}|${date}`), `${at}: ${id} skipped on ${date}`).toBe(true)
         for (const [id, rule] of Object.entries(ro?.rule ?? {})) expect(store.ruleOf(id), `${at}: ${id} rule`).toEqual(rule)
+        const go = step.expect.goals
+        for (const id of go?.unchanged ?? []) expect(JSON.stringify(store.goals.get(id)), `${at}: goal ${id} untouched`).toBe(goalsBefore.get(id))
+        for (const [id, status] of Object.entries(go?.status ?? {})) expect(store.goals.get(id)?.status, `${at}: goal ${id} status`).toBe(status)
+        for (const name of go?.present ?? []) expect(store.goalsByName(name).length, `${at}: goal ${name} present`).toBeGreaterThan(0)
+        for (const name of go?.absent ?? []) expect(store.goalsByName(name).length, `${at}: goal ${name} absent`).toBe(0)
+        for (const [name, year] of Object.entries(go?.carriedCopies ?? {})) {
+          const copies = store.goalsByName(name).filter((g) => (g as unknown as { carriedFrom?: string }).carriedFrom)
+          if (year === null) expect(copies.length, `${at}: no carried copy of ${name}`).toBe(0)
+          else expect(copies.map((g) => g.year), `${at}: ${name} carried to ${year}`).toEqual([year])
+        }
       }
     })
   })

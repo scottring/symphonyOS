@@ -113,7 +113,9 @@ describe('RealtimeTransport', () => {
     expect(String(init.body)).toMatch(/^v=0/)
     expect(JSON.stringify(init)).not.toMatch(/sk-|ek_/)
     expect(peer.remote).toEqual({ type: 'answer', sdp: 'v=0 answer' })
-    expect(events.at(-1)).toEqual({ type: 'status', status: 'live' })
+    // Live, then the connect timing (a content-free metric for the UX05 targets).
+    expect(events.at(-2)).toEqual({ type: 'status', status: 'live' })
+    expect(events.at(-1)).toMatchObject({ type: 'metric', name: 'connect' })
   })
 
   it('does not touch the microphone without a session', async () => {

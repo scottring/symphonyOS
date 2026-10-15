@@ -69,6 +69,8 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
    if(event.type==='error')setError(event.message)
    if(event.type==='user')setHeard(event.text)
    if(event.type==='assistant')setReply(event.text)
+   // Content-free timing for the UX05 targets; read it from the console on a real device.
+   if(event.type==='metric')console.info('symphony.voice.metric',JSON.stringify({name:event.name,ms:event.ms,page:current.current.context.page}))
   })
   await voice.start(toContext())
  }

@@ -67,6 +67,8 @@ export class RealtimeTransport implements VoiceTransport {
   private abort: AbortController | null = null
   // Tap mode.
   private turn: 'listening' | 'off' = 'off'
+  private startedAt = 0
+  private doneAt = 0
   private userSpeaking = false
   private spokeThisTurn = false
   private responding = false
@@ -121,6 +123,7 @@ export class RealtimeTransport implements VoiceTransport {
     // pause the server has already committed them (an empty commit is an error).
     if (this.userSpeaking) send(this.dc, { type: 'input_audio_buffer.commit' })
     if (this.spokeThisTurn) send(this.dc, { type: 'response.create' })
+    this.doneAt = this.spokeThisTurn ? Date.now() : 0
     this.userSpeaking = false
     this.setTurn('off')
   }
@@ -146,6 +149,7 @@ export class RealtimeTransport implements VoiceTransport {
     const createPeer = this.deps.createPeer ?? (typeof RTCPeerConnection !== 'undefined' ? () => new RTCPeerConnection() : undefined)
     if (!gum || !createPeer) { this.fail('unsupported'); return }
 
+    this.startedAt = Date.now()
     this.set('connecting')
     const token = await this.deps.getAccessToken().catch(() => null)
     if (gen !== this.generation) return
@@ -207,6 +211,7 @@ export class RealtimeTransport implements VoiceTransport {
       const maxSeconds = Math.max(1, Math.min(DEFAULT_MAX_SECONDS, Number(res.headers.get('x-voice-max-seconds')) || DEFAULT_MAX_SECONDS))
       this.timer = this.setTimer(() => this.end('time_limit'), maxSeconds * 1000)
       this.set('live')
+      if (this.startedAt) this.em.emit({ type: 'metric', name: 'connect', ms: Date.now() - this.startedAt })
       // Tapping Talk is starting to speak.
       if (this.tap) this.listen()
     } catch {
@@ -311,6 +316,7 @@ export class RealtimeTransport implements VoiceTransport {
         break
       case 'output_audio_buffer.started':
         this.assistantAudio = true
+        if (this.doneAt) { this.em.emit({ type: 'metric', name: 'first_reply', ms: Date.now() - this.doneAt }); this.doneAt = 0 }
         this.em.emit({ type: 'speaking', who: 'assistant', active: true })
         break
       case 'output_audio_buffer.stopped':
