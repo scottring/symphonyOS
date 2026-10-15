@@ -58,7 +58,16 @@ When the session starts, say hello in a few words and ask what they would like t
 // (or ten quiet seconds) asks for the reply.
 export const TURN_DETECTION = {type:'server_vad',create_response:false,interrupt_response:false,silence_duration_ms:500,prefix_padding_ms:300} as const
 
-export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>string|undefined;userId:(authorization:string)=>Promise<string|null>;fetch:typeof fetch;reserve:(authorization:string)=>Promise<boolean>}) {
+/** Household words the transcriber should expect (plan §5): the family's
+ *  names and routine names, so "Kaleb" is not heard as "Caleb". Bounded and
+ *  deduplicated; never private task text. */
+export function transcriptionPrompt(words:readonly string[]):string|undefined {
+ const seen=new Set<string>();const kept:string[]=[]
+ for(const w of words){const t=(w??'').trim();if(!t||t.length>40||seen.has(t.toLowerCase()))continue;seen.add(t.toLowerCase());kept.push(t);if(kept.length>=40)break}
+ return kept.length?`Names and words in this household: ${kept.join(', ')}.`:undefined
+}
+
+export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>string|undefined;userId:(authorization:string)=>Promise<string|null>;fetch:typeof fetch;reserve:(authorization:string)=>Promise<boolean>;vocabulary?:(authorization:string)=>Promise<string[]>}) {
   const env=deps.env
   const reply=(status:number,text:string)=>new Response(status===204?null:text,{status,headers:{...cors,'Cache-Control':'no-store'}})
   if(req.method==='OPTIONS')return reply(204,'')
@@ -79,9 +88,11 @@ export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>s
     const sdp=await req.text()
     if(sdp.length>65536||!sdp.startsWith('v=0'))return reply(400,'invalid_offer')
     if(!await deps.reserve(auth))return reply(429,'daily_limit')
+    // Household vocabulary is a nice-to-have: a failed read never blocks the call.
+    const prompt=transcriptionPrompt(await (deps.vocabulary?.(auth)??Promise.resolve([])).catch(()=>[]))
     // The transcript is what the person sees as "heard". Unpinned, it guesses a
     // language from room noise and shows foreign text; gpt-realtime is retired.
-    const form=new FormData();form.set('sdp',sdp);form.set('session',JSON.stringify({type:'realtime',model:env('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',instructions,max_output_tokens:400,tools,audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'en'},noise_reduction:{type:'near_field'},turn_detection:TURN_DETECTION},output:{voice:'marin',speed:1}}}))
+    const form=new FormData();form.set('sdp',sdp);form.set('session',JSON.stringify({type:'realtime',model:env('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',instructions,max_output_tokens:400,tools,audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'en',...(prompt?{prompt}:{})},noise_reduction:{type:'near_field'},turn_detection:TURN_DETECTION},output:{voice:'marin',speed:1}}}))
     const response=await deps.fetch('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${key}`},body:form,signal:AbortSignal.timeout(20000)})
     if(!response.ok)return reply(502,'voice_unavailable')
     return new Response(await response.text(),{headers:{...cors,'Content-Type':'application/sdp','Cache-Control':'no-store','x-voice-max-seconds':'300'}})

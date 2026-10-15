@@ -1,5 +1,5 @@
 import {describe,it,expect,vi} from 'vitest'
-import {handleWorkspaceVoice} from './handler'
+import {handleWorkspaceVoice,transcriptionPrompt} from './handler'
 const request=()=>new Request('https://example.test',{method:'POST',headers:{Authorization:'Bearer user','Content-Type':'application/sdp'},body:'v=0\r\n'})
 function setup(over:Record<string,string>={}){
  const values:Record<string,string>={WORKSPACE_VOICE_ENABLED:'1',WORKSPACE_VOICE_USER_IDS:'pilot',OPENAI_API_KEY:'test-secret',...over}
@@ -81,4 +81,21 @@ it('discovers pilot access without provider calls or quota consumption',async()=
   expect(await result.json()).toEqual({enabled:allowed==='pilot'})
   expect(deps.reserve).not.toHaveBeenCalled();expect(deps.fetch).not.toHaveBeenCalled()
  }
+})
+
+describe('household vocabulary for the transcriber',()=>{
+ it('passes the family\'s names and routine names as the transcription prompt, bounded and deduplicated',async()=>{
+  const deps={...setup(),vocabulary:vi.fn(async()=>['Kaleb','Ella','kaleb','Piano practice','',' '.repeat(3),'x'.repeat(41)])}
+  await handleWorkspaceVoice(request(),deps)
+  const form=(deps.fetch as unknown as {mock:{calls:[[string,{body:FormData}]]}}).mock.calls[0][1].body
+  const session=JSON.parse(String(form.get('session')))
+  expect(session.audio.input.transcription.prompt).toBe('Names and words in this household: Kaleb, Ella, Piano practice.')
+ })
+ it('a failed vocabulary read never blocks the call',async()=>{
+  const deps={...setup(),vocabulary:vi.fn(async()=>{throw new Error('down')})}
+  expect((await handleWorkspaceVoice(request(),deps)).status).toBe(200)
+ })
+ it('transcriptionPrompt is empty with nothing to say',()=>{
+  expect(transcriptionPrompt([])).toBeUndefined()
+ })
 })

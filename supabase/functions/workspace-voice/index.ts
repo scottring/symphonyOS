@@ -13,6 +13,11 @@ Deno.serve(req=>handleWorkspaceVoice(req,{
   if(error)throw new Error('Voice quota unavailable')
   return data===true
  },
+ vocabulary:async authorization=>{
+  const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:authorization}}})
+  const [members,routines]=await Promise.all([db.from('family_members').select('name').limit(20),db.from('routines').select('name').eq('visibility','active').limit(20)])
+  return [...(members.data??[]),...(routines.data??[])].map(r=>String((r as {name?:unknown}).name??''))
+ },
  userId:async authorization=>{
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:authorization}}})
   const {data:{user},error}=await db.auth.getUser()
