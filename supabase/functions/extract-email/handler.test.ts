@@ -7,6 +7,8 @@ import {
   it,
   vi,
 } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { textBudget } from '../_shared/aiBudget.ts'
 
 const h = vi.hoisted(() => ({
   serve: vi.fn(),
@@ -121,6 +123,15 @@ const request = (secret = 'test-secret') =>
     body: JSON.stringify({ capture_id: 'capture' }),
   })
 describe('email extraction boundary', () => {
+  it('requests a bounded text model present in the deployed pricing configuration', async () => {
+    await handler(request())
+    const budget = textBudget(h.paidFetch.mock.calls[0][1])
+    expect(budget).not.toBeNull()
+    const prices = readFileSync('supabase/migrations/20261015150000_ai_spend_ledger.sql', 'utf8')
+    const configuredModels = [...prices.matchAll(/\('([^']+)',\s*\d+,\s*\d+,\s*null,/g)].map((match) => match[1])
+    expect(configuredModels).toContain(budget?.model)
+    expect(budget?.output).toBeLessThanOrEqual(4096)
+  })
   it('rejects unauthenticated ingestion without reading a household or spending', async () => {
     expect((await handler(request('wrong'))).status).toBe(401)
     expect(h.from).not.toHaveBeenCalled()
