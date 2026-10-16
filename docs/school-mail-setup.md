@@ -60,15 +60,15 @@ activities are skipped; differently worded duplicates still require parent judgm
   malformed/truncated responses, forwarding confirmation and publishing failure.
 - 14 Worker checks including MIME, empty/attachment-only mail and retry behavior.
 - 61 regression checks around onboarding, Settings, Inbox and Today.
-- 19 checks in disposable PostgreSQL: no writes before Save, corrections,
-  household/display isolation, atomic rollback, simultaneous saves, lost-response
+- 21 checks in disposable PostgreSQL: no writes before Save, corrections,
+  household/display/child isolation, atomic rollback, simultaneous saves, lost-response
   retries, duplicate email scope, routine visibility and child-specific notices.
 - Desktop and 390px browser walkthrough using production components and synthetic
   examples: changed 09:00 to 15:00, omitted two suggestions, hid a routine from
   Today/Week, simulated failed Save and retried successfully. No horizontal overflow.
   This is UI evidence, not live email delivery or real-AI extraction.
 - Migration rehearsed against hosted schema in a rolled-back transaction. The
-  later notice-targeting refinement passed local transactional checks. No retained
+  later notice-targeting and child-login refinements passed local checks. No retained
   production migration and no real family records changed.
 
 ```sh

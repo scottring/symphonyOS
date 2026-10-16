@@ -7,6 +7,8 @@ create unique index captures_email_message_idx on public.captures(household_id, 
 create or replace function public.school_mail_can_review(p_household uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select auth.uid() is not null and not coalesce((auth.jwt()->>'is_anonymous')::boolean, false)
+    and not exists(select 1 from public.family_members where auth_user_id=auth.uid()
+      and lower(coalesce(role_label,'')) in ('child','kid'))
     and exists(select 1 from public.household_members where household_id=p_household
       and user_id=auth.uid() and status='active' and role in ('owner','admin','member'));
 $$;

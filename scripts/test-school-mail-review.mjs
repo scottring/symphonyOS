@@ -106,13 +106,14 @@ try {
     `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
  grant usage on schema auth to authenticated,service_role;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
- create function auth.jwt() returns jsonb language sql stable as $$select '{}'::jsonb$$;
+ create function auth.jwt() returns jsonb language sql stable as $$select coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb)$$;
  create table auth.users(id uuid primary key);insert into auth.users values('${A}'),('${B}'),('${OTHER}'),('${DISPLAY}');
  create table households(id uuid primary key,inbound_token text,timezone text default 'America/New_York');insert into households(id) values('${H}'),('${H2}');
  create table household_members(household_id uuid,user_id uuid,role text,status text,created_at timestamptz default now());
  insert into household_members values('${H}','${A}','owner','active'),('${H}','${B}','member','active'),('${H2}','${OTHER}','owner','active'),('${H}','${DISPLAY}','display','active');
  create table family_members(id uuid primary key,user_id uuid,name text,member_type text,display_order int);
  insert into family_members values('${K}','${A}','Casey','core',1),('${K2}','${OTHER}','Foreign child','core',1);
+ alter table family_members add column auth_user_id uuid,add column role_label text;
  create function users_share_household(a uuid,b uuid) returns boolean language sql as $$ select exists(select 1 from household_members x join household_members y using(household_id) where x.user_id=a and y.user_id=b) $$;
  create table captures(id uuid primary key,user_id uuid,household_id uuid,kind text,source_key text,subject text,source_label text,raw_text text,status text default 'pending',error text,created_at timestamptz default now(),reviewed_at timestamptz);
  alter table captures enable row level security;
@@ -154,6 +155,16 @@ try {
     )
   })
   const c = capture(100), lease = stage(c)
+  check('a child login cannot read email or save even with household member access', () => {
+    const child=id(5)
+    sql(`insert into auth.users values('${child}');insert into household_members values('${H}','${child}','member','active');update family_members set auth_user_id='${child}',role_label='child' where id='${K}'`)
+    assert.equal(JSON.parse(sql(auth('select school_mail_overview(true)',child))).address,null)
+    assert.equal(sql(auth('select count(*) from school_mail_reviews',child)),'0')
+    assert.throws(()=>save(c,[item],child))
+  })
+  check('an anonymous session cannot enable school email', () => {
+    assert.throws(()=>sql(auth(`set request.jwt.claims='{"is_anonymous":true}';select ensure_inbound_token('${H}')`)))
+  })
   check('extraction produces no plan rows before parent Save', () => {
     assert.equal(sql('select count(*) from tasks'), '0')
     assert.equal(sql('select count(*) from routines'), '0')
