@@ -70,4 +70,23 @@ describe('CalendarReconnectBanner (calendar status)', () => {
     fireEvent.click(screen.getByRole('button', { name: /retry/i }))
     expect(fetchWeekEvents).toHaveBeenCalledTimes(1)
   })
+
+  // Google lets a person untick "see your calendar list" (Josh, 2026-10-16).
+  // Only the primary calendar shows then; say so and offer the way back.
+  it('asks for the missing permission when only the primary calendar is readable', () => {
+    const connect = vi.fn()
+    setCalendarState({ isConnected: true, calendarListMissing: true, connect })
+    render(<CalendarReconnectBanner />)
+    expect(screen.getByRole('status')).toHaveTextContent(/only your main Google calendar/i)
+    expect(screen.getByRole('status')).toHaveTextContent(/allow both/i)
+    fireEvent.click(screen.getByRole('button', { name: /reconnect/i }))
+    expect(connect).toHaveBeenCalledWith('google')
+  })
+
+  it('a sync failure outranks the missing-permission note', () => {
+    setCalendarState({ isConnected: true, calendarListMissing: true, error: 'Google returned 503' })
+    render(<CalendarReconnectBanner />)
+    expect(screen.getByRole('alert')).toHaveTextContent(/didn’t sync/)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
 })

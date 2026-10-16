@@ -14,6 +14,8 @@ export interface NormalizedCalendar {
   primary: boolean
   backgroundColor?: string
   provider: CalendarProvider
+  /** The account withheld its calendar list, so only its primary calendar is visible. */
+  calendarListMissing?: true
 }
 
 export interface NormalizedAttendee {

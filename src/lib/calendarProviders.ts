@@ -35,3 +35,26 @@ export function callbackFunctionFor(provider: CalendarProvider): string {
 export function providerLabel(provider: CalendarProvider): string {
   return provider === 'microsoft' ? 'Outlook Calendar' : 'Google Calendar'
 }
+
+/** What a calendar edge function says when it fails. */
+export interface CalendarFunctionErrorBody {
+  error?: string
+  needsReconnect?: boolean
+  [key: string]: unknown
+}
+
+/**
+ * supabase-js reports any non-2xx as a FunctionsHttpError whose message is
+ * always "Edge Function returned a non-2xx status code"; the function's own
+ * JSON body is on `context` (the raw Response). Null when there is none.
+ */
+export async function functionErrorBody(err: unknown): Promise<CalendarFunctionErrorBody | null> {
+  const context = (err as { context?: unknown } | null)?.context
+  if (!(context instanceof Response)) return null
+  try {
+    const body = await context.clone().json()
+    return body && typeof body === 'object' ? (body as CalendarFunctionErrorBody) : null
+  } catch {
+    return null
+  }
+}

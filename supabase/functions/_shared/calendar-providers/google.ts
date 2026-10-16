@@ -103,6 +103,13 @@ export async function fetchGoogleCalendars(
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   const data = await res.json()
+  if (res.status === 403) {
+    // Google's consent screen lets a person untick the calendar-list
+    // permission and keep events. The events scope still reads the primary
+    // calendar, so show that one and flag it rather than failing the sync.
+    const primary = await fetchGooglePrimaryOnly(accessToken, fetchImpl)
+    if (primary) return [primary]
+  }
   if (!res.ok || data.error) {
     throw new Error(data?.error?.message || `Google calendarList failed: ${res.status}`)
   }
@@ -110,6 +117,19 @@ export async function fetchGoogleCalendars(
     // Only calendars the user can at least read.
     .filter((cal) => cal.accessRole !== 'freeBusyReader')
     .map(normalizeGoogleCalendar)
+}
+
+/** The primary calendar alone, read through the events endpoint (its response
+ *  names the calendar). Null when that is refused too. */
+async function fetchGooglePrimaryOnly(accessToken: string, fetchImpl: typeof fetch): Promise<NormalizedCalendar | null> {
+  const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events')
+  url.searchParams.set('maxResults', '1')
+  url.searchParams.set('fields', 'summary')
+  const res = await fetchImpl(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!res.ok) return null
+  const data = await res.json().catch(() => null)
+  const id = typeof data?.summary === 'string' && data.summary ? data.summary : 'primary'
+  return { ...normalizeGoogleCalendar({ id, accessRole: 'owner', primary: true }), calendarListMissing: true }
 }
 
 export async function fetchGoogleEvents(

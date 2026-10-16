@@ -12,6 +12,9 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
  *   loading              nothing (no flash during the startup validation)
  *   expired / revoked    the amber alert + Reconnect (unchanged)
  *   sync failure         amber line + Retry; "connected" never means "synced"
+ *   main calendar only   quiet line + Reconnect — Google's consent screen let
+ *                        the person untick the calendar-list permission
+ *                        (2026-10-16), so only the primary calendar shows
  *   healthy              nothing here — the day's own empty copy says
  *                        "your calendar is clear" (TodayView)
  *
@@ -19,7 +22,7 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
  * forgotten. The file keeps its old name because the mount does.
  */
 export function CalendarReconnectBanner() {
-  const { isConnected, needsReconnect, isLoading, error, connect, fetchWeekEvents } = useGoogleCalendar()
+  const { isConnected, needsReconnect, isLoading, error, connect, fetchWeekEvents, calendarListMissing } = useGoogleCalendar()
 
   if (isLoading) return null
 
@@ -69,6 +72,23 @@ export function CalendarReconnectBanner() {
         <button type="button" onClick={() => void fetchWeekEvents()}
           className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700">
           Retry
+        </button>
+      </div>
+    )
+  }
+
+  if (calendarListMissing) {
+    return (
+      <div role="status" className="calendar-connection-banner mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white">
+          <CalendarDays className="h-4 w-4 text-neutral-500" aria-hidden="true" />
+        </span>
+        <p className="min-w-[160px] flex-1 text-sm text-neutral-700">
+          Showing only your main Google calendar. Reconnect and allow both permissions to see the rest.
+        </p>
+        <button type="button" onClick={() => void connect('google')}
+          className="shrink-0 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-700">
+          Reconnect
         </button>
       </div>
     )

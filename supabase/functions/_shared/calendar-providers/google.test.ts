@@ -103,6 +103,36 @@ describe('Google fetchers', () => {
     expect(cals.map((c) => c.id)).toEqual(['a'])
   })
 
+  // Google's consent screen lets a person untick "see your calendar list" and
+  // keep "events" (Josh, 2026-10-16). The list then answers 403 and the whole
+  // sync used to fail. The events scope still reads the primary calendar.
+  it('falls back to the primary calendar, flagged, when the calendar list is not granted', async () => {
+    const fetchImpl = vi.fn(async (url: string) =>
+      url.includes('/calendarList')
+        ? new Response(JSON.stringify({ error: { code: 403, message: 'Request had insufficient authentication scopes.' } }), { status: 403 })
+        : new Response(JSON.stringify({ summary: 'josh@example.com', items: [] })),
+    )
+    const cals = await fetchGoogleCalendars('tok', fetchImpl as unknown as typeof fetch)
+    const probe = new URL(fetchImpl.mock.calls[1][0] as string)
+    expect(probe.pathname).toBe('/calendar/v3/calendars/primary/events')
+    expect(cals).toEqual([
+      expect.objectContaining({ id: 'josh@example.com', primary: true, accessRole: 'owner', provider: 'google', calendarListMissing: true }),
+    ])
+  })
+
+  it('still fails when the primary calendar cannot be read either', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ error: { code: 403, message: 'Request had insufficient authentication scopes.' } }), { status: 403 }),
+    )
+    await expect(fetchGoogleCalendars('tok', fetchImpl as unknown as typeof fetch)).rejects.toThrow('insufficient authentication scopes')
+  })
+
+  it('does not fall back on other list failures', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: { code: 500, message: 'Backend Error' } }), { status: 500 }))
+    await expect(fetchGoogleCalendars('tok', fetchImpl as unknown as typeof fetch)).rejects.toThrow('Backend Error')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
   it('reads a calendar with single events in the range', async () => {
     const fetchImpl = vi.fn(async () =>
       new Response(JSON.stringify({ items: [{ id: 'e1', summary: 'X', start: { date: '2026-09-10' }, end: { date: '2026-09-11' } }] })),

@@ -77,6 +77,7 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
   useGoogleCalendar: () => ({
     isConnected: false,
     needsReconnect: false,
+    calendarListMissing: false,
     isLoading: false,
     isFetching: false,
     events: [],

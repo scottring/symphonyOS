@@ -161,7 +161,10 @@ serve(async (req) => {
       }
     }
 
-    return json({ events, providerErrors: opened.errors })
+    // Only the primary calendar is readable (google.ts): say so, so the app
+    // can ask for the missing permission instead of looking complete.
+    const calendarListMissing = opened.calendars.some((c) => c.calendarListMissing)
+    return json({ events, providerErrors: opened.errors, calendarListMissing })
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 500)
   }

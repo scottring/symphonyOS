@@ -5,7 +5,7 @@ import { supabase, getAuthUser } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
 import { getRecurringBaseId } from './useHiddenCalendarEvents'
 import { filterOutEvent } from './calendarEventCache'
-import { authUrlFunctionFor, isCalendarProvider, type CalendarProvider } from '@/lib/calendarProviders'
+import { authUrlFunctionFor, functionErrorBody, isCalendarProvider, type CalendarProvider } from '@/lib/calendarProviders'
 
 export type { CalendarProvider }
 
@@ -123,6 +123,8 @@ interface GoogleCalendarContextValue {
   needsReconnect: boolean
   /** Providers whose grant was revoked while another still works. */
   reconnectProviders: CalendarProvider[]
+  /** Google withheld the calendar list, so only the primary calendar shows. */
+  calendarListMissing: boolean
   isLoading: boolean
   isFetching: boolean
   events: CalendarEvent[]
@@ -158,6 +160,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   const [connectedProviders, setConnectedProviders] = useState<CalendarProvider[]>([])
   const [needsReconnect, setNeedsReconnect] = useState(false)
   const [reconnectProviders, setReconnectProviders] = useState<CalendarProvider[]>([])
+  const [calendarListMissing, setCalendarListMissing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isFetching, setIsFetching] = useState(false)
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -249,10 +252,15 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
             validated = true
             const broken = (data?.providerErrors ?? []) as Array<{ provider: string; needsReconnect: boolean }>
             setReconnectProviders(broken.filter((e) => e.needsReconnect).map((e) => e.provider).filter(isCalendarProvider))
+            if (typeof data?.calendarListMissing === 'boolean') setCalendarListMissing(data.calendarListMissing)
             break
           }
 
-          lastErrorMsg = data?.error || validateError?.message || ''
+          // A non-2xx carries the function's reason in its body, not in the
+          // error's message ("Edge Function returned a non-2xx status code").
+          const body = validateError ? await functionErrorBody(validateError) : null
+          lastErrorMsg = data?.error || body?.error || validateError?.message || ''
+          if (body?.needsReconnect === true) lastErrorMsg = `invalid_grant: ${lastErrorMsg}`
           if (attempt === 0) {
             // Wait briefly before retry
             await new Promise(r => setTimeout(r, 1000))
@@ -392,25 +400,31 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         },
       })
 
-      if (fetchError) throw fetchError
+      // A non-2xx carries the function's reason in its body; without reading
+      // it the banner could only say "Edge Function returned a non-2xx status
+      // code" (2026-10-16).
+      const failure = fetchError ? (await functionErrorBody(fetchError)) ?? { error: fetchError.message } : data
 
       // Check for auth errors that might indicate token refresh failure
-      if (data?.error) {
+      if (failure?.error) {
         // Common auth error patterns
         if (
-          data.error.includes('Unauthorized') ||
-          data.error.includes('invalid_grant') ||
-          data.error.includes('Token has been expired or revoked') ||
-          data.error.includes('Token')
+          failure.needsReconnect === true ||
+          failure.error.includes('Unauthorized') ||
+          failure.error.includes('invalid_grant') ||
+          failure.error.includes('Token has been expired or revoked') ||
+          failure.error.includes('Token')
         ) {
           setError('Calendar connection expired. Please reconnect.')
           setIsConnected(false)
           setNeedsReconnect(true)
           return []
         }
-        throw new Error(data.error)
+        throw new Error(failure.error)
       }
 
+      // Domain-filtered answers can return early without the flag; keep the last known.
+      if (typeof data?.calendarListMissing === 'boolean') setCalendarListMissing(data.calendarListMissing)
       setEvents(data.events || [])
       return data.events || []
     } catch (err) {
@@ -740,6 +754,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     connectedProviders,
     needsReconnect,
     reconnectProviders,
+    calendarListMissing,
     isLoading,
     isFetching,
     events,
