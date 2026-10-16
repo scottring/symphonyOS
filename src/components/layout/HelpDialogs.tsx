@@ -57,7 +57,7 @@ export function HelpDialogs({ open, onClose, returnFocus }: {
   )
   if (open === 'help') return (
     <MenuDialog title="Help" onClose={onClose} returnFocus={returnFocus}>
-      <p><a href="/learn/">Watch the Symphony walkthroughs</a> — a full introduction and short guides for each step.</p>
+      <p><a href="/learn/">Watch the Symphony walkthroughs</a> — eight short guides to help you get started.</p>
       <ul className="desktop-footer-help">
         <li><strong>Today</strong> holds what you have chosen to do today, with what you need to do it.</li>
         <li><strong>Week and Month</strong> open their pages, or pin their lists beside the page you are on.</li>
