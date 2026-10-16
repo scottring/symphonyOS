@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useAuth } from './useAuth'
+import { readAuthEmailFlow } from '@/lib/authCallback'
 import { createMockUser, createMockSession } from '@/test/mocks/factories'
 import * as Sentry from '@sentry/react'
-import { INVITE_ONLY_MESSAGE } from '@/lib/signupGate'
+import { INVITE_ONLY_MESSAGE, SIGNUP_FAILED_MESSAGE } from '@/lib/signupGate'
 import type { SignUpFailure } from './useAuth'
 
 vi.mock('@sentry/react', () => ({
@@ -16,6 +17,7 @@ let mockSession: ReturnType<typeof createMockSession> | null = null
 let mockSignInError: { message: string } | null = null
 let mockSignUpError: { message: string } | null = null
 let mockSignOutError: { message: string } | null = null
+let mockResendError: { message: string; status?: number } | null = null
 // What public.signup_allowed() answers, and whether asking it even worked.
 let mockSignupAllowed: boolean | null = true
 let mockSignupAllowedError: { message: string } | null = null
@@ -56,6 +58,8 @@ vi.mock('@/lib/supabase', () => ({
           error: null
         })
       }),
+      resend: vi.fn(() => Promise.resolve({ data: {}, error: mockResendError })),
+      resetPasswordForEmail: vi.fn(() => Promise.resolve({ data: {}, error: null })),
       signOut: vi.fn(() => {
         if (mockSignOutError) {
           return Promise.resolve({ error: mockSignOutError })
@@ -89,6 +93,7 @@ describe('useAuth', () => {
     mockSignInError = null
     mockSignUpError = null
     mockSignOutError = null
+    mockResendError = null
     mockSignupAllowed = true
     mockSignupAllowedError = null
     authStateCallback = null
@@ -439,21 +444,58 @@ describe('useAuth', () => {
         expect(supabase.auth.signUp).toHaveBeenCalled()
       })
 
-      it('translates the generic GoTrue failure the trigger causes', async () => {
-        // The exact shape Josh Glazer hit: the gate said yes (or could not be
-        // reached) but the trigger still refused, and GoTrue flattened it.
+      it('does not blame the invite gate for an opaque failure after the gate said allowed', async () => {
+        // Readiness audit: "Database error saving new user" is what GoTrue
+        // says for ANY fault in the new-user path. The gate just let this
+        // address through, so telling them to request an invite would send an
+        // invited person to the waitlist and hide a real fault.
         mockSignupAllowed = true
         mockSignUpError = { message: 'Database error saving new user' }
         const result = await renderReady()
 
         let signUpResult: { error: SignUpFailure | null } | undefined
         await act(async () => {
-          signUpResult = await result.current.signUpWithEmail('stranger@example.com', 'password123')
+          signUpResult = await result.current.signUpWithEmail('invited@example.com', 'password123')
+        })
+
+        expect(signUpResult?.error?.message).toBe(SIGNUP_FAILED_MESSAGE)
+        expect(signUpResult?.error?.unexpected).toBe(true)
+        expect(signUpResult?.error?.inviteOnly).toBeFalsy()
+        expect(signUpResult?.error?.message).not.toContain('Database error')
+        // Reported, so the real fault doesn't vanish — without the address.
+        expect(Sentry.captureEvent).toHaveBeenCalledWith(
+          expect.objectContaining({ message: 'auth.signup_unexpected_failure' })
+        )
+        expect(JSON.stringify(vi.mocked(Sentry.captureEvent).mock.calls)).not.toContain('invited@example.com')
+      })
+
+      it('shows the generic failure, not invite-only, when the gate check failed and sign-up hit the opaque error', async () => {
+        mockSignupAllowed = null
+        mockSignupAllowedError = { message: 'Failed to fetch' }
+        mockSignUpError = { message: 'Database error saving new user' }
+        const result = await renderReady()
+
+        let signUpResult: { error: SignUpFailure | null } | undefined
+        await act(async () => {
+          signUpResult = await result.current.signUpWithEmail('maybe@example.com', 'password123')
+        })
+
+        expect(signUpResult?.error?.message).toBe(SIGNUP_FAILED_MESSAGE)
+        expect(signUpResult?.error?.inviteOnly).toBeFalsy()
+      })
+
+      it("still says invite-only when the trigger's own refusal comes through", async () => {
+        mockSignupAllowed = true
+        mockSignUpError = { message: 'Signups are currently restricted. Contact the administrator.' }
+        const result = await renderReady()
+
+        let signUpResult: { error: SignUpFailure | null } | undefined
+        await act(async () => {
+          signUpResult = await result.current.signUpWithEmail('revoked@example.com', 'password123')
         })
 
         expect(signUpResult?.error?.inviteOnly).toBe(true)
         expect(signUpResult?.error?.message).toBe(INVITE_ONLY_MESSAGE)
-        expect(signUpResult?.error?.message).not.toContain('Database error')
       })
 
       it('still tries the sign-up when the gate cannot be reached', async () => {
@@ -486,6 +528,64 @@ describe('useAuth', () => {
         expect(signUpResult?.error?.message).toBe('User already registered')
         expect(signUpResult?.error?.inviteOnly).toBeUndefined()
       })
+    })
+  })
+
+  describe('resendConfirmation', () => {
+    it('asks Supabase for a new sign-up confirmation that lands back on this app', async () => {
+      const { result } = renderHook(() => useAuth())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      const { supabase } = await import('@/lib/supabase')
+
+      let out: { error: unknown } | undefined
+      await act(async () => {
+        out = await result.current.resendConfirmation('new@example.com')
+      })
+
+      expect(supabase.auth.resend).toHaveBeenCalledWith({
+        type: 'signup',
+        email: 'new@example.com',
+        options: { emailRedirectTo: window.location.origin },
+      })
+      expect(out?.error).toBeNull()
+    })
+
+    it('hands back the error so the form can explain it', async () => {
+      mockResendError = { message: 'For security purposes, you can only request this after 42 seconds.', status: 429 }
+      const { result } = renderHook(() => useAuth())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+
+      let out: { error: unknown } | undefined
+      await act(async () => {
+        out = await result.current.resendConfirmation('new@example.com')
+      })
+
+      expect(out?.error).toEqual(mockResendError)
+    })
+  })
+
+  // Review, 2026-10-08: an expired reset link and an expired confirmation link
+  // both arrive as otp_expired; remembering which one this browser asked for
+  // lets the broken-link screen start on the right recovery.
+  describe('remembering which email was asked for', () => {
+    beforeEach(() => localStorage.clear())
+
+    it('a reset request is remembered as a password reset', async () => {
+      const { result } = renderHook(() => useAuth())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => { await result.current.resetPassword('sam@example.com') })
+      expect(readAuthEmailFlow()).toBe('recovery')
+    })
+
+    it('a confirmation resend is remembered as confirming an account, but not when it failed', async () => {
+      const { result } = renderHook(() => useAuth())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      mockResendError = { message: 'rate limited', status: 429 }
+      await act(async () => { await result.current.resendConfirmation('sam@example.com') })
+      expect(readAuthEmailFlow()).toBeNull()
+      mockResendError = null
+      await act(async () => { await result.current.resendConfirmation('sam@example.com') })
+      expect(readAuthEmailFlow()).toBe('signup')
     })
   })
 
