@@ -1,5 +1,7 @@
 # Symphony conversation coverage register
 
+**October 16 production supplement:** [Baseline release evidence](2026-10-16-baseline-production.json) records normal-account onboarding, three saved routines with recurrence and visibility, two saved initial activities, one existing-task time correction without duplication, and a separate two-task draft → Save → Undo with database readback. The existing-task correction was a direct single-item action, not a reviewed card; no Undo is claimed for that direct write. These checks passed with real AI and an ordinary synthetic account on the production planner. Source `f2b5a919` is now live at `app.symphony-os.com`. The historical rows below retain their original evidence scope; this supplement does not certify every transaction or the deferred voice path.
+
 Version 3, October 15, 2026. Branch `claude/beta-readiness-program` (origin/main `d781b072` plus `codex/beta-readiness`). Companion to [beta-readiness.md](beta-readiness.md), which holds the release gates; this register holds the per-intent evidence the gates point at.
 
 Status marks, per the reliability plan §1:

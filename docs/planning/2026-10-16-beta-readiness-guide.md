@@ -1,6 +1,14 @@
 # Friends and family beta: readiness and walkthrough guide
 
-Updated October 16, 2026. This is the current guide for hosted test version **2026-10-16.5**, built from `codex/voice-transaction-bench` and available at [the test onboarding](https://symphony-rebuild.vercel.app/getting-started). It supersedes the form-based onboarding instructions in the October 15 review. Earlier test reports remain dated evidence; they are not a release approval for this candidate.
+Updated October 16, 2026. The baseline **2026-10-16.6-baseline** is deployed for normal authenticated accounts at [Symphony](https://app.symphony-os.com), from `codex/beta-baseline-release` source commit `f2b5a919ea669279e704751945502981af72bb38`. The stable Vercel address serves the same build. Multiple-account calendar work remains separate in `codex/voice-transaction-bench`; it is not included in this release. Earlier test reports below remain dated evidence, not a blanket invitation approval.
+
+## Current production baseline — October 16
+
+Frontend deployment `dpl_HanBwr5giz8rPuQFMZELxZ81Efr5` serves both production addresses. The planner is `symphony-agent` v75 with JWT verification enabled. This release uses the previously reviewed .5 onboarding, chat and single-account calendar implementation, removes the test-account frontend restriction, and connects chat to the normal production planner. It also corrects Today's summary and open-time labels when calendar coverage is missing or unavailable. No database migration was applied in this release.
+
+Verification passed: **353 selected automated tests**, TypeScript/Vite production build, Deno planner source check, and a real-AI walkthrough using a fresh ordinary synthetic account outside the test allowlist. The walkthrough saved a Saturday-start household, three routines (including a hidden routine), and two initial activities; moved the existing library task without duplication; then saved and undid a separate two-task reviewed draft. Database readback confirmed the original tasks and routines survived Undo. The final main-domain sign-in and saved onboarding state were checked again after promotion.
+
+Six hosted checks passed on the main domain: production preflight, anonymous planner refusal, normal-account planner admission, Google Calendar's production return address with calendar-only scopes, the exact frontend release identity, and all five video files serving playable media. Google account consent and real event synchronization were not rerun for this release. Phone and tablet instructions were reviewed; physical installation and display soak tests remain open. See [machine-readable evidence](2026-10-16-baseline-production.json).
 
 ## What is ready to walk through
 
@@ -27,7 +35,7 @@ The candidate also includes installation instructions, shared-tablet pairing gui
 | Devices | Choose personal installation, a shared display, or this browser for now. | Reviewing instructions is not proof of installation or pairing. Another adult uses an invitation and their own account. A shared tablet uses a restricted display identity. |
 | Finish | Review Ready now and For later, then open the saved destination. | Future dates and years are named explicitly. Deferred items remain available. Getting started and everyday guidance remain in Help. |
 
-For the next manual round, use **https://symphony-rebuild.vercel.app/getting-started**. The clean Rivera household is at the household review: Alex and Sam, Saturday–Friday weeks, no saved tasks, routines, goals or calendar connection. Start with **Open Calendar settings**, choose the intended test Google account yourself, review permissions and select calendars; then return to Getting started for the routines story. Use this hosted address throughout. Old localhost OAuth links have expired and should be restarted from this candidate.
+For the next walkthrough, use **https://app.symphony-os.com/getting-started**. Existing accounts retain their saved place. The new Baseline Verification Household has completed the automated live walkthrough and is no longer empty; the earlier Rivera household and its Google connection were left untouched. Restart any old localhost OAuth link from the main app's Calendar settings.
 
 The Google sign-in request, approved return address, user binding, expiry and one-use callback checks pass. Actual Google account consent, calendar selection, event visibility and reconnect still require the account holder's walkthrough. **Calendar wording fixed in .5:** disconnected/unavailable calendars say availability is unknown; day columns omit clear-time claims without coverage. Planner reads expose calendar coverage and keep replies scoped to recorded activities. A real AI check passed after refining its concluding summary. No real calendar consent was performed during unattended testing.
 
@@ -67,7 +75,9 @@ Help → **When life changes** opens these explanations, each with a concrete ex
 
 These examples are product guidance, not a claim that every legacy transaction path is newly certified. The broader transaction evidence and open recovery findings below still apply.
 
-## October 16 hosted release verification
+## Earlier October 16 hosted test verification — historical
+
+The version numbers, account state and deployment statements in this section describe those earlier test runs. The current production baseline is recorded above.
 
 **Current revision: 2026-10-16.5.** Hosted at `symphony-rebuild-cdgiwqsb2-scottrings-projects.vercel.app` (`dpl_8hUgHEqSpgaoTiMoqqS9i3p7o5Xn`) through the stable test alias. Calendar coverage wording and the restricted planner (v13, JWT enabled) are corrected. Seventy-two focused checks and the production build passed. A live synthetic conversation acknowledged the missing connection and confined its calendar knowledge to recorded activities. The clean Rivera week displayed unknown availability without calendar-clear day labels. Google account choice is open with the registered hosted callback and only Calendar scopes; consent, selection, event visibility and reconnect are still pending. This turn used 27.3468 cents in the conservative provider ledger, with no outstanding holds. Shared production planner v74 is unchanged by this revision.
 
