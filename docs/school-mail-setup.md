@@ -1,8 +1,18 @@
 # School information for the beta
 
-Candidate implementation, October 16, 2026. **Not deployed.** Automatic approval
-review blocked the production migration pending explicit deployment authorization.
-Production remains on the previously deployed baseline.
+Production rollout, October 16, 2026. The user explicitly approved the shared
+database, functions, mail worker and app deployment. The database, three functions
+and app are deployed; the Cloudflare worker update is waiting for the account
+holder to finish signing in. Its existing version still handles incoming mail.
+Actual SMTP delivery and Gmail forwarding/filter setup remain unverified.
+
+App version **2026-10-16.7-school-review**, source `9f74011524b11658c6ccb4d6a46e0227f02407e3`,
+Vercel deployment `dpl_5ED7NyzmQL3pTD4RhGHm4ESMEGTB`, serves both
+`app.symphony-os.com` and `symphony-rebuild.vercel.app`. Migration
+`20261016150000_school_mail_review` is applied and recorded atomically.
+`inbound-email` v14 and `extract-email` v20 retain shared-secret authentication;
+`capture-retry` v13 retains JWT verification plus the adult household check.
+The planner remains `symphony-agent` v75. No real family records were edited.
 
 ## A parent's path
 
@@ -43,7 +53,11 @@ anyone holding it can submit mail for review. No self-service address rotation y
 Cloudflare Email Routing → `infra/inbound-mail` Worker → `inbound-email` →
 `extract-email` → `school_mail_reviews` → parent Save → plan tables.
 
-The extractor uses the existing `claude-sonnet-5` through the household cost guard.
+The extractor uses `claude-sonnet-4-6`, the working production planner model,
+through the household cost guard. The live check caught the old extractor's
+unpriced `claude-sonnet-5` configuration; it failed before a paid call. The model
+name was corrected without changing limits, and a pricing-compatibility regression
+check was added.
 It publishes proposals, never writes tasks/routines/notices. Source text is untrusted;
 malformed/truncated model responses are retryable failures. Gmail confirmations
 skip AI. A processing lease prevents concurrent duplicate model calls.
@@ -56,8 +70,9 @@ activities are skipped; differently worded duplicates still require parent judgm
 ## Verification before rollout
 
 - 109 focused component, hook, extraction and inbound validation tests.
-- 7 extraction handler checks: authentication, processing lease, no plan writes,
-  malformed/truncated responses, forwarding confirmation and publishing failure.
+- 8 extraction handler checks: authentication, processing lease, no plan writes,
+  malformed/truncated responses, forwarding confirmation, publishing failure and
+  compatibility with the priced, bounded text-model configuration.
 - 14 Worker checks including MIME, empty/attachment-only mail and retry behavior.
 - 61 regression checks around onboarding, Settings, Inbox and Today.
 - 21 checks in disposable PostgreSQL: no writes before Save, corrections,
@@ -67,9 +82,20 @@ activities are skipped; differently worded duplicates still require parent judgm
   examples: changed 09:00 to 15:00, omitted two suggestions, hid a routine from
   Today/Week, simulated failed Save and retried successfully. No horizontal overflow.
   This is UI evidence, not live email delivery or real-AI extraction.
-- Migration rehearsed against hosted schema in a rolled-back transaction. The
-  later notice-targeting and child-login refinements passed local checks. No retained
-  production migration and no real family records changed.
+- Migration rehearsed against hosted schema in a rolled-back transaction before
+  the approved production deployment; later notice-targeting and child-login
+  refinements passed local checks. The production migration is now retained.
+- **14 live assertions** with the ordinary synthetic account in Baseline
+  Verification Household: real AI extraction, unchanged plans before Save,
+  attachment warning, correct date and weekly recurrence, parent-edited time,
+  hidden routine, unselected items omitted, idempotent Save/extraction, and a
+  synthetic Gmail confirmation dismissed without plan writes or another AI call.
+- Hosted browser check on the release candidate: real AI proposal, selected one
+  of three items, changed 13:00 to 17:00, saved, and read back exactly one event
+  at `2026-10-22T21:00:00Z` (17:00 America/New_York) with no unselected notices.
+  [Saved receipt](planning/beta-sessions/evidence/2026-10-16-school-hosted-save.png).
+- Both public domains were checked after promotion and reported the exact release
+  version and source commit. See [deployment evidence](planning/2026-10-16-school-mail-production.json).
 
 ```sh
 npx vitest run src/components/settings/SchoolMailCard.test.tsx src/components/settings/SchoolMailReview.test.tsx src/hooks/useSchoolMail.test.ts src/hooks/useUnreviewedCaptures.test.ts supabase/functions/extract-email supabase/functions/inbound-email/lib
@@ -82,22 +108,23 @@ cluster; it never connects to production. UI preview:
 `/scripts/school-mail-bench/panel-preview.html` on Vite. Examples and saves stay in
 memory. This preview is not packaged into the main app.
 
-## Remaining rollout and live checks
+## Remaining rollout and live delivery checks
 
-Approval needed: migration `20261016150000_school_mail_review.sql`, updates to the
-existing inbound/extraction/retry functions, Worker and frontend. This changes
-forwarded school email from automatic placement to parent review for all households.
-Keep baseline frontend/function copies available; do not casually restore the old
-automatic importer while reviews are pending.
+Deployment approval is already granted. Forwarded school emails now require
+parent review for all households. Keep baseline frontend/function copies available;
+do not casually restore the old automatic importer while reviews are pending.
+Previous frontend deployment: `dpl_HanBwr5giz8rPuQFMZELxZ81Efr5`.
 
-1. Apply and record the migration atomically; deploy the three functions, retaining
-   shared-secret protection for inbound/extraction and JWT for `capture-retry`.
-2. Refresh Cloudflare login and deploy the Worker. Its saved token has expired.
-   Fly connector login is also unavailable; no inbound secret was retrieved.
-3. Test a real AI proposal with the synthetic normal account: zero plan writes
-   before approval, corrected selected items saved once, retry returns same receipt.
-4. Deploy the frontend and verify one actual forwarded-email delivery plus the
-   Gmail confirmation/filter flow. These live checks are still outstanding.
+1. Finish Cloudflare sign-in, refresh the existing CLI authorization without wider
+   scopes, and deploy the tested `symphony-inbound-mail` worker. The pending change
+   adds explicit unread-attachment markers and preserves empty/attachment-only
+   messages. The currently deployed worker has not been verified to do those things.
+2. Have the account holder forward one selected message to the synthetic household
+   address. Verify receipt, review and Save from that actual delivery. The live
+   tests above seeded fictional captures directly; they did not send SMTP mail.
+3. If automatic forwarding is wanted, the account holder completes Gmail's real
+   verification and sender-specific filter setup. The confirmation test above used
+   a fixture, not a genuine Google confirmation or a mailbox permission change.
 
 Scope limits: PDFs/images are not parsed. At most 40 emails load, pending reviews
 first, with up to 80 suggestions each. No review-specific Undo; saved activities
