@@ -1,0 +1,3 @@
+Of course, not everything starts with a bigger goal. Sometimes, something just needs your attention today. Suppose the pharmacy hasn’t filled a medication you need. You can add a task to Today: call the pharmacy about my missing medication.
+
+You or Symphony’s AI can prepare the details beforehand: the correct store’s verified phone number, which medication is missing, and any notes from your last conversation. When you’re ready, open the task and tap the number to call. The details are right there. Afterward, record the answer and add any follow-up.

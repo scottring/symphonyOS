@@ -577,3 +577,5 @@ body { transition: background-color 300ms var(--sc-ease-out); }
   .smoke circle { transform: none; opacity: 0.8; }
   .pg { will-change: auto; transition: opacity 240ms linear; }
 }
+
+.watch-section{padding-top:70px;padding-bottom:70px;scroll-margin-top:80px}.watch-section video{display:block;width:100%;max-width:1000px;aspect-ratio:16/9;border-radius:18px;margin-top:28px;background:#f8f9f5}.watch-section a{text-underline-offset:4px}
