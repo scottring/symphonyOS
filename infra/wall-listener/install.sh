@@ -10,8 +10,9 @@ set -euo pipefail
 HOST=${1:-pi@symphony-wall.local}
 HERE=$(cd "$(dirname "$0")" && pwd)
 
-ssh "$HOST" 'mkdir -p ~/wall-listener/voices ~/.config/systemd/user'
+ssh "$HOST" 'mkdir -p ~/wall-listener/voices ~/wall-listener/sounds ~/.config/systemd/user'
 scp -q "$HERE"/listener.py "$HERE"/endpoint.py "$HERE"/wake.py "$HERE"/requirements.txt "$HOST":wall-listener/
+scp -q "$HERE"/sounds/*.wav "$HOST":wall-listener/sounds/
 scp -q "$HERE"/wall-listener.service "$HOST":.config/systemd/user/wall-listener.service
 
 ssh "$HOST" 'bash -s' <<'REMOTE'
