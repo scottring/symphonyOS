@@ -130,11 +130,33 @@
   },
   "worker": {
     "name": "symphony-inbound-mail",
-    "newVersionDeployed": false,
-    "blocker": "Cloudflare login expired; account holder sign-in requested. Existing worker remains running."
+    "newVersionDeployed": true,
+    "version": "3a4c7aa6-c157-4dba-97f4-4f28eab57e94",
+    "percentage": 100,
+    "deployment": "f3027597-c4a9-4bf5-9b0e-deeaf7540e3a",
+    "deployedAt": "2026-10-16T18:28:39.547299Z",
+    "previousVersion": "648767ec-29b5-4038-8ad9-f938938aed87",
+    "secretBindingNames": [
+      "CAPTURE_SHARED_SECRET",
+      "SUPABASE_URL"
+    ],
+    "existingRoutingVerified": {
+      "zone": "symphony-os.com",
+      "active": true,
+      "catchAllEnabled": true,
+      "actions": [
+        {
+          "type": "worker",
+          "value": [
+            "symphony-inbound-mail"
+          ]
+        }
+      ],
+      "managedBy": null
+    },
+    "routingChanged": false
   },
   "remaining": [
-    "Deploy tested attachment/empty-body mail-worker handling after Cloudflare sign-in.",
     "Verify actual SMTP delivery of one parent-selected forwarded email.",
     "If desired, account holder completes genuine Gmail forwarding confirmation and sender-specific filter."
   ],
@@ -152,5 +174,6 @@
       "name": "capture-retry",
       "status": 401
     }
-  ]
+  ],
+  "completedAt": "2026-10-16T18:30:19.229Z"
 }

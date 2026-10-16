@@ -11,8 +11,10 @@ v14, `extract-email` v20, `capture-retry` v13 and frontend
 14 live synthetic assertions and a hosted browser correction/selection/Save with
 database readback passed. The live check also corrected an unpriced email-model
 configuration to the funded planner model without relaxing spending controls.
-The mail-worker update still needs Cloudflare sign-in; actual forwarded-email
-delivery and Gmail filter setup remain to be checked. See
+The mail-worker update is also deployed (version
+`3a4c7aa6-c157-4dba-97f4-4f28eab57e94`, 100% traffic); existing secret bindings and
+the enabled domain catch-all route were verified. Actual forwarded-email delivery
+and Gmail filter setup remain to be checked. See
 [school mail setup](../school-mail-setup.md) and
 [deployment evidence](2026-10-16-school-mail-production.json).
 

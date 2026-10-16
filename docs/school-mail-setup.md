@@ -1,9 +1,7 @@
 # School information for the beta
 
-Production rollout, October 16, 2026. The user explicitly approved the shared
-database, functions, mail worker and app deployment. The database, three functions
-and app are deployed; the Cloudflare worker update is waiting for the account
-holder to finish signing in. Its existing version still handles incoming mail.
+Production rollout completed October 16, 2026. The user explicitly approved the
+shared database, functions, mail worker and app deployment. All are deployed.
 Actual SMTP delivery and Gmail forwarding/filter setup remain unverified.
 
 App version **2026-10-16.7-school-review**, source `9f74011524b11658c6ccb4d6a46e0227f02407e3`,
@@ -13,6 +11,10 @@ Vercel deployment `dpl_5ED7NyzmQL3pTD4RhGHm4ESMEGTB`, serves both
 `inbound-email` v14 and `extract-email` v20 retain shared-secret authentication;
 `capture-retry` v13 retains JWT verification plus the adult household check.
 The planner remains `symphony-agent` v75. No real family records were edited.
+Cloudflare worker `symphony-inbound-mail` version
+`3a4c7aa6-c157-4dba-97f4-4f28eab57e94` serves 100% of traffic. Its existing secret
+bindings are present, and the active `symphony-os.com` catch-all rule points to
+that worker. No DNS or routing changes were made.
 
 ## A parent's path
 
@@ -108,21 +110,23 @@ cluster; it never connects to production. UI preview:
 `/scripts/school-mail-bench/panel-preview.html` on Vite. Examples and saves stay in
 memory. This preview is not packaged into the main app.
 
-## Remaining rollout and live delivery checks
+## Remaining live delivery checks
 
 Deployment approval is already granted. Forwarded school emails now require
 parent review for all households. Keep baseline frontend/function copies available;
 do not casually restore the old automatic importer while reviews are pending.
 Previous frontend deployment: `dpl_HanBwr5giz8rPuQFMZELxZ81Efr5`.
 
-1. Finish Cloudflare sign-in, refresh the existing CLI authorization without wider
-   scopes, and deploy the tested `symphony-inbound-mail` worker. The pending change
-   adds explicit unread-attachment markers and preserves empty/attachment-only
-   messages. The currently deployed worker has not been verified to do those things.
-2. Have the account holder forward one selected message to the synthetic household
+The worker update is deployed after the account holder completed Cloudflare sign-in.
+Its unread-attachment markers and empty/attachment-only handling passed the 14
+worker tests. Cloudflare reports the new version active at 100%, the two required
+secret bindings remain configured, and the enabled catch-all routes to it.
+Previous worker version for rollback: `648767ec-29b5-4038-8ad9-f938938aed87`.
+
+1. Have the account holder forward one selected message to the synthetic household
    address. Verify receipt, review and Save from that actual delivery. The live
    tests above seeded fictional captures directly; they did not send SMTP mail.
-3. If automatic forwarding is wanted, the account holder completes Gmail's real
+2. If automatic forwarding is wanted, the account holder completes Gmail's real
    verification and sender-specific filter setup. The confirmation test above used
    a fixture, not a genuine Google confirmation or a mailbox permission change.
 
