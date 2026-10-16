@@ -25,6 +25,12 @@ function renderScale(items: TimelineItem[], over: Record<string, unknown> = {}) 
 }
 
 describe('TodayDayScale', () => {
+  it('keeps recorded tasks visible but makes no open-time claims without calendar coverage', () => {
+    renderScale([item({ id: 'task-library', title: 'Library books', startTime: at(10) })], { showOpenTime: false })
+    expect(screen.getByRole('button', { name: 'Library books, 10:00 AM' })).toBeInTheDocument()
+    expect(document.querySelectorAll('.today-scale-free')).toHaveLength(0)
+  })
+
   it('draws every kind of thing the same way, and opens its details on a click', () => {
     const props = renderScale([
       item({ id: 'event-boxing', type: 'event', title: 'Boxing', startTime: at(9), endTime: at(10, 15) }),

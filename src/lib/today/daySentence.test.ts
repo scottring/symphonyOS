@@ -7,6 +7,13 @@ const task = (title: string, s: Date): DaySentenceItem => ({ title, start: s, ki
 const routine = (title: string, s: Date, e?: Date): DaySentenceItem => ({ title, start: s, end: e, kind: 'routine' })
 
 describe('daySentence', () => {
+  it('names recorded activities without inferring free time from missing calendar coverage', () => {
+    expect(daySentence({ items: [task('Library books', at(10))], now: null, calendarReady: false }).day)
+      .toBe('Recorded: Library books at 10.')
+    expect(daySentence({ items: [task('Library books', at(10))], now: at(12), calendarReady: false }).day).toBeNull()
+    expect(daySentence({ items: [], now: null, calendarReady: false }).day).toBeNull()
+  })
+
   it('says the mockup day: what is on until when, the open stretch, the last fixed thing tonight', () => {
     const items = [
       routine('School morning', at(7), at(8)),

@@ -29,6 +29,8 @@ export interface DaySentenceInput {
   now: Date | null
   /** Unreviewed email captures. */
   emailCount?: number
+  /** Only describe open time after the connected calendars finish loading. */
+  calendarReady?: boolean
 }
 
 export interface DaySentence {
@@ -112,9 +114,12 @@ function dayPart(items: readonly DaySentenceItem[], now: Date | null): string | 
   return parts.length ? parts.join(' ') : null
 }
 
-export function daySentence({ items, now, emailCount = 0 }: DaySentenceInput): DaySentence {
+export function daySentence({ items, now, emailCount = 0, calendarReady = true }: DaySentenceInput): DaySentence {
+  const recorded = items.filter(i => !i.completed && i.kind !== 'routine' && (!now || endOf(i) > now))
+    .sort((a, b) => a.start.getTime() - b.start.getTime()).slice(0, 2)
   return {
-    day: dayPart(items, now),
+    day: calendarReady ? dayPart(items, now) : recorded.length
+      ? `Recorded: ${recorded.map(i => `${i.title} at ${sayClock(i.start)}`).join('; ')}.` : null,
     email: emailCount > 0 ? `${emailCount} new from email.` : null,
   }
 }
