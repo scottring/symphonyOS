@@ -5,6 +5,7 @@ export interface ParsedMail {
   subject?: string
   text?: string
   html?: string
+  attachments?: { filename?: string | null }[]
 }
 export interface InboundPayload {
   token: string; message_id?: string; from: string; subject: string; text: string; received_at: string
@@ -54,7 +55,9 @@ function htmlToText(html: string): string {
 export function buildPayload(msg: ParsedMail, to: string, receivedAt: Date): InboundPayload | null {
   const token = tokenFromAddress(to)
   if (!token) return null
-  const text = msg.text?.trim() || (msg.html ? htmlToText(msg.html) : '')
+  const body = msg.text?.trim() || (msg.html ? htmlToText(msg.html) : '')
+  const attachments = (msg.attachments ?? []).map(a => a.filename || 'Unnamed attachment')
+  const text = [body, attachments.length ? `[Attachments not read: ${attachments.join(', ')}]` : ''].filter(Boolean).join('\n\n') || '[This email has no readable text.]'
   const from = msg.from?.name && msg.from.address
     ? `${msg.from.name} <${msg.from.address}>`
     : msg.from?.address ?? msg.from?.name ?? 'unknown'

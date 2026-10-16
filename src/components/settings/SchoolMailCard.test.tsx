@@ -1,119 +1,105 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 const h = vi.hoisted(() => ({
-  retry: vi.fn().mockResolvedValue(undefined),
+  enable: vi.fn(),
   state: {
-    address: 'p7k2mq4x@symphony-os.com' as string | null,
+    householdId: 'h' as string | null,
+    address: null as string | null,
+    members: [],
+    messages: [] as any[],
     loading: false,
-    error: null as string | null,
-    recent: [] as Array<{
-      id: string; subject: string | null; sourceLabel: string | null
-      status: string; error: string | null; createdAt: string
-    }>,
+    error: null,
   },
 }))
-
-vi.mock('@/hooks/useSchoolMail', () => ({
-  useSchoolMail: () => ({ ...h.state, retry: h.retry, refresh: vi.fn() }),
-}))
-
+vi.mock(
+  '@/hooks/useSchoolMail',
+  () => ({
+    useSchoolMail: () => ({
+      ...h.state,
+      enable: h.enable,
+      refresh: vi.fn(),
+      save: vi.fn(),
+      retry: vi.fn(),
+    }),
+  }),
+)
 import { SchoolMailCard } from './SchoolMailCard'
-
-const writeText = vi.fn().mockResolvedValue(undefined)
-
 beforeEach(() => {
-  h.retry.mockClear()
-  writeText.mockClear()
-  h.state.address = 'p7k2mq4x@symphony-os.com'
+  h.enable.mockReset()
+  h.state.householdId = 'h'
+  h.state.address = null
+  h.state.messages = []
   h.state.loading = false
-  h.state.error = null
-  h.state.recent = []
-  Object.defineProperty(navigator, 'clipboard', {
-    value: { writeText }, configurable: true, writable: true,
-  })
 })
-
-describe('SchoolMailCard', () => {
-  it('shows the household forwarding address and the password warning', () => {
+describe('school information setup', () => {
+  it('starts with one setup action and the review promise', () => {
     render(<SchoolMailCard />)
-    expect(screen.getByText('School mail')).toBeInTheDocument()
-    expect(screen.getByText('p7k2mq4x@symphony-os.com')).toBeInTheDocument()
-    expect(screen.getByText(/Treat this address like a password/i)).toBeInTheDocument()
+    expect(screen.getByText('Nothing enters your plans until you save it.'))
+      .toBeInTheDocument()
+    expect(h.enable).not.toHaveBeenCalled()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Get my forwarding address' }),
+    )
+    expect(h.enable).toHaveBeenCalledOnce()
   })
-
-  it('copies the address and flips the button label', async () => {
+  it('an address is not evidence of delivered mail', () => {
+    h.state.address = 'test-only@symphony.invalid'
     render(<SchoolMailCard />)
-    const copy = screen.getByRole('button', { name: /copy/i })
-    await act(async () => { fireEvent.click(copy) })
-
-    expect(writeText).toHaveBeenCalledWith('p7k2mq4x@symphony-os.com')
-    await waitFor(() => expect(screen.getByRole('button', { name: /copied/i })).toBeInTheDocument())
+    expect(screen.getByText(/Waiting for your first email/)).toBeInTheDocument()
+    expect(screen.queryByText(/has received mail/)).not.toBeInTheDocument()
   })
-
-  it('offers Retry only on a failed capture, and calls retry with its id', async () => {
-    h.state.recent = [
-      {
-        id: 'c1', subject: 'Field trip Friday', sourceLabel: 'Sunrise Elementary',
-        status: 'extracted', error: null, createdAt: '2026-09-02T14:00:00Z',
+  it('shows received and review states separately', () => {
+    h.state.address = 'test-only@symphony.invalid'
+    h.state.messages = [{
+      id: 'c',
+      subject: 'Trip',
+      sourceLabel: 'School',
+      createdAt: '2026-10-16',
+      status: 'processing',
+      proposal: null,
+    }]
+    render(<SchoolMailCard />)
+    expect(screen.getByText(/has received mail/)).toBeInTheDocument()
+    expect(screen.getByText('Reading…')).toBeInTheDocument()
+  })
+  it('refreshes an opened processing card when its proposal becomes ready', async () => {
+    h.state.address = 'test-only@symphony.invalid'
+    h.state.messages = [{
+      id: 'c',
+      subject: 'Trip',
+      sourceLabel: 'School',
+      createdAt: '2026-10-16',
+      status: 'processing',
+      proposal: null,
+    }]
+    const { rerender } = render(<SchoolMailCard />)
+    fireEvent.click(screen.getByRole('button', { name: /Trip/ }))
+    h.state.messages = [{
+      ...h.state.messages[0],
+      status: 'ready',
+      proposal: {
+        gaps: [],
+        items: [{
+          id: 'x',
+          kind: 'task',
+          title: 'Return form',
+          date: null,
+          time: null,
+          memberIds: [],
+          quote: 'Return form',
+        }],
       },
-      {
-        id: 'c2', subject: 'Picture day', sourceLabel: 'ClassDojo',
-        status: 'failed', error: 'model timeout', createdAt: '2026-09-01T09:00:00Z',
-      },
-    ]
-    render(<SchoolMailCard />)
-
-    expect(screen.getByText('Field trip Friday')).toBeInTheDocument()
-    expect(screen.getByText('Picture day')).toBeInTheDocument()
-    const retryButtons = screen.getAllByRole('button', { name: /retry/i })
-    expect(retryButtons).toHaveLength(1)
-
-    await act(async () => { fireEvent.click(retryButtons[0]) })
-    expect(h.retry).toHaveBeenCalledWith('c2')
+    }]
+    rerender(<SchoolMailCard />)
+    await waitFor(() =>
+      expect(screen.getByLabelText('Include Return form')).toBeInTheDocument()
+    )
   })
-
-  it('says nothing has arrived yet when there are no captures', () => {
+  it('requires a household before offering an address', () => {
+    h.state.householdId = null
     render(<SchoolMailCard />)
-    expect(screen.getByText(/No email has arrived yet/i)).toBeInTheDocument()
-  })
-
-  it('renders no address block while the address is still unknown', () => {
-    h.state.address = null
-    h.state.loading = true
-    render(<SchoolMailCard />)
-    expect(screen.queryByRole('button', { name: /copy/i })).toBeNull()
-  })
-
-  // The card used to swallow all three of the hook's other states: a load that
-  // failed, a load still running, and a signed-in user with no household. All
-  // three rendered as the flat lie "No email has arrived yet."
-  it('shows a skeleton, not "nothing yet", while the load is still running', () => {
-    h.state.loading = true
-    render(<SchoolMailCard />)
-    expect(screen.getByTestId('school-mail-skeleton')).toBeInTheDocument()
-    expect(screen.queryByText(/No email has arrived yet/i)).toBeNull()
-  })
-
-  it('says so quietly when the load failed', () => {
-    h.state.error = 'permission denied for table captures'
-    render(<SchoolMailCard />)
-    expect(screen.getByText(/permission denied for table captures/)).toBeInTheDocument()
-  })
-
-  // No household means there is no address to mint — the fix is to join one,
-  // and saying nothing left the reader staring at an empty card.
-  it('points a household-less user at the thing that would give them an address', () => {
-    h.state.address = null
-    h.state.loading = false
-    render(<SchoolMailCard />)
-    expect(screen.getByText(/Join or create a household/i)).toBeInTheDocument()
-  })
-
-  it('says nothing about households while the address is still loading', () => {
-    h.state.address = null
-    h.state.loading = true
-    render(<SchoolMailCard />)
-    expect(screen.queryByText(/Join or create a household/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Get my forwarding address' }))
+      .not.toBeInTheDocument()
+    expect(screen.getByText(/Create or join a household/)).toBeInTheDocument()
   })
 })

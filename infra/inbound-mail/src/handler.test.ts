@@ -21,6 +21,13 @@ describe('tokenFromAddress', () => {
 })
 
 describe('buildPayload', () => {
+  it('keeps attachment-only mail visible without claiming to read the attachment', () => {
+    const p = buildPayload({ subject: 'School form', attachments: [{ filename: 'permission.pdf' }] }, 'a1b2c3d4e5f60718@symphony-os.com', new Date(0))
+    expect(p?.text).toBe('[Attachments not read: permission.pdf]')
+  })
+  it('keeps an empty message visible for review', () => {
+    expect(buildPayload({}, 'a1b2c3d4e5f60718@symphony-os.com', new Date(0))?.text).toBe('[This email has no readable text.]')
+  })
   it('prefers text and carries headers', () => {
     const p = buildPayload(parsed, 'a1b2c3d4e5f60718@symphony-os.com', new Date('2026-09-02T12:00:00Z'))
     expect(p).toEqual({

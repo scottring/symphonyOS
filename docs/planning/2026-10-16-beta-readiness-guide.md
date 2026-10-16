@@ -4,6 +4,13 @@ Updated October 16, 2026. The baseline **2026-10-16.6-baseline** is deployed for
 
 ## Current production baseline — October 16
 
+School email setup is prepared separately on `codex/school-information-beta`.
+It adds review-before-save, routines and forwarding guidance. Local tests and a
+rolled-back hosted-schema rehearsal passed. It is **not deployed**: the shared
+database migration needs explicit deployment approval, and Cloudflare login needs
+refreshing. See [school mail setup](../school-mail-setup.md) for evidence and the
+remaining live-delivery check. The production baseline below is unchanged.
+
 Frontend deployment `dpl_HanBwr5giz8rPuQFMZELxZ81Efr5` serves both production addresses. The planner is `symphony-agent` v75 with JWT verification enabled. This release uses the previously reviewed .5 onboarding, chat and single-account calendar implementation, removes the test-account frontend restriction, and connects chat to the normal production planner. It also corrects Today's summary and open-time labels when calendar coverage is missing or unavailable. No database migration was applied in this release.
 
 Verification passed: **353 selected automated tests**, TypeScript/Vite production build, Deno planner source check, and a real-AI walkthrough using a fresh ordinary synthetic account outside the test allowlist. The walkthrough saved a Saturday-start household, three routines (including a hidden routine), and two initial activities; moved the existing library task without duplication; then saved and undid a separate two-task reviewed draft. Database readback confirmed the original tasks and routines survived Undo. The final main-domain sign-in and saved onboarding state were checked again after promotion.

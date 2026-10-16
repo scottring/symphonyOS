@@ -440,6 +440,13 @@ function ShellLayoutInner({ children }: Props) {
     latest: () => ({ tasks: latestTasks.current, routines: canvasRoutines }),
   }, reviewedWriter), [reviewedWriter, tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
+  // School review saves happen in Settings. Refresh the mounted planning
+  // data immediately, including when the realtime socket has gone to sleep.
+  useEffect(() => {
+    const refresh = () => { void canvasRefetch(); };
+    window.addEventListener('symphony-school-review-saved', refresh);
+    return () => window.removeEventListener('symphony-school-review-saved', refresh);
+  }, [canvasRefetch]);
   const showStrip = conversationStripPath(location.pathname);
   const stripVoice = { available: voiceEnabled, active: voiceEnabled && voice.active, status: voice.status, error: voice.error, speaking: voice.speaking, working: voice.working, start: () => { void voice.start(); }, stop: voice.stop, heard: voice.heard, reply: voice.reply, turn: voice.turn, talk: voice.talk, done: voice.done };
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };

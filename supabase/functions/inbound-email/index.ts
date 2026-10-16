@@ -3,6 +3,7 @@
 // captures row, and hands off to extract-email. Auth: x-capture-secret.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateInbound, sourceKeyFor, senderLabel, originalSender, type InboundPayload } from './lib/validate.ts'
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,16 +47,17 @@ Deno.serve(async (req: Request) => {
 
   const sourceKey = sourceKeyFor(body)
   const findExisting = (key: string) =>
-    admin.from('captures').select('id, status').eq('kind', 'email').eq('source_key', key).maybeSingle()
+    admin.from('captures').select('id, status').eq('kind', 'email').eq('household_id', hh.id).eq('source_key', key).maybeSingle()
   // Fire-and-forget: the caller does not wait on extraction. A dispatch lost to
   // a cold start or a dropped socket is recovered by the next delivery/retry,
   // which lands here as a duplicate and re-fires while the capture is pending.
   const fireExtraction = (captureId: string) => {
-    fetch(`${supabaseUrl}/functions/v1/extract-email`, {
+    const dispatch = fetch(`${supabaseUrl}/functions/v1/extract-email`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-capture-secret': secret },
       body: JSON.stringify({ capture_id: captureId }),
     }).catch(() => {})
+    if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(dispatch)
   }
 
   const { data: existing, error: existingError } = await findExisting(sourceKey)
@@ -82,6 +84,7 @@ Deno.serve(async (req: Request) => {
       sender: originalSender(body.subject, body.text, body.from),
       raw_text: rawText,
       status: 'pending',
+      review_required: true,
     })
     .select('id')
     .single()

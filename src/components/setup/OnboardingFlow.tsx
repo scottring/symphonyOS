@@ -212,7 +212,7 @@ export function OnboardingFlow({user,onDone}: Props) {
               {progress.activity==='later'&&<li><button className="onboarding-link" disabled={busy} onClick={()=>visit('activity')}>Capture something or start with a goal</button></li>}
             </ul></>}
             </div>
-            <div className="onboarding-note"><h2>Bring the rest in when it helps</h2><p><Link className="onboarding-link" to="/settings?tab=calendar">Connect and choose calendars</Link> · <Link className="onboarding-link" to="/settings?tab=general">Invite another adult</Link></p><p>Each adult signs in to their own account. Review what your household can see before sharing. This walkthrough does not connect a calendar or invite anyone automatically.</p></div>
+            <div className="onboarding-note"><h2>Bring the rest in when it helps</h2><p><Link className="onboarding-link" to="/settings?tab=calendar">Connect and choose calendars</Link> · <Link className="onboarding-link" to="/settings?tab=general#school-information">Bring in school emails</Link> · <Link className="onboarding-link" to="/settings?tab=general">Invite another adult</Link></p><p>School emails become suggestions you review before saving. Each adult signs in to their own account. This walkthrough does not connect a calendar, forward email or invite anyone automatically.</p></div>
             <EverydayGuide/>
             <p>Getting started stays in More and Help. You can return for routines or the goal walkthrough whenever it’s useful.</p>
             <button className="btn-primary" disabled={busy} onClick={()=>void run(finish)}>{busy?'Saving your progress…':onboardingOpenLabel(progress)} <ArrowRight size={16}/></button>

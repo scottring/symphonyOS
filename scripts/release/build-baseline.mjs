@@ -33,6 +33,6 @@ for (const name of readdirSync(assets)) {
 const routing = JSON.parse(readFileSync(root + '/vercel.json', 'utf8'))
 const headers = routing.headers.map(h => ({ src: h.source, headers: Object.fromEntries(h.headers.map(x => [x.key, x.value])), continue: true }))
 writeFileSync(stage + '/.vercel/output/config.json', JSON.stringify({ version: 3, routes: [...headers, { handle: 'filesystem' }, { src: '/(.*)', dest: '/index.html' }] }, null, 2))
-const version = { version: '2026-10-16.6-baseline', basedOn: '2026-10-16.5', agent: 'symphony-agent', accountAccess: 'authenticated', multiAccountCalendars: false, builtAt: new Date().toISOString(), commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim() }
+const version = { version: process.argv[4] || '2026-10-16.6-baseline', basedOn: '2026-10-16.6-baseline', agent: 'symphony-agent', accountAccess: 'authenticated', multiAccountCalendars: false, builtAt: new Date().toISOString(), commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim() }
 writeFileSync(stage + '/.vercel/output/static/release-version.json', JSON.stringify(version))
 console.log('Production baseline packaged with normal account access; temporary planner and multi-account calendar code excluded.')

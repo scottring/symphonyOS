@@ -1,14 +1,8 @@
 // src/hooks/useUnreviewedCaptures.ts
 //
-// Email captures the extractor has already turned into rows, that nobody has
-// looked at yet.
-//
-// The commit policy for forwarded school mail is "auto-place, review after":
-// a dated, confident event lands on its day the moment the email arrives, so
-// by the time anyone opens Today the work is already there. That is the whole
-// promise — but it also means a wrong guess is on the calendar unannounced.
-// This hook is the census behind the quiet "New from email" door: what
-// arrived, and has not been looked at.
+// Legacy email imports that were placed before parent approval was required.
+// New school emails are staged in school_mail_reviews and are deliberately
+// excluded here; their review-and-save flow lives in SchoolMailCard.
 //
 // It is deliberately a COUNT-FREE census. Today never shows a tally (see
 // TodayBacklogFooter), so callers use `captures.length > 0` as a gate and
@@ -53,6 +47,7 @@ export function useUnreviewedCaptures() {
       .select('id, subject, source_label, created_at')
       .eq('kind', 'email')
       .eq('status', 'extracted')
+      .eq('review_required', false)
       .is('reviewed_at', null)
       .order('created_at', { ascending: false })
       .limit(LIMIT)

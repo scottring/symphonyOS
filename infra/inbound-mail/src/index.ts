@@ -17,7 +17,7 @@ export default {
       return
     }
     const payload = buildPayload(
-      { messageId: parsed.messageId, from: parsed.from, subject: parsed.subject, text: parsed.text, html: parsed.html },
+      { messageId: parsed.messageId, from: parsed.from, subject: parsed.subject, text: parsed.text, html: parsed.html, attachments: parsed.attachments },
       message.to,
       new Date(),
     )

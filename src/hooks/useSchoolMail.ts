@@ -1,110 +1,79 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-
-/**
- * The household's secret forwarding address and the last few emails that
- * landed on it. `ensure_inbound_token` mints the token on first read, so
- * opening Settings is what gives a founding household its address.
- *
- * Retrying a failed extraction needs CAPTURE_SHARED_SECRET, which the browser
- * must never hold — the `capture-retry` edge function holds it and checks the
- * caller shares the household before forwarding to `extract-email`.
- */
-
-export const INBOUND_DOMAIN = 'symphony-os.com'
-
-export interface SchoolMailCapture {
-  id: string
-  subject: string | null
-  sourceLabel: string | null
-  status: string
-  error: string | null
-  createdAt: string
-}
-
-/** Supabase errors are plain objects, not Errors — read either shape. */
-function messageOf(err: unknown): string | null {
-  if (err instanceof Error) return err.message
-  if (err && typeof err === 'object' && 'message' in err) {
-    const message = (err as { message: unknown }).message
-    if (typeof message === 'string') return message
-  }
-  return null
-}
-
-interface CaptureRow {
-  id: string
-  subject: string | null
-  source_label: string | null
-  status: string
-  error: string | null
-  created_at: string
-}
+import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
+import {
+  EMPTY_SCHOOL_MAIL,
+  type SchoolMailItem,
+  type SchoolMailOverview,
+  type SchoolMailReceipt,
+} from '@/lib/schoolMail'
 
 export function useSchoolMail() {
-  const [address, setAddress] = useState<string | null>(null)
-  const [recent, setRecent] = useState<SchoolMailCapture[]>([])
+  const [overview, setOverview] = useState<SchoolMailOverview>(
+    EMPTY_SCHOOL_MAIL,
+  )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
+  const load = useCallback(async (enable = false) => {
     try {
-      const { data: householdId, error: householdError } = await supabase.rpc('get_user_household_id')
-      if (householdError) throw householdError
-      if (!householdId) {
-        setAddress(null)
-        setRecent([])
-        return
-      }
-
-      const { data: token, error: tokenError } = await supabase.rpc('ensure_inbound_token', {
-        p_household: householdId,
-      })
-      if (tokenError) throw tokenError
-      setAddress(token ? `${token}@${INBOUND_DOMAIN}` : null)
-
-      const { data, error: capturesError } = await supabase
-        .from('captures')
-        .select('id, subject, source_label, status, error, created_at')
-        .eq('kind', 'email')
-        .eq('household_id', householdId)
-        .order('created_at', { ascending: false })
-        .limit(5)
-      if (capturesError) throw capturesError
-
-      setRecent(((data ?? []) as CaptureRow[]).map((row) => ({
-        id: row.id,
-        subject: row.subject,
-        sourceLabel: row.source_label,
-        status: row.status,
-        error: row.error,
-        createdAt: row.created_at,
-      })))
+      const { data, error: failure } = await supabase.rpc(
+        'school_mail_overview',
+        { p_enable: enable },
+      )
+      if (failure) throw failure
+      setOverview(data as SchoolMailOverview)
       setError(null)
-    } catch (err) {
-      console.error('Error loading school mail:', err)
-      setError(messageOf(err) ?? 'Could not load school mail')
+    } catch {
+      setError(
+        'Could not load school information. Your saved items have not changed. Please refresh.',
+      )
     } finally {
       setLoading(false)
     }
   }, [])
-
-  useEffect(() => { load() }, [load])
-
-  const retry = useCallback(async (captureId: string) => {
-    setError(null)
-    try {
-      const { error: invokeError } = await supabase.functions.invoke('capture-retry', {
-        body: { capture_id: captureId },
-      })
-      if (invokeError) throw invokeError
-    } catch (err) {
-      console.error('Error retrying capture:', err)
-      setError(messageOf(err) ?? 'Retry failed')
-      return
+  const refresh = useCallback(() => load(false), [load])
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+  useRefreshOnVisible(refresh)
+  // This runs only while the settings panel is mounted and visible. It lets
+  // the first forwarded email arrive without asking a parent to reload.
+  useEffect(() => {
+    if (!overview.address) return
+    const timer = setInterval(() => {
+      if (!document.hidden) void refresh()
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [overview.address, refresh])
+  const enable = useCallback(() => load(true), [load])
+  const retry = useCallback(async (id: string) => {
+    const { error } = await supabase.functions.invoke('capture-retry', {
+      body: { capture_id: id },
+    })
+    if (error) throw new Error('Could not retry this email. Please try again.')
+    await refresh()
+  }, [refresh])
+  const save = useCallback(async (id: string, items: SchoolMailItem[]) => {
+    const { data, error } = await supabase.rpc('save_school_mail_review', {
+      p_capture: id,
+      p_items: items,
+    })
+    if (error) {
+      throw new Error(
+        'The save was not confirmed. Your selection is still here. Try Save again; it will not add the same items twice.',
+      )
     }
-    await load()
-  }, [load])
-
-  return { address, loading, error, recent, retry, refresh: load }
+    const receipt = data as SchoolMailReceipt
+    setOverview((previous) => ({
+      ...previous,
+      messages: previous.messages.map((message) =>
+        message.id === id
+          ? { ...message, status: receipt.status, result: receipt }
+          : message
+      ),
+    }))
+    window.dispatchEvent(new Event('symphony-school-review-saved'))
+    return receipt
+  }, [])
+  return { ...overview, loading, error, enable, refresh, retry, save }
 }
