@@ -460,6 +460,13 @@ describe('useRoutines', () => {
   })
 
   describe('addRoutine', () => {
+    it('saves a hidden routine as active without dropping the explicit false', async () => {
+      mockSingle.mockResolvedValue({data:createMockRoutine({show_on_timeline:false}),error:null})
+      const {result}=renderHook(()=>useRoutines())
+      await waitFor(()=>expect(result.current.loading).toBe(false))
+      await act(async()=>{await result.current.addRoutine({name:'Vitamins',show_on_timeline:false})})
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({name:'Vitamins',visibility:'active',show_on_timeline:false}))
+    })
     it('creates routine and updates local state', async () => {
       const newRoutine = createMockRoutine({ id: 'new-id', name: 'New Routine' })
 

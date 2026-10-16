@@ -10,6 +10,14 @@ const show = (recurrencePattern: RecurrencePattern) =>
 // routine with no day saves and runs as a flexible one, and Daily and
 // "Weekly, all seven days" are the same routine — the editor said neither.
 describe('RoutineScheduleEditor explains the schedule it will save', () => {
+  it('captures a native time input before it loses focus', () => {
+    const onChange = vi.fn()
+    const recurrencePattern: RecurrencePattern = { type: 'weekly', days: ['mon', 'thu'] }
+    render(<RoutineScheduleEditor recurrencePattern={recurrencePattern} timeOfDay="" onChange={onChange} />)
+    fireEvent.input(screen.getByLabelText('Time (optional)'), { target: { value: '15:00' } })
+    expect(onChange).toHaveBeenLastCalledWith({ recurrencePattern, timeOfDay: '15:00' })
+  })
+
   it('no day chosen reads as a flexible day, not as an error', () => {
     show({ type: 'weekly', days: [] })
     expect(screen.queryByText('Select at least one day')).not.toBeInTheDocument()

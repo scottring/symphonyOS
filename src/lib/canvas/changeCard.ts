@@ -25,6 +25,9 @@ export type PlanLevel = 'year' | 'season' | 'month'
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
 
 export interface ChangeOp {
+  /** Per-item timing for the proposal-only first-activities introduction. */
+  capturePlacement?: 'inbox' | 'week' | 'day'
+  captureWeekStart?: string
   key: string
   op: ChangeOpKind
   taskId?: string
@@ -58,6 +61,8 @@ export interface ChangeOp {
   /** routine_change/add: who does it, every week. */
   assignees?: string[]
   assigneeNames?: string[]
+  /** routine_add/change: shared Today and Week visibility. */
+  showOnTimeline?: boolean
   /** routine_rest: YYYY-MM-DD it wakes; none = rest with no date. */
   until?: string
   /** routine_add: the life area. */
@@ -121,15 +126,17 @@ export interface ChangeSet {
  *  holds only the words, so without this it re-proposes changes already saved
  *  (or ones the person dismissed). */
 export interface ChangeCardNote {
+  /** Complete proposal-only onboarding state, preserved through corrections. */
+  draft?: ChangeSet
   state: 'pending' | 'approved' | 'dismissed'
   title: string
-  ops: { op: ChangeOpKind; title: string; where: string }[]
+  ops: { op: ChangeOpKind; title: string; where: string; taskId?: string; date?: string; time?: string }[]
   /** ISO time the card reached this state. */
   at: string
 }
 
 export function changeCardNote(set: ChangeSet, state: ChangeCardNote['state'], now = new Date()): ChangeCardNote {
-  return { state, title: set.title, ops: set.ops.map((op) => ({ op: op.op, title: op.title, where: opRow(op, now).where })), at: now.toISOString() }
+  return { state, title: set.title, ops: set.ops.map((op) => ({ op: op.op, title: op.title, where: opRow(op, now).where, ...(op.taskId ? {taskId:op.taskId} : {}), ...(op.date ? {date:op.date} : {}), ...(op.time ? {time:op.time} : {}) })), at: now.toISOString() }
 }
 
 /** Tasks with their steps (and Today-group members) laid out flat. The app
@@ -216,6 +223,7 @@ export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string
       if (op.time) { parts.push(clock(op.time)); kinds.push('TIME') }
       if (op.clearTime) { parts.push('any time'); kinds.push('TIME') }
       if (op.assignees) { parts.push(names(op.assigneeNames)); kinds.push('WHO') }
+      if (op.showOnTimeline !== undefined) { parts.push(op.showOnTimeline ? 'Show in Today and Week' : 'Hidden from Today and Week · Kept in Routines'); kinds.push('CHANGE') }
       if (op.name) kinds.push('NAME')
       const kind: RowKind = new Set(kinds).size === 1 ? kinds[0] : 'CHANGE'
       const title = op.name ? `${op.title} → ${op.name}` : op.title
@@ -230,7 +238,8 @@ export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string
     case 'plan_let_go': return { kind: 'LET GO', title: op.title, where: '→ Let go' }
     case 'plan_done': return op.level === 'year' ? { kind: 'MET', title: op.title, where: '→ Met' } : { kind: 'DONE', title: op.title, where: '→ Done' }
     case 'routine_add': {
-      const when = [op.days ? daysWords(op.days) : null, op.time ? clock(op.time) : null].filter(Boolean).join(' ')
+      const when = [op.days ? daysWords(op.days) : null, op.time ? clock(op.time) : null,
+        op.showOnTimeline === undefined ? null : op.showOnTimeline ? '· Show in Today and Week' : '· Hidden from Today and Week · Kept in Routines'].filter(Boolean).join(' ')
       return { kind: 'NEW', title: op.title, where: when ? `→ ${when}` : '' }
     }
   }

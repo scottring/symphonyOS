@@ -1,5 +1,9 @@
 # Symphony beta readiness register
 
+**October 16 current guide:** [Beta readiness and walkthrough guide](2026-10-16-beta-readiness-guide.md) records the conversational onboarding, optional device setup, everyday guidance, live first-activity evidence and remaining launch gates. Later independent findings take precedence over historical “no known failures” language below. Hosted test version **2026-10-16.5** is now deployed at [test onboarding](https://symphony-rebuild.vercel.app/getting-started). The shared backend and four migrations were updated; the main family frontend remains on its earlier deployment. Save/Undo, attachment access, bounded text spending and OAuth replay/expiry fixes have current evidence in the guide. Actual Google consent, device and usability acceptance, full recovery and invitation sign-off remain open.
+
+**October 15 chat beta roadmap:** [Friends and family beta roadmap](2026-10-15-friends-and-family-beta-roadmap.md) consolidates the remaining release sequence, with explicit onboarding and mid-app guidance gates. Scott has deferred voice and live conversational plan previews; the narrower optional-wall scope is a recommendation awaiting his decision. Older rows below remain dated evidence, not a current all-clear.
+
 Started October 14, 2026. Source baseline: `origin/main` at `82acf4d6`, fetched that day. Working branch: `codex/beta-readiness`. This is an implementation and evidence register, not a declaration that production is ready.
 
 The product and rollout authority is the [Symphony beta and market launch plan](https://chatgpt.com/space/page_50fd3d212da08191a8cb14eb58ea70e1). It now specifies one shared family assistant and an optional private assistant per person for personal and work life. Private assistants are optional to activate; their release requires separate privacy evidence. Household billing or administration does not confer access to private conversations.

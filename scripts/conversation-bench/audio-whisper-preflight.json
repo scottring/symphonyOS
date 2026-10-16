@@ -1,0 +1,23 @@
+{
+  "models": [
+    "gpt-realtime-whisper"
+  ],
+  "maxAudioSeconds": 120,
+  "clips": [
+    {
+      "id": "name-context-1",
+      "file": "audio-fixtures/name.wav",
+      "reference": "Remind Kaleb about piano on Thursday.",
+      "requiredTerms": [
+        "Kaleb",
+        "piano",
+        "Thursday"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field",
+      "prompt": "Kaleb, Ella, Piano practice",
+      "language": "en"
+    }
+  ]
+}

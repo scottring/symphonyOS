@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen } from '@/test/test-utils'
 import { AuthGate } from './AuthGate'
 
@@ -38,6 +38,8 @@ vi.mock('react-router-dom', async (importOriginal) => {
 })
 
 beforeEach(() => {
+  vi.stubEnv('VITE_TEST_ACCOUNT_IDS', '')
+  vi.stubEnv('VITE_TEST_VERSION', '')
   authState.user = null
   authState.loading = false
   authState.isPasswordRecovery = false
@@ -46,8 +48,24 @@ beforeEach(() => {
   sessionStorage.clear()
   window.history.replaceState({}, '', '/')
 })
+afterEach(() => vi.unstubAllEnvs())
 
 describe('AuthGate', () => {
+  it('the normal release accepts any authenticated account without a test badge', async () => {
+    authState.user = { id: 'ordinary-account-outside-test-allowlist', email: 'person@example.test' }
+    render(<AuthGate>{() => <div>PROTECTED</div>}</AuthGate>)
+    expect(await screen.findByText('PROTECTED')).toBeInTheDocument()
+    expect(screen.queryByTestId('test-version')).toBeNull()
+  })
+
+  it('a separately configured test build still restricts account access', async () => {
+    vi.stubEnv('VITE_TEST_ACCOUNT_IDS', 'test-account')
+    authState.user = { id: 'ordinary-account', email: 'person@example.test' }
+    render(<AuthGate>{() => <div>PROTECTED</div>}</AuthGate>)
+    expect(await screen.findByText('Use the prepared test account for this walkthrough.')).toBeInTheDocument()
+    expect(screen.queryByText('PROTECTED')).toBeNull()
+  })
+
   it('renders the auth form, not its children, when no user is signed in', async () => {
     authState.user = null
 

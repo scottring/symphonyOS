@@ -7,6 +7,10 @@ const op = (x: Partial<ChangeOp>): ChangeOp => ({ key: 'k', op: 'place', title: 
 const task = (x: Partial<Task>) => ({ id: 'a', title: 'T', completed: false, createdAt: new Date(2026, 8, 1), updatedAt: new Date(2026, 9, 14), ...x }) as Task
 
 describe('opRow', () => {
+  it('makes display choices explicit before approval',()=>{
+    expect(opRow(op({op:'routine_add',showOnTimeline:false}),today).where).toContain('Hidden from Today and Week · Kept in Routines')
+    expect(opRow(op({op:'routine_change',showOnTimeline:true}),today)).toMatchObject({kind:'CHANGE',where:'→ Show in Today and Week'})
+  })
   it('says where each change lands, in the card’s words', () => {
     expect(opRow(op({ date: '2026-10-14', time: '09:00' }), today)).toEqual({ kind: 'MOVE', title: 'Reply to Christian', where: '→ Today 9:00' })
     expect(opRow(op({ date: '2026-10-15', time: '13:30' }), today).where).toBe('→ Thu 1:30')

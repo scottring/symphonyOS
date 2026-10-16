@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { isFocused } from '@/lib/placement/model'
 import { localYmd } from '@/lib/cadence/config'
+import { applyChangeSet, type ApplyResult } from '@/lib/canvas/applyChangeSet'
 import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
 // The mocked client (see vi.mock below) — used by the test that pins down what
 // the database does to a partial-row upsert.
@@ -173,7 +174,8 @@ vi.mock('@/lib/supabase', () => ({
         const violation = notNullViolation(data as Record<string, unknown>, { insertShaped: true })
         const newTask = createMockDbTask({
           ...data,
-          id: `new-${Date.now()}`,
+          // Database IDs stay unique even when several writes share a millisecond.
+          id: data.id ?? crypto.randomUUID(),
         })
         return {
           select: () => ({
@@ -2139,6 +2141,35 @@ describe('useSupabaseTasks', () => {
       })
 
       expect(b.result.current.tasks.some((t) => t.title === 'Brand new task')).toBe(true)
+    })
+
+    it('a chat save publishes timed, all-day and undated items to the page without realtime, and Undo removes them', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'gate', title: 'Fix the gate latch' }))
+      const { a, b } = await renderTwoInstances()
+      let result: ApplyResult | undefined
+      await act(async () => {
+        result = await applyChangeSet({ key: 'chat', title: '3 changes', ops: [
+          { key: 'shower', op: 'add', title: 'Shower', date: '2026-10-15', time: '15:00' },
+          { key: 'bicycle', op: 'add', title: 'Take bicycle to Bicycle Connection', date: '2026-10-16' },
+          { key: 'bench', op: 'add', title: 'Buy the white bench' },
+        ] }, {
+          tasks: a.result.current.tasks,
+          weekStart: new Date(2026, 9, 11),
+          updateTask: a.result.current.updateTask,
+          deleteTask: a.result.current.deleteTask,
+          addTask: (title, when, options) => a.result.current.addTask(title, undefined, undefined, when, options),
+        })
+      })
+      expect(result?.ok).toBe(true)
+      const rows = b.result.current.tasks
+      expect(rows).toHaveLength(4)
+      expect(rows.find(t => t.title === 'Shower')?.scheduledFor).toEqual(new Date(2026, 9, 15, 15))
+      expect(rows.find(t => t.title === 'Take bicycle to Bicycle Connection')).toMatchObject({ scheduledFor: new Date(2026, 9, 16), isAllDay: true })
+      expect(rows.find(t => t.title === 'Buy the white bench')).toMatchObject({ bucket: 'week', weekStart: new Date(2026, 9, 11) })
+      if (!result?.ok) throw new Error('Save failed')
+      const undo = result.undo
+      await act(async () => { expect(await undo()).toBe(true) })
+      expect(b.result.current.tasks.map(t => t.id)).toEqual(['gate'])
     })
 
     it('an unmounted instance stops listening (no zombie writes)', async () => {

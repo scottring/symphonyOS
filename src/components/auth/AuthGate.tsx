@@ -160,5 +160,7 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
     return <PasswordResetForm onSubmit={updatePassword} />
   }
 
-  return <>{children({ user, signOut })}</>
+  const testAccounts = String(import.meta.env.VITE_TEST_ACCOUNT_IDS ?? '').split(',').filter(Boolean)
+  if (testAccounts.length && !testAccounts.includes(user.id)) return <div className="p-8"><h1>Symphony test version</h1><p>Use the prepared test account for this walkthrough.</p><button onClick={() => { void signOut() }}>Sign out</button></div>
+  return <>{import.meta.env.VITE_TEST_VERSION && <div data-testid="test-version" style={{position:'fixed',bottom:4,left:8,zIndex:100,pointerEvents:'none',fontSize:10,opacity:0.65}}>Test version · {import.meta.env.VITE_TEST_VERSION}</div>}{children({ user, signOut })}</>
 }

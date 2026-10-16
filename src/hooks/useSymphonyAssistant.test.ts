@@ -1,5 +1,10 @@
+import {createElement} from 'react'
+import {CanvasActivityProvider,useCanvasActivity,type CanvasActivityProviderProps} from '../contexts/CanvasActivityContext'
+import {resolveConversationAction} from '../lib/conversationActions'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
+
+vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>undefined})}))
 
 vi.mock('@/lib/agentStream', () => ({
   streamSymphonyAgent: vi.fn(),
@@ -8,6 +13,8 @@ vi.mock('@/lib/agentStream', () => ({
 // Local supabase mock with chat_sessions support (the global setup mock has no
 // .limit or capture hooks). Kept minimal: family_members returns empty.
 const db = vi.hoisted(() => ({
+  failInsert: false,
+  failRead: false,
   sessionsRows: [] as Array<Record<string, unknown>>,
   inserted: [] as Array<Record<string, unknown>>,
   updated: [] as Array<{ id: string; patch: Record<string, unknown> }>,
@@ -34,7 +41,7 @@ vi.mock('@/lib/supabase', () => {
           Object.assign(query, {
             eq: back,
             order: back,
-            limit: () => thenable(db.sessionsRows),
+            limit: () => db.failRead?Promise.resolve({data:null,error:new Error('Read unavailable')}):thenable(db.sessionsRows),
           })
           return {
             select: () => query,
@@ -42,7 +49,7 @@ vi.mock('@/lib/supabase', () => {
               db.inserted.push(row)
               return {
                 select: () => ({
-                  single: () => Promise.resolve({ data: { id: 'sess-1' }, error: null }),
+                  single: () => Promise.resolve(db.failInsert ? {data:null,error:new Error('offline')} : { data: { id: 'sess-1' }, error: null }),
                 }),
               }
             },
@@ -79,6 +86,17 @@ import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant'
 
 describe('useSymphonyAssistant', () => {
   beforeEach(() => vi.clearAllMocks())
+
+  it('reports failed history reads and can retry without losing the saved conversation',async()=>{
+    db.failRead=true
+    const {result}=renderHook(()=>useSymphonyAssistant({persistKey:'onboarding_test'}))
+    await waitFor(()=>expect(result.current.sessionsLoading).toBe(false))
+    expect(result.current.sessionsError).toContain('could not be loaded')
+    db.failRead=false
+    await act(async()=>result.current.reloadSessions())
+    await waitFor(()=>expect(result.current.sessionsError).toBeNull())
+    expect(result.current.sessionsLoading).toBe(false)
+  })
 
   it('appends streamed text to a single assistant message and clears loading on done', async () => {
     vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
@@ -296,4 +314,91 @@ describe('useSymphonyAssistant empty-reply resilience', () => {
     expect(result.current.messages[1].content.length).toBeGreaterThan(0)
     expect(result.current.error).toBeTruthy()
   })
+})
+
+
+it('persists spoken actions in the same conversation and includes them in the next typed turn',async()=>{
+ const {resolveConversationAction}=await import('../lib/conversationActions')
+ const approve=vi.fn(async()=> 'saved' as const),undo=vi.fn(async()=> 'undone' as const)
+ const histories:unknown[]=[]
+ vi.mocked(streamSymphonyAgent).mockImplementation(async(messages,h)=>{histories.push(messages);h.onText?.('On the card.');h.onDone?.('On the card.',null)})
+ const start=vi.fn(),end=vi.fn()
+ const {result}=renderHook(()=>useSymphonyAssistant({persistKey:'symphony_rail',turnObserver:{start,end},resolveAction:text=>resolveConversationAction(text,approve,undo)}))
+ await act(async()=>{await result.current.sendMessage('Call my mom about dinner tonight')})
+ await act(async()=>{await result.current.sendTurn('Approve')})
+ await act(async()=>{await result.current.sendTurn('Undo')})
+ await act(async()=>{await result.current.sendMessage('What is left?')})
+ expect(approve).toHaveBeenCalledTimes(1);expect(undo).toHaveBeenCalledTimes(1)
+ expect(histories).toHaveLength(2)
+ expect(start).toHaveBeenCalledTimes(2);expect(end).toHaveBeenCalledTimes(2)
+ expect((histories[1] as any[]).map(m=>m.content)).toEqual(['Call my mom about dinner tonight','On the card.','Approve','Saved.','Undo','Undone.','What is left?'])
+ expect((db.updated.at(-1)?.patch.messages as any[]).map(m=>m.content)).toEqual(result.current.messages.map(m=>m.content))
+})
+
+
+it('preserves the actual canvas Undo through shared conversation approval and Undo turns',async()=>{
+ const undoWrite=vi.fn(async()=>true),apply=vi.fn(async()=>({ok:true as const,summary:'Saved',undo:undoWrite,ids:['new-task']}))
+ const wrapper=({children}:{children:React.ReactNode})=>createElement(CanvasActivityProvider,{
+  snapshot:{tasks:[],goals:[]},writers:{deleteTask:vi.fn(),updateTask:vi.fn(),deleteGoal:vi.fn(),updateGoal:vi.fn()},
+  refetch:vi.fn(),applyChanges:apply,children,
+ } as CanvasActivityProviderProps)
+ const {result}=renderHook(()=>{
+  const activity=useCanvasActivity()
+  const assistant=useSymphonyAssistant({persistKey:'symphony_rail',
+   resolveAction:text=>resolveConversationAction(text,async()=>{
+    if(!activity.changeSet)return 'none'
+    let outcome:'saved'|'partial'|'failed'='failed'
+    await activity.approveChangeSet(state=>{outcome=state});return outcome
+   },activity.undo),
+   turnObserver:{start:({text,retry})=>activity.turnStarted(text,retry),end:activity.turnEnded,changeCard:activity.takeChangeCard},
+  })
+  return {activity,assistant}
+ },{wrapper})
+ act(()=>result.current.activity.setChangeSet({key:'one-conversation',title:'Call mom',ops:[{key:'mom',op:'add',title:'Talk to my mom about dinner tonight'}]}))
+ await act(async()=>{await result.current.assistant.sendTurn('Approve')})
+ expect(apply).toHaveBeenCalledTimes(1)
+ expect(result.current.activity.receipt?.undoable).toBe(true)
+ await act(async()=>{await result.current.assistant.sendTurn('Undo')})
+ expect(undoWrite).toHaveBeenCalledTimes(1)
+ expect(result.current.activity.receipt?.summary).toBe('Undone')
+ expect(result.current.assistant.messages.map(m=>m.content)).toEqual(['Approve','Saved.','Undo','Undone.'])
+})
+
+
+it('retains the full conversation after a save failure and retries it with the next turn',async()=>{
+ vi.mocked(streamSymphonyAgent).mockImplementation(async(_messages,h)=>{h.onText?.('On the card.');h.onDone?.('On the card.',null)})
+ const {result}=renderHook(()=>useSymphonyAssistant({persistKey:'symphony_rail'}))
+ db.failInsert=true
+ try {
+  await act(async()=>{await result.current.sendTurn('Return the library books')})
+  expect(result.current.error).toMatch(/conversation could not be saved/)
+  expect(result.current.messages.map(m=>m.content)).toEqual(['Return the library books','On the card.'])
+ }finally{db.failInsert=false}
+ await act(async()=>{await result.current.sendTurn('On Saturday')})
+ expect(result.current.error).toBeNull()
+ expect((db.inserted.at(-1)?.messages as any[]).map(m=>m.content)).toEqual(['Return the library books','On the card.','On Saturday','On the card.'])
+})
+
+
+it.each([false,true])('beta publishes a final card only after successful completion (failure=%s)',async(failed)=>{
+ const changeSet=vi.fn(),point=vi.fn()
+ let finish!:()=>void
+ vi.mocked(streamSymphonyAgent).mockImplementation(async(_m,h)=>{
+  h.onText?.('Draft wording')
+  h.onChangeSet?.({key:'bike',title:'Bike tomorrow',ops:[]})
+  h.onPoint?.({dates:['2026-10-16'],taskIds:[]})
+  await new Promise<void>(resolve=>{finish=resolve})
+  if(failed)h.onError?.('Connection dropped')
+  else h.onDone?.('Ready to review.',null,undefined,{state:'proposed',writes:[],say:'Ready',proposal:{key:'bike',title:'Bike tomorrow',ops:0}})
+ })
+ const {result}=renderHook(()=>useSymphonyAssistant({turnObserver:{changeSet,point}}))
+ let pending!:Promise<unknown>
+ act(()=>{pending=result.current.sendTurn('Tomorrow for the bicycle.')})
+ await waitFor(()=>expect(finish).toBeDefined())
+ expect(changeSet).not.toHaveBeenCalled()
+ expect(point).not.toHaveBeenCalled()
+ expect(result.current.messages.at(-1)?.content).toBe('')
+ await act(async()=>{finish();await pending})
+ expect(changeSet).toHaveBeenCalledTimes(failed?0:1)
+ expect(point).not.toHaveBeenCalled()
 })

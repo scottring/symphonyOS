@@ -1,5 +1,5 @@
 import { useId, useState, type ComponentType } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Compass, PenLine, Target } from 'lucide-react'
 import type { FirstWeekStep } from '@/lib/firstWeek'
 
@@ -42,19 +42,20 @@ export function FirstWeekCard({ onHide, onClearSample }: {
   steps: FirstWeekStep[]; onHide: () => void; onSamplePage: () => void; onClearSample?: () => void
 }) {
   const [path, setPath] = useState<'today' | 'goal' | null>(null)
+  const navigate = useNavigate()
   return <section aria-labelledby="first-week" className="mx-3 mb-4 border-b border-neutral-200 py-4 md:mx-0">
     <h2 id="first-week" className="font-display text-lg text-neutral-800">Where would you like to start?</h2>
     <p className="mt-1 text-sm text-neutral-500">Start with what needs doing, or what you want to work toward. You can plan at any level.</p>
+    <Link to="/getting-started" className="inline-block py-3 text-primary-700 underline">Getting started · people, routines and the planning horizons</Link>
     {/* Three tiles in a row on a wide screen, stacked on a phone. */}
     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <Tile icon={PenLine} primary title="Add something for today" promise="Write it down and do it today."
-        onClick={() => { setPath('today'); window.dispatchEvent(new Event('symphony:add-today')) }} />
+      <Tile icon={PenLine} primary title="Capture something" promise="Get it down; decide when later."
+        onClick={() => navigate('/getting-started')} />
       <Tile icon={Target} title="Start with a goal" promise="Name what you want this year or season to hold."
         pressed={path === 'goal'} onClick={() => setPath('goal')} />
       <Tile icon={Compass} title="Explore on my own" promise="Hide this and look around." onClick={onHide} />
     </div>
-    {path === 'today' && <p className="mt-3 text-sm text-neutral-600">Add a task in For today. For later work, use <Link to="/week" className="text-primary-700 underline">Week</Link>; Shelves lets you choose it for a day. Completing a task updates it wherever it appears.</p>}
-    {path === 'goal' && <div className="mt-3 text-sm text-neutral-600"><p>What would you like to make progress on? Choose a horizon; add a supporting task when you're ready.</p><div className="mt-2 flex gap-4">{['month', 'season', 'year'].map(level => <Link className="text-primary-700 underline" key={level} to={`/${level}`}>{level[0].toUpperCase() + level.slice(1)}</Link>)}</div></div>}
+    {path === 'goal' && <div className="mt-3 text-sm text-neutral-600"><p>What would you like to make progress on? Choose a horizon; add a supporting task when you're ready.</p><Link className="inline-block py-3 text-primary-700 underline" to="/getting-started?journey=goals">Walk me through starting with a goal</Link><div className="mt-2 flex gap-4">{['month', 'season', 'year'].map(level => <Link className="text-primary-700 underline" key={level} to={`/${level}`}>{level[0].toUpperCase() + level.slice(1)}</Link>)}</div></div>}
     {onClearSample && <button type="button" className="mt-3 text-xs text-neutral-500 underline" onClick={onClearSample}>Clear sample</button>}
   </section>
 }

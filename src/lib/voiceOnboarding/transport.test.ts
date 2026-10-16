@@ -189,6 +189,23 @@ describe('RealtimeTransport', () => {
     expect(events.at(-1)).toEqual({ type: 'status', status: 'ended', reason: 'time_limit' })
   })
 
+  it('does not submit a partial second utterance when the session expires', async () => {
+    const handleTurn = vi.fn(async () => 'What else?')
+    const {t, peer, timers, track, events} = setup({turns:'tap',handleTurn})
+    await t.start(ctx)
+    t.sendText('Help plan today')
+    await vi.waitFor(()=>expect(handleTurn).toHaveBeenCalledTimes(1))
+    serverEvent(peer,{type:'response.done',response:{status:'completed'}})
+    serverEvent(peer,{type:'input_audio_buffer.speech_started',item_id:'second'})
+    serverEvent(peer,{type:'conversation.item.input_audio_transcription.delta',item_id:'second',delta:'Return the books'})
+    timers[0].fn()
+    serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'second',transcript:'Return the books Saturday'})
+    expect(handleTurn).toHaveBeenCalledTimes(1)
+    expect(track.stopped).toBe(true)
+    expect(events).toContainEqual({type:'user',text:'Return the books'})
+    expect(events.at(-1)).toEqual({type:'status',status:'ended',reason:'time_limit'})
+  })
+
   it('a failed connection releases the microphone and says so', async () => {
     const { t, peer, track, events } = setup()
     await t.start(ctx)
@@ -273,11 +290,11 @@ describe('RealtimeTransport, tap to talk', () => {
   it('a pause is not the end: no reply until Done, and the words show as they come', async () => {
     const { t, peer, events } = setup({ turns: 'tap' })
     await t.start(ctx)
-    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started', item_id: 'a' })
     serverEvent(peer, { type: 'input_audio_buffer.speech_stopped' })
     serverEvent(peer, { type: 'input_audio_buffer.committed', item_id: 'a' })
     serverEvent(peer, { type: 'conversation.item.input_audio_transcription.delta', item_id: 'a', delta: 'Add milk' })
-    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started', item_id: 'b' })
     serverEvent(peer, { type: 'input_audio_buffer.speech_stopped' })
     serverEvent(peer, { type: 'input_audio_buffer.committed', item_id: 'b' })
     serverEvent(peer, { type: 'conversation.item.input_audio_transcription.completed', item_id: 'b', transcript: 'and eggs.' })
@@ -327,6 +344,22 @@ describe('RealtimeTransport, tap to talk', () => {
     serverEvent(peer, { type: 'output_audio_buffer.stopped' })
     expect(track.enabled).toBe(true)
     expect(events.filter((e) => e.type === 'turn').at(-1)).toEqual({ type: 'turn', turn: 'listening' })
+  })
+
+  it.each(['text-only', 'audio-stops-first'])('reopens the mic after a %s terminal reply', async mode => {
+    const { t, peer, track } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    t.finishTurn()
+    serverEvent(peer, { type: 'response.created' })
+    if (mode === 'audio-stops-first') {
+      serverEvent(peer, { type: 'output_audio_buffer.started' })
+      serverEvent(peer, { type: 'output_audio_buffer.stopped' })
+      expect(track.enabled).toBe(false)
+    }
+    serverEvent(peer, { type: 'response.done', response: { output: [] } })
+    await Promise.resolve()
+    expect(track.enabled).toBe(true)
   })
 
   it('a short quiet after speaking sends it (no Done needed); speaking again resets', async () => {
@@ -397,4 +430,116 @@ describe('workspace voice tools',()=>{
   await t.start(ctx);expect(t.sendText('show my week')).toBe(true)
   expect(peer.channel.sent).toContainEqual(expect.objectContaining({item:expect.objectContaining({content:[{type:'input_text',text:'show my week'}]})}))
  })
+})
+
+
+it('ignores silent/late caption items and keeps listening when Done is pressed in silence',async()=>{
+ const {t,peer,track,events}=setup({turns:'tap'})
+ await t.start(ctx);peer.channel.onopen?.()
+ const sent=peer.channel.sent.length
+ serverEvent(peer,{type:'input_audio_buffer.committed',item_id:'silence'})
+ serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'silence',transcript:'Kaleb, Ella, piano practice.'})
+ t.finishTurn()
+ expect(peer.channel.sent.slice(sent)).not.toContainEqual({type:'response.create'})
+ expect(track.enabled).toBe(true)
+ expect(events.filter(e=>e.type==='user')).toHaveLength(0)
+ serverEvent(peer,{type:'input_audio_buffer.speech_started',item_id:'real'})
+ serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'real',transcript:'Call Kaleb'})
+ expect(events).toContainEqual({type:'user',text:'Call Kaleb'})
+ t.finishTurn();serverEvent(peer,{type:'response.done',response:{output:[]}})
+ serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'real',transcript:'Late old caption'})
+ expect(events.filter(e=>e.type==='user').at(-1)).toEqual({type:'user',text:'Call Kaleb'})
+ t.stop()
+})
+
+
+it('ignores queued data-channel events after End',async()=>{
+ const {t,peer,events}=setup({turns:'tap'})
+ await t.start(ctx);peer.channel.onopen?.();t.stop()
+ const count=events.length
+ serverEvent(peer,{type:'input_audio_buffer.speech_started',item_id:'late'})
+ serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'late',transcript:'Late words'})
+ serverEvent(peer,{type:'response.output_audio_transcript.done',transcript:'Late reply'})
+ serverEvent(peer,{type:'output_audio_buffer.started'})
+ expect(events).toHaveLength(count)
+})
+
+
+describe('shared app conversation', () => {
+ const utterance=(peer:FakePeer,id:string,text?:string)=>{
+  serverEvent(peer,{type:'input_audio_buffer.speech_started',item_id:id})
+  serverEvent(peer,{type:'input_audio_buffer.speech_stopped',item_id:id})
+  if(text!==undefined)serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:id,transcript:text})
+ }
+ it('waits for final captions, preserves speech order and submits exactly once without a model relay',async()=>{
+  const handleTurn=vi.fn(async()=> 'The library books are on the card for Saturday. Nothing saved yet.')
+  const {t,peer}=setup({turns:'tap',handleTurn});await t.start(ctx);peer.channel.onopen?.()
+  utterance(peer,'a');utterance(peer,'b','about dinner tonight.')
+  t.finishTurn();expect(handleTurn).not.toHaveBeenCalled()
+  serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'a',transcript:'I want to talk to my mom'})
+  await Promise.resolve();await Promise.resolve()
+  expect(handleTurn).toHaveBeenCalledWith('I want to talk to my mom about dinner tonight.')
+  serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'a',transcript:'duplicate'})
+  expect(handleTurn).toHaveBeenCalledTimes(1)
+  const responses=peer.channel.sent.filter((e:any)=>e.type==='response.create') as any[]
+  expect(responses).toHaveLength(1)
+  expect(responses[0].response).toMatchObject({conversation:'none',tools:[],tool_choice:'none',input:[{content:[{text:'The library books are on the card for Saturday. Nothing saved yet.'}]}]})
+ })
+ it('does not act on noise, incomplete transcription, or captions arriving after End',async()=>{
+  const handleTurn=vi.fn(async()=> 'Saved.')
+  const {t,peer}=setup({turns:'tap',handleTurn});await t.start(ctx);peer.channel.onopen?.()
+  serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'noise',transcript:'Approve'})
+  t.finishTurn();expect(handleTurn).not.toHaveBeenCalled()
+  utterance(peer,'late');t.finishTurn();t.stop()
+  serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'late',transcript:'Approve'})
+  expect(handleTurn).not.toHaveBeenCalled()
+ })
+ it('does not speak a late planner reply after End and cannot execute audio-model tools',async()=>{
+  let finish!:(text:string)=>void
+  const handleTurn=vi.fn(()=>new Promise<string>(resolve=>{finish=resolve})),handleTool=vi.fn()
+  const {t,peer}=setup({turns:'tap',handleTurn,handleTool});await t.start(ctx);peer.channel.onopen?.()
+  utterance(peer,'a','Plan the rest of my week');t.finishTurn();t.stop();finish('What day?')
+  await Promise.resolve();await Promise.resolve()
+  expect(peer.channel.sent.filter((e:any)=>e.type==='response.create')).toHaveLength(0)
+  expect(handleTool).not.toHaveBeenCalled()
+ })
+ it('typed input uses the same owner and audio tool output is ignored',async()=>{
+  const handleTurn=vi.fn(async()=> 'Which day works?'),handleTool=vi.fn()
+  const {t,peer}=setup({turns:'tap',handleTurn,handleTool});await t.start(ctx);peer.channel.onopen?.()
+  expect(t.sendText('Plan the rest of my week')).toBe(true)
+  await Promise.resolve();await Promise.resolve()
+  serverEvent(peer,{type:'response.done',response:{output:[{type:'function_call',name:'approve_card',call_id:'bad',arguments:'{}'}]}})
+  expect(handleTurn).toHaveBeenCalledWith('Plan the rest of my week');expect(handleTool).not.toHaveBeenCalled()
+ })
+})
+
+
+it('recovers from incomplete transcription without submitting a partial request',async()=>{
+ const handleTurn=vi.fn(async()=> 'On the card.')
+ const {t,peer,timers,events}=setup({turns:'tap',handleTurn})
+ await t.start(ctx);peer.channel.onopen?.()
+ serverEvent(peer,{type:'input_audio_buffer.speech_started',item_id:'incomplete'})
+ serverEvent(peer,{type:'input_audio_buffer.speech_stopped',item_id:'incomplete'})
+ serverEvent(peer,{type:'conversation.item.input_audio_transcription.delta',item_id:'incomplete',delta:'Do not'})
+ t.finishTurn()
+ timers.find(t=>t.ms===10000)!.fn()
+ expect(handleTurn).not.toHaveBeenCalled()
+ expect(events.at(-1)).toEqual({type:'turn',turn:'listening'})
+ serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'incomplete',transcript:'Do not approve'})
+ expect(handleTurn).not.toHaveBeenCalled()
+})
+
+
+it('beta explicit send tolerates pauses and submits the complete utterance only on Done',async()=>{
+ const handleTurn=vi.fn(async()=>'Ready to review.')
+ const {t,peer,timers}=setup({turns:'tap',explicitSend:true,handleTurn})
+ await t.start(ctx)
+ serverEvent(peer,{type:'input_audio_buffer.speech_started',item_id:'bike'})
+ serverEvent(peer,{type:'input_audio_buffer.speech_stopped',item_id:'bike'})
+ serverEvent(peer,{type:'conversation.item.input_audio_transcription.completed',item_id:'bike',transcript:'Take the bike to Bicycle Connection tomorrow.'})
+ expect(timers.filter(x=>x.ms===TAP_FALLBACK_MS)).toHaveLength(0)
+ expect(handleTurn).not.toHaveBeenCalled()
+ t.finishTurn()
+ await vi.waitFor(()=>expect(handleTurn).toHaveBeenCalledWith('Take the bike to Bicycle Connection tomorrow.'))
+ t.stop()
 })

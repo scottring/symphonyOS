@@ -54,7 +54,7 @@ export function CalendarSettings() {
 
   const [disconnecting, setDisconnecting] = useState<'google' | 'microsoft' | null>(null)
   const [connecting, setConnecting] = useState(false)
-  const [showSetupWizard, setShowSetupWizard] = useState(false)
+  const [showSetupWizard, setShowSetupWizard] = useState(() => new URLSearchParams(window.location.search).get('connected') === '1')
   const [calendars, setCalendars] = useState<GoogleCalendarInfo[]>([])
   const [defaultSaveState, setDefaultSaveState] = useState<'idle' | 'saving' | 'error'>('idle')
 
@@ -131,6 +131,9 @@ export function CalendarSettings() {
     return (
       <CalendarSetupWizard
         onComplete={() => {
+          const url = new URL(window.location.href)
+          url.searchParams.delete('connected')
+          window.history.replaceState(window.history.state, '', url)
           setShowSetupWizard(false)
           // Calendar will auto-refresh via useGoogleCalendar hook
         }}

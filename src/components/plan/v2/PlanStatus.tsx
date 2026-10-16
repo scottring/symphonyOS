@@ -32,6 +32,11 @@ export interface PlanToolbarProps {
   lookBack?: string | null
   /** Mark the period planned in place. */
   onMark?: () => void
+  /** Conversation entry remains visible beside the separate review confirmation. */
+  planningAction?: NextStep
+  markLabel?: string
+  markDisabled?: boolean
+  unplannedHint?: string
   /** A period planned in steps (Week, 2026-10-04): one button that opens the
    *  session — "Plan the week" — the look-back being its first step. */
   planLabel?: string
@@ -47,7 +52,7 @@ export interface PlanToolbarProps {
 
 /** Where the plan stands — "Week 40 isn't planned yet", "October planned ·
  *  …". The inside of the toolbar's status, or the masthead's subline. */
-function statusText({ period, saved, loading, error, agreedBy, onRetry, hasLines }: PlanToolbarProps) {
+function statusText({ period, saved, loading, error, agreedBy, onRetry, hasLines, unplannedHint }: PlanToolbarProps) {
   const day = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   // "· you" read as a stray word; only someone else's name says anything.
   const by = agreedBy && agreedBy !== 'you' ? ` by ${agreedBy}` : ''
@@ -56,17 +61,21 @@ function statusText({ period, saved, loading, error, agreedBy, onRetry, hasLines
       <button type="button" className="pv2-link" onClick={onRetry}>Try again</button></span>
     : saved
       ? <><span className="pv2-seal" aria-hidden="true" /><span><b>{cap(period)} planned</b> {day(saved.at)}{by}</span></>
-      : loading ? null : <span className="pv2-hint">{hasLines ? `${cap(period)} isn’t marked planned yet` : `${cap(period)} isn’t planned yet`}</span>
+      : loading ? null : <span className="pv2-hint">{unplannedHint ?? (hasLines ? `${cap(period)} isn’t marked planned yet` : `${cap(period)} isn’t planned yet`)}</span>
 }
 
 /** The page's tools, the view icons and one verb: "Look back at <prev>"
  *  while the last period left open work, else "Mark <period> planned" until
  *  it is. A just-saved period's next step is PlanSavedLine's, not this row's. */
-function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved, planLabel }: PlanToolbarProps) {
+function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved, planLabel, planningAction, markLabel, markDisabled }: PlanToolbarProps) {
   const verb = justSaved || loading || error ? null
+    : planningAction ? <div className="pv2-planning-actions">
+      <button type="button" className="pv2-btn" onClick={planningAction.onClick} data-explain="plan-walk" data-explain-label={planningAction.label}>{planningAction.label}</button>
+      {!saved && onMark && <button type="button" className="pv2-link pv2-quiet" disabled={markDisabled} onClick={onMark}>{markLabel ?? `Mark ${period} planned`}</button>}
+    </div>
     : planLabel ? <button type="button" className={saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={onPlan} data-explain="plan-button" data-explain-label={saved ? 'Change the plan' : planLabel}>{saved ? 'Change the plan' : planLabel}</button>
     : lookBack ? <button type="button" className="pv2-btn" onClick={onPlan}>Look back at {lookBack}</button>
-      : !saved && onMark ? <button type="button" className="pv2-btn" onClick={onMark}>Mark {period} planned</button>
+      : !saved && onMark ? <button type="button" className="pv2-btn" disabled={markDisabled} onClick={onMark}>{markLabel ?? `Mark ${period} planned`}</button>
         : null
   return <>
     {tools}

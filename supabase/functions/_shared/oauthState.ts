@@ -7,7 +7,7 @@
 // verify or names another user. The JSON shape is kept, so the client's
 // providerFromOAuthState still reads `provider`.
 
-export interface OAuthStateBody { userId: string; provider: 'google' | 'microsoft'; access?: string; nonce: string; sig?: string }
+export interface OAuthStateBody { userId: string; provider: 'google' | 'microsoft'; access?: string; redirectUri: string; expiresAt: number; nonce: string; sig?: string }
 
 const enc = new TextEncoder()
 const toB64 = (s: string) => btoa(unescape(encodeURIComponent(s)))
@@ -18,22 +18,24 @@ async function hmac(secret: string, text: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   return hex(await crypto.subtle.sign('HMAC', key, enc.encode(text)))
 }
-const payload = (b: Omit<OAuthStateBody, 'sig'>) => `${b.userId}|${b.provider}|${b.access ?? ''}|${b.nonce}`
+const payload = (b: Omit<OAuthStateBody, 'sig'>) => JSON.stringify([b.userId, b.provider, b.access ?? '', b.redirectUri, b.expiresAt, b.nonce])
 
-export async function signOAuthState(secret: string, body: Omit<OAuthStateBody, 'nonce' | 'sig'>): Promise<string> {
+export async function signOAuthState(secret: string, body: Omit<OAuthStateBody, 'nonce' | 'sig' | 'expiresAt'>, now = Date.now()): Promise<string> {
   const nonce = crypto.randomUUID()
-  const sig = await hmac(secret, payload({ ...body, nonce }))
-  return toB64(JSON.stringify({ ...body, nonce, sig }))
+  const signed = { ...body, expiresAt: now + 10 * 60_000, nonce }
+  const sig = await hmac(secret, payload(signed))
+  return toB64(JSON.stringify({ ...signed, sig }))
 }
 
 /** The verified body, or null when the state is missing, malformed, unsigned,
  *  forged, or for another person. */
-export async function verifyOAuthState(secret: string, state: unknown, expectUserId: string, expectProvider: OAuthStateBody['provider']): Promise<OAuthStateBody | null> {
+export async function verifyOAuthState(secret: string, state: unknown, expectUserId: string, expectProvider: OAuthStateBody['provider'], redirectUri: string, now = Date.now()): Promise<OAuthStateBody | null> {
   if (typeof state !== 'string' || !state) return null
   let body: OAuthStateBody
   try { body = JSON.parse(fromB64(state)) } catch { return null }
   if (!body || typeof body !== 'object' || typeof body.sig !== 'string' || typeof body.nonce !== 'string') return null
   if (body.userId !== expectUserId || body.provider !== expectProvider) return null
+  if (body.redirectUri !== redirectUri || !Number.isSafeInteger(body.expiresAt) || body.expiresAt <= now || body.expiresAt > now + 10 * 60_000) return null
   const expected = await hmac(secret, payload(body))
   if (expected.length !== body.sig.length) return null
   let diff = 0

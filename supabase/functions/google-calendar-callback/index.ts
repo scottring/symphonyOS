@@ -42,10 +42,21 @@ serve(async (req) => {
     // The round trip must be the one this person started (oauthState.ts): a
     // state that is missing, forged or someone else's is refused before any
     // token is exchanged or stored.
-    if (!(await verifyOAuthState(clientSecret, state, user.id, 'google'))) {
-      return new Response(JSON.stringify({ error: 'This sign-in link is not yours or has been altered. Start the connection again from Settings.' }), {
+    const verified = typeof redirectUri === 'string' && await verifyOAuthState(clientSecret, state, user.id, 'google', redirectUri)
+    if (!verified || typeof code !== 'string' || !code) {
+      return new Response(JSON.stringify({ error: 'This sign-in link has expired or is invalid. Start the connection again from Calendar settings.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
+    const { data: consumed, error: consumeError } = await supabaseAdmin.rpc('consume_oauth_transaction', {
+      p_nonce: verified.nonce, p_user: user.id, p_provider: 'google', p_redirect: redirectUri,
+    })
+    if (consumeError || consumed !== true) {
+      return new Response(JSON.stringify({ error: 'This sign-in link has already been used or expired. Start the connection again from Calendar settings.' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -74,11 +85,6 @@ serve(async (req) => {
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
 
     // Use service role to store tokens securely
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
     const { error: upsertError } = await supabaseAdmin
       .from('calendar_connections')
       .upsert({

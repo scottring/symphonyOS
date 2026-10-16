@@ -72,7 +72,7 @@ export function JoinHousehold() {
       clearPendingJoin()
       setStatus('success')
       // Redirect to home after brief delay
-      setTimeout(() => navigate('/'), 2000)
+      setTimeout(() => navigate('/getting-started'), 2000)
     } catch (err) {
       setStatus('error')
       setErrorMessage(err instanceof Error ? err.message : 'Failed to join household')

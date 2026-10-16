@@ -109,3 +109,79 @@ describe('ask_symphony outcome',()=>{
   expect(out.outcome.state).toBe('failed');expect(out.reply).toMatch(/not processed/)
  })
 })
+
+describe('approval transaction boundaries',()=>{
+ it('never starts approval while another write is in flight',async()=>{
+  let finish!:(text:string)=>void
+  const ask=vi.fn(()=>new Promise<string>(resolve=>{finish=resolve})), approve=vi.fn(async()=>'saved' as const)
+  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a',approve))
+  await act(()=>result.current.start());const tool=mocks.instances[0].deps.handleTool
+  let pending!:Promise<unknown>
+  act(()=>{pending=tool('ask_symphony',{request:'Move my task'})})
+  await act(async()=>{expect(await tool('approve_card',{})).toHaveProperty('error')})
+  expect(approve).not.toHaveBeenCalled()
+  await act(async()=>{finish('Saved');await pending})
+ })
+ it('hands a partial result to speech without claiming nothing saved',async()=>{
+  const {result}=renderHook(()=>useWorkspaceVoice(context,vi.fn(),vi.fn(),true,'a',async()=>'partial' as const))
+  await act(()=>result.current.start())
+  await act(async()=>{const got=await mocks.instances[0].deps.handleTool('approve_card',{});expect(got.outcome.state).toBe('partial');expect(got.outcome.say).toMatch(/Some changes stayed saved/)})
+ })
+ it.each(['Do not approve it yet.','Do not undo that.'])('does not treat negation as authorization: %s',async request=>{
+  const ask=vi.fn(async()=>'Waiting'), approve=vi.fn(async()=>'saved' as const)
+  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a',approve))
+  await act(()=>result.current.start())
+  await act(async()=>{await mocks.instances[0].deps.handleTool('ask_symphony',{request})})
+  expect(approve).not.toHaveBeenCalled();expect(ask).toHaveBeenCalledWith(request)
+ })
+})
+
+describe('spoken Undo transaction',()=>{
+ it('uses the real undo action without starting a new assistant turn',async()=>{
+  const undo=vi.fn(async()=>'undone' as const),ask=vi.fn()
+  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a',undefined,undo))
+  await act(()=>result.current.start())
+  await act(async()=>{expect(await mocks.instances[0].deps.handleTool('ask_symphony',{request:'Undo that.'})).toMatchObject({outcome:{state:'saved',say:'Undone.'}})})
+  expect(ask).not.toHaveBeenCalled();expect(undo).toHaveBeenCalledOnce()
+ })
+ it('does not call an unconfirmed Undo successful',async()=>{
+  const {result}=renderHook(()=>useWorkspaceVoice(context,vi.fn(),vi.fn(),true,'a',undefined,async()=>'failed' as const))
+  await act(()=>result.current.start())
+  await act(async()=>{expect(await mocks.instances[0].deps.handleTool('undo_last_change',{})).toMatchObject({outcome:{state:'unverified'}})})
+ })
+})
+
+
+it('sends final speech directly to the shared conversation and renders its exact reply',async()=>{
+ const ask=vi.fn(async(text:string)=>({text:'Which weekend day works?',outcome:{state:'answered' as const,say:'Which weekend day works?',writes:[]}}))
+ const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a'))
+ await act(()=>result.current.start())
+ let reply
+ await act(async()=>{reply=await mocks.instances[0].deps.handleTurn('The library books would fit on the weekend.')})
+ expect(ask).toHaveBeenCalledWith('The library books would fit on the weekend.')
+ expect(ask).toHaveBeenCalledTimes(1)
+ expect(reply).toBe('Which weekend day works?')
+})
+
+
+describe('voice session ending',()=>{
+ it('explains a time limit and retains the last heard words for recovery',async()=>{
+  const {result}=renderHook(()=>useWorkspaceVoice(context,vi.fn(),vi.fn(),true,'a'))
+  await act(()=>result.current.start())
+  act(()=>{
+   mocks.instances[0].listener({type:'user',text:'Move the books to Saturday'})
+   mocks.instances[0].listener({type:'status',status:'ended',reason:'time_limit'})
+  })
+  expect(result.current.active).toBe(false)
+  expect(result.current.error).toContain('Voice reached its session limit')
+  expect(result.current.heard).toBe('Move the books to Saturday')
+  await act(()=>result.current.start())
+  expect(result.current.error).toBeNull()
+ })
+ it('does not describe an intentional stop as a time limit',async()=>{
+  const {result}=renderHook(()=>useWorkspaceVoice(context,vi.fn(),vi.fn(),true,'a'))
+  await act(()=>result.current.start())
+  act(()=>mocks.instances[0].listener({type:'status',status:'ended',reason:'stopped'}))
+  expect(result.current.error).toBeNull()
+ })
+})

@@ -9,13 +9,15 @@
 //
 // Refuses to run unless the account's email contains "+bench" or "synthetic",
 // so a slip cannot point it at a family's records. Approve / retry / undo
-// steps are reported as "manual" here: they belong to the page, and the
-// browser layer (Playwright) drives them. Each run writes a JSON report to
+// steps are reported as incomplete here: they require a browser action
+// adapter before the journey can be certified. Each run writes a JSON report to
 // scripts/conversation-bench/reports/<scenario>-<timestamp>.json; nothing is
 // stored about the account but its id.
 
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, basename } from 'node:path'
+import { gradeTurn, gradeScenarioRecords, summarizeRun } from './grading.mjs'
+import { execFileSync } from 'node:child_process'
 
 const [, , scenarioPath] = process.argv
 if (!scenarioPath) { console.error('Pass a scenario file.'); process.exit(2) }
@@ -25,6 +27,13 @@ const url = env('SUPABASE_URL'), anon = env('SUPABASE_ANON_KEY'), email = env('B
 if (!/\+bench|synthetic/i.test(email) && process.env.BENCH_CONFIRM_SYNTHETIC !== '1') { console.error('Refusing: the bench account must be a synthetic one (+bench or "synthetic" in its address), or set BENCH_CONFIRM_SYNTHETIC=1 for an account you made for this.'); process.exit(2) }
 
 const scenario = JSON.parse(readFileSync(scenarioPath, 'utf8'))
+if (scenario.start.events?.length || scenario.start.members?.length && scenario.start.members.some(m => !/^[0-9a-f-]{36}$/i.test(m.id))) {
+  console.error('INCOMPLETE: this runner cannot seed calendar/member fixtures. Use a browser fixture adapter; no provider call was made.'); process.exit(2)
+}
+if (scenario.surface !== 'desktop') { console.error('INCOMPLETE: this runner has no authenticated display fixture adapter.'); process.exit(2) }
+const actualToday = new Intl.DateTimeFormat('en-CA', { timeZone: scenario.timezone ?? 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+if (scenario.today !== actualToday) { console.error(`INCOMPLETE: relative-date fixture is ${scenario.today}, household date is ${actualToday}; rebase the fixture before running.`); process.exit(2) }
+
 
 const signIn = async () => {
   const r = await fetch(`${url}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
@@ -58,8 +67,11 @@ const userId = session.user?.id
 const seeded = { tasks: [], routines: [], goals: [] }
 const rest = async (path, method, body) => {
   const r = await fetch(`${url}/rest/v1/${path}`, { method, headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: body ? JSON.stringify(body) : undefined })
-  const text = await r.text(); return { status: r.status, body: text.slice(0, 200) }
+  const text = await r.text(); if (!r.ok) throw new Error(`fixture request failed: ${r.status}`); return { status: r.status, body: text.slice(0, 200) }
 }
+const report = { scenario: scenario.id, at: new Date().toISOString(), build: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: import.meta.dirname, encoding: 'utf8' }).trim(), surface: scenario.surface, steps: [], cleanup: [] }
+let before
+try {
 if (process.argv.includes('--seed')) {
   const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
   for (const t of scenario.start.tasks ?? []) {
@@ -76,41 +88,56 @@ if (process.argv.includes('--seed')) {
   }
   console.log(`seeded ${seeded.tasks.length} tasks, ${seeded.routines.length} routines, ${seeded.goals.length} goals`)
 }
-const unseed = async () => {
-  for (const id of seeded.tasks) await rest(`tasks?id=eq.${id}`, 'DELETE')
-  for (const id of seeded.routines) await rest(`routines?id=eq.${id}`, 'DELETE')
-  for (const id of seeded.goals) await rest(`goals?id=eq.${id}`, 'DELETE')
+// Read the actual persisted state with the synthetic caller's permissions.
+const observe = async () => {
+  const tables = ['tasks', 'routines', 'goals', 'actionable_instances']
+  const result = {}
+  for (const table of tables) {
+    const r = await fetch(`${url}/rest/v1/${table}?select=*`, { headers: { apikey: anon, Authorization: `Bearer ${token}` } })
+    if (!r.ok) throw new Error(`record observation failed: ${table} (${r.status})`)
+    const rows = await r.json()
+    if (!Array.isArray(rows) || rows.length >= 1000) throw new Error(`incomplete record observation: ${table}`)
+    result[table] = rows.map(row => ({ ...row,
+      ...(table === 'tasks' ? { date: row.scheduled_for ? new Intl.DateTimeFormat('en-CA', { timeZone: scenario.timezone ?? 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(row.scheduled_for)) : null } : {}),
+      ...(table === 'routines' ? { days: row.recurrence_pattern?.days, time: row.time_of_day } : {}),
+      ...(table === 'actionable_instances' ? { date: row.date ?? row.instance_date } : {}) }))
+  }
+  return result
 }
-const report = { scenario: scenario.id, at: new Date().toISOString(), user: session.user?.id, steps: [] }
+before = await observe()
 const history = []
-// The page tells the next turn what became of the last card (the client's
-// takeChangeCard): while one is waiting, the model is told so, with its ops.
 let pendingCard = null
-let pass = true
+let blocked = false
 for (const [i, step] of scenario.steps.entries()) {
-  if (!step.say) { report.steps.push({ step: i + 1, action: step.action, result: 'manual (page action: run in the browser layer)' }); continue }
+  if (blocked) { report.steps.push({ step: i + 1, status: 'blocked', findings: ['prior required step did not pass'] }); continue }
+  if (!step.say || step.connection || step.action) {
+    report.steps.push({ step: i + 1, action: step.action, status: 'skipped', findings: ['requires browser action/fault adapter; not exercised by the live-text runner'] })
+    blocked = true; continue
+  }
   history.push({ role: 'user', content: step.say })
-  const turnId = crypto.randomUUID()
-  const got = await turn(token, history, turnId, { workspaceContext: { page: scenario.page, date: scenario.today, layers: ['family'], selectedId: null, items: [], truncated: false }, ...(pendingCard ? { changeCard: pendingCard } : {}) })
-  if (got.changeSet) pendingCard = { state: 'pending', title: got.changeSet.title, ops: got.changeSet.ops.map((o) => ({ op: o.op, title: o.title, where: o.date ?? '' })), at: new Date().toISOString() }
+  const got = await turn(token, history, crypto.randomUUID(), { ...(scenario.surface === 'wall' ? { surface: 'wall' } : {}), workspaceContext: { page: scenario.page, date: scenario.today, layers: ['family'], selectedId: scenario.selectedId ?? null, items: [], truncated: true }, ...(pendingCard ? { changeCard: pendingCard } : {}) })
+  if (got.changeSet) pendingCard = { state: 'pending', title: got.changeSet.title, ops: got.changeSet.ops.map(o => ({ op: o.op, title: o.title, where: o.date ?? '' })), at: new Date().toISOString() }
   history.push({ role: 'assistant', content: got.reply })
-  const findings = []
-  if (!got.outcome) findings.push('no outcome event (older agent build?)')
-  else if (!step.expect.outcome.includes(got.outcome.state)) findings.push(`outcome ${got.outcome.state}, expected ${step.expect.outcome.join('|')}`)
-  for (const name of step.forbid?.tools ?? []) if (got.tools.includes(name)) findings.push(`forbidden tool ${name}`)
-  // `anyTools`: the live model may reach the same outcome by another supported route (a card instead of a direct write).
-  if (step.expect.anyTools) { if (!step.expect.anyTools.some((n) => got.tools.includes(n))) findings.push(`none of ${step.expect.anyTools.join('|')} called`) }
-  else for (const call of step.expect.tools ?? []) if (!got.tools.includes(call.name)) findings.push(`missing tool ${call.name}`)
-  if (step.expect.card && got.changeSet && got.changeSet.ops.length !== step.expect.card.ops) findings.push(`card has ${got.changeSet.ops.length} ops, expected ${step.expect.card.ops}`)
-  for (const re of step.say_must_not ?? []) if (new RegExp(re, 'i').test(got.reply)) findings.push(`reply must not match /${re}/`)
-  for (const re of step.say_must ?? []) if (!new RegExp(re, 'i').test(got.reply)) findings.push(`reply must match /${re}/`)
-  if (findings.length) pass = false
-  report.steps.push({ step: i + 1, say: step.say, tools: got.tools, outcome: got.outcome?.state, reply: got.reply.slice(0, 300), card: got.changeSet ? got.changeSet.ops.map((o) => ({ op: o.op, title: o.title, date: o.date ?? null, time: o.time ?? null })) : null, findings })
-  console.log(`${findings.length ? 'FAIL' : 'PASS'} step ${i + 1}: ${got.outcome?.state ?? 'no outcome'} ${findings.join('; ')}`)
+  const findings = [...gradeTurn(step, got), ...gradeScenarioRecords(step, await observe(), before)]
+  const status = findings.length ? 'failed' : 'passed'
+  report.steps.push({ step: i + 1, status, tools: got.tools, outcome: got.outcome?.state, reply: got.reply, card: got.changeSet ?? null, findings })
+  blocked = findings.length > 0
+  console.log(`${status.toUpperCase()} step ${i + 1}: ${findings.join('; ')}`)
 }
-await unseed()
-mkdirSync(join(import.meta.dirname, 'reports'), { recursive: true })
-const out = join(import.meta.dirname, 'reports', `${basename(scenarioPath, '.json')}-${Date.now()}.json`)
-writeFileSync(out, JSON.stringify(report, null, 2))
-console.log(`${pass ? 'PASSED' : 'FAILED'}; report: ${out}`)
-process.exit(pass ? 0 : 1)
+} catch (error) {
+  report.steps.push({ status: 'failed', findings: [error instanceof Error ? error.message : 'runner failed'] })
+} finally {
+  for (const [table, ids] of Object.entries(seeded)) for (const id of ids) {
+    try { await rest(`${table}?id=eq.${id}`, 'DELETE') }
+    catch { report.cleanup.push(`failed to remove seeded ${table} ${id}`) }
+  }
+  if (report.cleanup.length) report.steps.push({ status: 'failed', findings: report.cleanup })
+  report.summary = summarizeRun(report.steps)
+  // A partial run is never a completed journey, even when the model checks passed.
+  if (report.steps.length < scenario.steps.length && report.summary.status === 'passed') report.summary.status = 'incomplete'
+  mkdirSync(join(import.meta.dirname, 'reports'), { recursive: true })
+  const out = join(import.meta.dirname, 'reports', `${basename(scenarioPath, '.json')}-${Date.now()}.json`)
+  writeFileSync(out, JSON.stringify(report, null, 2))
+  console.log(`${report.summary.status.toUpperCase()}; report: ${out}`)
+  process.exitCode = report.summary.status === 'passed' ? 0 : report.summary.status === 'failed' ? 1 : 2
+}

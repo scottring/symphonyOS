@@ -7,6 +7,11 @@ import { DomainGateProvider } from '@/components/domain/DomainGate'
 import { DesktopPageControls } from '@/components/layout/DesktopNavigation'
 import { deriveActiveView, pageOwnsFilterChrome, ShellLayout } from './ShellLayout'
 
+vi.mock('@/lib/canvas/reviewedChange', async () => {
+  const {applyChangeSet} = await import('@/lib/canvas/applyChangeSet')
+  return {createReviewedWriter:()=>({client:undefined}),applyReviewedChange:applyChangeSet}
+})
+
 // Regression test for the House sidebar link: it navigated to '/home' but
 // deriveActiveView had no case for that prefix, so it fell through to the
 // 'today' default — House never highlighted and its inline room list never
@@ -93,7 +98,7 @@ vi.mock('@/contexts/PinsContext', () => ({ PinsProvider: ({ children }: { childr
 
 vi.mock('@/components/layout/Sidebar', () => ({ Sidebar: () => <div data-testid="sidebar" /> }))
 vi.mock('@/components/layout/MoreSheet', () => ({ MoreSheet: ({ isOpen, onAskSymphony }: { isOpen: boolean; onAskSymphony?: () => void }) => (isOpen && onAskSymphony ? <button type="button" onClick={onAskSymphony}>Ask Symphony</button> : null) }))
-vi.mock('@/components/layout/QuickCapture', () => ({ QuickCapture: ({ showFab, isOpen }: { showFab?: boolean; isOpen?: boolean }) => <div data-testid="quick-capture" data-fab={String(showFab)} data-open={String(!!isOpen)} /> }))
+vi.mock('@/components/layout/QuickCapture', () => ({ QuickCapture: ({ showFab, isOpen, rightInset }: { showFab?: boolean; isOpen?: boolean; rightInset?: number }) => <div data-testid="quick-capture" data-fab={String(showFab)} data-right-inset={rightInset} data-open={String(!!isOpen)} /> }))
 vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ loading: false, error: false, plan: {
   carried: [], scheduled: [], available: [], week: [], month: [], counts: { scheduled: 0, available: 0 },
   offMainTaskIds: new Set(), offMainRoutineItemIds: new Set(), plannedExtraTasks: [],
@@ -223,12 +228,12 @@ describe('Phone AI beside Details', () => {
     renderAt('/today?view=alongside')
     const open = () => { fireEvent.click(screen.getByRole('button', {name:'More'})); fireEvent.click(screen.getByRole('button', {name:'Ask Symphony'})) }
     open()
-    fireEvent.change(screen.getByRole('textbox', {name:'Conversation draft'}), {target:{value:'Keep this wording'}})
+    fireEvent.change(screen.getByRole('textbox', {name:'Message Symphony'}), {target:{value:'Keep this wording'}})
     expect(screen.getByTestId('app-content').closest('[inert]')).not.toBeNull()
     fireEvent.click(screen.getByRole('tab', {name:'Details'}))
     expect(screen.getByTestId('app-content').closest('[inert]')).toBeNull()
     open()
-    expect(screen.getByRole('textbox', {name:'Conversation draft'})).toHaveValue('Keep this wording')
+    expect(screen.getByRole('textbox', {name:'Message Symphony'})).toHaveValue('Keep this wording')
   })
 
   it('switches back to the item, which stays open underneath', () => {
@@ -460,45 +465,34 @@ describe('Capture and the Today pin from every desktop page', () => {
   })
 })
 
-// The approved Season board (2026-10-10): on Plan the conversation is one bar
-// at the window's foot; the side pane is for Details only.
-describe('Today, Week, Plan and Routines have one conversation, at the foot', () => {
+// Conversation is beside the page, with one compact entry point when closed.
+describe('Conversation beside the plan', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; aiState.hidden = false; sessionStorage.clear() })
   afterEach(() => { aiState.hidden = true })
-
-  it('docks the bar and keeps the AI pane and its top-bar button off Plan', () => {
-    renderAt('/season?view=constellation&horizon=1')
-    const bar = screen.getByRole('region', { name: 'Conversation with Symphony' })
-    expect(bar).toHaveClass('is-docked')
-    expect(within(bar).queryByRole('button', { name: 'Open the conversation' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'AI chat' })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Conversation draft')).not.toBeInTheDocument()
+  it.each(['/season?view=constellation&horizon=1', '/today?view=alongside', '/week?view=alongside', '/routines'])('gives %s a full-height conversation instead of a footer', path => {
+    renderAt(path)
+    const conversation = screen.getByRole('region', { name: 'Chat with Symphony' })
+    expect(conversation).toHaveClass('is-panel')
+    expect(conversation).not.toHaveClass('is-docked')
+    expect(conversation.closest('.side-column')).not.toBeNull()
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-right-inset', '420')
+    expect(screen.getByRole('tab', { name: 'Chat' })).toBeInTheDocument()
+    expect(screen.getAllByLabelText('Message Symphony')).toHaveLength(1)
   })
-
-  it('docks it on Today and Week too, with room for the bar under the page', () => {
-    for (const path of ['/today?view=alongside', '/week?view=alongside']) {
-      const view = renderAt(path)
-      expect(screen.getByRole('region', { name: 'Conversation with Symphony' })).toHaveClass('is-docked')
-      expect(screen.queryByRole('button', { name: 'AI chat' })).not.toBeInTheDocument()
-      expect(screen.getByRole('region', { name: 'Conversation with Symphony' }).closest('.has-docked-bar')).not.toBeNull()
-      view.unmount()
-    }
-  })
-
-  it('docks it on Routines too; pages off the destinations keep the AI button', () => {
-    const routines = renderAt('/routines')
-    expect(screen.getByRole('region', { name: 'Conversation with Symphony' })).toHaveClass('is-docked')
-    expect(screen.queryByRole('button', { name: 'AI chat' })).not.toBeInTheDocument()
-    routines.unmount()
-    renderAt('/inbox')
-    expect(screen.getByRole('button', { name: 'AI chat' })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Conversation with Symphony' })).not.toBeInTheDocument()
+  it('keeps the page clear and provides a launcher when the panel is closed', () => {
+    aiState.hidden = true
+    renderAt('/week?view=alongside')
+    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Chat with Symphony' })).toBeInTheDocument()
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-right-inset', '0')
   })
 })
 
 // Symphony's history holds words, not tool calls: the shell tells each turn
 // what became of the last change card (final review, 2026-10-14 #2).
 describe('The change card reaches the next turn', () => {
+  beforeEach(() => { aiState.hidden = false })
+  afterEach(() => { aiState.hidden = true })
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null })
   const set = { key: 's1', title: '2 changes', ops: [
     { key: 's1:0', op: 'someday' as const, taskId: 'a', title: 'Paper mail' },
@@ -510,7 +504,7 @@ describe('The change card reaches the next turn', () => {
     const observer = assistantState.observer!
     act(() => observer.changeSet?.(set))
     expect(observer.changeCard?.()).toMatchObject({ state: 'pending', title: '2 changes' })
-    fireEvent.click(within(screen.getByRole('region', { name: '2 changes' })).getByRole('button', { name: 'Dismiss' }))
+    fireEvent.click(within(screen.getByRole('region', { name: '2 changes' })).getByRole('button', { name: 'Discard draft' }))
     expect(observer.changeCard?.()).toMatchObject({ state: 'dismissed', ops: [{ op: 'someday', title: 'Paper mail', where: '→ Someday' }, { op: 'unplace', title: 'Call the bank', where: '→ No day yet' }] })
     expect(observer.changeCard?.()).toBeUndefined()
   })
@@ -536,7 +530,7 @@ describe('The change card in the conversation', () => {
     expect(within(chat).queryByRole('region', { name: '3 changes to your week' })).not.toBeInTheDocument()
     act(() => assistantState.observer!.changeSet?.(set))
     const card = within(chat).getByRole('region', { name: '3 changes to your week' })
-    expect(within(card).getByRole('button', { name: 'Approve all 3' })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Save 3 changes' })).toBeInTheDocument()
   })
 
   it('shows in the desktop side pane on a page with no docked bar', () => {
@@ -545,7 +539,7 @@ describe('The change card in the conversation', () => {
     act(() => assistantState.observer!.changeSet?.(set))
     const card = screen.getByRole('region', { name: '3 changes to your week' })
     expect(card.closest('.side-column')).not.toBeNull()
-    fireEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+    fireEvent.click(within(card).getByRole('button', { name: 'Discard draft' }))
     expect(screen.queryByRole('region', { name: '3 changes to your week' })).not.toBeInTheDocument()
   })
 })
@@ -553,21 +547,22 @@ describe('The change card in the conversation', () => {
 // Planning next week on this week's last day: an ADD with no day lands in the
 // week Symphony read, not the one it is today (final review, 2026-10-14 #4).
 describe('Approve puts an undated add in the planned week', () => {
-  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 })) })
-  afterEach(() => { localStorage.removeItem('symphony-cadence-config') })
+  beforeEach(() => { aiState.hidden = false; mobileState.isMobile = false; selectionState.selection = null; localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 })) })
+  afterEach(() => { aiState.hidden = true; localStorage.removeItem('symphony-cadence-config') })
 
   it('uses the set\'s week_start', async () => {
     tasksState.addTask.mockClear()
     renderAt('/week?view=alongside')
     act(() => assistantState.observer!.changeSet?.({ key: 'w1', title: '1 change', weekStart: '2099-10-17', ops: [{ key: 'w1:0', op: 'add', title: 'Book the vet' }] }))
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Approve all 1' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save 1 change' })) })
     expect(tasksState.addTask).toHaveBeenCalledWith('Book the vet', undefined, undefined, undefined, { bucket: 'week', weekStart: new Date(2099, 9, 17) })
   })
 })
 
 describe('typing while voice is on (2026-10-14, Wednesday Wheelie\'s)', () => {
-  it('sends the typed words to the agent, never into the voice session', () => {
+  it('keeps beta typing on the chat path even if an old voice session is active', () => {
     mobileState.isMobile = false
+    aiState.hidden = false
     voiceState.access = true
     voiceState.active = true
     assistantState.sendMessage.mockClear()
@@ -575,9 +570,11 @@ describe('typing while voice is on (2026-10-14, Wednesday Wheelie\'s)', () => {
     renderAt('/week')
     fireEvent.change(screen.getByLabelText('Message Symphony'), { target: { value: 'Add Wednesday Wheelies tonight 5:30–7' } })
     fireEvent.submit(screen.getByLabelText('Message Symphony').closest('form')!)
-    expect(assistantState.sendMessage).toHaveBeenCalledWith('Add Wednesday Wheelies tonight 5:30–7', undefined)
     expect(voiceState.sendText).not.toHaveBeenCalled()
+    expect(assistantState.sendMessage).toHaveBeenCalledWith('Add Wednesday Wheelies tonight 5:30–7', undefined)
+    expect(screen.queryByRole('button', { name: /Talk|End voice/ })).not.toBeInTheDocument()
     voiceState.active = false
     voiceState.access = false
+    aiState.hidden = true
   })
 })

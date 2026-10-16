@@ -1,0 +1,1035 @@
+[
+  {
+    "id": "single-capture",
+    "catalog": [
+      "T01",
+      "X11"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "single-capture",
+        "ops": [
+          {
+            "op": "add",
+            "title": "Buy milk"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "where": {
+          "title": "Buy milk"
+        },
+        "count": 1
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "correct-before-approval",
+    "catalog": [
+      "T02",
+      "T03"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "correct-before-approval",
+        "ops": [
+          {
+            "op": "add",
+            "title": "Buy milk"
+          },
+          {
+            "op": "add",
+            "title": "Pick up order"
+          }
+        ]
+      },
+      {
+        "title": "Corrected plan",
+        "ops": [
+          {
+            "op": "add",
+            "title": "Buy milk",
+            "date": "2026-10-16"
+          },
+          {
+            "op": "add",
+            "title": "Pick up order"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "where": {
+          "title": "Buy milk"
+        },
+        "count": 1,
+        "fields": {
+          "date": "2026-10-16"
+        }
+      },
+      {
+        "table": "tasks",
+        "where": {
+          "title": "Pick up order"
+        },
+        "count": 1
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "move-one",
+    "catalog": [
+      "T06"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "move-one",
+        "ops": [
+          {
+            "op": "place",
+            "task_id": "11111111-1111-4111-8111-111111111111",
+            "date": "2026-10-16"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "where": {
+          "id": "11111111-1111-4111-8111-111111111111"
+        },
+        "count": 1,
+        "fields": {
+          "date": "2026-10-16"
+        }
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "move-several",
+    "catalog": [
+      "T07",
+      "T11",
+      "T13"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "move-several",
+        "ops": [
+          {
+            "op": "place",
+            "task_id": "11111111-1111-4111-8111-111111111111",
+            "date": "2026-10-17"
+          },
+          {
+            "op": "place",
+            "task_id": "22222222-2222-4222-8222-222222222222",
+            "date": "2026-10-17"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "where": {
+          "id": "11111111-1111-4111-8111-111111111111"
+        },
+        "count": 1,
+        "fields": {
+          "date": "2026-10-17"
+        }
+      },
+      {
+        "table": "tasks",
+        "where": {
+          "id": "22222222-2222-4222-8222-222222222222"
+        },
+        "count": 1,
+        "fields": {
+          "date": "2026-10-17"
+        }
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "complete",
+    "catalog": [
+      "T09"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "complete",
+        "ops": [
+          {
+            "op": "done",
+            "task_id": "11111111-1111-4111-8111-111111111111"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "where": {
+          "id": "11111111-1111-4111-8111-111111111111"
+        },
+        "count": 1,
+        "fields": {
+          "completed": true
+        }
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "set-aside",
+    "catalog": [
+      "T04",
+      "T10"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "set-aside",
+        "ops": [
+          {
+            "op": "someday",
+            "task_id": "11111111-1111-4111-8111-111111111111"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "where": {
+          "id": "11111111-1111-4111-8111-111111111111"
+        },
+        "count": 1,
+        "fields": {
+          "bucket": "someday",
+          "date": null
+        }
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "assign",
+    "catalog": [
+      "T07"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "assign",
+        "ops": [
+          {
+            "op": "assign",
+            "task_id": "11111111-1111-4111-8111-111111111111",
+            "assignee": "44444444-4444-4444-8444-444444444444"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "where": {
+          "id": "11111111-1111-4111-8111-111111111111"
+        },
+        "count": 1,
+        "fields": {
+          "assignedTo": "44444444-4444-4444-8444-444444444444"
+        }
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "skip-occurrence",
+    "catalog": [
+      "T17"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "skip-occurrence",
+        "ops": [
+          {
+            "op": "routine_skip",
+            "routine_id": "33333333-3333-4333-8333-333333333333",
+            "date": "2026-10-15"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "skipped",
+        "where": {
+          "id": "33333333-3333-4333-8333-333333333333|2026-10-15"
+        },
+        "count": 1
+      },
+      {
+        "table": "routines",
+        "unchanged": true
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "change-recurring",
+    "catalog": [
+      "T19"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "change-recurring",
+        "ops": [
+          {
+            "op": "routine_change",
+            "routine_id": "33333333-3333-4333-8333-333333333333",
+            "days": [
+              "tue"
+            ],
+            "time": "15:30"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "routines",
+        "where": {
+          "id": "33333333-3333-4333-8333-333333333333"
+        },
+        "count": 1,
+        "fields": {
+          "days": [
+            "tue"
+          ],
+          "time": "15:30:00"
+        }
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "add-routine",
+    "catalog": [
+      "T20"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "add-routine",
+        "ops": [
+          {
+            "op": "routine_add",
+            "days": [
+              "sat"
+            ],
+            "time": "10:00",
+            "name": "Water plants"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "routines",
+        "where": {
+          "name": "Water plants"
+        },
+        "count": 1
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "stale-proposal",
+    "catalog": [
+      "X04"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "stale-proposal",
+        "ops": [
+          {
+            "op": "place",
+            "task_id": "11111111-1111-4111-8111-111111111111",
+            "date": "2026-10-16"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "where": {
+          "id": "11111111-1111-4111-8111-111111111111"
+        },
+        "count": 1,
+        "fields": {
+          "date": "2026-10-18"
+        }
+      }
+    ],
+    "fault": "stale",
+    "receipt": "failed"
+  },
+  {
+    "id": "rollback",
+    "catalog": [
+      "X05"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "rollback",
+        "ops": [
+          {
+            "op": "place",
+            "task_id": "11111111-1111-4111-8111-111111111111",
+            "date": "2026-10-17"
+          },
+          {
+            "op": "place",
+            "task_id": "22222222-2222-4222-8222-222222222222",
+            "date": "2026-10-17"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "unchanged": true
+      }
+    ],
+    "fault": "rollback",
+    "receipt": "failed"
+  },
+  {
+    "id": "partial-rollback",
+    "catalog": [
+      "X05"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "partial-rollback",
+        "ops": [
+          {
+            "op": "place",
+            "task_id": "11111111-1111-4111-8111-111111111111",
+            "date": "2026-10-17"
+          },
+          {
+            "op": "place",
+            "task_id": "22222222-2222-4222-8222-222222222222",
+            "date": "2026-10-17"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "tasks",
+        "where": {
+          "id": "11111111-1111-4111-8111-111111111111"
+        },
+        "count": 1,
+        "fields": {
+          "date": "2026-10-17"
+        }
+      },
+      {
+        "table": "tasks",
+        "where": {
+          "id": "22222222-2222-4222-8222-222222222222"
+        },
+        "count": 1,
+        "fields": {
+          "date": "2026-10-16"
+        }
+      }
+    ],
+    "fault": "partial",
+    "receipt": "partial"
+  },
+  {
+    "id": "move-occurrence",
+    "catalog": [
+      "T18"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "move-occurrence",
+        "ops": [
+          {
+            "op": "routine_move",
+            "routine_id": "33333333-3333-4333-8333-333333333333",
+            "date": "2026-10-15",
+            "to_date": "2026-10-16"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "occurrences",
+        "where": {
+          "id": "33333333-3333-4333-8333-333333333333|2026-10-15"
+        },
+        "count": 1,
+        "fields": {
+          "date": "2026-10-16"
+        }
+      },
+      {
+        "table": "routines",
+        "unchanged": true
+      }
+    ],
+    "undo": true
+  },
+  {
+    "id": "reassign-occurrence",
+    "catalog": [
+      "T18"
+    ],
+    "start": {
+      "tasks": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "title": "Call the plumber",
+          "scheduledFor": "2026-10-15",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "title": "Return library books",
+          "scheduledFor": "2026-10-16",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Alex"
+        }
+      ],
+      "routines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Piano",
+          "days": [
+            "thu"
+          ],
+          "time": "16:00",
+          "updatedAt": "2026-10-10T12:00:00Z"
+        }
+      ]
+    },
+    "stages": [
+      {
+        "title": "reassign-occurrence",
+        "ops": [
+          {
+            "op": "routine_who",
+            "routine_id": "33333333-3333-4333-8333-333333333333",
+            "date": "2026-10-15",
+            "assignee": "44444444-4444-4444-8444-444444444444"
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "table": "occurrences",
+        "where": {
+          "id": "33333333-3333-4333-8333-333333333333|2026-10-15"
+        },
+        "count": 1,
+        "fields": {
+          "assignee": "44444444-4444-4444-8444-444444444444"
+        }
+      },
+      {
+        "table": "routines",
+        "unchanged": true
+      }
+    ],
+    "undo": true
+  }
+]

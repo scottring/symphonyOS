@@ -29,6 +29,7 @@ export type WeekRoutine = {
 export interface WeekRead {
   start: string
   today: string
+  calendar: CalendarCoverage
   days: { date: string; events: { id: string; title: string; time: string | null }[]; tasks: { id: string; title: string; time: string | null; done: boolean; seen: string }[] }[]
   noDay: { id: string; title: string; seen: string }[]
   lastWeekUnfinished: { id: string; title: string; was: string; seen: string }[]
@@ -36,6 +37,42 @@ export interface WeekRead {
   routines: WeekRoutine[]
   talkAbouts: string[]
 }
+
+/** These tools read cached events, not a complete, live availability check. */
+export interface CalendarCoverage {
+  status: 'not-connected' | 'unavailable' | 'cached'
+  availability: 'unknown'
+  note: string
+}
+
+export async function readCalendarCoverage(
+  read: () => PromiseLike<{ data: { provider: string; sync_enabled: boolean | null }[] | null; error: unknown }>,
+  eventsReadable = true,
+): Promise<CalendarCoverage> {
+  try {
+    const { data, error } = await read()
+    if (error || !data) return unknownCalendar()
+    const connections = data.filter((c) => c.provider === 'google' || c.provider === 'outlook')
+    if (!connections.length) return {
+      status: 'not-connected', availability: 'unknown',
+      note: 'No calendar is connected. Availability is unknown. Empty event lists do not mean the person is free; plan from their tasks, routines and stated commitments.',
+    }
+    if (!eventsReadable || !connections.some((c) => c.sync_enabled !== false)) return unknownCalendar()
+    return {
+      status: 'cached', availability: 'unknown',
+      note: 'These are saved calendar events, not a verified live read of all calendars for this range. Missing events do not prove free time. Refer to what is shown in Symphony and ask about other commitments when needed.',
+    }
+  } catch {
+    // A wall device deliberately cannot inspect personal connections. Preserve
+    // that boundary; it must not turn a refused read into an empty calendar.
+    return unknownCalendar()
+  }
+}
+
+const unknownCalendar = (): CalendarCoverage => ({
+  status: 'unavailable', availability: 'unknown',
+  note: 'Calendar coverage could not be verified. Availability is unknown; do not describe the day or week as free, clear or wide open.',
+})
 
 const addDays = (ymd: string, n: number) => {
   const d = new Date(`${ymd}T12:00:00Z`)
@@ -79,7 +116,7 @@ function routineExceptions(instances: InstanceRow[], start: string, end: string,
   return byRoutine
 }
 
-export function shapeWeek(input: { start: string; today: string; tasks: TaskRow[]; events: EventRow[]; routines: RoutineRow[]; talks: { id: string; body: string }[]; instances?: InstanceRow[]; members?: { id: string; name: string }[] }): WeekRead {
+export function shapeWeek(input: { start: string; today: string; calendar?: CalendarCoverage; tasks: TaskRow[]; events: EventRow[]; routines: RoutineRow[]; talks: { id: string; body: string }[]; instances?: InstanceRow[]; members?: { id: string; name: string }[] }): WeekRead {
   const { start, today } = input
   const { end, lastStart } = weekWindow(start)
   const memberNames = new Map((input.members ?? []).map((m) => [m.id, m.name]))
@@ -97,7 +134,7 @@ export function shapeWeek(input: { start: string; today: string; tasks: TaskRow[
     }
   })
   return {
-    start, today, days,
+    start, today, calendar: input.calendar ?? unknownCalendar(), days,
     noDay: open.filter((t) => t.bucket === 'week' && !t.scheduled_for && (t.week_start ?? start) === start).map((t) => ({ id: t.id, title: t.title, seen: t.updated_at })),
     lastWeekUnfinished: open.filter((t) => { const d = ymd(t.scheduled_for); return !!d && d >= lastStart && d < start })
       .map((t) => ({ id: t.id, title: t.title, was: ymd(t.scheduled_for)!, seen: t.updated_at })),

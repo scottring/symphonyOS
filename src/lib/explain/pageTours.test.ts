@@ -36,14 +36,14 @@ describe('page-written tours', () => {
       <div data-explain="page-title">Oct 10 – 16</div>
       <span data-explain="week-sentence">Three days are full.</span>
       <span data-explain="still-to-place">No day yet</span>
-      <button data-explain="plan-walk">Plan the rest of my week</button>
+      <button data-explain="plan-walk">Help me plan the rest of my week</button>
       <section aria-label="The days">days</section>
     </div>`
     const steps = tourFor('week')
     expect(steps.map((s) => s.targets[0])).toEqual(['page-title', 'region:The days', 'week-sentence', 'still-to-place', 'plan-walk'])
     const words = [PAGE_GUIDES.week, ...(PAGE_TOURS.week ?? []).map((p) => p.text)].join(' ')
     for (const gone of [/eight steps/i, /Show opens/, /Days and Hours/, /Still to place/, /⋯/, /planning session/i]) expect(words).not.toMatch(gone)
-    expect(PAGE_GUIDES.week).toContain('Plan the rest of my week')
+    expect(PAGE_GUIDES.week).toContain('Help me plan the rest of my week')
   })
 
   it('never shows the same part twice, and a page without a tour gets none', () => {

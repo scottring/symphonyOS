@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { supabase, getAuthUser } from '@/lib/supabase'
+import { supabase as defaultSupabase, getAuthUser } from '@/lib/supabase'
 import { emitInstancesChanged } from '@/lib/instancesChangedSignal'
 import { applyProgressDelta, applyProgressExact } from '@/lib/wall/targetProgress'
 import { chainPerKey } from '@/lib/wall/chainPerKey'
@@ -38,7 +38,7 @@ function toDateString(date: Date): string {
 // write clobbers the first (lost update) — see writeProgress below.
 const progressWriteChains = new Map<string, Promise<unknown>>()
 
-export function useActionableInstances() {
+export function useActionableInstances(supabase = defaultSupabase) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

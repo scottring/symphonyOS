@@ -4,7 +4,7 @@ import { EVERYDAY_TALK_RULES, HARD_RULES, MONTH_SEASON_YEAR_NOTE, SESSION_SPINE_
 describe('session scripts', () => {
   it('holds the spine, the hard rules and the seven steps', () => {
     expect(SESSION_SPINE_PREAMBLE).toContain('Sessions follow a spine, not a script')
-    expect(HARD_RULES.split('\n')).toHaveLength(7)
+    expect(HARD_RULES.split('\n')).toHaveLength(9)
     expect(WEEKLY_PLANNING_SCRIPT).toContain("Let's plan the week of Oct 17")
     expect(WEEKLY_PLANNING_SCRIPT.split('\n')).toHaveLength(8)
     expect(HARD_RULES).toContain('(the opening read-back may take three)')

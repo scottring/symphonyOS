@@ -13,9 +13,10 @@ export function DisplaysSection() {
   const [code, setCode] = useState<PairingCode | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [checked, setChecked] = useState(false)
   const [now, setNow] = useState(() => Date.now())
 
-  const refresh = useCallback(async () => { setDisplays(await listDisplays()) }, [])
+  const refresh = useCallback(async () => { try { setDisplays(await listDisplays());setError(null);setChecked(true) } catch {setChecked(false);setError('Could not check paired displays. Try again.')} }, [])
   useEffect(() => { void refresh() }, [refresh])
   // The code's countdown.
   useEffect(() => {
@@ -27,17 +28,20 @@ export function DisplaysSection() {
   const makeCode = async () => {
     setError(null)
     setBusy(true)
-    const r = await createPairingCode('Kitchen wall')
-    setBusy(false)
-    if (!r.ok) { setError(r.error); return }
-    setCode(r.code)
-    setNow(Date.now())
+    try {
+      const r = await createPairingCode('Kitchen wall')
+      if (!r.ok) { setError(r.error); return }
+      setCode(r.code);setNow(Date.now())
+    } catch {setError('Could not make a pairing code. Try again.')} finally {setBusy(false)}
   }
   const revoke = async (d: HouseholdDisplay) => {
     setError(null)
-    const r = await revokeDisplay(d.id)
-    if (!r.ok) { setError(r.error); return }
-    await refresh()
+    setBusy(true)
+    try {
+      const r = await revokeDisplay(d.id)
+      if (!r.ok) { setError(r.error); return }
+      await refresh()
+    } catch {setError('Could not confirm revocation. Try again.')} finally {setBusy(false)}
   }
 
   const secondsLeft = code ? Math.max(0, Math.floor((code.expiresAt.getTime() - now) / 1000)) : 0
@@ -61,6 +65,9 @@ export function DisplaysSection() {
         </button>
       )}
       {error && <p role="alert" className="text-xs text-red-600 mt-2">{error}</p>}
+      {code&&secondsLeft===0&&<p role="status" className="text-xs text-neutral-500">This code expired. Make a new one when the tablet is ready.</p>}
+      <button className="onboarding-link" disabled={busy} onClick={()=>void refresh()}>Check paired displays</button>
+      {checked&&!error&&live.length===0&&<p role="status" className="text-xs text-neutral-500">No paired displays found.</p>}
       {live.length > 0 && (
         <div className="mt-3">
           {live.map((d) => (
@@ -68,8 +75,9 @@ export function DisplaysSection() {
               <div className="flex-1 min-w-0">
                 <p className="text-[16px] text-neutral-900 truncate">{d.name}</p>
                 <p className="mt-0.5 text-[12px] text-neutral-500">Paired {d.pairedAt.toLocaleDateString()}</p>
+                <p className="mt-0.5 text-[12px] text-neutral-500">{d.lastSeenAt?`Last connected ${d.lastSeenAt.toLocaleString()}`:'Waiting for its first connection'}</p>
               </div>
-              <button onClick={() => revoke(d)} className="text-xs font-medium text-danger-600 hover:text-danger-700 px-2 py-1 rounded hover:bg-danger-50 transition-colors whitespace-nowrap">
+              <button disabled={busy} onClick={() => revoke(d)} className="text-xs font-medium text-danger-600 hover:text-danger-700 px-2 py-1 rounded hover:bg-danger-50 transition-colors whitespace-nowrap">
                 Revoke
               </button>
             </div>

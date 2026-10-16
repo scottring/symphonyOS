@@ -183,10 +183,41 @@ try {
     assert.equal(sql('select sum(calls) from public.ai_provider_call_usage'), '1')
   })
   reset()
-  check('deleting a user or household cannot restore the global allowance', () => {
-    assert.equal(reserve().allowed, true)
-    sql(`delete from auth.users where id='${A}'; delete from public.households where id='${H1}'`)
-    assert.equal(sql('select sum(calls) from public.ai_provider_call_usage'), '1')
+  sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261016094000_ai_budget_reservations.sql', import.meta.url), 'utf8'))
+  sql(`truncate public.ai_provider_call_usage; truncate public.ai_budget_reservations,public.ai_spend restart identity;
+    update public.ai_usage_configuration set enabled=true,daily_cents=10000,monthly_cents=20000;
+    update public.ai_household_allowances set enabled=true,daily_calls=100,monthly_calls=1000,daily_cents=300,monthly_cents=2000;
+    update public.ai_model_prices set enabled=true where model='claude-sonnet-4-6';`)
+  // One bounded request holds 100c: 100k input * 2 * 300c/M + 26666 output * 1500c/M.
+  const funded=(user=A,input=100000,output=26666)=>`set role service_role; select public.reserve_ai_budget('${user}','symphony-agent','claude-sonnet-4-6',${input},${output});`
+  const fundedResults=await Promise.all(Array.from({length:16},()=>execAsync(join(bin,'psql'),[...args,'-c',funded()],{encoding:'utf8'}).then(r=>JSON.parse(r.stdout.trim().split('\n').at(-1)))))
+  check('16 simultaneous funded requests cannot overspend the remaining household money',()=>{
+    assert.equal(fundedResults.filter(r=>r.allowed).length,3)
+    assert.equal(Number(sql('select sum(held_cents) from public.ai_budget_reservations'))<=300,true)
+    assert.equal(fundedResults.filter(r=>!r.allowed).every(r=>r.reason==='daily_limit'),true)
+  })
+  const held=fundedResults.find(r=>r.allowed).reservation_id
+  const settle=(user=A)=>`set role service_role;select public.settle_ai_budget('${held}','${user}',1000,200);`
+  check('only service settlement of the exact reservation can release a monetary hold',()=>{
+    assert.equal(sql(settle(B)).split('\n').at(-1),'f')
+    assert.equal(sql('select count(*) from public.ai_spend'),'0')
+    assert.equal(sql(settle()).split('\n').at(-1),'t')
+    assert.equal(sql(settle()).split('\n').at(-1),'t')
+    assert.equal(sql('select count(*) from public.ai_spend'),'1')
+  })
+  check('ordinary authenticated clients cannot poison spend or bypass funded admission',()=>{
+    for(const call of ["record_ai_usage('symphony-agent','claude-sonnet-4-6',100000000,0,0)","reserve_ai_provider_call('symphony-agent','claude-sonnet-4-6')",`reserve_ai_budget('${A}','symphony-agent','claude-sonnet-4-6',1,1)`,`settle_ai_budget('${held}','${A}',0,0)`])
+      assert.throws(()=>sql(`set role authenticated;set request.jwt.claim.sub='${A}';select public.${call}`))
+    assert.equal(sql('select count(*) from public.ai_spend'),'1')
+  })
+  check('an uncertain timeout retains its full hold; another household cannot bypass the global balance',()=>{
+    assert.equal(sql('select count(*) from public.ai_budget_reservations where settled_at is null'),'2')
+    sql('update public.ai_usage_configuration set monthly_cents=200')
+    assert.equal(JSON.parse(sql(funded(C)).split('\n').at(-1)).reason,'monthly_limit')
+  })
+  check('unsupported model and negative funding are refused before a provider call',()=>{
+    assert.equal(JSON.parse(sql(funded(A,-1)).split('\n').at(-1)).allowed,false)
+    assert.equal(JSON.parse(sql(funded().replace('claude-sonnet-4-6','unpriced')).split('\n').at(-1)).allowed,false)
   })
   console.log(`${checks} local PostgreSQL checks passed. No remote database or provider was contacted.`)
 } finally {

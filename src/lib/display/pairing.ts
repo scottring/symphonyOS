@@ -49,7 +49,7 @@ export async function isDisplaySession(): Promise<boolean> {
 
 export async function listDisplays(): Promise<HouseholdDisplay[]> {
   const { data, error } = await supabase.from('household_displays').select('id, name, paired_at, last_seen_at, revoked_at').order('paired_at', { ascending: false })
-  if (error || !data) return []
+  if (error || !data) throw new Error('Could not check paired displays.')
   return (data as { id: string; name: string; paired_at: string; last_seen_at: string | null; revoked_at: string | null }[])
     .map((d) => ({ id: d.id, name: d.name, pairedAt: new Date(d.paired_at), lastSeenAt: d.last_seen_at ? new Date(d.last_seen_at) : null, revokedAt: d.revoked_at ? new Date(d.revoked_at) : null }))
 }

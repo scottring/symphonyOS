@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabase'
 import { setHomeCoords } from '@/hooks/useWeather'
 import type { GeocodedPlace } from '@/lib/geocode'
 import type { FamilyMemberColor } from '@/types/family'
+import { insertOnboardingOnce, onboardingId, saveOnboardingProgress, saveOnboardingWeekStart } from './onboarding'
+import { decodeOnboardingProgress, newOnboardingProgress } from './onboardingProgress'
+import { isWeekStart, type WeekStart } from './cadence/config'
 
 /**
  * First-run household setup: shown once to a fresh signup, never to an
@@ -15,9 +18,12 @@ export interface FirstRunSignals {
   hasTasks: boolean
   /** family_members rows visible to this account. */
   memberCount: number
+  onboardingStep?: string | null
 }
 
 export function needsFirstRun(s: FirstRunSignals): boolean {
+  const progress = decodeOnboardingProgress(s.onboardingStep)
+  if (progress) return !progress.finished && !progress.paused
   if (s.completed) return false
   if (s.hasTasks) return false          // an account that has been used
   if (s.memberCount > 1) return false   // joined an existing household
@@ -36,11 +42,13 @@ export function markFirstRunDoneLocally(userId: string) {
 
 export async function loadFirstRunSignals(userId: string): Promise<FirstRunSignals> {
   const [profile, tasks, members] = await Promise.all([
-    supabase.from('user_profiles').select('onboarding_completed_at').eq('user_id', userId).maybeSingle(),
+    supabase.from('user_profiles').select('onboarding_completed_at,onboarding_step').eq('user_id', userId).maybeSingle(),
     supabase.from('tasks').select('id', { count: 'exact', head: true }),
     supabase.from('family_members').select('id', { count: 'exact', head: true }),
   ])
+  for (const result of [profile,tasks,members]) if (result.error) throw result.error
   return {
+    onboardingStep: profile.data?.onboarding_step ?? null,
     completed: !!profile.data?.onboarding_completed_at,
     hasTasks: (tasks.count ?? 0) > 0,
     memberCount: members.count ?? 0,
@@ -67,6 +75,7 @@ export interface FirstRunForm {
   yourName: string
   others: Array<{ name: string; role: HouseholdRole }>
   home: GeocodedPlace | null
+  weekStartsOn?: WeekStart
 }
 
 export function initialsFor(name: string): string {
@@ -77,20 +86,29 @@ export function initialsFor(name: string): string {
 const OTHER_COLORS: FamilyMemberColor[] = ['purple', 'green', 'orange', 'pink', 'teal', 'blue']
 
 /**
- * Persist the first-run form. Each step is independent so a missing RPC
- * (migration not applied yet) or a failed insert does not strand the user on
- * the setup screen: the profile stamp at the end is what ends first-run.
+ * Persist the household foundation. Failures stay on this form. Completion
+ * of the whole introduction belongs to the final onboarding step.
  */
 export async function saveFirstRunSetup(userId: string, form: FirstRunForm): Promise<void> {
+  if(form.weekStartsOn!==undefined&&!isWeekStart(form.weekStartsOn))throw new Error('Choose Sunday, Monday or Saturday for the start of your week.')
   const householdName = form.householdName.trim()
   const yourName = form.yourName.trim() || 'Me'
 
+  // Persist the unfinished journey before creating people: a partial save must
+  // not make the legacy "several members means established" gate skip setup.
+  const profile = await supabase.from('user_profiles').select('onboarding_step').eq('user_id',userId).maybeSingle()
+  if (profile.error) throw profile.error
+  if (!decodeOnboardingProgress(profile.data?.onboarding_step)) {
+    await saveOnboardingProgress(userId,newOnboardingProgress())
+  }
+
   // 1. Household row + owner membership (idempotent; renames if it exists).
   const rpc = await supabase.rpc('setup_household', { p_name: householdName || null })
-  if (rpc.error) console.warn('[first-run] setup_household failed:', rpc.error.message)
+  if (rpc.error || !rpc.data) throw new Error(rpc.error?.message ?? 'Could not confirm your household. Please try again.')
+  if(form.weekStartsOn!==undefined)await saveOnboardingWeekStart(form.weekStartsOn)
 
   // 2. Your own member row: adopt the auto-seeded one if it exists.
-  const { data: self } = await supabase
+  const { data: self, error: selfError } = await supabase
     .from('family_members')
     .select('id')
     .eq('user_id', userId)
@@ -98,21 +116,21 @@ export async function saveFirstRunSetup(userId: string, form: FirstRunForm): Pro
     .is('auth_user_id', null)
     .limit(1)
     .maybeSingle()
+  if (selfError) throw selfError
   const selfRow = { name: yourName, initials: initialsFor(yourName), role_label: 'parent', member_type: 'core' }
   if (self?.id) {
-    const { error } = await supabase.from('family_members').update(selfRow).eq('id', self.id)
-    if (error) console.warn('[first-run] self member update failed:', error.message)
+    const { data, error } = await supabase.from('family_members').update(selfRow).eq('id', self.id).select('id').single()
+    if (error || !data) throw new Error(error?.message ?? 'Could not confirm your name. Please try again.')
   } else {
-    const { error } = await supabase
-      .from('family_members')
-      .insert([{ ...selfRow, user_id: userId, color: 'blue', is_full_user: true, display_order: 0, avatar_url: null }])
-    if (error) console.warn('[first-run] self member insert failed:', error.message)
+    await insertOnboardingOnce('family_members', {id:await onboardingId(userId,'self'), ...selfRow, user_id:userId, color:'blue',is_full_user:true,display_order:0,avatar_url:null})
   }
 
   // 3. Everyone else. Partners get a login later via Settings → Invite partner.
   const others = form.others.map((o) => o.name.trim() && o).filter(Boolean) as FirstRunForm['others']
   if (others.length > 0) {
-    const rows = others.map((o, i) => ({
+    for (const [i,o] of others.entries()) {
+      const row = {
+      id: await onboardingId(userId,`person:${i}`),
       user_id: userId,
       name: o.name.trim(),
       initials: initialsFor(o.name),
@@ -122,9 +140,9 @@ export async function saveFirstRunSetup(userId: string, form: FirstRunForm): Pro
       avatar_url: null,
       member_type: 'core',
       role_label: o.role,
-    }))
-    const { error } = await supabase.from('family_members').insert(rows)
-    if (error) console.warn('[first-run] member insert failed:', error.message)
+      }
+      await insertOnboardingOnce('family_members',row)
+    }
   }
 
   // 4. Home location → weather + directions default.
@@ -135,15 +153,14 @@ export async function saveFirstRunSetup(userId: string, form: FirstRunForm): Pro
     } catch { /* ignore */ }
   }
 
-  // 5. Stamp the profile (this is what ends first-run on every device).
-  await markFirstRunComplete(userId, form.home
-    ? { home_location: form.home.label, home_lat: form.home.lat, home_lng: form.home.lng }
-    : {})
+  if (form.home) {
+    const {error} = await supabase.from('user_profiles').upsert({user_id:userId,home_location:form.home.label,home_lat:form.home.lat,home_lng:form.home.lng},{onConflict:'user_id'})
+    if (error) throw error
+  }
 }
 
 /** "Skip for now": still make sure a household exists so Invite partner works. */
-export async function skipFirstRunSetup(userId: string): Promise<void> {
+export async function skipFirstRunSetup(_userId: string): Promise<void> {
   const rpc = await supabase.rpc('setup_household', { p_name: null })
-  if (rpc.error) console.warn('[first-run] setup_household failed:', rpc.error.message)
-  await markFirstRunComplete(userId)
+  if (rpc.error || !rpc.data) throw new Error(rpc.error?.message ?? 'Could not confirm your household. Please try again.')
 }

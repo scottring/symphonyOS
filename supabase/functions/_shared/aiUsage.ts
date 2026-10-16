@@ -1,4 +1,5 @@
-/** Provider-call admission, not a token/dollar budget. No local fallback: a
+import { serviceBudgetControl, textBudget, type BudgetControl } from './aiBudget.ts'
+/** Provider-call admission with a conservative monetary hold. No local fallback: a
  * missing migration/configuration or failed reservation means no paid call. */
 /** Every interactive paid route (the caller is a signed-in person). Must match
  *  the allowlist in reserve_ai_provider_call (migration 20261015110000). */
@@ -9,7 +10,7 @@ export const GUARDED_AI_ROUTES = [
   'kiosk-agent', 'math-story', 'meal-planner-chat', 'meal-slot-suggest', 'semantic-search', 'note-match',
 ] as const
 export type GuardedAiRoute = typeof GUARDED_AI_ROUTES[number]
-type UsageDb = { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }
+type UsageDb = Parameters<typeof serviceBudgetControl>[0] & { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }
 
 /** What a paid request cost, read from the provider's JSON reply (tokens) or
  *  supplied by the caller for audio (minutes). Recorded in the spend ledger
@@ -37,7 +38,9 @@ export function usageOf(body: unknown, fallbackModel: string | null): AiUsageRec
   const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : 0)
   const model = typeof b.model === 'string' ? b.model : fallbackModel
   if (!model) return null
-  const input = n(u.input_tokens ?? u.prompt_tokens)
+  // Charge cached reads at the full input rate and cache creation at 2x.
+  // This intentionally overestimates cache discounts; it never omits them.
+  const input = n(u.input_tokens ?? u.prompt_tokens) + 2*n(u.cache_creation_input_tokens) + n(u.cache_read_input_tokens)
   const output = n(u.output_tokens ?? u.completion_tokens)
   if (!input && !output) return null
   return { model, inputTokens: input, outputTokens: output, minutes: 0 }
@@ -72,29 +75,36 @@ export async function reserveAiProviderCall(db: UsageDb, route: GuardedAiRoute, 
 
 /** One reservation per outbound provider attempt, including retries/tool-loop
  * follow-ups and embeddings. Supply this only for paid provider requests. */
-export function guardedAiFetch(db: UsageDb, route: GuardedAiRoute, transport: typeof fetch = fetch, estimate?: AiUsageEstimate): typeof fetch {
-  return async (input, init) => {
-    const model = estimate?.model ?? modelOf(init)
-    await reserveAiProviderCall(db, route, model)
-    const res = await transport(input, init)
-    await recordUsage((args) => db.rpc('record_ai_usage', { ...args, p_route: route }), res, model, estimate)
-    return res
-  }
+export function guardedAiFetch(db: UsageDb, route: GuardedAiRoute, transport: typeof fetch = fetch, estimate?: AiUsageEstimate, control?: BudgetControl): typeof fetch {
+  return budgetFetch(()=>control?Promise.resolve(control):serviceBudgetControl(db),route,transport,estimate)
 }
 
-/** Record what the reply says it cost (or the caller's estimate). Best effort:
- *  a failed record never fails the call, and the reply is never consumed. */
-async function recordUsage(record: (args: Record<string, unknown>) => PromiseLike<unknown>, res: Response, model: string | null, estimate?: AiUsageEstimate): Promise<void> {
-  try {
-    let usage: AiUsageRecord | null = null
-    // A refused or failed attempt costs nothing at the provider; an estimate
-    // charged anyway locked a household out of voice after two tries (2026-10-15).
-    if (!res.ok) return
-    if (estimate) usage = { model: estimate.model, inputTokens: estimate.inputTokens ?? 0, outputTokens: estimate.outputTokens ?? 0, minutes: estimate.minutes ?? 0 }
-    else if (res.ok && /json/i.test(res.headers.get('content-type') ?? '')) usage = usageOf(await res.clone().json().catch(() => null), model)
-    if (!usage) return
-    await record({ p_model: usage.model, p_input: usage.inputTokens, p_output: usage.outputTokens, p_minutes: usage.minutes })
-  } catch { /* the ledger is for limits and reports; the person's request comes first */ }
+/** Settle only confirmed usage. A failed settlement keeps the conservative
+ * monetary hold in place; the response remains readable by the caller. */
+function budgetFetch(authority:()=>Promise<BudgetControl>,route:string,transport:typeof fetch,estimate?:AiUsageEstimate):typeof fetch {
+  let control:Promise<BudgetControl>|undefined
+  return async(input,init)=>{
+    // No guessed audio liability in the chat beta. Those routes fail before
+    // any provider call until a measured, bounded policy is supplied.
+    const budget=estimate?null:textBudget(init)
+    if(!budget) throw new AiUsageError('unavailable')
+    let owner:BudgetControl, reservation:{allowed?:boolean;reservation_id?:string;reason?:string;retry_at?:string}
+    try {
+      owner=await(control??=authority())
+      const result=await owner.db.rpc('reserve_ai_budget',{p_user:owner.userId,p_route:route,p_model:budget.model,p_input:budget.input,p_output:budget.output})
+      if(result.error) throw new Error('Reservation failed')
+      reservation=(result.data??{}) as typeof reservation
+    } catch {throw new AiUsageError('unavailable')}
+    if(reservation.allowed!==true||!reservation.reservation_id) throw new AiUsageError(reservation.reason??'unavailable',reservation.retry_at)
+    const response=await transport(input,init) // A timeout leaves its hold intact.
+    try {
+      const usage=/json/i.test(response.headers.get('content-type')??'')?usageOf(await response.clone().json().catch(()=>null),budget.model):null
+      if(usage || [400,401,403,404,422,429].includes(response.status)) {
+        await owner.db.rpc('settle_ai_budget',{p_id:reservation.reservation_id,p_user:owner.userId,p_input:usage?.inputTokens??0,p_output:usage?.outputTokens??0})
+      }
+    } catch { /* The hold stays charged when settlement cannot be confirmed. */ }
+    return response
+  }
 }
 
 /** Background paid routes: a worker or cron charging the person it works
@@ -119,11 +129,5 @@ export async function reserveAiProviderCallFor(db: ServiceDb, userId: string, ro
 
 /** One reservation per outbound provider attempt, charged to `userId`. */
 export function guardedAiFetchFor(db: ServiceDb, userId: string, route: BackgroundAiRoute, transport: typeof fetch = fetch, estimate?: AiUsageEstimate): typeof fetch {
-  return async (input, init) => {
-    const model = estimate?.model ?? modelOf(init)
-    await reserveAiProviderCallFor(db, userId, route, model)
-    const res = await transport(input, init)
-    await recordUsage((args) => db.rpc('record_ai_usage_for', { p_user: userId, ...args, p_route: route }), res, model, estimate)
-    return res
-  }
+  return budgetFetch(()=>Promise.resolve({userId,db}),route,transport,estimate)
 }

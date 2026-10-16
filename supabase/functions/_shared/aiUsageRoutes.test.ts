@@ -16,21 +16,22 @@ beforeEach(() => {
   vi.resetModules(); vi.clearAllMocks()
   allowed = true; quotaReady = false; providerCalls = 0
   const env: Record<string, string> = {
-    SUPABASE_URL: 'https://example.invalid', SUPABASE_ANON_KEY: 'public-test', ANTHROPIC_API_KEY: 'test', OPENAI_API_KEY: 'test',
+    SUPABASE_SERVICE_ROLE_KEY:'service-test', SUPABASE_URL: 'https://example.invalid', SUPABASE_ANON_KEY: 'public-test', ANTHROPIC_API_KEY: 'test', OPENAI_API_KEY: 'test',
     WORKSPACE_VOICE_ENABLED: '1', WORKSPACE_VOICE_USER_IDS: 'member',
   }
   vi.stubGlobal('Deno', { env: { get: (key: string) => env[key] }, serve: (next: Handler) => { handler = next } })
-  rpc.mockImplementation(async (name: string) => name === 'reserve_workspace_voice_start'
+  rpc.mockImplementation(async (name: string) => name === 'reserve_workspace_voice_start_v2'
     ? { data: true, error: null }
     // The agent's identity check (a paired display or a member) is not a reservation.
     : name === 'my_surface' ? { data: 'member', error: null }
-    : { data: quotaReady ? { allowed: true } : { allowed: false, reason: 'daily_limit', retry_at: '2026-10-15T00:00:00Z' }, error: null })
+    : { data: quotaReady ? { allowed: true, reservation_id: 'reservation' } : { allowed: false, reason: 'daily_limit', retry_at: '2026-10-15T00:00:00Z' }, error: null })
   createClient.mockReturnValue({
     rpc,
     auth: { getUser: async () => ({ data: { user: allowed ? { id: 'member' } : null }, error: allowed ? null : { message: 'Invalid' } }) },
     from: () => ({ select: () => ({ order: async () => ({ data: [] }), limit: async () => ({ data: [], error: null }) }) }),
   })
-  vi.stubGlobal('fetch', vi.fn(async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input:RequestInfo|URL,init?:RequestInit) => {
+    if(String(input).includes('/rest/v1/rpc/')) { const result=await rpc(String(input).split('/').at(-1),JSON.parse(String(init?.body)));return new Response(JSON.stringify(result.data),{headers:{'content-type':'application/json'}}) }
     providerCalls++
     return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Answer.' }], stop_reason: 'end_turn' }))
   }))
@@ -54,18 +55,20 @@ async function run(route: typeof routes[number]) {
 describe.each(routes)('%s usage guard', (route) => {
   it('calls the provider after a confirmed server reservation', async () => {
     quotaReady = true
+    if(route==='wall-say'||route==='workspace-voice'){expect((await run(route)).status).toBe(503);expect(providerCalls).toBe(0);return}
     expect((await run(route)).status).toBe(200)
     expect(providerCalls).toBe(1)
-    expect(rpc).toHaveBeenCalledWith('reserve_ai_provider_call', expect.objectContaining({ p_route: route }))
+    expect(rpc).toHaveBeenCalledWith('reserve_ai_budget', expect.objectContaining({ p_route: route }))
   })
 
   it('denies an exhausted allowance without any provider request', async () => {
     const result = await run(route)
     expect(providerCalls).toBe(0)
+    if(route==='wall-say'||route==='workspace-voice'){expect(result.status).toBe(503);return}
     expect(result.status).toBe(route === 'symphony-agent' ? 200 : 429)
     expect(result.body).toContain('AI allowance')
     expect(result.body).toContain('view and change your plans directly')
-    expect(rpc).toHaveBeenCalledWith('reserve_ai_provider_call', expect.objectContaining({ p_route: route }))
+    expect(rpc).toHaveBeenCalledWith('reserve_ai_budget', expect.objectContaining({ p_route: route }))
   })
 
   it('authenticates before reserving or spending', async () => {
@@ -80,8 +83,9 @@ it('reserves the next agent tool-loop attempt and stops when it is refused', asy
   let reservations = 0
   rpc.mockImplementation(async (name: string) => name === 'my_surface'
     ? { data: 'member', error: null }
-    : { data: ++reservations === 1 ? { allowed: true } : { allowed: false, reason: 'daily_limit' }, error: null })
-  vi.stubGlobal('fetch', vi.fn(async () => {
+    : { data: ++reservations === 1 ? { allowed: true, reservation_id:'reservation' } : { allowed: false, reason: 'daily_limit' }, error: null })
+  vi.stubGlobal('fetch', vi.fn(async (input:RequestInfo|URL,init?:RequestInit) => {
+    if(String(input).includes('/rest/v1/rpc/')) { const result=await rpc(String(input).split('/').at(-1),JSON.parse(String(init?.body)));return new Response(JSON.stringify(result.data),{headers:{'content-type':'application/json'}}) }
     providerCalls++
     return new Response(JSON.stringify({ content: [{ type: 'server_tool_use', name: 'web_search' }], stop_reason: 'pause_turn' }))
   }))

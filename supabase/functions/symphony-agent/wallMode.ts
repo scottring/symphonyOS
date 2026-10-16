@@ -22,13 +22,18 @@
 // Nothing here applies when `surface` is absent: toolsForSurface,
 // systemForSurface and fenceDb hand back exactly what they were given.
 
-export type Surface = 'wall'
+import { ONBOARDING_PROMPT, ONBOARDING_TOOLS } from './onboardingMode.ts'
+import { ACTIVITY_PROMPT, ACTIVITY_TOOLS, ACTIVITY_PROPOSE_TOOL } from './onboardingActivities.ts'
+
+export type Surface = 'wall' | 'onboarding' | 'onboarding_activity'
 
 /** The request's `surface`. Absent → the desktop/phone agent, unchanged. */
 export function parseSurface(raw: unknown): { surface: Surface | null } | { error: string } {
   if (raw === undefined || raw === null) return { surface: null }
   if (raw === 'wall') return { surface: 'wall' }
-  return { error: 'surface must be "wall" when given' }
+  if (raw === 'onboarding') return { surface: 'onboarding' }
+  if (raw === 'onboarding_activity') return { surface: 'onboarding_activity' }
+  return { error: 'surface must be "wall", "onboarding" or "onboarding_activity" when given' }
 }
 
 export const SCRATCHPAD_TOOL = {
@@ -75,12 +80,16 @@ export const WALL_TOOL_NAMES: ReadonlySet<string> = new Set([...WALL_READ_TOOLS,
 
 /** May this tool run for this surface? Desktop: anything it was offered. */
 export function toolAllowed(name: string, surface: Surface | null): boolean {
+  if (surface === 'onboarding_activity') return ACTIVITY_TOOLS.has(name)
+  if (surface === 'onboarding') return ONBOARDING_TOOLS.has(name)
   return !surface || WALL_TOOL_NAMES.has(name)
 }
 
 /** The Symphony tools to offer. Desktop gets the very same list back. */
 export function toolsForSurface<T extends { name?: string }>(tools: readonly T[], surface: Surface | null): readonly T[] {
   if (!surface) return tools
+  if (surface === 'onboarding_activity') return tools.filter(t=>!!t.name&&ACTIVITY_TOOLS.has(t.name)).map(t=>t.name===ACTIVITY_PROPOSE_TOOL.name?ACTIVITY_PROPOSE_TOOL as unknown as T:t)
+  if (surface === 'onboarding') return tools.filter(t => !!t.name && ONBOARDING_TOOLS.has(t.name))
   return [...tools.filter((t) => !!t.name && WALL_TOOL_NAMES.has(t.name)), SCRATCHPAD_TOOL as unknown as T]
 }
 
@@ -96,6 +105,8 @@ export const WALL_PROMPT_SECTION = `On the kitchen wall (this conversation). The
 
 /** The system prompt for this surface. Desktop gets the very same string back. */
 export function systemForSurface(base: string, surface: Surface | null): string {
+  if (surface === 'onboarding_activity') return `${base}\n\n${ACTIVITY_PROMPT}`
+  if (surface === 'onboarding') return `${base}\n\n${ONBOARDING_PROMPT}`
   return surface ? `${base}\n\n${WALL_PROMPT_SECTION}` : base
 }
 

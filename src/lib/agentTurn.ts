@@ -35,6 +35,7 @@ export const WRITE_TOOLS = new Set([
 ])
 
 export interface AgentTurnHandlers {
+  surface?: 'wall' | 'onboarding' | 'onboarding_activity'
   onPlanSaved?: (saved: { id: string; level: number; date: string }) => void
   onWorkspace?: (page:string,date?:string)=>void
   workspaceContext?: WorkspaceContext
@@ -146,6 +147,7 @@ export async function runAgentTurn(
       onChangeSet: handlers.onChangeSet,
       onPoint: handlers.onPoint,
       turnId: handlers.turnId,
+      surface: handlers.surface,
       workspaceContext: handlers.workspaceContext,
       changeCard: handlers.changeCard,
       onWorkspace: handlers.onWorkspace,
@@ -160,7 +162,9 @@ export async function runAgentTurn(
   }
 
   if (text.length === 0) {
-    text = streamError
+    text = !streamError && outcome?.state === 'proposed'
+      ? 'The updated plan is ready to review. Nothing is saved until you approve.'
+      : !streamError && outcome?.say?.trim() ? outcome.say : streamError
       ? `Something went wrong on my end (${streamError}). Please try that again.`
       : 'Something went wrong on my end — please try that again.'
     handlers.onFallbackText?.(text)

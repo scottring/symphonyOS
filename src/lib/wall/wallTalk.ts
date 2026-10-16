@@ -44,17 +44,17 @@ export function talkIntent(text: string, cardUp: boolean): TalkIntent | null {
 
 /** What the wall says to start planning: the desktop Week page's own opening
  *  (weekWalk in src/components/home/week/WeekViewV2.tsx) for the week we are
- *  in — "Plan the week." on its first day, the next week by its start on its
- *  last day, "Plan the rest of my week." between. */
+ *  in — "Help me plan the week." on its first day, the next week by its start on its
+ *  last day, "Help me plan the rest of my week." between. */
 export function wallPlanOpening(now: Date, weekStartsOn: WeekStart): string {
   const anchor = weekStartAnchor(now, weekStartsOn)
-  if (localYmd(now) === localYmd(anchor)) return 'Plan the week.'
+  if (localYmd(now) === localYmd(anchor)) return 'Help me plan the week.'
   const lastDay = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 6)
   if (localYmd(now) === localYmd(lastDay)) {
     const next = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 7)
-    return `Plan the week of ${next.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
+    return `Help me plan the week of ${next.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
   }
-  return 'Plan the rest of my week.'
+  return 'Help me plan the rest of my week.'
 }
 
 /** Rejects with 'timeout' when the promise takes longer than `ms`; `onTimeout`

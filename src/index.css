@@ -3273,6 +3273,8 @@ div.chooser-action-group { overflow: visible !important; }
 
 .pv2-toolbar, .pv2-sbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 26px; }
 .pv2-toolbar { padding-bottom: 14px; border-bottom: 1px solid var(--color-neutral-200); }
+.pv2-planning-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.pv2-planning-actions > .pv2-btn { white-space: normal; text-align: left; }
 .pv2-sbar { padding: 12px 16px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-left: 3px solid var(--color-primary-500); border-radius: 12px; box-shadow: 0 18px 40px -24px rgb(0 0 0 / .3); }
 .pv2-st { font: 500 17px var(--font-family-display); }
 .pv2-st small { font: 400 13px var(--font-family-sans); color: var(--color-neutral-500); margin-left: 8px; }
@@ -3589,6 +3591,8 @@ div.chooser-action-group { overflow: visible !important; }
 @media (max-width: 640px) {
   .pv2-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; align-items: center; }
   .pv2-toolbar > .pv2-status { grid-column: 1; grid-row: 1; margin: 0; }
+  .pv2-toolbar:has(.pv2-planning-actions) > .pv2-status { grid-column: 1 / -1; }
+  .pv2-toolbar > .pv2-planning-actions { grid-column: 1 / -1; grid-row: 2; }
   .pv2-toolbar > .pv2-btn, .pv2-toolbar > .pv2-qbtn { grid-column: 2; grid-row: 1; }
   .pv2-toolbar > .pv2-seg { grid-column: 1 / -1; grid-row: 2; display: flex; }
   .pv2-toolbar > .pv2-seg button { flex: 1; min-height: 36px; }

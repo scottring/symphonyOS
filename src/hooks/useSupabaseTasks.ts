@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase as defaultSupabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
 import { showToast } from './useToast'
@@ -487,7 +487,7 @@ async function loadTasks(
 
   const request = (async (): Promise<Task[] | null> => {
     // RLS policies handle household sharing - no need to filter by user_id.
-    const { data, error } = await supabase
+    const { data, error } = await defaultSupabase
       .from('tasks')
       .select('*')
       .order('created_at', { ascending: false })
@@ -504,8 +504,8 @@ async function loadTasks(
     let focus: DbTaskFocus[] | null = null
     try {
       const [cRes, fRes] = await Promise.all([
-        supabase.from('task_commitments').select('*'),
-        supabase.from('task_focus').select('*'),
+        defaultSupabase.from('task_commitments').select('*'),
+        defaultSupabase.from('task_focus').select('*'),
       ])
       commitments = Array.isArray(cRes?.data) ? (cRes.data as DbTaskCommitment[]) : null
       focus = Array.isArray(fRes?.data) ? (fRes.data as DbTaskFocus[]) : null
@@ -592,7 +592,7 @@ function nestSubtasks(tasks: Task[]): Task[] {
   return result
 }
 
-export function useSupabaseTasks() {
+export function useSupabaseTasks(supabase = defaultSupabase) {
   const { user } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)

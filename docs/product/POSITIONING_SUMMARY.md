@@ -14,6 +14,24 @@
 
 ---
 
+## Capture first; structure together
+
+Clarified by Scott, 2026-10-15: Symphony is a “post-scribed” platform. People
+capture their ideas, goals, tasks and routines before they need a finished plan.
+Symphony helps organise that material and bring it into attention at the right
+time and planning horizon. Capturing something is not a commitment to do it now.
+
+The AI contributes questions, connections, conflict checks and options for
+structuring the person’s own activities. Intentions, priorities and commitments
+remain theirs. Open time does not need filling, and an idea can stay undated or
+wait for a later period. This is the existing “Structures, never supplies” rule
+in the planning-by-conversation design.
+
+Use invitations such as **“Help me plan the rest of my week”**. The wording
+should convey collaboration and preserve the person’s ownership of the plan.
+
+---
+
 ## The Three Pillars
 
 ### 1. Context-Linking (What Makes Us Different)

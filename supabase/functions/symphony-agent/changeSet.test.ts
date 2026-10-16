@@ -208,6 +208,15 @@ describe('routine ops: from now on', () => {
       { op: 'routine_skip', routine_id: R, date: '2026-10-16' },
     ])).toHaveLength(2)
   })
+  it('accepts explicit display choices, including a display-only edit, and rejects ambiguous values', () => {
+    expect(ok([{op:'routine_add',name:'Vitamins',days:['mon'],show_on_timeline:false}])[0]).toMatchObject({showOnTimeline:false})
+    expect(ok([{op:'routine_change',routine_id:R,show_on_timeline:true}])[0]).toMatchObject({showOnTimeline:true})
+    for (const value of ['false',null,0]) {
+      expect(err([{op:'routine_add',name:'Vitamins',show_on_timeline:value}])).toContain('show_on_timeline')
+      expect(err([{op:'routine_change',routine_id:R,show_on_timeline:value}])).toContain('show_on_timeline')
+    }
+    expect(err([{op:'routine_rest',routine_id:R,show_on_timeline:false}])).toContain('show_on_timeline')
+  })
   it('names every op in an unknown-op error', () => {
     expect(err([{ op: 'routine_delete', routine_id: R }])).toContain('routine_rest')
   })
@@ -318,7 +327,8 @@ describe('agent wiring', () => {
   })
   it('resolves routines and merged tasks through the same RLS client', () => {
     expect(src).toContain("tdb.from('routines').select('id, name, updated_at, parent_routine_id').in('id', routineIds)")
-    expect(src).toMatch(/resolveRefs\(parsed\.set, tasksRead\.data \?\? \[\], membersRead\.data \?\? \[\], routinesRead\.data \?\? \[\], planRead\)/)
+    expect(src).toContain('resolveRefs(parsed.set, (tasksRead.data ?? []).map')
+    expect(src).toContain('membersRead.data ?? [], routinesRead.data ?? [], planRead)')
     expect(src).toContain('loadPlanRefs(tdb, planIds,')
     expect(src).toContain('[o.taskId, o.fromTaskId]')
   })
@@ -611,4 +621,21 @@ describe('agent wiring: Month, Season and Year talk-first', () => {
     expect(src).toContain("const WALL_CARD_OPS = new Set(['place', 'unplace', 'add', 'someday', 'assign'])")
     expect(src).toContain('hasPlanOps && !wallRefused')
   })
+})
+
+
+it('keeps exact task identity and chosen date in pending conversation context',()=>{
+ const note=changeCardNote({state:'pending',title:'Library books',ops:[{op:'place',title:'Return library books',where:'Saturday',taskId:'library-id',date:'2026-10-17'}]})
+ expect(note).toContain('"taskId":"library-id"')
+ expect(note).toContain('"date":"2026-10-17"')
+})
+
+
+it('rejects an unchanged gate-latch move while allowing a real time change',()=>{
+ const parsed=changeSetFromInput({ops:[{op:'place',task_id:A,date:'2026-10-16'}]},'gate')
+ if('error' in parsed)throw new Error(parsed.error)
+ const tasks=[{id:A,title:'Fix the gate latch',updated_at:'now',completed:false,placement:{date:'2026-10-16'}}]
+ expect(resolveRefs(parsed.set,tasks,[])).toHaveProperty('error',expect.stringContaining('already scheduled'))
+ parsed.set.ops[0].time='16:00'
+ expect(resolveRefs(parsed.set,tasks,[])).toHaveProperty('set')
 })

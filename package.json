@@ -16,7 +16,12 @@
     "test:e2e:ui": "playwright test --ui",
     "narration": "tsx scripts/generate-narration.ts",
     "vault:sync": "tsx scripts/vault-sync.ts",
-    "prepare": "git config core.hooksPath .githooks"
+    "prepare": "git config core.hooksPath .githooks",
+    "test:conversation": "node scripts/conversation-bench/run-offline.mjs",
+    "bench:coverage": "node scripts/conversation-bench/coverage.mjs",
+    "bench:audio": "node scripts/conversation-bench/audio.mjs",
+    "bench:transactions": "node scripts/conversation-bench/transactions-browser.mjs",
+    "bench:audio:fixtures": "python3 scripts/conversation-bench/generate-audio.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -80,6 +85,7 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
     "vitest": "^2.1.9",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "ws": "^8.18.2"
   }
 }

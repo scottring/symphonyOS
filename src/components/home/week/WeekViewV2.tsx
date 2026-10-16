@@ -69,7 +69,6 @@ import { dayFreeWindows, formatFree } from '@/lib/week/dayShape'
 import { parseSpecials } from '@/lib/today/specials'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
-import { changePreview, withPreview } from '@/components/canvas/week/changePreview'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
 import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
@@ -158,25 +157,25 @@ const DAILY_KEY = 'symphony-week-daily'
 const weekIsCurrentFor = (anchor: Date) => sameDay(anchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
 
 /**
- * The page's walk into planning by conversation. This week: "Plan the week"
- * on its first day, "Plan the rest of my week" after. On its last day (Friday,
+ * The page's walk into planning by conversation. This week: "Help me plan the week"
+ * on its first day, "Help me plan the rest of my week" after. On its last day (Friday,
  * for a Saturday week) there is nothing left to plan, so it offers the next
- * week by number, as the old step did ("Plan week 43"). A week ahead offers
- * "Plan the week". Whenever the week is not this one, the message names its
+ * week by number, as the old step did ("Help me plan week 43"). A week ahead offers
+ * "Help me plan the week". Whenever the week is not this one, the message names its
  * start, so Symphony reads and plans that week. A past week offers nothing.
  */
 function weekWalk(anchor: Date, now: Date): { label: string; message: string } | null {
   const wso = readCadenceConfig().weekStartsOn
   const current = weekStartAnchor(now, wso)
-  const named = (d: Date) => `Plan the week of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
+  const named = (d: Date) => `Help me plan the week of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
   if (sameDay(anchor, current)) {
-    if (localYmd(now) === localYmd(anchor)) return { label: 'Plan the week', message: 'Plan the week.' }
+    if (localYmd(now) === localYmd(anchor)) return { label: 'Help me plan the week', message: 'Help me plan the week.' }
     const next = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 7)
     const lastDay = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 6)
-    if (localYmd(now) === localYmd(lastDay)) return { label: `Plan week ${weekOfYear(next, wso)}`, message: named(next) }
-    return { label: 'Plan the rest of my week', message: 'Plan the rest of my week.' }
+    if (localYmd(now) === localYmd(lastDay)) return { label: `Help me plan week ${weekOfYear(next, wso)}`, message: named(next) }
+    return { label: 'Help me plan the rest of my week', message: 'Help me plan the rest of my week.' }
   }
-  return anchor.getTime() > current.getTime() ? { label: 'Plan the week', message: named(anchor) } : null
+  return anchor.getTime() > current.getTime() ? { label: 'Help me plan the week', message: named(anchor) } : null
 }
 
 
@@ -230,12 +229,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // workweek); the list and the pin key on the week ANCHOR, like belongsToWeek.
   const weekAnchor = useMemo(() => weekStartAnchor(weekStart, readCadenceConfig().weekStartsOn), [weekStart])
   useEffect(() => { publishViewedWeek(weekAnchor) }, [weekAnchor])
-  // Planning the week is a conversation: the bar offers it (weekWalk).
+  // Keep the conversation invitation beside the week's status, even when
+  // Chat is closed. It is also available inside the conversation itself.
   const walk = weekWalk(weekAnchor, new Date())
-  const walkInBar = useConversationWalk(walk)
-  // Phones have no bar: the page offers the same walk, sent the same way.
+  useConversationWalk(walk)
   const { openAssistant } = useAssistantLauncher()
-  const pageWalk = walk && !walkInBar ? { label: walk.label, onStart: () => openAssistant({ message: walk.message, autoSend: true }) } : undefined
+  const pageWalk = walk ? { label: walk.label, onStart: () => openAssistant({ message: walk.message, autoSend: true }) } : undefined
   // Only unmount clears it — a cleanup on every change published null → week
   // and defeated the signal's same-week dedupe.
   useEffect(() => () => publishViewedWeek(null), [])
@@ -799,7 +798,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
         weather: forecast[d.key] ? <DayWeather weather={forecast[d.key]} narrow={false} /> : undefined,
         // The hours with nothing scheduled ("Calendar clear 10:30a–4:15p"),
         // not a promise of spare time: untimed tasks still want some.
-        free: d.date >= todayStart ? formatFree(dayFreeWindows(whole.get(d.key)?.entries ?? d.entries)) : undefined,
+        free: d.date >= todayStart && sources?.events === 'ready'
+          ? formatFree(dayFreeWindows(whole.get(d.key)?.entries ?? d.entries)) : undefined,
       }
     })
     const lines = [
@@ -807,11 +807,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
       { label: 'Weekdays', items: rhythm.weekdays.map((r) => ({ title: r.title, openId: r.openId })) },
     ]
     return { days, lines, hasDaily }
-  }, [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners])
-  // A pending change card, drawn dashed on its days; what it moves leaves its current spot.
-  const { changeSet } = activity
-  const preview = useMemo(() => changePreview(changeSet, tasks), [changeSet, tasks])
-  const shown = useMemo(() => withPreview(canvasDays.days, shelf, preview), [canvasDays.days, shelf, preview])
+  }, [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners, sources?.events])
+  // Beta: drafts stay in chat. The week always shows the stored plan;
+  // successful writes reach it through the shared task hooks.
 
   const canvasWriters = useMemo<WeekCanvasWriters>(() => {
     const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -897,7 +895,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
   ])), [dayChoices])
   const weekCanvas = () => (
-    <WeekCanvas weekStart={weekAnchor} days={shown.days} shelf={shown.shelf} routinesToPlace={routinesToPlace}
+    <WeekCanvas weekStart={weekAnchor} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers}
       daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}

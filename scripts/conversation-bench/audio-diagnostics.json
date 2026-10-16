@@ -1,0 +1,32 @@
+{
+  "models": [
+    "gpt-4o-mini-transcribe",
+    "gpt-realtime-whisper"
+  ],
+  "maxAudioSeconds": 60,
+  "clips": [
+    {
+      "id": "noise-clean-control",
+      "file": "audio-fixtures/noise-clean-control.wav",
+      "reference": "Put milk on the grocery list.",
+      "requiredTerms": [
+        "milk",
+        "grocery"
+      ],
+      "provenance": "synthetic control: Karen without added noise",
+      "maxWordErrorRate": 0.15
+    },
+    {
+      "id": "noise-near-field",
+      "file": "audio-fixtures/background-noise.wav",
+      "reference": "Put milk on the grocery list.",
+      "requiredTerms": [
+        "milk",
+        "grocery"
+      ],
+      "provenance": "synthetic-stress: seeded white noise at 12 dB SNR",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    }
+  ]
+}

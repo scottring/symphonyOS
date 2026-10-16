@@ -6,55 +6,200 @@
   "today": "2026-10-14",
   "weekStart": "2026-10-11",
   "start": {
-    "members": [{ "id": "m-a", "name": "Alex" }],
+    "members": [
+      {
+        "id": "m-a",
+        "name": "Alex"
+      }
+    ],
     "tasks": [],
     "routines": [
-      { "id": "7a1b2c3d-0000-4000-8000-00000000a001", "name": "Piano practice", "days": ["thu"], "time": "16:30", "updatedAt": "2026-10-01T12:00:00Z" }
+      {
+        "id": "7a1b2c3d-0000-4000-8000-00000000a001",
+        "name": "Piano practice",
+        "days": [
+          "thu"
+        ],
+        "time": "16:30",
+        "updatedAt": "2026-10-01T12:00:00Z"
+      }
     ]
   },
   "steps": [
     {
       "say": "No piano this Thursday, Kaleb has a field trip.",
       "expect": {
-        "outcome": ["proposed"],
-        "tools": [
-          { "name": "symphony_read_week", "input": { "week_start": "2026-10-11" } },
-          { "name": "symphony_propose_changes", "input": { "title": "1 change to your week", "week_start": "2026-10-11", "ops": [
-            { "op": "routine_skip", "routine_id": "7a1b2c3d-0000-4000-8000-00000000a001", "date": "2026-10-15" }
-          ] } }
+        "outcome": [
+          "proposed"
         ],
-        "card": { "ops": 1 },
-        "routines": { "unchanged": ["7a1b2c3d-0000-4000-8000-00000000a001"] }
+        "tools": [
+          {
+            "name": "symphony_read_week",
+            "input": {
+              "week_start": "2026-10-11"
+            }
+          },
+          {
+            "name": "symphony_propose_changes",
+            "input": {
+              "title": "1 change to your week",
+              "week_start": "2026-10-11",
+              "ops": [
+                {
+                  "op": "routine_skip",
+                  "routine_id": "7a1b2c3d-0000-4000-8000-00000000a001",
+                  "date": "2026-10-15"
+                }
+              ]
+            }
+          }
+        ],
+        "card": {
+          "ops": 1,
+          "contains": [
+            {
+              "op": "routine_skip",
+              "routineId": "7a1b2c3d-0000-4000-8000-00000000a001",
+              "date": "2026-10-15"
+            }
+          ]
+        },
+        "routines": {
+          "unchanged": [
+            "7a1b2c3d-0000-4000-8000-00000000a001"
+          ]
+        }
       },
-      "forbid": { "tools": ["symphony_update_routine", "symphony_create_routine"] },
+      "forbid": {
+        "tools": [
+          "symphony_update_routine",
+          "symphony_create_routine"
+        ]
+      },
       "note": "A named day means this week only: one routine_skip on that occurrence; the routine's rule is untouched."
     },
     {
       "action": "approve",
-      "expect": { "outcome": ["saved"], "routines": { "unchanged": ["7a1b2c3d-0000-4000-8000-00000000a001"], "skipped": [["7a1b2c3d-0000-4000-8000-00000000a001", "2026-10-15"]] } }
+      "expect": {
+        "outcome": [
+          "saved"
+        ],
+        "routines": {
+          "unchanged": [
+            "7a1b2c3d-0000-4000-8000-00000000a001"
+          ],
+          "skipped": [
+            [
+              "7a1b2c3d-0000-4000-8000-00000000a001",
+              "2026-10-15"
+            ]
+          ]
+        }
+      }
     },
     {
       "say": "Actually piano is moving to Tuesdays at 4 from now on.",
       "expect": {
-        "outcome": ["proposed"],
-        "tools": [
-          { "name": "symphony_propose_changes", "input": { "title": "1 change", "ops": [
-            { "op": "routine_change", "routine_id": "7a1b2c3d-0000-4000-8000-00000000a001", "days": ["tue"], "time": "16:00" }
-          ] } }
+        "outcome": [
+          "proposed"
         ],
-        "card": { "ops": 1 },
-        "routines": { "unchanged": ["7a1b2c3d-0000-4000-8000-00000000a001"], "skipped": [["7a1b2c3d-0000-4000-8000-00000000a001", "2026-10-15"]] }
+        "tools": [
+          {
+            "name": "symphony_propose_changes",
+            "input": {
+              "title": "1 change",
+              "ops": [
+                {
+                  "op": "routine_change",
+                  "routine_id": "7a1b2c3d-0000-4000-8000-00000000a001",
+                  "days": [
+                    "tue"
+                  ],
+                  "time": "16:00"
+                }
+              ]
+            }
+          }
+        ],
+        "card": {
+          "ops": 1,
+          "contains": [
+            {
+              "op": "routine_change",
+              "routineId": "7a1b2c3d-0000-4000-8000-00000000a001",
+              "days": [
+                "tue"
+              ],
+              "time": "16:00"
+            }
+          ]
+        },
+        "routines": {
+          "unchanged": [
+            "7a1b2c3d-0000-4000-8000-00000000a001"
+          ],
+          "skipped": [
+            [
+              "7a1b2c3d-0000-4000-8000-00000000a001",
+              "2026-10-15"
+            ]
+          ]
+        }
       },
-      "forbid": { "tools": ["symphony_update_routine"] },
+      "forbid": {
+        "tools": [
+          "symphony_update_routine"
+        ]
+      },
       "note": "\"From now on\" is a lasting change: routine_change on the card, nothing written until Approve; this week's skip stays."
     },
     {
       "action": "approve",
-      "expect": { "outcome": ["saved"], "routines": { "rule": { "7a1b2c3d-0000-4000-8000-00000000a001": { "days": ["tue"], "time": "16:00:00" } }, "skipped": [["7a1b2c3d-0000-4000-8000-00000000a001", "2026-10-15"]] } }
+      "expect": {
+        "outcome": [
+          "saved"
+        ],
+        "routines": {
+          "rule": {
+            "7a1b2c3d-0000-4000-8000-00000000a001": {
+              "days": [
+                "tue"
+              ],
+              "time": "16:00:00"
+            }
+          },
+          "skipped": [
+            [
+              "7a1b2c3d-0000-4000-8000-00000000a001",
+              "2026-10-15"
+            ]
+          ]
+        }
+      }
     },
     {
       "action": "undo-set",
-      "expect": { "outcome": ["saved"], "routines": { "rule": { "7a1b2c3d-0000-4000-8000-00000000a001": { "days": ["thu"], "time": "16:30:00" } }, "skipped": [["7a1b2c3d-0000-4000-8000-00000000a001", "2026-10-15"]] } },
+      "expect": {
+        "outcome": [
+          "saved"
+        ],
+        "routines": {
+          "rule": {
+            "7a1b2c3d-0000-4000-8000-00000000a001": {
+              "days": [
+                "thu"
+              ],
+              "time": "16:30:00"
+            }
+          },
+          "skipped": [
+            [
+              "7a1b2c3d-0000-4000-8000-00000000a001",
+              "2026-10-15"
+            ]
+          ]
+        }
+      },
       "note": "Undo of the lasting change puts the rule back; the earlier approved skip is a separate set and stays."
     }
   ]

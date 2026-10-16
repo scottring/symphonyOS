@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { shapeWeek, weekWindow } from './readWeek'
+import { readCalendarCoverage, shapeWeek, weekWindow } from './readWeek'
+
+describe('calendar coverage', () => {
+  it('distinguishes no connection from a connected but empty cache', async () => {
+    const disconnected = await readCalendarCoverage(async () => ({ data: [], error: null }))
+    const cached = await readCalendarCoverage(async () => ({ data: [{ provider: 'google', sync_enabled: true }], error: null }))
+    expect(disconnected.status).toBe('not-connected')
+    expect(cached.status).toBe('cached')
+    expect(disconnected.availability).toBe('unknown')
+    expect(cached.availability).toBe('unknown')
+    const week = shapeWeek({ start: '2026-10-10', today: '2026-10-14', tasks: [], events: [], routines: [], talks: [], calendar: disconnected })
+    expect(week.calendar).toEqual(disconnected)
+    expect(week.days.every((d) => d.events.length === 0)).toBe(true)
+  })
+  it('keeps unavailable, fenced, disabled and failed event reads unknown', async () => {
+    const results = await Promise.all([
+      readCalendarCoverage(async () => ({ data: null, error: { message: 'unavailable' } })),
+      readCalendarCoverage(() => { throw new Error('not available on the kitchen wall') }),
+      readCalendarCoverage(async () => ({ data: [{ provider: 'google', sync_enabled: false }], error: null })),
+      readCalendarCoverage(async () => ({ data: [{ provider: 'google', sync_enabled: true }], error: null }), false),
+    ])
+    for (const result of results) expect(result).toMatchObject({ status: 'unavailable', availability: 'unknown' })
+  })
+  it('never infers coverage when the caller supplies only an empty event list', () => {
+    expect(shapeWeek({ start: '2026-10-10', today: '2026-10-14', tasks: [], events: [], routines: [], talks: [] }).calendar)
+      .toMatchObject({ status: 'unavailable', availability: 'unknown' })
+  })
+})
 
 const t = (x: Record<string, unknown>) => ({ id: 'x', title: 'X', scheduled_for: null, is_all_day: null, bucket: 'inbox', week_start: null, completed: false, assigned_to: null, updated_at: 'u', ...x })
 

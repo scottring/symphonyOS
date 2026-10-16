@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase as defaultSupabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { shareInFlight } from '@/lib/sharedRequest'
 import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
@@ -95,10 +95,10 @@ type GoalsLoad = { areas: GoalArea[]; goals: Goal[]; actions: GoalAction[]; mile
 function loadGoals(key: string): Promise<GoalsLoad> {
   return shareInFlight(`goals:${key}`, async (): Promise<GoalsLoad> => {
     const [areasRes, goalsRes, actionsRes, milestonesRes] = await Promise.all([
-      supabase.from('goal_areas').select('*').order('sort_order'),
-      supabase.from('goals').select('*').order('sort_order'),
-      supabase.from('goal_actions').select('*').order('sort_order'),
-      supabase.from('goal_milestones').select('*').order('sort_order'),
+      defaultSupabase.from('goal_areas').select('*').order('sort_order'),
+      defaultSupabase.from('goals').select('*').order('sort_order'),
+      defaultSupabase.from('goal_actions').select('*').order('sort_order'),
+      defaultSupabase.from('goal_milestones').select('*').order('sort_order'),
     ])
     if (areasRes.error) throw areasRes.error
     if (goalsRes.error) throw goalsRes.error
@@ -121,7 +121,7 @@ function loadGoals(key: string): Promise<GoalsLoad> {
 // looks back at the one before it, so a fetch pinned to the calendar year left
 // both of those empty (final review, Phase 3). Consumers all filter by
 // `g.year` themselves.
-export function useGoals() {
+export function useGoals(supabase = defaultSupabase) {
   const { user } = useAuth()
   const { members: familyMembers } = useFamilyMembers()
   /** Only the default for a goal created without an explicit year. */

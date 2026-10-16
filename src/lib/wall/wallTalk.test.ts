@@ -20,16 +20,16 @@ describe('talkIntent: words that act on the wall itself', () => {
     expect(talkIntent('not now', false)).toBeNull()
   })
   it('"plan the week" starts planning, card or not', () => {
-    for (const s of ['Plan the week', "Let's plan the week", 'plan the rest of the week', 'Hey Symphony, plan our week.']) expect(talkIntent(s, false)).toBe('plan-week')
+    for (const s of ['Help me plan the week', "Let's plan the week", 'plan the rest of the week', 'Hey Symphony, plan our week.']) expect(talkIntent(s, false)).toBe('plan-week')
     expect(talkIntent('plan dinner on Tuesday', false)).toBeNull()
   })
 })
 
 describe('wallPlanOpening: the desktop Week page’s opening phrase', () => {
   it('first day, middle and last day of the week', () => {
-    expect(wallPlanOpening(new Date(2026, 9, 12, 9), 1)).toBe('Plan the week.') // Monday
-    expect(wallPlanOpening(today, 1)).toBe('Plan the rest of my week.')
-    expect(wallPlanOpening(new Date(2026, 9, 18, 9), 1)).toBe('Plan the week of Oct 19.') // Sunday
+    expect(wallPlanOpening(new Date(2026, 9, 12, 9), 1)).toBe('Help me plan the week.') // Monday
+    expect(wallPlanOpening(today, 1)).toBe('Help me plan the rest of my week.')
+    expect(wallPlanOpening(new Date(2026, 9, 18, 9), 1)).toBe('Help me plan the week of Oct 19.') // Sunday
   })
 })
 
