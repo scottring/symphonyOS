@@ -39,8 +39,9 @@ Deno.serve(async (req) => {
 
     const { redirectUri } = body
 
-    if (!redirectUri) {
-      return new Response(JSON.stringify({ error: 'Missing redirectUri' }), {
+    const allowedRedirects = ['http://localhost:5173/calendar-callback', 'https://symphony-rebuild.vercel.app/calendar-callback', 'https://symphony-os.com/calendar-callback', 'https://www.symphony-os.com/calendar-callback', 'https://app.symphony-os.com/calendar-callback']
+    if (typeof redirectUri !== 'string' || !allowedRedirects.includes(redirectUri)) {
+      return new Response(JSON.stringify({ error: 'Start the calendar connection from Symphony’s published app or approved test version.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -62,7 +63,14 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'GOOGLE_CLIENT_SECRET not configured in Edge Function secrets' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
     // Signed and bound to this person: the callback refuses any other state.
-    const state = await signOAuthState(clientSecret, { userId: user.id, provider: 'google', access })
+    const state = await signOAuthState(clientSecret, { userId: user.id, provider: 'google', access, redirectUri })
+    const transaction = JSON.parse(atob(state))
+    const admin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
+    const { error: transactionError } = await admin.from('oauth_transactions').insert({
+      nonce: transaction.nonce, user_id: user.id, provider: 'google', redirect_uri: redirectUri,
+      expires_at: new Date(transaction.expiresAt).toISOString(),
+    })
+    if (transactionError) throw new Error('Could not start the calendar connection. Please try again.')
     const scopes = scopesFor(access)
 
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')

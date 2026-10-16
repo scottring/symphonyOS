@@ -4,7 +4,10 @@
 
 export type GoogleAccess = 'calendar' | 'calendar_mail'
 
-const CALENDAR = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.events']
+// Match this project's approved Google permissions: list calendars and work
+// with their events. Full /auth/calendar also permits calendar administration
+// and is not approved; requesting it brings back Google's unverified warning.
+const CALENDAR = ['https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.events']
 // Used by gmail-check, symphony_search_email and gmail-send (drafts).
 const MAIL = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send']
 
