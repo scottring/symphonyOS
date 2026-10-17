@@ -19,7 +19,7 @@ const h = vi.hoisted(() => {
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: h.from } }))
 
-import { firstWeekSteps, shouldShowFirstWeek, readSampleIds, writeSampleIds, clearSampleIdsRecord, hasSampleIds, deleteSampleRows, type FirstWeekSignals, shouldOpenFirstWeek } from './firstWeek'
+import { firstWeekSteps, shouldShowFirstWeek, readSampleIds, writeSampleIds, clearSampleIdsRecord, hasSampleIds, deleteSampleRows, type FirstWeekSignals, shouldOpenFirstWeek, paperPlanRequest } from './firstWeek'
 
 const none: FirstWeekSignals = {
   yearPlanned: false,
@@ -161,5 +161,14 @@ describe('shouldOpenFirstWeek', () => {
     expect(shouldOpenFirstWeek({ asked: false, taskCount: 1, steps: twoLeft, hiddenAt: null, now })).toBe(false)
     expect(shouldOpenFirstWeek({ asked: false, taskCount: 0, steps: twoLeft, hiddenAt: '2026-09-01', now })).toBe(false)
     expect(shouldOpenFirstWeek({ asked: false, taskCount: 0, steps: allDone, hiddenAt: null, now })).toBe(false)
+  })
+})
+
+describe('paperPlanRequest', () => {
+  it('takes only the page step’s own ?plan values, leaving Week’s ?plan=1 alone', () => {
+    expect(paperPlanRequest('paper')).toBe('paper')
+    expect(paperPlanRequest('sample')).toBe('sample')
+    expect(paperPlanRequest('1')).toBeNull()
+    expect(paperPlanRequest(null)).toBeNull()
   })
 })
