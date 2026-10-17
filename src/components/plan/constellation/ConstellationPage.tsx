@@ -471,8 +471,10 @@ function Inner() {
         <PageHelpButton onHelp={() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true })} />
         {!current && <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>Back to this {PERIODS[level]}</button>}
       </div>
-      {dataReady && !error && !goalsError && sentence && <p className="plan-sentence">{sentence}</p>}
-      <Link className="canvas-link" to="/getting-started?journey=goals">Start with a goal · guided introduction</Link>
+      {/* The review says where the period stands in its own words, and is
+          no place to start a new goal: both step aside while it is open. */}
+      {!reviewing && dataReady && !error && !goalsError && sentence && <p className="plan-sentence">{sentence}</p>}
+      {!reviewing && <Link className="canvas-link" to="/getting-started?journey=goals">Start with a goal · guided introduction</Link>}
     </header>
 
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}

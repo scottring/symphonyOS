@@ -41,6 +41,12 @@ describe('PeriodReview', () => {
     expect(screen.queryByText('Decided')).toBeNull()
   })
 
+  it('a skipped routine occurrence is decided', () => {
+    mount({ lines: [line('r', 'Trash night · Sun', 'skipped')] })
+    expect(screen.getByText('Trash night · Sun').closest('li')).toHaveTextContent('Skipped')
+    expect(screen.getByText('Nothing left open. One skipped.')).toBeInTheDocument()
+  })
+
   it('a verb that fails leaves the line open and says so', async () => {
     mount({ lines: [line('a', 'Book the cabin', 'open', vi.fn(async () => false))] })
     fireEvent.click(screen.getByRole('button', { name: 'Done: Book the cabin' }))

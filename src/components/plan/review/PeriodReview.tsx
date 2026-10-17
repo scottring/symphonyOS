@@ -68,6 +68,7 @@ export function PeriodReview(p: PeriodReviewProps) {
   const keys = new Set(p.lines.map((l) => l.key))
   const open = p.lines.filter((l) => l.state === 'open')
   const moved = p.lines.filter((l) => l.state === 'moved')
+  const skipped = p.lines.filter((l) => l.state === 'skipped')
   const done = p.lines.filter((l) => l.state === 'done')
   // Undone back onto the list: no longer "let go".
   const gone = left.filter((l) => !keys.has(l.key))
@@ -101,7 +102,7 @@ export function PeriodReview(p: PeriodReviewProps) {
       {p.reviewed && !justFinished && <p className="plan-review-was">
         <span className="pv2-seal" aria-hidden="true" /> Reviewed {day(p.reviewed.at)} by {p.byWhom(p.reviewed.authorId)}.
       </p>}
-      {!p.loading && <p className="plan-review-sentence">{reviewSentence({ open: open.length, done: done.length, moved: moved.length, letGo: gone.length })}</p>}
+      {!p.loading && <p className="plan-review-sentence">{reviewSentence({ open: open.length, done: done.length, moved: moved.length, skipped: skipped.length, letGo: gone.length })}</p>}
     </header>
 
     {p.loading ? <p className="plan-status" role="status">Loading {word}…</p> : <>
@@ -126,10 +127,11 @@ export function PeriodReview(p: PeriodReviewProps) {
           </>}
       </div>
 
-      {(moved.length > 0 || gone.length > 0) && <div className="plan-review-step">
+      {(moved.length > 0 || skipped.length > 0 || gone.length > 0) && <div className="plan-review-step">
         <h3 className="plan-review-step-title">Decided</h3>
         <ul className="plan-review-decided">
           {moved.map((l) => <li key={l.key}><span>{l.title}</span><span className="plan-review-verdict">Moved on</span></li>)}
+          {skipped.map((l) => <li key={l.key}><span>{l.title}</span><span className="plan-review-verdict">Skipped</span></li>)}
           {gone.map((l) => <li key={l.key}><span>{l.title}</span><span className="plan-review-verdict">{l.label}</span></li>)}
         </ul>
       </div>}

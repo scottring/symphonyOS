@@ -73,7 +73,7 @@ import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters 
 import { DayWeather } from './WeekJournal'
 import { committedTo, liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
-import { taskReviewState } from '@/lib/planning/periodReview'
+import { weekReviewState, weekRoutineOccurrences } from '@/lib/planning/periodReview'
 import type { ReviewLine, ReviewVerb } from '@/components/plan/review/PeriodReview'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
@@ -212,7 +212,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // Create-gesture wiring
   const navigate = useNavigate()
-  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask, userId, keepForward, dropCommitment } = useSupabaseTasks()
+  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask, userId, keepForward } = useSupabaseTasks()
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember, members: familyMembers } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
@@ -479,7 +479,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // second toggle would read a stale snapshot — HomeView's rule). A routine
   // ticks its OCCURRENCE — that day's instance — so Today, the pin and this
   // page show the same completion.
-  const { markDone, undoDone, setPlanned, reschedule: rescheduleInstance, undoReschedule } = useActionableInstances()
+  const { markDone, undoDone, skip, setPlanned, reschedule: rescheduleInstance, undoReschedule } = useActionableInstances()
   const handleJournalToggle = useCallback((entry: JournalEntry, day: JournalDay) => {
     if (entry.task) {
       const task = entry.task
@@ -910,28 +910,46 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // A past week is a look-back, not a plan.
   const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
 
-  // The review by hand (PeriodReview, Scott 2026-10-17): every task committed
-  // to this week, under the page's people lens, with the Month page's verbs.
-  // Undo puts back the week's commitments as they were (horizonPanel's rule).
+  // The review by hand (PeriodReview, Scott 2026-10-17): every task on this
+  // week — committed to it or given a day in it — under the page's people
+  // lens, with the Month page's verbs. Moving a task with a day takes the day
+  // off first (it would otherwise stay on this week's day); Remove is the
+  // week's own "not this week" (timingRemoval). Undo puts back the day and
+  // the commitments as they were.
   const reviewWeekWord = `week ${weekOfYear(weekAnchor, readCadenceConfig().weekStartsOn)}`
   const nextWeekStart = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7)
   const reviewVerbs = (t: Task): ReviewVerb[] => {
     const before = liveCommitments({ commitments: bootstrapCommitments(t) })
-    const restore = async () => (await updateTask(t.id, { commitments: before })) !== false
+    const offDay = timingRemoval(t, 'day'), offWeek = timingRemoval(t, 'all')
+    const restore = async () => (await updateTask(t.id, { ...offDay.previous, commitments: before })) !== false
     const toggle = async () => (await toggleTask(t.id)) !== false
+    const clearDay = async () => !t.scheduledFor || (await updateTask(t.id, offDay.updates)) !== false
     return [
       { label: 'Done', run: () => activity.run(`Done: “${t.title}”`, toggle, { ids: [t.id], undo: toggle }) },
-      { label: 'Move to next week', run: () => activity.run(`Move “${t.title}” to next week`, async () => !!await keepForward(t.id, { weekStart: nextWeekStart }, weekAnchor), { ids: [t.id], undo: restore }) },
-      { label: 'Someday', run: () => activity.run(`${describeTriageWhen('someday')}: “${t.title}”`, () => applyTriageWhen('someday', t.id, {
+      { label: 'Move to next week', run: () => activity.run(`Move “${t.title}” to next week`, async () => await clearDay() && !!await keepForward(t.id, { weekStart: nextWeekStart }, weekAnchor), { ids: [t.id], undo: restore }) },
+      { label: 'Someday', run: () => activity.run(`${describeTriageWhen('someday')}: “${t.title}”`, async () => await clearDay() && applyTriageWhen('someday', t.id, {
         onPushTask: gated.pushTask, onSetBucket: gated.setBucket ?? ((id, bucket) => onUpdateTask(id, { bucket })),
       }), { ids: [t.id] }) },
-      { label: `Remove from ${reviewWeekWord}`, run: () => activity.run(`Remove “${t.title}” from ${reviewWeekWord}`, () => dropCommitment(t.id, 'week', weekAnchor), { ids: [t.id], undo: restore }) },
+      { label: `Remove from ${reviewWeekWord}`, run: () => activity.run(`Remove “${t.title}” from ${reviewWeekWord}`, async () => (await updateTask(t.id, offWeek.updates)) !== false, { ids: [t.id], undo: async () => (await updateTask(t.id, offWeek.previous)) !== false }) },
     ]
   }
-  const weekReviewLines: ReviewLine[] = tasks.filter((t) => !t.isGoal).filter(lens.keep).flatMap((t) => {
-    const state = taskReviewState(t, 'week', weekAnchor, { isCurrent: weekIsCurrent })
+  const taskReviewLines: ReviewLine[] = tasks.filter((t) => !t.isGoal).filter(lens.keep).flatMap((t) => {
+    const state = weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent })
     return state ? [{ key: t.id, title: t.title, state, verbs: state === 'open' ? reviewVerbs(t) : [] }] : []
   })
+  // Routines that don't run every day (or every weekday) are reviewed too, one
+  // line per occurrence so far: Done or Skip, as the day's row offers them.
+  const routineReviewLines: ReviewLine[] = weekRoutineOccurrences(journalDays, weekInstances, { includeDaily: dailyShown, todayKey: localYmd(new Date()) }).map((o) => {
+    const name = `${o.title} · ${o.date.toLocaleDateString('en-US', { weekday: 'short' })}`
+    return {
+      key: `routine:${o.routineId}:${o.dayKey}`, title: name, state: o.state,
+      verbs: o.state !== 'open' ? [] : [
+        { label: 'Done', run: () => activity.run(`Done: “${name}”`, () => markDone('routine', o.routineId, o.date), { ids: [o.routineId], undo: () => undoDone('routine', o.routineId, o.date) }) },
+        { label: 'Skip', run: () => activity.run(`Skip “${name}”`, () => skip('routine', o.routineId, o.date), { ids: [o.routineId], undo: () => undoDone('routine', o.routineId, o.date) }) },
+      ],
+    }
+  })
+  const weekReviewLines = [...taskReviewLines, ...routineReviewLines]
 
 
   return (

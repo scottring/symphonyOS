@@ -528,6 +528,8 @@ describe('the review by hand (2026-10-17)',()=>{
   expect(review.horizon).toBe('monthly');expect(review.token).toBe('2026-10')
   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
   expect(screen.getByTestId('where').textContent).toContain('review=1')
+  expect(screen.queryByRole('link',{name:/guided introduction/})).toBeNull()
+  expect(document.querySelector('.plan-sentence')).toBeNull()
   const open=screen.getByRole('list',{name:'Still open in October'})
   expect(within(open).getAllByRole('listitem')).toHaveLength(1)
   expect(within(open).getAllByRole('button').map(b=>b.textContent)).toEqual(['Done','Move to November','Someday','Remove from October'])
