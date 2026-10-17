@@ -29,7 +29,7 @@
 import { PageHelpButton } from '@/components/explain/PageHelp'
 import { LearnVideoChip } from '@/components/learn/LearnVideoChip'
 import { useEffect, useRef, useState } from 'react'
-import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { useCanvasActivity, type CanvasProposal } from '@/contexts/CanvasActivityContext'
@@ -68,8 +68,9 @@ import { monthToken, usePlanningSession, yearToken, type SessionHorizon } from '
 import { showToast } from '@/hooks/useToast'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { seasonToken } from '@/lib/cadence/seasons'
-import { movedOn, taskReviewState, yearGoalReviewState } from '@/lib/planning/periodReview'
+import { REVIEW_WINDOW_DAYS, movedOn, reviewTarget, taskReviewState, weekPhrase, yearGoalReviewState } from '@/lib/planning/periodReview'
 import { PeriodReview, type ReviewLine, type ReviewVerb } from '@/components/plan/review/PeriodReview'
+import { PeriodPlan, type PlanParent } from '@/components/plan/review/PeriodPlan'
 
 const TERMS = ['year goal', 'season goal', 'month goal', 'week task'] as const
 const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
@@ -103,6 +104,7 @@ function Inner() {
   const { user } = useAuth()
   const { pathname } = useLocation()
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const area = useAddArea()
 
   // ---- Where we are -------------------------------------------------------
@@ -125,19 +127,29 @@ function Inner() {
   const seasonWord = periodWordOf(seasonB), monthWord = periodWordOf(monthB)
   // The review by hand of the period on screen (PeriodReview): open with ?review=1.
   const reviewing = params.get('review') === '1'
+  // Planning by hand (PeriodPlan): open with ?plan=1, on a period not yet over.
+  // A period already over is reviewed, not planned.
+  const plannable = bounds.end > now
+  const planning = !reviewing && params.get('plan') === '1' && plannable
   const sessionToken = level === 0 ? yearToken(year) : level === 1 ? seasonToken(bounds.start, seasons) : monthToken(bounds.start)
   const review = usePeriodReview(SESSION_HORIZONS[level], sessionToken)
+  // Under way, the review on offer is the period before's, until it is done
+  // (Scott, 2026-10-17); its own opens in its last days (reviewTarget).
+  const prevToken = level === 0 ? yearToken(year - 1) : level === 1 ? seasonToken(bounds.prev, seasons) : monthToken(bounds.prev)
+  const prevReview = usePeriodReview(SESSION_HORIZONS[level], prevToken)
+  const target = reviewTarget(bounds, now, REVIEW_WINDOW_DAYS[PERIODS[level]])
   // "I'm happy with October" (Scott, 2026-10-17): planned is a thing you
   // say, as on Week — not a list that merely has lines. Home's checklist
   // reads it.
   const planSession = usePlanningSession(SESSION_HORIZONS[level], sessionToken)
   const [marking, setMarking] = useState(false)
-  const markPlanned = async () => {
+  const markPlanned = async (): Promise<boolean> => {
     setMarking(true)
     const mine = planSession.mine
     const ok = await planSession.save({ wentWell: mine?.wentWell ?? '', didnt: mine?.didnt ?? '', ...(mine?.focus ? { focus: mine.focus } : {}) })
     setMarking(false)
     if (!ok) showToast('Couldn’t save that — try again.', 'error', 5000)
+    return ok
   }
 
   // ---- What is planned (already filtered for privacy, area and people) ----
@@ -288,11 +300,11 @@ function Inner() {
   }
   // A year goal carried on is a copy in next year that remembers it (the
   // change card's plan_carry); the original stays as this year's record.
-  const carryGoal = (node: PlanNode): Promise<boolean> => {
+  const carryGoal = (node: PlanNode, to: number = year + 1, label = `Move “${node.title}” to ${to}`): Promise<boolean> => {
     const g = node.goal!
     const id = crypto.randomUUID()
-    return act(`Move “${g.name}” to ${year + 1}`, () => addGoal(g.areaId || null, g.name, g.context ?? undefined, {
-      id, year: year + 1, carriedFrom: g.id, notes: g.notes ?? null, strategy: g.strategy ?? null,
+    return act(label, () => addGoal(g.areaId || null, g.name, g.context ?? undefined, {
+      id, year: to, carriedFrom: g.id, notes: g.notes ?? null, strategy: g.strategy ?? null,
       ...(g.assignedToAll ? { assignedToAll: g.assignedToAll } : {}),
     }).then((made) => !!made), { ids: [id], undo: async () => { await deleteGoal(id) } })
   }
@@ -410,13 +422,15 @@ function Inner() {
   const belowOf = (node: PlanNode) => allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && isOpen(n)).map((n) => n.title)
 
   // ---- The review by hand (Scott, 2026-10-17) ---------------------------------
-  const setReviewing = (on: boolean, start?: Date) => setParams((prev) => {
+  const setMode = (mode: 'review' | 'plan' | null, start?: Date) => setParams((prev) => {
     const p = new URLSearchParams(prev)
-    if (on) p.set('review', '1'); else p.delete('review')
+    p.delete('review'); p.delete('plan')
+    if (mode) p.set(mode, '1')
     if (start) p.set('start', localYmd(start))
     p.delete('focus')
     return p
   })
+  const setReviewing = (on: boolean, start?: Date) => setMode(on ? 'review' : null, start)
   const nextYearGoals = level === 0 ? goals.filter((g) => g.year === year + 1) : []
   const reviewLines: ReviewLine[] = levelNodes.flatMap((n) => {
     const state = n.goal ? yearGoalReviewState(n.goal, nextYearGoals)
@@ -485,15 +499,63 @@ function Inner() {
       ? { to: `/month?view=constellation&horizon=2${keepStart}`, label: `Go to ${monthWord} →` }
       : { to: `/season?view=constellation&horizon=1${keepStart}`, label: `Go to ${seasonWord} →` }
 
+  // ---- Planning by hand (PeriodPlan, Scott 2026-10-17) -------------------------
+  // The talk's steps without the talk: what the period before left open, what
+  // this one does for each goal above, anything else — then "I'm happy with".
+  const prevB = periodBounds(PERIODS[level], bounds.prev, seasons)
+  const prevWord = level === 0 ? String(year - 1) : periodWordOf(prevB)
+  const thisYearGoals = level === 0 ? goals.filter((g) => g.year === year) : []
+  const carryLines: ReviewLine[] = !planning ? [] : level === 0
+    ? goalsOf(year - 1).filter((g) => yearGoalReviewState(g, thisYearGoals) === 'open').map((g) => {
+      const node: PlanNode = { key: `0:${g.id}`, id: g.id, title: g.name, level: 0, parent: null, goal: g }
+      return { key: node.key, title: g.name, state: 'open' as const, verbs: [
+        { label: `Bring into ${year}`, run: () => carryGoal(node, year, `Bring “${g.name}” into ${year}`) },
+        { label: 'Done', run: () => setGoalStatus(node, 'completed', `Complete “${g.name}”`) },
+        { label: 'Let go', run: () => setGoalStatus(node, 'archived', `Archive “${g.name}”`) },
+      ] }
+    })
+    : (() => {
+      const lvl = PERIODS[level] as 'season' | 'month'
+      const prevCurrent = isCurrentPeriod(prevB, now)
+      return selectPeriodTasks(visible, lvl, prevB.start, prevCurrent, lens.scopeId, seasons).flatMap((t): ReviewLine[] => {
+        if (taskReviewState(t, lvl, prevB.start, { isCurrent: prevCurrent, seasons }) !== 'open') return []
+        // The period's own moves, aimed from the one before: carry it here, or drop it there.
+        const [carry, remove] = periodMoves(t, lvl, prevB, seasons, { updateTask, keepForward, dropCommitment }, activity.run)
+        const toggle = async () => (await toggleTask(t.id)) !== false
+        return [{ key: t.id, title: t.title, state: 'open', verbs: [
+          { label: `Bring into ${periodWord}`, run: carry.onClick },
+          { label: 'Done', run: () => act(`Complete “${t.title}”`, toggle, { ids: [t.id], undo: toggle }) },
+          { label: 'Someday', run: () => act(`${describeTriageWhen('someday')}: “${t.title}”`, () => applyTriageWhen('someday', t.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }), { ids: [t.id] }) },
+          { label: 'Let go', run: remove.onClick },
+        ] }]
+      })
+    })()
+  const planParents: PlanParent[] = above.map((n) => ({
+    key: n.key, title: n.title,
+    children: levelNodes.filter((c) => c.parent === n.key && isOpen(c)).map((c) => c.title),
+    onAdd: (title: string) => runCreate(level, title, n, `Add “${title}” for “${n.title}”`),
+  }))
+  // Planned, the next horizon down is next: Year → Season → Month → Week.
+  // This month's next week is this one; a coming month's, its first.
+  const planWeek = weekStartAnchor(current ? now : bounds.start, weekStartsOn)
+  const planNext = level === 2
+    ? { label: `Plan ${weekPhrase(planWeek)} →`, onClick: () => navigate(`/week?view=alongside&date=${localYmd(planWeek)}&start=${localYmd(planWeek)}&plan=1`) }
+    : level === 1
+      ? { label: `Plan ${monthWord} →`, onClick: () => navigate(`/month?view=constellation&horizon=2${keepStart}&plan=1`) }
+      : { label: `Plan ${seasonWord} →`, onClick: () => navigate(`/season?view=constellation&horizon=1${keepStart}&plan=1`) }
+
   const walk = <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>{walkLabel}</button>
 
   return <main ref={mainRef} className={`plan-canvas plan-horizon ${PAGE_PLANNING}`} data-horizon={level}>
     <header className="plan-head">
       {/* Without the docked bar (phones) the page offers both itself. */}
-      {(!walkInBar || !reviewing) && <div className="plan-head-row">
+      {(!walkInBar || !(reviewing || planning)) && <div className="plan-head-row">
         {!walkInBar && walk}
-        {!reviewing && <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setReviewing(true)}>Review {periodWord}</button>}
-        {!reviewing && !planSession.loading && !planSession.error && (planSession.saved
+        {!reviewing && !planning && target === 'this' && <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setReviewing(true)}>Review {periodWord}</button>}
+        {!reviewing && !planning && target === 'previous' && !prevReview.loading && !prevReview.error && !prevReview.reviewed &&
+          <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setReviewing(true, bounds.prev)}>Review {prevWord}</button>}
+        {!reviewing && !planning && plannable && <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setMode('plan')}>Plan {periodWord}</button>}
+        {!reviewing && !planning && !planSession.loading && !planSession.error && (planSession.saved
           ? <span className="plan-planned"><span className="pv2-seal" aria-hidden="true" />{periodWord} planned {planSession.saved.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
           // A period already over is reviewed, not planned.
           : bounds.end > now && <button type="button" className="canvas-link plan-mark" disabled={marking || !dataReady} onClick={() => { void markPlanned() }}>I’m happy with {periodWord}</button>)}
@@ -509,8 +571,8 @@ function Inner() {
       </div>
       {/* The review says where the period stands in its own words, and is
           no place to start a new goal: both step aside while it is open. */}
-      {!reviewing && dataReady && !error && !goalsError && sentence && <p className="plan-sentence">{sentence}</p>}
-      {!reviewing && <Link className="canvas-link" to="/getting-started?journey=goals">Start with a goal · guided introduction</Link>}
+      {!reviewing && !planning && dataReady && !error && !goalsError && sentence && <p className="plan-sentence">{sentence}</p>}
+      {!reviewing && !planning && <Link className="canvas-link" to="/getting-started?journey=goals">Start with a goal · guided introduction</Link>}
     </header>
 
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
@@ -519,8 +581,16 @@ function Inner() {
       : !dataReady ? null
       : reviewing ? <PeriodReview key={`${level}:${localYmd(bounds.start)}`} periodWord={periodWord} lines={reviewLines} loading={review.loading}
           reviewed={review.reviewed} mine={review.mine} byWhom={byWhom} onFinish={review.finish}
-          next={{ label: `Go to ${nextWord} →`, onClick: () => setReviewing(false, bounds.next) }}
+          // Reviewed, the next step is planning what comes after.
+          next={{ label: `Plan ${nextWord} →`, onClick: () => setMode('plan', bounds.next) }}
           onClose={() => setReviewing(false)} />
+      : planning ? <PeriodPlan key={`${level}:${localYmd(bounds.start)}`} periodWord={periodWord} itemWord={aGoal}
+          loading={planSession.loading} carry={{ fromWord: prevWord, lines: carryLines }}
+          parents={level > 0 ? { word: aboveWord, goals: planParents } : undefined}
+          current={openNodes.map((n) => n.title)}
+          onAdd={(title) => runCreate(level, title, null, `Add “${title}”`)}
+          planned={planSession.saved ? { at: planSession.saved.at, by: byWhom(planSession.saved.authorId) } : null}
+          onMark={markPlanned} next={planNext} onClose={() => setMode(null)} />
       : <>
         {/* Wide screens: open, the panel beside the list carries the title
             and its own Hide, so this line steps aside (canvas-plan.css). */}

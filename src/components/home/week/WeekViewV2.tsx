@@ -73,8 +73,9 @@ import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters 
 import { DayWeather } from './WeekJournal'
 import { committedTo, liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
-import { dayNote, weekPhrase, weekReviewState, weekRoutineOccurrences } from '@/lib/planning/periodReview'
+import { dayNote, taskReviewState, weekPhrase, weekReviewState, weekRoutineOccurrences } from '@/lib/planning/periodReview'
 import type { ReviewLine, ReviewVerb } from '@/components/plan/review/PeriodReview'
+import type { WeekPlanData } from '@/components/plan/v2/WeekV2'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
@@ -954,6 +955,64 @@ export function WeekViewV2(props: WeekViewV2Props) {
   })
   const weekReviewLines = [...taskReviewLines, ...routineReviewLines]
 
+  // Planning by hand (PeriodPlan, Scott 2026-10-17): what last week left open
+  // (bring it in, Someday, let it go), the month's goals with what this week
+  // does for each, anything else, and a day for each task without one. The
+  // same writes as the canvas and the review, each with its Undo.
+  const lastWeekStart = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() - 7)
+  const addToWeek = (title: string, goal?: Task): Promise<boolean> => {
+    const id = crypto.randomUUID()
+    return activity.run(`Add “${title}”${goal ? ` for “${goal.title}”` : ''}`, async () => !!await addTask(title, undefined, undefined, undefined, {
+      id, bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined, goalTaskId: goal?.id, context: goal?.context ?? undefined,
+    }), { ids: [id], undo: async () => { await deleteTask(id) } })
+  }
+  const planCarry: ReviewLine[] = tasks.filter((t) => !t.isGoal).filter(lens.keep).flatMap((t): ReviewLine[] => {
+    if (weekReviewState(t, lastWeekStart, { isCurrent: false }) !== 'open') return []
+    const before = liveCommitments({ commitments: bootstrapCommitments(t) })
+    const offDay = timingRemoval(t, 'day'), offWeek = timingRemoval(t, 'all')
+    const restore = async () => (await updateTask(t.id, { ...offDay.previous, commitments: before })) !== false
+    const toggle = async () => (await toggleTask(t.id)) !== false
+    // Its old day was last week's: it comes in with no day yet, to be given one below.
+    const clearDay = async () => !t.scheduledFor || (await updateTask(t.id, offDay.updates)) !== false
+    return [{ key: t.id, title: t.title, note: dayNote(t.scheduledFor, !!t.scheduledFor && t.isAllDay === false), state: 'open', verbs: [
+      { label: `Bring into ${reviewWeekWord}`, run: () => activity.run(`Bring “${t.title}” into ${reviewWeekWord}`, async () => await clearDay() && !!await keepForward(t.id, { weekStart: weekAnchor }, lastWeekStart), { ids: [t.id], undo: restore }) },
+      { label: 'Done', run: () => activity.run(`Done: “${t.title}”`, toggle, { ids: [t.id], undo: toggle }) },
+      { label: 'Someday', run: () => activity.run(`${describeTriageWhen('someday')}: “${t.title}”`, async () => await clearDay() && applyTriageWhen('someday', t.id, {
+        onPushTask: gated.pushTask, onSetBucket: gated.setBucket ?? ((id, bucket) => onUpdateTask(id, { bucket })),
+      }), { ids: [t.id] }) },
+      { label: 'Let go', run: () => activity.run(`Let go of “${t.title}”`, async () => (await updateTask(t.id, offWeek.updates)) !== false, { ids: [t.id], undo: async () => (await updateTask(t.id, offWeek.previous)) !== false }) },
+    ] }]
+  })
+  const weekOpen = tasks.filter((t) => !t.isGoal).filter(lens.keep).filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) === 'open')
+  // The month this week mostly lives in, as the week's add box reads it.
+  const planMonth = monthStartOf(new Date(weekAnchor.getTime() + 3 * 86_400_000))
+  const planMonthCurrent = weekIsCurrent && localYmd(planMonth) === localYmd(monthStartOf(new Date()))
+  const planParents = selectPeriodTasks(tasks, 'month', planMonth, planMonthCurrent, meId, readSeasons())
+    .filter((g) => taskReviewState(g, 'month', planMonth, { isCurrent: planMonthCurrent, seasons: readSeasons() }) === 'open')
+    .map((g) => ({
+      key: g.id, title: g.title,
+      children: weekOpen.filter((t) => t.sourceId === g.id || t.goalTaskId === g.id).map((t) => t.title),
+      onAdd: (title: string) => addToWeek(title, g),
+    }))
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const planDays = Array.from({ length: 7 }, (_, i) => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + i)).filter((d) => d >= todayStart)
+  const weekPlan: WeekPlanData = {
+    carry: { fromWord: weekPhrase(lastWeekStart), lines: planCarry },
+    parents: { word: planMonth.toLocaleDateString('en-US', { month: 'long' }), goals: planParents },
+    current: weekOpen.map((t) => t.title),
+    onAdd: (title) => addToWeek(title),
+    place: weekOpen.filter((t) => !t.scheduledFor).map((t) => ({
+      key: t.id, title: t.title,
+      days: planDays.map((d) => {
+        const label = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })
+        const patch = lineDropUpdates(t, { kind: 'day', at: d })
+        const before = Object.fromEntries(Object.keys(patch).map((k) => [k, t[k as keyof Task]])) as Partial<Task>
+        return { label, run: () => activity.run(`Give “${t.title}” ${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
+          async () => (await onUpdateTask(t.id, patch)) !== false, { ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) } }) }
+      }),
+    })),
+  }
+
 
   return (
     <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast}>
@@ -975,7 +1034,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             never by dragging from it. On a narrow screen the list sits above
             the stacked days instead. */}
         {narrow && planV2Enabled() ? (
-          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} reviewLines={weekReviewLines} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} reviewLines={weekReviewLines} plan={weekPlan} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
             {weekListFor()}
@@ -989,7 +1048,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {planV2Enabled() ? (
           // v2 (docs/planning/2026-09-28-planning-v2.md): the same journal and
           // list, laid out as the prototype's day column + "Any day this week".
-          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} reviewLines={weekReviewLines} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} reviewLines={weekReviewLines} plan={weekPlan} />
         ) : (
           <>
             {weekListFor()}

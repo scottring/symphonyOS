@@ -8,7 +8,8 @@
 //
 // It is chrome AROUND the existing week: the canvas, drag and drop and
 // add-to-day are WeekViewV2's, unchanged. "Review week N" (?review=1) swaps
-// the canvas for the review by hand (PeriodReview) over WeekViewV2's lines.
+// the canvas for the review by hand (PeriodReview) over WeekViewV2's lines;
+// "Plan this week" (?plan=1) for planning by hand (PeriodPlan).
 
 import { useContext, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -16,7 +17,8 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { PeriodReview, type ReviewLine } from '@/components/plan/review/PeriodReview'
-import { weekPhrase } from '@/lib/planning/periodReview'
+import { PeriodPlan, type PeriodPlanProps } from '@/components/plan/review/PeriodPlan'
+import { REVIEW_WINDOW_DAYS, reviewTarget, weekPhrase } from '@/lib/planning/periodReview'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useAuth } from '@/hooks/useAuth'
 import { showToast } from '@/hooks/useToast'
@@ -29,7 +31,10 @@ import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 
 const DAY = 86_400_000
 
-export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines }: {
+/** What WeekViewV2 knows for planning the week by hand; the mark is WeekV2's. */
+export type WeekPlanData = Pick<PeriodPlanProps, 'carry' | 'parents' | 'current' | 'onAdd' | 'place'>
+
+export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines, plan }: {
   weekStart: Date
   isCurrent: boolean
   /** The week's display toggles (Routines), drawn in this toolbar. */
@@ -40,6 +45,8 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines 
   walk?: { label: string; onStart: () => void }
   /** The week's lines for the review by hand, with their verbs (WeekViewV2). */
   reviewLines?: ReviewLine[]
+  /** The week's steps for planning by hand (WeekViewV2). */
+  plan?: WeekPlanData
 }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -47,14 +54,19 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines 
   const { members } = useFamilyMembers()
   const session = usePlanningSession('weekly', weekToken(weekStart))
   const review = usePeriodReview('weekly', weekToken(weekStart))
+  // Early in a week, the review on offer is last week's, until it is done.
+  const lastWeek = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7)
+  const lastReview = usePeriodReview('weekly', weekToken(lastWeek))
   const [params, setParams] = useSearchParams()
   const reviewing = !!reviewLines && params.get('review') === '1'
-  const setReviewing = (on: boolean, week?: Date) => setParams((prev) => {
+  const setMode = (mode: 'review' | 'plan' | null, week?: Date) => setParams((prev) => {
     const p = new URLSearchParams(prev)
-    if (on) p.set('review', '1'); else p.delete('review')
+    p.delete('review'); p.delete('plan')
+    if (mode) p.set(mode, '1')
     if (week) { p.set('date', localYmd(week)); p.set('start', localYmd(week)) }
     return p
   })
+  const setReviewing = (on: boolean, week?: Date) => setMode(on ? 'review' : null, week)
   const reviewWord = weekPhrase(weekStart)
   const nextWeek = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
   const [justSaved, setJustSaved] = useState<null | { detail: string }>(null)
@@ -91,17 +103,34 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines 
     : null
   const weekNo = weekOfYear(weekStart, readCadenceConfig().weekStartsOn)
   const endsToday = isCurrent && localYmd(new Date(weekStart.getTime() + 6 * DAY)) === localYmd(new Date())
+  // A week that is over, or ends today, is reviewed, not planned.
+  const plannable = !!plan && !endsToday && weekStart.getTime() + 7 * DAY > Date.now()
+  const planning = plannable && !reviewing && params.get('plan') === '1'
+  const markFromPlan = async (): Promise<boolean> => {
+    if (confirmationBlocked) return false
+    setConfirming(true)
+    const ok = await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '', focus: session.mine?.focus ?? session.saved?.notes?.focus })
+    setConfirming(false)
+    return ok
+  }
+  const target = reviewTarget({ start: weekStart, end: nextWeek }, new Date(), REVIEW_WINDOW_DAYS.week)
+  const reviewOffer = target === 'this' ? { label: `Review ${reviewWord}`, onClick: () => setReviewing(true) }
+    : target === 'previous' && !lastReview.loading && !lastReview.error && !lastReview.reviewed
+      ? { label: `Review ${weekPhrase(lastWeek)}`, onClick: () => setReviewing(true, lastWeek) }
+      : undefined
   const toolbar: PlanToolbarProps = {
     period: `week ${weekNo}`, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
     planningAction: walk && { label: walk.label, onClick: walk.onStart },
-    reviewAction: reviewLines && !reviewing ? { label: `Review ${reviewWord}`, onClick: () => setReviewing(true) } : undefined,
+    reviewAction: reviewLines && !reviewing && !planning ? reviewOffer : undefined,
+    handPlanAction: plannable && !reviewing && !planning ? { label: `Plan ${reviewWord}`, onClick: () => setMode('plan') } : undefined,
     markLabel: 'I’m happy with this week',
     markDisabled: confirmationBlocked,
     unplannedHint: reviewHint,
     reviewDue: !session.saved, onPlan: () => undefined, onRetry: session.reload,
     // On its last day the week is not marked planned; the line under the
     // masthead points at planning the next one.
-    onMark: endsToday ? undefined : () => void markPlanned(),
+    // While planning by hand, the mark is the steps' last one, not the bar's.
+    onMark: endsToday || planning ? undefined : () => void markPlanned(),
     tools: tools && <div className="pv2-wtools">{tools}</div>,
     justSaved: justSaved && {
       detail: justSaved.detail,
@@ -141,8 +170,17 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines 
       {reviewing
         ? <PeriodReview key={localYmd(weekStart)} periodWord={reviewWord} lines={reviewLines!} loading={review.loading}
             reviewed={review.reviewed} mine={review.mine} onFinish={review.finish} onClose={() => setReviewing(false)}
-            next={{ label: `Go to ${weekPhrase(nextWeek)} →`, onClick: () => setReviewing(false, nextWeek) }}
+            // Reviewed, the next step is planning the week after.
+            next={{ label: `Plan ${weekPhrase(nextWeek)} →`, onClick: () => setMode('plan', nextWeek) }}
             byWhom={(id) => id === user?.id ? 'you' : members.find((m) => m.auth_user_id === id)?.name ?? 'your household'} />
+        : planning ? <PeriodPlan key={localYmd(weekStart)} periodWord={reviewWord} itemWord={`something for ${reviewWord}`}
+            loading={session.loading} {...plan!}
+            planned={session.saved ? { at: session.saved.at, by: agreedBy ?? 'you' } : null}
+            onMark={markFromPlan} markBlocked={confirmationBlocked ? reviewHint || 'Finish the current change first.' : undefined}
+            next={isCurrent
+              ? { label: 'Pick something for today →', onClick: () => { writePlanView('today', 'ref'); toToday() } }
+              : { label: 'Back to Today →', onClick: toToday }}
+            onClose={() => setMode(null)} />
         : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
     </div>
   )

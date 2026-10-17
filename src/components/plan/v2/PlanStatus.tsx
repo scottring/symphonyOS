@@ -38,6 +38,8 @@ export interface PlanToolbarProps {
    *  on the left with the status — not with the planning verbs at the right
    *  (Scott, 2026-10-17). */
   reviewAction?: NextStep
+  /** Planning by hand (PeriodPlan), beside the review (Scott, 2026-10-17). */
+  handPlanAction?: NextStep
   markLabel?: string
   markDisabled?: boolean
   unplannedHint?: string
@@ -119,10 +121,12 @@ export function PlanToolbar(props: PlanToolbarProps) {
 // keep the row (PlanToolbar).
 
 /** "Review this week", beside the status. */
-function reviewOf({ reviewAction, loading }: PlanToolbarProps) {
-  return reviewAction && !loading
-    ? <button type="button" className="pv2-qbtn pv2-review" onClick={reviewAction.onClick} data-explain="plan-review" data-explain-label={reviewAction.label}>{reviewAction.label}</button>
-    : null
+function reviewOf({ reviewAction, handPlanAction, loading }: PlanToolbarProps) {
+  if (loading) return null
+  return <>
+    {reviewAction && <button type="button" className="pv2-qbtn pv2-review" onClick={reviewAction.onClick} data-explain="plan-review" data-explain-label={reviewAction.label}>{reviewAction.label}</button>}
+    {handPlanAction && <button type="button" className="pv2-qbtn pv2-review" onClick={handPlanAction.onClick} data-explain="plan-by-hand" data-explain-label={handPlanAction.label}>{handPlanAction.label}</button>}
+  </>
 }
 
 /** The toolbar's status, as the masthead's subline. */

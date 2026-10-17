@@ -3,7 +3,7 @@
 // and this period planned ("I'm happy with …") — read from planning_sessions.
 // A review is `notes.periodReview` on the reviewed period's row; planned is
 // `notes.savedAt` on this period's row. Each open step links to where it is
-// done.
+// done: the review by hand, or planning by hand (PeriodPlan).
 
 import type { SessionHorizon } from '@/hooks/usePlanningSession'
 import { monthToken, weekToken, yearToken } from '@/hooks/usePlanningSession'
@@ -40,7 +40,7 @@ export function checklistSlots(today: Date, weekStartsOn: WeekStart, seasons: Se
   const lastWeek = new Date(week.getFullYear(), week.getMonth(), week.getDate() - 7)
   const weekSlot = (start: Date, review: boolean): Slot => ({
     horizon: 'weekly', token: weekToken(start), word: `week ${weekOfYear(start, weekStartsOn)}`, dates: weekDates(start),
-    to: review ? `/week?view=alongside&date=${localYmd(start)}&start=${localYmd(start)}&review=1` : '/week',
+    to: review ? `/week?view=alongside&date=${localYmd(start)}&start=${localYmd(start)}&review=1` : '/week?view=alongside&plan=1',
   })
   const month = periodBounds('month', today, seasons), lastMonth = periodBounds('month', month.prev, seasons)
   const season = periodBounds('season', today, seasons), lastSeason = periodBounds('season', season.prev, seasons)
@@ -49,15 +49,15 @@ export function checklistSlots(today: Date, weekStartsOn: WeekStart, seasons: Se
     week: { review: weekSlot(lastWeek, true), plan: weekSlot(week, false) },
     month: {
       review: { horizon: 'monthly', token: monthToken(lastMonth.start), word: word(lastMonth.label), to: `/month?start=${localYmd(lastMonth.start)}&review=1` },
-      plan: { horizon: 'monthly', token: monthToken(month.start), word: word(month.label), to: '/month' },
+      plan: { horizon: 'monthly', token: monthToken(month.start), word: word(month.label), to: '/month?plan=1' },
     },
     season: {
       review: { horizon: 'seasonal', token: seasonToken(lastSeason.start, seasons), word: word(lastSeason.label), to: `/season?start=${localYmd(lastSeason.start)}&review=1` },
-      plan: { horizon: 'seasonal', token: seasonToken(season.start, seasons), word: word(season.label), to: '/season' },
+      plan: { horizon: 'seasonal', token: seasonToken(season.start, seasons), word: word(season.label), to: '/season?plan=1' },
     },
     year: {
       review: { horizon: 'annual', token: yearToken(year - 1), word: String(year - 1), to: `/year?start=${year - 1}-01-01&review=1` },
-      plan: { horizon: 'annual', token: yearToken(year), word: String(year), to: '/year' },
+      plan: { horizon: 'annual', token: yearToken(year), word: String(year), to: '/year?plan=1' },
     },
   }
 }

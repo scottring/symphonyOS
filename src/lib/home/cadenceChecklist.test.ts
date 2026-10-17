@@ -9,9 +9,9 @@ describe('cadenceChecklist', () => {
   it('names last period to review and this one to plan, with week dates', () => {
     const rows = checklistRows(slots, [])
     expect(rows.week.review).toMatchObject({ label: expect.stringMatching(/^Review week \d+$/), done: false, dates: 'Oct 10 – 16', to: '/week?view=alongside&date=2026-10-10&start=2026-10-10&review=1' })
-    expect(rows.week.plan).toMatchObject({ label: expect.stringMatching(/^Plan week \d+$/), dates: 'Oct 17 – 23', to: '/week' })
+    expect(rows.week.plan).toMatchObject({ label: expect.stringMatching(/^Plan week \d+$/), dates: 'Oct 17 – 23', to: '/week?view=alongside&plan=1' })
     expect(rows.month.review).toMatchObject({ label: 'Review September', to: '/month?start=2026-09-01&review=1' })
-    expect(rows.month.plan).toMatchObject({ label: 'Plan October', to: '/month' })
+    expect(rows.month.plan).toMatchObject({ label: 'Plan October', to: '/month?plan=1' })
     expect(rows.season.review.label).toBe('Review Summer')
     expect(rows.season.plan.label).toBe('Plan Fall')
     expect(rows.year.review).toMatchObject({ label: 'Review 2025', to: '/year?start=2025-01-01&review=1' })

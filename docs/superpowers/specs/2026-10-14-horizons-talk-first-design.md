@@ -49,6 +49,21 @@ far that is not the week's daily rhythm (every day / every weekday, unless
 Home's "Look back" opens the previous month's or season's review.
 (`PeriodReview.tsx`, `periodReview.ts`, `usePeriodReview.ts`.)
 
+## Plan by hand (amended 2026-10-17, Scott)
+
+Beside "Review {period}", every horizon not yet over offers "Plan {period}"
+(`?plan=1`): the talk's steps on one page, no conversation. 1. Left from
+{last period}: each line still open there — Bring into {period} · Done ·
+Someday · Let go (a year goal: Bring into {year}, a copy with `carriedFrom` ·
+Done · Let go = Archive). 2. For {the level above} (not on Year): each open
+goal above, what is under it here already, and "+ Add". 3. Anything else: the
+list so far and "+ Add". 4. Week only: Give them a day — each open task with no
+day, one button per remaining day. Then "I'm happy with {period}" — the same
+`savedAt` mark as the page's link — and the next horizon down (Year → Season →
+Month → Week → Today). Every verb and add saves at once with Undo. A finished
+review's onward step is "Plan {next period} →"; Home's open "Plan …" steps
+open it. (`PeriodPlan.tsx`.)
+
 ## The schedule (frame "After 2")
 
 A quiet chip invites the conversation, on that horizon's page (the bar chip)
