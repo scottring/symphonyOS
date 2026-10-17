@@ -66,7 +66,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { monthToken, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { seasonToken } from '@/lib/cadence/seasons'
-import { taskReviewState, yearGoalReviewState } from '@/lib/planning/periodReview'
+import { movedOn, taskReviewState, yearGoalReviewState } from '@/lib/planning/periodReview'
 import { PeriodReview, type ReviewLine, type ReviewVerb } from '@/components/plan/review/PeriodReview'
 
 const TERMS = ['year goal', 'season goal', 'month goal', 'week task'] as const
@@ -186,6 +186,19 @@ function Inner() {
     reveal.current = null
   }, [tasks, goals, composer])
 
+  // A line moved on to a later period stays on this list as the record, but
+  // it is not open here: "Moved to November", no verbs, folded with the done.
+  const LEVEL_BOUNDS = [yearB, seasonB, monthB]
+  const movedLabel = (node: PlanNode): string | null => {
+    if (node.goal) return goals.some((g) => g.year === node.goal!.year + 1 && g.carriedFrom === node.id && g.status !== 'archived') ? `Moved to ${node.goal.year + 1}` : null
+    if (!node.task || node.level === 0 || node.level > 2) return null
+    const lvl = PERIODS[node.level] as 'season' | 'month', b = LEVEL_BOUNDS[node.level]
+    const moved = movedOn(node.task, lvl, b.start, { isCurrent: isCurrentPeriod(b, now), seasons })
+    if (!moved) return null
+    return `Moved to ${periodWordOf(periodBounds(lvl, moved.to ?? b.next, seasons))}`
+  }
+  const isOpen = (n: PlanNode) => !isDone(n) && !movedLabel(n)
+
   // ---- Writes ---------------------------------------------------------------
   type Opts = { ids?: string[]; undo?: () => Promise<boolean | void>; retry?: () => void }
   const act = (label: string, command: () => Promise<unknown>, opts?: Opts) =>
@@ -277,7 +290,7 @@ function Inner() {
   // The same verbs answer each open line in the review by hand (PeriodReview),
   // where a year goal can also move on to next year.
   const verbsFor = (node: PlanNode, opts: { carryYear?: boolean } = {}): ReviewVerb[] => {
-    if (isDone(node)) return []
+    if (isDone(node) || movedLabel(node)) return []
     if (!node.task) return [
       { label: 'Done', run: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
       ...(opts.carryYear ? [{ label: `Move to ${year + 1}`, run: () => carryGoal(node) }] : []),
@@ -334,7 +347,7 @@ function Inner() {
   const prepLookup: ReadinessLookup = { task: (id) => visibleById.get(id), goal: (id) => goalsById.get(id) }
 
   // ---- The level above, folded into one line ------------------------------
-  const above = level > 0 ? allNodes.filter((n) => n.level === level - 1 && !isDone(n)) : []
+  const above = level > 0 ? allNodes.filter((n) => n.level === level - 1 && isOpen(n)) : []
   const aboveTitles = level > 0 ? above.map((n) => n.title) : goalsOf(year - 1).filter((g) => g.status !== 'completed').map((g) => g.name)
   const aboveWord = level === 2 ? seasonWord : String(year)
   // The toggle names the list it opens ("Show Fall list"), and once open it
@@ -347,14 +360,17 @@ function Inner() {
 
   // ---- The period's goals: open first, done folded into one line -----------
   const levelNodes = allNodes.filter((n) => n.level === level)
-  const openNodes = levelNodes.filter((n) => !isDone(n))
+  const openNodes = levelNodes.filter(isOpen)
   const doneNodes = levelNodes.filter(isDone)
-  const items = showDone ? [...openNodes, ...doneNodes] : openNodes
+  const movedNodes = levelNodes.filter((n) => !isDone(n) && !!movedLabel(n))
+  const items = showDone ? [...openNodes, ...movedNodes, ...doneNodes] : openNodes
   const sentence = horizonSentence({
-    items: levelNodes.map((n) => ({ done: isDone(n), hasParent: !!n.parent })),
+    items: levelNodes.map((n) => ({ done: isDone(n), moved: !!movedLabel(n), hasParent: !!n.parent })),
     parentWord: level === 2 ? seasonWord : level === 1 ? String(year) : null,
   })
-  const doneLine = `${doneNodes.length} done · ${doneNodes.slice(0, 2).map((n) => n.title).join(', ')}${doneNodes.length > 2 ? '…' : ''}`
+  // "5 done, 1 moved on · Taxes, Picnic…": what is no longer open, in one line.
+  const folded = [...doneNodes, ...movedNodes]
+  const doneLine = `${[doneNodes.length ? `${doneNodes.length} done` : '', movedNodes.length ? `${movedNodes.length} moved on` : ''].filter(Boolean).join(', ')} · ${folded.slice(0, 2).map((n) => n.title).join(', ')}${folded.length > 2 ? '…' : ''}`
 
   // ---- A pending change card, drawn dashed (planPreview.ts) -----------------
   const span = (b: { start: Date; end: Date; label: string }): PeriodSpan => ({ start: localYmd(b.start), end: localYmd(b.end), label: periodWordOf(b) })
@@ -376,7 +392,7 @@ function Inner() {
   // What is already under a goal one horizon down, by name — never a count.
   const belowLabel = level === 2 ? (thisWeek ? 'This week' : `Week of ${week.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)
     : level === 1 ? monthWord : seasonWord
-  const belowOf = (node: PlanNode) => allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && !isDone(n)).map((n) => n.title)
+  const belowOf = (node: PlanNode) => allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && isOpen(n)).map((n) => n.title)
 
   // ---- The review by hand (Scott, 2026-10-17) ---------------------------------
   const setReviewing = (on: boolean, start?: Date) => setParams((prev) => {
@@ -417,7 +433,7 @@ function Inner() {
       parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
       below={{ label: belowLabel, titles: belowOf(node) }}
       linked={linked === node.key}
-      done={isDone(node)} saved={savedKey === node.key}
+      done={isDone(node)} movedTo={movedLabel(node) ?? undefined} saved={savedKey === node.key}
       onOpen={onOpen} expanded={expanded === node.key} more={more} quick={quickFor(node)}
       editing={editing}
       onSaveEdit={async (text) => { const ok = await rename(node, text); if (ok) setComposer(null); return ok }}
@@ -518,8 +534,8 @@ function Inner() {
                 onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />
             })}
           </ul>
-          {openNodes.length === 0 && preview.here.length === 0 && proposals.length === 0 && !adding && <p className="plan-empty">Nothing{doneNodes.length ? ' open' : ''} for {periodWord} yet.</p>}
-          {doneNodes.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>
+          {openNodes.length === 0 && preview.here.length === 0 && proposals.length === 0 && !adding && <p className="plan-empty">Nothing{folded.length ? ' open' : ''} for {periodWord} yet.</p>}
+          {folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>
             <span className="plan-done-fold-text">{doneLine}</span>
             <span className="canvas-link plan-done-fold-go">{showDone ? 'Hide' : 'Show'}</span>
           </button>}

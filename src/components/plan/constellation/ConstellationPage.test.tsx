@@ -23,7 +23,7 @@ vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'u1'}})}))
 const review=vi.hoisted(()=>({reviewed:null as any,mine:null as any,finish:vi.fn(async()=>true),token:'' as string,horizon:'' as string}))
 vi.mock('@/hooks/usePeriodReview',()=>({usePeriodReview:(horizon:string,token:string)=>{review.horizon=horizon;review.token=token;return{reviewed:review.reviewed,mine:review.mine,loading:false,error:null,reload:vi.fn(),finish:review.finish}}}))
 // This file's committedTo stub says nothing about status; the review reads it from the fixture.
-vi.mock('@/lib/planning/periodReview',async(importOriginal)=>({...await importOriginal<any>(),taskReviewState:(t:any)=>t.completed?'done':t.carried?'moved':'open'}))
+vi.mock('@/lib/planning/periodReview',async(importOriginal)=>({...await importOriginal<any>(),taskReviewState:(t:any)=>t.completed?'done':t.carried?'moved':'open',movedOn:(t:any)=>t.carried&&!t.completed?{to:t.carriedTo}:null}))
 vi.mock('@/hooks/useHouseholdSeasons',()=>({useHouseholdSeasons:()=>({seasons:[{name:'Spring',month:3,day:1},{name:'Summer',month:6,day:1},{name:'Fall',month:9,day:1},{name:'Winter',month:12,day:1}]})}))
 vi.mock('@/lib/today/domainFilter',()=>({filterTasksForLayers:(t:any)=>t,matchesLayers:()=>true}))
 vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,scopeId:null})}))
@@ -567,3 +567,29 @@ describe('the review by hand (2026-10-17)',()=>{
   }finally{review.reviewed=null}
  })
 })
+
+describe('a line moved on is not open here (2026-10-17)',()=>{
+ it('Month: out of the count and the verbs, folded with the done, named where it went',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'a',title:'Come up with October business plan',bucket:'month',sourceId:'s',carried:true,carriedTo:new Date(2026,10,1)},
+   {id:'b',title:'Book the cabin',bucket:'month'},{id:'c',title:'Pay taxes',bucket:'month',completed:true}]
+  month()
+  expect(screen.getByText('1 open, 1 done, 1 moved on.')).toBeInTheDocument()
+  expect(titles('October goals')).toEqual(['Book the cabin'])
+  const fold=screen.getByRole('button',{name:/1 done, 1 moved on/})
+  fireEvent.click(fold)
+  const moved=row('Come up with October business plan')
+  expect(within(moved).getByText('Moved to November')).toBeInTheDocument()
+  expect(within(moved).queryByRole('group',{name:/Triage/})).toBeNull()
+  // Not named under its season goal as something still moving it.
+  cleanup();season()
+  expect(row('Autumn outings').querySelector('.plan-item-below')).toBeNull()
+ })
+ it('Year: a goal carried into next year reads Moved to 2027',()=>{
+  api.goals=[...GOALS.map(g=>({...g})),{id:'g27',name:'Together',year:2027,status:'active',carriedFrom:'g'}]
+  open()
+  expect(titles('2026 goals')).toEqual(['Health'])
+  fireEvent.click(screen.getByRole('button',{name:/1 moved on/}))
+  expect(within(row('Together')).getByText('Moved to 2027')).toBeInTheDocument()
+ })
+})
+

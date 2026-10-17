@@ -121,6 +121,8 @@
 .plan-item > .canvas-item:hover { background: var(--color-neutral-50); }
 .canvas-item.is-selected { border-color: var(--color-primary-400); background: var(--color-primary-50); }
 .canvas-item.is-done .plan-item-title { color: var(--color-neutral-500); text-decoration: line-through; }
+/* Moved on to a later period: kept as the record, quiet, not struck (not done). */
+.canvas-item.is-moved .plan-item-title { color: var(--color-neutral-500); }
 .plan-item-more { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 4px 0 2px; }
 /* An open row and its options read as one panel, not as more rows (2026-10-12). */
 .plan-item.is-open > .canvas-item { background: var(--color-neutral-50); border-radius: var(--radius-md) var(--radius-md) 0 0; }

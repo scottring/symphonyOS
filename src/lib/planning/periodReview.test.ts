@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { createMockActionableInstance, createMockTask } from '@/test/mocks/factories'
 import type { JournalDay, JournalEntry } from '@/lib/week/journalDays'
 import type { Goal } from '@/types/goal'
-import { reviewSentence, taskReviewState, weekReviewState, weekRoutineOccurrences, yearGoalReviewState } from './periodReview'
+import { movedOn, reviewSentence, taskReviewState, weekReviewState, weekRoutineOccurrences, yearGoalReviewState } from './periodReview'
 
 const OCT = new Date(2026, 9, 1)
 const onOctober = (status: 'open' | 'done' | 'carried' | 'removed', completed = false) =>
@@ -20,6 +20,17 @@ describe('taskReviewState', () => {
   it('a line removed from the period is no longer on its list', () => {
     expect(taskReviewState(onOctober('removed'), 'month', OCT, { isCurrent: false })).toBeUndefined()
     expect(taskReviewState(onOctober('open'), 'month', new Date(2026, 10, 1), { isCurrent: false })).toBeUndefined()
+  })
+})
+
+describe('movedOn', () => {
+  it('names where a carried line went; an open, done or completed line has not moved on', () => {
+    const nov = new Date(2026, 10, 1)
+    const carried = createMockTask({ commitments: [{ level: 'month', periodStart: OCT, status: 'carried', carriedTo: nov }] })
+    expect(movedOn(carried, 'month', OCT, { isCurrent: true })).toEqual({ to: nov })
+    expect(movedOn(onOctober('open'), 'month', OCT, { isCurrent: true })).toBeNull()
+    expect(movedOn(onOctober('done'), 'month', OCT, { isCurrent: true })).toBeNull()
+    expect(movedOn({ ...carried, completed: true }, 'month', OCT, { isCurrent: true })).toBeNull()
   })
 })
 

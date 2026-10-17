@@ -32,6 +32,16 @@ export function taskReviewState(
   return 'open'
 }
 
+/** A line moved on from this period: where to, when the record says. Null
+ *  while it is still this period's (open or done here). */
+export function movedOn(
+  task: Task, level: PlacementLevel, start: Date, opts: { isCurrent: boolean; seasons?: Seasons },
+): { to?: Date } | null {
+  const c = committedTo(task, level, start, opts)
+  if (!c || c === 'legacy' || c.status !== 'carried' || task.completed) return null
+  return { to: c.carriedTo }
+}
+
 /** A week's line: a task committed to the week, or given a day in it (most
  *  week tasks have a day and no week commitment). */
 export function weekReviewState(task: Task, weekStart: Date, opts: { isCurrent: boolean }): ReviewState | undefined {

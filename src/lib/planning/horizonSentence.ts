@@ -2,12 +2,12 @@
 //
 // The one sentence under a Month, Season or Year heading (spec 2026-10-14,
 // "The pages"): what the list holds, said back from rules — never written by
-// a model. "11 open, 5 done. Four serve a Fall goal." An empty list says
-// nothing.
+// a model. "11 open, 5 done, 1 moved on. Four serve a Fall goal." An empty
+// list says nothing. A line moved on to a later period is not open here.
 
 export interface HorizonSentenceInput {
   /** Every item on the list on screen. */
-  items: readonly { done: boolean; hasParent: boolean }[]
+  items: readonly { done: boolean; hasParent: boolean; moved?: boolean }[]
   /** The list one horizon up, by name ("Fall", "2026"); none for a year. */
   parentWord?: string | null
 }
@@ -20,9 +20,10 @@ const aOrAn = (word: string) => (/^[aeiou8]/i.test(word) ? 'an' : 'a')
 
 export function horizonSentence({ items, parentWord }: HorizonSentenceInput): string {
   if (items.length === 0) return ''
-  const open = items.filter((i) => !i.done)
-  const done = items.length - open.length
-  const counts = [open.length ? `${open.length} open` : '', done ? `${done} done` : ''].filter(Boolean).join(', ')
+  const open = items.filter((i) => !i.done && !i.moved)
+  const done = items.filter((i) => i.done).length
+  const moved = items.filter((i) => i.moved && !i.done).length
+  const counts = [open.length ? `${open.length} open` : '', done ? `${done} done` : '', moved ? `${moved} moved on` : ''].filter(Boolean).join(', ')
   const parts = [`${counts}.`]
   // Of what is still open, how many serve something one horizon up.
   const serving = parentWord ? open.filter((i) => i.hasParent).length : 0
