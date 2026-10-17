@@ -124,3 +124,21 @@ export function reviewSentence(c: { open: number; done: number; moved: number; l
   const joined = rest.length === 1 ? rest[0] : `${rest.slice(0, -1).join(', ')} and ${rest[rest.length - 1]}`
   return `${first} ${joined[0].toUpperCase()}${joined.slice(1)}.`
 }
+
+/** How many of a period's last days count as its end, when looking back at it
+ *  makes sense: a week's last day, a month's last three, a season's or a
+ *  year's last week. */
+export const REVIEW_WINDOW_DAYS = { week: 1, month: 3, season: 7, year: 7 } as const
+
+/**
+ * Which review a period's page offers (Scott, 2026-10-17: "why do we have a
+ * review this week button before we've even really started the week?").
+ * A period over, or in its last days: its own ('this'). Under way: the one
+ * before it ('previous'), for the page to offer while that one is unreviewed.
+ * Not begun: none.
+ */
+export function reviewTarget(bounds: { start: Date; end: Date }, now: Date, windowDays: number): 'this' | 'previous' | 'none' {
+  if (now < bounds.start) return 'none'
+  const opens = new Date(bounds.end.getFullYear(), bounds.end.getMonth(), bounds.end.getDate() - windowDays)
+  return now >= opens ? 'this' : 'previous'
+}

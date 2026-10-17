@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { createMockActionableInstance, createMockTask } from '@/test/mocks/factories'
 import type { JournalDay, JournalEntry } from '@/lib/week/journalDays'
 import type { Goal } from '@/types/goal'
-import { dayNote, movedOn, reviewSentence, weekPhrase, taskReviewState, weekReviewState, weekRoutineOccurrences, yearGoalReviewState } from './periodReview'
+import { dayNote, movedOn, reviewSentence, reviewTarget, weekPhrase, taskReviewState, weekReviewState, weekRoutineOccurrences, yearGoalReviewState } from './periodReview'
 
 const OCT = new Date(2026, 9, 1)
 const onOctober = (status: 'open' | 'done' | 'carried' | 'removed', completed = false) =>
@@ -102,5 +102,21 @@ describe('reviewSentence', () => {
     expect(reviewSentence({ open: 0, done: 2, moved: 1, letGo: 1 })).toBe('Nothing left open. Two done, one moved on and one let go.')
     expect(reviewSentence({ open: 1, done: 0, moved: 0, letGo: 0 })).toBe('One still open.')
     expect(reviewSentence({ open: 0, done: 1, moved: 0, letGo: 0, skipped: 2 })).toBe('Nothing left open. One done and two skipped.')
+  })
+})
+
+describe('reviewTarget (2026-10-17)', () => {
+  const week = { start: new Date(2026, 9, 17), end: new Date(2026, 9, 24) }
+  it('a week under way offers the week before; its last day and after, its own; a coming one, none', () => {
+    expect(reviewTarget(week, new Date(2026, 9, 17, 9), 1)).toBe('previous')
+    expect(reviewTarget(week, new Date(2026, 9, 22, 23), 1)).toBe('previous')
+    expect(reviewTarget(week, new Date(2026, 9, 23, 8), 1)).toBe('this')
+    expect(reviewTarget(week, new Date(2026, 9, 30), 1)).toBe('this')
+    expect(reviewTarget(week, new Date(2026, 9, 16), 1)).toBe('none')
+  })
+  it('a month opens its own review three days before it ends', () => {
+    const oct = { start: new Date(2026, 9, 1), end: new Date(2026, 10, 1) }
+    expect(reviewTarget(oct, new Date(2026, 9, 28, 23), 3)).toBe('previous')
+    expect(reviewTarget(oct, new Date(2026, 9, 29), 3)).toBe('this')
   })
 })

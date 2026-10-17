@@ -20,10 +20,11 @@ vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[],soleDomain:'personal
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null,members:[{auth_user_id:'u2',name:'Iris'}]})}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'u1'}})}))
-const review=vi.hoisted(()=>({reviewed:null as any,mine:null as any,finish:vi.fn(async()=>true),token:'' as string,horizon:'' as string}))
+const review=vi.hoisted(()=>({reviewed:null as any,prevReviewed:null as any,mine:null as any,finish:vi.fn(async()=>true),seen:[] as string[]}))
 const plan=vi.hoisted(()=>({saved:null as any,save:vi.fn(async()=>true)}))
 vi.mock('@/hooks/usePlanningSession',async(importOriginal)=>({...await importOriginal<any>(),usePlanningSession:()=>({saved:plan.saved,mine:null,loading:false,loadedToken:'',error:null,reload:vi.fn(),save:plan.save})}))
-vi.mock('@/hooks/usePeriodReview',()=>({usePeriodReview:(horizon:string,token:string)=>{review.horizon=horizon;review.token=token;return{reviewed:review.reviewed,mine:review.mine,loading:false,error:null,reload:vi.fn(),finish:review.finish}}}))
+// The page reads two: the period on screen's, then the one before's (its own Review, or last period's).
+vi.mock('@/hooks/usePeriodReview',()=>({usePeriodReview:(horizon:string,token:string)=>{const first=!review.seen.length||review.seen.length%2===0;review.seen.push(`${horizon}:${token}`);return{reviewed:first?review.reviewed:review.prevReviewed,mine:review.mine,loading:false,error:null,reload:vi.fn(),finish:review.finish}}}))
 // This file's committedTo stub says nothing about status; the review reads it from the fixture.
 vi.mock('@/lib/planning/periodReview',async(importOriginal)=>({...await importOriginal<any>(),taskReviewState:(t:any)=>t.completed?'done':t.carried?'moved':'open',movedOn:(t:any)=>t.carried&&!t.completed?{to:t.carriedTo}:null}))
 vi.mock('@/hooks/useHouseholdSeasons',()=>({useHouseholdSeasons:()=>({seasons:[{name:'Spring',month:3,day:1},{name:'Summer',month:6,day:1},{name:'Fall',month:9,day:1},{name:'Winter',month:12,day:1}]})}))
@@ -53,7 +54,7 @@ const titles=(name:string)=>within(list(name)).getAllByRole('listitem').map(li=>
 const row=(title:string)=>screen.getByText(title,{selector:'.plan-item-title'}).closest('li')!
 const lastRun=()=>activity.calls[activity.calls.length-1]
 beforeEach(()=>{
- vi.clearAllMocks();api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
+ vi.clearAllMocks();review.seen=[];review.prevReviewed=null;api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
  HTMLElement.prototype.scrollIntoView=vi.fn()
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
@@ -526,8 +527,10 @@ describe('the review by hand (2026-10-17)',()=>{
  it('Month: Review October lists the open lines with the row verbs; each saves through the activity',async()=>{
   api.tasks=[{id:'a',title:'Book the cabin',bucket:'month'},{id:'b',title:'Pay taxes',bucket:'month',completed:true},{id:'c',title:'Plan sabbatical',bucket:'month',carried:true}]
   api.toggleTask.mockResolvedValue(true)
+  // Its own review opens in October's last three days.
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,12))
   month()
-  expect(review.horizon).toBe('monthly');expect(review.token).toBe('2026-10')
+  expect(review.seen.slice(0,2)).toEqual(['monthly:2026-10','monthly:2026-9'])
   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
   expect(screen.getByTestId('where').textContent).toContain('review=1')
   expect(screen.queryByRole('link',{name:/guided introduction/})).toBeNull()
@@ -542,14 +545,31 @@ describe('the review by hand (2026-10-17)',()=>{
   fireEvent.click(screen.getAllByRole('button',{name:'Close review'})[0])
   expect(screen.getByTestId('where').textContent).not.toContain('review=1')
   expect(screen.getByRole('list',{name:'October goals'})).toBeInTheDocument()
+  vi.useRealTimers()
+ })
+ it('under way, the page offers last period’s review until it is done; a coming period offers none',()=>{
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,17,12))
+  try{
+   month()
+   expect(screen.queryByRole('button',{name:'Review October'})).toBeNull()
+   fireEvent.click(screen.getByRole('button',{name:'Review September'}))
+   expect(screen.getByTestId('where').textContent).toContain('start=2026-09-01')
+   expect(screen.getByRole('heading',{name:'Review September'})).toBeInTheDocument()
+   cleanup();review.prevReviewed={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
+   month()
+   expect(screen.queryByRole('button',{name:/^Review /})).toBeNull()
+   cleanup()
+   open('/month?view=constellation&horizon=2&start=2026-11-09')
+   expect(screen.queryByRole('button',{name:/^Review /})).toBeNull()
+  }finally{vi.useRealTimers()}
  })
  it('Season and Year review under their own records; a year goal can move on to next year',async()=>{
   season('&review=1')
-  expect(review.horizon).toBe('seasonal');expect(review.token).toBe('2026-fall')
+  expect(review.seen[0]).toBe('seasonal:2026-fall')
   expect(screen.getByRole('heading',{name:'Review Fall'})).toBeInTheDocument()
   cleanup()
-  open('/year?view=constellation&start=2026-10-09&review=1')
-  expect(review.horizon).toBe('annual');expect(review.token).toBe('2026')
+  review.seen=[];open('/year?view=constellation&start=2026-10-09&review=1')
+  expect(review.seen[0]).toBe('annual:2026')
   const open2=screen.getByRole('list',{name:'Still open in 2026'})
   expect(within(open2).getAllByRole('button',{name:/Together$/}).map(b=>b.textContent)).toEqual(['Done','Move to 2027','Archive'])
   fireEvent.click(within(open2).getByRole('button',{name:'Move to 2027: Together'}))
@@ -563,9 +583,11 @@ describe('the review by hand (2026-10-17)',()=>{
    expect(screen.getByText(/Reviewed Oct 31 by Iris/)).toBeInTheDocument()
    fireEvent.click(screen.getByRole('button',{name:'Update review'}))
    await waitFor(()=>expect(review.finish).toHaveBeenCalledWith({wentWell:'',didnt:''}))
-   fireEvent.click(await screen.findByRole('button',{name:'Go to November →'}))
+   // Reviewed, the next step is planning the period after.
+   fireEvent.click(await screen.findByRole('button',{name:'Plan November →'}))
    expect(screen.getByTestId('where').textContent).toContain('start=2026-11-01')
    expect(screen.getByTestId('where').textContent).not.toContain('review=1')
+   expect(screen.getByRole('heading',{name:'Plan November'})).toBeInTheDocument()
   }finally{review.reviewed=null}
  })
 })
@@ -616,3 +638,50 @@ describe('I’m happy with October (2026-10-17)',()=>{
  })
 })
 
+
+describe('planning by hand (2026-10-17)',()=>{
+ const SEP=new Date(2026,8,1),OCT=new Date(2026,9,1)
+ it('Month: Plan October brings in September’s leftovers, adds for each Fall goal and on its own, then marks it planned',async()=>{
+  api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},
+   {id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP},{id:'gone',title:'Pay taxes',bucket:'month',monthStart:SEP,completed:true},
+   {id:'a',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'}]
+  api.keepForward.mockResolvedValue('old');api.dropCommitment.mockResolvedValue(true)
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Plan October'}))
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+  expect(document.querySelector('.plan-sentence')).toBeNull()
+  expect(screen.queryByRole('button',{name:'Review October'})).toBeNull()
+  const left=screen.getByRole('list',{name:'Left from September'})
+  expect(within(left).getAllByRole('listitem')).toHaveLength(1)
+  expect(within(left).getAllByRole('button').map(b=>b.textContent)).toEqual(['Bring into October','Done','Someday','Let go'])
+  fireEvent.click(within(left).getByRole('button',{name:'Bring into October: Fix the gate'}))
+  await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('old',{monthStart:OCT},SEP))
+  expect(lastRun().label).toBe('Move “Fix the gate” to October')
+  expect(screen.getByText('In October: Hike Bear Mountain')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Add to October for Get outside'}))
+  const field=screen.getByRole('textbox',{name:'New line in October for Get outside'})
+  fireEvent.change(field,{target:{value:'Rake leaves'}});fireEvent.submit(field.closest('form')!)
+  await waitFor(()=>expect(api.addTask).toHaveBeenCalledWith('Rake leaves',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT,sourceId:'s'})))
+  expect(lastRun().label).toBe('Add “Rake leaves” for “Get outside”')
+  fireEvent.click(screen.getByRole('button',{name:'I’m happy with October'}))
+  await waitFor(()=>expect(plan.save).toHaveBeenCalled())
+  fireEvent.click(await screen.findByRole('button',{name:'Plan this week →'}))
+  expect(screen.getByText('Week page')).toBeInTheDocument()
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+ })
+ it('Year: last year’s open goals can be brought in as a copy that remembers them',async()=>{
+  api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
+  open('/year?view=constellation&start=2026-10-09&plan=1')
+  expect(screen.queryByRole('heading',{name:/For /})).toBeNull()
+  fireEvent.click(screen.getByRole('button',{name:'Bring into 2026: Learn to sail'}))
+  await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old'})))
+  expect(lastRun().label).toBe('Bring “Learn to sail” into 2026')
+  fireEvent.click(screen.getByRole('button',{name:'Close planning'}))
+  expect(screen.getByTestId('where').textContent).not.toContain('plan=1')
+ })
+ it('a period already over has no Plan, even asked for',()=>{
+  open('/month?view=constellation&horizon=2&start=2025-03-09&plan=1')
+  expect(screen.queryByRole('button',{name:'Plan March'})).toBeNull()
+  expect(screen.queryByRole('heading',{name:'Plan March'})).toBeNull()
+ })
+})
