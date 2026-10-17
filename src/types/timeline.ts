@@ -129,6 +129,13 @@ export function taskToTimelineItem(task: Task, goalLabel?: string): TimelineItem
     captureId: task.captureId,
     isSubtask: !!task.parentTaskId,
     assignedTo: task.assignedTo,
+    // Everyone it is assigned to, as Today's avatars read it (the legacy
+    // single column plus the list); unset when there is no list, so readers
+    // fall back to assignedTo. The kiosk read only assignedTo and took a
+    // task shared by two adults for one adult's.
+    owners: task.assignedToAll?.length
+      ? [...new Set([...(task.assignedTo ? [task.assignedTo] : []), ...task.assignedToAll])]
+      : undefined,
     context: task.context,
     category: task.category,
     allDay: task.isAllDay,

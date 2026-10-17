@@ -9,7 +9,6 @@ import { routineEarnsTheWall } from '@/lib/routineUtils'
 import { boardOwnersOf } from '@/components/wall-v2/wallGantt'
 import { titleForMember, HOUSEHOLD_ID } from '@/components/wall-v2/wallEventAttribution'
 import { bandForTime, type MemberDayModel, type KidRow } from './kidDayModel'
-import { memberShape } from './memberPageModel'
 import type { WallMoment } from './wallMoment'
 
 /** "7:30a", "2:10p", "12p". */
@@ -42,16 +41,14 @@ export interface WallTodayRow {
  * shape, not news, and stays off (the board's rule, routineEarnsTheWall); a
  * collection step never stands alone, and neither does a task's step: it
  * folds into its task's row as "3 steps" (2026-10-07 — a task and its three
- * steps were four rows at 8:30). And it is the family's screen: a task that
- * is one adult's alone stays off it (Scott, 2026-10-07: "only relevant to
- * me — we should be more focused on shared tasks and stuff involving the
- * kids"). A task kept: shared by two or more, any kid's, or nobody's in
- * particular (the household's). Events stay — they say who is where.
+ * steps were four rows at 8:30). Every timed family task is on it, whoever
+ * carries it (Scott, 2026-10-17: "if there's a family task on Today The Day
+ * it should also show on the kiosk" — replacing 2026-10-07's rule that kept
+ * one adult's own task off). Events stay — they say who is where.
  */
 export function wallTodayRows(items: Record<string, TimelineItem[]>, members: FamilyMember[], now: Date): WallTodayRow[] {
   const all = Object.values(items).flat()
   const ids = new Set(all.map((it) => it.id))
-  const kidIds = new Set(members.filter((m) => memberShape(m) === 'kid').map((m) => m.id))
   const steps = new Map<string, number>()
   for (const it of all) {
     if (it.isSubtask && it.parentTaskId && ids.has(`task-${it.parentTaskId}`) && !it.completed) {
@@ -66,7 +63,6 @@ export function wallTodayRows(items: Record<string, TimelineItem[]>, members: Fa
     if (it.type === 'routine' && (it.originalRoutine?.parent_routine_id != null || !routineEarnsTheWall(it.recurrencePattern))) continue
     if (it.completed && it.type !== 'event') continue
     const owners = boardOwnersOf(it, members).filter((id) => id !== HOUSEHOLD_ID)
-    if (it.type === 'task' && owners.length === 1 && !kidIds.has(owners[0])) continue
     seen.add(it.id)
     const stepCount = steps.get(it.id) ?? 0
     const start = new Date(it.startTime)

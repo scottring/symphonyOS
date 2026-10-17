@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows } from './wallMomentsModel'
-import type { TimelineItem } from '@/types/timeline'
+import { taskToTimelineItem, type TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { MemberDayModel } from './kidDayModel'
 import type { WallDayData } from '@/hooks/useWallData'
@@ -110,11 +110,12 @@ describe('afterSchoolRows', () => {
   })
 })
 
-// Scott, 2026-10-07: "the individual tasks … are only relevant to me — we
-// should be more focused on shared tasks and stuff involving the kids".
+// Scott, 2026-10-17: "if there's a family task on Today The Day it should
+// also show on the kiosk" — this replaces 2026-10-07's rule that kept one
+// adult's own task off the wall.
 describe('wallTodayRows — the family’s screen', () => {
   const task = (id: string, o: Partial<TimelineItem>) => item({ id, type: 'task', title: id, startTime: at(8, 30), ...o })
-  it('leaves one adult’s own task off, and keeps shared, kids’ and household tasks and every event', () => {
+  it('keeps every timed family task — one adult’s, shared, a kid’s, the household’s — and every event', () => {
     const rows = wallTodayRows({ morning: [
       task('task-mine', { assignedTo: 'sk' }),
       task('task-shared', { originalTask: { assignedToAll: ['sk', 'el'] } as never, assignedTo: null }),
@@ -122,6 +123,13 @@ describe('wallTodayRows — the family’s screen', () => {
       task('task-house', {}),
       item({ id: 'event-jury', title: 'Jury duty', startTime: at(8), assignedTo: 'sk' }),
     ] }, members, at(7))
-    expect(rows.map((r) => r.id).sort()).toEqual(['event-jury', 'task-ella', 'task-house', 'task-shared'])
+    expect(rows.map((r) => r.id).sort()).toEqual(['event-jury', 'task-ella', 'task-house', 'task-mine', 'task-shared'])
+  })
+
+  it('names everyone a shared task is assigned to, not just its first assignee', () => {
+    const shared = taskToTimelineItem({ id: 'poop', title: 'pick up poop', completed: false, createdAt: at(0), updatedAt: at(0),
+      scheduledFor: at(10), isAllDay: false, assignedTo: 'sk', assignedToAll: ['sk', 'el'] } as never)
+    const rows = wallTodayRows({ morning: [shared] }, members, at(7))
+    expect(rows.map((r) => [r.id, r.owners])).toEqual([['task-poop', ['sk', 'el']]])
   })
 })
