@@ -8,6 +8,12 @@
 
 import { supabase } from '@/lib/supabase'
 
+/** The page step's ?plan=paper, or ?plan=sample to load the bundled sample.
+ *  Any other ?plan= belongs to someone else (Week's ?plan=1, planning by hand). */
+export function paperPlanRequest(plan: string | null): 'paper' | 'sample' | null {
+  return plan === 'paper' || plan === 'sample' ? plan : null
+}
+
 export type FirstWeekStepId = 'plan-year' | 'people' | 'page' | 'partner' | 'routine'
 
 export interface FirstWeekSignals {

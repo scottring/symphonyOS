@@ -60,7 +60,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { FirstWeekCard } from '@/components/schedule/FirstWeekCard';
 import { PlanningNudge } from '@/components/plan/PlanningNudge';
 import { useFirstWeekSignals } from '@/hooks/useFirstWeekSignals';
-import { firstWeekSteps, shouldOpenFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
+import { firstWeekSteps, shouldOpenFirstWeek, paperPlanRequest, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
 import { getAuthUser } from '@/lib/supabase';
 
 const sameLocalDay = (a: Date, b: Date) =>
@@ -245,8 +245,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
 
   // ?plan=paper (from the card's "Snap this week's page" link) opens the flow
   // directly on this route; ?plan=sample loads the bundled sample first.
+  // Week's own ?plan=1 (planning by hand) is left for WeekV2 to read.
   useEffect(() => {
-    const plan = searchParams.get('plan');
+    const plan = paperPlanRequest(searchParams.get('plan'));
     if (!plan) return;
     const next = new URLSearchParams(searchParams);
     next.delete('plan');
