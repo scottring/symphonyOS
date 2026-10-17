@@ -159,6 +159,34 @@
 .canvas-transcript-voice { margin: 0; font-size: 14px; color: var(--color-neutral-800); }
 .canvas-transcript-voice small { display: block; font-size: 11.5px; color: var(--color-neutral-500); }
 
+/* The conversation gets a full-height reading surface beside the plan. */
+.canvas-strip.is-panel, .desktop-workspace-page .canvas-strip.is-panel {
+  position: relative; inset: auto; height: 100%; min-height: 0; width: 100%; max-width: none;
+  margin: 0; padding: 20px; gap: 16px; border: 0; border-radius: 0; box-shadow: none;
+  background: var(--color-bg-panel, var(--color-bg-elevated));
+}
+.conversation-panel-header { display: flex; align-items: center; justify-content: space-between; flex: none; }
+.conversation-panel-header h2 { margin: 0; font: 25px var(--font-family-display); }
+.conversation-panel-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding-right: 4px; }
+.is-panel .canvas-transcript { display: flex; flex-direction: column; align-items: stretch; gap: 20px; border: 0; padding-bottom: 24px; }
+.is-panel .canvas-transcript-scroll { max-height: none; overflow: visible; flex: none; gap: 18px; }
+.is-panel .canvas-transcript-voice { padding: 12px 14px; border-radius: 12px; background: var(--color-bg-base); font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+.is-panel .canvas-transcript-voice small { margin-bottom: 4px; }
+.canvas-transcript-empty { margin: 24px 0; font-size: 16px; line-height: 1.65; color: var(--color-neutral-500); }
+.is-panel .canvas-composer { flex: none; align-items: flex-end; flex-wrap: wrap; padding: 10px; border: 1px solid var(--color-neutral-300); border-radius: 16px; background: var(--color-bg-elevated); }
+.is-panel .canvas-composer-field { flex: 1 0 100%; width: 100%; min-height: 64px; height: auto; padding: 4px; resize: vertical; max-height: 160px; line-height: 1.5; font-size: 15px; }
+.canvas-composer-field { resize: none; }
+.is-panel .canvas-send { margin-left: auto; }
+.is-panel .canvas-mic, .is-panel .canvas-send, .conversation-panel-header .canvas-icon { min-width: 44px; min-height: 44px; }
+.is-panel .canvas-voice-error { flex-basis: 100%; }
+.is-panel .canvas-receipt { padding-block: 16px; border-top: 1px solid var(--color-neutral-200); }
+.conversation-launcher { position: fixed; bottom: 24px; z-index: 25; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 12px 20px; border: 1px solid var(--color-primary-200); border-radius: 999px; background: var(--color-bg-elevated); color: var(--color-primary-800); box-shadow: var(--shadow-lg); font: inherit; cursor: pointer; }
+.conversation-launcher:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 4px; }
+@media (max-width: 767px) {
+  .canvas-strip.is-panel { padding: 16px; bottom: auto; }
+  .canvas-strip.is-panel .canvas-mic span { position: static; width: auto; height: auto; clip: auto; overflow: visible; }
+}
+
 .canvas-strip.is-listening { border-color: var(--color-primary-400); box-shadow: 0 0 0 3px var(--color-primary-100), var(--shadow-lg); }
 .canvas-receipt, .canvas-proposals-line {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;
@@ -347,3 +375,43 @@
 .chat-task-action:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 @media (pointer: coarse) { .chat-task-action { min-height: 32px; padding: 2px 11px; font-size: 13px; } }
 .chat-task-action svg { width: 13px; height: 13px; flex: none; }
+
+/* Motion describes arrival and progress; labels remain the source of truth. */
+.canvas-strip.is-panel { animation: conversation-enter 180ms ease-out; }
+.is-panel > .canvas-voice-state { flex: none; min-height: 24px; }
+.change-card { animation: conversation-enter 180ms ease-out; }
+.change-card.is-saving { border-color: var(--color-primary-500); }
+.change-card.is-saving .change-card-approve { animation: canvas-pulse 1.4s ease-in-out infinite; }
+.canvas-receipt.is-saved { animation: conversation-confirm 700ms ease-out; }
+@keyframes conversation-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes conversation-confirm { from { background-color: var(--color-primary-100); } to { background-color: transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .canvas-strip.is-panel, .change-card, .change-card.is-saving .change-card-approve, .canvas-receipt.is-saved { animation: none; }
+  .canvas-item { transition: none; }
+}
+
+/* Beta chat: one conversation, one explicit draft, one confirmed result. */
+.canvas-strip.is-chat .canvas-composer-label { flex-basis:100%; font-size:12px; color:var(--color-neutral-600); }
+.canvas-strip.is-chat .canvas-send { display:flex; align-items:center; gap:8px; width:auto; padding-inline:14px; border-radius:9px; }
+.canvas-strip.is-chat .canvas-transcript-empty { margin-block:16px; }
+.canvas-strip.is-chat .change-card-body { max-height:none; overflow:visible; }
+.change-card.is-chat-draft { border:1px solid var(--color-neutral-200); background:var(--color-bg-elevated); padding:16px; }
+.is-chat-draft .change-card-head { align-items:flex-start; flex-wrap:wrap; }
+.is-chat-draft .change-card-title { font:500 16px/1.4 var(--font-family-sans); }
+.change-card-status { font-size:12px; color:var(--color-neutral-600); }
+.is-chat-draft .change-card-row { grid-template-columns: minmax(0,1fr) auto; gap:4px 12px; padding-block:12px; }
+.is-chat-draft .change-card-kind { grid-column:1 / -1; font-size:12px; font-weight:400; letter-spacing:0; color:var(--color-neutral-600); }
+.is-chat-draft .change-card-what { overflow-wrap:anywhere; }
+.is-chat-draft .change-card-where { color:var(--color-neutral-800); white-space:normal; }
+.is-chat-draft .change-card-note { flex-basis:100%; margin-top:8px; color:var(--color-neutral-600); }
+.is-chat-draft .change-card-approve { background:var(--color-primary-700); color:#fff; font-weight:500; padding-inline:16px; }
+.is-chat-draft .change-card-discard { color:var(--color-neutral-600); }
+.is-chat-draft .canvas-link { min-height:44px; }
+.is-chat-draft .canvas-link:disabled { opacity:.5; cursor:default; }
+.canvas-chat-result { border-top:1px solid var(--color-neutral-200); padding:16px 0; color:var(--color-neutral-800); font-size:14px; }
+.canvas-chat-result p { margin:0 0 8px; }
+.canvas-chat-result-title { display:flex; align-items:center; gap:8px; font-weight:500; }
+.canvas-chat-result-actions { display:flex; flex-wrap:wrap; gap:16px; }
+.canvas-chat-result-actions button { min-height:44px; }
+.canvas-chat-result.is-failed, .canvas-chat-result.is-partial { color:var(--color-danger-700, #9b3412); }
+@media(max-width:420px) { .is-chat-draft .change-card-row { grid-template-columns:minmax(0,1fr); } .is-chat-draft .change-card-where { text-align:left; } }

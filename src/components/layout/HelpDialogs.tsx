@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { DOMAINS } from '@/lib/domains'
 import { domainHotkeyLabel } from '@/lib/domainHotkey'
+import { Link } from 'react-router-dom'
 
 const SHORTCUTS: [keys: string, action: string][] = [
   ['⌘K', 'Add, search, ask, or talk to Symphony'],
@@ -59,10 +60,14 @@ export function HelpDialogs({ open, onClose, returnFocus }: {
     <MenuDialog title="Help" onClose={onClose} returnFocus={returnFocus}>
       <p><a href="/learn/">Watch the Symphony walkthroughs</a> — eight short guides to help you get started.</p>
       <ul className="desktop-footer-help">
+        <li><Link to="/getting-started" onClick={onClose}><strong>Getting started</strong></Link> resumes household setup, routines and the planning horizons.</li>
+        <li><Link to="/getting-started?journey=goals" onClick={onClose}>Start with a goal</Link> walks through choosing a horizon and giving shape to your own intentions.</li>
+        <li><Link to="/getting-started?journey=devices" onClick={onClose}>Phones, tablets and shared displays</Link> explains installation, sign-in and pairing.</li>
+        <li><Link to="/getting-started?journey=guide" onClick={onClose}>When life changes</Link> explains new plans, changes, routines, deferring and recovery.</li>
         <li><strong>Today</strong> holds what you have chosen to do today, with what you need to do it.</li>
         <li><strong>Week and Month</strong> open their pages, or pin their lists beside the page you are on.</li>
         <li><strong>Inbox</strong> keeps captures until you decide where they belong.</li>
-        <li><strong>⌘K</strong> adds, searches, or asks Symphony from anywhere; its <strong>Talk</strong> button (or <strong>⌘⇧K</strong>) starts a conversation.</li>
+        <li><strong>⌘K</strong> adds, searches, or opens Chat with Symphony from anywhere.</li>
       </ul>
       <p>
         Questions or problems: <a href="mailto:hello@symphony-os.com">hello@symphony-os.com</a>.

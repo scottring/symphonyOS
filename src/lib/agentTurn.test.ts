@@ -136,3 +136,14 @@ describe('runAgentTurn outcome', () => {
     expect(r.outcome.writes).toHaveLength(1)
   })
 })
+
+
+it('uses the confirmed proposal receipt when the model returns no final sentence',async()=>{
+ vi.mocked(streamSymphonyAgent).mockImplementation(async(_m,h)=>{
+  h.onDone?.('',null,undefined,{state:'proposed',writes:[],say:'Shown',proposal:{key:'bike',title:'3 changes',ops:3}})
+ })
+ const result=await runAgentTurn([])
+ expect(result.text).toContain('ready to review')
+ expect(result.text).toContain('Nothing is saved')
+ expect(result.error).toBeNull()
+})

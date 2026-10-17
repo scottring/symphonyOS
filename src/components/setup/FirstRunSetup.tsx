@@ -1,12 +1,15 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Plus, X, Check } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { geocodePlace, type GeocodedPlace } from '@/lib/geocode'
 import { saveFirstRunSetup, skipFirstRunSetup, type HouseholdRole } from '@/lib/firstRun'
+import { isWeekStart, type WeekStart } from '@/lib/cadence/config'
+import { WeekStartChoice } from './WeekStartChoice'
 
 interface Props {
   user: User
-  onDone: () => void
+  onDone: () => void | Promise<void>
+  embedded?: boolean
 }
 
 interface OtherRow {
@@ -28,15 +31,23 @@ function guessName(user: User): string {
  * name yourself, list who lives here, and pin home for the weather. Every
  * field is editable later in Settings, so this stays short.
  */
-export function FirstRunSetup({ user, onDone }: Props) {
-  const [householdName, setHouseholdName] = useState('')
-  const [yourName, setYourName] = useState(() => guessName(user))
-  const [others, setOthers] = useState<OtherRow[]>([{ key: 1, name: '', role: 'parent' }])
-  const [homeQuery, setHomeQuery] = useState('')
+export function FirstRunSetup({ user, onDone, embedded = false }: Props) {
+  const draftKey = `symphony.setup.household.${user.id}`
+  const [draft] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(draftKey) ?? '{}') as {householdName?:string;yourName?:string;others?:OtherRow[];homeQuery?:string;weekStartsOn?:WeekStart} } catch { return {} }
+  })
+  const [householdName, setHouseholdName] = useState(draft.householdName ?? '')
+  const [yourName, setYourName] = useState(() => draft.yourName ?? guessName(user))
+  const [others, setOthers] = useState<OtherRow[]>(draft.others ?? [{ key: 1, name: '', role: 'parent' }])
+  const [homeQuery, setHomeQuery] = useState(draft.homeQuery ?? '')
+  const [weekStartsOn,setWeekStartsOn]=useState<WeekStart>(isWeekStart(draft.weekStartsOn)?draft.weekStartsOn:0)
   const [home, setHome] = useState<GeocodedPlace | null>(null)
   const [homeStatus, setHomeStatus] = useState<'idle' | 'looking' | 'notfound'>('idle')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    try { localStorage.setItem(draftKey,JSON.stringify({householdName,yourName,others,homeQuery,weekStartsOn})) } catch { /* form remains usable without local storage */ }
+  }, [draftKey,householdName,yourName,others,homeQuery,weekStartsOn])
 
   const addOther = () => setOthers((rows) => [...rows, { key: Date.now(), name: '', role: 'child' }])
   const removeOther = (key: number) => setOthers((rows) => rows.filter((r) => r.key !== key))
@@ -75,8 +86,9 @@ export function FirstRunSetup({ user, onDone }: Props) {
         yourName,
         others: others.filter((r) => r.name.trim()).map(({ name, role }) => ({ name, role })),
         home: resolvedHome,
+        weekStartsOn,
       })
-      onDone()
+      await onDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save. Try again.')
       setSaving(false)
@@ -88,25 +100,26 @@ export function FirstRunSetup({ user, onDone }: Props) {
     setSaving(true)
     try {
       await skipFirstRunSetup(user.id)
+      await onDone()
     } catch (err) {
-      console.warn('[first-run] skip failed:', err)
+      setError(err instanceof Error ? err.message : 'Could not save. Try again.')
+      setSaving(false)
     }
-    onDone()
   }
 
   return (
-    <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
+    <div className={embedded ? '' : 'min-h-screen bg-bg-base flex flex-col items-center justify-center px-6 py-12'}>
+      <div className={embedded ? '' : 'w-full max-w-md'}>
+        {!embedded && <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-2">
             <img src="/symphony-logo.png" alt="Symphony Logo" className="w-12 h-12" />
             <h1 className="font-display text-3xl text-neutral-900">Symphony</h1>
           </div>
-        </div>
+        </div>}
 
-        <div className="card p-8">
-          <h2 className="font-display text-xl font-medium text-neutral-800 mb-1 text-center">Set up your household</h2>
-          <p className="text-sm text-neutral-500 mb-2 text-center">Two minutes. Everything here can be changed in Settings.</p>
+        <div className={embedded ? '' : 'card p-8'}>
+          {!embedded && <h2 className="font-display text-xl font-medium text-neutral-800 mb-1 text-center">Set up your household</h2>}
+          <p className="text-sm text-neutral-500 mb-2 text-center">Start with your people. You can change these details in Settings.</p>
           <p className="text-xs text-neutral-500 mb-6 text-center">Invited by someone? Open their invitation link again to join their household instead of starting a new one.</p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -139,7 +152,7 @@ export function FirstRunSetup({ user, onDone }: Props) {
 
             <fieldset className="space-y-2">
               <legend className="block text-sm font-medium text-neutral-600">Who else lives here?</legend>
-              <p className="text-xs text-neutral-400">A partner can get their own login later from Settings.</p>
+              <p className="text-sm text-neutral-500">Adding a name does not invite anyone or give them access. Send invitations later from Settings.</p>
               <div className="space-y-2">
                 {/* input-base is unlayered CSS (width: 100%), so size via wrappers */}
                 {others.map((row, i) => (
@@ -186,6 +199,8 @@ export function FirstRunSetup({ user, onDone }: Props) {
               </button>
             </fieldset>
 
+            <WeekStartChoice value={weekStartsOn} onChange={setWeekStartsOn} disabled={saving}/>
+
             <div className="space-y-2">
               <label htmlFor="home-place" className="block text-sm font-medium text-neutral-600">Where is home?</label>
               <input
@@ -207,7 +222,7 @@ export function FirstRunSetup({ user, onDone }: Props) {
               </p>
             </div>
 
-            {error && <div className="p-3 rounded-lg text-sm bg-danger-50 text-danger-700">{error}</div>}
+            {error && <div role="alert" className="p-3 rounded-lg text-sm bg-danger-50 text-danger-700">{error}</div>}
 
             <button
               type="submit"
@@ -218,7 +233,7 @@ export function FirstRunSetup({ user, onDone }: Props) {
             </button>
           </form>
 
-          <div className="mt-4 text-center">
+          {!embedded && <div className="mt-4 text-center">
             <button
               type="button"
               onClick={handleSkip}
@@ -227,7 +242,7 @@ export function FirstRunSetup({ user, onDone }: Props) {
             >
               Skip for now
             </button>
-          </div>
+          </div>}
         </div>
       </div>
     </div>

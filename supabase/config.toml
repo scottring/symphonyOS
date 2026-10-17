@@ -4,6 +4,11 @@
 # working directory name when running `supabase init`.
 project_id = "symphony-rebuild"
 
+# The baseline serves ordinary authenticated accounts; gateway JWT validation
+# remains enabled in addition to the handler's user and household checks.
+[functions.symphony-agent]
+verify_jwt = true
+
 [api]
 enabled = true
 # Port to use for the API URL.

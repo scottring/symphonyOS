@@ -48,6 +48,8 @@ interface QuickCaptureProps {
   onOpen?: () => void
   onClose?: () => void
   showFab?: boolean
+  /** Keep the floating + beside an open side panel, clear of its controls. */
+  rightInset?: number
   /** Talk to Symphony (live voice): the box's mic starts a conversation,
    *  which continues in the conversation bar. Without it, the mic dictates. */
   onTalk?: () => void
@@ -85,6 +87,7 @@ export function QuickCapture({
   onOpen,
   onClose,
   showFab = true,
+  rightInset = 0,
   onTalk,
   resultsSlot,
   onAskSymphony,
@@ -382,7 +385,7 @@ export function QuickCapture({
 
   return (
     <>
-      {/* Floating Action Button - only on mobile, positioned above bottom nav */}
+      {/* Floating Action Button — desktop capture, kept clear of the side panel */}
       {showFab && (
         <button
           onClick={handleOpen}
@@ -390,7 +393,7 @@ export function QuickCapture({
                      flex items-center justify-center
                      hover:bg-primary-600 active:bg-primary-700 active:scale-95
                      transition-all z-50"
-          style={{ bottom: `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` }}
+          style={{ right: `calc(1.25rem + ${rightInset}px)`, bottom: `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` }}
           aria-label="Quick add task"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">

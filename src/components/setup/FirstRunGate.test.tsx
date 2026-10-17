@@ -12,7 +12,7 @@ vi.mock('@/lib/firstRun', async (importOriginal) => {
   const mod = await importOriginal<typeof import('@/lib/firstRun')>()
   return { ...mod, loadFirstRunSignals: h.signals }
 })
-vi.mock('./FirstRunSetup', () => ({ FirstRunSetup: () => <div>SETUP SCREEN</div> }))
+vi.mock('./OnboardingFlow', () => ({ OnboardingFlow: () => <div>SETUP SCREEN</div> }))
 
 import { FirstRunGate } from './FirstRunGate'
 

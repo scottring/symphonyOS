@@ -1,0 +1,57 @@
+{
+  "year": {
+    "id": "year",
+    "name": "Year",
+    "seconds": 43.25,
+    "connectionsStart": 24.65,
+    "voice": "marin",
+    "video": "/onboarding/horizons/year.07304704e7d6.mp4",
+    "poster": "/onboarding/horizons/year.07304704e7d6.jpg",
+    "captions": "/onboarding/horizons/year.07304704e7d6.vtt",
+    "bytes": 945115
+  },
+  "season": {
+    "id": "season",
+    "name": "Season",
+    "seconds": 42.1,
+    "connectionsStart": 25.2,
+    "voice": "marin",
+    "video": "/onboarding/horizons/season.399df305e3f9.mp4",
+    "poster": "/onboarding/horizons/season.399df305e3f9.jpg",
+    "captions": "/onboarding/horizons/season.399df305e3f9.vtt",
+    "bytes": 961772
+  },
+  "month": {
+    "id": "month",
+    "name": "Month",
+    "seconds": 45.5,
+    "connectionsStart": 24.4,
+    "voice": "marin",
+    "video": "/onboarding/horizons/month.f57f54d76ea7.mp4",
+    "poster": "/onboarding/horizons/month.f57f54d76ea7.jpg",
+    "captions": "/onboarding/horizons/month.f57f54d76ea7.vtt",
+    "bytes": 1033808
+  },
+  "week": {
+    "id": "week",
+    "name": "Week",
+    "seconds": 46.1,
+    "connectionsStart": 26.3,
+    "voice": "marin",
+    "video": "/onboarding/horizons/week.9052852fc491.mp4",
+    "poster": "/onboarding/horizons/week.9052852fc491.jpg",
+    "captions": "/onboarding/horizons/week.9052852fc491.vtt",
+    "bytes": 1009885
+  },
+  "today": {
+    "id": "today",
+    "name": "Today",
+    "seconds": 44.0,
+    "connectionsStart": 27.25,
+    "voice": "marin",
+    "video": "/onboarding/horizons/today.9002cc8f97f1.mp4",
+    "poster": "/onboarding/horizons/today.9002cc8f97f1.jpg",
+    "captions": "/onboarding/horizons/today.9002cc8f97f1.vtt",
+    "bytes": 982232
+  }
+}

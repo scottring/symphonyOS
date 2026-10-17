@@ -1,145 +1,241 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Copy, Mail, RefreshCw } from 'lucide-react'
 import { useSchoolMail } from '@/hooks/useSchoolMail'
 import { SectionHeading } from '@/components/layout/SectionHeading'
-
-/** "2h ago" / "3d ago" / a date once it stops being recent. */
-function relativeTime(iso: string, now: Date = new Date()): string {
-  const then = new Date(iso)
-  if (Number.isNaN(then.getTime())) return ''
-  const minutes = Math.floor((now.getTime() - then.getTime()) / 60000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d ago`
-  return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-const STATUS_STYLES: Record<string, string> = {
-  extracted: 'bg-primary-50 text-primary-700',
-  pending: 'bg-neutral-100 text-neutral-500',
-  failed: 'bg-red-50 text-red-600',
-}
-
-function StatusPill({ status }: { status: string }) {
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${STATUS_STYLES[status] ?? 'bg-neutral-100 text-neutral-500'}`}>
-      {status}
-    </span>
-  )
-}
+import { SchoolMailReview } from './SchoolMailReview'
 
 export function SchoolMailCard() {
-  const { address, recent, retry, loading, error } = useSchoolMail()
+  const school = useSchoolMail()
+  return <SchoolMailPanel school={school} />
+}
+
+/** The production view also supports the isolated, in-memory UI walkthrough. */
+export function SchoolMailPanel(
+  { school }: { school: ReturnType<typeof useSchoolMail> },
+) {
+  const section = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (window.location.hash === '#school-information') {
+      section.current?.scrollIntoView({ block: 'start' })
+    }
+  }, [])
   const [copied, setCopied] = useState(false)
-  const [retrying, setRetrying] = useState<string | null>(null)
-
-  const handleCopy = async () => {
-    if (!address) return
+  const [copyError, setCopyError] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [opened, setOpened] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const ready = school.messages.filter((message) => message.status === 'ready')
+  const received = school.messages.length > 0
+  const doAction = async (action: () => Promise<unknown>) => {
+    setBusy(true)
+    setActionError(null)
     try {
-      await navigator.clipboard.writeText(address)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Could not copy the school mail address:', err)
-    }
-  }
-
-  const handleRetry = async (id: string) => {
-    setRetrying(id)
-    try {
-      await retry(id)
+      await action()
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : 'Please try again.',
+      )
     } finally {
-      setRetrying(null)
+      setBusy(false)
     }
   }
-
   return (
-    <section>
-      <SectionHeading>School mail</SectionHeading>
-      <p className="text-sm text-neutral-500 mb-6">
-        Forward school email here once, or set a Gmail filter. Events land on their day with what
-        each kid needs.
+    <section ref={section} id='school-information' className='scroll-mt-24'>
+      <SectionHeading>School information</SectionHeading>
+      <p className='text-sm text-neutral-600 mb-4'>
+        Bring school emails here. Symphony picks out dates, things to do and
+        routines. You choose what to add.
       </p>
-
-      {address && (
-        <div className="p-4 bg-white rounded-lg border border-neutral-100">
-          <div className="flex items-center gap-3">
-            <Mail className="w-4 h-4 text-neutral-400 shrink-0" />
-            <span className="font-mono text-sm text-neutral-700 break-all flex-1">{address}</span>
-            <button
-              onClick={handleCopy}
-              className="text-xs font-medium text-primary-600 hover:text-primary-700 px-2 py-1 rounded hover:bg-primary-50 transition-colors whitespace-nowrap flex items-center gap-1"
+      <div className='rounded-xl border border-primary-100 bg-primary-50/40 p-4 mb-5 text-sm text-primary-800 flex items-start gap-3'>
+        <Mail className='w-5 h-5 shrink-0' />
+        <p>
+          <strong>Nothing enters your plans until you save it.</strong>{' '}
+          School email is shared with the adults in your household. Forward only
+          what you want them to see.
+        </p>
+      </div>
+      {school.loading
+        ? <p role='status'>Loading school information…</p>
+        : !school.householdId
+        ? (
+          <p>
+            Create or join a household with an adult account to set up school
+            information.
+          </p>
+        )
+        : (
+          <>
+            <ol
+              aria-label='School information progress'
+              className='flex flex-wrap gap-x-6 gap-y-2 text-xs text-neutral-600 mb-5'
             >
-              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <p className="text-xs text-neutral-400 mt-3">Treat this address like a password.</p>
-        </div>
-      )}
-
-      {/* No address and nothing still in flight means no household — and the
-          address is minted per household, so there is a concrete next step
-          rather than an empty card. */}
-      {!address && !loading && (
-        <p className="text-sm text-neutral-500">
-          Join or create a household to get a forwarding address.
+              <li>{school.address ? '✓' : '1.'} Address ready</li>
+              <li>{received ? '✓' : '2.'} First email received</li>
+              <li>
+                {school.messages.some((m) =>
+                    m.status === 'saved' || m.status === 'dismissed'
+                  )
+                  ? '✓'
+                  : '3.'} First review complete
+              </li>
+            </ol>
+            {!school.address
+              ? (
+                <button
+                  disabled={busy}
+                  className='btn-primary'
+                  onClick={() => void doAction(school.enable)}
+                >
+                  Get my forwarding address
+                </button>
+              )
+              : (
+                <>
+                  <div className='bg-white rounded-xl border border-neutral-200 p-4'>
+                    <p className='font-medium mb-2'>
+                      Forward one school email to:
+                    </p>
+                    <div className='flex flex-wrap gap-3 items-center'>
+                      <code className='text-sm break-all flex-1'>
+                        {school.address}
+                      </code>
+                      <button
+                        className='text-sm text-primary-700 flex items-center gap-1'
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(school.address!)
+                            setCopied(true)
+                            setCopyError(false)
+                          } catch {
+                            setCopyError(true)
+                          }
+                        }}
+                      >
+                        {copied ? <Check size={16} /> : <Copy size={16} />}{' '}
+                        {copied ? 'Copied' : 'Copy address'}
+                      </button>
+                    </div>
+                    <p className='text-xs text-neutral-500 mt-3'>
+                      Keep this address private. Anyone with it can submit an
+                      email for your household to review.
+                    </p>
+                    {copyError && (
+                      <p role='alert' className='text-sm mt-2'>
+                        Could not copy. Select the address above and copy it.
+                      </p>
+                    )}
+                  </div>
+                  <p role='status' className='text-sm my-4'>
+                    {received
+                      ? 'Your forwarding address has received mail.'
+                      : 'Waiting for your first email. You can keep this page open; it checks for new mail.'}
+                  </p>
+                  <details className='text-sm border-b border-neutral-100 pb-4 mb-5'>
+                    <summary className='cursor-pointer text-primary-700 font-medium'>
+                      Make school emails arrive automatically
+                    </summary>
+                    <div className='mt-3 space-y-3 text-neutral-600'>
+                      <p>
+                        Start with one forwarded message. Once it arrives
+                        correctly, make a rule for the school or teacher
+                        addresses you choose.
+                      </p>
+                      <p>
+                        <strong>Gmail:</strong>{' '}
+                        on a computer, open Settings → See all settings →
+                        Forwarding and POP/IMAP → Add a forwarding address.
+                        Paste the address above. Google sends a confirmation
+                        email here; open it below and use its code in Gmail.
+                        Then create a filter for the school senders and choose
+                        “Forward it to.” Leave forwarding for all mail off.
+                      </p>
+                      <p>
+                        <strong>Outlook or another provider:</strong>{' '}
+                        create a rule for the school senders that forwards to
+                        this address, if your provider allows it. Otherwise,
+                        forward selected messages yourself.
+                      </p>
+                      <p>
+                        This reads the email text. PDFs, photos and documents
+                        attached to it may still need your attention. Connecting
+                        Google Calendar does not enable email forwarding.
+                      </p>
+                    </div>
+                  </details>
+                  <div className='flex justify-between gap-4 items-center mb-3'>
+                    <h3 className='font-medium'>
+                      {ready.length
+                        ? `Ready for your review (${ready.length})`
+                        : 'Received emails'}
+                    </h3>
+                    <button
+                      disabled={busy}
+                      className='text-sm flex items-center gap-1 text-primary-700'
+                      onClick={() => void doAction(school.refresh)}
+                    >
+                      <RefreshCw size={14} /> Check for mail
+                    </button>
+                  </div>
+                  <div className='space-y-3'>
+                    {[...school.messages].sort((a, b) =>
+                      Number(b.status === 'ready') -
+                      Number(a.status === 'ready')
+                    ).map((message) => (
+                      <div
+                        key={message.id}
+                        className='border border-neutral-200 rounded-xl bg-white overflow-hidden'
+                      >
+                        <button
+                          className='w-full text-left p-4 flex items-start justify-between gap-3'
+                          aria-expanded={opened === message.id}
+                          onClick={() =>
+                            setOpened(
+                              opened === message.id ? null : message.id,
+                            )}
+                        >
+                          <span>
+                            <strong className='text-sm block'>
+                              {message.subject || 'School email'}
+                            </strong>
+                            <span className='text-xs text-neutral-500'>
+                              {message.sourceLabel || 'Email'} ·{' '}
+                              {new Date(message.createdAt).toLocaleDateString()}
+                            </span>
+                          </span>
+                          <span className='text-xs text-primary-700 shrink-0'>
+                            {{
+                              ready: message.proposal?.confirmation
+                                ? 'Forwarding confirmation'
+                                : 'Review',
+                              processing: 'Reading…',
+                              failed: 'Needs a retry',
+                              saved: `Saved ${message.result?.count ?? ''}`,
+                              dismissed: 'Reviewed · nothing added',
+                              legacy: 'Earlier import',
+                            }[message.status]}
+                          </span>
+                        </button>
+                        {opened === message.id && (
+                          <SchoolMailReview
+                            key={`${message.id}:${message.status}`}
+                            message={message}
+                            members={school.members}
+                            onSave={school.save}
+                            onRetry={school.retry}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+          </>
+        )}
+      {(school.error || actionError) && (
+        <p role='alert' className='text-sm text-red-700 mt-4'>
+          {actionError || school.error}
         </p>
       )}
-
-      <div className="mt-4">
-        <label className="block text-sm text-neutral-500 mb-2">Recent</label>
-        {loading ? (
-          // A skeleton, not "No email has arrived yet" — a load in flight and a
-          // genuinely empty list are different things, and saying the second
-          // while the first is true is simply wrong.
-          <div
-            data-testid="school-mail-skeleton"
-            aria-hidden
-            className="h-12 rounded-lg bg-neutral-100 animate-pulse"
-          />
-        ) : recent.length === 0 ? (
-          <p className="text-xs text-neutral-400">No email has arrived yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {recent.map((capture) => (
-              <div
-                key={capture.id}
-                className="flex items-center gap-3 p-3 bg-white rounded-lg border border-neutral-100"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-neutral-700 truncate">{capture.subject ?? 'No subject'}</p>
-                  <p className="text-xs text-neutral-400 truncate">
-                    {[capture.sourceLabel, relativeTime(capture.createdAt)].filter(Boolean).join(' · ')}
-                  </p>
-                  {capture.status === 'failed' && capture.error && (
-                    <p className="text-xs text-red-500 truncate">{capture.error}</p>
-                  )}
-                </div>
-                <StatusPill status={capture.status} />
-                {capture.status === 'failed' && (
-                  <button
-                    onClick={() => handleRetry(capture.id)}
-                    disabled={retrying === capture.id}
-                    className="text-xs font-medium text-primary-600 hover:text-primary-700 px-2 py-1 rounded hover:bg-primary-50 transition-colors whitespace-nowrap flex items-center gap-1 disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${retrying === capture.id ? 'animate-spin' : ''}`} />
-                    Retry
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* The hook's own failure — a load that never landed, or a retry that
-            was refused. Quiet: one line, no banner, no retry button of its
-            own (opening Settings again re-runs the load). */}
-        {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
-      </div>
     </section>
   )
 }

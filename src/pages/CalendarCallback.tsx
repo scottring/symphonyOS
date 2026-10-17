@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { callbackFunctionFor, providerFromOAuthState, providerLabel } from '@/lib/calendarProviders'
@@ -7,8 +7,12 @@ export function CalendarCallback() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  const started = useRef(false)
 
   useEffect(() => {
+    // StrictMode may run this effect twice. A connection transaction is one-use.
+    if (started.current) return
+    started.current = true
     async function handleCallback() {
       const code = searchParams.get('code')
       const errorParam = searchParams.get('error')
@@ -37,7 +41,8 @@ export function CalendarCallback() {
         })
 
         if (fnError) {
-          setError(fnError.message)
+          const detail = await fnError.context?.json?.().catch(() => null)
+          setError(typeof detail?.error === 'string' ? detail.error : 'Could not finish connecting. Start again from Calendar settings.')
           return
         }
 
@@ -47,7 +52,7 @@ export function CalendarCallback() {
         // manual refresh — the connection silently "won't stick" and every
         // surface keeps showing the Connect prompt. A hard reload remounts the
         // provider, which re-checks and flips isConnected=true.
-        window.location.replace('/')
+        window.location.replace('/settings?tab=calendar&connected=1')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }
@@ -63,10 +68,10 @@ export function CalendarCallback() {
           <h1 className="text-lg font-semibold text-red-600 mb-2">Connection Failed</h1>
           <p className="text-neutral-600 mb-4">{error}</p>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/settings?tab=calendar')}
             className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
           >
-            Back to Home
+            Back to Calendar settings
           </button>
         </div>
       </div>

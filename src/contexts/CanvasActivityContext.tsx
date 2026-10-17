@@ -19,7 +19,7 @@ import type { Goal } from '@/types/goal'
 import type { Routine } from '@/types/routine'
 import type { AgentProposalItem } from '@/lib/agentStream'
 import { WRITE_TOOLS } from '@/lib/agentTurn'
-import { canUndo, describeChanges, diffSnapshots, type CanvasChange, type Snapshot } from '@/lib/canvas/changeSet'
+import { describeChanges, diffSnapshots, type CanvasChange, type Snapshot } from '@/lib/canvas/changeSet'
 import { toolSavingLabel } from '@/lib/canvas/toolLabels'
 import { changeCardNote, type ChangeCardNote, type ChangeSet } from '@/lib/canvas/changeCard'
 import type { ApplyResult } from '@/lib/canvas/applyChangeSet'
@@ -41,6 +41,8 @@ export interface CanvasReceipt {
   failures: string[]
   undoable: boolean
   canRetry: boolean
+  /** Number of operations in an explicitly saved review card. */
+  changeCount?: number
 }
 
 export interface CanvasProposal extends AgentProposalItem {
@@ -48,8 +50,9 @@ export interface CanvasProposal extends AgentProposalItem {
 }
 
 export interface PendingChangeSet extends ChangeSet {
-  state: 'proposed' | 'saving' | 'failed'
+  state: 'proposed' | 'saving' | 'failed' | 'partial'
   message?: string
+  recoverable?: boolean
   /** A newer proposal took the place of one still waiting. */
   replaced?: boolean
 }
@@ -90,6 +93,9 @@ const TRACKED_TOOLS = new Set([
 ])
 
 interface CommandOptions {
+  changeCount?: number
+  failureState?: 'failed' | 'partial'
+  failureSummary?: string
   /** Ids the command touches, marked as arrived once it saves. */
   ids?: string[]
   /** Reverses the command. Offered as Undo only when given. */
@@ -109,7 +115,7 @@ export interface CanvasActivity {
   turnEnded: (turn: { didWrite: boolean; error: string | null; text: string; requestId?: string }) => void
   /** Run a manual command with the same save states and Undo as conversation. */
   run: (label: string, command: () => Promise<boolean | void | string | undefined>, options?: CommandOptions) => Promise<boolean>
-  undo: () => Promise<void>
+  undo: () => Promise<'undone' | 'none' | 'failed'>
   retry: () => void
   dismiss: () => void
   proposals: CanvasProposal[]
@@ -119,7 +125,7 @@ export interface CanvasActivity {
   changeSet: PendingChangeSet | null
   setChangeSet: (set: ChangeSet) => void
   dismissChangeSet: () => void
-  approveChangeSet: () => Promise<boolean>
+  approveChangeSet: (onResult?: (state: 'saved' | 'partial' | 'failed') => void) => Promise<boolean>
   /** For the next turn: the pending card (every turn while it waits), or
    *  what became of the last one (approved or dismissed), told once. */
   takeChangeCard: () => ChangeCardNote | undefined
@@ -201,7 +207,8 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   const turnStarted = useCallback((text: string, retry: boolean) => {
     const key = nextKey()
     turnRef.current = { key, request: text, before: snapshotRef.current, startedAt: Date.now() - 2000, wrote: false, trackedWrite: false, reportedOk: false, failures: [], reportedIds: [], awaitingDiff: false }
-    undoRef.current = null
+    // A question or clarification does not invalidate the last saved change.
+    // A new write replaces that Undo, not merely starting a conversation turn.
     setPointingState(null)
     retryRef.current = retryTurn ?? null
     setReceipt({ key, source: 'conversation', state: 'working', request: text, summary: retry ? 'Trying again…' : 'Working on it…', changes: [], failures: [], undoable: false, canRetry: false })
@@ -210,6 +217,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   const toolUsed = useCallback((name: string) => {
     const turn = turnRef.current
     if (!turn || !WRITE_TOOLS.has(name)) return
+    undoRef.current = null
     turn.wrote = true
     if (TRACKED_TOOLS.has(name)) turn.trackedWrite = true
     setReceipt((r) => r && r.key === turn.key ? { ...r, state: 'saving', summary: toolSavingLabel(name) } : r)
@@ -239,8 +247,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
         : turn.trackedWrite ? 'failed'
           : turn.wrote ? (turn.reportedOk ? 'saved' : 'unverified')
             : 'answered'
-    const routineUndo = !!writersRef.current.deleteRoutine && !!writersRef.current.updateRoutine
-    const undoable = changes.length > 0 && changes.every((c) => canUndo(c) && (c.entity !== 'routine' || routineUndo))
+    const undoable = false // Only an attributed server receipt may offer Undo.
     const summary = state === 'answered' ? ''
       : state === 'unverified' ? "Symphony says it's done. It isn't shown on this page, so it wasn't checked here."
       : state === 'saved' && !changes.length ? 'Saved'
@@ -249,20 +256,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
       : state === 'partial'
         ? `${describeChanges(changes)}. Some of it didn't save.`
         : describeChanges(changes)
-    undoRef.current = undoable ? async () => {
-      const w = writersRef.current
-      for (const c of [...changes].reverse()) {
-        if (c.kind === 'created') {
-          if (c.entity === 'task') await w.deleteTask(c.id)
-          else if (c.entity === 'goal') await w.deleteGoal(c.id)
-          else await w.deleteRoutine?.(c.id)
-        } else if (c.kind === 'updated' && c.before) {
-          if (c.entity === 'task') await w.updateTask(c.id, c.before as Partial<Task>)
-          else if (c.entity === 'goal') await w.updateGoal(c.id, c.before as Partial<Goal>)
-          else await w.updateRoutine?.(c.id, c.before as Partial<Routine>)
-        }
-      }
-    } : null
+    undoRef.current = null
     setReceipt({ key: turn.key, source: 'conversation', state, request: turn.request, summary, changes, failures: turn.failures, undoable, canRetry: failed && !!retryRef.current })
   }, [markArrived])
 
@@ -276,7 +270,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     if (ended.requestId) setReceipt((r) => r && r.key === turn.key ? { ...r, requestId: ended.requestId } : r)
     if (!ended.didWrite && !turn.wrote) {
       setReceipt((r) => r && r.key === turn.key
-        ? { ...r, state: ended.error ? 'failed' : 'answered', summary: ended.error ? "Couldn't reach Symphony. Nothing changed." : '', canRetry: !!ended.error && !!retryRef.current }
+        ? { ...r, state: ended.error ? 'failed' : 'answered', undoable: !!undoRef.current, summary: ended.error ? "Couldn't reach Symphony. Nothing changed." : '', canRetry: !!ended.error && !!retryRef.current }
         : r)
       return
     }
@@ -289,7 +283,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     turnRef.current = null
     undoRef.current = null
     retryRef.current = options?.retry ?? null
-    setReceipt({ key, source: 'manual', state: 'saving', request: label, summary: 'Saving…', changes: [], failures: [], undoable: false, canRetry: false })
+    setReceipt({ key, source: 'manual', state: 'saving', request: label, summary: 'Saving…', changes: [], failures: [], undoable: false, canRetry: false, changeCount: options?.changeCount })
     let ok = false
     try {
       const result = await command()
@@ -300,8 +294,8 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
       undoRef.current = options?.undo ?? null
     }
     setReceipt((r) => r && r.key === key ? {
-      ...r, state: ok ? 'saved' : 'failed',
-      summary: ok ? 'Saved' : "Didn't save. Nothing changed.",
+      ...r, state: ok ? 'saved' : options?.failureState ?? 'failed',
+      summary: ok ? 'Saved' : options?.failureSummary ?? "Didn't save. Nothing changed.",
       undoable: ok && !!options?.undo, canRetry: !ok && !!options?.retry,
     } : r)
     return ok
@@ -309,7 +303,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
 
   const undo = useCallback(async () => {
     const fn = undoRef.current
-    if (!fn) return
+    if (!fn) return 'none' as const
     undoRef.current = null
     const key = receipt?.key
     setReceipt((r) => r && r.key === key ? { ...r, state: 'saving', summary: 'Undoing…', undoable: false } : r)
@@ -319,8 +313,12 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
       // changed since is left as they left it), so never "nothing changed".
       setReceipt((r) => r && r.key === key ? { ...r, state: ok === false ? 'failed' : 'saved', summary: ok === false ? "Couldn't undo all of it. Check the page." : 'Undone', changes: ok === false ? r.changes : [] } : r)
       void refetch()
-    } catch {
-      setReceipt((r) => r && r.key === key ? { ...r, state: 'failed', summary: "Couldn't undo. Nothing changed." } : r)
+      return ok === false ? 'failed' as const : 'undone' as const
+    } catch (error) {
+      const recoverable = error instanceof Error && error.name === 'UndoOutcomeUnknown'
+      if (recoverable) undoRef.current = fn
+      setReceipt((r) => r && r.key === key ? { ...r, state: 'failed', undoable: recoverable, summary: recoverable ? "Couldn't confirm Undo. Try Undo again to check the same change safely." : "Couldn't confirm Undo. Check the page." } : r)
+      return 'failed' as const
     }
   }, [receipt?.key, refetch])
 
@@ -353,14 +351,14 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     if (!pendingRef.current) { const stored = readPendingCard(persistKey); if (stored) setPending(stored) }
   }, [persistKey])
   // Only a card still waiting survives a reload; saving/failed states do not.
-  useEffect(() => { if (persistKey && restoredFor.current === persistKey) writePendingCard(persistKey, changeSet?.state === 'proposed' ? changeSet : null) }, [persistKey, changeSet])
+  useEffect(() => { if (persistKey && restoredFor.current === persistKey) writePendingCard(persistKey, changeSet) }, [persistKey, changeSet])
   // What became of the last card, until a turn has been told.
   const cardNoteRef = useRef<ChangeCardNote | null>(null)
   const setChangeSet = useCallback((set: ChangeSet) => {
     cardNoteRef.current = null
     setPending((prev) => {
       // The same set re-announced while it is being saved stays saving.
-      if (prev && prev.key === set.key && prev.state === 'saving') return prev
+      if (prev && prev.key === set.key && (prev.state === 'saving' || prev.state === 'partial')) return prev
       return { ...set, state: 'proposed', replaced: !!prev && prev.key !== set.key }
     })
   }, [])
@@ -377,33 +375,39 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     return note ?? undefined
   }, [])
   const approvingRef = useRef(false)
-  const approveChangeSet = useCallback(async () => {
+  const approveChangeSet = useCallback(async (onResult?: (state: 'saved' | 'partial' | 'failed') => void) => {
     const set = changeSet
+    if (set?.state === 'partial' && !set.recoverable) { onResult?.('partial'); return false }
     if (approvingRef.current || !set || set.state === 'saving' || !applyChanges) return false
     approvingRef.current = true
     try {
     setPending({ ...set, state: 'saving', message: undefined })
-    const opts: CommandOptions = { ids: [] }
+    const opts: CommandOptions = { ids: [], changeCount: set.ops.length }
     let failure: string | null = null
+    let recoverable = false
     const ok = await run(set.title, async () => {
       const r = await applyChanges(set)
       if (!r.ok) {
+        recoverable = r.reason === 'failed' && !!r.recoverable
         failure = r.reason === 'stale'
           ? `“${r.title}” changed since I proposed this. Ask me for a fresh list.`
           : r.reverted
             ? "Couldn't save. Nothing was changed. Try again."
-            : "Couldn't finish, and some of it stayed saved. Check the page before trying again."
+            : recoverable ? "The connection interrupted Save. Check save to recover the same changes safely." : "Couldn't finish, and some of it stayed saved. Check the page before trying again."
+        opts.failureState = r.reason === 'failed' && !r.reverted ? 'partial' : 'failed'
+        opts.failureSummary = failure
         return false
       }
       opts.ids = r.ids
       opts.undo = r.undo
       return true
     }, opts)
+    onResult?.(ok ? 'saved' : opts.failureState ?? 'failed')
     if (ok) cardNoteRef.current = changeCardNote(set, 'approved')
     // Only touch the card if it is still the one that was saved; a newer set
     // that arrived meanwhile stays as it is.
     setPending((cur) => cur && cur.key === set.key
-      ? (ok ? null : { ...cur, state: 'failed', message: failure ?? "Couldn't save. Nothing was changed. Try again." })
+      ? (ok ? null : { ...cur, state: opts.failureState ?? 'failed', recoverable, message: failure ?? "Couldn't save. Nothing was changed. Try again." })
       : cur)
     return ok
     } finally { approvingRef.current = false }
@@ -421,7 +425,7 @@ const NOOP_ACTIVITY: CanvasActivity = {
   receipt: null, isArrived: () => false, arrivedVersion: 0,
   turnStarted: () => {}, toolUsed: () => {}, toolResult: () => {}, turnEnded: () => {},
   run: async (_l, command) => { try { return (await command()) !== false } catch { return false } },
-  undo: async () => {}, retry: () => {}, dismiss: () => {},
+  undo: async () => 'none', retry: () => {}, dismiss: () => {},
   proposals: [], addProposals: () => {}, setProposalState: () => {}, removeProposal: () => {},
   changeSet: null, setChangeSet: () => {}, dismissChangeSet: () => {}, approveChangeSet: async () => false, takeChangeCard: () => undefined,
   pointing: null, setPointing: () => {},

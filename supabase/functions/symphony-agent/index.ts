@@ -1,11 +1,15 @@
+import { routineTimeEvidenceError } from './routineTimeEvidence.ts'
+import { claimsPreparedCard, PROPOSAL_REPAIR, PROPOSAL_FAILURE, proposalReply, proposalRepairToolAllowed } from './proposalEvidence.ts'
 import { planSaved } from './planSaved.ts'
+import { onboardingCardAllowed } from './onboardingMode.ts'
+import { activitySetFromInput } from './onboardingActivities.ts'
 import { guardedAiFetch } from '../_shared/aiUsage.ts'
 import { ACCOUNT_GROUNDING_RULES, ASSISTANT_PERSONALITY, RESULT_LANGUAGE_RULES } from '../_shared/assistantExperience.ts'
 import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
 import { PROPOSE_CHANGES_TOOL, changeCardNote, changeSetFromInput, resolveRefs } from './changeSet.ts'
-import { READ_WEEK_TOOL, local, shapeWeek, weekWindow } from './readWeek.ts'
+import { READ_WEEK_TOOL, local, readCalendarCoverage, shapeWeek, weekWindow } from './readWeek.ts'
 import { READ_PLAN_TOOL, loadPlanRefs, readPlan } from './readPlan.ts'
 import { POINT_TOOL, pointAt } from './pointing.ts'
 import { planningRow, validatePlanningParent, planningWeekStart } from './planning.ts'
@@ -93,6 +97,11 @@ ${ACCOUNT_GROUNDING_RULES}
 
 ${RESULT_LANGUAGE_RULES}
 
+Desktop and phone chat:
+- The review button is called Save. Refer to the pending change card as the draft, and use Save when explaining how to apply it. The kitchen wall has its own rules below.
+- Drafts appear only in chat until saved; do not say they are dashed on the page or already on the calendar.
+- The draft itself shows its items and Not saved status. Keep your reply natural: acknowledge the requested change or ask the next useful question, without repeating a stock review reminder each turn.
+
 Rules:
 - You operate within Symphony. When the tools and authorized sources are available, you can search notes, read Gmail, create email drafts (never send), and search the web. See the source-specific rules below. If asked to do something none of your tools cover, say so plainly and stop.
 - No em dashes. No AI cliches. No sycophancy. Be direct and action-oriented.
@@ -126,16 +135,28 @@ Symphony domain model:
 Routines vs tasks:
 - Meals live in the family meal plan, not in tasks or the calendar. "What's for dinner" is symphony_get_meals; "dinner tonight is pizza" or "make Thursday tacos" is symphony_set_meal (it replaces that day's meal). Say what it was and what it is now.
 - A routine is a recurring item (e.g. "Feed Jax dinner", "Walk Jax", "Kids morning routine"). Routines are NOT tasks. To find a routine, use symphony_list_routines, never symphony_list_tasks.
+- Routine display is a choice the person can make in chat: propose routine_add or routine_change with show_on_timeline false to keep a routine in Routines but hide it from Today and Week, or true to show it when due. This is not stopping, deleting, skipping, or making it private. Today and Week share this setting; if asked to show in one and hide in the other, explain and clarify before changing both. Preserve the choice when revising a pending draft. Never claim it changed until the proposal is saved.
 - Routines can be grouped into collections. A "step" is just a routine whose parent_routine_id points at a parent routine; step_order sets its order within the parent.
 - To GROUP existing routines into a collection (e.g. "group Feed Jax dinner and Walk Jax into Jax Evening Routine"): first confirm the grouping with the person in one sentence listing what goes under which collection; then (1) symphony_list_routines to find each one and get its id; (2) symphony_create_routine to make the parent collection; (3) symphony_update_routine on each existing routine, setting parent_routine_id to the parent's id and step_order (0, 1, 2...). Do NOT recreate routines that already exist; fold the existing ones in.
 - When folding a routine in, change ONLY parent_routine_id and step_order. Do NOT modify its recurrence_pattern, time_of_day, name, context, or any other field. Preserve each routine's existing schedule exactly. Never assert or "restore" a schedule the data does not show, and never invent one. Report only the changes you actually made.
 
 Keep replies tight. Summary first, offer to expand.
 
+Conversation continuity:
+- A review card exists only after symphony_propose_changes returns a successful shown result in this turn. Saying items are on the card does not create one. When capturing or revising a list, make that tool call before the final answer, including undated items.
+- Only your final answer is delivered to the person. Text accompanying tool calls is internal; the final answer must stand on its own and reflect the tool results.
+- You are Symphony. Speak directly to the person; never describe handing them to Symphony, a planner, or another agent.
+- Capture everyday intentions without demanding a contact record. For "talk to my mom about dinner tonight", keep "my mom" in the task and dinner/tonight as stated. Do not guess a household member from a role or ask "who is your mom in Symphony?". Resolve identity only when the requested action requires a particular recipient (such as sending a message), or the person asks you to link a contact. Never create a contact merely to capture a task.
+- When a person refers to an existing task ("the library books", "move the plumber"), use its id from the screen or week read. If it is missing from that limited view, search symphony_list_tasks by a distinctive title word before proposing an add. A week read is not the whole task inventory. Propose place/update for a matching open task, not a duplicate add. Do not put already-correct, unchanged tasks into the change card.
+- A week-wide intention has no chosen day. Omit the proposal date until the person chooses one; never use today as a placeholder. Preserve unplaced items while asking about a day.
+- The pending card records decisions already made. Carry every unchanged operation forward with its exact taskId and ISO date. Never recalculate or move an already-chosen date while adding another item. Only change that operation when the person asks to change it.
+- When a planning answer settles a change, update the whole proposal before acknowledging it. Say that it is on the card, pending approval. If "the weekend" cannot be represented without choosing a day, ask Saturday or Sunday; do not silently choose or say it is scheduled.
+
 Preparing to act:
+- Calendar availability: missing events never prove free time. Respect the calendar coverage returned by the read tools. When no calendar is connected, say so briefly and use the person's tasks, routines and stated commitments. Never call their day, week, schedule or overall picture free, clear, open, wide open, light or quiet from empty or unavailable calendar data, even after a disclaimer. Every summary must keep that boundary: say "These are the activities recorded in Symphony; I don't yet know your other commitments." Say "No tasks recorded for Sunday", not "Sunday is empty" or "nothing scheduled". Cached events are only what Symphony has on record; do not promise complete availability even when a connection exists. Continue helping them structure their own activities; connecting a calendar is optional.
 - Planning should leave the person ready to act, not just holding a list. When a task becomes concrete (a week task, or a task given a day), ask once, briefly: "What will you need when you come to do this?" Skip it for small self-explanatory tasks, and never turn it into a checklist interview.
 - Ask and capture this only for a task that is saved: after the person approves the card, or after a one-item change. While a task waits on a change card, write nothing to it: a write changes the task, and Approve refuses the card until you propose the list again. Note what they said and capture it once the card is approved.
-- Capture what they say onto the task: instructions or questions in notes, the person to reach as contact_id (find or create the contact), phone_number or email, location, websites or documents with add_links, and supplies or prerequisite steps as subtasks (symphony_create_task with parent_task_id).
+- Capture what they say onto the task: instructions or questions in notes, the person to reach in their words (link contact_id only when requested or necessary for the action), phone_number or email, location, websites or documents with add_links, and supplies or prerequisite steps as subtasks (symphony_create_task with parent_task_id).
 - When a resource serves several tasks (a supply list for the whole class, the venue for every planning step), put it once on the goal they share, and say so; the tasks reach it from there. Don't copy it onto every child.
 
 Everyday talk:
@@ -148,7 +169,7 @@ Doing versus suggesting:
 - When the person captures several things at once ("the plumber, the Amazon order, the yard, and an all-day test drive this week"), call symphony_propose_changes IN THAT SAME TURN, before you ask anything, with ALL of them as adds, undated where the day is unknown (an add with no date lands in the week); then ask only about what is genuinely unclear, one question. The card is how the person sees that you heard them; a question with no card means they must repeat the list. A correction ("actually Friday", "not the yard, the garage") is a change to the card: re-send the whole revised list in that same turn, before or with your reply; "got it" alone leaves the old card standing. Never hold items back until every day is known, and never make them say the list again. Something named for a day goes on that day; an all-day commitment is an add with a date and no time, and if that day already holds an all-day event, say so and ask before placing it.
 - When several things change, these go on the card with the rest: done (mark a task finished), merge (two tasks that are the same thing: task_id is the one with the better title, from_task_id the duplicate) and talk (something the person wants to discuss with someone before deciding; note like "with Iris"). A single clear done can still be done directly.
 - symphony_propose_changes has no delete. To drop something, use someday.
-- Planning the week (or the rest of it): call symphony_read_week first, passing the week's start: the week the message names ("Plan the week of Oct 17" means the week starting on the Oct 17 nearest today), else the week on the page. Call symphony_point with the days or tasks before you name them so the page lights them up. Propose early: the moment the person names things (even in their first message, before any question is answered), and again as soon as one answer settles a change, call symphony_propose_changes with the whole list so far (title like "2 changes so far") and week_start set to the start symphony_read_week returned, and call it again with the whole revised list after each later answer, so the page rebuilds as you talk; the person approves whenever they are ready. Write nothing yourself for the week's changes — the card carries them; a separate one-off the person mentions in passing (e.g. "also call Molly this afternoon") may still be done directly. Month, season and year goals are reference only for the week; mention one only when something clearly serves it. Check the calendar and email before asking anything they could answer.
+- Planning the week (or the rest of it): call symphony_read_week first, passing the week's start: the week the message names ("Plan the week of Oct 17" means the week starting on the Oct 17 nearest today), else the week on the page. For beta, do not call symphony_point or symphony_show_on_page while planning. Respond to complete messages; the app shows the final card after the turn completes. Propose early: the moment the person names things (even in their first message, before any question is answered), and again as soon as one answer settles a change, call symphony_propose_changes with the whole list so far (title like "2 changes so far") and week_start set to the start symphony_read_week returned, and call it again with the whole revised list after each later answer, so the draft stays current; the person saves whenever they are ready. Write nothing yourself for the week's changes — the card carries them; include a separate one-off mentioned in passing (e.g. "also call Molly this afternoon") in the same pending card; do not bypass approval during planning. Month, season and year goals are reference only for the week; mention one only when something clearly serves it. Check the calendar and email before asking anything they could answer.
 - "Plan my day" (the Today page's morning chip): call symphony_read_week for this week and look at today. Say the day back in two or three plain sentences: what is fixed and until when, the open stretch, what has to happen tonight. Name tasks that look like the same thing (offer merge) and tasks left over from earlier days that are still open. Ask only what you cannot tell, one or two questions at a time, e.g. what has to happen today and in what order. Then one change card: place with times for the order the person gave (never invent a time they did not give or that the calendar does not fix), merge for duplicates they confirm, place or someday for leftovers. Title like "5 changes to today".
 - "Review my day" (the evening chip): call symphony_read_week and look at today. Say what got done, then name what is still open (at most three at a time) and ask what happened. Then one change card: done for what they finished, place on another day for what carries over (tomorrow unless they say otherwise), talk (note like "with Iris") for what needs a conversation first, someday for what they drop, routine_skip on today's date for a routine they did not do and will not. No row-by-row questionnaire; skip what they did not mention.
 - "What came in from email (…)?" (Today's new-from-email line): school mail is placed on days automatically. Find what those emails added (search email for the subjects, then symphony_read_week for the tasks and events they made) and say in a sentence or two what landed where. Ask whether anything is wrong; corrections go on one change card.
@@ -628,6 +649,10 @@ async function runTool(
   turnId: string | null = null,
 ): Promise<string> {
   const stableId = IDEMPOTENT_CREATES.has(name) ? await stableRowId(userId, turnId, name, input) : null
+  const calendarCoverage = (eventsReadable = true) => readCalendarCoverage(
+    () => db.from('calendar_connections').select('provider, sync_enabled').eq('user_id', userId),
+    eventsReadable,
+  )
   // A unique violation on a stable id means this creation already saved in an
   // earlier attempt of the same turn: return that row instead of failing.
   const alreadySaved = async (table: string) => {
@@ -716,7 +741,7 @@ async function runTool(
           db.from('scratchpad_notes').select('id, body').eq('kind', 'talk').eq('status', 'open').limit(20),
           db.from('family_members').select('id, name').limit(50),
         ])
-        const failed = [dated, week, inbox, events, routines, talks, members].find((r) => r.error)
+        const failed = [dated, week, inbox, routines, talks, members].find((r) => r.error)
         if (failed?.error) throw failed.error
         // This week's skipped, moved and someone-else days. shapeWeek keeps
         // only rows for routines read above. The wall's fenced client has no
@@ -732,7 +757,7 @@ async function runTool(
           if (read.error) throw read.error
           instances = read.data ?? []
         }
-        return JSON.stringify(shapeWeek({ start, today, tasks: [...(dated.data ?? []), ...(week.data ?? []), ...(inbox.data ?? [])], events: events.data ?? [], routines: routines.data ?? [], talks: talks.data ?? [], instances, members: members.data ?? [] }))
+        return JSON.stringify(shapeWeek({ start, today, calendar: await calendarCoverage(!events.error), tasks: [...(dated.data ?? []), ...(week.data ?? []), ...(inbox.data ?? [])], events: events.data ?? [], routines: routines.data ?? [], talks: talks.data ?? [], instances, members: members.data ?? [] }))
       }
       case 'symphony_read_plan': {
         // Month, Season or Year: this list, the next, and the parent list, through RLS.
@@ -934,6 +959,7 @@ async function runTool(
         ])
         return JSON.stringify({
           date: today,
+          calendar: await calendarCoverage(!eventsT.error),
           today: { total: todayT.data?.length ?? 0, remaining: todayT.data?.filter((t) => !t.completed).length ?? 0, tasks: todayT.data ?? [] },
           events: { count: eventsT.data?.length ?? 0, events: eventsT.data ?? [] },
           inbox: { count: inboxT.data?.length ?? 0, tasks: inboxT.data ?? [] },
@@ -982,7 +1008,7 @@ async function runTool(
       }
       case 'symphony_list_routines': {
         let q = db.from('routines')
-          .select('id, name, context, parent_routine_id, step_order, recurrence_pattern, time_of_day, times_per_day, visibility')
+          .select('id, name, description, context, parent_routine_id, step_order, recurrence_pattern, time_of_day, times_per_day, visibility, show_on_timeline')
           .order('name')
         if (input.context) q = q.eq('context', input.context)
         if (input.search) q = q.ilike('name', `%${input.search}%`)
@@ -1207,7 +1233,7 @@ async function runTool(
         const { data, error } = await q.order('start_time').limit(100)
         if (error) throw error
         const range = start === end ? `on ${start}` : `from ${start} to ${end}`
-        return `${(data || []).length} events ${range}${search ? ` matching "${search}"` : ''}:\n${JSON.stringify(data, null, 2)}`
+        return `${JSON.stringify(await calendarCoverage())}\n${(data || []).length} saved events ${range}${search ? ` matching "${search}"` : ''}:\n${JSON.stringify(data, null, 2)}`
       }
       case 'symphony_search_email': {
         const query = typeof input.query === 'string' ? input.query.trim() : ''
@@ -1297,6 +1323,7 @@ async function callAnthropic(
   containerId: string | null,
   canShow = false,
   surface: Surface | null = null,
+  repairingProposal = false,
 ): Promise<{ content: AnthropicBlock[]; stop_reason: string; containerId: string | null }> {
   // Symphony's own tools first (minus the destructive ones once the web has
   // been read), then Anthropic's server-side web tools. The cache breakpoint
@@ -1304,8 +1331,8 @@ async function callAnthropic(
   // cover the whole list, whatever the fence removed.
   // Pointing at the page needs a client that sends what is on it.
   // On the wall, only the family-layer tools (wallMode.ts); desktop unchanged.
-  const symphonyTools = toolsForTurn(toolsForSurface(TOOLS, surface), webTouched).filter((t) => canShow || t.name !== SHOW_TOOL.name)
-  const tools: unknown[] = [...symphonyTools, ...WEB_TOOLS]
+  const symphonyTools = toolsForTurn(toolsForSurface(TOOLS, surface), webTouched).filter((t) => (canShow || t.name !== SHOW_TOOL.name) && (!repairingProposal || proposalRepairToolAllowed(t.name)))
+  const tools: unknown[] = [...symphonyTools, ...(Deno.env.get('SYMPHONY_ENABLE_HOSTED_WEB') === '1' && !repairingProposal && surface !== 'onboarding' && surface !== 'onboarding_activity' ? WEB_TOOLS : [])]
   const res = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -1316,7 +1343,7 @@ async function callAnthropic(
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 2048,
-      system: [{ type: 'text', text: systemForSurface(SYSTEM_PROMPT, surface), cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: systemForSurface(SYSTEM_PROMPT, surface) + (Deno.env.get('SYMPHONY_ENABLE_HOSTED_WEB') === '1' ? '' : '\nThis beta supports text planning using Symphony data. Hosted web search and page/PDF analysis are unavailable. If a request needs current web information, say that plainly; never claim you searched or verified it.'), cache_control: { type: 'ephemeral' } }],
       tools: tools.map((t, i) =>
         i === tools.length - 1
           ? { ...(t as Record<string, unknown>), cache_control: { type: 'ephemeral' } }
@@ -1524,30 +1551,31 @@ Deno.serve(async (req) => {
       // never the words. One line per turn, at the end.
       const requestId = crypto.randomUUID()
       const startedAt = Date.now()
-      const trace = { providerCalls: 0, providerMs: 0, tools: [] as string[], truncated: false }
+      const trace = { proposalRepairs: 0, providerCalls: 0, providerMs: 0, tools: [] as string[], truncated: false }
       const logTurn = (state: string, error?: string) => console.log(JSON.stringify({
         kind: 'symphony-agent.turn', requestId, turnId: typeof turnId === 'string' ? turnId : null, surface: surface ?? 'desktop', model: MODEL,
         providerCalls: trace.providerCalls, providerMs: trace.providerMs, totalMs: Date.now() - startedAt,
         tools: trace.tools, writes: writes.length, writesFailed: writes.filter((w) => !w.ok).length,
-        proposed: !!shown.proposal, webTouched, truncated: trace.truncated, outcome: state, ...(error ? { error: error.slice(0, 120) } : {}),
+        proposed: !!shown.proposal, proposalRepairs: trace.proposalRepairs, webTouched, truncated: trace.truncated, outcome: state, ...(error ? { error: error.slice(0, 120) } : {}),
       }))
       try {
         let turn = 0
         for (; turn < MAX_TURNS; turn++) {
           const callStarted = Date.now()
-          const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface)
+          const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface, trace.proposalRepairs > 0)
           trace.providerCalls++
           trace.providerMs += Date.now() - callStarted
           const { content, stop_reason } = res
           if (res.containerId) containerId = res.containerId
+          let responseText = ''
           const toolResults: Array<Record<string, unknown>> = []
           for (const block of content) {
-            if (block.type === 'text' && block.text) {
-              // Accumulate, don't overwrite: a cited answer arrives as SEVERAL
+            if (block.type === 'text' && block.text && stop_reason !== 'tool_use') {
+              // Tool-call narration is internal. Accumulate final response blocks:
+              // a cited answer arrives as SEVERAL
               // text blocks in one response, and `reply` on the done event has
               // to carry all of them or the pane keeps only the last fragment.
-              finalText += block.text
-              send({ type: 'text', text: block.text })
+              responseText += block.text
             } else if (isWebBlock(block)) {
               // Anthropic already ran this one — surface it so the pane says
               // "web_search" instead of stalling silently, and drop the fence.
@@ -1557,7 +1585,9 @@ Deno.serve(async (req) => {
               trace.tools.push(block.name)
               send({ type: 'tool', name: block.name })
               let result:string
-              if (!toolAllowed(block.name, surface)) {
+              if (trace.proposalRepairs > 0 && !proposalRepairToolAllowed(block.name)) {
+                result = 'Error: proposal repair may only read existing data and prepare a review card. It cannot save changes.'
+              } else if (!toolAllowed(block.name, surface)) {
                 // Never offered on the wall; refused even if named anyway.
                 result = `Error: ${block.name} is not available on the kitchen wall`
               } else if (block.name === SCRATCHPAD_TOOL.name) {
@@ -1587,8 +1617,10 @@ Deno.serve(async (req) => {
               } else if (block.name === PROPOSE_CHANGES_TOOL.name) {
                 // A change card: validated and resolved through the person's own
                 // RLS-scoped reads, streamed to the page, never written here.
-                const parsed = changeSetFromInput(block.input ?? {}, String(block.id ?? crypto.randomUUID()))
+                const parsed = (surface==='onboarding_activity'?activitySetFromInput:changeSetFromInput)(block.input ?? {}, String(block.id ?? crypto.randomUUID()))
                 if ('error' in parsed) result = JSON.stringify({ error: parsed.error })
+                else if (surface === 'onboarding' && routineTimeEvidenceError(block.input?.ops, parsed.set.ops, incoming)) result = JSON.stringify({error:routineTimeEvidenceError(block.input?.ops, parsed.set.ops, incoming)})
+                else if (surface === 'onboarding' && !onboardingCardAllowed(parsed.set.ops)) result = JSON.stringify({ error: 'During this introduction, draft new routines or display-only changes to existing routines (routine_change with show_on_timeline only). Other changes happen in the main app. Do not turn one-off activities into routines.' })
                 else {
                   const taskIds = [...new Set(parsed.set.ops.flatMap((o) => [o.taskId, o.fromTaskId].filter((x): x is string => !!x)))]
                   const memberIds = [...new Set(parsed.set.ops.flatMap((o) => [...(o.assignee ? [o.assignee] : []), ...(o.assignees ?? [])]))]
@@ -1604,7 +1636,7 @@ Deno.serve(async (req) => {
                   // Same RLS client as every tool: a routine or goal the person
                   // cannot see is simply absent, and resolveRefs refuses it.
                   const [tasksRead, membersRead, routinesRead, planRead] = await Promise.all([
-                    taskIds.length ? tdb.from('tasks').select('id, title, updated_at, completed').in('id', taskIds) : { data: [], error: null },
+                    taskIds.length ? tdb.from('tasks').select('id, title, updated_at, completed, scheduled_for, is_all_day').in('id', taskIds) : { data: [], error: null },
                     memberIds.length ? tdb.from('family_members').select('id, name').in('id', memberIds) : { data: [], error: null },
                     routineIds.length ? tdb.from('routines').select('id, name, updated_at, parent_routine_id').in('id', routineIds) : { data: [], error: null },
                     hasPlanOps && !wallRefused ? loadPlanRefs(tdb, planIds, local(new Date().toISOString()).date).catch(() => null) : undefined,
@@ -1613,12 +1645,12 @@ Deno.serve(async (req) => {
                     ? { error: 'On the kitchen wall the change card can move, add, set aside and assign tasks. Routine changes, done, merge, talk-about and goals are made in the Symphony app for now: say so, and offer to note it on the scratchpad.' }
                     : tasksRead.error || membersRead.error || routinesRead.error || planRead === null
                     ? { error: 'Could not read the tasks, routines and goals to check this list. Try again.' }
-                    : resolveRefs(parsed.set, tasksRead.data ?? [], membersRead.data ?? [], routinesRead.data ?? [], planRead)
+                    : resolveRefs(parsed.set, (tasksRead.data ?? []).map(t => ({...t, ...(t.scheduled_for ? {placement:{date:local(t.scheduled_for).date, ...(!t.is_all_day ? {time:local(t.scheduled_for).time} : {})}} : {})})), membersRead.data ?? [], routinesRead.data ?? [], planRead)
                   if ('error' in resolved) result = JSON.stringify({ error: resolved.error })
                   else {
                     send({ type: 'change_set', set: resolved.set })
                     shown.proposal = { key: resolved.set.key, title: resolved.set.title, ops: resolved.set.ops.length }
-                    result = JSON.stringify({ shown: resolved.set.ops.length, saved: false, note: 'Shown as a change card and dashed on the page. Nothing is saved until the person approves. Do not read the list back; ask your next question or say it is ready to approve.' })
+                    result = JSON.stringify({ shown: resolved.set.ops.length, saved: false, note: wall ? 'Shown as a change card. Nothing is saved until a grown-up approves. Ask your next useful question or say it is ready to approve.' : 'Shown as a draft in chat, marked Not saved. The plan is unchanged until the person clicks Save. Do not repeat the list or the review reminder; acknowledge the change or ask your next useful question.' })
                   }
                 }
               } else if (block.name === PROPOSE_TOOL.name) {
@@ -1647,7 +1679,23 @@ Deno.serve(async (req) => {
           // A server tool that runs long pauses the turn. Re-send with the
           // assistant turn appended and NO tool results — Anthropic resumes
           // where it left off. Without this the answer truncates in silence.
-          if (stop_reason === 'pause_turn') continue
+          if (stop_reason === 'pause_turn') { finalText += responseText; continue }
+          const candidateReply = finalText + responseText
+          if (!shown.proposal && claimsPreparedCard(candidateReply)) {
+            // Hold unsupported prose off every surface, including streamed text.
+            // Repair inside this request so the person need not repeat a list.
+            finalText = ''
+            if (trace.proposalRepairs === 0 && turn + 1 < MAX_TURNS) {
+              trace.proposalRepairs++
+              convo.push({ role: 'user', content: PROPOSAL_REPAIR })
+              continue
+            }
+            const outcome = summarizeTurn(writes, shown, 'error')
+            send({ type: 'error', message: PROPOSAL_FAILURE, outcome, requestId })
+            logTurn(outcome.state, 'proposal_evidence_missing')
+            return
+          }
+          finalText = candidateReply
           break
         }
         // The tool-loop cap is a cost bound (plan §11). Hitting it must not
@@ -1656,11 +1704,13 @@ Deno.serve(async (req) => {
           trace.truncated = true
           const note = 'I stopped before finishing; what is saved is saved, and the rest is not. Ask me to continue.'
           finalText = finalText ? `${finalText}\n\n${note}` : note
-          send({ type: 'text', text: `\n\n${note}` })
         }
         const seen = new Set<string>()
         const sources = sourceNotes.filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)))
         const outcome = summarizeTurn(writes, shown, trace.truncated ? 'error' : 'ok')
+        if (outcome.state === 'proposed') finalText = proposalReply(finalText, surface)
+        else if (!finalText.trim()) finalText = outcome.say
+        send({ type: 'text', text: finalText })
         send({ type: 'done', reply: finalText, sessionId: null, sources, outcome, requestId })
         logTurn(outcome.state)
       } catch (err) {

@@ -1,0 +1,179 @@
+{
+  "at": "2026-10-16T17:59:43.020Z",
+  "version": "2026-10-16.7-school-review",
+  "sourceCommit": "9f74011524b11658c6ccb4d6a46e0227f02407e3",
+  "deployment": "dpl_5ED7NyzmQL3pTD4RhGHm4ESMEGTB",
+  "previousFrontend": "dpl_HanBwr5giz8rPuQFMZELxZ81Efr5",
+  "domains": [
+    "https://app.symphony-os.com",
+    "https://symphony-rebuild.vercel.app"
+  ],
+  "verifiedReleaseIdentityOnBothDomains": true,
+  "migration": "20261016150000_school_mail_review",
+  "migrationAppliedAndHistoryRecorded": true,
+  "functions": [
+    {
+      "slug": "inbound-email",
+      "version": 14,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "extract-email",
+      "version": 20,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "capture-retry",
+      "version": 13,
+      "verify_jwt": true,
+      "status": "ACTIVE"
+    }
+  ],
+  "plannerUnchanged": "symphony-agent v75",
+  "automatedChecks": 213,
+  "syntheticLive": {
+    "checks": [
+      "normal-account authentication",
+      "adult household review access",
+      "real model extraction",
+      "attachment warning",
+      "no plan writes before approval",
+      "event date and time",
+      "weekly routine",
+      "parent-edited time persisted",
+      "routine hidden from Today and Week",
+      "unselected items not saved",
+      "repeat Save returns same receipt",
+      "repeat extraction is idempotent",
+      "forwarding confirmation creates no plan suggestions",
+      "dismiss creates no plan rows"
+    ],
+    "before": {
+      "tasks": 2,
+      "routines": 3,
+      "notices": 0
+    },
+    "after": {
+      "tasks": 3,
+      "routines": 4,
+      "notices": 0
+    },
+    "receipt": {
+      "count": 2,
+      "items": [
+        {
+          "id": "6d9edfc3-f6a6-4bcb-b8ea-4ef4db0590a4",
+          "kind": "event",
+          "title": "Synthetic school garden visit 1792173172907"
+        },
+        {
+          "id": "a1bc8696-c535-4ad3-9fe3-c143f0e49a62",
+          "kind": "routine",
+          "title": "Synthetic reading practice 1792173172907"
+        }
+      ],
+      "status": "saved",
+      "skipped": []
+    }
+  },
+  "hostedBrowser": {
+    "at": "2026-10-16T17:56:50.790Z",
+    "event": {
+      "id": "501c768b-8329-4ffc-83a8-95a612dcfe85",
+      "title": "Synthetic parent open house — reviewed",
+      "scheduled_for": "2026-10-22T21:00:00+00:00",
+      "category": "event"
+    },
+    "unselectedNoticesSaved": 0,
+    "receipt": {
+      "count": 1,
+      "items": [
+        {
+          "id": "501c768b-8329-4ffc-83a8-95a612dcfe85",
+          "kind": "event",
+          "title": "Synthetic parent open house — reviewed"
+        }
+      ],
+      "status": "saved",
+      "skipped": []
+    },
+    "evidence": "beta-sessions/evidence/2026-10-16-school-hosted-save.png"
+  },
+  "recordedAiUsage": {
+    "calls": 2,
+    "cents": 1.9383,
+    "rows": [
+      {
+        "cents": "1.1721",
+        "input_tokens": 1067,
+        "model": "claude-sonnet-4-6",
+        "output_tokens": 568,
+        "route": "extract-email"
+      },
+      {
+        "cents": "0.7662",
+        "input_tokens": 1029,
+        "model": "claude-sonnet-4-6",
+        "output_tokens": 305,
+        "route": "extract-email"
+      }
+    ]
+  },
+  "realFamilyRecordsEdited": false,
+  "modelCorrection": {
+    "previous": "claude-sonnet-5",
+    "current": "claude-sonnet-4-6",
+    "reason": "Old name had no enabled production price and was refused before a paid call.",
+    "spendingLimitsChanged": false
+  },
+  "worker": {
+    "name": "symphony-inbound-mail",
+    "newVersionDeployed": true,
+    "version": "3a4c7aa6-c157-4dba-97f4-4f28eab57e94",
+    "percentage": 100,
+    "deployment": "f3027597-c4a9-4bf5-9b0e-deeaf7540e3a",
+    "deployedAt": "2026-10-16T18:28:39.547299Z",
+    "previousVersion": "648767ec-29b5-4038-8ad9-f938938aed87",
+    "secretBindingNames": [
+      "CAPTURE_SHARED_SECRET",
+      "SUPABASE_URL"
+    ],
+    "existingRoutingVerified": {
+      "zone": "symphony-os.com",
+      "active": true,
+      "catchAllEnabled": true,
+      "actions": [
+        {
+          "type": "worker",
+          "value": [
+            "symphony-inbound-mail"
+          ]
+        }
+      ],
+      "managedBy": null
+    },
+    "routingChanged": false
+  },
+  "remaining": [
+    "Verify actual SMTP delivery of one parent-selected forwarded email.",
+    "If desired, account holder completes genuine Gmail forwarding confirmation and sender-specific filter."
+  ],
+  "liveTestBoundary": "Fictional captures seeded into the isolated normal-account household, then actual deployed extraction and authenticated review APIs. No SMTP mail sent; no Gmail permissions changed.",
+  "unauthenticatedRouteChecks": [
+    {
+      "name": "inbound-email",
+      "status": 401
+    },
+    {
+      "name": "extract-email",
+      "status": 401
+    },
+    {
+      "name": "capture-retry",
+      "status": 401
+    }
+  ],
+  "completedAt": "2026-10-16T18:30:19.229Z"
+}

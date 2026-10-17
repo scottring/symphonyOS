@@ -1,3 +1,5 @@
+import { createReviewedWriter, applyReviewedChange } from '@/lib/canvas/reviewedChange'
+import {resolveConversationAction} from '@/lib/conversationActions';
 import { connectedDestination, defaultPlanningDestination } from '@/lib/planning/connectedDestination';
 import { useCadenceConfig } from '@/lib/cadence/config';
 import { useGoals } from '@/hooks/useGoals';
@@ -31,7 +33,7 @@ import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { HeaderPeopleFilter } from '@/components/layout/HeaderPeopleFilter';
 import { Toast, ConfirmationToast, ToastLiveRegion } from '@/components/toast';
 import { ChatPanel } from '@/components/chat/ChatPanel';
-import { applyChangeSet, plannedWeekStart } from '@/lib/canvas/applyChangeSet';
+import { plannedWeekStart } from '@/lib/canvas/applyChangeSet';
 import { withSteps, type ChangeSet } from '@/lib/canvas/changeCard';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { readCadenceConfig } from '@/lib/cadence/config';
@@ -105,7 +107,7 @@ import { requestShow } from '@/lib/explain/showSignal';
 const REFERENCE_DOCK_WIDTH = 340;
 // The docked conversation bar at rest (ConversationStrip .is-docked): the
 // landscape stands on it and side-by-side columns stop above it.
-const DOCKED_BAR_HEIGHT = '67px';
+
 const MIN_PAGE_WITH_REFERENCES = 640;
 
 function useViewportWidth() {
@@ -194,16 +196,17 @@ function ShellLayoutInner({ children }: Props) {
   // is for Details there.
   const dockedBar = !isMobile && conversationStripPath(location.pathname);
   // Plan's docked bar is the desktop floor the landscape stands on.
-  const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : dockedBar ? DOCKED_BAR_HEIGHT : undefined;
+  const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : undefined;
 
   const references = useReferenceLists();
 
-  const { tasks, refetch, deleteTask, updateTask, addTask, completeTask, toggleTask, keepForward, dropCommitment } = useSupabaseTasks();
-  const { goals, deleteGoal, updateGoal, addGoal } = useGoals();
+  const reviewedWriter = useMemo(() => createReviewedWriter(), []);
+  const { tasks, refetch, deleteTask, updateTask, addTask, completeTask, toggleTask, keepForward, dropCommitment } = useSupabaseTasks(reviewedWriter.client);
+  const { goals, deleteGoal, updateGoal, addGoal } = useGoals(reviewedWriter.client);
   // Held so routine writes from a conversation are seen (and undoable) too.
-  const { routines: canvasRoutines, deleteRoutine, updateRoutine, addRoutine, refetch: refetchRoutines } = useRoutines();
+  const { routines: canvasRoutines, deleteRoutine, updateRoutine, addRoutine, refetch: refetchRoutines } = useRoutines(reviewedWriter.client);
   // The change card's this-week routine ops write one day's occurrence.
-  const { skip: skipInstance, undoDone: undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee } = useActionableInstances();
+  const { skip: skipInstance, undoDone: undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee } = useActionableInstances(reviewedWriter.client);
   // The canvas activity provider sits inside this component's tree, but the
   // assistant hook runs above it: a ref bridges each turn's events across.
   const canvasRef = useRef<CanvasActivity | null>(null);
@@ -282,7 +285,8 @@ function ShellLayoutInner({ children }: Props) {
   // button toggles the same state); phones open it per launch.
   const conversationContext = useMemo(() => assistantSelection(scopedTasks, selection, layers), [scopedTasks, selection, layers]);
   const screenContext = useMemo(() => workspaceContext(scopedTasks, location.pathname, location.search, layers, selection?.kind === 'task' ? selection.id : null, new Date(), scopedGoals), [scopedTasks, scopedGoals, location.pathname, location.search, layers, selection, cadenceConfig.weekStartsOn]);
-  const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail', onPlanSaved: (saved) => {
+  const approveConversationCard = async () => { const a = canvasRef.current; if (!a?.changeSet) return 'none' as const; let outcome: 'saved' | 'partial' | 'failed' = 'failed'; await a.approveChangeSet(state => { outcome = state; }); return outcome; };
+  const assistant = useSymphonyAssistant({ resolveAction: text => resolveConversationAction(text, approveConversationCard, async () => (await canvasRef.current?.undo()) ?? 'none'), persistKey: 'symphony_rail', onPlanSaved: (saved) => {
     void refetch();
     window.dispatchEvent(new Event('symphony-plan-updated'));
     if (connectedWorkspace && !document.querySelector('dialog[open]') && Number.isInteger(saved.level) && saved.level >= 0 && saved.level <= 3 && /^\d{4}-\d{2}-\d{2}$/.test(saved.date)) {
@@ -290,9 +294,15 @@ function ShellLayoutInner({ children }: Props) {
       navigate(`/year?${query}`, { replace: true });
     }
   }, onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); }, turnObserver });
-  const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace);
-  const voiceEnabled = connectedWorkspace && voiceAccess;
-  const voice = useWorkspaceVoice(screenContext, assistant.sendTurn, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null, async () => { const a = canvasRef.current; if (!a?.changeSet) return 'none'; return (await a.approveChangeSet()) ? 'saved' : 'failed'; });
+  const { hidden: aiHidden, setHidden: setAiHidden } = useScratchpadHidden();
+  const [phoneChatOpen, setPhoneChatOpen] = useState(false);
+  const [conversationDraft, setConversationDraft] = useState('');
+  const [pane, setPane] = useState<SidePane>('details');
+  // Talk is deferred for beta; retain the transport for a later voice pass.
+  const workspaceTalkEnabled = false;
+  const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace && workspaceTalkEnabled);
+  const voiceEnabled = workspaceTalkEnabled && connectedWorkspace && voiceAccess;
+  const voice = useWorkspaceVoice(screenContext, assistant.sendTurn, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null, async () => { const a = canvasRef.current; if (!a?.changeSet) return 'none'; let outcome: 'saved' | 'partial' | 'failed' = 'failed'; await a.approveChangeSet(state => { outcome = state; }); return outcome; }, async () => (await canvasRef.current?.undo()) ?? 'none');
   // Talk to Symphony from anywhere (Scott, 2026-10-14: one front door — ⌘K
   // adds, searches, asks, or talks). Starting closes the box; the conversation
   // carries on in the bar at the page's foot. Already talking: your turn.
@@ -300,9 +310,10 @@ function ShellLayoutInner({ children }: Props) {
     if (!voiceEnabled) return;
     setQuickAddOpen(false);
     stayInSymphony();
+    if (isMobile) setPhoneChatOpen(true); else { setAiHidden(false); setPane('ai'); }
     if (voice.active) voice.talk();
     else void voice.start();
-  }, [voiceEnabled, voice, stayInSymphony]);
+  }, [voiceEnabled, voice, stayInSymphony, isMobile, setAiHidden]);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
@@ -328,15 +339,15 @@ function ShellLayoutInner({ children }: Props) {
   const sendConversation = (text: string, attachment?: Parameters<typeof assistant.sendMessage>[1]) => {
     // What Symphony showed belongs to the last exchange.
     pageGuide?.close();
-    // Typed words always go to the agent, even while voice is on: only the
-    // agent can save, and it offers Undo. Into the live voice session they
-    // were answered "Done" with nothing saved (2026-10-14, Wednesday
-    // Wheelie's). Voice stays on for speaking.
+    if (isMobile) setPhoneChatOpen(true); else showPane('ai');
+    // The voice transport now delegates typed and spoken turns to this same
+    // assistant. Stop playback before falling back to a text-only turn.
+    if (voiceEnabled && !attachment && voice.active && voice.sendText(text)) return;
+    voice.stop();
     void assistant.sendMessage(text, attachment);
   };
-  const resetConversation = () => { voice.stop(); assistant.resetSession(); };
+  const resetConversation = () => { voice.stop(); setConversationDraft(''); assistant.resetSession(); };
 
-  const { hidden: aiHidden, setHidden: setAiHidden } = useScratchpadHidden();
   const [walk, setWalk] = useState<ConversationWalk | null>(null);
   // "What is this page?" beside the walk, on pages Symphony can explain.
   // It plays the page's own tour (pageTours.ts); Symphony answers only if the
@@ -347,12 +358,10 @@ function ShellLayoutInner({ children }: Props) {
   } : null;
   // The page shows it as a "?" beside its title (PageHelp.tsx).
   const pageHelp = explain ? () => { if (!explain.show()) sendConversation(explain.message) } : null;
-  const [phoneChatOpen, setPhoneChatOpen] = useState(false);
   const phoneChatRef = useRef<HTMLDivElement>(null);
   useDialogFocus(phoneChatOpen && isMobile, phoneChatRef, () => setPhoneChatOpen(false));
-  const [pane, setPane] = useState<SidePane>('details');
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
-  const aiOpen = !isMobile && !aiHidden && !dockedBar;
+  const aiOpen = !isMobile && !aiHidden;
   // A new selection brings Details to the front.
   const selectionKey = selection ? `${selection.kind}:${selection.id}` : null;
   useEffect(() => { if (selectionKey) setPane('details'); }, [selectionKey]);
@@ -371,7 +380,7 @@ function ShellLayoutInner({ children }: Props) {
     const seed = consumeSeed();
     if (seed?.stayOnPage) { pageGuide?.close(); }
     else if (isMobile) setPhoneChatOpen(true);
-    else if (!dockedBar) showPane('ai');
+    else showPane('ai');
     if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
   }, [launchNonce, isMobile, dockedBar, consumeSeed, assistant, showPane, pageGuide]);
 
@@ -406,7 +415,7 @@ function ShellLayoutInner({ children }: Props) {
   // task already reopened by hand must not be toggled closed again.
   const latestTasks = useRef(tasks);
   useEffect(() => { latestTasks.current = tasks; }, [tasks]);
-  const applyChanges = useCallback((set: ChangeSet) => applyChangeSet(set, {
+  const applyChanges = useCallback((set: ChangeSet) => applyReviewedChange(set, {
     tasks, updateTask, deleteTask,
     addTask: (title, when, options) => addTask(title, undefined, undefined, when, options),
     weekStart: plannedWeekStart(set, new Date(), readCadenceConfig().weekStartsOn),
@@ -430,10 +439,17 @@ function ShellLayoutInner({ children }: Props) {
     updateGoal, deleteGoal, keepForward, dropCommitment,
     // Undo's conflict check reads the rows as they are then.
     latest: () => ({ tasks: latestTasks.current, routines: canvasRoutines }),
-  }), [tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment]);
+  }, reviewedWriter), [reviewedWriter, tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
+  // School review saves happen in Settings. Refresh the mounted planning
+  // data immediately, including when the realtime socket has gone to sleep.
+  useEffect(() => {
+    const refresh = () => { void canvasRefetch(); };
+    window.addEventListener('symphony-school-review-saved', refresh);
+    return () => window.removeEventListener('symphony-school-review-saved', refresh);
+  }, [canvasRefetch]);
   const showStrip = conversationStripPath(location.pathname);
-  const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, error: voice.error, speaking: voice.speaking, working: voice.working, start: () => { void voice.start(); }, stop: voice.stop, heard: voice.heard, reply: voice.reply, turn: voice.turn, talk: voice.talk, done: voice.done };
+  const stripVoice = { available: voiceEnabled, active: voiceEnabled && voice.active, status: voice.status, error: voice.error, speaking: voice.speaking, working: voice.working, start: () => { void voice.start(); }, stop: voice.stop, heard: voice.heard, reply: voice.reply, turn: voice.turn, talk: voice.talk, done: voice.done };
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };
 
   return (
@@ -456,7 +472,7 @@ function ShellLayoutInner({ children }: Props) {
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}
       <NewVersionBanner />
-      {voice.active && !dockedBar && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span className="workspace-voice-floating-words">{lastWords(voice.turn === 'listening' ? (voice.heard || 'Listening — take your time') : voice.reply || voice.heard || 'Voice on')}</span>{voice.status === 'live' && (voice.turn === 'listening' ? <button onClick={voice.done}>Done</button> : <button onClick={voice.talk}>Talk</button>)}<button onClick={voice.stop}>End voice</button></div>}
+      {voiceEnabled && voice.active && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span className="workspace-voice-floating-words">{lastWords(voice.turn === 'listening' ? (voice.heard || 'Listening — take your time') : voice.reply || voice.heard || 'Voice on')}</span>{voice.status === 'live' && (voice.turn === 'listening' ? <button onClick={voice.done}>Done</button> : <button onClick={voice.talk}>Talk</button>)}<button onClick={voice.stop}>End voice</button></div>}
 
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}
@@ -475,7 +491,7 @@ function ShellLayoutInner({ children }: Props) {
                 // the bar's actual height and clipped AttentionLine.
                 paddingBottom: `calc(${MOBILE_TAB_BAR_HEIGHT} + 0.5rem + env(safe-area-inset-bottom, 0px))`,
               }
-            : { marginRight: `${paneWidth}px`, ...(dockedBar ? { '--dock-clearance': DOCKED_BAR_HEIGHT } : {}) } as CSSProperties
+            : { marginRight: `${paneWidth}px`,  } as CSSProperties
         }
       >
         {/* Mobile header — domain switcher (date nav lives in
@@ -508,7 +524,7 @@ function ShellLayoutInner({ children }: Props) {
                 onOpen={(row) => navigate(row ? `/discussions?open=${row.sessionId}` : '/discussions')} />
             )}
             <div className="min-w-0">{children}</div>
-            {showStrip && <ConversationStrip compact receiptOnly onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
+            {showStrip && <ConversationStrip chatOnly compact receiptOnly onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
           </div>
         ) : (
           // Desktop: navigation and page share one centred column —
@@ -530,12 +546,12 @@ function ShellLayoutInner({ children }: Props) {
             <HeaderPeopleFilter />
             <DomainSwitcher />
             {/* On Plan the conversation is the bar at the foot. */}
-            {!dockedBar && <button
-              onClick={() => setAiHidden(aiOpen)}
+            {<button
+              onClick={() => { setAiHidden(aiOpen); setPane('ai'); }}
               className={`page-navigation-icon${aiOpen ? ' is-on' : ''}`}
-              aria-label="AI chat"
+              aria-label="Chat"
               aria-pressed={aiOpen}
-              title="AI chat"
+              title="Chat"
             >
               <Sparkles className="w-[17px] h-[17px]" aria-hidden="true" />
             </button>}
@@ -546,14 +562,15 @@ function ShellLayoutInner({ children }: Props) {
               <SideColumn
                 hasSelection={!!selection}
                 aiOpen={aiOpen}
+                aiLabel={dockedBar ? "Chat" : undefined}
                 pane={pane}
                 onPaneChange={showPane}
                 onCloseDetails={clearSelection}
                 onCloseAi={() => setAiHidden(true)}
-                ai={
+                ai={conversationStripPath(location.pathname) ? <ConversationStrip chatOnly panel draft={conversationDraft} onDraftChange={setConversationDraft} error={assistant.error} messages={assistant.messages} walk={walk} onSend={sendConversation} busy={assistant.loading} voice={stripVoice} /> :
                   <ChatPanel
                     voiceControls={voiceEnabled ? <WorkspaceVoiceControls voice={voice}/> : undefined}
-                    beforeInput={<PendingChangeCard />}
+                    beforeInput={<PendingChangeCard chat updating={assistant.loading} />}
                     messages={assistant.messages}
                     loading={assistant.loading}
                     error={assistant.error}
@@ -573,11 +590,11 @@ function ShellLayoutInner({ children }: Props) {
                   />
                 }
               >
-                <div className={`scenery-page scenery-page-contents${dockedBar ? ' has-docked-bar' : ''}`}>
+                <div className={`scenery-page scenery-page-contents`}>
                   {children}
                   {dockedBar
-                    ? <ConversationStrip docked messages={assistant.messages} walk={walk} right={paneWidth} onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} />
-                    : showStrip && <ConversationStrip onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
+                    ? !aiOpen && <button type="button" className="conversation-launcher" style={{ right: paneWidth + 24 }} onClick={openConversation}><Sparkles size={18} aria-hidden="true" />Chat with Symphony</button>
+                    : showStrip && <ConversationStrip chatOnly onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
                 </div>
               </SideColumn>
             </div>
@@ -601,6 +618,7 @@ function ShellLayoutInner({ children }: Props) {
           // ⌘K add box as the shortcut. Phones add
           // through the dock's + (and the capture bar) instead.
           showFab={!isMobile}
+          rightInset={isMobile ? 0 : paneWidth}
           onAdd={tracked(chrome.onQuickAdd)}
           onAddRich={tracked(chrome.onQuickAddRich)}
           // useShellChrome confirms every capture once its write lands.
@@ -649,9 +667,9 @@ function ShellLayoutInner({ children }: Props) {
               Details is still mounted underneath, edits and all. */}
           {selection && <PhonePaneSwitch active="ai" onChange={(p) => { if (p === 'details') setPhoneChatOpen(false); }} />}
           <div className="min-h-0 flex-1">
-          <ChatPanel
+          {conversationStripPath(location.pathname) ? <ConversationStrip chatOnly panel draft={conversationDraft} onDraftChange={setConversationDraft} error={assistant.error} messages={assistant.messages} walk={walk} onSend={sendConversation} busy={assistant.loading} voice={stripVoice} onClose={() => setPhoneChatOpen(false)} /> : <ChatPanel
                     voiceControls={voiceEnabled ? <WorkspaceVoiceControls voice={voice}/> : undefined}
-                    beforeInput={<PendingChangeCard />}
+                    beforeInput={<PendingChangeCard chat updating={assistant.loading} />}
             messages={assistant.messages}
             loading={assistant.loading}
             error={assistant.error}
@@ -667,7 +685,7 @@ function ShellLayoutInner({ children }: Props) {
             onLoadSession={session => { voice.stop(); assistant.loadSession(session); }}
             onDeleteSession={assistant.deleteSession}
             activeSessionId={assistant.activeSessionId}
-          />
+          />}
           </div>
         </div>
       )}

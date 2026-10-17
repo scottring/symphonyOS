@@ -48,12 +48,13 @@ interface Props {
   onCloseAi: () => void;
   /** The assistant pane (ChatPanel), mounted once and kept while hidden. */
   ai: ReactNode;
+  aiLabel?: string;
   /** Page content — the detail panel inside it portals into the slot. */
   children: ReactNode;
 }
 
 /** The column itself plus the slot context for the page beneath it. */
-export function SideColumn({ hasSelection, aiOpen, pane, onPaneChange, onCloseDetails, onCloseAi, ai, children }: Props) {
+export function SideColumn({ hasSelection, aiOpen, pane, onPaneChange, onCloseDetails, onCloseAi, ai, children, aiLabel = 'AI' }: Props) {
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const open = hasSelection || aiOpen;
   // Nothing selected → AI is all there is; AI closed → Details is.
@@ -67,7 +68,7 @@ export function SideColumn({ hasSelection, aiOpen, pane, onPaneChange, onCloseDe
         <aside
           className="side-column"
           style={{ width: SIDE_COLUMN_WIDTH }}
-          aria-label={showAi ? 'Symphony AI' : 'Details'}
+          aria-label={showAi ? `Symphony ${aiLabel}` : 'Details'}
           // Clicks in either pane are not "clicks away" from the detail panel.
           data-panel-keepalive
         >
@@ -84,13 +85,13 @@ export function SideColumn({ hasSelection, aiOpen, pane, onPaneChange, onCloseDe
                 Details
               </button>
               <button type="button" role="tab" aria-selected={showAi} onClick={() => onPaneChange('ai')}>
-                AI
+                {aiLabel}
               </button>
             </div>
             <button
               type="button"
               className="side-column-close"
-              aria-label={showAi ? 'Close AI' : 'Close details'}
+              aria-label={showAi ? `Close ${aiLabel.toLowerCase() === 'conversation' ? 'conversation' : aiLabel}` : 'Close details'}
               onClick={showAi ? onCloseAi : onCloseDetails}
             >
               <X className="h-4 w-4" aria-hidden="true" />

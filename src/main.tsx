@@ -123,6 +123,7 @@ window.addEventListener('vite:preloadError', (event) => {
   window.location.reload()
 })
 import { FirstRunGate } from './components/setup/FirstRunGate'
+import { OnboardingFlow } from './components/setup/OnboardingFlow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 // Quick-capture window for the Mac shell (desktop/): a frameless Tauri window
@@ -178,6 +179,7 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <GoogleCalendarProvider>
             <Routes>
+              <Route path="/getting-started" element={<AuthGate>{({ user }) => <OnboardingFlow key={user.id} user={user} />}</AuthGate>} />
               {/* /, /today, /inbox, /task/:id are served by the Shell via the
                   /* catch-all below (explicit routes here win by specificity). */}
               <Route path="/goals/*" element={cutoverShell} />

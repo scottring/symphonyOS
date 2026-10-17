@@ -106,7 +106,7 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const { members, addMember, updateMember, deleteMember } = useFamilyMembers()
   const { invitations, createInvitation, deleteInvitation } = useHouseholdInvitations()
-  const [activeTab, setActiveTab] = useState<Tab>('general')
+  const [activeTab, setActiveTab] = useState<Tab>(() => new URLSearchParams(window.location.search).get('tab') === 'calendar' ? 'calendar' : 'general')
   // The Admin tab carries demo controls and the waitlist roster. It rendered
   // for every signed-in user until the 2026-09-04 launch rehearsal; the
   // waitlist RLS was the real hole and is fixed in a migration, but a tab

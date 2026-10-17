@@ -43,7 +43,7 @@ Deno.serve(async (req: Request) => {
   // retryable target and must not be reachable through this door.
   const { data: capture, error: captureError } = await admin
     .from('captures')
-    .select('id, user_id')
+    .select('id, user_id, household_id')
     .eq('id', captureId)
     .eq('kind', 'email')
     .maybeSingle()
@@ -51,14 +51,8 @@ Deno.serve(async (req: Request) => {
   if (!capture) return json({ error: 'capture not found' }, 404)
 
   // The service-role client bypasses RLS, so the household check is explicit.
-  if (capture.user_id !== user.id) {
-    const { data: shares, error: sharesError } = await admin.rpc('users_share_household', {
-      user_a: user.id,
-      user_b: capture.user_id,
-    })
-    if (sharesError) return json({ error: `db: ${sharesError.message}` }, 500)
-    if (!shares) return json({ error: 'forbidden' }, 403)
-  }
+  const { data: allowed, error: accessError } = await caller.rpc('school_mail_can_review', { p_household: capture.household_id })
+  if (accessError || !allowed) return json({ error: 'forbidden' }, 403)
 
   const res = await fetch(`${supabaseUrl}/functions/v1/extract-email`, {
     method: 'POST',

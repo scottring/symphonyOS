@@ -3,6 +3,7 @@ import { render, screen, within, fireEvent, waitFor } from '@/test/test-utils'
 import { WeekViewV2 } from './WeekViewV2'
 import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
+import type { ChangeSet } from '@/lib/canvas/changeCard'
 import type { RecurrencePattern } from '@/types/actionable'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -33,7 +34,7 @@ vi.mock('@/contexts/AssistantLaunchContext', async (importOriginal) => ({
   useAssistantLauncher: () => launcher,
 }))
 
-// The week's planning session, settled and unplanned: "Plan the week" is offered.
+// The week's planning session, settled and unplanned: "Help me plan the week" is offered.
 vi.mock('@/hooks/usePlanningSession', () => ({ usePlanningSession: () => ({ saved: null, mine: null, loading: false, error: null, reload: vi.fn(), save: vi.fn() }), weekToken: () => 'w' }))
 
 vi.mock('@/hooks/useDayPlan', () => ({
@@ -420,13 +421,22 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9)) })
   afterEach(() => { vi.useRealTimers(); localStorage.removeItem('symphony-week-daily') })
 
-  it('has no Plan the week session button, no steps; planning starts in the conversation', () => {
+  it.each(['not-connected', 'loading', 'stale', 'error', undefined] as const)('does not claim open calendar time when coverage is %s', (events) => {
+    const { rerender } = render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday}
+      sources={{ tasks: 'ready', routines: 'ready', events: 'ready' }} />)
+    expect(screen.getAllByText('Calendar clear all day').length).toBeGreaterThan(0)
+    rerender(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday}
+      sources={events ? { tasks: 'ready', routines: 'ready', events } : undefined} />)
+    expect(screen.queryByText(/Calendar clear/)).not.toBeInTheDocument()
+  })
+
+  it('offers the planning conversation without a separate wizard', () => {
     render(
       <ConversationWalkContext.Provider value={vi.fn()}>
         <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />
       </ConversationWalkContext.Provider>,
     )
-    expect(screen.queryByRole('button', { name: 'Plan the week' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Help me plan the week' })).toBeInTheDocument()
     expect(screen.queryByText(/Step \d of 8/)).toBeNull()
     expect(screen.queryByRole('region', { name: /Planning week/ })).toBeNull()
   })
@@ -434,8 +444,8 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   it('on a phone (no bar) the page offers the same walk and sends the same message', () => {
     launcher.openAssistant.mockClear()
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
-    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the week.', autoSend: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Help me plan the week' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Help me plan the week.', autoSend: true })
   })
 
   it('every-day routines are written once until "Show daily", which is remembered', () => {
@@ -451,7 +461,7 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
 
 // Task 12: the walk sits in the conversation bar on the current week. The
 // household's week starts on Saturday.
-describe('WeekViewV2 — Plan the rest of my week in the bar', () => {
+describe('WeekViewV2 — Help me plan the rest of my week in the bar', () => {
   beforeEach(() => {
     localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -467,36 +477,37 @@ describe('WeekViewV2 — Plan the rest of my week in the bar', () => {
     return setWalk
   }
 
-  it('offers "Plan the rest of my week" mid-week', () => {
+  it('offers "Help me plan the rest of my week" mid-week', () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     const setWalk = mount(new Date(2026, 9, 10))
-    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the rest of my week', message: 'Plan the rest of my week.' })
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Help me plan the rest of my week', message: 'Help me plan the rest of my week.' })
   })
 
-  it('offers "Plan the week" on the week\'s first day', () => {
+  it('offers "Help me plan the week" on the week\'s first day', () => {
     vi.setSystemTime(new Date(2026, 9, 10, 9))
     const setWalk = mount(new Date(2026, 9, 10))
-    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the week', message: 'Plan the week.' })
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Help me plan the week', message: 'Help me plan the week.' })
   })
 
-  it('offers no in-page button when the bar carries the walk', () => {
+  it('keeps the planning entry visible even when the chat also carries it', () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     mount(new Date(2026, 9, 10))
-    expect(screen.queryByRole('button', { name: /^Plan (the rest of my|the) week$/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Help me plan the rest of my week' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Help me plan the rest of my week.', autoSend: true })
   })
 
-  it('on a phone mid-week the page offers "Plan the rest of my week"', () => {
+  it('on a phone mid-week the page offers "Help me plan the rest of my week"', () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     launcher.openAssistant.mockClear()
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Plan the rest of my week' }))
-    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the rest of my week.', autoSend: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Help me plan the rest of my week' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Help me plan the rest of my week.', autoSend: true })
   })
 
   it('offers nothing on a past week', () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     const setWalk = mount(new Date(2026, 9, 3))
-    expect(screen.queryByRole('button', { name: /^Plan (the rest of my|the) week$/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Help me plan (the rest of my|the) week$/ })).toBeNull()
     expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: expect.any(String) }))
   })
 
@@ -505,22 +516,22 @@ describe('WeekViewV2 — Plan the rest of my week in the bar', () => {
   it('on the week\'s last day offers planning the next week, by its start date', () => {
     vi.setSystemTime(new Date(2026, 9, 16, 18))
     const setWalk = mount(new Date(2026, 9, 10))
-    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan week 43', message: 'Plan the week of Oct 17.' })
-    expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: 'Plan the rest of my week' }))
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Help me plan week 43', message: 'Help me plan the week of Oct 17.' })
+    expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: 'Help me plan the rest of my week' }))
   })
 
   it('on the last day a phone offers the same, in the page', () => {
     vi.setSystemTime(new Date(2026, 9, 16, 18))
     launcher.openAssistant.mockClear()
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Plan week 43' }))
-    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the week of Oct 17.', autoSend: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Help me plan week 43' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Help me plan the week of Oct 17.', autoSend: true })
   })
 
-  it('next week\'s page offers "Plan the week", naming its start', () => {
+  it('next week\'s page offers "Help me plan the week", naming its start', () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     const setWalk = mount(new Date(2026, 9, 17))
-    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the week', message: 'Plan the week of Oct 17.' })
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Help me plan the week', message: 'Help me plan the week of Oct 17.' })
   })
 
   // Final review 2026-10-14 #5: the line said false things while loading.
@@ -533,5 +544,42 @@ describe('WeekViewV2 — Plan the rest of my week in the bar', () => {
     expect(document.querySelector('.wc-week-sentence')).toBeNull()
     rerender(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} sources={{ ...loading, events: 'ready' }} />)
     expect(document.querySelector('.wc-week-sentence')?.textContent).toMatch(/wide open/)
+  })
+})
+
+
+describe('Chat drafts and the saved week', () => {
+  it('keeps proposed additions and moves off the week, then draws saved rows immediately', () => {
+    const start = new Date(2026, 9, 11)
+    const gate = createMockTask({ id: 'gate', title: 'Fix the gate latch', scheduledFor: new Date(2026, 9, 16), isAllDay: true })
+    const draft: ChangeSet = { key: 'review', title: '2 changes', ops: [
+      { key: 'shower', op: 'add', title: 'Shower', date: '2026-10-15', time: '15:00' },
+      { key: 'gate', op: 'place', taskId: 'gate', title: gate.title, date: '2026-10-17' },
+    ] }
+    function DraftControl() {
+      const activity = useCanvasActivity()
+      return <button onClick={() => activity.setChangeSet(draft)}>Prepare draft</button>
+    }
+    const scene = (tasks: Task[]) => <CanvasActivityProvider snapshot={{ tasks, goals: [] }} writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn() }} refetch={() => {}}>
+      <DraftControl />
+      <WeekViewV2 {...defaultProps} tasks={tasks} routines={[]} weekStart={start} />
+    </CanvasActivityProvider>
+    const view = render(scene([gate]))
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare draft' }))
+    expect(screen.queryByText('Shower')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-16')).getByText(gate.title)).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-17')).queryByText(gate.title)).not.toBeInTheDocument()
+
+    // Stored data arrives before the draft is cleared. It must render once,
+    // in the right day, without waiting for a timer or another network event.
+    const shower = createMockTask({ id: 'shower', title: 'Shower', scheduledFor: new Date(2026, 9, 15, 15), isAllDay: false })
+    view.rerender(scene([shower, { ...gate, scheduledFor: new Date(2026, 9, 17) }]))
+    expect(screen.getAllByText('Shower')).toHaveLength(1)
+    expect(within(screen.getByTestId('journal-day-2026-10-15')).getByText('Shower')).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-16')).queryByText(gate.title)).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-17')).getByText(gate.title)).toBeInTheDocument()
+    view.rerender(scene([gate]))
+    expect(screen.queryByText('Shower')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-16')).getByText(gate.title)).toBeInTheDocument()
   })
 })

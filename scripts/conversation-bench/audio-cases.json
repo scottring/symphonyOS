@@ -1,0 +1,172 @@
+{
+  "models": [
+    "gpt-4o-mini-transcribe",
+    "gpt-realtime-whisper"
+  ],
+  "maxAudioSeconds": 600,
+  "clips": [
+    {
+      "id": "capture",
+      "file": "audio-fixtures/capture.wav",
+      "reference": "I need to call the plumber, pick up the Amazon order, clean the yard, and fit in an all-day test drive this week.",
+      "requiredTerms": [
+        "plumber",
+        "Amazon",
+        "yard",
+        "test drive"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "correction",
+      "file": "audio-fixtures/correction.wav",
+      "reference": "The plumber call is tomorrow. Actually, Friday.",
+      "requiredTerms": [
+        "plumber",
+        "Friday"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "name",
+      "file": "audio-fixtures/name.wav",
+      "reference": "Remind Kaleb about piano on Thursday.",
+      "requiredTerms": [
+        "Kaleb",
+        "piano",
+        "Thursday"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "occurrence",
+      "file": "audio-fixtures/occurrence.wav",
+      "reference": "No piano this Thursday.",
+      "requiredTerms": [
+        "piano",
+        "Thursday"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "recurrence",
+      "file": "audio-fixtures/recurrence.wav",
+      "reference": "Piano is moving to Tuesdays at four from now on.",
+      "requiredTerms": [
+        "Tuesdays",
+        "from now on"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "approve",
+      "file": "audio-fixtures/approve.wav",
+      "reference": "Approve.",
+      "requiredTerms": [
+        [
+          "Approve",
+          "Approved"
+        ]
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field",
+      "acceptableTranscripts": [
+        "Approved."
+      ],
+      "note": "Both forms are explicitly accepted by the existing APPROVE command parser; negated commands are separate fixtures."
+    },
+    {
+      "id": "undo",
+      "file": "audio-fixtures/undo.wav",
+      "reference": "Undo that.",
+      "requiredTerms": [
+        "Undo"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "negation",
+      "file": "audio-fixtures/negation.wav",
+      "reference": "Do not approve it yet.",
+      "requiredTerms": [
+        "not",
+        "yet"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "time",
+      "file": "audio-fixtures/time.wav",
+      "reference": "The appointment is at four thirty, not four thirteen.",
+      "requiredTerms": [
+        "thirty",
+        "thirteen",
+        "not"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "thinking-pause",
+      "file": "audio-fixtures/thinking-pause.wav",
+      "reference": "Move the plumber call to Friday.",
+      "requiredTerms": [
+        "plumber",
+        "Friday"
+      ],
+      "provenance": "synthetic-stress: 3-second inserted pause",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "background-noise",
+      "file": "audio-fixtures/background-noise.wav",
+      "reference": "Put milk on the grocery list.",
+      "requiredTerms": [
+        "milk",
+        "grocery"
+      ],
+      "provenance": "synthetic-stress: seeded white noise at 12 dB SNR",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "silence",
+      "file": "audio-fixtures/silence.wav",
+      "reference": "",
+      "requiredTerms": [],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    },
+    {
+      "id": "approve-changes",
+      "file": "audio-fixtures/approve-changes.wav",
+      "reference": "Approve these changes.",
+      "requiredTerms": [
+        "approve",
+        "changes"
+      ],
+      "provenance": "synthetic-smoke",
+      "maxWordErrorRate": 0.15,
+      "noiseReduction": "near_field"
+    }
+  ],
+  "humanDeviceValidation": "not measured by these synthetic fixtures"
+}

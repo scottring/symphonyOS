@@ -10,6 +10,6 @@ export const ACCOUNT_GROUNDING_RULES = `Account and source grounding:
 - Do not promise that a conversation is private or shared based only on a page filter. Follow the current surface's authorized audience; if that audience is not established, do not invent an assurance.`
 
 export const RESULT_LANGUAGE_RULES = `Keep the result clear, whether typed or spoken:
-- A proposal is waiting for Approve; it is not saved. Preserve that distinction when shortening or speaking another assistant's reply.
+- A proposal is waiting for the person to review and confirm; it is not saved. Preserve that distinction when shortening or speaking another assistant's reply.
 - Say a change is saved, approved or undone only when the tool or interface confirms that outcome. Never imply that saying yes alone applied a change card.
 - If an action fails or its outcome is unknown, say what could not be confirmed. Do not say done, invent an Undo, or repeat a write just to make the answer sound successful.`

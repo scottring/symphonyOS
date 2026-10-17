@@ -20,6 +20,7 @@ import { showToast } from '@/hooks/useToast'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
 import { SupernotePagesSection } from '@/components/capture/SupernotePagesSection'
+import { SchoolMailInboxLink } from '@/components/settings/SchoolMailInboxLink'
 import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
 import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
@@ -821,6 +822,7 @@ export function InboxView({
       />
 
       <SupernotePagesSection />
+      <SchoolMailInboxLink />
 
       <HomeNeedsDetailsSection />
 

@@ -23,7 +23,8 @@ const rows = [
 const limit = vi.fn().mockResolvedValue({ data: rows, error: null })
 const order = vi.fn(() => ({ limit }))
 const isNull = vi.fn(() => ({ order }))
-const eqStatus = vi.fn(() => ({ is: isNull }))
+const eqReview = vi.fn(() => ({ is: isNull }))
+const eqStatus = vi.fn(() => ({ eq: eqReview }))
 const eqKind = vi.fn(() => ({ eq: eqStatus }))
 const select = vi.fn(() => ({ eq: eqKind }))
 
@@ -52,6 +53,7 @@ describe('useUnreviewedCaptures', () => {
     expect(select).toHaveBeenCalledWith('id, subject, source_label, created_at')
     expect(eqKind).toHaveBeenCalledWith('kind', 'email')
     expect(eqStatus).toHaveBeenCalledWith('status', 'extracted')
+    expect(eqReview).toHaveBeenCalledWith('review_required', false)
     expect(isNull).toHaveBeenCalledWith('reviewed_at', null)
     expect(order).toHaveBeenCalledWith('created_at', { ascending: false })
     expect(limit).toHaveBeenCalledWith(10)

@@ -33,7 +33,7 @@ export const PAGE_GUIDES: Record<string, string> = {
     'One plain sentence about the week sits under the title. ' +
     '"No day yet" lists what is chosen for this week but has no day: drag one onto a day, or on a phone press + to pick the day. ' +
     'Tick a task to finish it, drag it to move it, tap it to open it. ' +
-    'Planning is a conversation: "Plan the rest of my week" in the bar at the bottom (on a phone, the button under the title) starts it, and Symphony proposes the changes for you to approve.',
+    '"Help me plan the rest of my week" in the week header starts a conversation in chat. Bring your ideas, goals, tasks and routines; Symphony helps you organise them and decide what needs attention now. Review the draft and choose Save when you are ready.',
   today:
     'Today is for doing: what you are doing today, with what you need to do it. ' +
     '"The day" shows the day\'s hours with timed things on them and how many hours are still open. ' +

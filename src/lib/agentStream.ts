@@ -127,7 +127,7 @@ export interface StreamHandlers {
   sessionContext?: AssistantSessionContext
   /** 'wall': the kitchen wall — the agent reads only the family layer and
    *  proposes every change (supabase/functions/symphony-agent/wallMode.ts). */
-  surface?: 'wall'
+  surface?: 'wall' | 'onboarding' | 'onboarding_activity'
   /** Another deployed copy of the agent function (e.g. a test copy). */
   functionName?: string
   /** Abort the request (the wall's timeout): the server's stream closes and

@@ -297,7 +297,7 @@ describe('talking to the wall: plan the week', () => {
     const { ask } = setup(async (t, h) => reply(t, h, 'Let’s plan the rest of the week. Sunday has swim and a party; Friday is open.'))
     fireEvent.click(dock().getByRole('button', { name: 'More' }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Plan the week/ })) })
-    expect(ask).toHaveBeenCalledWith('Plan the rest of my week.', [], expect.anything())
+    expect(ask).toHaveBeenCalledWith('Help me plan the rest of my week.', [], expect.anything())
     expect(screen.getByText('Family only · October 10 – 16')).toBeInTheDocument()
     const pic = screen.getByLabelText('The family’s week')
     expect(within(pic).getAllByRole('group')).toHaveLength(7)
@@ -308,7 +308,7 @@ describe('talking to the wall: plan the week', () => {
   it('saying "plan the week" starts it too; proposals land dashed in their days and the card waits behind Review', async () => {
     const { ask, applyChanges } = setup(async (t, h) => reply(t, h, 'Swim to Friday?', h.length ? { changeSet: SET } : {}))
     await type('plan the week')
-    expect(ask).toHaveBeenCalledWith('Plan the rest of my week.', [], expect.anything())
+    expect(ask).toHaveBeenCalledWith('Help me plan the rest of my week.', [], expect.anything())
     await type('move swim to Friday')
     const fri = screen.getByRole('group', { name: 'Friday, October 16' })
     expect(within(fri).getByText('Swim lesson').closest('[data-kind]')).toHaveAttribute('data-kind', 'prop')

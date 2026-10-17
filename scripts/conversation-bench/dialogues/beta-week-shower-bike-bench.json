@@ -1,0 +1,18 @@
+{
+  "id": "beta-week-shower-bike-bench",
+  "scope": "synthetic household only",
+  "messages": [
+    "Help me plan the rest of my week.",
+    "I need to shower today at 4 p.m.",
+    "I need to take the bicycle to Bicycle Connection. And I need to buy the white bench.",
+    "Tomorrow for the bicycle."
+  ],
+  "expectations": [
+    "Every completed turn has a nonempty truthful reply",
+    "Final card contains exactly shower today at 16:00, bike tomorrow and undated white bench",
+    "No move of unchanged gate-latch task",
+    "No writes before approval",
+    "No invented household names"
+  ],
+  "liveEvidence": "candidate-dialogue-1792079160662.json"
+}

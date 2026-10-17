@@ -18,6 +18,8 @@ import { liveCommitments } from '@/lib/placement/model'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 
 export interface ApplyDeps extends Partial<MoreApplyDeps> {
+  /** Durable server journal owns rollback/Undo for actual chat writes. */
+  managedRecovery?: boolean
   tasks: Task[]
   updateTask: (id: string, updates: Partial<Task>) => Promise<boolean | void>
   addTask: (title: string, scheduledFor: Date | undefined, options: {
@@ -79,7 +81,7 @@ export type ApplyResult =
   /** `reverted`: every write made before the failure was put back. When it is
    *  false, `kept` names the rows whose write could not be reversed: the page
    *  must say that some of it saved, never "nothing changed". */
-  | { ok: false; reason: 'failed'; reverted: boolean; kept: string[] }
+  | { ok: false; reason: 'failed'; reverted: boolean; kept: string[]; recoverable?: boolean }
 
 /** The week an add with no day lands in: the one the set was planned for
  *  (planning next week on this week's last day), else this week. */
@@ -120,6 +122,7 @@ function routineChange(op: ChangeOp, r: Routine): { updates: UpdateRoutineInput;
   if (op.clearTime) { updates.time_of_day = null; previous.time_of_day = r.time_of_day }
   else if (op.time) { updates.time_of_day = dbTime(op.time); previous.time_of_day = r.time_of_day }
   if (op.days) { updates.recurrence_pattern = withDays(r.recurrence_pattern, op.days); previous.recurrence_pattern = r.recurrence_pattern }
+  if (op.showOnTimeline !== undefined) { updates.show_on_timeline = op.showOnTimeline; previous.show_on_timeline = r.show_on_timeline }
   if (op.assignees) {
     updates.assigned_to_all = [...op.assignees]
     updates.assigned_to = op.assignees[0] ?? null
@@ -134,6 +137,8 @@ function routineAdd(op: ChangeOp): CreateRoutineInput {
   const recurrence_pattern: RecurrencePattern = days.length === 7 ? { type: 'daily' } : { type: 'weekly', days: [...days], interval: 1 }
   return {
     name: op.title,
+    ...(op.note ? { description: op.note } : {}),
+    ...(op.showOnTimeline !== undefined ? { show_on_timeline: op.showOnTimeline } : {}),
     recurrence_pattern,
     ...(op.time ? { time_of_day: dbTime(op.time) } : {}),
     assigned_to_all: op.assignees?.length ? [...op.assignees] : null,
@@ -259,7 +264,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
     undos.push({ id, undo, kind: routinesById.has(id) ? 'routine' : 'task' })
     return true
   }
-  const fail = async (): Promise<ApplyResult> => { const kept = await rollback(); return { ok: false, reason: 'failed', reverted: kept.length === 0, kept } }
+  const fail = async (): Promise<ApplyResult> => { if (deps.managedRecovery) return { ok: false, reason: 'failed', reverted: false, kept: ids }; const kept = await rollback(); return { ok: false, reason: 'failed', reverted: kept.length === 0, kept } }
 
   try {
     for (const op of set.ops) {

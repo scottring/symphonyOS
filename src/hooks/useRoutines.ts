@@ -1,7 +1,7 @@
 import { parseLocalDate } from '@/lib/dateUtils'
 import { withDayKeys } from '@/lib/recurrenceDays'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase, getAuthUser } from '@/lib/supabase'
+import { supabase as defaultSupabase, getAuthUser } from '@/lib/supabase'
 import { shareInFlight } from '@/lib/sharedRequest'
 import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate, TargetUnit } from '@/types/actionable'
 import { matchesRecurrenceForDate, type LastCompletionMap } from '@/lib/routineUtils'
@@ -76,7 +76,7 @@ async function householdMembers(): Promise<{ authUserId: string; rows: MemberRow
       try {
         // No filter: RLS already limits this to the household, and a person is
         // identified by auth_user_id (a joined member) or user_id (the creator).
-        const { data } = await supabase
+        const { data } = await defaultSupabase
           .from('family_members')
           .select('id, user_id, auth_user_id')
         const rows = (data ?? []) as MemberRow[]
@@ -154,6 +154,7 @@ export interface CreateRoutineInput {
   times_per_day?: string[] // when set, routine recurs N times/day
   image_url?: string | null
   visibility?: RoutineVisibility
+  show_on_timeline?: boolean
   default_assignee?: string | null  // Used for generating recurring instances
   assigned_to?: string | null  // Current assignment (if null, uses defaultFallbackAssignee)
   assigned_to_all?: string[] | null  // Multi-assignment, same column the Who control writes
@@ -198,7 +199,7 @@ export interface UpdateRoutineInput {
   step_order?: number | null
 }
 
-export function useRoutines() {
+export function useRoutines(supabase = defaultSupabase) {
   const [routines, setRoutines] = useState<Routine[]>([])
   // updateRoutine needs the row's CURRENT context and scope to decide whether a
   // context change should move the share, and it must stay dependency-free
@@ -376,6 +377,7 @@ export function useRoutines() {
           times_per_day: input.times_per_day ?? null,
           image_url: input.image_url ?? null,
           visibility: input.visibility || 'active',
+          ...(input.show_on_timeline !== undefined ? { show_on_timeline: input.show_on_timeline } : {}),
           default_assignee: input.default_assignee || null,
           assigned_to: effectiveAssignedTo,
           assigned_to_all: input.assigned_to_all ?? null,

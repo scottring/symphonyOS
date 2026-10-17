@@ -393,6 +393,7 @@ function Inner() {
         {!current && <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>Back to this {PERIODS[level]}</button>}
       </div>
       {dataReady && !error && !goalsError && sentence && <p className="plan-sentence">{sentence}</p>}
+      <Link className="canvas-link" to="/getting-started?journey=goals">Start with a goal · guided introduction</Link>
     </header>
 
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}

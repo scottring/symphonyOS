@@ -1,3 +1,4 @@
+import { createReviewedWriter, applyReviewedChange } from '@/lib/canvas/reviewedChange'
 // src/components/wall-v2/WallV2Shell.tsx
 //
 // Orchestrates the WallV2 kiosk surface — three-column grid (rail / center
@@ -34,7 +35,7 @@ import { assignWallEvent } from '@/lib/wall/eventAssign';
 import { readReadingTimer, readingTimerKey, elapsedMinutes, isTimerRunning } from '@/lib/wall/readingScreenTime';
 import { localYmd, readCadenceConfig } from '@/lib/cadence/config';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
-import { applyChangeSet, plannedWeekStart } from '@/lib/canvas/applyChangeSet';
+import { plannedWeekStart } from '@/lib/canvas/applyChangeSet';
 import { useDisplayHeartbeat } from '@/lib/display/useDisplayHeartbeat';
 import { withSteps, type ChangeSet } from '@/lib/canvas/changeCard';
 import type { WallTalkDeps, WallApplyResult } from './activity/useWallTalk';
@@ -937,24 +938,25 @@ export function WallV2Shell() {
   // load it) for Approve: every op goes through applyChangeSet, the change
   // card's all-or-nothing apply with one Undo. Only family tasks may change
   // from the wall, and anything it adds is a family task.
-  const { tasks: storeTasks, updateTask: storeUpdate, deleteTask: storeDelete, addTask: storeAdd } = useSupabaseTasks();
+  const reviewedWriter = useMemo(() => createReviewedWriter(), []);
+  const { tasks: storeTasks, updateTask: storeUpdate, deleteTask: storeDelete, addTask: storeAdd } = useSupabaseTasks(reviewedWriter.client);
   const applyWallChanges = useCallback(async (set: ChangeSet): Promise<WallApplyResult> => {
     const byId = new Map(withSteps(storeTasks).map((t) => [t.id, t]));
     for (const op of set.ops) {
       const t = op.taskId ? byId.get(op.taskId) : undefined;
       if (t && t.context !== 'family') return { ok: false, reason: 'private', title: op.title };
     }
-    const r = await applyChangeSet(set, {
+    const r = await applyReviewedChange(set, {
       tasks: storeTasks,
       updateTask: storeUpdate,
       deleteTask: storeDelete,
       addTask: (title, when, options) => storeAdd(title, undefined, undefined, when, { ...options, context: 'family' }),
       weekStart: plannedWeekStart(set, new Date(), readCadenceConfig().weekStartsOn),
-    });
+    }, reviewedWriter);
     if (!r.ok) return r;
     void wallData.refetch();
     return { ...r, undo: async () => { const ok = await r.undo(); void wallData.refetch(); return ok; } };
-  }, [storeTasks, storeUpdate, storeDelete, storeAdd, wallData]);
+  }, [reviewedWriter, storeTasks, storeUpdate, storeDelete, storeAdd, wallData]);
   const wallAgent: WallTalkDeps = useMemo(
     () => ({ applyChanges: applyWallChanges, weekStartsOn: readCadenceConfig().weekStartsOn }),
     [applyWallChanges],
@@ -977,7 +979,7 @@ export function WallV2Shell() {
         return { title: t.title, at: t.scheduledFor ?? null, allDay: !!t.isAllDay, who };
       },
     };
-  }, [storeTasks, wallData.days, wallData.familyMembers, now]);
+  }, [reviewedWriter, storeTasks, wallData.days, wallData.familyMembers, now]);
 
   // Sentences said to the wall (the Pi's listener, or typed into Tell
   // Symphony): what it may save, each with Undo, and what it knows — only

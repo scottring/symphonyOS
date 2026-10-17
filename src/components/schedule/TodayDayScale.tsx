@@ -167,6 +167,7 @@ export function TodayDayScale({
   handleRef,
   markOf,
   proposed = [],
+  showOpenTime = true,
 }: {
   /** The day's timed rows (a group's children ride with their parent). */
   items: TimelineItem[]
@@ -190,6 +191,8 @@ export function TodayDayScale({
   markOf?: (item: TimelineItem) => RowMark | undefined
   /** A pending change card's timed arrivals: dashed, inert, at their time. */
   proposed?: readonly ProposedRow[]
+  /** Missing or incomplete calendars cannot establish available time. */
+  showOpenTime?: boolean
 }) {
   // When each thing runs. An all-day "Dinner: …" event sits at its meal's
   // hour (effectiveStartTime), for the half hour a bare time gets.
@@ -285,7 +288,7 @@ export function TodayDayScale({
       {scale.ticks.map((t) => (
         <div key={t.label} className="today-scale-hour" style={{ top: t.top }} aria-hidden="true"><span>{t.label}</span></div>
       ))}
-      {scale.free.map((f) => (
+      {showOpenTime && scale.free.map((f) => (
         <div key={f.top} className="today-scale-free" style={{ top: f.top, height: f.height }}>{f.label}</div>
       ))}
       {scale.blocks.map((b) => {

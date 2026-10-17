@@ -13,6 +13,7 @@
 // pattern then saves on a button) and live-save (panel writes immediately).
 
 import { CalendarCheck } from 'lucide-react'
+import { useId } from 'react'
 import type { MonthDayOfWeek, MonthWeek, RecurrencePattern, RecurrenceType, RecurrenceUnit } from '@/types/actionable'
 import { TIME_INPUT_LARGE_CLASS } from '@/lib/inputStyles'
 import { isEverydayRoutine } from '@/lib/routineUtils'
@@ -83,6 +84,7 @@ export function RoutineScheduleEditor({
   onChange,
   size = 'lg',
 }: RoutineScheduleEditorProps) {
+  const timeId = useId()
   const p = recurrencePattern
   const type = p.type
   const selectedDays = p.days ?? []
@@ -378,13 +380,15 @@ export function RoutineScheduleEditor({
 
       {/* time of day */}
       <div>
-        <label className={label}>
+        <label className={label} htmlFor={timeId}>
           Time <span className="text-neutral-400 font-normal">(optional)</span>
         </label>
         <input
+          id={timeId}
           type="time"
           step="300"
           value={timeOfDay}
+          onInput={(e) => emit(p, e.currentTarget.value)}
           onChange={(e) => emit(p, e.target.value)}
           className={`w-full text-neutral-800 ${TIME_INPUT_LARGE_CLASS}`}
         />

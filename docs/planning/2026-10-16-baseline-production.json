@@ -1,0 +1,158 @@
+{
+  "verifiedAt": "2026-10-16T14:28:07.938Z",
+  "release": "2026-10-16.6-baseline",
+  "sourceCommit": "f2b5a919ea669279e704751945502981af72bb38",
+  "branch": "codex/beta-baseline-release",
+  "frontend": {
+    "deploymentId": "dpl_HanBwr5giz8rPuQFMZELxZ81Efr5",
+    "immutableUrl": "https://symphony-rebuild-ktqh3oeh6-scottrings-projects.vercel.app",
+    "domains": [
+      {
+        "site": "https://app.symphony-os.com",
+        "version": "2026-10-16.6-baseline",
+        "basedOn": "2026-10-16.5",
+        "agent": "symphony-agent",
+        "accountAccess": "authenticated",
+        "multiAccountCalendars": false,
+        "builtAt": "2026-10-16T14:16:03.898Z",
+        "commit": "f2b5a919ea669279e704751945502981af72bb38"
+      },
+      {
+        "site": "https://symphony-rebuild.vercel.app",
+        "version": "2026-10-16.6-baseline",
+        "basedOn": "2026-10-16.5",
+        "agent": "symphony-agent",
+        "accountAccess": "authenticated",
+        "multiAccountCalendars": false,
+        "builtAt": "2026-10-16T14:16:03.898Z",
+        "commit": "f2b5a919ea669279e704751945502981af72bb38"
+      }
+    ],
+    "promotion": "vercel promote with explicit owning team scope; success"
+  },
+  "backend": {
+    "project": "mwadppyrqzuzgstmwpuy",
+    "function": "symphony-agent",
+    "version": 75,
+    "verifyJwt": true,
+    "otherFunctionsChanged": false,
+    "migrationsApplied": []
+  },
+  "access": {
+    "normalAuthenticatedAccounts": true,
+    "testAllowlistInFrontend": false,
+    "anonymousPlannerDenied": true,
+    "temporaryTestPlannerUsed": false
+  },
+  "automated": {
+    "total": 353,
+    "groups": [
+      {
+        "tests": 231,
+        "files": 24,
+        "scope": "onboarding, chat, reviewed saves, week planning, calendar baseline, assistant, recovery and budgeting"
+      },
+      {
+        "tests": 47,
+        "files": 3,
+        "scope": "normal/restricted AuthGate, agentStream, wallMode"
+      },
+      {
+        "tests": 75,
+        "files": 5,
+        "scope": "Today calendar coverage summary and day scale"
+      }
+    ],
+    "productionBuild": "pass",
+    "denoPlannerCheck": "pass"
+  },
+  "hosted": {
+    "at": "2026-10-16T14:25:26.339Z",
+    "site": "https://app.symphony-os.com",
+    "checks": [
+      {
+        "name": "production browser preflight succeeds",
+        "pass": true
+      },
+      {
+        "name": "anonymous planner access is refused",
+        "pass": true
+      },
+      {
+        "name": "ordinary authenticated account reaches production planner without an allowlist",
+        "pass": true
+      },
+      {
+        "name": "Google connection returns to the main app with calendar-only scopes",
+        "pass": true
+      },
+      {
+        "name": "hosted frontend identifies the normal-account baseline",
+        "pass": true
+      },
+      {
+        "name": "all five horizon videos serve playable media",
+        "pass": true
+      }
+    ]
+  },
+  "liveWalkthrough": {
+    "account": "fresh ordinary synthetic account outside the restricted-test allowlist",
+    "household": "Baseline Verification Household",
+    "checks": [
+      "Household and two people saved; week starts Saturday.",
+      "Real AI proposed three routines; no routine write before Save; recurrence, people and hidden Today/Week preference persisted.",
+      "Horizon introduction and video links available; all five public media files verified.",
+      "Two initial activities saved: Saturday library task at 10am and undated herb-shelf task.",
+      "Phone, tablet, computer and shared-display guidance opened; browser-only completion retained devices for later.",
+      "Existing library task moved from 10am to 11am with the same row ID and no duplicate (direct single-item action).",
+      "Separate two-task draft reviewed, saved, then undone; database readback confirmed both new tasks removed while original tasks and routines remained.",
+      "Final hosted build removed unsupported open-time claims when no calendar is connected.",
+      "Main-domain normal-account sign-in succeeded and completed onboarding state persisted."
+    ],
+    "finalDatabaseState": {
+      "tasks": 2,
+      "routines": 3,
+      "reviewedChangeStatus": "undone",
+      "libraryLocalTime": "2026-10-17T11:00:00 America/New_York"
+    },
+    "screenshot": "beta-sessions/evidence/2026-10-16-baseline-live.png"
+  },
+  "limitations": [
+    "Google consent and event synchronization not rerun for this release.",
+    "Phone/tablet installation and physical-display soak acceptance remain open.",
+    "Voice remains deferred.",
+    "Multi-account/shared-family-calendar redesign is excluded.",
+    "This deployment does not approve expanded beta invitations."
+  ],
+  "rollback": {
+    "priorFrontendDeployment": "dpl_5EMQRRTvKkNztiAQ4JeApd3tcsFE",
+    "priorPlannerVersion": 74,
+    "downloadedSource": "/tmp/symphony-baseline-rollback/supabase/functions",
+    "method": "Promote prior frontend in the owning Vercel team; planner rollback uses the downloaded prior source with JWT verification preserved."
+  },
+  "temporaryPlanner": {
+    "name": "symphony-conversation-bench",
+    "version": 13,
+    "changed": false,
+    "normalBaselineDependsOnIt": false
+  },
+  "provenance": {
+    "sourceCandidate": "2026-10-16.5",
+    "immutableUrl": "https://symphony-rebuild-cdgiwqsb2-scottrings-projects.vercel.app",
+    "frontendRecoveredFromBuildMaps": {
+      "src/hooks/useGoogleCalendar.tsx": "0ae4171a121999711b01c3babc6c3f6bcc123cb7e5535b035fe02356fda56767",
+      "src/components/calendar/CalendarSetupWizard.tsx": "499f502391fb7a808e46b04222eac713a523186dabb5a50ff5c824902c829c2a",
+      "src/components/settings/CalendarSettings.tsx": "9ca5f5457db404ef2f90eb39e37c7ea64ff692f619bd96375e05dbb9a99b4673",
+      "src/components/setup/OnboardingFlow.tsx": "44625db02c7cf70f176c038adc3f4f2e4e93c1fe07ff09fb11ae081239de0705"
+    },
+    "backendSource": "/tmp/symphony-release-backend/supabase/functions",
+    "excluded": [
+      "scripts/test-calendar-accounts.mjs",
+      "src/components/calendar/FamilyCalendarSetup.test.tsx",
+      "src/components/calendar/FamilyCalendarSetup.tsx",
+      "supabase/migrations/20261016120000_calendar_accounts.sql"
+    ],
+    "copiedFiles": 3402
+  }
+}

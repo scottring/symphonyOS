@@ -1,0 +1,67 @@
+[
+  {
+    "id": "year", "name": "Year", "title": "Your broader direction", "listTitle": "This year", "question": "What would you like this year to add up to?",
+    "quote": "I want more time outdoors, a calmer home, and to stay close to my family.",
+    "items": [{"text":"More time outdoors","detail":"Something I want more of"},{"text":"A calmer home","detail":"A direction worth returning to"},{"text":"Stay close to family","detail":"In my own words"}],
+    "takeaway": "Smaller goals support your bigger intention.",
+    "narration": [
+      "Year gives your bigger intentions somewhere to live. Imagine you want more time outdoors, a calmer home, and to stay close to family.",
+      "More time outdoors is one direction. You can add detail later.",
+      "A calmer home joins the list. You decide what that means in your own life.",
+      "Stay close to family sits alongside it. These are your intentions.",
+      "Here is how goals can nest. A calmer home might lead to a usable spare room this quarter, then a clear floor this month. Sorting one box becomes a weekly activity, given attention today. The bigger goals stay in place. You choose the connections, and can start anywhere."
+    ]
+  },
+  {
+    "id": "season", "name": "Season", "title": "Goals to progress this quarter", "listTitle": "This quarter", "question": "What goals will you progress this quarter?",
+    "quote": "This quarter, I want a regular walking rhythm, a usable spare room, and a family weekend to look forward to.",
+    "items": [{"text":"Build a regular walking rhythm","detail":"For: More time outdoors"},{"text":"Make the spare room usable","detail":"For: A calmer home"},{"text":"Arrange a family weekend","detail":"For: Stay close to family"}],
+    "takeaway": "A quarterly goal can hold smaller monthly goals.",
+    "narration": [
+      "Season asks, what goals will you progress this quarter? Your list might include a walking rhythm, a usable spare room, and a family weekend.",
+      "A walking rhythm supports your yearly wish for more time outdoors.",
+      "Making the spare room usable supports a calmer home.",
+      "A family weekend supports staying close to family. You choose these connections.",
+      "Follow the home goal down. Making the spare room usable this quarter can hold a smaller goal: clear the floor this month. Sort one box is an activity you might choose for this week, then today. These are nested goals and their actions. Your quarterly goal stays in place."
+    ]
+  },
+  {
+    "id": "month", "name": "Month", "title": "A nearer focus", "listTitle": "This month", "question": "What would you like to move forward this month?",
+    "quote": "This month, I want to find two walks we like, clear the spare-room floor, and agree on a date for the family weekend.",
+    "items": [{"text":"Find two walks we enjoy","detail":"For: Build a regular walking rhythm"},{"text":"Clear the spare-room floor","detail":"For: Make the spare room usable"},{"text":"Agree on a family-weekend date","detail":"For: Arrange a family weekend"}],
+    "takeaway": "Keep the goal here; choose its next activities for a week.",
+    "narration": [
+      "Month gives your larger goals a nearer focus. Imagine choosing two walks to enjoy, a clear spare-room floor, and a date for the family weekend.",
+      "Finding two walks supports the walking rhythm you want this quarter.",
+      "Clearing the floor is a smaller goal within making the spare room usable.",
+      "Agreeing on a date moves the family weekend closer.",
+      "Now choose an activity toward a monthly goal. Sort one box can go into this week, then onto today when you choose a day. Clear the floor remains on the month list, connected to the bigger home goal. Smaller actions support it; finishing one does not automatically finish the whole goal."
+    ]
+  },
+  {
+    "id": "week", "name": "Week", "title": "This week’s attention", "listTitle": "This week", "question": "Which activities belong in this week?",
+    "quote": "I’d like to try the riverside trail on Saturday, sort one box sometime this week, and ask the family about dates on Thursday.",
+    "items": [{"text":"Try the riverside trail","detail":"Saturday · For: Find two walks we enjoy"},{"text":"Sort one box","detail":"No day yet · For: Clear the floor"},{"text":"Ask family about dates","detail":"Thursday · For: Agree on a date"}],
+    "takeaway": "Choose activities for the week; give them a day when useful.",
+    "narration": [
+      "Week holds activities you choose to give attention to soon. For example, a trail on Saturday, one box sometime this week, and family dates on Thursday.",
+      "Trying the riverside trail supports finding two walks you enjoy.",
+      "Sorting one box supports clearing the spare-room floor. It can stay undated.",
+      "Asking about dates moves the family weekend forward.",
+      "Look back up the chain: one box supports a clear floor, a usable spare room, and a calmer home. The goals stay on their own lists. Give this activity a day and the same item appears in Today. You can also add everyday tasks directly; not everything needs a bigger goal."
+    ]
+  },
+  {
+    "id": "today", "name": "Today", "title": "Attention for today", "listTitle": "Today", "question": "What will you give attention to today?",
+    "quote": "I’ll ask the family about dates this morning. School pickup is at three. I’d also like to sort one box today.",
+    "items": [{"text":"Ask family about dates","detail":"This morning · For: Agree on a date"},{"text":"School pickup","detail":"3:00 PM · Existing routine"},{"text":"Sort one box","detail":"Any time today · For: Clear the floor"}],
+    "takeaway": "Today’s attention can serve a bigger intention.",
+    "narration": [
+      "Today brings your chosen activities and due routines together. Imagine it is Thursday: family dates this morning, school pickup at three, and one box to sort.",
+      "Asking about dates is the activity already chosen for Thursday in your week.",
+      "School pickup is an existing routine. It needs no bigger goal to belong here.",
+      "You also choose today for sorting one box, without a precise time.",
+      "Trace that activity upward: sorting a box supports a clear floor this month, a usable spare room this quarter, and a calmer home this year. Today and Week show the same activity, not two copies. Completing it is one step toward those goals. You decide when the bigger goals are complete."
+    ]
+  }
+]

@@ -1,4 +1,5 @@
 import {describe,it,expect,vi} from 'vitest'
+import {AiUsageError} from '../_shared/aiUsage'
 import {handleWorkspaceVoice,transcriptionPrompt} from './handler'
 const request=()=>new Request('https://example.test',{method:'POST',headers:{Authorization:'Bearer user','Content-Type':'application/sdp'},body:'v=0\r\n'})
 function setup(over:Record<string,string>={}){
@@ -58,6 +59,8 @@ describe('workspace voice handshake',()=>{
   expect(session.instructions).not.toContain('Shape of planning')
   expect(session.instructions).toContain('forward the request to ask_symphony and say its result in a few words')
   expect(session.instructions).toContain('During a session, never ask your own questions')
+  expect(session.instructions).toContain('Preserve the request type')
+  expect(session.instructions).toContain('Screen context is not additional user intent')
   expect(session.instructions).toContain('say its reply naturally, keeping its meaning and any options it offers')
   expect(session.instructions).toContain("don't call show_on_page")
   expect(session.instructions).toContain('the planning agent does this')
@@ -84,12 +87,13 @@ it('discovers pilot access without provider calls or quota consumption',async()=
 })
 
 describe('household vocabulary for the transcriber',()=>{
- it('passes the family\'s names and routine names as the transcription prompt, bounded and deduplicated',async()=>{
+ it('does not inject household vocabulary into beta speech transcription',async()=>{
   const deps={...setup(),vocabulary:vi.fn(async()=>['Kaleb','Ella','kaleb','Piano practice','',' '.repeat(3),'x'.repeat(41)])}
   await handleWorkspaceVoice(request(),deps)
   const form=(deps.fetch as unknown as {mock:{calls:[[string,{body:FormData}]]}}).mock.calls[0][1].body
   const session=JSON.parse(String(form.get('session')))
-  expect(session.audio.input.transcription.prompt).toBe('Kaleb, Ella, Piano practice')
+  expect(session.audio.input.transcription.prompt).toBeUndefined()
+  expect(deps.vocabulary).not.toHaveBeenCalled()
  })
  it('a failed vocabulary read never blocks the call',async()=>{
   const deps={...setup(),vocabulary:vi.fn(async()=>{throw new Error('down')})}
@@ -101,4 +105,36 @@ describe('household vocabulary for the transcriber',()=>{
  it('transcriptionPrompt is a bare word list without sign-in addresses, so an echo is never mistaken for speech',()=>{
   expect(transcriptionPrompt(['Jerry Salve','Rita','smkaufman+bench-a2','a@b.c','rita'])).toBe('Jerry Salve, Rita')
  })
+})
+
+
+describe('voice admission settlement',()=>{
+ it('releases refused and failed provider handshakes once, retaining successful starts',async()=>{
+  for(const mode of ['success','refused','network']){
+   const deps={...setup(),settle:vi.fn(async()=>{})}
+   if(mode==='refused')deps.fetch.mockResolvedValue(new Response('no',{status:429}))
+   if(mode==='network')deps.fetch.mockRejectedValue(new Error('offline'))
+   const response=await handleWorkspaceVoice(request(),deps)
+   expect(response.status).toBe(mode==='success'?200:502)
+   expect(deps.settle).toHaveBeenCalledTimes(1);expect(deps.settle).toHaveBeenCalledWith('pilot',mode==='success')
+  }
+ })
+ it('does not settle a reservation that was never granted',async()=>{
+  const deps={...setup(),settle:vi.fn(async()=>{})};deps.reserve.mockResolvedValue(false)
+  expect((await handleWorkspaceVoice(request(),deps)).status).toBe(429)
+  expect(deps.settle).not.toHaveBeenCalled()
+ })
+ it('keeps an accepted connection alive if settlement is unavailable',async()=>{
+  const log=vi.spyOn(console,'error').mockImplementation(()=>{})
+  try{
+   const deps={...setup(),settle:vi.fn(async()=>{throw new Error('db unavailable')})}
+   expect((await handleWorkspaceVoice(request(),deps)).status).toBe(200)
+   expect(log).toHaveBeenCalledWith('workspace_voice_settlement_failed')
+  }finally{log.mockRestore()}
+ })
+})
+
+it('refunds the pilot slot when the household monthly allowance refuses the handshake',async()=>{
+ const deps={...setup(),settle:vi.fn(async()=>{})};deps.fetch.mockRejectedValue(new AiUsageError('monthly_limit'))
+ const r=await handleWorkspaceVoice(request(),deps);expect(r.status).toBe(429);expect((await r.json()).code).toBe('ai_monthly_limit');expect(deps.settle).toHaveBeenCalledWith('pilot',false)
 })

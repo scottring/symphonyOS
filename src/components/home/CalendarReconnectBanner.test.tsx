@@ -48,6 +48,7 @@ describe('CalendarReconnectBanner (calendar status)', () => {
     setCalendarState({ isConnected: false, connect })
     render(<CalendarReconnectBanner />)
     expect(screen.getByRole('status')).toHaveTextContent(/No calendar connected/)
+    expect(screen.getByRole('status')).toHaveTextContent(/availability is unknown/)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /connect google calendar/i }))
     expect(connect).toHaveBeenCalledTimes(1)

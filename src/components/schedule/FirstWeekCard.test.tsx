@@ -3,15 +3,11 @@ import { render, screen } from '@/test/test-utils'
 import { FirstWeekCard } from './FirstWeekCard'
 
 describe('optional onboarding', () => {
-  it('offers immediate work without requiring annual planning or family setup', async () => {
-    const open = vi.fn()
-    window.addEventListener('symphony:add-today', open)
-    const { user } = render(<FirstWeekCard steps={[]} onHide={vi.fn()} onSamplePage={vi.fn()} />)
-    expect(screen.queryByText('Your first week')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Add something for today' }))
-    expect(open).toHaveBeenCalledOnce()
-    expect(screen.getByRole('link', { name: 'Week' })).toHaveAttribute('href', '/week')
-    window.removeEventListener('symphony:add-today', open)
+  it('offers undated capture and a permanent guided setup entry', () => {
+    render(<FirstWeekCard steps={[]} onHide={vi.fn()} onSamplePage={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Capture something' })).toHaveAccessibleDescription('Get it down; decide when later.')
+    expect(screen.getByRole('link', { name: /Getting started/ })).toHaveAttribute('href', '/getting-started')
+    expect(screen.queryByText('Shelves')).not.toBeInTheDocument()
   })
   it('lets goal-first users choose a horizon and explore independently', async () => {
     const hide = vi.fn()
@@ -24,8 +20,8 @@ describe('optional onboarding', () => {
   // Walkthrough 2026-10-02 (#2): "more graphical / push-buttony / inviting".
   it('draws the three ways in as tiles, each with a one-line promise; today is the filled one', () => {
     render(<FirstWeekCard steps={[]} onHide={vi.fn()} onSamplePage={vi.fn()} />)
-    const today = screen.getByRole('button', { name: 'Add something for today' })
-    expect(today).toHaveAccessibleDescription('Write it down and do it today.')
+    const today = screen.getByRole('button', { name: 'Capture something' })
+    expect(today).toHaveAccessibleDescription('Get it down; decide when later.')
     expect(today).toHaveClass('bg-primary-600')
     expect(today.querySelector('svg')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'Start with a goal' })).toHaveAccessibleDescription('Name what you want this year or season to hold.')

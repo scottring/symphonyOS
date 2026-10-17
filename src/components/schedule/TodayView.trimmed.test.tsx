@@ -93,10 +93,11 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers() })
 
 describe('Today, trimmed: the header sentence', () => {
-  it('says the day back from rules in the masthead', () => {
+  it('describes recorded tasks without free-time claims when no calendar is connected', () => {
     renderView({ tasks: [timed('d', 'Dentist', at(14))] })
     const masthead = screen.getByTestId('masthead-card')
-    expect(within(masthead).getByText('4 hours open, then Dentist at 2.')).toBeInTheDocument()
+    expect(within(masthead).getByText('Recorded: Dentist at 2.')).toBeInTheDocument()
+    expect(document.querySelectorAll('.today-scale-free')).toHaveLength(0)
   })
 
   it('folds in new email captures; following them asks Symphony what came in and marks them read', () => {

@@ -1,0 +1,44 @@
+/* An opt-in layout study using production chat and the in-memory applier.
+ * No user-agent detection or assumption of an exposed Apple hinge API. */
+.duo-study { min-height:100dvh; background:#edf2ee; padding:36px 24px 24px; color:#233a32; }
+.duo-study-header { max-width:1120px; margin:0 auto 20px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.duo-study-header h1 { font:30px/1.15 var(--font-family-display); margin:8px 0; }
+.duo-study-header p:last-child { max-width:60ch; font-size:13px; color:#52685c; line-height:1.5; }
+.duo-postures,.duo-compact-tabs { display:flex; gap:5px; padding:5px; background:#fff; border:1px solid #d4dfd7; border-radius:14px; }
+.duo-postures button,.duo-compact-tabs button { min-height:44px; white-space:nowrap; padding:8px 14px; border-radius:9px; }
+.duo-postures button[aria-pressed=true],.duo-compact-tabs button[aria-pressed=true] { background:#315f4e; color:white; }
+.duo-study .preview-layout { max-width:1120px; height:calc(100dvh - 150px); min-height:480px; margin:auto; background:#fcfcf9; border:1px solid #c6d7cb; border-radius:24px; overflow:hidden; box-shadow:0 14px 45px #273c2920; }
+.duo-study .preview-guide { padding:30px; flex:1 1 50%; }
+.duo-study .preview-panel { flex:1 1 50%; width:auto; min-width:0; }
+.duo-study .preview-guide h1 { font-size:28px; }
+.duo-study .preview-records { margin-top:24px; }
+.duo-study .preview-guide>ol { margin:18px 0; font-size:14px; }
+.duo-study .preview-guide>p { font-size:14px; }
+.duo-study .preview-records li { flex-direction:column; gap:5px; }
+.duo-goal-thread { margin:20px 0; padding:14px; background:#eaf2ec; border-radius:12px; }
+.duo-goal-thread summary { min-height:44px; cursor:pointer; padding-block:10px; }
+.duo-goal-thread ol { margin:12px 0!important; font-size:14px; list-style:none!important; padding:0!important; }
+.duo-goal-thread li { padding:6px 0 6px 12px; border-left:2px solid #93b59e; }
+.duo-goal-thread p { font-size:13px; line-height:1.6; }
+.duo-instructions summary { cursor:pointer; min-height:44px; padding:12px 0; font-size:14px; }
+.duo-instructions p,.duo-instructions ol { font-size:13px; line-height:1.6; }
+.duo-compact-tabs { display:none; max-width:390px; margin:0 auto 12px; }
+.duo-study[data-posture=pocket] .preview-layout { max-width:390px; height:690px; }
+.duo-study[data-posture=pocket] .duo-compact-tabs { display:flex; }
+.duo-study[data-posture=pocket][data-pane=chat] .preview-guide,.duo-study[data-posture=pocket][data-pane=plan] .preview-panel { display:none; }
+.duo-study[data-posture=pocket] .preview-panel { border:0; }
+.duo-study[data-posture=stand] .preview-layout { flex-direction:column; max-width:760px; height:850px; }
+.duo-study[data-posture=stand] .preview-guide { flex:0 1 42%; min-height:170px; }
+.duo-study[data-posture=stand] .preview-panel { flex:1 1 58%; min-height:0; width:100%; border:0; border-top:10px solid #d6e0d8; }
+.duo-study .canvas-strip.is-panel { padding-bottom:max(16px,env(safe-area-inset-bottom)); }
+@media(max-width:767px) {
+ .duo-study { padding:36px 12px 12px; }
+ .duo-study-header { flex-direction:column; align-items:flex-start; }
+ .duo-study-header h1 { font-size:25px; }
+ .duo-study .preview-layout { height:72dvh; min-height:420px; }
+ .duo-study .duo-compact-tabs { display:flex; }
+ .duo-study[data-pane=plan] .preview-layout .preview-guide { display:block!important; }
+ .duo-study[data-pane=plan] .preview-panel { display:none; }
+ .duo-study[data-pane=chat] .preview-guide { display:none; }
+ .duo-study .preview-panel { border:0; }
+}

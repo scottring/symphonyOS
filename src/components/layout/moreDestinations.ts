@@ -16,6 +16,7 @@ export const MORE_GROUPS: [string, MoreDestination[]][] = [
     { label: 'House', route: '/home' },
   ]],
   ['Reference', [
+    { label: 'Getting started', route: '/getting-started' },
     { label: 'Discussions', route: '/discussions' },
     { label: 'Contacts', route: '/contacts' },
     { label: 'Documents', route: '/documents' },

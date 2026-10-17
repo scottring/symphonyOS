@@ -34,7 +34,7 @@ function Harness({ initial, after, writers, onReady, retryTurn }: {
 }
 
 describe('CanvasActivityProvider', () => {
-  it('reports a writing turn as saved only after the refetched rows show it, and undoes a creation', async () => {
+  it('reports refetched changes without an unsafe snapshot-based Undo', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const deleteTask = vi.fn().mockResolvedValue(undefined)
     let api!: CanvasActivity
@@ -46,10 +46,10 @@ describe('CanvasActivityProvider', () => {
     expect(screen.getByTestId('state').textContent).toMatch(/^saving\|Adding a task/)
     act(() => api.turnEnded({ didWrite: true, error: null, text: 'Done.' }))
     await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
-    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('saved|Added “Call the plumber”|undo|'))
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('saved|Added “Call the plumber”||'))
     expect(api.isArrived('n1')).toBe(true)
     await act(async () => { await api.undo() })
-    expect(deleteTask).toHaveBeenCalledWith('n1')
+    expect(deleteTask).not.toHaveBeenCalled()
     vi.useRealTimers()
   })
 
@@ -75,7 +75,7 @@ describe('CanvasActivityProvider', () => {
     act(() => api.toolResult({ name: 'symphony_create_plan_item', ok: false, error: 'timeout' }))
     act(() => api.turnEnded({ didWrite: true, error: null, text: '' }))
     await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
-    await waitFor(() => expect(screen.getByTestId('state').textContent).toMatch(/^partial\|Added “Tour the Y”\. Some of it didn't save\.\|undo\|retry$/))
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toMatch(/^partial\|Added “Tour the Y”\. Some of it didn't save\.\|\|retry$/))
     vi.useRealTimers()
   })
 
@@ -117,7 +117,7 @@ describe('CanvasActivityProvider', () => {
 })
 
 describe('CanvasActivityProvider — writes the canvas does not hold', () => {
-  it('sees a routine created by a turn and offers Undo', async () => {
+  it('sees a routine created by a turn without attributing the snapshot difference to Undo', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let api!: CanvasActivity
     const deleteRoutine = vi.fn().mockResolvedValue(true)
@@ -138,9 +138,9 @@ describe('CanvasActivityProvider — writes the canvas does not hold', () => {
     act(() => api.toolUsed('symphony_create_routine'))
     act(() => api.turnEnded({ didWrite: true, error: null, text: 'Done.' }))
     await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
-    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('saved|Added “Canvas test: bedtime”|undo|'))
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('saved|Added “Canvas test: bedtime”||'))
     await act(async () => { await api.undo() })
-    expect(deleteRoutine).toHaveBeenCalledWith('r1')
+    expect(deleteRoutine).not.toHaveBeenCalled()
     vi.useRealTimers()
   })
 
@@ -217,7 +217,10 @@ describe('change sets', () => {
     const { activity } = mountActivity({ applyChanges })
     act(() => activity().setChangeSet(set('s1')))
     await act(async () => { await activity().approveChangeSet() })
-    expect(activity().changeSet).toMatchObject({ state: 'failed', message: expect.stringMatching(/some of it stayed saved/) })
+    expect(activity().changeSet).toMatchObject({ state: 'partial', message: expect.stringMatching(/some of it stayed saved/) })
+    await act(async () => { await activity().approveChangeSet() })
+    expect(applyChanges).toHaveBeenCalledTimes(1)
+    expect(activity().receipt).toMatchObject({ state: 'partial', summary: expect.stringMatching(/some of it stayed saved/) })
   })
 
   it('Undo is gone once the receipt is dismissed', async () => {
@@ -375,4 +378,20 @@ describe('a waiting card survives a reload (plan §4)', () => {
     sessionStorage.setItem('symphony.pendingCard.user-3', '{"key":"x"}')
     expect(readPendingCard('user-3')).toBeNull()
   })
+})
+
+
+it('keeps the last saved Undo after a conversational question, but invalidates it on a new write',async()=>{
+ let api!:CanvasActivity
+ const undo=vi.fn(async()=>true)
+ render(<Harness initial={[]} after={[]} writers={{}} onReady={a=>{api=a}} />)
+ await act(async()=>{await api.run('Saved a task',async()=>true,{undo})})
+ act(()=>{api.turnStarted('What did you save?',false);api.turnEnded({didWrite:false,error:null,text:'The task.'})})
+ expect(api.receipt?.undoable).toBe(true)
+ await act(async()=>{expect(await api.undo()).toBe('undone')})
+ expect(undo).toHaveBeenCalledTimes(1)
+ await act(async()=>{await api.run('Saved another task',async()=>true,{undo})})
+ act(()=>{api.turnStarted('Make a different change',false);api.toolUsed('symphony_create_task')})
+ await act(async()=>{expect(await api.undo()).toBe('none')})
+ expect(undo).toHaveBeenCalledTimes(1)
 })

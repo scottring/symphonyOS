@@ -2,9 +2,9 @@
 //
 // Week (docs/superpowers/specs/2026-10-04-planning-model-design.md). The page
 // is the week's canvas (WeekViewV2) under the plan's status. Planning the week
-// is a conversation, started from the docked bar's "Plan the rest of my week";
-// the eight-step session this file once ran is retired (2026-10-14). Where no
-// bar exists (phones) the page offers the same walk in place (`walk`).
+// is a conversation, started from "Help me plan the rest of my week";
+// the eight-step session this file once ran is retired (2026-10-14).
+// The page offers that same entry on every screen size (`walk`).
 //
 // It is chrome AROUND the existing week: the canvas, drag and drop and
 // add-to-day are WeekViewV2's, unchanged.
@@ -21,6 +21,7 @@ import { PlanSavedLine, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, typ
 import { readCadenceConfig, localYmd } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { writePlanView } from '@/lib/planning/v2/planV2'
+import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 
 const DAY = 86_400_000
 
@@ -31,7 +32,7 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk }: {
   tools?: ReactNode
   /** The week at rest: WeekViewV2's canvas. */
   canvas?: ReactNode | (() => ReactNode)
-  /** Phones have no conversation bar: the page's own entry to the same walk. */
+  /** The page's entry to the same conversation on every screen size. */
   walk?: { label: string; onStart: () => void }
 }) {
   const navigate = useNavigate()
@@ -40,15 +41,30 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk }: {
   const { members } = useFamilyMembers()
   const session = usePlanningSession('weekly', weekToken(weekStart))
   const [justSaved, setJustSaved] = useState<null | { detail: string }>(null)
+  const [confirming, setConfirming] = useState(false)
+  const { changeSet, receipt } = useCanvasActivity()
+  const working = receipt?.state === 'working' || receipt?.state === 'saving'
+  const unresolved = !!changeSet || receipt?.state === 'partial' || receipt?.state === 'unverified'
+  const confirmationBlocked = working || unresolved || confirming
+  const reviewHint = working ? 'Finish the current conversation or save before confirming the week.'
+    : changeSet ? 'Save or discard the draft in Chat before confirming this week.'
+    : unresolved ? 'Check the last change in Chat before confirming this week.'
+    : receipt?.state === 'saved' ? 'Your changes are saved. Review the week, then choose “I’m happy with this week.”'
+    : 'Review your activities and decide what needs attention this week.'
   const toToday = () => navigate(new URLSearchParams(location.search).get('view') === 'alongside' ? '/today?view=alongside' : '/today')
 
   // Marking planned is one tap; the conversation does the planning.
   const markPlanned = async () => {
-    if (!(await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '', focus: session.mine?.focus ?? session.saved?.notes?.focus }))) {
+    if (confirmationBlocked) return
+    setConfirming(true)
+    try {
+      if (!(await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '', focus: session.mine?.focus ?? session.saved?.notes?.focus }))) throw new Error('Not confirmed')
+      setJustSaved({ detail: 'You can still adjust your activities as things change.' })
+    } catch {
       showToast('Couldn’t save the plan — try again.', 'error', 5000)
-      return
+    } finally {
+      setConfirming(false)
     }
-    setJustSaved({ detail: '' })
   }
 
   const agreedBy = session.saved
@@ -58,6 +74,10 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk }: {
   const endsToday = isCurrent && localYmd(new Date(weekStart.getTime() + 6 * DAY)) === localYmd(new Date())
   const toolbar: PlanToolbarProps = {
     period: `week ${weekNo}`, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
+    planningAction: walk && { label: walk.label, onClick: walk.onStart },
+    markLabel: 'I’m happy with this week',
+    markDisabled: confirmationBlocked,
+    unplannedHint: reviewHint,
     reviewDue: !session.saved, onPlan: () => undefined, onRetry: session.reload,
     // On its last day the week is not marked planned; the line under the
     // masthead points at planning the next one.
@@ -95,12 +115,7 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk }: {
         // The week's last day: nothing left in it to plan, so say so and
         // point at planning the next one by talking.
         <div className="pv2-saved pv2-endsweek" role="note">
-          <span className="pv2-saved-text"><b>Week {weekNo} ends today.</b> Plan the week ahead while it’s fresh{walk ? <>: tap “{walk.label}” below.</> : <>: talk it through in the bar below.</>}</span>
-        </div>
-      )}
-      {walk && (
-        <div className="pv2-walk">
-          <button type="button" className="pv2-btn" data-explain="plan-walk" data-explain-label={walk.label} onClick={walk.onStart}>{walk.label}</button>
+          <span className="pv2-saved-text"><b>Week {weekNo} ends today.</b> {walk ? <>Use “{walk.label}” to look ahead.</> : <>Open Chat to talk through the week ahead.</>}</span>
         </div>
       )}
       <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>

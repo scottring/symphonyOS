@@ -1,0 +1,1171 @@
+{
+  "source": "docs/planning/2026-10-14-conversation-coverage-register.md",
+  "baseline": "a23b63dc",
+  "entries": [
+    {
+      "id": "T01",
+      "kind": "transaction",
+      "group": "Capture and Inbox",
+      "intent": "Capture one task",
+      "catalogEvidence": "canvasEvents (stableRowId), CanvasActivityContext receipts, ShellLayout typed-goes-to-agent",
+      "catalogStatus": "IT (contract) / IU (real model)",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/canvasEvents.test.ts",
+        "src/contexts/CanvasActivityContext.test.tsx"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "single-capture"
+      ]
+    },
+    {
+      "id": "T02",
+      "kind": "transaction",
+      "group": "Capture and Inbox",
+      "intent": "Capture several tasks in one breath",
+      "catalogEvidence": "bench J1 contract and live layers (5/5 live runs on the deployed agent, text only), changeSet.test, applyChangeSet.test",
+      "catalogStatus": "IT (contract, live text) / IU (spoken)",
+      "scenarios": [
+        "j1-plumber-week"
+      ],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "scripts/conversation-bench/contract.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "correct-before-approval"
+      ]
+    },
+    {
+      "id": "T03",
+      "kind": "transaction",
+      "group": "Capture and Inbox",
+      "intent": "Correct in the same breath",
+      "catalogEvidence": "bench J1 step 2 (contract and live: 5/5 after the correction-re-sends-the-card rule)",
+      "catalogStatus": "IT (contract, live text)",
+      "scenarios": [
+        "j1-plumber-week"
+      ],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "scripts/conversation-bench/contract.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "correct-before-approval"
+      ]
+    },
+    {
+      "id": "T04",
+      "kind": "transaction",
+      "group": "Capture and Inbox",
+      "intent": "Triage Inbox",
+      "catalogEvidence": "prompt rule only (index.ts \"Doing versus suggesting\")",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "set-aside"
+      ]
+    },
+    {
+      "id": "T05",
+      "kind": "transaction",
+      "group": "Capture and Inbox",
+      "intent": "Paper / photo / document capture",
+      "catalogEvidence": "none for the agent path (plan-from-paper has its own)",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/components/capture/PaperPlanFlow.test.tsx",
+        "src/components/capture/PageReviewSheet.test.tsx"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T06",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "Move one task",
+      "catalogEvidence": "CanvasActivityContext (updated \u2192 undo)",
+      "catalogStatus": "IT / IU",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts",
+        "src/contexts/CanvasActivityContext.test.tsx"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "move-one"
+      ]
+    },
+    {
+      "id": "T07",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "Move several",
+      "catalogEvidence": "changeSet, applyChangeSet",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "move-several",
+        "assign"
+      ]
+    },
+    {
+      "id": "T08",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "\"That one\" with two matches",
+      "catalogEvidence": "**P**",
+      "catalogStatus": "P",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/changeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T09",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "Complete a task",
+      "catalogEvidence": "receipts",
+      "catalogStatus": "IT / IU",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "complete"
+      ]
+    },
+    {
+      "id": "T10",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "Set aside / drop",
+      "catalogEvidence": "agent has no delete tool (this branch)",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "set-aside"
+      ]
+    },
+    {
+      "id": "T11",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "Plan the day",
+      "catalogEvidence": "prompt + readWeek.test",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/planning.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "move-several"
+      ]
+    },
+    {
+      "id": "T12",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "Review the day",
+      "catalogEvidence": "prompt",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/planning.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T13",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "Plan the week",
+      "catalogEvidence": "sessionScripts.test, readWeek.test, changeSet (week_start)",
+      "catalogStatus": "IU (real-model spine unmeasured)",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/readWeek.test.ts",
+        "supabase/functions/symphony-agent/planning.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "move-several"
+      ]
+    },
+    {
+      "id": "T14",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "Fit an all-day commitment around conflicts",
+      "catalogEvidence": "**P** benchmark J1",
+      "catalogStatus": "P",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/readWeek.test.ts",
+        "supabase/functions/symphony-agent/schedule.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T15",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "What's on today / this week",
+      "catalogEvidence": "readWeek.test, pointing.test",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/readWeek.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T16",
+      "kind": "transaction",
+      "group": "Today and Week",
+      "intent": "Dinner tonight / set a meal",
+      "catalogEvidence": "meals.test",
+      "catalogStatus": "IT (contract)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/meals.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T17",
+      "kind": "transaction",
+      "group": "Routines",
+      "intent": "Skip this week's occurrence",
+      "catalogEvidence": "bench R1 (contract), changeSet (routine ops), applyChangeSet",
+      "catalogStatus": "IT (contract)",
+      "scenarios": [
+        "r1-routine-this-week-vs-always"
+      ],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "scripts/conversation-bench/contract.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "skip-occurrence"
+      ]
+    },
+    {
+      "id": "T18",
+      "kind": "transaction",
+      "group": "Routines",
+      "intent": "Move / reassign one occurrence",
+      "catalogEvidence": "as above",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "move-occurrence",
+        "reassign-occurrence"
+      ]
+    },
+    {
+      "id": "T19",
+      "kind": "transaction",
+      "group": "Routines",
+      "intent": "Change from now on",
+      "catalogEvidence": "bench R1 (contract), as above",
+      "catalogStatus": "IT (contract)",
+      "scenarios": [
+        "r1-routine-this-week-vs-always"
+      ],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "scripts/conversation-bench/contract.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "change-recurring"
+      ]
+    },
+    {
+      "id": "T20",
+      "kind": "transaction",
+      "group": "Routines",
+      "intent": "Add a routine",
+      "catalogEvidence": "as above; stableRowId",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "add-routine"
+      ]
+    },
+    {
+      "id": "T21",
+      "kind": "transaction",
+      "group": "Routines",
+      "intent": "Delete a routine",
+      "catalogEvidence": "webAccess/wallMode tests assert no delete tool",
+      "catalogStatus": "U by design",
+      "scenarios": [],
+      "automation": "unsupported-boundary-test-needed",
+      "requiredLayers": [
+        "contract",
+        "live-text"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/changeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T22",
+      "kind": "transaction",
+      "group": "Goals at Month, Season and Year",
+      "intent": "Read the lists",
+      "catalogEvidence": "readPlan.test",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/readPlan.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T23",
+      "kind": "transaction",
+      "group": "Goals at Month, Season and Year",
+      "intent": "Plan a month / season / year",
+      "catalogEvidence": "bench M1 (year plan ops: carry, let go, done, add, Undo), readPlan.test, changeSet (plan ops), applyChangeSet (plan ops)",
+      "catalogStatus": "IT (contract) / IU",
+      "scenarios": [
+        "m1-plan-next-year"
+      ],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "scripts/conversation-bench/contract.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T24",
+      "kind": "transaction",
+      "group": "Goals at Month, Season and Year",
+      "intent": "Add one goal outside a session",
+      "catalogEvidence": "planSaved.test, stableRowId",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T25",
+      "kind": "transaction",
+      "group": "Goals at Month, Season and Year",
+      "intent": "Link a week task to a month goal",
+      "catalogEvidence": "planning.test",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/planning.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T26",
+      "kind": "transaction",
+      "group": "Goals at Month, Season and Year",
+      "intent": "Suggest missing goals/links",
+      "catalogEvidence": "canvasEvents (proposalItems)",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/planning.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T27",
+      "kind": "transaction",
+      "group": "Item notes, people, links, places",
+      "intent": "Add what's needed to do a task",
+      "catalogEvidence": "receipts; scopeDefaultCoverage (contact scope)",
+      "catalogStatus": "IT / IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/prep.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T28",
+      "kind": "transaction",
+      "group": "Item notes, people, links, places",
+      "intent": "Find background in notes",
+      "catalogEvidence": "experience.test",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/untrusted.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T29",
+      "kind": "transaction",
+      "group": "Lists",
+      "intent": "Add to a list",
+      "catalogEvidence": "wallMode (write allowlist), stableRowId",
+      "catalogStatus": "IT (contract)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/hooks/useListItems.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T30",
+      "kind": "transaction",
+      "group": "Lists",
+      "intent": "Check off / remove",
+      "catalogEvidence": "webAccess.test",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/hooks/useListItems.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T31",
+      "kind": "transaction",
+      "group": "Connected calendar and mail",
+      "intent": "What's on the calendar",
+      "catalogEvidence": "\u2014",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/readWeek.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T32",
+      "kind": "transaction",
+      "group": "Connected calendar and mail",
+      "intent": "Put an occasion on the calendar",
+      "catalogEvidence": "ShellLayout (typed goes to agent), handler.test (voice must call ask_symphony)",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/hooks/useSendToCalendar.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T33",
+      "kind": "transaction",
+      "group": "Connected calendar and mail",
+      "intent": "Check email",
+      "catalogEvidence": "experience.test",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/experience.test.ts",
+        "supabase/functions/_shared/gmail-tools.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T34",
+      "kind": "transaction",
+      "group": "Connected calendar and mail",
+      "intent": "Draft an email",
+      "catalogEvidence": "prompt rule; receipt wiring (this branch)",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/_shared/gmail-tools.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T35",
+      "kind": "transaction",
+      "group": "Connected calendar and mail",
+      "intent": "Connect an account",
+      "catalogEvidence": "\u2014",
+      "catalogStatus": "U (guide only)",
+      "scenarios": [],
+      "automation": "unsupported-boundary-test-needed",
+      "requiredLayers": [
+        "contract",
+        "live-text"
+      ],
+      "supportingTestFiles": [
+        "src/hooks/useGoogleCalendar.connection.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T36",
+      "kind": "transaction",
+      "group": "Help, review, device setup",
+      "intent": "\"What can I do here?\"",
+      "catalogEvidence": "showOnPage.test, pointing.test, explain.test",
+      "catalogStatus": "IT (contract) for all eight pages / IU (generated help on a real screen)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/explain/explain.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T37",
+      "kind": "transaction",
+      "group": "Help, review, device setup",
+      "intent": "Go to a page",
+      "catalogEvidence": "context.test (workspaceDestination)",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/hooks/useWorkspaceVoice.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T38",
+      "kind": "transaction",
+      "group": "Help, review, device setup",
+      "intent": "Wall: ask about the day / add to a list / note on the scratchpad",
+      "catalogEvidence": "wallMode.test, wallTalk.test, useTellSymphony.test",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/wallMode.test.ts",
+        "src/lib/wall/wallAgent.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "T39",
+      "kind": "transaction",
+      "group": "Help, review, device setup",
+      "intent": "Private assistant (work / personal)",
+      "catalogEvidence": "\u2014",
+      "catalogStatus": "**P** (not in the first beta)",
+      "scenarios": [],
+      "automation": "unsupported-boundary-test-needed",
+      "requiredLayers": [
+        "contract",
+        "live-text"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/wallMode.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X01",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "One verdict per turn (`outcome`)",
+      "catalogEvidence": "outcome.test, agentTurn.test, useWorkspaceVoice.test",
+      "catalogStatus": "IT (contract); IU (does the live voice obey it)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/outcome.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X02",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Proposed never spoken as saved",
+      "catalogEvidence": "handler.test, wallAgent.test",
+      "catalogStatus": "IU (needs recorded-audio runs)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/outcome.test.ts",
+        "src/hooks/useWorkspaceVoice.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X03",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Retry after a dropped connection does not duplicate",
+      "catalogEvidence": "canvasEvents.test (stableRowId); **P** integration case against a real database",
+      "catalogStatus": "IT (unit) / P (integration)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/canvasEvents.test.ts",
+        "scripts/conversation-bench/contract.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X04",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Approve refuses a set whose rows moved",
+      "catalogEvidence": "applyChangeSet.test",
+      "catalogStatus": "IT; **gap**: compares against the browser cache, not a fresh read",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "stale-proposal"
+      ]
+    },
+    {
+      "id": "X05",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Partial failure reported as partial",
+      "catalogEvidence": "applyChangeSet.test (unreverted rollback), CanvasActivityContext.test",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/contexts/CanvasActivityContext.test.tsx",
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "rollback",
+        "partial-rollback"
+      ]
+    },
+    {
+      "id": "X06",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Undo does not overwrite another person's later edit",
+      "catalogEvidence": "applyChangeSet.test (edited since)",
+      "catalogStatus": "IT",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/lib/canvas/applyChangeSet.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X07",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "\"This Friday\" while viewing an old week",
+      "catalogEvidence": "context.test, voice instructions",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/planning.test.ts",
+        "supabase/functions/symphony-agent/schedule.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X08",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "An item the screen left out is looked up, not denied",
+      "catalogEvidence": "\u2014",
+      "catalogStatus": "IU",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/experience.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X09",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Imported mail/notes are data, not instructions",
+      "catalogEvidence": "changeSet.test (changeCardNote)",
+      "catalogStatus": "IU; **P** injection scenario (benchmark #13)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/untrusted.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X10",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Household vocabulary (names, schools, places)",
+      "catalogEvidence": "workspace-voice handler.test",
+      "catalogStatus": "IT (contract) / IU (does it help recognition: needs recorded audio)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/hooks/useWorkspaceVoice.test.ts",
+        "scripts/conversation-bench/audio.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X11",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Durable session state across reload",
+      "catalogEvidence": "CanvasActivityContext.test (reload)",
+      "catalogStatus": "IT (card) / **P** (Undo, receipt, objective and unresolved questions)",
+      "scenarios": [],
+      "automation": "partial",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "src/contexts/CanvasActivityContext.test.tsx"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": [
+        "single-capture"
+      ]
+    },
+    {
+      "id": "X12",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Authorization not inferred from the screen",
+      "catalogEvidence": "wallMode.test (callerSurface), `scripts/test-household-displays.mjs` (8 SQL checks); integration privacy test (not run on this candidate)",
+      "catalogStatus": "IT (unit, local SQL) / P (real accounts, hosted migration)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/symphony-agent/wallMode.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    },
+    {
+      "id": "X13",
+      "kind": "shared",
+      "group": "Cross-cutting",
+      "intent": "Spending limits",
+      "catalogEvidence": "aiUsage tests, aiUsageRoutes tests; `scripts/test-ai-usage-guard.mjs` (15 checks)",
+      "catalogStatus": "IT (local) / P (hosted: migrations, prices and ceilings unapplied; orphans not deleted)",
+      "scenarios": [],
+      "automation": "needed",
+      "requiredLayers": [
+        "contract",
+        "live-text",
+        "browser",
+        "audio"
+      ],
+      "supportingTestFiles": [
+        "supabase/functions/_shared/aiUsage.test.ts",
+        "supabase/functions/_shared/aiUsageRoutes.test.ts",
+        "supabase/functions/workspace-voice/handler.test.ts"
+      ],
+      "evidenceScope": "Supporting component/contract checks; not certification of model interpretation or full transaction",
+      "browserJourneys": []
+    }
+  ],
+  "liveJourneys": [
+    {
+      "id": "live-capture-correction-approve-undo",
+      "catalog": [
+        "T01",
+        "T02",
+        "T03",
+        "X02"
+      ],
+      "runner": "scripts/conversation-bench/live-approval.mjs",
+      "scope": "deployed agent and persisted synthetic records; browser uses real applier with REST fixture writers"
+    }
+  ],
+  "continuousVoiceEvidence": {
+    "report": "reports/voice-database-webrtc-1792065573035.json",
+    "status": "passed",
+    "scope": "Selected four-turn capture/correction/spoken approval/Undo journey through production transport and action handler, deployed planner and synthetic REST persistence; no physical microphone, general member/calendar journey coverage not implied"
+  }
+}

@@ -39,3 +39,11 @@ describe('ChangeCard', () => {
     expect(screen.queryByText('This replaces the earlier list.')).toBeNull()
   })
 })
+
+it.each([['00:00', '12 a.m.'], ['12:00', '12 p.m.'], ['16:00', '4 p.m.'], ['17:30', '5:30 p.m.']])('chat makes %s unambiguous without changing the scheduled value', (time, label) => {
+  const today = new Date(2026, 9, 14, 8)
+  render(<ChangeCard chat set={pending({ ops: [{ key: 's:0', op: 'add', title: 'Shower', date: '2026-10-14', time }] })} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
+  expect(screen.getByText(`Today ${label}`)).toBeInTheDocument()
+  expect(screen.getByText('Draft · Not saved')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Save 1 change' })).toBeInTheDocument()
+})

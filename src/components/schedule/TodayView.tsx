@@ -238,7 +238,7 @@ export function TodayView({
   const [editionPreview, hideEditionPreview] = useEditionPreview()
   const navigate = useNavigate()
   const { rows: discussionRows } = useDiscussionInbox()
-  const { isConnected: calendarConnected, error: calendarError } = useGoogleCalendar()
+  const { isConnected: calendarConnected, error: calendarError, isLoading: calendarLoading, isFetching: calendarFetching } = useGoogleCalendar()
   const ctx = useScheduleActionsContext()
   // Only what THIS file still uses. The row-level handlers moved with the
   // section loop into TodaySectionList, which reads the same context itself.
@@ -579,9 +579,10 @@ export function TodayView({
     const kind = item.type === 'event' ? 'event' : item.type === 'task' ? 'task' : 'routine'
     return [{ title: item.title, start, end: item.allDay ? null : item.endTime, kind, completed: item.completed || !!item.skipped }]
   }), [data.grouped])
+  const calendarReady = calendarConnected && !calendarError && !calendarLoading && !calendarFetching && layers.size === ALL_LAYERS.size
   const sentence = useMemo(
-    () => daySentence({ items: sentenceItems, now: data.isToday ? nowForDisplay : null, emailCount: data.isToday ? emailCaptures.length : 0 }),
-    [sentenceItems, data.isToday, nowForDisplay, emailCaptures.length],
+    () => daySentence({ items: sentenceItems, now: data.isToday ? nowForDisplay : null, emailCount: data.isToday ? emailCaptures.length : 0, calendarReady }),
+    [sentenceItems, data.isToday, nowForDisplay, emailCaptures.length, calendarReady],
   )
   const statusLine = loading ? 'Loading the day.' : tasksLoadFailed ? 'Your tasks didn’t load.' : null
   const headerSentence = statusLine || sentence.day || sentence.email ? (
@@ -1382,6 +1383,7 @@ export function TodayView({
               </ul>
             )}
             <TodayDayScale
+              showOpenTime={calendarReady}
               items={shownTimedItems}
               markOf={previewOf}
               proposed={proposedTimed}
@@ -1403,7 +1405,7 @@ export function TodayView({
                     out. Otherwise say only what is shown — a hidden Personal
                     calendar under a Family filter is not a clear day. */}
                 {data.isToday
-                  ? (calendarConnected && !calendarError && layers.size === ALL_LAYERS.size
+                  ? (calendarReady
                       ? 'Nothing with a time today. Your calendar is clear.'
                       : calendarConnected
                         ? 'Nothing with a time today. No events shown for your current view.'

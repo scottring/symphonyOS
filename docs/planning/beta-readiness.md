@@ -1,5 +1,9 @@
 # Symphony beta readiness register
 
+**October 16 current production baseline:** **2026-10-16.6-baseline** is deployed at [Symphony](https://app.symphony-os.com) for normal authenticated accounts, using `symphony-agent` v75 with JWT verification. The [current guide](2026-10-16-beta-readiness-guide.md) and [release evidence](2026-10-16-baseline-production.json) record 353 passing selected tests, a real-AI ordinary-account onboarding and Save/Undo walkthrough, database readback, and final main-domain checks. Multiple-account calendar work remains separate. No new migration was applied by this baseline release. Later independent findings take precedence over historical “no known failures” language below. Full calendar consent/sync acceptance, physical-device and usability acceptance, remaining recovery gates and invitation sign-off are not certified by this deployment.
+
+**October 15 chat beta roadmap:** [Friends and family beta roadmap](2026-10-15-friends-and-family-beta-roadmap.md) consolidates the remaining release sequence, with explicit onboarding and mid-app guidance gates. Scott has deferred voice and live conversational plan previews; the narrower optional-wall scope is a recommendation awaiting his decision. Older rows below remain dated evidence, not a current all-clear.
+
 Started October 14, 2026. Source baseline: `origin/main` at `82acf4d6`, fetched that day. Working branch: `codex/beta-readiness`. This is an implementation and evidence register, not a declaration that production is ready.
 
 The product and rollout authority is the [Symphony beta and market launch plan](https://chatgpt.com/space/page_50fd3d212da08191a8cb14eb58ea70e1). It now specifies one shared family assistant and an optional private assistant per person for personal and work life. Private assistants are optional to activate; their release requires separate privacy evidence. Household billing or administration does not confer access to private conversations.

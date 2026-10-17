@@ -1,0 +1,12 @@
+{
+  "title": "Goals within goals",
+  "description": "Smaller goals support a bigger intention. Activities give those goals your attention.",
+  "rule": "The bigger goal stays in place. You choose what comes next.",
+  "rows": [
+    {"horizon":"Year","title":"A calmer home","detail":"Your bigger intention"},
+    {"horizon":"Season","title":"Make the spare room usable","detail":"One goal that supports a calmer home"},
+    {"horizon":"Month","title":"Clear the spare-room floor","detail":"A smaller goal within that focus"},
+    {"horizon":"Week","title":"Sort one box","detail":"An activity toward the monthly goal"},
+    {"horizon":"Today","title":"Sort one box · Thursday","detail":"The same activity, given a day"}
+  ]
+}

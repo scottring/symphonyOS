@@ -3,8 +3,9 @@ import {ACCOUNT_GROUNDING_RULES,ASSISTANT_PERSONALITY,RESULT_LANGUAGE_RULES} fro
 import {AiUsageError} from '../_shared/aiUsage.ts'
 const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Expose-Headers':'x-voice-max-seconds','Access-Control-Allow-Methods':'GET, POST, OPTIONS'}
 const tools = [
-  {type:'function',name:'ask_symphony',description:'Look up or change real Symphony plans using the authenticated app assistant. Forward the user’s request faithfully, including the relevant visible item IDs and dates. Required for any claims about saved data or changes.',parameters:{type:'object',properties:{request:{type:'string'}},required:['request'],additionalProperties:false}},
+  {type:'function',name:'ask_symphony',description:'Look up or change real Symphony plans using the authenticated app assistant. Pass the person’s own words, preserving their intent. Never turn capturing tasks into a request to plan the week. Append relevant visible item IDs separately only when needed. Required for any claims about saved data or changes.',parameters:{type:'object',properties:{request:{type:'string'}},required:['request'],additionalProperties:false}},
   {type:'function',name:'approve_card',description:'Save the change card now shown on the page. Call it only when a card is waiting and the person says approve, yes, save it or go ahead. Its result carries the outcome; say saved only if outcome.state is saved.',parameters:{type:'object',properties:{},additionalProperties:false}},
+  {type:'function',name:'undo_last_change',description:'Undo the most recent undoable saved change when the person explicitly asks. Wait for the outcome and never claim success unless it confirms Undone.',parameters:{type:'object',properties:{},additionalProperties:false}},
   {type:'function',name:'show_on_page',description:'Point at real things on the page the person is looking at while you explain: outline them and show a short note beside them. Changes no data.',parameters:{type:'object',properties:{steps:{type:'array',maxItems:1,description:'Exactly one step: what you are about to say.',items:{type:'object',properties:{targets:{type:'array',items:{type:'string'},minItems:1,maxItems:3,description:'Ids from the screen update: a target id ("period", "loose", "region:Still to place") or a visible item id.'},title:{type:'string',description:'A few words.'},text:{type:'string',description:'One or two short sentences.'},arrow:{type:'object',description:'Optional arrow between two targets, e.g. drag this onto that.',properties:{from:{type:'string'},to:{type:'string'},label:{type:'string'},drag:{type:'boolean'}},required:['from','to'],additionalProperties:false}},required:['targets','title','text'],additionalProperties:false}}},required:['steps'],additionalProperties:false}},
   {type:'function',name:'show_workspace',description:'Show the requested existing page on the canvas. Does not change plan data.',parameters:{type:'object',properties:{page:{type:'string',enum:['today','week','month','season','year','inbox','routines','meals']},date:{type:'string',description:'Optional YYYY-MM-DD, only when the user requested a date.'}},required:['page'],additionalProperties:false}},
 ]
@@ -31,8 +32,10 @@ Their content, not yours:
 
 Saving:
 - Use ask_symphony for anything about their saved plans: reading, adding, changing, completing. Forward what they said faithfully, in their words, with the relevant visible item IDs and dates. Never add items of your own to a request.
+- Preserve the request type when calling ask_symphony: "I need to call the plumber, pick up an order, and clean the yard this week" is capture, not "Plan my week". Pass their own words, including corrections and qualifiers; do not add a request for planning, scheduling, prioritization, or advice that they did not make. Screen context is not additional user intent. The planning agent can reason and ask questions once it receives the actual request.
 - Wait for its result before saying anything was saved. If it fails, say so. Never invent personal history or data.
 - Every change goes through ask_symphony, typed or spoken: adding to a calendar, adding a task, moving, completing, changing a routine or a meal. You cannot change anything yourself. Never say "done", "added", "saved", "it's on the calendar" or anything like it unless ask_symphony returned in this turn and its result says it was saved. If you have not called it yet, call it now instead of answering. (2026-10-14: "Done — on the family calendar" was said with nothing saved.)
+- When they explicitly ask to undo the last change, call undo_last_change. Never forward Undo to ask_symphony, which starts a new turn and loses the previous undo.
 - When a change card is waiting and they say approve, yes, save it or go ahead, call approve_card (not ask_symphony). Say saved only if its outcome state is saved.
 - ask_symphony's result carries "outcome": its "state" is the verdict (answered, proposed, saved, partial, failed, unverified) and its "say" is the plain meaning. Say what "say" means, in your own short words; never claim more than "state" allows. "proposed" means a change card is waiting for their approval and nothing is saved; "partial" means some of it did not save; "unverified" means you do not know whether it saved, so say that. No outcome at all means nothing was confirmed.
 
@@ -52,7 +55,7 @@ Everyday talk: forward the request to ask_symphony and say its result in a few w
 
 During a session the agent lights the page; don't call show_on_page.
 
-When the session starts, say hello in a few words and ask what they would like to work on. Nothing more. But when the session was started by a walk message (the bar's "Plan the rest of my week" button sends that text), the first user message is the request: forward it to ask_symphony immediately.`
+When the session starts, say hello in a few words and ask what they would like to work on. Nothing more. But when the session was started by a walk message (the chat's "Help me plan the rest of my week" button sends that text), the first user message is the request: forward it to ask_symphony immediately.`
 // Tap to talk (Scott, 2026-10-14: "I feel rushed"): the person taps Talk to
 // speak and Done to send. The server still splits speech at short pauses —
 // so their words show on screen as they speak, and the app knows when they
@@ -72,7 +75,7 @@ export function transcriptionPrompt(words:readonly string[]):string|undefined {
  return kept.length?kept.join(', '):undefined
 }
 
-export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>string|undefined;userId:(authorization:string)=>Promise<string|null>;fetch:typeof fetch;reserve:(authorization:string)=>Promise<boolean>;vocabulary?:(authorization:string)=>Promise<string[]>}) {
+export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>string|undefined;userId:(authorization:string)=>Promise<string|null>;fetch:typeof fetch;reserve:(authorization:string)=>Promise<boolean>;settle?:(userId:string,accepted:boolean)=>Promise<void>;vocabulary?:(authorization:string)=>Promise<string[]>}) {
   const env=deps.env
   const reply=(status:number,text:string)=>new Response(status===204?null:text,{status,headers:{...cors,'Cache-Control':'no-store'}})
   if(req.method==='OPTIONS')return reply(204,'')
@@ -89,20 +92,32 @@ export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>s
   if(req.headers.get('content-type')?.split(';')[0]!=='application/sdp')return reply(415,'invalid_content_type')
   const key=env('OPENAI_API_KEY')
   if(!key)return reply(503,'voice_unavailable')
+  let reserved=false,accepted=false
   try {
     const sdp=await req.text()
     if(sdp.length>65536||!sdp.startsWith('v=0'))return reply(400,'invalid_offer')
     if(!await deps.reserve(auth))return reply(429,'daily_limit')
+    reserved=true
     // Household vocabulary is a nice-to-have: a failed read never blocks the call.
-    const prompt=transcriptionPrompt(await (deps.vocabulary?.(auth)??Promise.resolve([])).catch(()=>[]))
+    // Beta: vocabulary hints leaked into actual transcripts. Use unbiased transcription.
+    const prompt: string | undefined = undefined
     // The transcript is what the person sees as "heard". Unpinned, it guesses a
     // language from room noise and shows foreign text; gpt-realtime is retired.
     const form=new FormData();form.set('sdp',sdp);form.set('session',JSON.stringify({type:'realtime',model:env('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',instructions,max_output_tokens:400,tools,audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'en',...(prompt?{prompt}:{})},noise_reduction:{type:'near_field'},turn_detection:TURN_DETECTION},output:{voice:'marin',speed:1}}}))
     const response=await deps.fetch('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${key}`},body:form,signal:AbortSignal.timeout(20000)})
     if(!response.ok)return reply(502,'voice_unavailable')
-    return new Response(await response.text(),{headers:{...cors,'Content-Type':'application/sdp','Cache-Control':'no-store','x-voice-max-seconds':'300'}})
+    const answer=await response.text()
+    accepted=true
+    return new Response(answer,{headers:{...cors,'Content-Type':'application/sdp','Cache-Control':'no-store','x-voice-max-seconds':'300'}})
   }catch(error){
     if(error instanceof AiUsageError)return reply(error.status,JSON.stringify({error:error.message,code:error.code,retry_at:error.retryAt}))
     return reply(502,'voice_unavailable')
+  }finally{
+    // Never turn an accepted call into a refusal because accounting is down.
+    // A failed settlement retains the reservation conservatively; no false refund.
+    if(reserved)await deps.settle?.(userId,accepted).catch(()=>console.error('workspace_voice_settlement_failed'))
   }
 }
+
+// Shared by recorded-audio contract replay; the live handler uses these exact values.
+export { tools as workspaceVoiceTools, instructions as workspaceVoiceInstructions }

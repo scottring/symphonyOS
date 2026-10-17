@@ -33,7 +33,7 @@ export function CalendarReconnectBanner() {
           <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
         </span>
         <p className="min-w-[160px] flex-1 text-sm text-amber-900">
-          Google Calendar disconnected — your events aren’t showing.
+          Google Calendar disconnected — your events aren’t showing, so availability is unknown.
         </p>
         <button type="button" onClick={() => void connect()}
           className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700">
@@ -50,7 +50,7 @@ export function CalendarReconnectBanner() {
           <CalendarDays className="h-4 w-4 text-neutral-500" aria-hidden="true" />
         </span>
         <p className="min-w-[160px] flex-1 text-sm text-neutral-700">
-          No calendar connected. Your events give the day its shape.
+          No calendar connected. Your tasks and routines are shown, but calendar availability is unknown.
         </p>
         <button type="button" onClick={() => void connect()}
           className="shrink-0 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-700">
@@ -67,7 +67,7 @@ export function CalendarReconnectBanner() {
           <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
         </span>
         <p className="min-w-[160px] flex-1 text-sm text-amber-900">
-          Calendar didn’t sync — {error}
+          Calendar didn’t sync — {error}. Calendar availability is unknown.
         </p>
         <button type="button" onClick={() => void fetchWeekEvents()}
           className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700">

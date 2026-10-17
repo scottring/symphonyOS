@@ -26,8 +26,8 @@ describe('docked conversation bar (approved Season board, 2026-10-10)', () => {
   })
 
   it('offers the page\'s talk as a suggestion, the mic as an icon, and no page help (2026-10-14)', () => {
-    render(<ConversationStrip docked messages={[]} walk={{ label: 'Plan the rest of my week', message: 'Plan the rest of my week.' }} onSend={vi.fn()} busy={false} voice={voice} />)
-    expect(screen.getByText(/Suggested:/)).toContainElement(screen.getByRole('button', { name: 'Plan the rest of my week' }))
+    render(<ConversationStrip docked messages={[]} walk={{ label: 'Help me plan the rest of my week', message: 'Help me plan the rest of my week.' }} onSend={vi.fn()} busy={false} voice={voice} />)
+    expect(screen.getByText(/Suggested:/)).toContainElement(screen.getByRole('button', { name: 'Help me plan the rest of my week' }))
     expect(screen.getByRole('button', { name: 'Talk with Symphony' })).not.toHaveTextContent('Talk')
     expect(screen.queryByRole('button', { name: 'What is this page?' })).not.toBeInTheDocument()
   })
@@ -73,4 +73,44 @@ describe('docked conversation bar (approved Season board, 2026-10-10)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Talk — your turn' }))
     expect(talk).toHaveBeenCalled()
   })
+})
+
+describe('conversation panel', () => {
+  it('shows the whole history and keeps voice activity outside the scrolling history', () => {
+    render(<ConversationStrip panel messages={[msg('1', 'user', 'First ask'), msg('2', 'assistant', 'First answer'), msg('3', 'user', 'Second ask')]} onSend={vi.fn()} busy={false} voice={{ ...voice, active: true, status: 'live', turn: 'listening' }} />)
+    expect(screen.getByText('First answer')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Earlier' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('voice-state').closest('.conversation-panel-scroll')).toBeNull()
+    expect(screen.getByTestId('voice-state')).toHaveAttribute('role', 'status')
+  })
+
+  it('keeps draft ownership outside the panel and sends Enter but not Shift+Enter', () => {
+    const onSend = vi.fn(), onDraftChange = vi.fn()
+    render(<ConversationStrip panel draft="Move it to Friday" onDraftChange={onDraftChange} messages={[]} onSend={onSend} busy={false} voice={voice} />)
+    const input = screen.getByLabelText('Message Symphony')
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+    expect(onSend).not.toHaveBeenCalled()
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onSend).toHaveBeenCalledWith('Move it to Friday')
+    expect(onDraftChange).toHaveBeenCalledWith('')
+  })
+
+  it('shows failures and lets a connecting conversation be ended', () => {
+    const stop = vi.fn()
+    render(<ConversationStrip panel error="Could not save" messages={[]} onSend={vi.fn()} busy={false} voice={{ ...voice, active: true, status: 'connecting', stop }} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save')
+    expect(screen.getByTestId('voice-state')).toHaveTextContent('Connecting')
+    fireEvent.click(screen.getByRole('button', { name: 'End voice conversation' }))
+    expect(stop).toHaveBeenCalledOnce()
+  })
+})
+
+
+it('keeps interrupted speech and the reason visible after voice shuts down',()=>{
+ render(<ConversationStrip panel messages={[msg('first','assistant','What needs to happen today?')]} onSend={vi.fn()} busy={false} voice={{...voice,status:'ended',heard:'Return the library books',error:'Voice reached its session limit.'}} />)
+ expect(screen.getByText('What needs to happen today?')).toBeInTheDocument()
+ expect(screen.getByText('Return the library books')).toBeInTheDocument()
+ expect(screen.getByText('Last words heard (may be incomplete)')).toBeInTheDocument()
+ expect(screen.getByRole('alert')).toHaveTextContent('Voice reached its session limit.')
+ expect(screen.getByRole('button',{name:'Talk with Symphony'})).toBeEnabled()
 })

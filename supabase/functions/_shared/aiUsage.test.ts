@@ -1,89 +1,59 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AiUsageError, guardedAiFetch, reserveAiProviderCall, modelOf, usageOf } from './aiUsage'
-
-describe('paid provider admission', () => {
-  it.each([
-    { data: null, error: null },
-    { data: { allowed: 'true' }, error: null },
-    { data: { allowed: true }, error: { message: 'database unavailable' } },
-    { data: { allowed: false, reason: 'unavailable' }, error: null },
-  ])('fails closed without a confirmed reservation: %j', async (result) => {
-    const transport = vi.fn()
-    const db = { rpc: vi.fn(async () => result) }
-    await expect(guardedAiFetch(db, 'symphony-agent', transport)('https://provider.test')).rejects.toMatchObject({ status: 503 })
-    expect(transport).not.toHaveBeenCalled()
+import { guardedAiFetch, guardedAiFetchFor, modelOf, usageOf } from './aiUsage'
+import { textBudget } from './aiBudget'
+const init = { method:'POST', body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2048,messages:[{role:'user',content:'Hello'}]}) }
+const reply = (usage:unknown={input_tokens:10,output_tokens:20},status=200)=>new Response(JSON.stringify({usage}),{status,headers:{'content-type':'application/json'}})
+function fixture(decision:unknown={allowed:true,reservation_id:'r'}) {
+  const rpc=vi.fn(async(name:string,_args:Record<string,unknown>):Promise<{data:unknown;error:unknown}>=>({data:name==='reserve_ai_budget'?decision:true,error:null}))
+  const db={rpc}, transport=vi.fn(async()=>reply())
+  return {rpc,db,transport,fetch:guardedAiFetch(db,'symphony-agent',transport,undefined,{userId:'u',db})}
+}
+describe('service-authoritative funding',()=>{
+  it.each([null,{allowed:'true'},{allowed:true},{allowed:false,reason:'unavailable'}])('fails closed without a reservation id: %j',async decision=>{
+    const f=fixture(decision);await expect(f.fetch('https://provider.test',init)).rejects.toMatchObject({status:503});expect(f.transport).not.toHaveBeenCalled()
   })
-
-  it('does not call a provider when the reservation service throws', async () => {
-    const transport = vi.fn()
-    const db = { rpc: vi.fn(async () => { throw new Error('private database detail') }) }
-    await expect(guardedAiFetch(db, 'wall-say', transport)('https://provider.test')).rejects.toThrow('usage controls are not ready')
-    expect(transport).not.toHaveBeenCalled()
+  it.each(['daily_limit','monthly_limit'])('reports %s before any paid attempt',async reason=>{
+    const f=fixture({allowed:false,reason});await expect(f.fetch('https://provider.test',init)).rejects.toMatchObject({status:429,code:`ai_${reason}`});expect(f.transport).not.toHaveBeenCalled()
   })
-
-  it.each(['daily_limit', 'monthly_limit'])('reports %s with its reset and a manual route', async (reason) => {
-    const db = { rpc: vi.fn(async () => ({ data: { allowed: false, reason, retry_at: '2026-11-01T00:00:00+00:00' }, error: null })) }
-    await expect(reserveAiProviderCall(db, 'wall-ask')).rejects.toMatchObject({
-      status: 429, code: `ai_${reason}`, retryAt: '2026-11-01T00:00:00.000Z',
-      message: expect.stringContaining('view and change your plans directly'),
-    })
+  it('reserves before the provider and settles cache-inclusive usage without consuming the reply',async()=>{
+    const f=fixture();f.transport.mockImplementation(async()=>{expect(f.rpc).toHaveBeenCalledTimes(1);return reply({input_tokens:10,output_tokens:20,cache_creation_input_tokens:30,cache_read_input_tokens:40})})
+    const r=await f.fetch('https://provider.test',init)
+    expect(f.rpc).toHaveBeenNthCalledWith(1,'reserve_ai_budget',expect.objectContaining({p_user:'u',p_model:'claude-sonnet-4-6',p_output:2048}))
+    expect(f.rpc).toHaveBeenNthCalledWith(2,'settle_ai_budget',{p_id:'r',p_user:'u',p_input:110,p_output:20})
+    expect((await r.json()).usage.output_tokens).toBe(20)
   })
-
-  it('reserves every attempt, including retries after an uncertain provider failure', async () => {
-    const sequence: string[] = []
-    const db = { rpc: vi.fn(async () => { sequence.push('reserve'); return { data: { allowed: true }, error: null } }) }
-    const transport = vi.fn(async () => { sequence.push('provider'); throw new Error('timeout after submission') })
-    const fetcher = guardedAiFetch(db, 'symphony-agent', transport)
-    await expect(fetcher('https://provider.test')).rejects.toThrow('timeout')
-    await expect(fetcher('https://provider.test')).rejects.toThrow('timeout')
-    expect(sequence).toEqual(['reserve', 'provider', 'reserve', 'provider'])
-    expect(db.rpc).toHaveBeenNthCalledWith(1, 'reserve_ai_provider_call', { p_route: 'symphony-agent' })
+  it('keeps uncertain provider attempts charged and reserves again before retry',async()=>{
+    const f=fixture();f.transport.mockRejectedValue(new Error('timeout'))
+    await expect(f.fetch('https://provider.test',init)).rejects.toThrow('timeout');await expect(f.fetch('https://provider.test',init)).rejects.toThrow('timeout')
+    expect(f.rpc.mock.calls.map(c=>c[0])).toEqual(['reserve_ai_budget','reserve_ai_budget'])
   })
-
-  it('uses the database atomic decision when callers race for the final allowance', async () => {
-    let remaining = 1
-    const db = { rpc: vi.fn(async () => ({ data: remaining-- > 0 ? { allowed: true } : { allowed: false, reason: 'daily_limit' }, error: null })) }
-    const transport = vi.fn(async () => new Response('ok'))
-    const outcomes = await Promise.allSettled(Array.from({ length: 12 }, () => guardedAiFetch(db, 'wall-say', transport)('https://provider.test')))
-    expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1)
-    expect(transport).toHaveBeenCalledTimes(1)
-    expect(outcomes.filter((o) => o.status === 'rejected').every((o) => o.reason instanceof AiUsageError)).toBe(true)
-    // The separate PostgreSQL harness proves the database's decision itself.
+  it('keeps the hold when usage is missing or settlement fails',async()=>{
+    const f=fixture();f.transport.mockResolvedValue(reply(null));await f.fetch('https://provider.test',init);expect(f.rpc).toHaveBeenCalledTimes(1)
+    f.transport.mockResolvedValue(reply());f.rpc.mockImplementation(async name=>name==='settle_ai_budget'?{data:null,error:true}:{data:{allowed:true,reservation_id:'r2'},error:null})
+    expect((await f.fetch('https://provider.test',init)).ok).toBe(true)
   })
-})
-
-describe('spend ledger (cents, not only calls)', () => {
-  it('names the model to the reservation and records the reply\'s token usage', async () => {
-    const calls: Array<[string, Record<string, unknown>]> = []
-    const db = { rpc: async (name: string, args: Record<string, unknown>) => { calls.push([name, args]); return { data: { allowed: true }, error: null } } }
-    const transport = vi.fn(async () => new Response(JSON.stringify({ model: 'claude-sonnet-4-6', usage: { input_tokens: 1200, output_tokens: 300 } }), { headers: { 'content-type': 'application/json' } }))
-    const res = await guardedAiFetch(db, 'symphony-agent', transport)('https://api.anthropic.com/v1/messages', { method: 'POST', body: JSON.stringify({ model: 'claude-sonnet-4-6' }) })
-    expect(calls[0]).toEqual(['reserve_ai_provider_call', { p_route: 'symphony-agent', p_model: 'claude-sonnet-4-6' }])
-    expect(calls[1]).toEqual(['record_ai_usage', { p_model: 'claude-sonnet-4-6', p_input: 1200, p_output: 300, p_minutes: 0, p_route: 'symphony-agent' }])
-    // The reply is still readable by the caller.
-    expect((await res.json()).usage.output_tokens).toBe(300)
+  it('settles a confirmed provider refusal at zero against its reservation',async()=>{
+    const f=fixture();f.transport.mockResolvedValue(reply(null,429));await f.fetch('https://provider.test',init)
+    expect(f.rpc).toHaveBeenLastCalledWith('settle_ai_budget',{p_id:'r',p_user:'u',p_input:0,p_output:0})
   })
-  it('OpenAI shapes and the caller\'s audio estimate are recorded too; a failed record never fails the call', async () => {
-    const calls: string[] = []
-    const db = { rpc: async (name: string) => { calls.push(name); return name === 'record_ai_usage' ? { data: null, error: { message: 'down' } } : { data: { allowed: true }, error: null } } }
-    const openai = vi.fn(async () => new Response(JSON.stringify({ model: 'gpt-4o-mini', usage: { prompt_tokens: 50, completion_tokens: 20 } }), { headers: { 'content-type': 'application/json' } }))
-    expect((await guardedAiFetch(db, 'kiosk-agent', openai)('https://api.openai.com/v1/chat/completions', { method: 'POST', body: '{"model":"gpt-4o-mini"}' })).ok).toBe(true)
-    const sdp = vi.fn(async () => new Response('v=0', { headers: { 'content-type': 'application/sdp' } }))
-    expect((await guardedAiFetch(db, 'workspace-voice', sdp, { model: 'gpt-realtime-2.1', minutes: 5 })('https://api.openai.com/v1/realtime/calls', { method: 'POST' })).ok).toBe(true)
-    expect(calls).toEqual(['reserve_ai_provider_call', 'record_ai_usage', 'reserve_ai_provider_call', 'record_ai_usage'])
+  it('workers use the same funded service path',async()=>{
+    const f=fixture();await guardedAiFetchFor(f.db,'worker-user','email-scanner',f.transport)('https://provider.test',init)
+    expect(f.rpc).toHaveBeenCalledWith('reserve_ai_budget',expect.objectContaining({p_user:'worker-user',p_route:'email-scanner'}))
   })
-  it('a refused provider handshake records no spend: the estimate is only charged on success', async () => {
-    const calls: string[] = []
-    const db = { rpc: async (name: string) => { calls.push(name); return { data: { allowed: true }, error: null } } }
-    const refused = vi.fn(async () => new Response('bad sdp', { status: 400 }))
-    expect((await guardedAiFetch(db, 'workspace-voice', refused, { model: 'gpt-realtime-2.1', minutes: 2 })('https://api.openai.com/v1/realtime/calls', { method: 'POST' })).ok).toBe(false)
-    expect(calls).toEqual(['reserve_ai_provider_call'])
+  it('refuses requests whose liability cannot be bounded',async()=>{
+    const f=fixture()
+    for(const body of [{model:'x'},{model:'x',max_tokens:3,stream:true},{model:'x',max_tokens:3,messages:[{type:'image',source:'x'}]},{model:'x',max_tokens:3,tools:[{type:'web_search_20260209'}]}])
+      await expect(f.fetch('https://provider.test',{body:JSON.stringify(body)})).rejects.toMatchObject({status:503})
+    await expect(guardedAiFetch(f.db,'workspace-voice',f.transport,{model:'gpt-realtime',minutes:2},{userId:'u',db:f.db})('https://provider.test',init)).rejects.toMatchObject({status:503})
+    expect(f.transport).not.toHaveBeenCalled()
   })
-  it('usageOf reads both vendors and ignores replies without usage', () => {
-    expect(usageOf({ model: 'm', usage: { input_tokens: 1, output_tokens: 2 } }, null)).toEqual({ model: 'm', inputTokens: 1, outputTokens: 2, minutes: 0 })
-    expect(usageOf({ usage: { prompt_tokens: 3, total_tokens: 3 } }, 'text-embedding-3-small')).toEqual({ model: 'text-embedding-3-small', inputTokens: 3, outputTokens: 0, minutes: 0 })
-    expect(usageOf({ content: [] }, 'm')).toBeNull()
-    expect(modelOf({ body: '{"model":"x"}' })).toBe('x')
-    expect(modelOf({ body: new FormData() })).toBeNull()
+  it('bounds UTF-8 input and explicit output, including zero-output embeddings',()=>{
+    expect(textBudget(init)?.input).toBeGreaterThan(init.body.length)
+    expect(textBudget({body:'{"model":"text-embedding-3-small","input":"hi"}'})?.output).toBe(0)
+    expect(textBudget({body:'{"model":"x","max_tokens":-1}'})).toBeNull()
+  })
+  it('reads both vendor usage formats',()=>{
+    expect(usageOf({usage:{prompt_tokens:3,completion_tokens:2}},'gpt-4o-mini')).toEqual({model:'gpt-4o-mini',inputTokens:3,outputTokens:2,minutes:0})
+    expect(usageOf({content:[]},'x')).toBeNull();expect(modelOf({body:'{"model":"x"}'})).toBe('x');expect(modelOf({body:new FormData()})).toBeNull()
   })
 })

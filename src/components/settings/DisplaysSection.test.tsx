@@ -12,6 +12,23 @@ beforeEach(() => {
 })
 
 describe('DisplaysSection', () => {
+  it('does not describe an unavailable list as no paired displays',async()=>{
+    mocks.list.mockRejectedValueOnce(new Error('Offline'))
+    render(<DisplaysSection/>)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not check paired displays')
+    expect(screen.queryByText('No paired displays found.')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Check paired displays'}))
+    expect(await screen.findByText('No paired displays found.')).toBeInTheDocument()
+  })
+  it('makes expired codes and network failures recoverable',async()=>{
+    mocks.create.mockRejectedValueOnce(new Error('Network')).mockResolvedValueOnce({ok:true,code:{code:'OLD123',expiresAt:new Date(Date.now()-1000)}})
+    render(<DisplaysSection/>)
+    fireEvent.click(await screen.findByRole('button',{name:'Pair a display'}))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not make a pairing code')
+    fireEvent.click(screen.getByRole('button',{name:'Pair a display'}))
+    expect(await screen.findByText(/This code expired/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Pairing code')).not.toBeInTheDocument()
+  })
   it('makes a code and shows it with its countdown', async () => {
     mocks.create.mockResolvedValue({ ok: true, code: { code: 'ABC234', expiresAt: new Date(Date.now() + 10 * 60_000) } })
     render(<DisplaysSection />)

@@ -44,7 +44,7 @@ export const PAGE_TOURS: Record<string, TourPart[]> = {
     { target: 'region:The days', title: 'The days', text: 'The picture of the week. Each day shows its events, the kids’ specials, tasks (circles) and routines (rounded squares), who carries each, and the hours with nothing scheduled. Tick a task to finish it, drag it to move it, tap it to open it. Days gone by are dimmed.' },
     { target: 'week-sentence', title: 'The week in a sentence', text: 'One plain sentence about how the week stands.' },
     { target: 'still-to-place', title: 'No day yet', text: 'What is chosen for this week but has no day. Drag one onto a day, or on a phone press + to pick its day.' },
-    { target: 'plan-walk', title: 'Plan the rest of my week', text: 'Starts planning as a conversation. On a computer the same button is in the bar at the bottom.' },
+    { target: 'plan-walk', title: 'Help me plan the rest of my week', text: 'Opens a conversation to help you organise your own activities into a plan. The invitation stays visible in the week header, even when chat is closed.' },
   ],
   today: [
     { target: 'page-title', title: 'Today', text: 'Today is for doing: what you are doing today, with what you need to do it.' },

@@ -3,7 +3,7 @@ import type { TurnOutcome } from '@/lib/turnOutcome'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { AgentApiMessage, AgentProposalItem, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
-import { runAgentTurn } from '@/lib/agentTurn'
+import { runAgentTurn, type AgentTurnResult } from '@/lib/agentTurn'
 import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 import type { ChatMessage, ChatSession } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
@@ -12,6 +12,8 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 const SESSIONS_LIMIT = 20
 
 export interface UseSymphonyAssistantOptions {
+  surface?: 'onboarding' | 'onboarding_activity'
+  resolveAction?: (text: string) => Promise<AgentTurnResult | null>
   onPlanSaved?: (saved: { id: string; level: number; date: string }) => void
   onWorkspace?: (page:string,date?:string)=>void
   workspaceContext?: WorkspaceContext
@@ -75,7 +77,7 @@ function hydrateMessages(raw: unknown, sessionId: string): ChatMessage[] {
  * chat_sessions so conversations survive reloads (history dropdown).
  */
 export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
-  const { onPlanSaved, onWorkspace, onMutate, taskContext, workspaceContext, persistKey, persistEntityId, turnObserver } = options ?? {}
+  const { surface, resolveAction, onPlanSaved, onWorkspace, onMutate, taskContext, workspaceContext, persistKey, persistEntityId, turnObserver } = options ?? {}
   // The last message sent, so a failed turn can be retried with the same turn
   // id (the server can then recognise writes it already made).
   const lastTurn = useRef<{ text: string; turnId: string; changeCard?: ChangeCardNote } | null>(null)
@@ -85,7 +87,10 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   const [error, setError] = useState<string | null>(null)
   const [toolActivity, setToolActivity] = useState<string[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [sessionsLoading, setSessionsLoading] = useState(!!persistKey)
+  const [sessionsError,setSessionsError] = useState<string|null>(null)
+  const [sessionsAttempt,setSessionsAttempt] = useState(0)
+  const reloadSessions=useCallback(()=>setSessionsAttempt(n=>n+1),[])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   // The persisted row id survives across turns without waiting for state.
   const sessionIdRef = useRef<string | null>(null)
@@ -97,6 +102,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     let cancelled = false
     ;(async () => {
       setSessionsLoading(true)
+      setSessionsError(null)
       try {
         // mode='chat' only: the item's Discuss thread is a chat_sessions row on
         // the same entity_id, and it belongs to the drawer's main pane, not to
@@ -107,9 +113,10 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
           .eq('entity_type', persistKey)
           .eq('mode', 'chat')
         if (persistEntityId) query = query.eq('entity_id', persistEntityId)
-        const { data } = await query
+        const { data,error:historyError } = await query
           .order('updated_at', { ascending: false })
           .limit(SESSIONS_LIMIT)
+        if(historyError)throw historyError
         if (cancelled || !data) return
         setSessions(data.map((row) => ({
           id: row.id,
@@ -121,12 +128,14 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
           createdAt: new Date(row.created_at),
           updatedAt: new Date(row.updated_at),
         })))
+      } catch {
+        if(!cancelled)setSessionsError('Your earlier conversation could not be loaded. Your saved activities are unchanged.')
       } finally {
         if (!cancelled) setSessionsLoading(false)
       }
     })()
     return () => { cancelled = true }
-  }, [persistKey, persistEntityId])
+  }, [persistKey, persistEntityId, sessionsAttempt])
 
   /** Insert or update the chat_sessions row for the current conversation. */
   const persistTurn = useCallback(async (finalMessages: ChatMessage[]) => {
@@ -179,12 +188,16 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   const sendTurn = useCallback(async (text: string, attachment?: ChatAttachment, opts?: { turnId?: string; retry?: boolean }): Promise<{ text: string; outcome: TurnOutcome; error: string | null } | undefined> => {
     if ((!text.trim() && !attachment) || sending.current) return
     sending.current = true
+    setLoading(true)
+    // Resolve approval/Undo before starting a planner turn: turnStarted clears
+    // the prior Undo receipt. These actions own their existing canvas receipt.
+    const localTurn = attachment ? null : await resolveAction?.(text)
     const turnId = opts?.turnId ?? crypto.randomUUID()
     const retry = !!opts?.retry
     // A retry tells the same card again: it was taken for the first try.
-    const changeCard = retry && lastTurn.current?.turnId === turnId ? lastTurn.current.changeCard : turnObserver?.changeCard?.()
+    const changeCard = localTurn ? undefined : retry && lastTurn.current?.turnId === turnId ? lastTurn.current.changeCard : turnObserver?.changeCard?.()
     lastTurn.current = { text, turnId, changeCard }
-    turnObserver?.start?.({ text: text.trim(), turnId, retry })
+    if (!localTurn) turnObserver?.start?.({ text: text.trim(), turnId, retry })
 
     // Build the content for this turn: blocks array if there's an attachment, plain string otherwise.
     const content: AgentApiMessage['content'] = attachment
@@ -232,16 +245,15 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
         }
       : undefined
 
-    const turn = await runAgentTurn(apiMessages, {
-      onText: (chunk) => {
-        setMessages((prev) => prev.map((m) =>
-          m.id === assistantId ? { ...m, content: m.content + chunk } : m))
-      },
+    let pendingCard: ChangeSet | undefined
+    let pendingProposals: AgentProposalItem[] | undefined
+    const turn = localTurn ?? await runAgentTurn(apiMessages, {
+      surface,
       onTool: (name) => { setToolActivity((prev) => [...prev, name]); turnObserver?.tool?.(name) },
       onToolResult: (result) => turnObserver?.toolResult?.(result),
-      onProposal: (items) => turnObserver?.proposal?.(items),
-      onChangeSet: (set) => turnObserver?.changeSet?.(set),
-      onPoint: (p) => turnObserver?.point?.(p),
+      onProposal: (items) => { pendingProposals = items },
+      onChangeSet: (set) => { pendingCard = set },
+      // Beta: no live page pointing while the conversation is running.
       turnId,
       onReplyFallback: (reply) => {
         setMessages((prev) => prev.map((m) =>
@@ -265,10 +277,15 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       onPlanSaved,
     })
 
+    if (!turn.error && !['failed', 'unverified'].includes(turn.outcome.state)) {
+      if (pendingCard) turnObserver?.changeSet?.(pendingCard)
+      if (pendingProposals) turnObserver?.proposal?.(pendingProposals)
+    }
+    setMessages(prev => prev.map(m => m.id === assistantId ? {...m, content:turn.text, sources:turn.sources} : m))
     const assistantSources: AgentSourceNote[] | undefined = turn.sources
 
     if (turn.didWrite) onMutate?.()
-    turnObserver?.end?.({ turnId, didWrite: turn.didWrite, error: turn.error, text: turn.text, ...(turn.requestId ? { requestId: turn.requestId } : {}) })
+    if (!localTurn) turnObserver?.end?.({ turnId, didWrite: turn.didWrite, error: turn.error, text: turn.text, ...(turn.requestId ? { requestId: turn.requestId } : {}) })
     await persistTurn([
       ...messages,
       userMsg,
@@ -276,8 +293,8 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     ])
     setLoading(false)
     sending.current = false
-    return { text: turn.error ? `The request failed: ${turn.error}. ${turn.text}` : turn.text, outcome: turn.outcome, error: turn.error }
-  }, [onPlanSaved, onWorkspace, workspaceContext, loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn, turnObserver])
+    return { text: turn.text, outcome: turn.outcome, error: turn.error }
+  }, [surface, resolveAction, onPlanSaved, onWorkspace, workspaceContext, messages, onMutate, taskContext, getCurrentUserMember, persistTurn, turnObserver])
 
   const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment, opts?: { turnId?: string; retry?: boolean }) => (await sendTurn(text, attachment, opts))?.text, [sendTurn])
 
@@ -320,6 +337,6 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
 
   return {
     messages, loading, error, toolActivity, sendMessage, sendTurn, retryLast, resetSession,
-    sessions, sessionsLoading, activeSessionId, loadSession, deleteSession,
+    sessions, sessionsLoading, sessionsError, reloadSessions, activeSessionId, loadSession, deleteSession,
   }
 }

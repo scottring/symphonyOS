@@ -16,7 +16,7 @@ import { FirstRunSetup } from './FirstRunSetup'
 const user = { id: 'u1', email: 'jess.rivera@example.com', user_metadata: {} } as unknown as User
 
 beforeEach(() => {
-  h.save.mockClear(); h.skip.mockClear(); h.geocode.mockReset()
+  h.save.mockClear(); h.skip.mockClear(); h.geocode.mockReset(); localStorage.clear()
 })
 
 describe('FirstRunSetup', () => {
@@ -32,6 +32,8 @@ describe('FirstRunSetup', () => {
     await u.click(screen.getByText('Add someone'))
     await u.type(screen.getByLabelText('Person 2 name'), 'Liam')
     expect(screen.getByLabelText('Person 2 role')).toHaveValue('child')
+    await u.click(screen.getByRole('radio',{name:'Saturday'}))
+    expect(screen.getByText(/Weeks run Saturday–Friday/)).toBeInTheDocument()
 
     await u.type(screen.getByLabelText('Where is home?'), '21211')
     await u.tab()
@@ -45,6 +47,7 @@ describe('FirstRunSetup', () => {
       yourName: 'Jess',
       others: [{ name: 'Sam', role: 'parent' }, { name: 'Liam', role: 'child' }],
       home: { lat: 39.29, lng: -76.61, label: 'Baltimore, Maryland' },
+      weekStartsOn: 6,
     })
   })
 
@@ -61,9 +64,20 @@ describe('FirstRunSetup', () => {
     h.save.mockRejectedValueOnce(new Error('boom'))
     const onDone = vi.fn()
     const { user: u } = render(<FirstRunSetup user={user} onDone={onDone} />)
+    await u.click(screen.getByRole('radio',{name:'Saturday'}))
     await u.click(screen.getByRole('button', { name: 'Set up my household' }))
     expect(await screen.findByText('boom')).toBeInTheDocument()
     expect(onDone).not.toHaveBeenCalled()
+    expect(screen.getByRole('radio',{name:'Saturday'})).toBeChecked()
+  })
+
+  it('restores the selected week start after returning to unfinished setup',async()=>{
+    const first=render(<FirstRunSetup user={user} onDone={vi.fn()}/>)
+    await first.user.click(screen.getByRole('radio',{name:'Saturday'}))
+    first.unmount()
+    render(<FirstRunSetup user={user} onDone={vi.fn()}/>)
+    expect(screen.getByRole('radio',{name:'Saturday'})).toBeChecked()
+    expect(h.save).not.toHaveBeenCalled()
   })
 
   it('skip still ensures a household, then continues', async () => {

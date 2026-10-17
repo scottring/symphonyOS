@@ -285,6 +285,15 @@ describe('applyChangeSet: done, merge and routine ops (stage 3)', () => {
     await applyOk(one({ key: 'k:1', op: 'routine_add', title: 'Someday chore' }), d)
     expect(d.addRoutine).toHaveBeenLastCalledWith(expect.objectContaining({ recurrence_pattern: { type: 'weekly', days: [], interval: 1 } }))
   })
+  it('keeps a hidden new routine and changes display without resting an existing routine; Undo restores it', async () => {
+    const d=deps({routines:[routine('r1',{show_on_timeline:true})]})
+    await applyOk(one({key:'new',op:'routine_add',title:'Vitamins',days:['mon'],showOnTimeline:false}),d)
+    expect(d.addRoutine).toHaveBeenCalledWith(expect.objectContaining({show_on_timeline:false}))
+    const result=await applyOk(one({key:'edit',op:'routine_change',routineId:'r1',title:'Walk',seen,showOnTimeline:false}),d)
+    expect(d.updateRoutine).toHaveBeenCalledWith('r1',{show_on_timeline:false})
+    await result.undo()
+    expect(d.updateRoutine).toHaveBeenLastCalledWith('r1',{show_on_timeline:true})
+  })
 
   it('refuses the whole set when a routine changed since Symphony read it', async () => {
     const d = deps({ routines: [routine('r1', { updated_at: new Date(Date.parse(seen) + 60_000).toISOString() })] })
