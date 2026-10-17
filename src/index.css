@@ -4288,23 +4288,21 @@ button.domain-switcher-trigger[data-filtered="true"] { color: var(--color-primar
 .page-help:hover { border-color: var(--color-primary-500); color: var(--color-primary-700); }
 .page-help:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 
-/* A page's short guide, under its title (LearnVideoChip.tsx). Quiet: it
-   goes away once watched or hidden. */
-.learn-cue { display: inline-flex; align-items: center; gap: 2px; margin-top: 8px; max-width: 100%; }
-.learn-cue-play {
-  display: inline-flex; align-items: center; gap: 6px; min-width: 0; min-height: 32px; padding: 4px 10px;
+/* A page's short guide: a small play button beside its "?" (LearnVideoChip.tsx).
+   Quiet, the same size as the "?"; it goes away once watched. */
+.learn-cue {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 6px; vertical-align: middle;
   border: 1px solid var(--color-neutral-300); border-radius: 9999px; background: var(--color-bg-elevated);
-  font-family: var(--font-family-sans); font-size: 13px; line-height: 1.3; text-align: left; color: var(--color-neutral-700); cursor: pointer;
+  color: var(--color-neutral-600); cursor: pointer;
 }
-.learn-cue-play svg { flex-shrink: 0; }
-.learn-cue-play:hover { border-color: var(--color-primary-500); color: var(--color-primary-700); }
-.learn-cue-time { flex-shrink: 0; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+.learn-cue svg { margin-left: 1px; }
+.learn-cue:hover { border-color: var(--color-primary-500); color: var(--color-primary-700); }
+.learn-cue:focus-visible, .learn-cue-dismiss:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .learn-cue-dismiss {
   display: inline-grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 9999px;
   color: var(--color-neutral-500); cursor: pointer;
 }
 .learn-cue-dismiss:hover { background: var(--color-neutral-100); color: var(--color-neutral-700); }
-.learn-cue-play:focus-visible, .learn-cue-dismiss:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .learn-dialog {
   position: fixed; left: 50%; top: 50%; z-index: 70; transform: translate(-50%, -50%);
   width: calc(100% - 32px); max-width: 720px; max-height: 90vh; overflow-y: auto;

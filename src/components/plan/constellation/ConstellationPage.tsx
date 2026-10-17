@@ -27,6 +27,7 @@
 // saved / didn't save, with Undo when the previous fields can be restored.
 
 import { PageHelpButton } from '@/components/explain/PageHelp'
+import { LearnVideoChip } from '@/components/learn/LearnVideoChip'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
@@ -485,6 +486,7 @@ function Inner() {
         <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
         <span className="plan-period-range">{periodRange(bounds.start, bounds.end)}</span>
         <PageHelpButton onHelp={() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true })} />
+        <LearnVideoChip />
         {!current && <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>Back to this {PERIODS[level]}</button>}
       </div>
       {/* The review says where the period stands in its own words, and is

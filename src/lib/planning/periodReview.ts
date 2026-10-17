@@ -32,6 +32,22 @@ export function taskReviewState(
   return 'open'
 }
 
+const monthDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+/** A week named by its dates, never its number (Scott, 2026-10-17: "not
+ *  clear which week"): "this week", "the week of Oct 10". */
+export function weekPhrase(start: Date, today: Date = new Date()): string {
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7)
+  return today >= start && today < end ? 'this week' : `the week of ${monthDay(start)}`
+}
+
+/** When a week's line falls: "Sat, Oct 17 · 10:30 AM", "Tue, Oct 20", or "No day yet". */
+export function dayNote(at: Date | undefined, timed = false): string {
+  if (!at) return 'No day yet'
+  const day = at.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  return timed ? `${day} · ${at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : day
+}
+
 /** A line moved on from this period: where to, when the record says. Null
  *  while it is still this period's (open or done here). */
 export function movedOn(
