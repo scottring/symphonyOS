@@ -5,7 +5,8 @@ import { DesktopNavigation } from './DesktopNavigation'
 
 describe('DesktopNavigation — one bar on every page (2026-09-29)', () => {
   // Scott, 2026-10-03: the menu immediately left of the rail, in the centre.
-  it('the menu just before the rail; Discussions and Inbox (counts, no words), search and the account at the right — no Add', () => {
+  // Scott, 2026-10-17: Inbox moves to the rail's left, just before Today.
+  it('the menu, then Inbox, just before the rail; Discussions, search and the account at the right — no Add', () => {
     render(<MemoryRouter initialEntries={['/week']}>
       <DesktopNavigation inboxCount={3} discussionsUnread={1} onSearch={vi.fn()} onSignOut={vi.fn()} paused={false} controlsRef={() => {}} centerRef={() => {}} />
     </MemoryRouter>)
@@ -14,12 +15,13 @@ describe('DesktopNavigation — one bar on every page (2026-09-29)', () => {
     expect(mid).toContainElement(screen.getByRole('button', { name: 'More' }))
     expect(mid.lastElementChild?.className).toBe('page-navigation-center')
     expect(nav.querySelector('.page-navigation-left')).not.toContainElement(screen.getByRole('button', { name: 'More' }))
-    const right = nav.querySelector('.page-navigation-utilities') as HTMLElement
-    const inbox = within(right).getByRole('link', { name: 'Inbox, 3 items' })
+    const inbox = within(mid).getByRole('link', { name: 'Inbox, 3 items' })
     expect(inbox.textContent).toBe('3')
+    expect(inbox.nextElementSibling?.className).toBe('page-navigation-center')
+    const right = nav.querySelector('.page-navigation-utilities') as HTMLElement
     const order = [...right.querySelectorAll('a, button')].map((el) => el.getAttribute('aria-label') ?? el.textContent)
-    expect(order).toEqual(['Discussions, 1 waiting on you', 'Inbox, 3 items', 'Search', 'Account'])
-    // Scott, 2026-10-14: nowhere showed discussions waiting; now beside Inbox.
+    expect(order).toEqual(['Discussions, 1 waiting on you', 'Search', 'Account'])
+    // Scott, 2026-10-14: nowhere showed discussions waiting.
     const talk = within(right).getByRole('link', { name: 'Discussions, 1 waiting on you' })
     expect(talk.getAttribute('href')).toMatch(/^\/discussions\b/)
     expect(talk.textContent).toBe('1')

@@ -61,7 +61,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     {/* No "Planner" and no "Routines" here (Scott, 2026-09-28): the horizon
         rail beneath is the main navigation, and Routines lives under More.
         One bar on every page (2026-09-29): the menu at the left; at the right
-        Inbox, search and you — page controls live in the page heading. No Add
+        Discussions, search and you — page controls live in the page heading. No Add
         button (Scott, 2026-09-29): the round + and ⌘K already add. */}
     <div className="page-navigation-left">
     {/* The app's mark anchors the bar's corner (Scott, 2026-10-02); it goes
@@ -95,21 +95,23 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
       </div>
     </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)),
       { ariaLabel: 'More', chevron: false, className: 'is-hamburger' })}
+    {/* Inbox opens the rail, just before Today (Scott, 2026-10-17): the
+        captures not yet planned come before the smallest horizon. */}
+    <NavLink to={connectedDestination('/inbox', search)} className="page-navigation-icon" title="Inbox"
+      aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}>
+      <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}
+    </NavLink>
     {centerRef && <div ref={centerRef} className="page-navigation-center" />}
     </div>
     <div className="page-navigation-utilities">
       {auxiliaryControls}
       <div ref={controlsRef} className="page-navigation-page-controls" />
-      {/* Discussions beside Inbox, counting the ones waiting on you (Scott,
-          2026-10-14: "there's no place … you're notified of new or ongoing
+      {/* Discussions, counting the ones waiting on you (Scott, 2026-10-14:
+          "there's no place … you're notified of new or ongoing
           discussions"). Was a count on the menu. */}
       <NavLink to={connectedDestination('/discussions', search)} className="page-navigation-icon" title="Discussions"
         aria-label={`Discussions${discussionsUnread ? `, ${discussionsUnread} waiting on you` : ''}`}>
         <MessageSquare size={17} aria-hidden="true" />{discussionsUnread > 0 && <span className="navigation-count is-waiting">{discussionsUnread}</span>}
-      </NavLink>
-      <NavLink to={connectedDestination('/inbox', search)} className="page-navigation-icon" title="Inbox"
-        aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}>
-        <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}
       </NavLink>
       <button onClick={onSearch} aria-label="Search" title="Search" className="page-navigation-icon"><Search size={17} aria-hidden="true" /></button>
       {menu('account', <><UserRound size={17} aria-hidden="true" /><span className="sr-only">Account</span></>, <>
