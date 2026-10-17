@@ -11,12 +11,8 @@ import { describe, expect, it } from 'vitest'
 import { changeSetFromInput, resolveRefs } from '../../supabase/functions/symphony-agent/changeSet.ts'
 import { summarizeTurn, type TurnWrite } from '../../supabase/functions/symphony-agent/outcome.ts'
 import { CANVAS_WRITE_TOOLS, IDEMPOTENT_CREATES, stableRowId } from '../../supabase/functions/symphony-agent/canvasEvents.ts'
-import { applyChangeSet, plannedWeekStart, type ApplyDeps } from '@/lib/canvas/applyChangeSet'
+import { applyChangeSet, plannedWeekStart } from '@/lib/canvas/applyChangeSet'
 import type { ChangeSet } from '@/lib/canvas/changeCard'
-import type { Task } from '@/types/task'
-import type { Routine } from '@/types/actionable'
-import type { Goal } from '@/types/goal'
-import { DEFAULT_SEASONS } from '../../supabase/functions/symphony-agent/readPlan.ts'
 
 interface Step {
   say?: string

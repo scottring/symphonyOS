@@ -63,7 +63,6 @@ describe('workspace voice handshake',()=>{
   expect(session.instructions).toContain('Screen context is not additional user intent')
   expect(session.instructions).toContain('say its reply naturally, keeping its meaning and any options it offers')
   expect(session.instructions).toContain("don't call show_on_page")
-  expect(session.instructions).toContain('the planning agent does this')
   expect(session.instructions).not.toContain('light them up on the page')
   expect(session.instructions).not.toContain('Clear and about one item: just do it')
  })

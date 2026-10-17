@@ -11,7 +11,9 @@ let handler: Handler
 const values: Record<string, string> = {
   SUPABASE_URL: 'https://example.invalid', SUPABASE_ANON_KEY: 'public-test-key',
   ANTHROPIC_API_KEY: 'test-only',
-  // Deliberately no service-role key. Interactive routes must not need it.
+  // The service-role key funds the AI budget ledger only, over its own fetch;
+  // the person's data is still read through the caller's client alone.
+  SUPABASE_SERVICE_ROLE_KEY: 'service-test-key',
 }
 
 const bundle = {
@@ -28,9 +30,11 @@ beforeEach(() => {
     serve: (next: Handler) => { handler = next },
   })
   assembleContext.mockResolvedValue(bundle)
-  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
-    content: [{ type: 'text', text: '{"suggestions":["the bank to reply"]}' }], stop_reason: 'end_turn',
-  })))))
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(
+    String(url).includes('/rest/v1/rpc/')
+      ? { allowed: true, reservation_id: 'test-reservation' }
+      : { content: [{ type: 'text', text: '{"suggestions":["the bank to reply"]}' }], stop_reason: 'end_turn' },
+  )))))
 })
 afterEach(() => vi.unstubAllGlobals())
 

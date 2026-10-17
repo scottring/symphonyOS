@@ -153,7 +153,7 @@ describe('spoken Undo transaction',()=>{
 
 
 it('sends final speech directly to the shared conversation and renders its exact reply',async()=>{
- const ask=vi.fn(async(text:string)=>({text:'Which weekend day works?',outcome:{state:'answered' as const,say:'Which weekend day works?',writes:[]}}))
+ const ask=vi.fn(async(_text:string)=>({text:'Which weekend day works?',outcome:{state:'answered' as const,say:'Which weekend day works?',writes:[]}}))
  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a'))
  await act(()=>result.current.start())
  let reply

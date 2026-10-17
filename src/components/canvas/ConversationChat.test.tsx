@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { useEffect } from 'react'
 import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity, type CanvasActivityProviderProps } from '@/contexts/CanvasActivityContext'
 import type { ApplyResult } from '@/lib/canvas/applyChangeSet'
 import type { ChangeSet } from '@/lib/canvas/changeCard'
@@ -15,10 +16,11 @@ const proposal: ChangeSet = { key: 'draft-1', title: '2 changes to your week', o
   { key: 'bike', op: 'add', title: 'Take bicycle to Bicycle Connection', date: '2026-10-16' },
 ] }
 function mount(applyChanges: CanvasActivityProviderProps['applyChanges'] = vi.fn(), initialMessages = messages) {
-  let activity!: CanvasActivity
+  const seen: { activity?: CanvasActivity } = {}
   const onSend = vi.fn()
   function Panel({ busy = false, history = initialMessages }: { busy?: boolean; history?: ChatMessage[] }) {
-    activity = useCanvasActivity()
+    const activity = useCanvasActivity()
+    useEffect(() => { seen.activity = activity })
     return <ConversationStrip chatOnly panel messages={history} busy={busy} onSend={onSend}
       walk={{ label: 'Help me plan the rest of my week', message: 'Help me plan the rest of my week.' }}
       voice={{ available: true, active: true, status: 'live', turn: 'listening', heard: 'Duplicate live words', reply: 'Duplicate spoken reply', start: vi.fn(), stop: vi.fn() }} />
@@ -27,7 +29,7 @@ function mount(applyChanges: CanvasActivityProviderProps['applyChanges'] = vi.fn
     return <CanvasActivityProvider snapshot={{ tasks: [], goals: [] }} writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn() }} refetch={vi.fn()} applyChanges={applyChanges}><Panel {...props} /></CanvasActivityProvider>
   }
   const view = render(<Harness />)
-  return { activity: () => activity, onSend, update: (props: { busy?: boolean; history?: ChatMessage[] }) => view.rerender(<Harness {...props} />) }
+  return { activity: () => seen.activity!, onSend, update: (props: { busy?: boolean; history?: ChatMessage[] }) => view.rerender(<Harness {...props} />) }
 }
 
 it('uses one text conversation without stale voice controls or duplicate captions', () => {

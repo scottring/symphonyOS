@@ -22,6 +22,15 @@ vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
 vi.mock('@/hooks/useTimelineInsert', () => ({
   useTimelineInsert: () => ({ handlePick: vi.fn(), noteComposer: null, closeNoteComposer: vi.fn() }),
 }))
+// Open time is only claimed once every calendar has loaded.
+vi.mock('@/hooks/useGoogleCalendar', () => ({
+  useGoogleCalendar: () => ({
+    isConnected: true, needsReconnect: false, isLoading: false, isFetching: false, events: [], error: null,
+    connect: vi.fn(), disconnect: vi.fn(), fetchTodayEvents: vi.fn(), fetchWeekEvents: vi.fn(), fetchEvents: vi.fn(),
+    createEvent: vi.fn(), updateEvent: vi.fn(), moveEvent: vi.fn(), deleteEvent: vi.fn(), removeEventLocal: vi.fn(), restoreEventLocal: vi.fn(),
+    fetchCalendarList: vi.fn(async () => []), defaultCalendarId: null, setDefaultCalendarId: vi.fn(),
+  }),
+}))
 
 // Frozen at 6:00 AM so the span is measured from the commitments and not from
 // whatever time of day the suite happens to run at — this line clamps to `now`

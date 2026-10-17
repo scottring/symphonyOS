@@ -13,7 +13,10 @@ type ProviderBody = { system: { text: string }[]; tools: { name: string; descrip
 let handler: Handler
 const values: Record<string, string> = {
   SUPABASE_URL: 'https://example.invalid', SUPABASE_ANON_KEY: 'public-test-key', ANTHROPIC_API_KEY: 'test-only',
+  SUPABASE_SERVICE_ROLE_KEY: 'service-test-key',
 }
+/** The AI budget ledger's admission, answered before any provider call. */
+const budgetReply = (url: string) => url.includes('/rest/v1/rpc/') ? new Response(JSON.stringify({ allowed: true, reservation_id: 'test-reservation' })) : null
 
 beforeEach(() => {
   vi.resetModules()
@@ -34,6 +37,8 @@ async function askWithEmailResult(emailBody: unknown, status = 200) {
   const providerBodies: ProviderBody[] = []
   const emailRequests: RequestInit[] = []
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+    const budget = budgetReply(url)
+    if (budget) return budget
     if (url.endsWith('/gmail-event-threads')) {
       emailRequests.push(init)
       return new Response(JSON.stringify(emailBody), { status })
@@ -127,7 +132,9 @@ it('keeps identity resolution optional for capture and planning answers on the p
 
 async function proposalSequence(responses: unknown[]) {
  const requests: ProviderBody[]=[]
- vi.stubGlobal('fetch',vi.fn(async(_url:string,init:RequestInit)=>{
+ vi.stubGlobal('fetch',vi.fn(async(url:string,init:RequestInit)=>{
+  const budget=budgetReply(url)
+  if(budget)return budget
   requests.push(JSON.parse(init.body as string))
   const reply=responses[requests.length-1]
   if(!reply)throw new Error('Unexpected extra provider call')

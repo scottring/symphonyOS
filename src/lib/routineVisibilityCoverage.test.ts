@@ -77,6 +77,10 @@ const ALLOWED = new Map<string, string>([
   ['types/actionable.ts', 'the column declarations'],
   ['hooks/useRoutines.ts', 'the WRITE path: create/update and the paused_until auto-resume'],
   ['components/routine/RoutineForm.tsx', 'the editor UI that toggles the flags'],
+  ['lib/canvas/applyChangeSet.ts', 'the WRITE path for a confirmed change card that sets show_on_timeline'],
+  ['lib/onboarding.ts', 'the WRITE path: setup creates routines with show_on_timeline and reads it back for setup'],
+  ['lib/onboardingStory.ts', 'the WRITE path: setup toggles show_on_timeline with an optimistic check'],
+  ['components/setup/RoutineStory.tsx', 'setup labels the saved flag ("Hidden from Today and Week"); it does not filter'],
   [
     'components/routine/RoutineScheduleEditor.tsx',
     'EXPLAINS the rule, never applies it: under a Mon–Fri schedule it says ' +

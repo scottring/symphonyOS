@@ -85,7 +85,7 @@ beforeEach(() => {
       in: () => query,
       single: async () => ({ data: data(), error: null }),
       maybeSingle: async () => ({ data: data(), error: null }),
-      then: (resolve: Function) =>
+      then: (resolve: (value: unknown) => unknown) =>
         Promise.resolve({ data: data(), error: null }).then(resolve as any),
     }
     return query
