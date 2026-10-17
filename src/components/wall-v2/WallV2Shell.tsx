@@ -80,6 +80,7 @@ import { WallV2ScratchpadSheet } from './WallV2ScratchpadSheet';
 import { useScratchpad } from '@/hooks/useScratchpad';
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useKidMath } from '@/hooks/useKidMath';
+import { useHomeEnergy } from '@/hooks/useHomeEnergy';
 import { openScratchpadRows, recentlySorted, type ScratchpadRow } from '@/lib/wall/scratchpad';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -735,6 +736,8 @@ export function WallV2Shell() {
   // Math of the day: each kid's problem, made the first time the wall loads that day.
   const mathFailed = useCallback(() => showFlash('That answer didn’t save'), [showFlash]);
   const kidMath = useKidMath(user?.id ?? null, kids, localYmd(now), mathFailed);
+  // The house's power, from the home-energy bridge on the wall Pi (null elsewhere).
+  const homeEnergy = useHomeEnergy();
   const todayItems = useMemo(() => todayData?.items ?? emptySections<TimelineItem>(), [todayData]);
   const tomorrowData = useMemo(() => wallData.days.find((d) => !d.isToday && d.date > now) ?? wallData.days[1], [wallData.days, now]);
   const specials = useMemo(() => specialsWeek(wallData.days, kids, now), [wallData.days, kids, now]);
@@ -1215,6 +1218,7 @@ export function WallV2Shell() {
           week={talkWeek}
           v1={kioskV1Shown}
           math={kidMath}
+          energy={homeEnergy}
         />
       </div>
 

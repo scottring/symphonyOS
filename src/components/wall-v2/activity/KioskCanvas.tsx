@@ -22,7 +22,7 @@
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen, Calculator } from 'lucide-react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen, Calculator, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
@@ -59,6 +59,8 @@ import {
 import { WallV2PhoneScreen, type PhoneFixture } from '../WallV2PhoneScreen'
 import { MathStage } from './MathStage'
 import type { KidMath } from '@/hooks/useKidMath'
+import { EnergyStage } from './EnergyStage'
+import { formatWatts, hasReading, type EnergyLive } from '@/lib/wall/energy/homeEnergy'
 
 /** The household tools in the bottom bar. Call is the canvas's own (it opens
  *  the Calling activity); the rest are the Shell's sheets. */
@@ -124,6 +126,9 @@ export interface KioskCanvasProps {
   week?: WallTalkWeek
   /** Math of the day: each kid's problem, streak and the writes (useKidMath). */
   math?: KidMath
+  /** The house's power from the wall Pi's home-energy bridge (useHomeEnergy);
+   *  null where there's no bridge, which hides the Energy tile. */
+  energy?: EnergyLive | null
 }
 
 const V2_FONTS = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Instrument+Sans:wght@400;500;600;700&display=swap'
@@ -316,10 +321,16 @@ export function KioskCanvas(p: KioskCanvasProps) {
     dispatch({ type: 'OPEN', stage: { kind: 'math' } })
   }, [math, dispatch])
   const mathLeft = math ? math.kids.filter((k) => k.daily?.status === 'open').length : 0
+  // Only the wall Pi runs the home-energy bridge; elsewhere the tile stays hidden.
+  const energy = p.energy ?? null
+  const energyNow = energy && hasReading(energy.now) ? energy.now : null
   const moreTiles = [
     talk.enabled ? { id: 'plan', label: 'Plan the week', sub: 'Together, with Symphony', icon: CalendarDays, onSelect: () => { setMoreOpen(false); void tell.handle('Plan the week', false) } } : null,
     math && math.kids.length > 0
       ? { id: 'math', label: 'Math of the day', sub: mathLeft ? `${mathLeft} still to solve` : 'All done today', icon: Calculator, onSelect: () => { setMoreOpen(false); openMath() } }
+      : null,
+    energyNow
+      ? { id: 'energy', label: 'Energy', sub: `Solar ${formatWatts(energyNow.pv)} · using ${formatWatts(energyNow.house)}`, icon: Zap, onSelect: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'energy' } }) } }
       : null,
     shellTile('list'),
     { id: 'recipes', label: 'Recipes', sub: 'The family’s recipes', icon: BookOpen, onSelect: () => { setMoreOpen(false); p.tools.onRecipes() } },
@@ -426,6 +437,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
       content = math
         ? <MathStage math={math} now={p.now} flash={p.flash} />
         : <div className="kc-card kc-fill"><p className="kc-quiet-line">Math of the day isn’t ready.</p></div>
+      break
+    case 'energy':
+      content = <EnergyStage live={energy} now={p.now} />
       break
   }
 

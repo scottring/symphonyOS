@@ -1,6 +1,6 @@
 // The kiosk fixture's scenes — one per approved kiosk board.
 export type KioskScene =
   | 'home-morning' | 'home-afternoon' | 'home-evening' | 'quiet'
-  | 'dinner' | 'groceries' | 'cooking' | 'held' | 'departure' | 'bedtime' | 'call' | 'math'
+  | 'dinner' | 'groceries' | 'cooking' | 'held' | 'departure' | 'bedtime' | 'call' | 'math' | 'energy'
 
-export const KIOSK_SCENES: KioskScene[] = ['home-morning', 'home-afternoon', 'home-evening', 'quiet', 'dinner', 'groceries', 'cooking', 'held', 'departure', 'bedtime', 'call', 'math']
+export const KIOSK_SCENES: KioskScene[] = ['home-morning', 'home-afternoon', 'home-evening', 'quiet', 'dinner', 'groceries', 'cooking', 'held', 'departure', 'bedtime', 'call', 'math', 'energy']

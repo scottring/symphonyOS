@@ -1,0 +1,85 @@
+/* ===== Energy — the kitchen wall's power stage ===============================
+   The house's power right now (Scott, 2026-10-17): a Sankey of the grid's
+   fuels and the roof's solar into the house and out to each device, beside
+   the numbers. Kitchen wall v2's design pixels (--p) and tokens (--kw-*):
+   no text under 20, nothing scrolls. The flow's own colours (--ke-*) are a
+   validated categorical set, stepped separately for the night theme. Every
+   rule is under .kiosk-canvas like the wall's other stages. */
+
+.kiosk-canvas {
+  --ke-nuclear: #6250d6;
+  --ke-gas: #eb6834;
+  --ke-coal: #5b5650;
+  --ke-renewable: #3b7650;
+  --ke-other: #a8a29a;
+  --ke-grid: #857d72;
+  --ke-solar: #e0a100;
+  --ke-home: #1e2628;
+  --ke-ev: #1b6a64;
+  --ke-verified: #2a78d6;
+  --ke-unverified: #d55181;
+  --ke-always_on: #a8a29a;
+  --ke-unattributed: #c9c3b8;
+}
+.kiosk-canvas.is-dark {
+  --ke-nuclear: #9085e9;
+  --ke-gas: #d95926;
+  --ke-coal: #a3a29a;
+  --ke-renewable: #82c296;
+  --ke-other: #6c6a64;
+  --ke-grid: #77817f;
+  --ke-solar: #c98500;
+  --ke-home: #ece8e1;
+  --ke-ev: #6cc4b9;
+  --ke-verified: #3987e5;
+  --ke-unverified: #d55181;
+  --ke-always_on: #6c6a64;
+  --ke-unattributed: #4f4d48;
+}
+
+.kiosk-canvas .ke-stage {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) 1px minmax(0, 1fr);
+  column-gap: calc(56 * var(--p));
+}
+.kiosk-canvas .ke-rule { background: var(--kw-line); }
+.kiosk-canvas .ke-lead { min-height: 0; min-width: 0; overflow: hidden; }
+.kiosk-canvas .ke-flow { display: block; width: 100%; height: 100%; }
+.kiosk-canvas .ke-empty { height: 100%; display: grid; place-items: center; font-size: calc(30 * var(--p)); color: var(--kw-muted); }
+
+.kiosk-canvas .ke-head { font: 600 20px var(--kw-sans); letter-spacing: .12em; text-transform: uppercase; fill: var(--kw-muted); }
+.kiosk-canvas .ke-label,
+.kiosk-canvas .ke-value {
+  paint-order: stroke; stroke: var(--kw-bg); stroke-width: 6px; stroke-linejoin: round;
+}
+.kiosk-canvas .ke-label { font: 600 24px var(--kw-sans); fill: var(--kw-ink); }
+.kiosk-canvas .ke-value { font: 400 21px var(--kw-sans); fill: var(--kw-muted); }
+.kiosk-canvas .ke-band { fill-opacity: .34; }
+.kiosk-canvas .ke-zoom { fill: var(--kw-ink); fill-opacity: .05; stroke: var(--kw-line-strong); stroke-dasharray: 6 6; stroke-width: 1.5; }
+
+.kiosk-canvas .ke-nuclear { fill: var(--ke-nuclear); }
+.kiosk-canvas .ke-gas { fill: var(--ke-gas); }
+.kiosk-canvas .ke-coal { fill: var(--ke-coal); }
+.kiosk-canvas .ke-renewable { fill: var(--ke-renewable); }
+.kiosk-canvas .ke-other { fill: var(--ke-other); }
+.kiosk-canvas .ke-grid { fill: var(--ke-grid); }
+.kiosk-canvas .ke-solar { fill: var(--ke-solar); }
+.kiosk-canvas .ke-home { fill: var(--ke-home); }
+.kiosk-canvas .ke-ev { fill: var(--ke-ev); }
+.kiosk-canvas .ke-verified { fill: var(--ke-verified); }
+.kiosk-canvas .ke-unverified { fill: var(--ke-unverified); }
+.kiosk-canvas .ke-always_on { fill: var(--ke-always_on); }
+.kiosk-canvas .ke-unattributed { fill: var(--ke-unattributed); }
+
+/* The numbers */
+.kiosk-canvas .ke-side { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: calc(14 * var(--p)); overflow: hidden; }
+.kiosk-canvas .ke-lab { margin: 0; font: 600 calc(20 * var(--p)) var(--kw-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--kw-muted); }
+.kiosk-canvas .ke-nums { margin: 0 0 calc(10 * var(--p)); display: flex; flex-direction: column; gap: calc(16 * var(--p)); }
+.kiosk-canvas .ke-nums dt { font-size: calc(24 * var(--p)); color: var(--kw-muted); }
+.kiosk-canvas .ke-nums dd { margin: 0; font: 500 calc(64 * var(--p))/1.05 var(--kw-serif); color: var(--kw-ink); }
+.kiosk-canvas .ke-nums .is-send dd { color: var(--kw-done); }
+.kiosk-canvas .ke-line { margin: 0; font-size: calc(28 * var(--p)); color: var(--kw-ink); }
+.kiosk-canvas .ke-line b { font-weight: 600; }
+.kiosk-canvas .ke-grid { margin: calc(6 * var(--p)) 0 0; font-size: calc(22 * var(--p)); line-height: 1.35; color: var(--kw-muted); }
+.kiosk-canvas .ke-foot { margin: auto 0 0; font-size: calc(20 * var(--p)); color: var(--kw-muted); }

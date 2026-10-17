@@ -33,6 +33,8 @@ export type KioskStage =
   | { kind: 'recipe'; source: 'dinner' | 'picked' }
   /** Math of the day: the kid on screen is the math hook's choice. */
   | { kind: 'math' }
+  /** The house's power right now (the home-energy bridge on the wall Pi). */
+  | { kind: 'energy' }
 
 export type KioskStageKind = KioskStage['kind']
 
@@ -167,6 +169,7 @@ export function stageHoldsOpen(s: KioskState, ctx: HoldContext): boolean {
     case 'home':
     case 'dinner':
     case 'math':
+    case 'energy':
       return false
     case 'cooking':
     case 'calling':
@@ -334,6 +337,8 @@ export function kioskPlace(s: KioskState, ctx: PlaceContext): string {
       return ctx.recipeTitle ? `Recipe · ${ctx.recipeTitle}` : 'Recipe'
     case 'math':
       return 'Math of the day'
+    case 'energy':
+      return 'Energy'
   }
 }
 

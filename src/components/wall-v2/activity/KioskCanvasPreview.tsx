@@ -33,6 +33,7 @@ import type { KioskScene } from './kioskScenes'
 import type { KidMath } from '@/hooks/useKidMath'
 import type { MathRow } from '@/lib/wall/math/mathProgress'
 import { useLocalKidMath } from './useLocalKidMath'
+import type { EnergyLive } from '@/lib/wall/energy/homeEnergy'
 
 /** Math of the day with fixed problems: Liam's long division (with a story,
  *  six days in a row behind it), Mia's fractions in plain words. */
@@ -75,6 +76,7 @@ const SCENE_CLOCK: Record<KioskScene, { moment: WallMoment; h: number; min: numb
   bedtime: { moment: 'evening', h: 20, min: 6 },
   call: { moment: 'after', h: 16, min: 52 },
   math: { moment: 'after', h: 15, min: 42 },
+  energy: { moment: 'dinner', h: 18, min: 20 },
 }
 
 // Wall v2 moments (mockups 2026-10-14): each at the time its mockup shows.
@@ -153,11 +155,35 @@ function sceneState(scene: KioskScene, dateKey: string, nowMs: number): KioskSta
     bedtime: [{ type: 'OPEN', stage: { kind: 'bedtime' } }],
     call: [{ type: 'OPEN', stage: { kind: 'calling' } }],
     math: [{ type: 'OPEN', stage: { kind: 'math' } }],
+    energy: [{ type: 'OPEN', stage: { kind: 'energy' } }],
   }
   let s = events[scene].reduce(kioskReducer, initialKioskState(dateKey))
   // "Cumin — probably in the pantry": the board shows one line left off.
   if (scene === 'groceries' && s.groceries) s = kioskReducer(s, { type: 'GROCERY_TOGGLE', key: s.groceries.lines[3].key })
   return s
+}
+
+// The Energy scene: an evening with the car charging, the sun nearly down.
+function energyFixture(now: Date): EnergyLive {
+  const ts = Math.floor(now.getTime() / 1000)
+  const hour = new Date(now.getTime() - 3600_000)
+  const key = `${hour.getFullYear()}-${String(hour.getMonth() + 1).padStart(2, '0')}-${String(hour.getDate()).padStart(2, '0')}T${String(hour.getHours()).padStart(2, '0')}:00:00`
+  return {
+    site: { rate_cents: 13.04, sell_back_cents: 13.04, co2_kg_per_kwh: 0.3, tz: 'America/New_York' },
+    now: { ts, pv: 600, house: 9400, grid: 8800, devices: { 'Electric Vehicle': 7200, AC: 900, 'Heat 4': 300, Microwave: 250, 'Always On': 154, Other: 476, 'Light 9': 40, 'Coffee grinder': 20 } },
+    price_now: [13.04, 13.04],
+    catalog: [
+      { id: 'ev', name: 'Electric Vehicle', status: 'ev', type: 'Electric Vehicle', first_used: null },
+      { id: 'ac', name: 'AC', status: 'verified', type: 'AC', first_used: '2019-06-23' },
+      { id: 'mw', name: 'Microwave', status: 'verified', type: 'Microwave', first_used: '2019-06-23' },
+      { id: 'l9', name: 'Light 9', status: 'verified', type: 'Light', first_used: '2020-10-24' },
+      { id: 'cg', name: 'Coffee grinder', status: 'verified', type: 'Coffee Grinder', first_used: '2020-02-01' },
+      { id: 'h4', name: 'Heat 4', status: 'unverified', type: 'Mystery Heat', first_used: '2019-11-26' },
+      { id: 'always_on', name: 'Always On', status: 'always_on', type: 'Always On', first_used: null },
+      { id: 'unknown', name: 'Other', status: 'unattributed', type: 'Unknown', first_used: null },
+    ],
+    mix: { [key]: { Nuclear: 27082, Gas: 26016, Coal: 11245, Wind: 6100, Solar: 4200, Hydro: 642, 'Multiple Fuels': 2697, Oil: 197 } },
+  }
 }
 
 export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1Screen, dock }: { scene?: KioskScene; theme?: 'light' | 'dark'; v1Screen?: KioskScreen; dock?: ListenerPreview }) {
@@ -268,6 +294,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         onOpenRecipe={noop} onTapRow={noop} onTick={noop} onClaim={noop} onTapQuestion={noop} flash={noop}
         v1={v1}
         math={math}
+        energy={energyFixture(now)}
         listenerPreview={v1Screen ? dock ?? (v1Screen === 'night' ? 'quiet' : 'idle') : undefined}
       />
     </div>
