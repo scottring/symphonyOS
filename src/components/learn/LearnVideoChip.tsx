@@ -1,9 +1,11 @@
 // src/components/learn/LearnVideoChip.tsx
 //
-// A quiet "Watch · 22s" under a page's title, for the short guide that
-// belongs to this page (learnVideos.ts). Playing it or pressing × marks it
-// seen, and the page moves on to its next guide or shows none. The shell
-// says which page is showing; outside the shell nothing renders.
+// A small play button beside the page's "?" (Scott, 2026-10-17: just the
+// play button, next to the help), for the short guide that belongs to this
+// page (learnVideos.ts); its name and length are its label and tooltip.
+// Playing it marks it seen, and the page moves on to its next guide or shows
+// none. The shell says which page is showing; outside the shell nothing
+// renders.
 
 import { createContext, useContext, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -28,16 +30,10 @@ export function LearnVideoChip() {
   return (
     <>
       {video && (
-        <div className="learn-cue" data-testid="learn-cue">
-          <button type="button" className="learn-cue-play" onClick={() => { setPlaying(video); finish(video.id) }}>
-            <Play className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Watch: {video.title}</span>
-            <span className="learn-cue-time">{video.seconds}s</span>
-          </button>
-          <button type="button" className="learn-cue-dismiss" aria-label={`Hide “${video.title}”`} title="Hide" onClick={() => finish(video.id)}>
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </div>
+        <button type="button" className="learn-cue" data-testid="learn-cue" onClick={() => { setPlaying(video); finish(video.id) }}
+          aria-label={`Watch: ${video.title} (${video.seconds}s)`} title={`Watch: ${video.title} · ${video.seconds}s`}>
+          <Play className="h-3 w-3" aria-hidden="true" />
+        </button>
       )}
       {playing && <LearnVideoDialog video={playing} onClose={() => setPlaying(null)} />}
     </>

@@ -82,14 +82,14 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
             <div className={action ? 'daybook-title-row' : undefined}>
               <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'}>
                 {title}
-                {/* "What is this page?", where the page has a guide. */}
+                {/* "What is this page?", where the page has a guide, and its
+                    short video beside it until watched (learnVideos.ts). */}
                 <PageHelpButton />
+                <LearnVideoChip />
               </h1>
               {action && <div className="daybook-title-action">{action}</div>}
             </div>
             {subline && <div className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{subline}</div>}
-            {/* The page's short guide, until it has been watched (learnVideos.ts). */}
-            <LearnVideoChip />
           </div>
           {controls && <div className="daybook-masthead-controls hidden shrink-0 md:block">{controls}</div>}
           {aside && <div data-testid="masthead-aside" className="daybook-masthead-aside">{aside}</div>}

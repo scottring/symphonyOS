@@ -21,9 +21,17 @@ describe('LearnVideoChip', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('moves on to the page’s next guide once one is hidden, and remembers it', () => {
+  it('is only a play button, named by the guide and its length', () => {
+    onPage('inbox')
+    const play = screen.getByTestId('learn-cue')
+    expect(play.textContent).toBe('')
+    expect(play.getAttribute('aria-label')).toMatch(/^Watch: Start with Inbox \(\d+s\)$/)
+  })
+
+  it('moves on to the page’s next guide once one is watched, and remembers it', () => {
     const { unmount } = onPage('today')
-    fireEvent.click(screen.getByRole('button', { name: /Hide “Choose a task for today”/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Watch: Choose a task for today/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.getByRole('button', { name: /Watch: Add an urgent task/ })).toBeTruthy()
     unmount()
     onPage('today')
