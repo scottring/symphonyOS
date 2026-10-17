@@ -43,6 +43,25 @@ export interface EnergyLive {
   mix: Record<string, Record<string, number>>
 }
 
+/** A period's totals from the bridge's /api/flow, in kWh; purchases are split
+ *  by each hour's PJM mix and netted per hour against the solar. */
+export interface EnergyPeriod {
+  /** First and last hour with data (ISO, Eastern), or null with no history. */
+  first: string | null
+  last: string | null
+  usage: number
+  solar: number
+  bought: number
+  sent: number
+  /** Net: purchases minus solar credit. Negative is a credit. */
+  cents: number
+  co2_kg: number
+  /** kWh bought, by PJM fuel ('Unknown' for hours without a posted mix). */
+  fuels: Record<string, number>
+  /** kWh by Sense device name. */
+  devices: Record<string, number>
+}
+
 export const hasReading = (now: EnergyLive['now']): now is EnergyReading => typeof (now as EnergyReading).ts === 'number'
 
 // ─── The grid's mix ───
@@ -66,6 +85,15 @@ export function easternHour(ts: number): string {
       .formatToParts(new Date(ts * 1000)).map((x) => [x.type, x.value]),
   )
   return `${p.year}-${p.month}-${p.day}T${p.hour}:00:00`
+}
+
+/** A period's purchases as fuel-group shares (an "unknown" hour counts as other). */
+export function periodShares(p: EnergyPeriod): MixAt['shares'] {
+  if (p.bought <= 0) return []
+  return FUEL_GROUPS.map(({ group, label, fuels }) => ({
+    group, label,
+    share: (fuels.reduce((s, f) => s + (p.fuels[f] ?? 0), 0) + (group === 'other' ? p.fuels.Unknown ?? 0 : 0)) / p.bought,
+  }))
 }
 
 export interface MixAt {
@@ -100,7 +128,7 @@ export interface FlowNode {
   col: number
   label: string
   tone: FlowTone
-  /** Watts. */
+  /** Watts for a reading, kWh for a period. */
   value: number
 }
 export interface FlowLink { from: string; to: string; value: number; tone: FlowTone }
@@ -125,50 +153,60 @@ function statusOf(name: string, catalog: EnergyDevice[]): DeviceStatus {
   return 'unverified'
 }
 
-/** Watts from the grid's fuels and the roof, through the house, to each
- *  device and back out. The house zooms (its own scale) when the solar going
- *  back would otherwise squash it to a sliver. */
+/** One live reading as a flow, in watts. */
 export function buildFlow(r: EnergyReading, catalog: EnergyDevice[], mix: MixAt): Flow {
+  const pv = Math.max(0, r.pv)
+  const house = Math.max(0, r.house)
+  return flowOf({ pv, house, bought: Math.max(0, house - pv), sent: Math.max(0, pv - house), devices: r.devices }, catalog, mix.shares, 1)
+}
+
+/** A period's totals as a flow, in kWh. Over hours the house both buys and
+ *  sends back, so both sides can show at once. */
+export function buildPeriodFlow(p: EnergyPeriod, catalog: EnergyDevice[]): Flow {
+  return flowOf({ pv: p.solar, house: p.usage, bought: p.bought, sent: p.sent, devices: p.devices }, catalog, periodShares(p), 0.05)
+}
+
+interface FlowTotals { pv: number; house: number; bought: number; sent: number; devices: Record<string, number> }
+
+/** The grid's fuels and the roof, through the house, to each device and
+ *  back out. The house zooms (its own scale) when the solar going back would
+ *  otherwise squash it to a sliver. `eps` is the smallest band worth drawing. */
+function flowOf({ pv, house, bought, sent, devices: byDevice }: FlowTotals, catalog: EnergyDevice[], shares: MixAt['shares'], eps: number): Flow {
   const nodes: FlowNode[] = []
   const links: FlowLink[] = []
   const node = (n: FlowNode) => { nodes.push(n); return n.id }
-  const link = (from: string, to: string, value: number, tone: FlowTone) => { if (value >= 1) links.push({ from, to, value, tone }) }
-
-  const pv = Math.max(0, r.pv)
-  const house = Math.max(0, r.house)
-  const bought = Math.max(0, house - pv)
-  const sent = Math.max(0, pv - house)
+  const link = (from: string, to: string, value: number, tone: FlowTone) => { if (value >= eps) links.push({ from, to, value, tone }) }
   const zoomed = sent > house * 0.5
 
   const home = node({ id: 'home', col: 2, label: 'Home', tone: 'home', value: house })
-  if (bought >= 1) {
+  if (bought >= eps) {
     const grid = node({ id: 'grid', col: 1, label: 'Grid', tone: 'grid', value: bought })
-    for (const f of mix.shares) {
+    for (const f of shares) {
       const w = f.share * bought
-      if (w >= 1) link(node({ id: `fuel-${f.group}`, col: 0, label: f.label, tone: f.group, value: w }), grid, w, f.group)
+      if (w >= eps) link(node({ id: `fuel-${f.group}`, col: 0, label: f.label, tone: f.group, value: w }), grid, w, f.group)
     }
     link(grid, home, bought, 'grid')
   }
-  if (pv >= 1) {
+  if (pv >= eps) {
     const solar = node({ id: 'solar', col: 1, label: 'Your solar', tone: 'solar', value: pv })
     link(solar, home, pv - sent, 'solar')
-    if (sent >= 1) link(solar, node({ id: 'sent', col: 2, label: 'Back to the grid', tone: 'solar', value: sent }), sent, 'solar')
+    if (sent >= eps) link(solar, node({ id: 'sent', col: 2, label: 'Back to the grid', tone: 'solar', value: sent }), sent, 'solar')
   }
   const inside = zoomed ? node({ id: 'home-zoom', col: 3, label: 'Home', tone: 'home', value: house }) : home
 
   // Sense's devices, scaled to the metered total; any gap is "not yet identified".
-  const devices = Object.entries(r.devices).filter(([name, w]) => w > 0 && name !== 'Solar')
+  const devices = Object.entries(byDevice).filter(([name, w]) => w > 0 && name !== 'Solar')
   const sum = devices.reduce((s, [, w]) => s + w, 0)
   const k = sum > house && sum > 0 ? house / sum : 1
   const groups = new Map<DeviceStatus, [string, number][]>()
   const add = (st: DeviceStatus, name: string, w: number) => groups.set(st, [...(groups.get(st) ?? []), [name, w]])
   for (const [name, w] of devices) add(statusOf(name, catalog), name, w * k)
-  if (house - sum * k >= 1) add('unattributed', 'Other', house - sum * k)
+  if (house - sum * k >= eps) add('unattributed', 'Other', house - sum * k)
 
   for (const st of STATUS_ORDER) {
     const list = (groups.get(st) ?? []).sort((a, b) => b[1] - a[1])
     const total = list.reduce((s, [, w]) => s + w, 0)
-    if (total < 1) continue
+    if (total < eps) continue
     const cat = node({ id: `cat-${st}`, col: 4, label: STATUS_LABEL[st], tone: st, value: total })
     link(inside, cat, total, st)
     if (st !== 'verified' && st !== 'unverified') continue
@@ -176,7 +214,7 @@ export function buildFlow(r: EnergyReading, catalog: EnergyDevice[], mix: MixAt)
     const small = list.filter(([, w]) => w < house * SMALL_SHARE)
     for (const [name, w] of big) link(cat, node({ id: `dev-${name}`, col: 5, label: name, tone: st, value: w }), w, st)
     const sw = small.reduce((s, [, w]) => s + w, 0)
-    if (sw >= 1) {
+    if (sw >= eps) {
       const label = small.length === 1 ? small[0][0] : `${small.length} small devices`
       link(cat, node({ id: `small-${st}`, col: 5, label, tone: st, value: sw }), sw, st)
     }
@@ -273,6 +311,9 @@ export function layoutFlow(flow: Flow, o: LayoutOptions): FlowLayout {
 }
 
 // ─── Words ───
+
+export const formatKwh = (k: number) =>
+  `${k >= 100 ? Math.round(k).toLocaleString('en-US') : k >= 10 ? k.toFixed(0) : k.toFixed(1)} kWh`
 
 export const formatWatts = (w: number) =>
   Math.abs(w) >= 1000 ? `${(w / 1000).toFixed(Math.abs(w) >= 10000 ? 0 : 1)} kW` : `${Math.round(w)} W`

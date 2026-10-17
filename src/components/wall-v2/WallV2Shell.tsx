@@ -80,7 +80,7 @@ import { WallV2ScratchpadSheet } from './WallV2ScratchpadSheet';
 import { useScratchpad } from '@/hooks/useScratchpad';
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useKidMath } from '@/hooks/useKidMath';
-import { useHomeEnergy } from '@/hooks/useHomeEnergy';
+import { fetchEnergyPeriod, useHomeEnergy } from '@/hooks/useHomeEnergy';
 import { openScratchpadRows, recentlySorted, type ScratchpadRow } from '@/lib/wall/scratchpad';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -1228,6 +1228,7 @@ export function WallV2Shell() {
           v1={kioskV1Shown}
           math={kidMath}
           energy={homeEnergy}
+          loadEnergyPeriod={fetchEnergyPeriod}
         />
       </div>
 

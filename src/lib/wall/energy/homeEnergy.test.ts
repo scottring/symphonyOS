@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildFlow, easternHour, formatWatts, layoutFlow, mixAt, type EnergyDevice, type EnergyReading } from './homeEnergy'
+import { buildFlow, buildPeriodFlow, easternHour, formatKwh, formatWatts, layoutFlow, mixAt, periodShares, type EnergyDevice, type EnergyPeriod, type EnergyReading } from './homeEnergy'
 
 const catalog: EnergyDevice[] = [
   { id: 'ac', name: 'AC', status: 'verified', type: 'AC', first_used: '2019-06-23' },
@@ -81,6 +81,34 @@ describe('buildFlow', () => {
   })
 })
 
+describe('buildPeriodFlow', () => {
+  const period: EnergyPeriod = {
+    first: '2026-09-18T00:00:00-04:00', last: '2026-10-17T15:00:00-04:00',
+    usage: 585, solar: 412, bought: 432, sent: 259, cents: 2260, co2_kg: 149,
+    fuels: { Nuclear: 136, Gas: 175, Coal: 67, Wind: 20, Solar: 10, Hydro: 8, Oil: 6, 'Multiple Fuels': 6, Unknown: 4 },
+    devices: { 'Electric Vehicle': 184, AC: 40, 'Heat 4': 5, 'Always On': 168, Other: 160 },
+  }
+
+  it('shows buying and sending back together, each side balanced', () => {
+    const flow = buildPeriodFlow(period, catalog)
+    expect(sumInto(flow, 'grid')).toBeCloseTo(432)
+    expect(flow.nodes.find((n) => n.id === 'sent')!.value).toBe(259)
+    // Solar into the house is what wasn't sent back; with purchases it makes the house.
+    expect(sumInto(flow, 'home')).toBeCloseTo(585)
+    expect(flow.zoomed).toBe(false)
+  })
+
+  it('counts hours without a posted mix as "oil & other"', () => {
+    const shares = periodShares(period)
+    expect(shares.reduce((s, f) => s + f.share, 0)).toBeCloseTo(1)
+    expect(shares.find((f) => f.group === 'other')!.share * 432).toBeCloseTo(16)
+  })
+
+  it('has nothing to split with nothing bought', () => {
+    expect(periodShares({ ...period, bought: 0 })).toEqual([])
+  })
+})
+
 describe('layoutFlow', () => {
   it('keeps every node in its column, labels apart, and bands within their nodes', () => {
     const r: EnergyReading = { ts: TS, pv: 600, house: 9400, grid: 8800, devices: { 'Electric Vehicle': 7200, AC: 900, 'Heat 4': 300, 'Always On': 150, Other: 400 } }
@@ -109,5 +137,7 @@ describe('formatWatts', () => {
     expect(formatWatts(488)).toBe('488 W')
     expect(formatWatts(2675)).toBe('2.7 kW')
     expect(formatWatts(12400)).toBe('12 kW')
+    expect(formatKwh(7.34)).toBe('7.3 kWh')
+    expect(formatKwh(1303.6)).toBe('1,304 kWh')
   })
 })

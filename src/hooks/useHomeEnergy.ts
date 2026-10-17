@@ -7,9 +7,16 @@
 // 30-second poll never lags a reading by more than half a minute.
 
 import { useEffect, useState } from 'react'
-import { HOME_ENERGY_URL, type EnergyLive } from '@/lib/wall/energy/homeEnergy'
+import { HOME_ENERGY_URL, type EnergyLive, type EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
 
 const POLL_MS = 30_000
+
+/** A period's totals (Today = 1 day), for the Energy stage's period buttons. */
+export async function fetchEnergyPeriod(days: number): Promise<EnergyPeriod> {
+  const res = await fetch(`${HOME_ENERGY_URL}/api/flow?days=${days}`, { cache: 'no-store' })
+  if (!res.ok) throw new Error(String(res.status))
+  return (await res.json()) as EnergyPeriod
+}
 
 export function useHomeEnergy(): EnergyLive | null {
   const [live, setLive] = useState<EnergyLive | null>(null)

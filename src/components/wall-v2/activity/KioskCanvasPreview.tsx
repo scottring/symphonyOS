@@ -33,7 +33,7 @@ import type { KioskScene } from './kioskScenes'
 import type { KidMath } from '@/hooks/useKidMath'
 import type { MathRow } from '@/lib/wall/math/mathProgress'
 import { useLocalKidMath } from './useLocalKidMath'
-import type { EnergyLive } from '@/lib/wall/energy/homeEnergy'
+import type { EnergyLive, EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
 
 /** Math of the day with fixed problems: Liam's long division (with a story,
  *  six days in a row behind it), Mia's fractions in plain words. */
@@ -186,6 +186,17 @@ function energyFixture(now: Date): EnergyLive {
   }
 }
 
+// The Energy scene's period buttons: a month like the house's real one, scaled.
+const energyPeriodFixture = async (days: number): Promise<EnergyPeriod> => {
+  const k = days / 30
+  return {
+    first: days === 1 ? '2026-10-13T00:00:00-04:00' : '2026-09-14T00:00:00-04:00', last: '2026-10-13T18:00:00-04:00',
+    usage: 585 * k, solar: 412 * k, bought: 432 * k, sent: 259 * k, cents: 2260 * k, co2_kg: 149 * k,
+    fuels: { Nuclear: 136 * k, Gas: 175 * k, Coal: 67 * k, Wind: 20 * k, Solar: 10 * k, Hydro: 8 * k, Oil: 8 * k, 'Multiple Fuels': 8 * k },
+    devices: { 'Electric Vehicle': 184 * k, AC: 40 * k, Microwave: 6 * k, 'Light 9': 4 * k, 'Coffee grinder': 1 * k, 'Heat 4': 5 * k, 'Always On': 168 * k, Other: 177 * k },
+  }
+}
+
 export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1Screen, dock }: { scene?: KioskScene; theme?: 'light' | 'dark'; v1Screen?: KioskScreen; dock?: ListenerPreview }) {
   const clock = v1Screen ? V1_CLOCK[v1Screen] : SCENE_CLOCK[scene]
   const now = useMemo(() => { const d = new Date(2026, 9, 13); d.setHours(clock.h, clock.min, 0, 0); return d }, [clock])
@@ -295,6 +306,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         v1={v1}
         math={math}
         energy={energyFixture(now)}
+        loadEnergyPeriod={energyPeriodFixture}
         listenerPreview={v1Screen ? dock ?? (v1Screen === 'night' ? 'quiet' : 'idle') : undefined}
       />
     </div>

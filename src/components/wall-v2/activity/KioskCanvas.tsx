@@ -60,7 +60,7 @@ import { WallV2PhoneScreen, type PhoneFixture } from '../WallV2PhoneScreen'
 import { MathStage } from './MathStage'
 import type { KidMath } from '@/hooks/useKidMath'
 import { EnergyStage } from './EnergyStage'
-import { formatWatts, hasReading, type EnergyLive } from '@/lib/wall/energy/homeEnergy'
+import { formatWatts, hasReading, type EnergyLive, type EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
 
 /** The household tools in the bottom bar. Call is the canvas's own (it opens
  *  the Calling activity); the rest are the Shell's sheets. */
@@ -131,6 +131,8 @@ export interface KioskCanvasProps {
   /** The house's power from the wall Pi's home-energy bridge (useHomeEnergy);
    *  null where there's no bridge, which hides the Energy tile. */
   energy?: EnergyLive | null
+  /** A period's totals for the Energy stage's Today / 7 days / 30 days. */
+  loadEnergyPeriod?: (days: number) => Promise<EnergyPeriod>
 }
 
 const V2_FONTS = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Instrument+Sans:wght@400;500;600;700&display=swap'
@@ -441,7 +443,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
         : <div className="kc-card kc-fill"><p className="kc-quiet-line">Math of the day isn’t ready.</p></div>
       break
     case 'energy':
-      content = <EnergyStage live={energy} now={p.now} />
+      content = <EnergyStage live={energy} now={p.now} loadPeriod={p.loadEnergyPeriod} />
       break
   }
 
