@@ -34,7 +34,9 @@ describe('WeekV2 toolbar — no session', () => {
   it('offers planning separately from confirmation without a wizard', () => {
     const start = vi.fn()
     renderWeek({ walk: { label: 'Help me plan the rest of my week', onStart: start } })
-    expect(screen.getByText(/Review your activities and decide what needs attention/)).toBeTruthy()
+    // At rest the header adds no sentence of its own (2026-10-17).
+    expect(screen.queryByText(/Review your activities/)).toBeNull()
+    expect(screen.queryByText(/isn’t (marked )?planned yet/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Plan the week' })).toBeNull()
     expect(screen.queryByRole('region', { name: /Planning week/ })).toBeNull()
     expect(screen.queryByText(/Step \d of 8/)).toBeNull()
@@ -136,7 +138,7 @@ describe('WeekV2 toolbar — folded into the masthead', () => {
       </MemoryRouter>,
     )
     expect(container.querySelector('.pv2-toolbar')).toBeNull()
-    expect(subline.textContent).toMatch(/Review your activities and decide what needs attention/)
+    expect(subline.textContent).toBe('')
     expect(within(controls).queryByRole('button', { name: 'Plan the week' })).toBeNull()
     expect(within(controls).queryByRole('group', { name: 'View' })).toBeNull()
     subline.remove(); controls.remove()

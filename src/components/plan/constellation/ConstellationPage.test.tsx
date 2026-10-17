@@ -21,6 +21,8 @@ vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null,members:[{auth_user_id:'u2',name:'Iris'}]})}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'u1'}})}))
 const review=vi.hoisted(()=>({reviewed:null as any,mine:null as any,finish:vi.fn(async()=>true),token:'' as string,horizon:'' as string}))
+const plan=vi.hoisted(()=>({saved:null as any,save:vi.fn(async()=>true)}))
+vi.mock('@/hooks/usePlanningSession',async(importOriginal)=>({...await importOriginal<any>(),usePlanningSession:()=>({saved:plan.saved,mine:null,loading:false,loadedToken:'',error:null,reload:vi.fn(),save:plan.save})}))
 vi.mock('@/hooks/usePeriodReview',()=>({usePeriodReview:(horizon:string,token:string)=>{review.horizon=horizon;review.token=token;return{reviewed:review.reviewed,mine:review.mine,loading:false,error:null,reload:vi.fn(),finish:review.finish}}}))
 // This file's committedTo stub says nothing about status; the review reads it from the fixture.
 vi.mock('@/lib/planning/periodReview',async(importOriginal)=>({...await importOriginal<any>(),taskReviewState:(t:any)=>t.completed?'done':t.carried?'moved':'open',movedOn:(t:any)=>t.carried&&!t.completed?{to:t.carriedTo}:null}))
@@ -590,6 +592,27 @@ describe('a line moved on is not open here (2026-10-17)',()=>{
   expect(titles('2026 goals')).toEqual(['Health'])
   fireEvent.click(screen.getByRole('button',{name:/1 moved on/}))
   expect(within(row('Together')).getByText('Moved to 2027')).toBeInTheDocument()
+ })
+})
+
+describe('I’m happy with October (2026-10-17)',()=>{
+ it('the period on screen can be marked planned; once it is, the page says so',async()=>{
+  plan.saved=null
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'I’m happy with October'}))
+  await waitFor(()=>expect(plan.save).toHaveBeenCalledWith({wentWell:'',didnt:''}))
+  cleanup()
+  plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
+  try{
+   month()
+   expect(screen.getByText(/October planned Oct 3/)).toBeInTheDocument()
+   expect(screen.queryByRole('button',{name:'I’m happy with October'})).toBeNull()
+  }finally{plan.saved=null}
+ })
+ it('a period already over is reviewed, not planned',()=>{
+  open('/month?view=constellation&horizon=2&start=2025-03-09')
+  expect(screen.getByRole('button',{name:'Review March'})).toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:/I’m happy with/})).toBeNull()
  })
 })
 

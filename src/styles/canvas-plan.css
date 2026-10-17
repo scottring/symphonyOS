@@ -545,4 +545,7 @@
 .plan-review-finished { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; color: var(--color-neutral-800); }
 .plan-review-onward { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 .plan-review-open:disabled { opacity: .5; cursor: default; }
+.plan-planned { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--color-neutral-700); }
+.plan-mark { font-size: 13.5px; }
+.plan-mark:disabled { opacity: .5; cursor: default; }
 @media (hover: none), (pointer: coarse) { .plan-review-open, .plan-review-finish { min-height: 44px; } }
