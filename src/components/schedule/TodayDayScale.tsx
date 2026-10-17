@@ -10,6 +10,7 @@ import { isPlanDrag, readPlanDrag, type PlanDragPayload } from '@/lib/planning/p
 import { useTravelTime } from '@/hooks/useTravelTime'
 import { effectiveStartTime, formatTimeLong } from '@/lib/timeUtils'
 import type { ProposedRow, RowMark } from './todayPreview'
+import { TaskCheckbox } from './TaskCheckbox'
 
 /**
  * The day, to scale (Scott, 2026-10-06, option B): Today's timed day as a
@@ -17,7 +18,8 @@ import type { ProposedRow, RowMark } from './todayPreview'
  * free stretches named, a now line. It IS the schedule — the timed list it
  * replaced is gone, so nothing draws the day twice.
  *
- * A click opens the thing's details (tick it off, fine-tune its time there).
+ * A task or routine is ticked off by its own check (Scott, 2026-10-17); a
+ * click elsewhere opens the thing's details (fine-tune its time there).
  * Everything moves by dragging; a drop lands on the quarter hour under the
  * pointer, and the list beside it ("For today") and the week column drop
  * onto it to give something a time.
@@ -67,13 +69,15 @@ interface BlockProps {
   /** A pending change card's mark on this thing (todayPreview.ts). */
   mark?: RowMark
   onSelect: (id: string) => void
+  /** Ticks it off (or back on). Unset: no check — events have none. */
+  onToggleDone?: () => void
 }
 
 /** Every thing on the day is drawn one way (Scott, 2026-10-07: three styles
  *  side by side "looks stupid"): "9:00–10:15 · Boxing" and who carries it.
- *  No check here — a click opens its details, where it is ticked off or its
- *  time fine-tuned. */
-function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selected, upNext, past, refused, mark, onSelect }: BlockProps) {
+ *  A task or routine leads with the same check "For today" has (Scott,
+ *  2026-10-17); an event has none. A click on the rest opens its details. */
+function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selected, upNext, past, refused, mark, onSelect, onToggleDone }: BlockProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: refused })
   const isEvent = item.type === 'event'
   // How far away it is, drawn above it as the time it takes to get there.
@@ -116,6 +120,19 @@ function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selecte
         ].filter(Boolean).join(' ')}
         style={pos}
       >
+        {onToggleDone && (
+          // Pressing the check is not picking the block up: the press stays
+          // out of the drag listeners on the wrapper.
+          <span className="today-scale-check" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+            <TaskCheckbox
+              shape="circle"
+              completed={item.completed}
+              onToggleComplete={onToggleDone}
+              onToggleWaiting={() => {}}
+              label={item.completed ? `Mark ${item.title} incomplete` : `Mark ${item.title} complete`}
+            />
+          </span>
+        )}
         <button type="button" className="today-scale-open" aria-label={label} onClick={() => onSelect(item.id)}>
           <span className="today-scale-line"><span className="tabular-nums">{time}</span> · <span>{item.title}</span></span>
           {mark?.note && <span className="wc-proposed-note">{mark.note}</span>}
@@ -162,6 +179,7 @@ export function TodayDayScale({
   peopleOf,
   isReadOnlyEvent,
   onSelect,
+  onToggleDone,
   onPlanDrop,
   fromHour = null,
   handleRef,
@@ -181,6 +199,8 @@ export function TodayDayScale({
   isReadOnlyEvent: (item: TimelineItem) => boolean
   /** Opens the thing's details pane, as a row's click does. */
   onSelect: (id: string) => void
+  /** Ticks a task or routine off (or back on), as its check in the list does. */
+  onToggleDone?: (item: TimelineItem) => void
   /** A row dragged in from the week column (native drag), with the time it
    *  was dropped at. */
   onPlanDrop?: (payload: PlanDragPayload, when: Date) => void
@@ -314,6 +334,7 @@ export function TodayDayScale({
             refused={!!refusalFor(item, isReadOnlyEvent)}
             mark={markOf?.(item)}
             onSelect={onSelect}
+            onToggleDone={onToggleDone && (item.type === 'task' || item.type === 'routine') ? () => onToggleDone(item) : undefined}
           />
         )
       })}

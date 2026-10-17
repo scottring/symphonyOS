@@ -141,7 +141,8 @@ describe('Today as a daily journal', () => {
     const day = screen.getByRole('region', { name: 'The day' })
     const mold = within(day).getByText('Figure out washing machine mold').closest('.today-scale-item')!
     expect(mold).toHaveClass('is-past')
-    expect(within(mold as HTMLElement).getByRole('button').getAttribute('aria-label')).not.toMatch(/, done/)
+    expect(within(mold as HTMLElement).getByRole('button', { name: /^Figure out washing machine mold,/ }).getAttribute('aria-label')).not.toMatch(/, done/)
+    expect(within(mold as HTMLElement).getByRole('button', { name: 'Mark Figure out washing machine mold complete' })).toBeInTheDocument()
     expect(within(day).getByText('Do kids laundry')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Earlier today/ })).toBeNull()
   })

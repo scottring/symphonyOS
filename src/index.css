@@ -2112,6 +2112,12 @@ html.desktop-shell a {
 .today-scale-item.is-selected { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
 .today-scale-item.is-dragging { opacity: .35; }
 .today-scale-item:hover { filter: brightness(.98); }
+.today-scale-check { flex: none; display: flex; margin-top: 4px; cursor: default; }
+/* A half hour is 24px tall: the check fits the line, its touch area the block. */
+.today-scale-check > button { min-width: 0; min-height: 0; margin: -4px; padding: 4px; }
+.today-scale-check > button > span { width: 16px; height: 16px; }
+.today-scale-check > button > span:not(.bg-primary-500) { border-color: var(--color-neutral-400); }
+.today-scale-item:has(.today-scale-check) { padding-left: 9px; }
 .today-scale-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: flex-start; padding-top: 5px; text-align: left; color: var(--color-neutral-900); }
 .today-scale-line { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .today-scale-people { flex: none; display: inline-flex; margin-top: 4px; }

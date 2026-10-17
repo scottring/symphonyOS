@@ -1395,6 +1395,14 @@ export function TodayView({
               peopleOf={peopleOf}
               isReadOnlyEvent={isReadOnlyEvent}
               onSelect={handleSelectItem}
+              // The same tick-off the list's checks do (Scott, 2026-10-17).
+              onToggleDone={(item) => {
+                if (item.type === 'task') onToggleTask(item.id.replace('task-', ''))
+                else if (item.type === 'routine' && onCompleteRoutine) {
+                  const { routineId, slot } = parseRoutineTimelineId(item.id)
+                  onCompleteRoutine(slot === null ? routineId : `${routineId}#${slot}`, !item.completed)
+                }
+              }}
               onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }) }}
               fromHour={canHideEarlier && hideEarlier ? earlierCutoff : null}
               handleRef={scaleRef}

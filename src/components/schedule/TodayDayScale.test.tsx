@@ -40,12 +40,28 @@ describe('TodayDayScale', () => {
     const boxing = screen.getByRole('button', { name: 'Boxing, 9:00 AM to 10:15 AM' })
     expect(boxing).toHaveTextContent('9:00–10:15 · Boxing')
     expect(screen.getByRole('button', { name: 'School pickup, 4:00 PM' })).toHaveTextContent('4:00 · School pickup')
-    // One look: the same block class, no kind-specific styling, no checks.
+    // One look: the same block class, no kind-specific styling.
     const blocks = [...document.querySelectorAll('.today-scale-item')]
     expect(blocks.map((b) => b.className.replace(/\s+/g, ' ').trim())).toEqual(['today-scale-item', 'today-scale-item', 'today-scale-item'])
     expect(screen.queryByRole('button', { name: /^Done: / })).toBeNull()
     fireEvent.click(boxing)
     expect(props.onSelect).toHaveBeenCalledWith('event-boxing')
+  })
+
+  it('gives a task and a routine a check that ticks it off, and an event none', () => {
+    const onToggleDone = vi.fn()
+    const props = renderScale([
+      item({ id: 'event-boxing', type: 'event', title: 'Boxing', startTime: at(9), endTime: at(10) }),
+      item({ id: 'task-pickup', title: 'School pickup', startTime: at(16) }),
+      item({ id: 'routine-r1', type: 'routine', title: 'Meds', startTime: at(20), completed: true }),
+    ], { onToggleDone })
+    expect(screen.queryByRole('button', { name: /Boxing (in)?complete/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Mark School pickup complete' }))
+    expect(onToggleDone).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-pickup' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Meds incomplete' }))
+    expect(onToggleDone).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'routine-r1' }))
+    // Ticking off is not opening.
+    expect(props.onSelect).not.toHaveBeenCalled()
   })
 
   it('draws a step under its parent, not as its own block', () => {
