@@ -34,6 +34,21 @@ status open/done/carried/removed). A month item serves a season item
 - **Done folds** into one line ("5 done · … Show").
 - The parent list beside, and each goal's "This week" line, stay.
 
+## Review by hand (amended 2026-10-17, Scott)
+
+Beside the conversation, every horizon — Week, Month, Season, Year — offers
+"Review {period}": the period's open lines with the rows' verbs always shown
+(Done · Move to {next} · Someday · Remove from {period}; a year goal: Done ·
+Move to {next year} · Archive), what was decided, "What went well?" / "What
+didn't?", and Finish. Each verb saves at once with Undo; Finish stores
+`notes.periodReview` on the reviewed period's `planning_sessions` row — never
+`savedAt`, so a review never marks a period planned. Week lines are tasks
+committed to the week or given a day in it, plus each routine occurrence so
+far that is not the week's daily rhythm (every day / every weekday, unless
+"Show daily" is on): Done or Skip.
+Home's "Look back" opens the previous month's or season's review.
+(`PeriodReview.tsx`, `periodReview.ts`, `usePeriodReview.ts`.)
+
 ## The schedule (frame "After 2")
 
 A quiet chip invites the conversation, on that horizon's page (the bar chip)

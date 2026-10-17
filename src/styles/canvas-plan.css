@@ -493,3 +493,52 @@
 .plan-quick:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 .plan-quick:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }
 .plan-quick:disabled { opacity: .5; cursor: default; }
+
+/* ---- The review by hand (PeriodReview, 2026-10-17) -------------------------
+   Week, Month, Season and Year alike: open lines with their verbs always in
+   view (no hover), what was decided, two notes, one Finish. */
+.plan-review { display: flex; flex-direction: column; gap: 22px; max-width: 46rem; min-width: 0; padding-bottom: 32px; }
+.plan-review-head { display: flex; flex-direction: column; gap: 6px; }
+.plan-review-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.plan-review-title { margin: 0; font-family: var(--font-family-display); font-size: 24px; font-weight: 500; color: var(--color-neutral-900); }
+.plan-review-was { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13.5px; color: var(--color-neutral-600); }
+.plan-review-sentence { margin: 0; font-family: var(--font-family-display); font-size: 18px; line-height: 1.35; color: var(--color-neutral-700); }
+.plan-review-step { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.plan-review-step-title { margin: 0; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.plan-review-hint, .plan-review-empty { margin: 0; font-size: 13.5px; color: var(--color-neutral-600); }
+.plan-review-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.plan-review-line { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: 1px solid var(--color-neutral-200); min-width: 0; }
+.plan-review-line:last-child { border-bottom: 1px solid var(--color-neutral-200); }
+.plan-review-line.is-saving { opacity: .6; }
+.plan-review-line-title { margin: 0; font-size: 16px; color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.plan-review-line-note { margin: -2px 0 0; font-size: 12.5px; color: var(--color-neutral-500); overflow-wrap: anywhere; }
+.plan-review-verbs { display: flex; flex-wrap: wrap; gap: 6px; }
+.plan-review-verb {
+  all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px;
+  border: 1px solid var(--color-neutral-300); border-radius: var(--radius-full); background: var(--color-bg-elevated);
+  font-family: var(--font-family-sans); font-size: 13px; font-weight: 500; color: var(--color-neutral-700); white-space: nowrap;
+}
+.plan-review-verb:hover { border-color: var(--color-primary-500); color: var(--color-primary-800); background: var(--color-primary-50); }
+.plan-review-verb:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.plan-review-verb:disabled { opacity: .5; cursor: default; }
+@media (hover: none), (pointer: coarse) { .plan-review-verb { min-height: 44px; padding: 0 14px; font-size: 14px; } }
+.plan-review-line-status { margin: 0; font-size: 12.5px; color: var(--color-neutral-500); }
+.plan-review-line-status.is-failed { color: var(--color-danger-700, #9b3412); }
+.plan-review-decided { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.plan-review-decided li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--color-neutral-600); min-width: 0; }
+.plan-review-decided li > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.plan-review-verdict { flex: none; font-size: 12.5px; color: var(--color-neutral-500); }
+.plan-review-done { margin-top: -10px; }
+.plan-review-note { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--color-neutral-700); }
+.plan-review-note textarea {
+  box-sizing: border-box; width: 100%; min-height: 60px; padding: 8px 10px; resize: vertical;
+  border: 1px solid var(--color-neutral-300); border-radius: var(--radius-md); background: var(--color-bg-elevated);
+  font: inherit; font-size: 15px; color: var(--color-neutral-900);
+}
+.plan-review-note textarea:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }
+.plan-review-foot { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.plan-review-finish:disabled { opacity: .55; cursor: default; }
+.plan-review-finished { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; color: var(--color-neutral-800); }
+.plan-review-onward { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.plan-review-open:disabled { opacity: .5; cursor: default; }
+@media (hover: none), (pointer: coarse) { .plan-review-open, .plan-review-finish { min-height: 44px; } }

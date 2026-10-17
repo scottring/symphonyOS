@@ -83,6 +83,10 @@ describe('isSessionSubstantive', () => {
     expect(isSessionSubstantive({ wentWell: '', didnt: '', savedAt: '' })).toBe(false)
   })
 
+  it('a review by hand alone plans nothing', () => {
+    expect(isSessionSubstantive({ periodReview: { wentWell: 'Bike rack', didnt: '', at: '2026-10-31T20:00:00Z' } })).toBe(false)
+  })
+
   it('accepts a real answer', () => {
     expect(isSessionSubstantive({ stepIndex: 4, review: 'Shipped the context graph' })).toBe(true)
     expect(isSessionSubstantive({ oneWord: 'steady' })).toBe(true)

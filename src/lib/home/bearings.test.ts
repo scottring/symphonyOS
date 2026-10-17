@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chooseNextStep, count, greeting, inTime, nextSteps, nextUp, numberWord, timeRange, type BearingsFacts } from './bearings'
+import { chooseNextStep, count, greeting, inTime, lookBackPath, nextSteps, nextUp, numberWord, timeRange, type BearingsFacts } from './bearings'
 
 const level = (name: string, over: Partial<BearingsFacts['month']> = {}) => ({ name, open: 3, planned: true, review: 0, reviewName: 'September', ...over })
 const facts = (over: Partial<BearingsFacts> = {}): BearingsFacts => ({
@@ -46,6 +46,12 @@ describe('the next step', () => {
   it('offers the month look-back with the month it reviews', () => {
     const step = chooseNextStep(facts({ month: level('October', { review: 3 }) }), new Set())
     expect(step.title).toBe('September closed with three open lines.')
+  })
+  it('Look back opens that period\'s review by hand', () => {
+    const step = chooseNextStep(facts({ month: level('October', { review: 3, reviewStart: '2026-09-01' }) }), new Set())
+    expect(step.action?.to).toBe('/month?start=2026-09-01&review=1')
+    expect(lookBackPath('season', { reviewStart: '2026-06-01' })).toBe('/season?start=2026-06-01&review=1')
+    expect(lookBackPath('season', {})).toBe('/season')
   })
   it('asks for today when nothing is chosen, but not late in the evening', () => {
     expect(chooseNextStep(facts({ todayChosen: 0 }), new Set()).id).toBe('choose-today')

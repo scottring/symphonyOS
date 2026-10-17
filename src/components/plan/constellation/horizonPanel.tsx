@@ -44,7 +44,8 @@ export function horizonOnScreen(pathname: string, params: URLSearchParams, today
 /** "October", "Fall", "2026". */
 const periodWord = (label: string) => label.replace(/\s\d{4}$/, '')
 
-export interface HorizonPanelAction { id: string; label: string; onClick: () => void }
+/** onClick settles true once the write is saved (the review waits on it). */
+export interface HorizonPanelAction { id: string; label: string; onClick: () => Promise<boolean> }
 
 export interface HorizonPanelDeps {
   tasks: readonly Task[]
@@ -77,11 +78,11 @@ export function periodMoves(
   return [
     {
       id: 'horizon-carry', label: `Move to ${nextName}`,
-      onClick: () => { void run(`Move “${task.title}” to ${nextName}`, async () => !!await deps.keepForward(task.id, level === 'month' ? { monthStart: bounds.next } : { seasonStart: bounds.next }, bounds.start), { ids: [task.id], undo }) },
+      onClick: () => run(`Move “${task.title}” to ${nextName}`, async () => !!await deps.keepForward(task.id, level === 'month' ? { monthStart: bounds.next } : { seasonStart: bounds.next }, bounds.start), { ids: [task.id], undo }),
     },
     {
       id: 'horizon-remove', label: `Remove from ${name}`,
-      onClick: () => { void run(`Remove “${task.title}” from ${name}`, () => deps.dropCommitment(task.id, level, bounds.start), { ids: [task.id], undo }) },
+      onClick: () => run(`Remove “${task.title}” from ${name}`, () => deps.dropCommitment(task.id, level, bounds.start), { ids: [task.id], undo }),
     },
   ]
 }

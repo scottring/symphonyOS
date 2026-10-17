@@ -9,6 +9,8 @@ vi.mock('@/hooks/usePlanningSession', () => ({ usePlanningSession: () => session
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'me' } }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [] }) }))
 vi.mock('@/contexts/CanvasActivityContext', () => ({ useCanvasActivity: () => activity }))
+const review = { reviewed: null, mine: null, loading: false, error: null, reload: vi.fn(), finish: vi.fn(async () => true) }
+vi.mock('@/hooks/usePeriodReview', () => ({ usePeriodReview: () => review }))
 
 import { WeekV2 } from './WeekV2'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
@@ -138,5 +140,35 @@ describe('WeekV2 toolbar — folded into the masthead', () => {
     expect(within(controls).queryByRole('button', { name: 'Plan the week' })).toBeNull()
     expect(within(controls).queryByRole('group', { name: 'View' })).toBeNull()
     subline.remove(); controls.remove()
+  })
+})
+
+// The review by hand (2026-10-17): the canvas gives way to the week's lines.
+describe('WeekV2 — Review week N', () => {
+  beforeEach(() => { session.saved = null; session.loading = false; session.error = null })
+  const lines = [
+    { key: 'a', title: 'Call the plumber', state: 'open' as const, verbs: [{ label: 'Done', run: vi.fn(async () => true) }, { label: 'Move to next week', run: vi.fn(async () => true) }] },
+    { key: 'b', title: 'Return library books', state: 'done' as const, verbs: [] },
+  ]
+
+  it('opens in place of the canvas and closes back to it', () => {
+    renderWeek({ canvas: <p>The days</p>, reviewLines: lines })
+    fireEvent.click(screen.getByRole('button', { name: /^Review week \d+$/ }))
+    expect(screen.queryByText('The days')).toBeNull()
+    const open = screen.getByRole('list', { name: /^Still open in week \d+$/ })
+    expect(within(open).getByRole('button', { name: 'Move to next week: Call the plumber' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Review week/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Close review' }))
+    expect(screen.getByText('The days')).toBeTruthy()
+  })
+
+  it('a past week offers the review too, without the conversation', () => {
+    renderWeek({ isCurrent: false, weekStart: new Date(2026, 8, 13), reviewLines: lines })
+    expect(screen.getByRole('button', { name: /^Review week \d+$/ })).toBeTruthy()
+  })
+
+  it('without lines (the v1 week) there is no review', () => {
+    renderWeek()
+    expect(screen.queryByRole('button', { name: /^Review week/ })).toBeNull()
   })
 })

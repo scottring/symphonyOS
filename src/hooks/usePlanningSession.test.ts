@@ -3,11 +3,16 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 
 const rows: Array<Record<string, unknown>> = []
 const upsert = vi.fn(async () => ({ error: null }))
+let ownRow: { notes: Record<string, unknown> } | null = null
 let orderImpl: () => Promise<{ data: unknown[]; error: null }> = async () => ({ data: rows, error: null })
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
-      select: () => ({ eq: () => ({ eq: () => ({ order: () => orderImpl() }) }) }),
+      // Reads: .eq().eq().order() for the page; .eq() x3 .maybeSingle() for a save's own row.
+      select: () => {
+        const chain = { eq: () => chain, order: () => orderImpl(), maybeSingle: async () => ({ data: ownRow, error: null }) }
+        return chain
+      },
       upsert,
     }),
   },
@@ -17,7 +22,7 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 import { usePlanningSession, monthToken, weekToken, yearToken } from './usePlanningSession'
 
 describe('usePlanningSession', () => {
-  beforeEach(() => { rows.length = 0; upsert.mockClear(); orderImpl = async () => ({ data: rows, error: null }) })
+  beforeEach(() => { rows.length = 0; ownRow = null; upsert.mockClear(); orderImpl = async () => ({ data: rows, error: null }) })
 
   it('builds the month token the cadence code uses', () => {
     expect(monthToken(new Date(2026, 9, 1))).toBe('2026-10')
@@ -48,6 +53,16 @@ describe('usePlanningSession', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     await act(async () => { await result.current.save({ wentWell: 'w', didnt: 'd' }) })
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ horizon: 'weekly', period_token: '2026-10-4' }), expect.anything())
+  })
+
+  it('keeps the period\'s review by hand when the plan is saved', async () => {
+    ownRow = { notes: { periodReview: { wentWell: 'bike', didnt: '', at: '2026-10-17T10:00:00Z' } } }
+    const { result } = renderHook(() => usePlanningSession('weekly', '2026-10-17'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => { await result.current.save({ wentWell: '', didnt: '' }) })
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      notes: expect.objectContaining({ periodReview: ownRow.notes.periodReview, savedAt: expect.any(String) }),
+    }), expect.anything())
   })
 
   it('reads the latest saved session visible to me, from anyone in the household', async () => {

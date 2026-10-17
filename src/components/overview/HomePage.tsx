@@ -20,7 +20,7 @@ import { useDomain } from '@/hooks/useDomain'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { connectedDestination } from '@/lib/planning/connectedDestination'
-import { chooseNextStep, count, greeting, lensLine, nextUp, timeRange, type NextStepId } from '@/lib/home/bearings'
+import { chooseNextStep, count, greeting, lensLine, lookBackPath, nextUp, timeRange, type NextStepId } from '@/lib/home/bearings'
 
 const SET_ASIDE_KEY = 'symphony-home-set-aside'
 
@@ -99,7 +99,7 @@ function HomeInner() {
   for (const lvl of ['month', 'season'] as const) {
     const f = b.facts[lvl]
     if (f.review > 0 && step.id !== `look-back-${lvl}`) {
-      waiting.push({ key: `review-${lvl}`, Icon: RotateCcw, text: `${f.reviewName} closed with ${count(f.review, 'open line')}. Carry, drop, or call them done.`, label: 'Look back', to: `/${lvl}` })
+      waiting.push({ key: `review-${lvl}`, Icon: RotateCcw, text: `${f.reviewName} closed with ${count(f.review, 'open line')}. Carry, drop, or call them done.`, label: 'Look back', to: lookBackPath(lvl, f) })
     }
   }
 

@@ -31,7 +31,7 @@ import { withDefaultEventAssignees } from '@/components/home/eventAssigneeDefaul
 import { dedupeCalendarEvents } from '@/lib/calendar/dedupeEvents'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { seasonToken } from '@/lib/cadence/seasons'
-import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
+import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { isCurrentPeriod, periodBounds, selectPeriodTasks } from '@/lib/planning/periodPage'
 import { closeOutCandidates, lineFate } from '@/lib/planning/v2/planV2'
@@ -189,7 +189,7 @@ export function useHomeBearings(now: Date): HomeBearings {
       : 0
     const name = lvl === 'month' ? b.start.toLocaleDateString('en-US', { month: 'long' }) : b.label.replace(/\s+\d{4}$/, '')
     const reviewName = lvl === 'month' ? prev.start.toLocaleDateString('en-US', { month: 'long' }) : prev.label.replace(/\s+\d{4}$/, '')
-    return { name, open: open.length, planned, review, reviewName, lines: open }
+    return { name, open: open.length, planned, review, reviewName, reviewStart: localYmd(prev.start), lines: open }
   }
   const monthFacts = useMemo(() => level('month', month, !!monthSession.saved),
     [layered, month, today, lens, seasons, monthSession.saved]) // eslint-disable-line react-hooks/exhaustive-deps
