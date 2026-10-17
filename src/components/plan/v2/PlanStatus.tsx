@@ -65,7 +65,7 @@ function statusText({ period, saved, loading, error, agreedBy, onRetry, hasLines
       <button type="button" className="pv2-link" onClick={onRetry}>Try again</button></span>
     : saved
       ? <><span className="pv2-seal" aria-hidden="true" /><span><b>{cap(period)} planned</b> {day(saved.at)}{by}</span></>
-      : loading ? null : <span className="pv2-hint">{unplannedHint ?? (hasLines ? `${cap(period)} isn’t marked planned yet` : `${cap(period)} isn’t planned yet`)}</span>
+      : loading || unplannedHint === '' ? null : <span className="pv2-hint">{unplannedHint ?? (hasLines ? `${cap(period)} isn’t marked planned yet` : `${cap(period)} isn’t planned yet`)}</span>
 }
 
 /** The page's tools, the view icons and one verb: "Look back at <prev>"

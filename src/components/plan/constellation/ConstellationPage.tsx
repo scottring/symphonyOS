@@ -64,7 +64,8 @@ import { periodMoves } from './horizonPanel'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 import { useAuth } from '@/hooks/useAuth'
-import { monthToken, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
+import { monthToken, usePlanningSession, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
+import { showToast } from '@/hooks/useToast'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { seasonToken } from '@/lib/cadence/seasons'
 import { movedOn, taskReviewState, yearGoalReviewState } from '@/lib/planning/periodReview'
@@ -124,7 +125,20 @@ function Inner() {
   const seasonWord = periodWordOf(seasonB), monthWord = periodWordOf(monthB)
   // The review by hand of the period on screen (PeriodReview): open with ?review=1.
   const reviewing = params.get('review') === '1'
-  const review = usePeriodReview(SESSION_HORIZONS[level], level === 0 ? yearToken(year) : level === 1 ? seasonToken(bounds.start, seasons) : monthToken(bounds.start))
+  const sessionToken = level === 0 ? yearToken(year) : level === 1 ? seasonToken(bounds.start, seasons) : monthToken(bounds.start)
+  const review = usePeriodReview(SESSION_HORIZONS[level], sessionToken)
+  // "I'm happy with October" (Scott, 2026-10-17): planned is a thing you
+  // say, as on Week — not a list that merely has lines. Home's checklist
+  // reads it.
+  const planSession = usePlanningSession(SESSION_HORIZONS[level], sessionToken)
+  const [marking, setMarking] = useState(false)
+  const markPlanned = async () => {
+    setMarking(true)
+    const mine = planSession.mine
+    const ok = await planSession.save({ wentWell: mine?.wentWell ?? '', didnt: mine?.didnt ?? '', ...(mine?.focus ? { focus: mine.focus } : {}) })
+    setMarking(false)
+    if (!ok) showToast('Couldn’t save that — try again.', 'error', 5000)
+  }
 
   // ---- What is planned (already filtered for privacy, area and people) ----
   const meId = getCurrentUserMember()?.id ?? null
@@ -479,6 +493,10 @@ function Inner() {
       {(!walkInBar || !reviewing) && <div className="plan-head-row">
         {!walkInBar && walk}
         {!reviewing && <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setReviewing(true)}>Review {periodWord}</button>}
+        {!reviewing && !planSession.loading && !planSession.error && (planSession.saved
+          ? <span className="plan-planned"><span className="pv2-seal" aria-hidden="true" />{periodWord} planned {planSession.saved.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          // A period already over is reviewed, not planned.
+          : bounds.end > now && <button type="button" className="canvas-link plan-mark" disabled={marking || !dataReady} onClick={() => { void markPlanned() }}>I’m happy with {periodWord}</button>)}
       </div>}
       <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
         <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>

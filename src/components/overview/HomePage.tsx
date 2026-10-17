@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
-  ArrowRight, BookOpen, FileText, Home as HouseIcon, Inbox, List, MessageCircle, NotebookText, Repeat, RotateCcw, Users, UtensilsCrossed,
+  ArrowRight, BookOpen, Check, FileText, Home as HouseIcon, Inbox, List, MessageCircle, NotebookText, Repeat, RotateCcw, Users, UtensilsCrossed,
 } from 'lucide-react'
 import { GoalsProvider } from '@/contexts/GoalsContext'
 import { useHomeBearings, type Rung } from '@/hooks/useHomeBearings'
@@ -194,7 +194,7 @@ function HomeInner() {
           <span>Lists above the week are for looking. The week and the day are for doing.</span>
         </div>
         <ol className="home-ladder">
-          {b.rungs.map((r) => <RungItem key={r.level} rung={r} to={go(r.to)} />)}
+          {b.rungs.map((r) => <RungItem key={r.level} rung={r} to={go(r.to)} go={go} />)}
         </ol>
       </section>
 
@@ -217,7 +217,7 @@ function HomeInner() {
   )
 }
 
-function RungItem({ rung, to }: { rung: Rung; to: string }) {
+function RungItem({ rung, to, go }: { rung: Rung; to: string; go: (to: string) => string }) {
   const here = rung.level === 'today'
   return (
     <li className={`home-rung${here ? ' is-here' : ''}${rung.attention ? ' needs-attention' : ''}`} aria-current={here ? 'step' : undefined}>
@@ -226,9 +226,19 @@ function RungItem({ rung, to }: { rung: Rung; to: string }) {
             step's name sits on one line; the phone's column puts it after the name. */}
         <span className="home-rung-mark"><span className="home-rung-dot" aria-hidden="true" />{here ? <span className="home-rung-here">You are here</span> : <span className="home-rung-line" aria-hidden="true" />}</span>
         <span className="home-rung-name">{rung.name}{here && <span className="home-rung-here is-inline" aria-hidden="true">You are here</span>}</span>
-        <span className="home-rung-status">{rung.status}</span>
+        {rung.status && <span className="home-rung-status">{rung.status}</span>}
         {rung.sample && <span className="home-rung-sample">“{rung.sample}”</span>}
       </Link>
+      {/* Where the rhythm stands (Scott, 2026-10-17): last period reviewed,
+          this one planned — ticked when done, a link to do it when not. */}
+      {rung.steps && <ul className="home-rung-steps" aria-label={`${rung.name}: review and plan`}>
+        {[rung.steps.review, rung.steps.plan].map((s) => <li key={s.label} className={s.done ? 'is-done' : undefined}>
+          {s.done
+            ? <span className="home-step"><Check size={14} aria-hidden="true" />{s.label}</span>
+            : <Link className="home-step" to={go(s.to)}><span className="home-step-ring" aria-hidden="true" />{s.label} →</Link>}
+          {s.dates && <span className="home-step-dates">{s.dates}</span>}
+        </li>)}
+      </ul>}
     </li>
   )
 }

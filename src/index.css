@@ -4235,6 +4235,15 @@ button.domain-switcher-trigger[data-filtered="true"] { color: var(--color-primar
 .home-rung.needs-attention .home-rung-status { color: hsl(28 70% 32%); }
 [data-scenery-lighting='nighttime'] .home-rung.needs-attention .home-rung-status { color: hsl(34 80% 72%); }
 .home-rung-sample { font: italic 15px/1.35 var(--font-family-display); color: var(--color-neutral-700); }
+.home-rung-steps { list-style: none; margin: 4px 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.home-rung-steps li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; font-size: 13px; }
+.home-step { display: inline-flex; align-items: center; gap: 6px; color: var(--color-neutral-600); }
+.home-rung-steps li.is-done .home-step { color: var(--color-neutral-700); }
+.home-rung-steps li.is-done svg { color: var(--home-accent); }
+a.home-step { color: var(--home-accent); font-weight: 500; }
+.home-page a.home-step:hover { text-decoration: underline; }
+.home-step-ring { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; opacity: .7; }
+.home-step-dates { font-size: 12px; color: var(--color-neutral-500); padding-left: 20px; flex-basis: 100%; }
 
 .home-library { display: flex; flex-direction: column; gap: 12px; }
 .home-library ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; }

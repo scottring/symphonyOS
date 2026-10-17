@@ -67,7 +67,9 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines 
     : changeSet ? 'Save or discard the draft in Chat before confirming this week.'
     : unresolved ? 'Check the last change in Chat before confirming this week.'
     : receipt?.state === 'saved' ? 'Your changes are saved. Review the week, then choose “I’m happy with this week.”'
-    : 'Review your activities and decide what needs attention this week.'
+    // At rest the header says nothing of its own (Scott, 2026-10-17: "quite
+    // cluttered"); Review and the planning verbs speak for themselves.
+    : ''
   const toToday = () => navigate(new URLSearchParams(location.search).get('view') === 'alongside' ? '/today?view=alongside' : '/today')
 
   // Marking planned is one tap; the conversation does the planning.

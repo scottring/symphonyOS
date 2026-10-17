@@ -46,6 +46,20 @@ beforeEach(() => {
 })
 
 describe('Home', () => {
+  it('each horizon says where its rhythm stands: last period reviewed, this one planned', () => {
+    const steps = {
+      review: { label: 'Reviewed week 42', done: true, dates: 'Oct 10 – 16', to: '/week?review=1' },
+      plan: { label: 'Plan week 43', done: false, dates: 'Oct 17 – 23', to: '/week' },
+    }
+    state.bearings = bearings({}, { rungs: [{ level: 'week', name: 'Week 43', status: 'Three to do', attention: true, sample: null, to: '/week', steps }] })
+    renderHome()
+    const list = screen.getByRole('list', { name: 'Week 43: review and plan' })
+    expect(list).toHaveTextContent('Reviewed week 42')
+    expect(list).toHaveTextContent('Oct 10 – 16')
+    expect(screen.queryByRole('link', { name: /Reviewed week 42/ })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Plan week 43 →' }).getAttribute('href')).toMatch(/^\/week/)
+  })
+
   it('greets, suggests one next step and links it', () => {
     renderHome()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/, Scott$/)
