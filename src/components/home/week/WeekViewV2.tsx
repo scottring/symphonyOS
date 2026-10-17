@@ -73,7 +73,7 @@ import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters 
 import { DayWeather } from './WeekJournal'
 import { committedTo, liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
-import { weekReviewState, weekRoutineOccurrences } from '@/lib/planning/periodReview'
+import { dayNote, weekPhrase, weekReviewState, weekRoutineOccurrences } from '@/lib/planning/periodReview'
 import type { ReviewLine, ReviewVerb } from '@/components/plan/review/PeriodReview'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
@@ -916,8 +916,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // off first (it would otherwise stay on this week's day); Remove is the
   // week's own "not this week" (timingRemoval). Undo puts back the day and
   // the commitments as they were.
-  const reviewWeekWord = `week ${weekOfYear(weekAnchor, readCadenceConfig().weekStartsOn)}`
+  // Named by dates, each line with its day, so it is plain which week is
+  // which (Scott, 2026-10-17).
+  const reviewWeekWord = weekPhrase(weekAnchor)
   const nextWeekStart = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7)
+  const nextWeekWord = weekPhrase(nextWeekStart)
   const reviewVerbs = (t: Task): ReviewVerb[] => {
     const before = liveCommitments({ commitments: bootstrapCommitments(t) })
     const offDay = timingRemoval(t, 'day'), offWeek = timingRemoval(t, 'all')
@@ -926,7 +929,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     const clearDay = async () => !t.scheduledFor || (await updateTask(t.id, offDay.updates)) !== false
     return [
       { label: 'Done', run: () => activity.run(`Done: “${t.title}”`, toggle, { ids: [t.id], undo: toggle }) },
-      { label: 'Move to next week', run: () => activity.run(`Move “${t.title}” to next week`, async () => await clearDay() && !!await keepForward(t.id, { weekStart: nextWeekStart }, weekAnchor), { ids: [t.id], undo: restore }) },
+      { label: `Move to ${nextWeekWord}`, run: () => activity.run(`Move “${t.title}” to ${nextWeekWord}`, async () => await clearDay() && !!await keepForward(t.id, { weekStart: nextWeekStart }, weekAnchor), { ids: [t.id], undo: restore }) },
       { label: 'Someday', run: () => activity.run(`${describeTriageWhen('someday')}: “${t.title}”`, async () => await clearDay() && applyTriageWhen('someday', t.id, {
         onPushTask: gated.pushTask, onSetBucket: gated.setBucket ?? ((id, bucket) => onUpdateTask(id, { bucket })),
       }), { ids: [t.id] }) },
@@ -935,14 +938,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
   }
   const taskReviewLines: ReviewLine[] = tasks.filter((t) => !t.isGoal).filter(lens.keep).flatMap((t) => {
     const state = weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent })
-    return state ? [{ key: t.id, title: t.title, state, verbs: state === 'open' ? reviewVerbs(t) : [] }] : []
+    return state ? [{ key: t.id, title: t.title, note: dayNote(t.scheduledFor, !!t.scheduledFor && t.isAllDay === false), state, verbs: state === 'open' ? reviewVerbs(t) : [] }] : []
   })
   // Routines that don't run every day (or every weekday) are reviewed too, one
   // line per occurrence so far: Done or Skip, as the day's row offers them.
   const routineReviewLines: ReviewLine[] = weekRoutineOccurrences(journalDays, weekInstances, { includeDaily: dailyShown, todayKey: localYmd(new Date()) }).map((o) => {
-    const name = `${o.title} · ${o.date.toLocaleDateString('en-US', { weekday: 'short' })}`
+    const name = `${o.title} (${o.date.toLocaleDateString('en-US', { weekday: 'short' })})`
     return {
-      key: `routine:${o.routineId}:${o.dayKey}`, title: name, state: o.state,
+      key: `routine:${o.routineId}:${o.dayKey}`, title: o.title, note: `Routine · ${dayNote(o.date)}`, state: o.state,
       verbs: o.state !== 'open' ? [] : [
         { label: 'Done', run: () => activity.run(`Done: “${name}”`, () => markDone('routine', o.routineId, o.date), { ids: [o.routineId], undo: () => undoDone('routine', o.routineId, o.date) }) },
         { label: 'Skip', run: () => activity.run(`Skip “${name}”`, () => skip('routine', o.routineId, o.date), { ids: [o.routineId], undo: () => undoDone('routine', o.routineId, o.date) }) },

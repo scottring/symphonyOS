@@ -109,7 +109,7 @@ export function PeriodReview(p: PeriodReviewProps) {
       <div className="plan-review-step">
         <h3 className="plan-review-step-title">Still open</h3>
         {open.length === 0
-          ? <p className="plan-review-empty">{p.lines.length === 0 && gone.length === 0 ? `Nothing was on ${word}.` : 'Every line has an answer.'}</p>
+          ? <p className="plan-review-empty">{p.lines.length === 0 && gone.length === 0 ? `Nothing was on ${word}.` : 'Every line has an answer. Add a note below if you like, then finish the review.'}</p>
           : <>
             <p className="plan-review-hint">Choose for each one. Each choice saves right away; what you skip stays on {word}.</p>
             <ul className="plan-review-lines" aria-label={`Still open in ${word}`}>
@@ -159,13 +159,14 @@ export function PeriodReview(p: PeriodReviewProps) {
           ? <p className="plan-review-finished" role="status"><span className="pv2-seal" aria-hidden="true" /> <b>{cap} reviewed.</b>{open.length > 0 ? ` ${open.length === 1 ? 'One line stays' : `${open.length} lines stay`} on ${word}.` : ''}</p>
           : <>
             {open.length > 0 && <p className="plan-review-hint">{open.length === 1 ? 'One line is' : `${open.length} lines are`} still open. Finishing leaves {open.length === 1 ? 'it' : 'them'} on {word}.</p>}
-            <button type="button" className="plan-walk plan-review-finish" disabled={saving} onClick={() => { void finish() }}>
+            {/* With nothing left to decide, Finish is the next step: say so. */}
+            <button type="button" className={`plan-walk plan-review-finish${open.length === 0 ? ' is-next' : ''}`} disabled={saving} onClick={() => { void finish() }}>
               {saving ? 'Saving…' : p.reviewed ? 'Update review' : 'Finish review'}
             </button>
             {saveFailed && <p className="plan-review-line-status is-failed" role="alert">Couldn’t save the review. Try again.</p>}
           </>}
         {justFinished && <div className="plan-review-onward">
-          {p.next && <button type="button" className="plan-walk" onClick={p.next.onClick}>{p.next.label}</button>}
+          {p.next && <button type="button" className="plan-walk plan-review-finish is-next" onClick={p.next.onClick}>{p.next.label}</button>}
           <button type="button" className="canvas-link" onClick={p.onClose}>Close review</button>
         </div>}
       </footer>

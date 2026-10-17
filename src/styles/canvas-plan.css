@@ -540,6 +540,8 @@
 .plan-review-note textarea:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }
 .plan-review-foot { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .plan-review-finish:disabled { opacity: .55; cursor: default; }
+.plan-review-finish.is-next { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.plan-review-finish.is-next:hover { background: var(--color-primary-800); }
 .plan-review-finished { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; color: var(--color-neutral-800); }
 .plan-review-onward { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 .plan-review-open:disabled { opacity: .5; cursor: default; }

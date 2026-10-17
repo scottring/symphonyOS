@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { createMockActionableInstance, createMockTask } from '@/test/mocks/factories'
 import type { JournalDay, JournalEntry } from '@/lib/week/journalDays'
 import type { Goal } from '@/types/goal'
-import { movedOn, reviewSentence, taskReviewState, weekReviewState, weekRoutineOccurrences, yearGoalReviewState } from './periodReview'
+import { dayNote, movedOn, reviewSentence, weekPhrase, taskReviewState, weekReviewState, weekRoutineOccurrences, yearGoalReviewState } from './periodReview'
 
 const OCT = new Date(2026, 9, 1)
 const onOctober = (status: 'open' | 'done' | 'carried' | 'removed', completed = false) =>
@@ -20,6 +20,17 @@ describe('taskReviewState', () => {
   it('a line removed from the period is no longer on its list', () => {
     expect(taskReviewState(onOctober('removed'), 'month', OCT, { isCurrent: false })).toBeUndefined()
     expect(taskReviewState(onOctober('open'), 'month', new Date(2026, 10, 1), { isCurrent: false })).toBeUndefined()
+  })
+})
+
+describe('weekPhrase and dayNote', () => {
+  it('names a week by its dates and a line by its day', () => {
+    const today = new Date(2026, 9, 20)
+    expect(weekPhrase(new Date(2026, 9, 17), today)).toBe('this week')
+    expect(weekPhrase(new Date(2026, 9, 10), today)).toBe('the week of Oct 10')
+    expect(dayNote(undefined)).toBe('No day yet')
+    expect(dayNote(new Date(2026, 9, 17))).toBe('Sat, Oct 17')
+    expect(dayNote(new Date(2026, 9, 17, 10, 30), true)).toBe('Sat, Oct 17 · 10:30 AM')
   })
 })
 

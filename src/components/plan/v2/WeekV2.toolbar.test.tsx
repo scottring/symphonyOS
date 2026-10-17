@@ -153,18 +153,30 @@ describe('WeekV2 — Review week N', () => {
 
   it('opens in place of the canvas and closes back to it', () => {
     renderWeek({ canvas: <p>The days</p>, reviewLines: lines })
-    fireEvent.click(screen.getByRole('button', { name: /^Review week \d+$/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
     expect(screen.queryByText('The days')).toBeNull()
-    const open = screen.getByRole('list', { name: /^Still open in week \d+$/ })
+    const open = screen.getByRole('list', { name: 'Still open in this week' })
     expect(within(open).getByRole('button', { name: 'Move to next week: Call the plumber' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Review week/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Close review' }))
     expect(screen.getByText('The days')).toBeTruthy()
   })
 
-  it('a past week offers the review too, without the conversation', () => {
-    renderWeek({ isCurrent: false, weekStart: new Date(2026, 8, 13), reviewLines: lines })
-    expect(screen.getByRole('button', { name: /^Review week \d+$/ })).toBeTruthy()
+  it('finishing points on to the next week, named by its date', async () => {
+    renderWeek({ canvas: <p>The days</p>, reviewLines: [lines[1]] })
+    fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
+    expect(screen.getByText(/Every line has an answer/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Finish review' }).className).toContain('is-next')
+    fireEvent.click(screen.getByRole('button', { name: 'Finish review' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Go to the week of Oct 4 →' }))
+    expect(screen.getByText('The days')).toBeTruthy()
+  })
+
+  it('a past week offers the review too, without the conversation, and points on to this week', async () => {
+    renderWeek({ isCurrent: false, weekStart: new Date(2026, 8, 20), reviewLines: [lines[1]] })
+    fireEvent.click(screen.getByRole('button', { name: 'Review the week of Sep 20' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Finish review' }))
+    expect(await screen.findByRole('button', { name: 'Go to this week →' })).toBeTruthy()
   })
 
   it('without lines (the v1 week) there is no review', () => {

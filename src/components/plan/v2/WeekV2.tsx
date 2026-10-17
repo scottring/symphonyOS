@@ -16,6 +16,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { PeriodReview, type ReviewLine } from '@/components/plan/review/PeriodReview'
+import { weekPhrase } from '@/lib/planning/periodReview'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useAuth } from '@/hooks/useAuth'
 import { showToast } from '@/hooks/useToast'
@@ -48,11 +49,14 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines 
   const review = usePeriodReview('weekly', weekToken(weekStart))
   const [params, setParams] = useSearchParams()
   const reviewing = !!reviewLines && params.get('review') === '1'
-  const setReviewing = (on: boolean) => setParams((prev) => {
+  const setReviewing = (on: boolean, week?: Date) => setParams((prev) => {
     const p = new URLSearchParams(prev)
     if (on) p.set('review', '1'); else p.delete('review')
+    if (week) { p.set('date', localYmd(week)); p.set('start', localYmd(week)) }
     return p
   })
+  const reviewWord = weekPhrase(weekStart)
+  const nextWeek = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
   const [justSaved, setJustSaved] = useState<null | { detail: string }>(null)
   const [confirming, setConfirming] = useState(false)
   const { changeSet, receipt } = useCanvasActivity()
@@ -88,7 +92,7 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines 
   const toolbar: PlanToolbarProps = {
     period: `week ${weekNo}`, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
     planningAction: walk && { label: walk.label, onClick: walk.onStart },
-    reviewAction: reviewLines && !reviewing ? { label: `Review week ${weekNo}`, onClick: () => setReviewing(true) } : undefined,
+    reviewAction: reviewLines && !reviewing ? { label: `Review ${reviewWord}`, onClick: () => setReviewing(true) } : undefined,
     markLabel: 'I’m happy with this week',
     markDisabled: confirmationBlocked,
     unplannedHint: reviewHint,
@@ -133,8 +137,9 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines 
         </div>
       )}
       {reviewing
-        ? <PeriodReview key={localYmd(weekStart)} periodWord={`week ${weekNo}`} lines={reviewLines!} loading={review.loading}
+        ? <PeriodReview key={localYmd(weekStart)} periodWord={reviewWord} lines={reviewLines!} loading={review.loading}
             reviewed={review.reviewed} mine={review.mine} onFinish={review.finish} onClose={() => setReviewing(false)}
+            next={{ label: `Go to ${weekPhrase(nextWeek)} →`, onClick: () => setReviewing(false, nextWeek) }}
             byWhom={(id) => id === user?.id ? 'you' : members.find((m) => m.auth_user_id === id)?.name ?? 'your household'} />
         : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
     </div>
