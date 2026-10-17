@@ -1,10 +1,14 @@
 // src/components/canvas/plan/PlanItemRow.tsx
 //
-// One goal on a Month, Season or Year list: a list to look at (spec
-// 2026-10-14, "The pages"). No ⋯ menu and no quick buttons. Tapping a month
-// or season goal (a task) opens its panel, which holds every verb; a year
-// goal opens in place with its few verbs (Done, Archive). Under the title, the
-// goal it serves and what is moving it one horizon down.
+// One goal on a Month, Season or Year list (spec 2026-10-14, "The pages").
+// Tapping a month or season goal (a task) opens its panel, which holds every
+// verb; a year goal opens in place with its few verbs (Done, Archive). Under
+// the title, the goal it serves and what is moving it one horizon down.
+//
+// Triage on the row (Scott, 2026-10-16, bringing back 2026-10-13's): an open
+// goal shows its quick verbs (Done · Move to … · Someday · Remove from … for a
+// month or season goal; Done · Archive for a year goal). With a mouse they
+// show on hover or focus; on touch, where there is no hover, always.
 //
 // A pending change card marks the row dashed (planPreview.ts): teal when it
 // would change here, grey when it would leave, struck when done or gone.
@@ -30,6 +34,8 @@ export interface PlanItemRowProps {
   expanded?: boolean
   /** The verbs a year goal shows when open. */
   more?: RowVerb[]
+  /** One-tap triage on the row (open goals only). */
+  quick?: RowVerb[]
   editing?: boolean
   onSaveEdit?: (text: string) => Promise<boolean>
   onCancelEdit?: () => void
@@ -68,6 +74,10 @@ export function PlanItemRow(p: PlanItemRowProps) {
       {p.readiness && !p.editing && <ReadinessIcons readiness={p.readiness} />}
       {p.saved && <span className="canvas-tag">Saved</span>}
       {p.done && !p.preview && <span className="canvas-tag plan-tag-done">{node.goal ? 'Met' : 'Done'}</span>}
+      {!p.editing && !open && !p.preview && p.quick && p.quick.length > 0 && <span className="plan-item-quick" role="group" aria-label={`Triage ${node.title}`}>
+        {p.quick.map((q) => <button key={q.label} type="button" className="plan-quick" disabled={p.disabled}
+          aria-label={`${q.label}: ${node.title}`} onClick={q.onSelect}>{q.label}</button>)}
+      </span>}
     </div>
     {p.preview && <span className="wc-proposed-note plan-preview-note">{p.preview.note}</span>}
     {p.parentLabel && <p className="plan-item-parent"><span className="plan-item-parent-kind">{p.parentLabel.kind}</span> {p.parentLabel.title}</p>}

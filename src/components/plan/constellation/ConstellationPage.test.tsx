@@ -146,6 +146,24 @@ describe('the level above, folded to one line',()=>{
   expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
   expect(api.updateTask).not.toHaveBeenCalled()
  })
+ it('the toggle names the list it opens, and the open list carries its own Hide',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
+  month()
+  const line=screen.getByRole('button',{name:/Fall goals.*the season October serves/})
+  expect(line).toHaveTextContent(/Show Fall list$/)
+  fireEvent.click(line)
+  expect(line).toHaveTextContent(/Hide Fall list$/)
+  const panel=screen.getByRole('complementary',{name:'Fall goals'})
+  fireEvent.click(within(panel).getByRole('button',{name:'Hide Fall list'}))
+  expect(screen.queryByRole('complementary',{name:'Fall goals'})).toBeNull()
+  expect(line).toHaveAttribute('aria-expanded','false')
+  cleanup()
+  season()
+  expect(screen.getByRole('button',{name:/2026 goals/})).toHaveTextContent(/Show 2026 list$/)
+  cleanup()
+  open()
+  expect(screen.getByRole('button',{name:/2025 goals/})).toHaveTextContent(/Show 2025 list$/)
+ })
  it('opens beside the list, and stays open for this viewer next time',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
   month()
@@ -251,15 +269,55 @@ describe('proposals',()=>{
 })
 
 describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
- it('rows carry no ⋯ menu and no quick buttons',()=>{
+ it('rows carry no ⋯ menu',()=>{
   api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'}]
   month()
   expect(screen.queryByRole('button',{name:'Actions for Picnic'})).toBeNull()
-  expect(screen.queryByRole('group',{name:'Triage Picnic'})).toBeNull()
-  expect(screen.queryByRole('button',{name:/^(Done|Someday|Delete): /})).toBeNull()
   open()
   expect(screen.queryByRole('button',{name:'Actions for Together'})).toBeNull()
-  expect(screen.queryByRole('group',{name:'Triage Together'})).toBeNull()
+ })
+ it('a month goal triages from its row: Done, Move to November, Someday, Remove from October',async()=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'}]
+  api.toggleTask.mockResolvedValue(true);api.keepForward.mockResolvedValue('m');api.dropCommitment.mockResolvedValue(true);api.setBucket.mockResolvedValue(true)
+  month()
+  const quick=within(screen.getByRole('group',{name:'Triage Picnic'})).getAllByRole('button').map(b=>b.textContent)
+  expect(quick).toEqual(['Done','Move to November','Someday','Remove from October'])
+  fireEvent.click(screen.getByRole('button',{name:'Done: Picnic'}))
+  await waitFor(()=>expect(api.toggleTask).toHaveBeenCalledWith('m'))
+  expect(lastRun().label).toBe('Complete “Picnic”')
+  await lastRun().opts.undo()
+  expect(api.toggleTask).toHaveBeenCalledTimes(2)
+  fireEvent.click(screen.getByRole('button',{name:'Move to November: Picnic'}))
+  await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('m',{monthStart:new Date(2026,10,1)},new Date(2026,9,1)))
+  expect(lastRun().label).toBe('Move “Picnic” to November')
+  expect(lastRun().opts.undo).toBeTypeOf('function')
+  fireEvent.click(screen.getByRole('button',{name:'Someday: Picnic'}))
+  await waitFor(()=>expect(api.setBucket).toHaveBeenCalledWith('m','someday',undefined,undefined))
+  fireEvent.click(screen.getByRole('button',{name:'Remove from October: Picnic'}))
+  await waitFor(()=>expect(api.dropCommitment).toHaveBeenCalledWith('m','month',new Date(2026,9,1)))
+  expect(lastRun().label).toBe('Remove “Picnic” from October')
+  expect(selection.setSelection).not.toHaveBeenCalled()
+ })
+ it('a season goal moves to the next season; a done goal has no triage',async()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'d',title:'Old one',bucket:'quarter',completed:true}]
+  api.keepForward.mockResolvedValue('s')
+  season()
+  expect(within(screen.getByRole('group',{name:'Triage Autumn outings'})).getAllByRole('button').map(b=>b.textContent))
+   .toEqual(['Done','Move to Winter','Someday','Remove from Fall'])
+  fireEvent.click(screen.getByRole('button',{name:'Move to Winter: Autumn outings'}))
+  await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('s',{seasonStart:new Date(2026,11,1)},new Date(2026,8,1)))
+  fireEvent.click(screen.getByRole('button',{name:/^1 done/}))
+  expect(screen.queryByRole('group',{name:'Triage Old one'})).toBeNull()
+ })
+ it('a year goal triages from its row with Done and Archive, never Delete',async()=>{
+  open()
+  expect(within(screen.getByRole('group',{name:'Triage Together'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Done','Archive'])
+  fireEvent.click(screen.getByRole('button',{name:'Archive: Together'}))
+  await waitFor(()=>expect(api.updateGoal).toHaveBeenCalledWith('g',{status:'archived'}))
+  expect(lastRun().label).toBe('Archive “Together”')
+  await lastRun().opts.undo()
+  expect(api.updateGoal).toHaveBeenLastCalledWith('g',{status:'active'})
+  expect(api.deleteGoal).not.toHaveBeenCalled()
  })
  it('tapping a month or season goal opens its task panel, without writing',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
