@@ -75,6 +75,7 @@ import { GuideProvider } from '@/hooks/useGuidedPlan';
 import { PageGuideProvider, usePageGuide } from '@/components/explain/GuideProvider';
 import { GuideLayer } from '@/components/explain/GuideLayer';
 import { PageHelpContext } from '@/components/explain/PageHelp';
+import { LearnPageContext } from '@/components/learn/LearnVideoChip';
 import { EXPLAIN_LABEL, EXPLAIN_MESSAGE, hasPageGuide } from '@/lib/explain/pageGuides';
 import { tourFor } from '@/lib/explain/pageTours';
 import { requestShow } from '@/lib/explain/showSignal';
@@ -456,6 +457,7 @@ function ShellLayoutInner({ children }: Props) {
     <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} applyChanges={applyChanges} persistKey={user?.id} retryTurn={() => { void assistant.retryLast(); }}>
     <ChatTaskActionsProvider tasks={tasks} toggleTask={toggleTask} updateTask={updateTask} routines={canvasRoutines}>
     <PageHelpContext.Provider value={pageHelp}>
+    <LearnPageContext.Provider value={screenContext.page}>
     <CanvasBridge onActivity={setCanvasActivity} />
     <DesktopControlsContext.Provider value={desktopControls}>
     <DesktopLeadContext.Provider value={desktopLead}>
@@ -786,6 +788,7 @@ function ShellLayoutInner({ children }: Props) {
     </DesktopCenterContext.Provider>
     </DesktopLeadContext.Provider>
     </DesktopControlsContext.Provider>
+    </LearnPageContext.Provider>
     </PageHelpContext.Provider>
     </ChatTaskActionsProvider>
     </CanvasActivityProvider>

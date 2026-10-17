@@ -21,6 +21,7 @@
 //              the surface's motif rides along as a small stamp, not a wash
 //   'card'     the older illustrated card, kept for anything still on it
 import { PageHelpButton } from '@/components/explain/PageHelp'
+import { LearnVideoChip } from '@/components/learn/LearnVideoChip'
 import type { ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
@@ -87,6 +88,8 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
               {action && <div className="daybook-title-action">{action}</div>}
             </div>
             {subline && <div className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{subline}</div>}
+            {/* The page's short guide, until it has been watched (learnVideos.ts). */}
+            <LearnVideoChip />
           </div>
           {controls && <div className="daybook-masthead-controls hidden shrink-0 md:block">{controls}</div>}
           {aside && <div data-testid="masthead-aside" className="daybook-masthead-aside">{aside}</div>}
