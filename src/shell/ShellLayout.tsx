@@ -51,6 +51,7 @@ import { WaitingOnYouBanner } from '@/components/discussion/WaitingOnYouBanner';
 import { useSymphonyAssistant, type AssistantTurnObserver } from '@/hooks/useSymphonyAssistant';
 import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from '@/contexts/CanvasActivityContext';
 import { ConversationStrip } from '@/components/canvas/ConversationStrip';
+import { ChatTaskActionsProvider } from '@/components/chat/ChatTaskActions';
 import { PendingChangeCard } from '@/components/canvas/ChangeCard';
 import { conversationStripPath } from '@/lib/canvas/stripPaths';
 import { ConversationWalkContext, type ConversationWalk } from '@/components/canvas/conversationWalk';
@@ -437,6 +438,7 @@ function ShellLayoutInner({ children }: Props) {
 
   return (
     <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} applyChanges={applyChanges} persistKey={user?.id} retryTurn={() => { void assistant.retryLast(); }}>
+    <ChatTaskActionsProvider tasks={tasks} toggleTask={toggleTask} updateTask={updateTask}>
     <PageHelpContext.Provider value={pageHelp}>
     <CanvasBridge onActivity={setCanvasActivity} />
     <DesktopControlsContext.Provider value={desktopControls}>
@@ -767,6 +769,7 @@ function ShellLayoutInner({ children }: Props) {
     </DesktopLeadContext.Provider>
     </DesktopControlsContext.Provider>
     </PageHelpContext.Provider>
+    </ChatTaskActionsProvider>
     </CanvasActivityProvider>
   );
 }

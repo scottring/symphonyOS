@@ -4,6 +4,8 @@ import type { ChatMessage as ChatMessageType } from '@/types/chat'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { inlineMarkdownToHtml } from '@/lib/notes/notesToHtml'
+import { splitListLines } from '@/lib/chat/taskMentions'
+import { ChatTaskLineActions, useChatTaskActions } from './ChatTaskActions'
 
 interface ChatMessageProps {
   message: ChatMessageType
@@ -104,7 +106,12 @@ export function ChatMessage({
   message, onSourceClick, onAddTask, currentUserId, familyMembers = [],
 }: ChatMessageProps) {
   const isUser = message.role === 'user'
-  const bulletItems = !isUser && onAddTask ? extractBulletItems(message.content) : []
+  const taskActions = useChatTaskActions()
+  // List lines that name one of the person's tasks, with that task.
+  const lines = !isUser && taskActions ? splitListLines(message.content) : []
+  const named = lines.map((l) => ('text' in l ? taskActions!.match(l.text) : null))
+  const namesTasks = named.some(Boolean)
+  const bulletItems = !isUser && onAddTask && !namesTasks ? extractBulletItems(message.content) : []
 
   // In a shared thread a user message written by the OTHER member reads as
   // someone else talking: left-aligned, with a face and a name. Everything
@@ -129,6 +136,29 @@ export function ChatMessage({
 
   // Render content with inline add buttons for bullet items
   function renderContent() {
+    if (namesTasks) {
+      // Runs of plain lines stay one block; a line naming a task gets its actions.
+      const blocks: React.ReactNode[] = []
+      let run: string[] = []
+      const flush = (key: string) => {
+        if (run.length === 0) return
+        blocks.push(<div key={key} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(inlineMarkdownToHtml(run.join('\n'))) }} />)
+        run = []
+      }
+      lines.forEach((l, i) => {
+        const task = named[i]
+        if (!task || !('text' in l)) { run.push(l.line); return }
+        flush(`text-${i}`)
+        blocks.push(
+          <div key={`task-${i}`} className={`chat-task-line${task.completed ? ' is-done' : ''}`}>
+            <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(inlineMarkdownToHtml(l.line)) }} />
+            <ChatTaskLineActions task={task} />
+          </div>,
+        )
+      })
+      flush('text-end')
+      return <div className="text-sm leading-relaxed whitespace-pre-wrap">{blocks}</div>
+    }
     if (bulletItems.length === 0) {
       // Assistant text streams back as markdown ("**bold**", `code`, etc.) —
       // render it, not the literal asterisks. User-typed text stays plain.
