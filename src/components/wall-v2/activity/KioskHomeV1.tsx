@@ -78,6 +78,8 @@ export interface KioskHomeV1Props {
   onStartCooking: () => void
   onAnotherQuestion?: () => void
   onTapRow: (id: string) => void
+  /** Ticks a task or routine on the day's lists off (Scott, 2026-10-17). */
+  onCompleteRow?: (id: string) => void
   /** The scratchpad: the night's talk-abouts open it. */
   onNotes: () => void
   /** More, in place of the side column (Kitchen wall v2). */
@@ -209,8 +211,29 @@ function Tl({ t, w, by, onTap }: { t: string; w: string; by?: string | null; onT
     : <div className="kw-tl">{body}</div>
 }
 
+/** A task or routine leads with a check that ticks it off (Scott,
+ *  2026-10-17); an event has none, only a blank of the same width so the
+ *  times line up. The check fills at once; the row leaves when the wall
+ *  refetches (done tasks are not on its lists). */
 function TodayRows({ rows, p, max }: { rows: WallTodayRow[]; p: KioskHomeV1Props; max: number }) {
-  return <>{rows.slice(0, max).map((r) => <Tl key={r.id} t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} onTap={() => p.onTapRow(r.id)} />)}</>
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
+  const shown = rows.slice(0, max)
+  const checkable = (r: WallTodayRow) => !!p.onCompleteRow && (r.kind === 'task' || r.kind === 'routine')
+  if (!shown.some(checkable)) return <>{shown.map((r) => <Tl key={r.id} t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} onTap={() => p.onTapRow(r.id)} />)}</>
+  return <>{shown.map((r) => {
+    const done = ticked.has(r.id)
+    return (
+      <div key={r.id} className="kw-tl-row">
+        {checkable(r) ? (
+          <button type="button" className={`kw-tl-ck ${done ? 'is-done' : ''}`} aria-label={`Mark ${r.title} done`} disabled={done}
+            onClick={() => { setTicked((s) => new Set(s).add(r.id)); p.onCompleteRow!(r.id) }}>
+            <span aria-hidden="true">{done && <Check />}</span>
+          </button>
+        ) : <span className="kw-tl-ck" aria-hidden="true" />}
+        <Tl t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} onTap={() => p.onTapRow(r.id)} />
+      </div>
+    )
+  })}</>
 }
 
 /** Time left as a ring: full when the window opens, empty when it closes. */

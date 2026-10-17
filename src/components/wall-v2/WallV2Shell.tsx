@@ -1048,6 +1048,14 @@ export function WallV2Shell() {
     if (row) showFlash(row.title);
   }, [timeline, todayRows, showFlash]);
 
+  // A check on the day's lists (Scott, 2026-10-17): the same writer the
+  // action sheet's Done uses, and the flash says it took.
+  const handleCompleteRow = useCallback((id: string) => {
+    handleToggleComplete(id, true);
+    const row = todayRows.find((r) => r.id === id);
+    if (row) showFlash(`Done · ${row.title}`);
+  }, [handleToggleComplete, todayRows, showFlash]);
+
   const handleWallSkip = useCallback(async (id: string, kind: 'event' | 'routine') => {
     const entityType = kind === 'routine' ? 'routine' : 'calendar_event';
     const entityId = id.replace(/^(routine-|event-)/, '');
@@ -1210,6 +1218,7 @@ export function WallV2Shell() {
           recipeTitle={recipeTitle}
           onOpenRecipe={() => { setMealDayKey(null); setRecipeViewerMeal('dinner'); }}
           onTapRow={handleTapRow}
+          onCompleteRow={handleCompleteRow}
           onTick={handleTick}
           onClaim={() => setShowWhoSheet(true)}
           onTapQuestion={() => (handoffAsk ? setShowWhoSheet(true) : setShowQuestionSheet(true))}

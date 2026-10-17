@@ -156,6 +156,15 @@
 }
 .is-v1 button.kw-tl { min-height: calc(88 * var(--p)); border-radius: 0; }
 .is-v1 button.kw-tl:active { background: var(--kw-sym-tint); }
+/* A row with a check (tasks and routines): the line moves to the row. */
+.is-v1 .kw-tl-row { display: flex; align-items: flex-start; column-gap: calc(14 * var(--p)); flex: none; border-top: 1px solid var(--kw-line); }
+.is-v1 .kw-tl-row > .kw-tl { flex: 1; min-width: 0; border-top: 0; }
+.is-v1 .kw-tl-ck { flex: none; display: grid; place-items: center; width: calc(72 * var(--p)); min-height: calc(88 * var(--p)); padding: calc(14 * var(--p)) 0 0; align-items: start; border: 0; background: none; color: var(--kw-on-done); }
+.is-v1 .kw-tl-ck > span { display: grid; place-items: center; width: calc(52 * var(--p)); height: calc(52 * var(--p)); border-radius: 999px; border: 2.5px solid var(--kw-line-strong); }
+.is-v1 span.kw-tl-ck > span, .is-v1 span.kw-tl-ck:empty { border: 0; }
+.is-v1 .kw-tl-ck.is-done > span { background: var(--kw-done); border-color: var(--kw-done); }
+.is-v1 .kw-tl-ck svg { width: calc(28 * var(--p)); height: calc(28 * var(--p)); stroke-width: 2.4; }
+.is-v1 button.kw-tl-ck:active > span { background: var(--kw-sym-tint); }
 .is-v1 .kw-tl-t { font-size: calc(30 * var(--p)); color: var(--kw-muted); }
 .is-v1 .kw-tl-w { display: flex; flex-direction: column; min-width: 0; font-size: calc(32 * var(--p)); font-weight: 600; line-height: 1.2; }
 .is-v1 .kw-tl-w > span:first-child, .is-v1 .kw-tl-by { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

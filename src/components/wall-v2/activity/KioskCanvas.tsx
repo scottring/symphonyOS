@@ -109,6 +109,8 @@ export interface KioskCanvasProps {
   recipeTitle: string | null
   onOpenRecipe: () => void
   onTapRow: (id: string) => void
+  /** Ticks a task or routine on the day's lists off. */
+  onCompleteRow?: (id: string) => void
   onTick: (member: FamilyMember, row: KidRow) => void
   onClaim: () => void
   onTapQuestion: () => void
@@ -364,7 +366,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
         <KioskHomeV1
           {...p.v1} now={p.v1.at ?? p.now} members={p.members} dinner={p.dinner} bedtime={p.bedtime}
           have={state.have} scale={p.dinner ? Math.max(1, Math.round((state.serves ?? p.dinner.baseServes) / p.dinner.baseServes)) : 1}
-          onTick={p.onTick} onTapRow={p.onTapRow}
+          onTick={p.onTick} onTapRow={p.onTapRow} onCompleteRow={p.onCompleteRow}
           onOpenKid={(m) => dispatch({ type: 'OPEN', stage: { kind: 'person', memberId: m.id } })}
           onToggleHave={(index) => dispatch({ type: 'TOGGLE_HAVE', index })}
           onScale={(n) => { if (p.dinner) dispatch({ type: 'SET_SERVES', serves: p.dinner.baseServes * n }) }}

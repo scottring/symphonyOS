@@ -128,6 +128,26 @@ describe('the wall, version 1', () => {
     expect(within(side).queryByText('Nothing else on the clock today.')).toBeNull()
   })
 
+  it('rest: a task or routine on the rest of today has a check that ticks it off; an event has none', () => {
+    const base = { end: null, sub: null, owners: [], now: false, past: false }
+    const rows = [
+      { ...base, id: 'task-campus', kind: 'task' as const, time: '3:00p', title: 'set up infinite campus' },
+      { ...base, id: 'routine-trash', kind: 'routine' as const, time: '4:00p', title: 'Trash out' },
+      { ...base, id: 'event-swim', kind: 'event' as const, time: '5:00p', title: 'Swim' },
+    ]
+    const p = props({ pick: { screen: 'rest', title: 'A quiet afternoon', dark: false }, onCompleteRow: vi.fn(), weekend: { rows, anytime: [], tomorrow: [], tomorrowLabel: 'Sunday' } })
+    render(<KioskHomeV1 {...p} />)
+    const side = screen.getByRole('complementary', { name: 'The rest of today' })
+    expect(within(side).queryByRole('button', { name: 'Mark Swim done' })).toBeNull()
+    fireEvent.click(within(side).getByRole('button', { name: 'Mark set up infinite campus done' }))
+    expect(p.onCompleteRow).toHaveBeenCalledWith('task-campus')
+    expect(p.onTapRow).not.toHaveBeenCalled()
+    // It fills at once and can't be pressed twice while the wall catches up.
+    expect(within(side).getByRole('button', { name: 'Mark set up infinite campus done' })).toBeDisabled()
+    fireEvent.click(within(side).getByRole('button', { name: 'Mark Trash out done' }))
+    expect(p.onCompleteRow).toHaveBeenLastCalledWith('routine-trash')
+  })
+
   it('every moment centres its lead group: nothing pinned to the foot by a spacer', () => {
     const screens = ['rest', 'out-the-door', 'home', 'dinner', 'bedtime', 'night', 'weekend'] as const
     for (const s of screens) {
