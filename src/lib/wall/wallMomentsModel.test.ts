@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows } from './wallMomentsModel'
+import { wallTodayRows, stillOnToday, specialsWeek, checklistFor, afterSchoolRows } from './wallMomentsModel'
 import { taskToTimelineItem, type TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { MemberDayModel } from './kidDayModel'
@@ -124,6 +124,17 @@ describe('wallTodayRows — the family’s screen', () => {
       item({ id: 'event-jury', title: 'Jury duty', startTime: at(8), assignedTo: 'sk' }),
     ] }, members, at(7))
     expect(rows.map((r) => r.id).sort()).toEqual(['event-jury', 'task-ella', 'task-house', 'task-mine', 'task-shared'])
+  })
+
+  it('keeps a task that is past its time but not done on the rest of today; a past event leaves', () => {
+    const rows = wallTodayRows({ morning: [
+      task('task-poop', { startTime: at(10) }),
+      task('task-done', { startTime: at(10), completed: true }),
+      item({ id: 'event-swim', title: 'Swim', startTime: at(9), endTime: at(10) }),
+      task('task-later', { startTime: at(16) }),
+    ] }, members, at(14))
+    expect(rows.filter(stillOnToday).map((r) => r.id)).toEqual(['task-poop', 'task-later'])
+    expect(rows.find((r) => r.id === 'task-poop')).toMatchObject({ past: true, open: true })
   })
 
   it('names everyone a shared task is assigned to, not just its first assignee', () => {

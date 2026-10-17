@@ -29,6 +29,9 @@ export interface WallTodayRow {
   /** Family member ids who carry it (never the household row). */
   owners: string[]
   past: boolean
+  /** A task whose time has passed but is not done: still the house's to do,
+   *  so the lists keep it (Today keeps it on the day, open, the same way). */
+  open?: boolean
   /** Starting within the next 45 minutes, or under way. */
   now: boolean
   /** Epoch ms of the start / end (the kiosk's lanes and NEXT slot). */
@@ -46,6 +49,11 @@ export interface WallTodayRow {
  * it should also show on the kiosk" — replacing 2026-10-07's rule that kept
  * one adult's own task off). Events stay — they say who is where.
  */
+/** On a "rest of today" list: still ahead, or a task not done yet. */
+export function stillOnToday(r: WallTodayRow): boolean {
+  return !r.past || !!r.open
+}
+
 export function wallTodayRows(items: Record<string, TimelineItem[]>, members: FamilyMember[], now: Date): WallTodayRow[] {
   const all = Object.values(items).flat()
   const ids = new Set(all.map((it) => it.id))
@@ -79,6 +87,7 @@ export function wallTodayRows(items: Record<string, TimelineItem[]>, members: Fa
         ?? (stepCount ? `${stepCount} ${stepCount === 1 ? 'step' : 'steps'}` : null),
       owners,
       past: endsAt <= now.getTime(),
+      open: it.type === 'task' && endsAt <= now.getTime(),
       now: start.getTime() <= now.getTime() + 45 * 60_000 && endsAt > now.getTime(),
       startsAt: start.getTime(),
       endsAt,

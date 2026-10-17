@@ -115,6 +115,19 @@ describe('the wall, version 1', () => {
     for (const name of ['Groceries', 'Recipes', 'Call', 'Notes']) expect(screen.queryByRole('button', { name })).toBeNull()
   })
 
+  it('rest: a task past its time but not done stays on the rest of today; a past event does not', () => {
+    const base = { end: null, sub: null, owners: [], now: false }
+    const rows = [
+      { ...base, id: 'task-poop', kind: 'task' as const, time: '10:00a', title: 'pick up poop in backyard', past: true, open: true },
+      { ...base, id: 'event-swim', kind: 'event' as const, time: '9:00a', title: 'Swim', past: true },
+    ]
+    render(<KioskHomeV1 {...props({ pick: { screen: 'rest', title: 'A quiet afternoon', dark: false }, weekend: { rows, anytime: [], tomorrow: [], tomorrowLabel: 'Sunday' } })} />)
+    const side = screen.getByRole('complementary', { name: 'The rest of today' })
+    expect(within(side).getByText('pick up poop in backyard')).toBeInTheDocument()
+    expect(within(side).queryByText('Swim')).toBeNull()
+    expect(within(side).queryByText('Nothing else on the clock today.')).toBeNull()
+  })
+
   it('every moment centres its lead group: nothing pinned to the foot by a spacer', () => {
     const screens = ['rest', 'out-the-door', 'home', 'dinner', 'bedtime', 'night', 'weekend'] as const
     for (const s of screens) {

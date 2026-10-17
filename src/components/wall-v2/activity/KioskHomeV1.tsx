@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { KidRow } from '@/lib/wall/kidDayModel'
-import type { WallTodayRow } from '@/lib/wall/wallMomentsModel'
+import { stillOnToday, type WallTodayRow } from '@/lib/wall/wallMomentsModel'
 import type { BedtimeGrid } from '@/lib/wall/activity/kioskRoutines'
 import { minutesOf, type DayAnchors, type KioskScreenPick } from '@/lib/wall/activity/kioskScreen'
 import { Photo, type KioskDinner } from './KioskStages'
@@ -468,7 +468,7 @@ function OutTheDoor(p: KioskHomeV1Props) {
 function Rest(p: KioskHomeV1Props) {
   const [hero, ...rest] = p.restLine.split(' · ')
   const lede = rest.join(' · ') || p.restSub
-  const today = p.weekend.rows.filter((r) => !r.past)
+  const today = p.weekend.rows.filter(stillOnToday)
   // Five timeline rows fit beside the lead, tomorrow's included.
   const todayMax = p.weekend.tomorrow.length ? 4 : 5
   const tomorrow = p.weekend.tomorrow.slice(0, Math.max(1, 5 - Math.min(today.length, todayMax)))
@@ -547,7 +547,7 @@ function HomeFromSchool(p: KioskHomeV1Props) {
       </div>
     </>
   )
-  const after = p.weekend.rows.filter((r) => !r.past && !/dinner/i.test(r.title))
+  const after = p.weekend.rows.filter((r) => stillOnToday(r) && !/dinner/i.test(r.title))
   return <Stage lead={lead} side={<DinnerSide p={p} after={after} />} sideLabel="Dinner" aside={p.aside} talk={p.talk} label="After school" />
 }
 
@@ -709,7 +709,7 @@ function Night(p: KioskHomeV1Props) {
 function Weekend(p: KioskHomeV1Props) {
   const rows = p.weekend.rows
   const lead0 = rows.find((r) => r.now && !r.past) ?? rows.find((r) => !r.past) ?? null
-  const later = rows.filter((r) => !r.past && r !== lead0)
+  const later = rows.filter((r) => stillOnToday(r) && r !== lead0)
   const until = lead0?.endsAt ? new Date(lead0.endsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '') : null
   // One row of supporting detail: three of the day's anytime things.
   const anytime = p.weekend.anytime.slice(0, 3)
