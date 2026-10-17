@@ -62,10 +62,17 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { periodMoves } from './horizonPanel'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
+import { useAuth } from '@/hooks/useAuth'
+import { monthToken, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
+import { usePeriodReview } from '@/hooks/usePeriodReview'
+import { seasonToken } from '@/lib/cadence/seasons'
+import { taskReviewState, yearGoalReviewState } from '@/lib/planning/periodReview'
+import { PeriodReview, type ReviewLine, type ReviewVerb } from '@/components/plan/review/PeriodReview'
 
 const TERMS = ['year goal', 'season goal', 'month goal', 'week task'] as const
 const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
 const PERIODS = ['year', 'season', 'month'] as const
+const SESSION_HORIZONS: readonly SessionHorizon[] = ['annual', 'seasonal', 'monthly']
 const ROUTE_LEVEL: Record<string, number> = { '/year': 0, '/season': 1, '/month': 2 }
 /** "an October goal", "a Fall goal". */
 const aOrAn = (word: string) => /^[aeiou8]/i.test(word) ? 'an' : 'a'
@@ -90,7 +97,8 @@ function Inner() {
   const gated = useGatedTaskActions({ updateTask, pushTask, setBucket, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const activity = useCanvasActivity()
   const { openAssistant } = useAssistantLauncher()
-  const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember } = useFamilyMembers(), { seasons } = useHouseholdSeasons()
+  const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember, members } = useFamilyMembers(), { seasons } = useHouseholdSeasons()
+  const { user } = useAuth()
   const { pathname } = useLocation()
   const [params, setParams] = useSearchParams()
   const area = useAddArea()
@@ -113,6 +121,9 @@ function Inner() {
   const year = anchor.getFullYear()
   const periodWord = level === 0 ? String(year) : periodWordOf(bounds)
   const seasonWord = periodWordOf(seasonB), monthWord = periodWordOf(monthB)
+  // The review by hand of the period on screen (PeriodReview): open with ?review=1.
+  const reviewing = params.get('review') === '1'
+  const review = usePeriodReview(SESSION_HORIZONS[level], level === 0 ? yearToken(year) : level === 1 ? seasonToken(bounds.start, seasons) : monthToken(bounds.start))
 
   // ---- What is planned (already filtered for privacy, area and people) ----
   const meId = getCurrentUserMember()?.id ?? null
@@ -243,9 +254,19 @@ function Inner() {
   }
 
   // A year goal is a goals row: it opens in place with its own few verbs.
-  const setGoalStatus = (node: PlanNode, next: 'active' | 'completed' | 'archived', what: string) => {
+  const setGoalStatus = (node: PlanNode, next: 'active' | 'completed' | 'archived', what: string): Promise<boolean> => {
     const status = node.goal?.status ?? 'active'
-    void act(what, () => updateGoal(node.id, { status: next }), { ids: [node.id], undo: async () => (await updateGoal(node.id, { status })) !== false })
+    return act(what, () => updateGoal(node.id, { status: next }), { ids: [node.id], undo: async () => (await updateGoal(node.id, { status })) !== false })
+  }
+  // A year goal carried on is a copy in next year that remembers it (the
+  // change card's plan_carry); the original stays as this year's record.
+  const carryGoal = (node: PlanNode): Promise<boolean> => {
+    const g = node.goal!
+    const id = crypto.randomUUID()
+    return act(`Move “${g.name}” to ${year + 1}`, () => addGoal(g.areaId || null, g.name, g.context ?? undefined, {
+      id, year: year + 1, carriedFrom: g.id, notes: g.notes ?? null, strategy: g.strategy ?? null,
+      ...(g.assignedToAll ? { assignedToAll: g.assignedToAll } : {}),
+    }).then((made) => !!made), { ids: [id], undo: async () => { await deleteGoal(id) } })
   }
 
   // Quick triage on an open row (Scott, 2026-10-13, again 2026-10-16). A year
@@ -253,22 +274,27 @@ function Inner() {
   // deleted). A month or season goal is a task committed to this period: Done,
   // Move to the next period, Someday, or Remove from this one. The row is on
   // this page's list by construction, so Move and Remove need no other check.
-  const quickFor = (node: PlanNode): { label: string; onSelect: () => void }[] => {
+  // The same verbs answer each open line in the review by hand (PeriodReview),
+  // where a year goal can also move on to next year.
+  const verbsFor = (node: PlanNode, opts: { carryYear?: boolean } = {}): ReviewVerb[] => {
     if (isDone(node)) return []
     if (!node.task) return [
-      { label: 'Done', onSelect: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
-      { label: 'Archive', onSelect: () => setGoalStatus(node, 'archived', `Archive “${node.title}”`) },
+      { label: 'Done', run: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
+      ...(opts.carryYear ? [{ label: `Move to ${year + 1}`, run: () => carryGoal(node) }] : []),
+      { label: 'Archive', run: () => setGoalStatus(node, 'archived', `Archive “${node.title}”`) },
     ]
     const task = node.task
     const toggle = async () => (await toggleTask(task.id)) !== false
     const [carry, remove] = periodMoves(task, PERIODS[level] as 'season' | 'month', bounds, seasons, { updateTask, keepForward, dropCommitment }, activity.run)
     return [
-      { label: 'Done', onSelect: () => void act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) },
-      { label: carry.label, onSelect: carry.onClick },
-      { label: 'Someday', onSelect: () => void act(`${describeTriageWhen('someday')}: “${node.title}”`, () => applyTriageWhen('someday', task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }), { ids: [node.id] }) },
-      { label: remove.label, onSelect: remove.onClick },
+      { label: 'Done', run: () => act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) },
+      { label: carry.label, run: carry.onClick },
+      { label: 'Someday', run: () => act(`${describeTriageWhen('someday')}: “${node.title}”`, () => applyTriageWhen('someday', task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }), { ids: [node.id] }) },
+      { label: remove.label, run: remove.onClick },
     ]
   }
+  const quickFor = (node: PlanNode): { label: string; onSelect: () => void }[] =>
+    verbsFor(node).map((v) => ({ label: v.label, onSelect: () => { void v.run() } }))
 
   // ---- Proposals for this horizon -----------------------------------------
   const inPeriod = (ymd?: string) => {
@@ -352,6 +378,24 @@ function Inner() {
     : level === 1 ? monthWord : seasonWord
   const belowOf = (node: PlanNode) => allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && !isDone(n)).map((n) => n.title)
 
+  // ---- The review by hand (Scott, 2026-10-17) ---------------------------------
+  const setReviewing = (on: boolean, start?: Date) => setParams((prev) => {
+    const p = new URLSearchParams(prev)
+    if (on) p.set('review', '1'); else p.delete('review')
+    if (start) p.set('start', localYmd(start))
+    p.delete('focus')
+    return p
+  })
+  const nextYearGoals = level === 0 ? goals.filter((g) => g.year === year + 1) : []
+  const reviewLines: ReviewLine[] = levelNodes.flatMap((n) => {
+    const state = n.goal ? yearGoalReviewState(n.goal, nextYearGoals)
+      : n.task ? taskReviewState(n.task, PERIODS[level] as 'season' | 'month', bounds.start, { isCurrent: current, seasons }) : undefined
+    if (!state) return []
+    const parent = parentOf(n)
+    return [{ key: n.key, title: n.title, state, note: parent ? `For ${parent.title}` : undefined, verbs: state === 'open' ? verbsFor(n, { carryYear: true }) : [] }]
+  })
+  const byWhom = (authorId: string) => authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === authorId)?.name ?? 'your household'
+
   const renderItem = (node: PlanNode) => {
     const scheduled = node.task?.scheduledFor
     const editing = composer?.kind === 'edit' && composer.key === node.key
@@ -415,7 +459,10 @@ function Inner() {
   return <main ref={mainRef} className={`plan-canvas plan-horizon ${PAGE_PLANNING}`} data-horizon={level}>
     <header className="plan-head">
       {/* Without the docked bar (phones) the page offers both itself. */}
-      {!walkInBar && <div className="plan-head-row">{walk}</div>}
+      {(!walkInBar || !reviewing) && <div className="plan-head-row">
+        {!walkInBar && walk}
+        {!reviewing && <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setReviewing(true)}>Review {periodWord}</button>}
+      </div>}
       <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
         <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
         <h1>{periodTitle}</h1>
@@ -432,6 +479,10 @@ function Inner() {
     {(error || goalsError)
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
       : !dataReady ? null
+      : reviewing ? <PeriodReview key={`${level}:${localYmd(bounds.start)}`} periodWord={periodWord} lines={reviewLines} loading={review.loading}
+          reviewed={review.reviewed} mine={review.mine} byWhom={byWhom} onFinish={review.finish}
+          next={{ label: `Go to ${nextWord} →`, onClick: () => setReviewing(false, bounds.next) }}
+          onClose={() => setReviewing(false)} />
       : <>
         {/* Wide screens: open, the panel beside the list carries the title
             and its own Hide, so this line steps aside (canvas-plan.css). */}

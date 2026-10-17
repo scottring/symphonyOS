@@ -71,7 +71,10 @@ import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
 import { DayWeather } from './WeekJournal'
-import { committedTo } from '@/lib/placement/model'
+import { committedTo, liveCommitments } from '@/lib/placement/model'
+import { bootstrapCommitments } from '@/lib/placement/intentions'
+import { taskReviewState } from '@/lib/planning/periodReview'
+import type { ReviewLine, ReviewVerb } from '@/components/plan/review/PeriodReview'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
@@ -209,7 +212,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // Create-gesture wiring
   const navigate = useNavigate()
-  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask, userId } = useSupabaseTasks()
+  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask, userId, keepForward, dropCommitment } = useSupabaseTasks()
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember, members: familyMembers } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
@@ -907,6 +910,29 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // A past week is a look-back, not a plan.
   const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
 
+  // The review by hand (PeriodReview, Scott 2026-10-17): every task committed
+  // to this week, under the page's people lens, with the Month page's verbs.
+  // Undo puts back the week's commitments as they were (horizonPanel's rule).
+  const reviewWeekWord = `week ${weekOfYear(weekAnchor, readCadenceConfig().weekStartsOn)}`
+  const nextWeekStart = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7)
+  const reviewVerbs = (t: Task): ReviewVerb[] => {
+    const before = liveCommitments({ commitments: bootstrapCommitments(t) })
+    const restore = async () => (await updateTask(t.id, { commitments: before })) !== false
+    const toggle = async () => (await toggleTask(t.id)) !== false
+    return [
+      { label: 'Done', run: () => activity.run(`Done: “${t.title}”`, toggle, { ids: [t.id], undo: toggle }) },
+      { label: 'Move to next week', run: () => activity.run(`Move “${t.title}” to next week`, async () => !!await keepForward(t.id, { weekStart: nextWeekStart }, weekAnchor), { ids: [t.id], undo: restore }) },
+      { label: 'Someday', run: () => activity.run(`${describeTriageWhen('someday')}: “${t.title}”`, () => applyTriageWhen('someday', t.id, {
+        onPushTask: gated.pushTask, onSetBucket: gated.setBucket ?? ((id, bucket) => onUpdateTask(id, { bucket })),
+      }), { ids: [t.id] }) },
+      { label: `Remove from ${reviewWeekWord}`, run: () => activity.run(`Remove “${t.title}” from ${reviewWeekWord}`, () => dropCommitment(t.id, 'week', weekAnchor), { ids: [t.id], undo: restore }) },
+    ]
+  }
+  const weekReviewLines: ReviewLine[] = tasks.filter((t) => !t.isGoal).filter(lens.keep).flatMap((t) => {
+    const state = taskReviewState(t, 'week', weekAnchor, { isCurrent: weekIsCurrent })
+    return state ? [{ key: t.id, title: t.title, state, verbs: state === 'open' ? reviewVerbs(t) : [] }] : []
+  })
+
 
   return (
     <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast}>
@@ -928,7 +954,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             never by dragging from it. On a narrow screen the list sits above
             the stacked days instead. */}
         {narrow && planV2Enabled() ? (
-          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} reviewLines={weekReviewLines} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
             {weekListFor()}
@@ -942,7 +968,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {planV2Enabled() ? (
           // v2 (docs/planning/2026-09-28-planning-v2.md): the same journal and
           // list, laid out as the prototype's day column + "Any day this week".
-          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} reviewLines={weekReviewLines} />
         ) : (
           <>
             {weekListFor()}

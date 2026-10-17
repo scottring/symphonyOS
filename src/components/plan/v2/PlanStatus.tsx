@@ -34,6 +34,8 @@ export interface PlanToolbarProps {
   onMark?: () => void
   /** Conversation entry remains visible beside the separate review confirmation. */
   planningAction?: NextStep
+  /** The review by hand (PeriodReview): offered on every week, past ones too. */
+  reviewAction?: NextStep
   markLabel?: string
   markDisabled?: boolean
   unplannedHint?: string
@@ -67,7 +69,7 @@ function statusText({ period, saved, loading, error, agreedBy, onRetry, hasLines
 /** The page's tools, the view icons and one verb: "Look back at <prev>"
  *  while the last period left open work, else "Mark <period> planned" until
  *  it is. A just-saved period's next step is PlanSavedLine's, not this row's. */
-function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved, planLabel, planningAction, markLabel, markDisabled }: PlanToolbarProps) {
+function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved, planLabel, planningAction, reviewAction, markLabel, markDisabled }: PlanToolbarProps) {
   const verb = justSaved || loading || error ? null
     : planningAction ? <div className="pv2-planning-actions">
       <button type="button" className="pv2-btn" onClick={planningAction.onClick} data-explain="plan-walk" data-explain-label={planningAction.label}>{planningAction.label}</button>
@@ -81,6 +83,7 @@ function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, v
     {tools}
     {viewSwitch}
     {verb}
+    {reviewAction && !loading && <button type="button" className="pv2-qbtn" onClick={reviewAction.onClick} data-explain="plan-review" data-explain-label={reviewAction.label}>{reviewAction.label}</button>}
   </>
 }
 

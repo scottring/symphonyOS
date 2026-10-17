@@ -7,12 +7,15 @@
 // The page offers that same entry on every screen size (`walk`).
 //
 // It is chrome AROUND the existing week: the canvas, drag and drop and
-// add-to-day are WeekViewV2's, unchanged.
+// add-to-day are WeekViewV2's, unchanged. "Review week N" (?review=1) swaps
+// the canvas for the review by hand (PeriodReview) over WeekViewV2's lines.
 
 import { useContext, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
+import { usePeriodReview } from '@/hooks/usePeriodReview'
+import { PeriodReview, type ReviewLine } from '@/components/plan/review/PeriodReview'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useAuth } from '@/hooks/useAuth'
 import { showToast } from '@/hooks/useToast'
@@ -25,7 +28,7 @@ import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 
 const DAY = 86_400_000
 
-export function WeekV2({ weekStart, isCurrent, tools, canvas, walk }: {
+export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, reviewLines }: {
   weekStart: Date
   isCurrent: boolean
   /** The week's display toggles (Routines), drawn in this toolbar. */
@@ -34,12 +37,22 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk }: {
   canvas?: ReactNode | (() => ReactNode)
   /** The page's entry to the same conversation on every screen size. */
   walk?: { label: string; onStart: () => void }
+  /** The week's lines for the review by hand, with their verbs (WeekViewV2). */
+  reviewLines?: ReviewLine[]
 }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
   const { members } = useFamilyMembers()
   const session = usePlanningSession('weekly', weekToken(weekStart))
+  const review = usePeriodReview('weekly', weekToken(weekStart))
+  const [params, setParams] = useSearchParams()
+  const reviewing = !!reviewLines && params.get('review') === '1'
+  const setReviewing = (on: boolean) => setParams((prev) => {
+    const p = new URLSearchParams(prev)
+    if (on) p.set('review', '1'); else p.delete('review')
+    return p
+  })
   const [justSaved, setJustSaved] = useState<null | { detail: string }>(null)
   const [confirming, setConfirming] = useState(false)
   const { changeSet, receipt } = useCanvasActivity()
@@ -75,6 +88,7 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk }: {
   const toolbar: PlanToolbarProps = {
     period: `week ${weekNo}`, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
     planningAction: walk && { label: walk.label, onClick: walk.onStart },
+    reviewAction: reviewLines && !reviewing ? { label: `Review week ${weekNo}`, onClick: () => setReviewing(true) } : undefined,
     markLabel: 'I’m happy with this week',
     markDisabled: confirmationBlocked,
     unplannedHint: reviewHint,
@@ -118,7 +132,11 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk }: {
           <span className="pv2-saved-text"><b>Week {weekNo} ends today.</b> {walk ? <>Use “{walk.label}” to look ahead.</> : <>Open Chat to talk through the week ahead.</>}</span>
         </div>
       )}
-      <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>
+      {reviewing
+        ? <PeriodReview key={localYmd(weekStart)} periodWord={`week ${weekNo}`} lines={reviewLines!} loading={review.loading}
+            reviewed={review.reviewed} mine={review.mine} onFinish={review.finish} onClose={() => setReviewing(false)}
+            byWhom={(id) => id === user?.id ? 'you' : members.find((m) => m.auth_user_id === id)?.name ?? 'your household'} />
+        : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
     </div>
   )
 }

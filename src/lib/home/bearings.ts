@@ -19,6 +19,13 @@ export interface LevelFacts {
   review: number
   /** The period looked back at ("September"). */
   reviewName: string
+  /** Its first day (YYYY-MM-DD): the look-back opens its review by hand. */
+  reviewStart?: string
+}
+
+/** Where "Look back" goes: the period's review by hand (PeriodReview). */
+export function lookBackPath(level: 'month' | 'season', f: Pick<LevelFacts, 'reviewStart'>): string {
+  return f.reviewStart ? `/${level}?start=${f.reviewStart}&review=1` : `/${level}`
 }
 
 export interface BearingsFacts {
@@ -87,7 +94,7 @@ export function nextSteps(f: BearingsFacts): NextStep[] {
       id: 'look-back-month',
       title: `${f.month.reviewName} closed with ${count(f.month.review, 'open line')}.`,
       body: `Carry each into ${f.month.name}, call it done, or let it go.`,
-      action: { label: 'Look back', to: '/month' },
+      action: { label: 'Look back', to: lookBackPath('month', f.month) },
     })
   }
   if (f.season.review > 0) {
@@ -95,7 +102,7 @@ export function nextSteps(f: BearingsFacts): NextStep[] {
       id: 'look-back-season',
       title: `${f.season.reviewName} closed with ${count(f.season.review, 'open line')}.`,
       body: `Carry each into ${f.season.name}, call it done, or let it go.`,
-      action: { label: 'Look back', to: '/season' },
+      action: { label: 'Look back', to: lookBackPath('season', f.season) },
     })
   }
   if (!f.month.planned && f.month.open === 0) {
