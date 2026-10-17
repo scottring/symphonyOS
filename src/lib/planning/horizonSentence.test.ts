@@ -17,6 +17,10 @@ describe('horizonSentence', () => {
     expect(horizonSentence({ items: items(3, 0), parentWord: 'Fall' })).toBe('3 open.')
     expect(horizonSentence({ items: items(0, 2), parentWord: 'Fall' })).toBe('2 done.')
   })
+  it('a line moved on to a later period is not open here (the screenshot of 2026-10-17)', () => {
+    expect(horizonSentence({ items: [{ done: false, moved: true, hasParent: true }], parentWord: 'Fall' })).toBe('1 moved on.')
+    expect(horizonSentence({ items: [...items(2, 1, 2), { done: false, moved: true, hasParent: true }], parentWord: 'Fall' })).toBe('2 open, 1 done, 1 moved on. Both serve a Fall goal.')
+  })
   it('counts only open items as serving; done ones are history', () => {
     expect(horizonSentence({ items: items(2, 3, 0), parentWord: 'Fall' })).toBe('2 open, 3 done.')
   })

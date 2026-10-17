@@ -26,6 +26,9 @@ export interface RowVerb { label: string; onSelect: () => void }
 export interface PlanItemRowProps {
   node: PlanNode
   done: boolean
+  /** Moved on to a later period ("Moved to November"): kept as the record,
+   *  quiet, with no verbs of its own here. */
+  movedTo?: string
   /** The item a conversation just saved (focus param names it). */
   saved: boolean
   /** Tapping the title: opens the task's panel, or a year goal in place. */
@@ -59,7 +62,7 @@ export function PlanItemRow(p: PlanItemRowProps) {
   const arrived = useArrived(p.node.id)
   const { node } = p
   const opensInPlace = !!p.more
-  const state = [arrived ? 'is-arrived' : '', p.saved ? 'is-selected' : '', p.done ? 'is-done' : ''].filter(Boolean).join(' ')
+  const state = [arrived ? 'is-arrived' : '', p.saved ? 'is-selected' : '', p.done ? 'is-done' : '', p.movedTo && !p.done ? 'is-moved' : ''].filter(Boolean).join(' ')
   const preview = p.preview ? ` is-preview is-${p.preview.tone}${p.preview.struck ? ' is-struck' : ''}` : ''
   const open = opensInPlace && !!p.expanded && !p.editing
   return <li className={`plan-item${open ? ' is-open' : ''}${p.linked ? ' is-linked' : ''}${preview}`} data-plan-key={node.key}
@@ -74,6 +77,7 @@ export function PlanItemRow(p: PlanItemRowProps) {
       {p.readiness && !p.editing && <ReadinessIcons readiness={p.readiness} />}
       {p.saved && <span className="canvas-tag">Saved</span>}
       {p.done && !p.preview && <span className="canvas-tag plan-tag-done">{node.goal ? 'Met' : 'Done'}</span>}
+      {p.movedTo && !p.done && !p.preview && <span className="canvas-tag plan-tag-moved">{p.movedTo}</span>}
       {!p.editing && !open && !p.preview && p.quick && p.quick.length > 0 && <span className="plan-item-quick" role="group" aria-label={`Triage ${node.title}`}>
         {p.quick.map((q) => <button key={q.label} type="button" className="plan-quick" disabled={p.disabled}
           aria-label={`${q.label}: ${node.title}`} onClick={q.onSelect}>{q.label}</button>)}
