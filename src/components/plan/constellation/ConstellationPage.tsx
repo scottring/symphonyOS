@@ -11,11 +11,12 @@
 // panel. A linked goal says what it is for and what is already under it one
 // horizon down; an unlinked goal says nothing.
 //
-// Talk-first (spec 2026-10-14, "The pages"): a list to look at. Rows carry no
-// ⋯ menu and no quick buttons; tapping a month or season goal opens its task
-// panel (which holds done, delete, its day, what it serves, Move to / Remove
-// from — horizonPanel.tsx), and a year goal opens in place with Done and
-// Archive. Done goals fold into one line. Under the heading, one sentence
+// Talk-first (spec 2026-10-14, "The pages"): a list to look at, with a few
+// quick triage verbs on each open row (Scott, 2026-10-16): Done · Move to
+// {next} · Someday · Remove from {period} on a month or season goal, Done ·
+// Archive on a year goal. Tapping a month or season goal opens its task panel
+// (which holds every verb — horizonPanel.tsx), and a year goal opens in place
+// with Done and Archive. Done goals fold into one line. Under the heading, one sentence
 // from rules (horizonSentence.ts). The bar's walk becomes "Plan November"
 // while that talk is due (planSchedule.ts), and a pending change card is
 // drawn dashed on the list (planPreview.ts).
@@ -56,6 +57,9 @@ import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
+import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
+import { periodMoves } from './horizonPanel'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 
@@ -81,7 +85,9 @@ function writeAboveOpen(open: boolean) {
 function Inner() {
   const selection = useSelectionOptional()
   const { goals, loading: goalsLoading, error: goalsError, addGoal, updateGoal, deleteGoal } = useGoalsContext()
-  const { tasks, loading, error, addTask, updateTask, refetch, deleteTask } = useSupabaseTasks()
+  const { tasks, loading, error, addTask, updateTask, refetch, deleteTask, toggleTask, pushTask, setBucket, updateTasksBulk, keepForward, dropCommitment } = useSupabaseTasks()
+  // Someday asks for a domain first on an Unsorted item, as every triage does.
+  const gated = useGatedTaskActions({ updateTask, pushTask, setBucket, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const activity = useCanvasActivity()
   const { openAssistant } = useAssistantLauncher()
   const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember } = useFamilyMembers(), { seasons } = useHouseholdSeasons()
@@ -242,6 +248,28 @@ function Inner() {
     void act(what, () => updateGoal(node.id, { status: next }), { ids: [node.id], undo: async () => (await updateGoal(node.id, { status })) !== false })
   }
 
+  // Quick triage on an open row (Scott, 2026-10-13, again 2026-10-16). A year
+  // goal is a goals row: Done or Archive (Archive is its let-go; nothing is
+  // deleted). A month or season goal is a task committed to this period: Done,
+  // Move to the next period, Someday, or Remove from this one. The row is on
+  // this page's list by construction, so Move and Remove need no other check.
+  const quickFor = (node: PlanNode): { label: string; onSelect: () => void }[] => {
+    if (isDone(node)) return []
+    if (!node.task) return [
+      { label: 'Done', onSelect: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
+      { label: 'Archive', onSelect: () => setGoalStatus(node, 'archived', `Archive “${node.title}”`) },
+    ]
+    const task = node.task
+    const toggle = async () => (await toggleTask(task.id)) !== false
+    const [carry, remove] = periodMoves(task, PERIODS[level] as 'season' | 'month', bounds, seasons, { updateTask, keepForward, dropCommitment }, activity.run)
+    return [
+      { label: 'Done', onSelect: () => void act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) },
+      { label: carry.label, onSelect: carry.onClick },
+      { label: 'Someday', onSelect: () => void act(`${describeTriageWhen('someday')}: “${node.title}”`, () => applyTriageWhen('someday', task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }), { ids: [node.id] }) },
+      { label: remove.label, onSelect: remove.onClick },
+    ]
+  }
+
   // ---- Proposals for this horizon -----------------------------------------
   const inPeriod = (ymd?: string) => {
     if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return true
@@ -283,6 +311,10 @@ function Inner() {
   const above = level > 0 ? allNodes.filter((n) => n.level === level - 1 && !isDone(n)) : []
   const aboveTitles = level > 0 ? above.map((n) => n.title) : goalsOf(year - 1).filter((g) => g.status !== 'completed').map((g) => g.name)
   const aboveWord = level === 2 ? seasonWord : String(year)
+  // The toggle names the list it opens ("Show Fall list"), and once open it
+  // sits on the list itself (Scott, 2026-10-16).
+  const aboveListWord = level === 2 ? seasonWord : level === 1 ? String(year) : String(year - 1)
+  const showAbove = `Show ${aboveListWord} list`, hideAbove = `Hide ${aboveListWord} list`
   const aboveTitle = level === 2 ? `${seasonWord} goals` : level === 1 ? `${year} goals` : `${year - 1} goals`
   const aboveWhat = level === 2 ? `the season ${periodWord} serves` : level === 1 ? `the year ${periodWord} serves` : 'last year, for reference'
   const aboveNone = level === 2 ? `No ${seasonWord} goals yet.` : level === 1 ? `No ${year} goals yet.` : `Nothing was written for ${year - 1}.`
@@ -342,7 +374,7 @@ function Inner() {
       below={{ label: belowLabel, titles: belowOf(node) }}
       linked={linked === node.key}
       done={isDone(node)} saved={savedKey === node.key}
-      onOpen={onOpen} expanded={expanded === node.key} more={more}
+      onOpen={onOpen} expanded={expanded === node.key} more={more} quick={quickFor(node)}
       editing={editing}
       onSaveEdit={async (text) => { const ok = await rename(node, text); if (ok) setComposer(null); return ok }}
       onCancelEdit={() => setComposer(null)}
@@ -401,11 +433,13 @@ function Inner() {
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
       : !dataReady ? null
       : <>
-        <div className="plan-above" data-explain="above" data-explain-label={`${aboveTitle}, ${aboveWhat}`}>
+        {/* Wide screens: open, the panel beside the list carries the title
+            and its own Hide, so this line steps aside (canvas-plan.css). */}
+        <div className={`plan-above${aboveOpen ? ' is-open' : ''}`} data-explain="above" data-explain-label={`${aboveTitle}, ${aboveWhat}`}>
           <button type="button" className="plan-above-line" aria-expanded={aboveOpen} aria-controls="plan-above-panel" onClick={toggleAbove}>
             <span className="plan-above-title">{aboveTitle}</span>
             <span className="plan-above-what">{aboveWhat}</span>
-            <span className="canvas-link plan-above-go">{aboveOpen ? 'Hide' : 'Show'}</span>
+            <span className="canvas-link plan-above-go">{aboveOpen ? hideAbove : showAbove}</span>
           </button>
         </div>
 
@@ -413,7 +447,10 @@ function Inner() {
         {/* Open, the level above sits beside the list and stays in view while
             the list scrolls (Scott, 2026-10-13); narrow screens show it above. */}
         {aboveOpen && <aside id="plan-above-panel" className="plan-above-panel" aria-label={aboveTitle}>
-          <p className="plan-above-panel-title">{aboveTitle}</p>
+          <div className="plan-above-panel-head">
+            <p className="plan-above-panel-title">{aboveTitle}</p>
+            <button type="button" className="canvas-link plan-above-hide" aria-expanded aria-controls="plan-above-panel" onClick={toggleAbove}>{hideAbove}</button>
+          </div>
           {aboveTitles.length > 0
             ? <ul className="plan-above-list" aria-label={aboveTitle}>{aboveTitles.map((t, i) => <li key={`${i}:${t}`}>{t}</li>)}</ul>
             : <p className="plan-above-none">{aboveNone}</p>}

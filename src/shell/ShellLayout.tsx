@@ -454,7 +454,7 @@ function ShellLayoutInner({ children }: Props) {
 
   return (
     <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} applyChanges={applyChanges} persistKey={user?.id} retryTurn={() => { void assistant.retryLast(); }}>
-    <ChatTaskActionsProvider tasks={tasks} toggleTask={toggleTask} updateTask={updateTask}>
+    <ChatTaskActionsProvider tasks={tasks} toggleTask={toggleTask} updateTask={updateTask} routines={canvasRoutines}>
     <PageHelpContext.Provider value={pageHelp}>
     <CanvasBridge onActivity={setCanvasActivity} />
     <DesktopControlsContext.Provider value={desktopControls}>

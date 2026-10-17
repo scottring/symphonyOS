@@ -26,6 +26,11 @@ status open/done/carried/removed). A month item serves a season item
   serves which goal ("Part of a goal"), and — opened from a horizon page —
   "Move to {next period}" and "Remove from {period}". Year goals expand in
   place with Done and Archive, as now.
+- **Amended 2026-10-16 (Scott):** open rows carry quick triage again — month
+  and season goals: Done · Move to {next} · Someday · Remove from {period};
+  year goals: Done · Archive. Hover/focus with a mouse, always on touch. The
+  level-above toggle names its list ("Show Fall list") and, open on wide
+  screens, carries its own "Hide Fall list" in the panel heading.
 - **Done folds** into one line ("5 done · … Show").
 - The parent list beside, and each goal's "This week" line, stay.
 

@@ -362,7 +362,9 @@
    list scrolls; narrow screens show it above the list (Scott, 2026-10-13). */
 .plan-horizon-body { display: grid; grid-template-columns: minmax(0, 46rem); gap: 0 48px; align-items: start; }
 .plan-above-panel { min-width: 0; margin: 0 0 14px; }
-.plan-above-panel-title { display: none; margin: 0 0 6px; font-family: var(--font-family-display); font-size: 17px; font-weight: 500; color: var(--color-neutral-900); }
+.plan-above-panel-head { display: none; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; margin: 0 0 6px; }
+.plan-above-panel-title { margin: 0; font-family: var(--font-family-display); font-size: 17px; font-weight: 500; color: var(--color-neutral-900); }
+.plan-above-hide { margin-left: auto; font-size: 13px; }
 .plan-above-list { list-style: none; margin: 0; padding: 2px 2px 14px; columns: 2 16rem; column-gap: 32px; }
 .plan-above-list > li { break-inside: avoid; padding: 3px 0; font-family: var(--font-family-display); font-size: 15px; line-height: 1.3; color: var(--color-neutral-700); }
 .plan-above-none { margin: 0; padding: 2px 2px 12px; font-family: var(--font-family-display); font-style: italic; font-size: 15px; color: var(--color-neutral-600); }
@@ -376,7 +378,10 @@
     max-height: calc(100vh - 150px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
     padding: 2px 4px 8px 20px; border-left: 1px solid var(--color-neutral-200);
   }
-  .plan-above-panel-title { display: block; }
+  /* Open, the panel carries the title and its own Hide, right on the list;
+     the fold line above steps aside (Scott, 2026-10-16). */
+  .plan-above-panel-head { display: flex; }
+  .plan-above.is-open { display: none; }
   .plan-above-panel .plan-above-list { columns: 1; padding: 0; }
   .plan-above-panel .plan-above-list > li { padding: 4px 0; }
 }
@@ -467,3 +472,24 @@
 @media (max-width: 767px) {
   .plan-talk-chip-quiet { min-height: 32px; display: inline-flex; align-items: center; }
 }
+
+/* One-tap triage on a goal row (2026-10-13, back 2026-10-16): with a mouse, on
+   hover or keyboard focus; on touch (no hover) always, wrapping under the title. */
+/* The title keeps room to read; short of it, the verbs wrap to their own line. */
+.plan-goal-list .plan-item > .canvas-item { flex-wrap: wrap; }
+.plan-goal-list .plan-item > .canvas-item > .plan-item-title { flex: 1 1 14rem; }
+.plan-item-quick { display: none; flex: none; flex-wrap: wrap; align-items: center; gap: 2px; margin-left: auto; }
+@media (hover: hover) and (pointer: fine) {
+  .plan-item:hover .plan-item-quick, .plan-item:focus-within .plan-item-quick { display: inline-flex; }
+}
+@media (hover: none), (pointer: coarse) {
+  .plan-item-quick { display: inline-flex; }
+  .plan-quick { min-height: 36px; }
+}
+.plan-quick {
+  all: unset; box-sizing: border-box; cursor: pointer; padding: 2px 8px; border-radius: var(--radius-sm);
+  font-family: var(--font-family-sans); font-size: 12px; font-weight: 500; color: var(--color-neutral-600); white-space: nowrap;
+}
+.plan-quick:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.plan-quick:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }
+.plan-quick:disabled { opacity: .5; cursor: default; }
