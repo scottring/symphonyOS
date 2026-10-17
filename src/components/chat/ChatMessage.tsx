@@ -5,7 +5,7 @@ import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { inlineMarkdownToHtml } from '@/lib/notes/notesToHtml'
 import { splitListLines } from '@/lib/chat/taskMentions'
-import { ChatTaskLineActions, useChatTaskActions } from './ChatTaskActions'
+import { ChatMentionLine, useChatTaskActions } from './ChatTaskActions'
 
 interface ChatMessageProps {
   message: ChatMessageType
@@ -107,7 +107,7 @@ export function ChatMessage({
 }: ChatMessageProps) {
   const isUser = message.role === 'user'
   const taskActions = useChatTaskActions()
-  // List lines that name one of the person's tasks, with that task.
+  // List lines that name one of the person's tasks or routines, with it.
   const lines = !isUser && taskActions ? splitListLines(message.content) : []
   const named = lines.map((l) => ('text' in l ? taskActions!.match(l.text) : null))
   const namesTasks = named.some(Boolean)
@@ -137,7 +137,7 @@ export function ChatMessage({
   // Render content with inline add buttons for bullet items
   function renderContent() {
     if (namesTasks) {
-      // Runs of plain lines stay one block; a line naming a task gets its actions.
+      // Runs of plain lines stay one block; a line naming a task or routine gets its actions.
       const blocks: React.ReactNode[] = []
       let run: string[] = []
       const flush = (key: string) => {
@@ -146,15 +146,10 @@ export function ChatMessage({
         run = []
       }
       lines.forEach((l, i) => {
-        const task = named[i]
-        if (!task || !('text' in l)) { run.push(l.line); return }
+        const mention = named[i]
+        if (!mention || !('text' in l)) { run.push(l.line); return }
         flush(`text-${i}`)
-        blocks.push(
-          <div key={`task-${i}`} className={`chat-task-line${task.completed ? ' is-done' : ''}`}>
-            <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(inlineMarkdownToHtml(l.line)) }} />
-            <ChatTaskLineActions task={task} />
-          </div>,
-        )
+        blocks.push(<ChatMentionLine key={`mention-${i}`} mention={mention} html={DOMPurify.sanitize(inlineMarkdownToHtml(l.line))} />)
       })
       flush('text-end')
       return <div className="text-sm leading-relaxed whitespace-pre-wrap">{blocks}</div>
