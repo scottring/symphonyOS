@@ -118,6 +118,9 @@ export function dayLoadWindow(accountId: string | null, now: Date = new Date()):
 
 /** Start a read. Callers have already decided that one is wanted. */
 function start(accountId: string | null): void {
+  // No one signed in yet — no calendar to read. The shell names the account
+  // a moment after the first page mounts; that announcement starts the read.
+  if (accountId === null) return
   const { key, range } = dayLoadWindow(accountId)
   const gen = ++generation
   const seq = changeSeq
@@ -225,7 +228,15 @@ function wireSignals(): void {
   }
   lastVisibleAt = Date.now()
   teardown.push(onCalendarChanged(() => invalidate()))
-  teardown.push(onAccountChanged(() => {
+  teardown.push(onAccountChanged((id) => {
+    // Signed out, or the shell is still finding out who is signed in (it
+    // starts from nobody while the app boots). Reads are keyed by account, so
+    // nothing held can be shown to anyone else — leave a read in flight to
+    // land, rather than start the same read again a moment later (prod,
+    // 2026-10-18: four identical reads on one cold load).
+    if (id === null) { notify(); return }
+    const { key } = dayLoadWindow(id)
+    if (read?.key === key || inflightKey === key) { notify(); return }
     // The read held belongs to the previous account; it must not be shown.
     read = null
     failedKey = null
