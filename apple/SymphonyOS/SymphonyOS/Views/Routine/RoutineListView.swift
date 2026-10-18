@@ -30,6 +30,7 @@ struct RoutineListView: View {
                             }
                             .onDelete { offsets in
                                 for offset in offsets {
+                                    modelContext.queueSync(table: "routines", recordId: active[offset].id, type: "delete")
                                     modelContext.delete(active[offset])
                                 }
                                 try? modelContext.save()
@@ -63,8 +64,10 @@ struct RoutineListView: View {
             }
         }
         .sheet(isPresented: $showingNewRoutine) {
-            NewRoutineSheet(userId: auth.currentUser?.id ?? UUID())
-                .presentationDetents([.medium])
+            if let userId = auth.currentUser?.id {
+                NewRoutineSheet(userId: userId)
+                    .presentationDetents([.medium])
+            }
         }
     }
 
@@ -76,9 +79,9 @@ struct RoutineListView: View {
         VStack(spacing: 16) {
             Image(systemName: "repeat")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.primaryTint.opacity(0.5))
+                .foregroundStyle(Color.textLight)
             Text("No Routines")
-                .font(.displaySmall)
+                .font(.displayMedium)
             Text("Add routines for recurring activities.")
                 .font(.bodySmall)
                 .foregroundStyle(Color.textSecondary)
@@ -215,7 +218,10 @@ struct NewRoutineSheet: View {
         if !timeOfDay.isEmpty {
             routine.timeOfDay = timeOfDay
         }
+        // Who can see it rides on the insert (no area or assignee yet: just you).
+        routine.scope = ScopeRule.derive(for: routine, members: [])
         modelContext.insert(routine)
+        modelContext.queueSync(table: "routines", recordId: routine.id, type: "insert")
         try? modelContext.save()
         dismiss()
     }

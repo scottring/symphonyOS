@@ -1,71 +1,44 @@
 import SwiftUI
 
-// MARK: - Typography
-
-// Instrument Serif — display font (entity titles, headers)
-// Satoshi — body font (all body text)
-// Both are bundled as custom fonts in the app
+// MARK: - Typography (landing-page kit)
+//
+// Crimson Pro — display (mastheads, block titles, the italic note line)
+// DM Sans — body, captions, eyebrows
+// Both are bundled under Resources/Fonts and registered via Info.plist
+// UIAppFonts. `DesignSystemTests.bundledFontResolves` fails if one goes missing.
 
 extension Font {
-    // MARK: Display (Instrument Serif)
-    static let displayLarge = Font.custom("InstrumentSerif-Regular", size: 32)
-    static let displayMedium = Font.custom("InstrumentSerif-Regular", size: 24)
-    static let displaySmall = Font.custom("InstrumentSerif-Regular", size: 20)
+    // MARK: Display (Crimson Pro)
+    static let displayLarge  = Font.custom("CrimsonPro-Regular", size: 34)
+    static let displayMedium = Font.custom("CrimsonPro-Regular", size: 24)
+    static let displaySmall  = Font.custom("CrimsonPro-SemiBold", size: 18)
+    /// The one-line serif note on a block card.
+    static let displayItalic = Font.custom("CrimsonPro-Italic", size: 14)
 
-    // MARK: Body (Satoshi)
-    static let bodyLarge = Font.custom("Satoshi-Regular", size: 17)
-    static let bodyMedium = Font.custom("Satoshi-Regular", size: 15)
-    static let bodySmall = Font.custom("Satoshi-Regular", size: 13)
+    // MARK: Body (DM Sans)
+    static let bodyLarge  = Font.custom("DMSans-Regular", size: 17)
+    static let bodyMedium = Font.custom("DMSans-Regular", size: 15)
+    static let bodySmall  = Font.custom("DMSans-Regular", size: 13)
 
-    static let bodyLargeBold = Font.custom("Satoshi-Bold", size: 17)
-    static let bodyMediumBold = Font.custom("Satoshi-Bold", size: 15)
-    static let bodySmallBold = Font.custom("Satoshi-Bold", size: 13)
+    static let bodyLargeBold  = Font.custom("DMSans-SemiBold", size: 17)
+    static let bodyMediumBold = Font.custom("DMSans-SemiBold", size: 15)
+    static let bodySmallBold  = Font.custom("DMSans-SemiBold", size: 13)
 
     // MARK: Caption
-    static let captionText = Font.custom("Satoshi-Regular", size: 11)
-    static let captionBold = Font.custom("Satoshi-Bold", size: 11)
+    static let captionText = Font.custom("DMSans-Regular", size: 11)
+    static let captionBold = Font.custom("DMSans-Medium", size: 11)
 
-    // MARK: Fallbacks (uses system fonts when custom fonts not yet loaded)
-    static let displayLargeFallback = Font.system(size: 32, weight: .regular, design: .serif)
-    static let displayMediumFallback = Font.system(size: 24, weight: .regular, design: .serif)
-    static let displaySmallFallback = Font.system(size: 20, weight: .regular, design: .serif)
+    /// Tracked uppercase section label (MORNING, AFTERNOON…). Pair with
+    /// `.eyebrowStyle()` for the tracking + case.
+    static let eyebrow = Font.custom("DMSans-Medium", size: 11)
 }
 
-// MARK: - Font Registration
-
-enum FontLoader {
-    static var fontsRegistered = false
-
-    static func registerFonts() {
-        guard !fontsRegistered else { return }
-        fontsRegistered = true
-
-        let fontNames = [
-            "InstrumentSerif-Regular",
-            "InstrumentSerif-Italic",
-            "Satoshi-Regular",
-            "Satoshi-Medium",
-            "Satoshi-Bold",
-            "Satoshi-Light",
-        ]
-
-        for fontName in fontNames {
-            registerFont(named: fontName)
-        }
-    }
-
-    private static func registerFont(named name: String) {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "otf")
-                ?? Bundle.main.url(forResource: name, withExtension: "ttf") else {
-            // Font file not found — will fall back to system font
-            return
-        }
-
-        guard let fontDataProvider = CGDataProvider(url: url as CFURL),
-              let font = CGFont(fontDataProvider) else {
-            return
-        }
-
-        CTFontManagerRegisterGraphicsFont(font, nil)
+extension View {
+    /// Landing `.section-eyebrow`: 11pt medium, uppercase, 1.2pt tracking, muted.
+    func eyebrowStyle() -> some View {
+        self.font(.eyebrow)
+            .textCase(.uppercase)
+            .kerning(1.2)
+            .foregroundStyle(Color.textTertiary)
     }
 }

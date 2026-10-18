@@ -13,13 +13,32 @@ final class TaskViewModel {
 
     // MARK: - Create
 
-    func createTask(title: String, userId: UUID, scheduledFor: Date? = nil, context: String? = nil) -> SymphonyTask {
+    func createTask(title: String, userId: UUID, scheduledFor: Date? = nil, isAllDay: Bool = false, context: String? = nil) -> SymphonyTask {
         let task = SymphonyTask(
             userId: userId,
             title: title,
             scheduledFor: scheduledFor,
             context: context
         )
+        task.isAllDay = isAllDay
+        task.bucket = scheduledFor != nil ? "timed" : "inbox"
+        modelContext.insert(task)
+        queueChange(tableName: "tasks", recordId: task.id, type: "insert")
+        try? modelContext.save()
+        return task
+    }
+
+    /// Create a task from a placed page item. Everything rides the INSERT —
+    /// the row exists locally with all fields before the push, so no follow-up
+    /// update can race the temp→real swap (the addTask-then-setBucket lesson).
+    func createTask(fields: PageTaskFields, userId: UUID) -> SymphonyTask {
+        let task = SymphonyTask(userId: userId, title: fields.title, scheduledFor: fields.scheduledFor,
+                                context: nil, notes: fields.notes)
+        task.isAllDay = fields.isAllDay
+        task.bucket = fields.bucket
+        task.weekStart = fields.weekStart
+        task.assignedTo = fields.assignedTo
+        task.scope = fields.scope
         modelContext.insert(task)
         queueChange(tableName: "tasks", recordId: task.id, type: "insert")
         try? modelContext.save()
@@ -29,7 +48,7 @@ final class TaskViewModel {
     // MARK: - Update
 
     func toggleComplete(_ task: SymphonyTask) {
-        task.completed.toggle()
+        task.setCompleted(!task.completed)
         task.updatedAt = Date()
         task.syncStatus = .pending
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
@@ -40,24 +59,29 @@ final class TaskViewModel {
         task.scheduledFor = date
         task.isAllDay = isAllDay
         task.isSomeday = false
+        // Move it out of the inbox once it has a date (the inbox is bucket=="inbox",
+        // independent of scheduledFor) — otherwise it shows in both Today and Inbox.
+        task.bucket = date != nil ? "timed" : "inbox"
         task.updatedAt = Date()
         task.syncStatus = .pending
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
         try? modelContext.save()
     }
 
-    func setContext(_ task: SymphonyTask, context: String?) {
+    func setContext(_ task: SymphonyTask, context: String?, members: [FamilyMember]) {
         task.context = context
         task.updatedAt = Date()
         task.syncStatus = .pending
+        reconcileScope(task, members: members)
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
         try? modelContext.save()
     }
 
-    func assign(_ task: SymphonyTask, to memberId: UUID?) {
+    func assign(_ task: SymphonyTask, to memberId: UUID?, members: [FamilyMember]) {
         task.assignedTo = memberId
         task.updatedAt = Date()
         task.syncStatus = .pending
+        reconcileScope(task, members: members)
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
         try? modelContext.save()
     }
@@ -75,6 +99,19 @@ final class TaskViewModel {
     func markSomeday(_ task: SymphonyTask) {
         task.isSomeday = true
         task.scheduledFor = nil
+        task.bucket = "someday"   // out of the inbox bucket, into someday
+        task.updatedAt = Date()
+        task.syncStatus = .pending
+        queueChange(tableName: "tasks", recordId: task.id, type: "update")
+        try? modelContext.save()
+    }
+
+    /// Move a task to a horizon bucket (week/month/someday/inbox). Mirrors the
+    /// web invariant: only bucket=="timed" carries a scheduled_for value.
+    func moveToBucket(_ task: SymphonyTask, bucket: String) {
+        task.bucket = bucket
+        task.scheduledFor = nil
+        task.isSomeday = bucket == "someday"
         task.updatedAt = Date()
         task.syncStatus = .pending
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
@@ -97,6 +134,25 @@ final class TaskViewModel {
         try? modelContext.save()
     }
 
+    /// Recompute `task.scope` per ScopeRule.derive and flag it dirty (so
+    /// SyncEngine pushes the new value) only if it actually changed. Call
+    /// this from every write path that can move `context`, `assignedTo`, or
+    /// `assignedToAll` — mirrors useSupabaseTasks.ts updateTask's
+    /// scope-recompute block. Does not save; callers already do.
+    func reconcileScope(_ task: SymphonyTask, members: [FamilyMember]) {
+        var parent: SymphonyTask?
+        if let parentId = task.parentTaskId {
+            var descriptor = FetchDescriptor<SymphonyTask>(predicate: #Predicate { $0.id == parentId })
+            descriptor.fetchLimit = 1
+            parent = try? modelContext.fetch(descriptor).first
+        }
+        let next = ScopeRule.derive(for: task, parent: parent, members: members)
+        if task.scope != next {
+            task.scope = next
+            task.scopeDirty = true
+        }
+    }
+
     // MARK: - Delete
 
     func deleteTask(_ task: SymphonyTask) {
@@ -109,7 +165,6 @@ final class TaskViewModel {
     // MARK: - Queue Changes
 
     private func queueChange(tableName: String, recordId: UUID, type: String) {
-        let change = PendingChange(tableName: tableName, recordId: recordId, changeType: type)
-        modelContext.insert(change)
+        modelContext.queueSync(table: tableName, recordId: recordId, type: type)
     }
 }

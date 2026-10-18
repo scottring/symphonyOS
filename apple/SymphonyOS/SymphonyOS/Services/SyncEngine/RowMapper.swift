@@ -21,20 +21,24 @@ enum RowMapper {
             return familyMemberFromRow(row) as? T
         case is ActionableInstance.Type:
             return actionableInstanceFromRow(row) as? T
-        case is PlaybookBlock.Type:
-            return playbookBlockFromRow(row) as? T
-        case is PlaybookInstance.Type:
-            return playbookInstanceFromRow(row) as? T
+        case is EventNote.Type:
+            return eventNoteFromRow(row) as? T
         case is WeeklyTemplate.Type:
             return weeklyTemplateFromRow(row) as? T
-        case is FamilyRule.Type:
-            return familyRuleFromRow(row) as? T
-        case is Responsibility.Type:
-            return responsibilityFromRow(row) as? T
+        case is SymphonyList.Type:
+            return listFromRow(row) as? T
+        case is SymphonyListItem.Type:
+            return listItemFromRow(row) as? T
         case is Household.Type:
             return householdFromRow(row) as? T
         case is UserProfile.Type:
             return userProfileFromRow(row) as? T
+        case is TaskCommitment.Type:
+            return commitmentFromRow(row) as? T
+        case is TaskFocus.Type:
+            return focusFromRow(row) as? T
+        case is Goal.Type:
+            return goalFromRow(row) as? T
         default:
             return nil
         }
@@ -49,11 +53,16 @@ enum RowMapper {
 
         let task = SymphonyTask(id: id, userId: userId, title: title, syncStatus: .synced)
         task.completed = row.bool("completed") ?? false
+        task.completedAt = row.date("completed_at")
+        task.isWaiting = row.bool("is_waiting") ?? false
+        task.waitingFor = row.string("waiting_for")
+        task.waitingSince = row.date("waiting_since")
         task.scheduledFor = row.date("scheduled_for")
         task.deferredUntil = row.date("deferred_until")
         task.deferCount = row.int("defer_count") ?? 0
         task.isAllDay = row.bool("is_all_day") ?? false
         task.isSomeday = row.bool("is_someday") ?? false
+        task.bucket = row.string("bucket")
         task.estimatedDuration = row.int("estimated_duration")
         task.context = row.string("context")
         task.category = row.string("category")
@@ -67,8 +76,22 @@ enum RowMapper {
         task.assignedToAll = row.uuidArray("assigned_to_all")
         task.projectId = row.uuid("project_id")
         task.parentTaskId = row.uuid("parent_task_id")
+        task.scope = row.string("scope")
+        task.captureId = row.uuid("capture_id")
+        task.weekStart = row.date("week_start")
+        task.monthStart = row.date("month_start")
+        task.seasonStart = row.date("season_start")
+        task.weekendStart = row.date("weekend_start")
+        task.isGoal = row.bool("is_goal") ?? false
+        task.goalTaskId = row.uuid("goal_task_id")
+        task.goalId = row.uuid("goal_id")
+        task.plannedOn = row.date("planned_on")
         task.linkedTo = row.codable("linked_to")
         task.linkType = row.string("link_type")
+        let captureMeta: CaptureMeta? = row.codable("capture_meta")
+        task.captureStatus = captureMeta?.status
+        task.captureStoragePath = captureMeta?.storage_path
+        task.captureSuggestedTaskId = captureMeta?.suggested_task_id.flatMap(UUID.init(uuidString:))
         task.lastSyncedAt = Date()
         task.createdAt = row.date("created_at") ?? Date()
         task.updatedAt = row.date("updated_at") ?? Date()
@@ -106,10 +129,56 @@ enum RowMapper {
         routine.timeOfDay = row.string("time_of_day")
         routine.context = row.string("context")
         routine.assignedTo = row.uuid("assigned_to")
+        routine.showOnTimeline = row.bool("show_on_timeline") ?? true
+        routine.pinToTimeline = row.bool("pin_to_timeline") ?? false
+        routine.parentRoutineId = row.uuid("parent_routine_id")
+        routine.pausedUntil = row.date("paused_until")
+        routine.assignedToAll = row.uuidArray("assigned_to_all")
+        routine.scope = row.string("scope")
         routine.lastSyncedAt = Date()
         routine.createdAt = row.date("created_at") ?? Date()
         routine.updatedAt = row.date("updated_at") ?? Date()
         return routine
+    }
+
+    private static func listFromRow(_ row: [String: AnyJSON]) -> SymphonyList? {
+        guard let id = row.uuid("id"),
+              let userId = row.uuid("user_id"),
+              let title = row.string("title") else { return nil }
+
+        let list = SymphonyList(id: id, userId: userId, title: title, syncStatus: .synced)
+        list.icon = row.string("icon")
+        list.category = row.string("category") ?? "general"
+        list.visibility = row.string("visibility") ?? "self"
+        list.sortOrder = row.int("sort_order") ?? 0
+        list.externalSource = row.string("external_source")
+        list.externalId = row.string("external_id")
+        list.lastSyncedAt = Date()
+        list.createdAt = row.date("created_at") ?? Date()
+        list.updatedAt = row.date("updated_at") ?? Date()
+        return list
+    }
+
+    private static func listItemFromRow(_ row: [String: AnyJSON]) -> SymphonyListItem? {
+        guard let id = row.uuid("id"),
+              let userId = row.uuid("user_id"),
+              let listId = row.uuid("list_id"),
+              let text = row.string("text") else { return nil }
+
+        // `completed`, not the legacy `is_checked` — both columns still exist,
+        // but the web reads and writes `completed`/`completed_at`.
+        let item = SymphonyListItem(id: id, userId: userId, listId: listId, text: text, syncStatus: .synced)
+        item.note = row.string("note")
+        item.completed = row.bool("completed") ?? false
+        item.completedAt = row.date("completed_at")
+        item.sortOrder = row.int("sort_order") ?? 0
+        item.parentItemId = row.uuid("parent_item_id")
+        item.externalSource = row.string("external_source")
+        item.externalId = row.string("external_id")
+        item.lastSyncedAt = Date()
+        item.createdAt = row.date("created_at") ?? Date()
+        item.updatedAt = row.date("updated_at") ?? Date()
+        return item
     }
 
     private static func contactFromRow(_ row: [String: AnyJSON]) -> Contact? {
@@ -166,52 +235,35 @@ enum RowMapper {
         instance.deferredTo = row.date("deferred_to")
         instance.completedAt = row.date("completed_at")
         instance.skippedAt = row.date("skipped_at")
+        instance.plannedOn = row.date("planned_on")
         instance.lastSyncedAt = Date()
         instance.createdAt = row.date("created_at") ?? Date()
         instance.updatedAt = row.date("updated_at") ?? Date()
         return instance
     }
 
-    private static func playbookBlockFromRow(_ row: [String: AnyJSON]) -> PlaybookBlock? {
+    private static func eventNoteFromRow(_ row: [String: AnyJSON]) -> EventNote? {
         guard let id = row.uuid("id"),
               let userId = row.uuid("user_id"),
-              let timeSlot = row.string("time_slot"),
-              let label = row.string("label"),
-              let blockType = row.string("block_type"),
-              let narrative = row.string("narrative") else { return nil }
+              let googleEventId = row.string("google_event_id") else { return nil }
 
-        let items: [PlaybookItem] = row.codable("items") ?? []
-        let dayTypes: [String] = row.stringArray("day_types") ?? ["school-day"]
-
-        let block = PlaybookBlock(id: id, userId: userId, timeSlot: timeSlot, label: label, blockType: blockType, narrative: narrative, items: items, dayTypes: dayTypes, syncStatus: .synced)
-        block.templateId = row.uuid("template_id")
-        block.layerId = row.uuid("layer_id")
-        block.sourceRuleIds = row.uuidArray("source_rule_ids")
-        block.visibility = row.string("visibility")
-        block.coachingNote = row.string("coaching_note")
-        block.sortOrder = row.int("sort_order") ?? 0
-        block.lastSyncedAt = Date()
-        block.createdAt = row.date("created_at") ?? Date()
-        block.updatedAt = row.date("updated_at") ?? Date()
-        return block
-    }
-
-    private static func playbookInstanceFromRow(_ row: [String: AnyJSON]) -> PlaybookInstance? {
-        guard let id = row.uuid("id"),
-              let userId = row.uuid("user_id"),
-              let blockId = row.uuid("block_id"),
-              let date = row.date("date") else { return nil }
-
-        let instance = PlaybookInstance(id: id, userId: userId, blockId: blockId, date: date, syncStatus: .synced)
-        instance.completed = row.bool("completed") ?? false
-        instance.react = row.string("react")
-        instance.tags = row.stringArray("tags") ?? []
-        instance.notes = row.string("notes")
-        instance.itemsState = row.codable("items_state")
-        instance.lastSyncedAt = Date()
-        instance.createdAt = row.date("created_at") ?? Date()
-        instance.updatedAt = row.date("updated_at") ?? Date()
-        return instance
+        let note = EventNote(id: id, userId: userId, googleEventId: googleEventId, syncStatus: .synced)
+        note.notes = row.string("notes")
+        note.links = row.codable("links")
+        note.eventTitle = row.string("event_title")
+        note.eventStartTime = row.date("event_start_time")
+        note.context = row.string("context")
+        note.sharedWithFamily = row.bool("shared_with_family") ?? false
+        note.shareNudgeDismissed = row.bool("share_nudge_dismissed") ?? false
+        note.assignedTo = row.uuid("assigned_to")
+        note.assignedToAll = row.uuidArray("assigned_to_all")
+        note.recipeUrl = row.string("recipe_url")
+        note.projectId = row.uuid("project_id")
+        note.isFree = row.bool("is_free") ?? false
+        note.lastSyncedAt = Date()
+        note.createdAt = row.date("created_at") ?? Date()
+        note.updatedAt = row.date("updated_at") ?? Date()
+        return note
     }
 
     private static func weeklyTemplateFromRow(_ row: [String: AnyJSON]) -> WeeklyTemplate? {
@@ -228,48 +280,60 @@ enum RowMapper {
         return template
     }
 
-    private static func familyRuleFromRow(_ row: [String: AnyJSON]) -> FamilyRule? {
-        guard let id = row.uuid("id"),
-              let userId = row.uuid("user_id"),
-              let rule = row.string("rule") else { return nil }
-
-        let model = FamilyRule(id: id, userId: userId, rule: rule, syncStatus: .synced)
-        model.appliesTo = row.stringArray("applies_to") ?? ["everyone"]
-        model.status = row.string("status") ?? "active"
-        model.rationale = row.string("rationale")
-        model.enforcementTip = row.string("enforcement_tip")
-        model.lastSyncedAt = Date()
-        model.createdAt = row.date("created_at") ?? Date()
-        model.updatedAt = row.date("updated_at") ?? Date()
-        return model
-    }
-
-    private static func responsibilityFromRow(_ row: [String: AnyJSON]) -> Responsibility? {
-        guard let id = row.uuid("id"),
-              let userId = row.uuid("user_id"),
-              let who = row.string("who"),
-              let task = row.string("task") else { return nil }
-
-        let model = Responsibility(id: id, userId: userId, who: who, task: task, syncStatus: .synced)
-        model.frequency = row.string("frequency") ?? "daily"
-        model.status = row.string("status") ?? "active"
-        model.ruleId = row.uuid("rule_id")
-        model.lastSyncedAt = Date()
-        model.createdAt = row.date("created_at") ?? Date()
-        model.updatedAt = row.date("updated_at") ?? Date()
-        return model
-    }
-
     private static func householdFromRow(_ row: [String: AnyJSON]) -> Household? {
         guard let id = row.uuid("id"),
               let ownerId = row.uuid("owner_id") else { return nil }
 
         let model = Household(id: id, name: row.string("name") ?? "My Household", ownerId: ownerId, syncStatus: .synced)
         model.address = row.string("address")
+        model.seasons = row.codable("seasons")
+        model.weekStartsOn = row.int("week_starts_on")
         model.lastSyncedAt = Date()
         model.createdAt = row.date("created_at") ?? Date()
         model.updatedAt = row.date("updated_at") ?? Date()
         return model
+    }
+
+    static func commitmentFromRow(_ row: [String: AnyJSON]) -> TaskCommitment? {
+        guard let id = row.uuid("id"),
+              let taskId = row.uuid("task_id"),
+              let level = row.string("level"),
+              let periodStart = row.date("period_start") else { return nil }
+        let c = TaskCommitment(id: id, taskId: taskId, level: level, periodStart: periodStart,
+                               status: row.string("status") ?? "open",
+                               createdBy: row.uuid("created_by"), syncStatus: .synced)
+        c.carriedTo = row.date("carried_to")
+        c.endedAt = row.date("ended_at")
+        c.createdAt = row.date("created_at") ?? Date()
+        c.lastSyncedAt = Date()
+        return c
+    }
+
+    static func focusFromRow(_ row: [String: AnyJSON]) -> TaskFocus? {
+        guard let taskId = row.uuid("task_id"),
+              let userId = row.uuid("user_id"),
+              let date = row.date("date") else { return nil }
+        let f = TaskFocus(taskId: taskId, userId: userId, date: date, syncStatus: .synced)
+        f.createdAt = row.date("created_at") ?? Date()
+        f.lastSyncedAt = Date()
+        return f
+    }
+
+    private static func goalFromRow(_ row: [String: AnyJSON]) -> Goal? {
+        guard let id = row.uuid("id"),
+              let userId = row.uuid("user_id"),
+              let name = row.string("name"),
+              let year = row.int("year") else { return nil }
+        let g = Goal(id: id, userId: userId, name: name, year: year)
+        g.status = row.string("status") ?? "active"
+        g.notes = row.string("notes")
+        g.context = row.string("context")
+        g.sortOrder = row.int("sort_order") ?? 0
+        g.scope = row.string("scope")
+        g.lastSyncedAt = Date()
+        g.createdAt = row.date("created_at") ?? Date()
+        g.updatedAt = row.date("updated_at") ?? Date()
+        return g
     }
 
     private static func userProfileFromRow(_ row: [String: AnyJSON]) -> UserProfile? {

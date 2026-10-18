@@ -5,13 +5,25 @@ struct TimelineItemCard: View {
     let item: TimelineItem
     let modelContext: ModelContext
     let userId: UUID
+    /// The day this card is rendered for (Today view's selected date) — routine
+    /// completions must attach to THIS day's instance, not whatever instance
+    /// happens to exist for the routine on another date.
+    let date: Date
 
     @State private var isCompleted: Bool
+    @State private var showContextPicker = false
+    @State private var showDetail = false
+    @State private var showEventDetail = false
+    /// The row's plain steps, unfolded. Per-person steps never fold.
+    @State private var stepsOpen = false
+    @State private var showRoutine = false
+    @Query private var familyMembers: [FamilyMember]
 
-    init(item: TimelineItem, modelContext: ModelContext, userId: UUID) {
+    init(item: TimelineItem, modelContext: ModelContext, userId: UUID, date: Date = Date()) {
         self.item = item
         self.modelContext = modelContext
         self.userId = userId
+        self.date = date
         self._isCompleted = State(initialValue: item.completed)
     }
 
@@ -26,107 +38,389 @@ struct TimelineItemCard: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Left accent bar — context colored
-            RoundedRectangle(cornerRadius: 2)
-                .fill(isCompleted ? Color.textTertiary.opacity(0.3) : accentColor)
-                .frame(width: 3)
-                .padding(.vertical, 8)
-
-            // Main content
-            HStack(spacing: 12) {
-                // Completion toggle
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        isCompleted.toggle()
-                    }
-                    toggleCompletion()
-                } label: {
-                    checkboxView
-                }
-                .buttonStyle(.plain)
-
-                // Content column
-                VStack(alignment: .leading, spacing: 3) {
-                    // Title row
-                    HStack(spacing: 6) {
-                        typeIcon
-
-                        Text(item.title)
-                            .font(.bodyMedium)
-                            .foregroundStyle(isCompleted ? Color.textTertiary : Color.textPrimary)
-                            .strikethrough(isCompleted)
-                            .lineLimit(2)
-                    }
-
-                    // Metadata row
-                    HStack(spacing: 8) {
-                        if let time = item.timeString {
-                            HStack(spacing: 4) {
-                                Image(systemName: "clock")
-                                    .font(.system(size: 10))
-                                Text(time)
-                                    .font(.captionText)
-                            }
-                            .foregroundStyle(Color.textSecondary)
-                        }
-
-                        if let context = item.context {
-                            ContextBadge(context: context)
-                        }
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.leading, 12)
-            .padding(.trailing, 14)
-            .padding(.vertical, 12)
+        SlideRow(
+            // A free event carries no expectation — no swipe-to-complete.
+            onComplete: item.isFree ? nil : {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
+                toggleCompletion()
+            },
+            actions: slideActions
+        ) {
+            cardContent
         }
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(item.type == .playbook ? Color.coachingBg : Color.bgElevated)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(
-                    item.type == .playbook
-                        ? Color.coachingTint.opacity(0.25)
-                        : Color.textTertiary.opacity(0.08),
-                    lineWidth: 1
-                )
-        )
-        .shadow(
-            color: item.type == .playbook
-                ? Color.coachingTint.opacity(0.06)
-                : Color.black.opacity(0.05),
-            radius: 6,
-            x: 0,
-            y: 2
-        )
-        .opacity(isCompleted ? 0.7 : 1.0)
+        .sheet(isPresented: $showContextPicker) {
+            if let task = fetchTask() {
+                ContextPickerSheet(task: task, modelContext: modelContext)
+                    .presentationDetents([.height(260)])
+            }
+        }
+        .sheet(isPresented: $showDetail) {
+            if let task = fetchTask() {
+                NavigationStack {
+                    TaskDetailView(task: task)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { showDetail = false }
+                            }
+                        }
+                }
+                .presentationDetents([.large, .medium])
+            }
+        }
+        .sheet(isPresented: $showRoutine) {
+            if let routine = fetchRoutine() {
+                RoutineOccurrenceSheet(routine: routine, date: date, completed: isCompleted)
+                    .presentationDetents([.medium, .large])
+            }
+        }
+        .sheet(isPresented: $showEventDetail) {
+            if let key = item.eventKey {
+                NavigationStack {
+                    EventDetailView(
+                        googleEventId: key,
+                        eventTitle: item.title,
+                        eventStart: item.startTime,
+                        eventLocation: item.location,
+                        recurringEventId: item.recurringEventId,
+                        date: date,
+                        userId: userId
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showEventDetail = false }
+                        }
+                    }
+                }
+                .presentationDetents([.large, .medium])
+            }
+        }
     }
 
-    // MARK: - Checkbox
+    /// Right-swipe actions. Tasks get push/context/more; routines get skip
+    /// (status="skipped" on the day's instance, same as the web). Events have none.
+    private var slideActions: [SlideAction] {
+        switch item.type {
+        case .task:
+            return [
+                SlideAction(label: "Push", systemImage: "arrow.right", tint: Color.primaryTint) {
+                    if let task = fetchTask() {
+                        TaskViewModel(modelContext: modelContext).schedule(task, for: Date().addingDays(1))
+                    }
+                },
+                SlideAction(label: "Context", systemImage: "tag", tint: Color.textSecondary) {
+                    showContextPicker = true
+                },
+                SlideAction(label: "More", systemImage: "ellipsis", tint: Color.infoBlue) {
+                    showDetail = true
+                },
+            ]
+        case .routine:
+            return [
+                // Move this occurrence to another day (web #115); the rule stays.
+                SlideAction(label: "Move", systemImage: "calendar", tint: Color.amberStrong) {
+                    showRoutine = true
+                },
+                SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Color.textSecondary) {
+                    setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString.lowercased(), status: "skipped")
+                },
+            ]
+        case .event:
+            guard let key = item.eventKey else { return [] }
+            return [
+                SlideAction(label: "Details", systemImage: "ellipsis", tint: Color.infoBlue) {
+                    showEventDetail = true
+                },
+                SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Color.textSecondary) {
+                    setInstanceStatus(entityType: "calendar_event", entityId: key, status: "skipped")
+                },
+            ]
+        default:
+            return []
+        }
+    }
+
+    private func fetchRoutine() -> Routine? {
+        guard item.type == .routine else { return nil }
+        return (try? modelContext.fetch(FetchDescriptor<Routine>()))?.first { $0.id == item.entityId }
+    }
+
+    private func fetchTask() -> SymphonyTask? {
+        guard item.type == .task else { return nil }
+        let descriptor = FetchDescriptor<SymphonyTask>()
+        return (try? modelContext.fetch(descriptor))?.first { $0.id == item.entityId }
+    }
+
+    @State private var safariURL: URL?
 
     @ViewBuilder
-    private var checkboxView: some View {
-        if item.type == .event {
-            // Calendar icon for events
-            Image(systemName: isCompleted ? "calendar.badge.checkmark" : "calendar")
-                .font(.system(size: 20))
-                .foregroundStyle(isCompleted ? Color.primaryTint : accentColor)
-        } else if item.type == .routine {
-            // Circle for routines
-            Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 22))
-                .foregroundStyle(isCompleted ? Color.primaryTint : Color.textTertiary)
+    private var cardContent: some View {
+        if item.isBlock { blockContent } else { plainRow }
+    }
+
+    // MARK: Plain row — time · dot · title · check circle (landing "Just a list" row)
+
+    /// Leading completion control: one tap completes (swipe-left is only a
+    /// shortcut). A free event carries no expectation, so it gets a quiet bar
+    /// in the circle's place instead — titles still align.
+    @ViewBuilder
+    private var leadingControl: some View {
+        if item.isFree || item.type == .event {
+            // Events are the calendar's, not commitments to tick off here;
+            // a non-free event can still be checked off with swipe-left.
+            EventMark()
         } else {
-            // Rounded square for tasks
-            Image(systemName: isCompleted ? "checkmark.square.fill" : "square")
-                .font(.system(size: 20))
-                .foregroundStyle(isCompleted ? Color.primaryTint : Color.textTertiary)
+            CheckCircle(checked: isCompleted, size: 24, label: item.title) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
+                toggleCompletion()
+            }
         }
+    }
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var titleText: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(item.title)
+                .font(.bodyMedium)
+                .foregroundStyle(isCompleted ? Color.textTertiary : (item.type == .event ? Color.textSecondary : Color.textPrimary))
+                .strikethrough(isCompleted)
+                .fixedSize(horizontal: false, vertical: true)
+            waitingLine
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// What the wait is ON, beneath the title — never in its place: two
+    /// months on, "Guy's response about pizza" won't say which task it was
+    /// (web ScheduleItem). Nothing once it's done.
+    @ViewBuilder
+    private var waitingLine: some View {
+        if item.isWaiting && !isCompleted {
+            Label {
+                Text(item.waitingFor.map { "Waiting on \($0)" } ?? "Waiting")
+                    .lineLimit(1)
+            } icon: {
+                Image(systemName: "hourglass")
+            }
+            .font(.bodySmall)
+            .foregroundStyle(Color.amberStrong)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    @ViewBuilder
+    private var timeText: some View {
+        if let time = item.timeString {
+            Text(time)
+                .font(.bodySmall)
+                .foregroundStyle(Color.textTertiary)
+                .fixedSize()
+        }
+    }
+
+    @ViewBuilder
+    private var trailingMarks: some View {
+        if item.isFree { FreePill() }
+        typeIcon
+        if item.context != nil { ContextDot(context: item.context) }
+        AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
+    }
+
+    @ViewBuilder
+    private var plainRowContent: some View {
+        if typeSize.isAccessibilitySize {
+            // Large text: the title gets the full width on its own line.
+            HStack(alignment: .top, spacing: 10) {
+                leadingControl
+                VStack(alignment: .leading, spacing: 4) {
+                    timeText
+                    titleText
+                    HStack(spacing: 8) {
+                        Spacer(minLength: 0)
+                        trailingMarks
+                    }
+                }
+            }
+        } else {
+            HStack(spacing: 10) {
+                leadingControl
+                timeText
+                titleText
+                trailingMarks
+            }
+        }
+    }
+
+    private var plainRow: some View {
+        plainRowContent
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.cardBorder, lineWidth: 1))
+        .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
+        .opacity(item.isFree ? 0.6 : (isCompleted ? 0.7 : 1.0))
+        .onTapGesture { openDetail() }
+    }
+
+    private func openDetail() {
+        switch item.type {
+        case .task: showDetail = true
+        case .event: if item.eventKey != nil { showEventDetail = true }
+        case .routine: showRoutine = true
+        }
+    }
+
+    // MARK: Block — rail · time + pill · serif title · note line · children · context row
+
+    private var blockContent: some View {
+        HStack(alignment: .top, spacing: 10) {
+            leadingControl
+
+            VStack(alignment: .leading, spacing: 6) {
+                if item.timeString != nil || item.isFree || item.source != nil {
+                    HStack {
+                        if let time = item.timeString {
+                            Text(time)
+                                .font(.bodySmall)
+                                .foregroundStyle(Color.textTertiary)
+                        }
+                        Spacer()
+                        if item.isFree { FreePill() }
+                        if let source = item.source { SourcePill(source: source) }
+                    }
+                }
+
+                HStack(alignment: .top, spacing: 6) {
+                    Text(item.title)
+                        .font(.displaySmall)
+                        .foregroundStyle(isCompleted ? Color.textTertiary : Color.textPrimary)
+                        .strikethrough(isCompleted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    typeIcon
+                    if item.context != nil { ContextDot(context: item.context).padding(.top, 6) }
+                    AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { openDetail() }
+
+                waitingLine
+
+                if let line = item.noteLine {
+                    Text(line)
+                        .font(.displayItalic)
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(2)
+                }
+
+                // Steps fold to their next one; a step for someone else stays
+                // open (web parity, 2026-10-06). Each keeps its own circle.
+                if !item.perPersonSteps.isEmpty || (stepsOpen && !item.plainSteps.isEmpty) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(item.perPersonSteps) { child in
+                            ChildRow(child: child, members: familyMembers) { toggleChild(child) }
+                        }
+                        if stepsOpen {
+                            ForEach(item.plainSteps) { child in
+                                ChildRow(child: child, members: familyMembers) { toggleChild(child) }
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                    .overlay(alignment: .top) { Rectangle().fill(Color.cardBorder).frame(height: 1) }
+                    .padding(.top, 2)
+                }
+                if item.stepsTotal > 0 && !item.plainSteps.isEmpty { stepsDisclosure }
+
+                if hasContextRow { contextRow.padding(.top, 2) }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.bgElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.cardBorder, lineWidth: 1))
+        .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
+        .opacity(item.isFree ? 0.6 : (isCompleted ? 0.7 : 1.0))
+        .sheet(item: $safariURL) { url in SafariView(url: url) }
+    }
+
+    /// "Next: Talk with Iris about the trip · 5 steps ›" — tap to open them.
+    private var stepsDisclosure: some View {
+        let next = stepsOpen ? nil : item.nextStep
+        let count = item.stepsTotal
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) { stepsOpen.toggle() }
+        } label: {
+            HStack(spacing: 4) {
+                if let next {
+                    Text("Next: \(next.title)")
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(1)
+                    Text("·").foregroundStyle(Color.textLight)
+                }
+                Text("\(count) \(count == 1 ? "step" : "steps")")
+                    .font(.captionBold)
+                    .foregroundStyle(Color.amberStrong)
+                    .fixedSize()
+                Image(systemName: stepsOpen ? "chevron.up" : "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Color.amberStrong)
+            }
+            .font(.bodySmall)
+            .frame(minHeight: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(stepsOpen ? "Hide steps" : "\(count) \(count == 1 ? "step" : "steps")\(next.map { ", next: \($0.title)" } ?? "")")
+        .accessibilityHint(stepsOpen ? "" : "Shows every step")
+    }
+
+    private var hasContextRow: Bool {
+        !item.links.isEmpty || item.phoneNumber != nil || item.location != nil
+    }
+
+    /// Link · phone · directions — small muted icons that open on tap.
+    private var contextRow: some View {
+        HStack(spacing: 14) {
+            ForEach(Array(item.links.prefix(3).enumerated()), id: \.offset) { _, link in
+                if let url = URL(string: link.url) {
+                    Button { safariURL = url } label: {
+                        Label(link.title ?? url.host ?? "Link", systemImage: "link")
+                    }
+                }
+            }
+            if let phone = item.phoneNumber,
+               let url = URL(string: "tel:" + phone.filter { $0.isNumber || $0 == "+" }) {
+                Link(destination: url) { Label(phone, systemImage: "phone") }
+            }
+            if let location = item.location {
+                Link(destination: Self.mapsURL(location: location, placeId: item.locationPlaceId)) {
+                    Label("Directions", systemImage: "arrow.triangle.turn.up.right.diamond")
+                }
+            }
+        }
+        .font(.captionBold)
+        .foregroundStyle(Color.textSecondary)
+        .labelStyle(.titleAndIcon)
+        .buttonStyle(.plain)
+        .lineLimit(1)
+    }
+
+    static func mapsURL(location: String, placeId: String?) -> URL {
+        var c = URLComponents(string: "https://www.google.com/maps/dir/")!
+        c.queryItems = [URLQueryItem(name: "api", value: "1"), URLQueryItem(name: "destination", value: location)]
+        if let placeId { c.queryItems?.append(URLQueryItem(name: "destination_place_id", value: placeId)) }
+        return c.url!
+    }
+
+    private func toggleChild(_ child: TimelineItem.ChildItem) {
+        let descriptor = FetchDescriptor<SymphonyTask>()
+        guard let task = (try? modelContext.fetch(descriptor))?.first(where: { $0.id == child.id }) else { return }
+        #if os(iOS)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        TaskViewModel(modelContext: modelContext).toggleComplete(task)
     }
 
     // MARK: - Type Icon
@@ -134,18 +428,12 @@ struct TimelineItemCard: View {
     @ViewBuilder
     private var typeIcon: some View {
         switch item.type {
-        case .task:
+        case .task, .event:
             EmptyView()
         case .routine:
             Image(systemName: "repeat")
-                .font(.system(size: 11, weight: .medium))
+                .font(.captionBold)
                 .foregroundStyle(Color.textSecondary)
-        case .event:
-            EmptyView() // Calendar checkbox already indicates event
-        case .playbook:
-            Image(systemName: "book.pages")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.coachingTint)
         }
     }
 
@@ -168,31 +456,188 @@ struct TimelineItemCard: View {
                 vm.toggleComplete(task)
             }
         case .routine:
-            let entityIdString = entityId.uuidString
-            let descriptor = FetchDescriptor<ActionableInstance>()
-            let allInstances = (try? modelContext.fetch(descriptor)) ?? []
-            let instance = allInstances.first {
-                $0.entityType == "routine" && $0.entityId == entityIdString
+            setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString.lowercased(),
+                              status: isCompleted ? "completed" : "pending")
+        case .event:
+            // Web parity: events check off via actionable_instances keyed by the
+            // Google event id.
+            if let key = item.eventKey {
+                setInstanceStatus(entityType: "calendar_event", entityId: key,
+                                  status: isCompleted ? "completed" : "pending")
             }
-
-            if let instance {
-                instance.status = isCompleted ? "completed" : "pending"
-                instance.completedAt = isCompleted ? Date() : nil
-                instance.updatedAt = Date()
-            } else if isCompleted {
-                let newInstance = ActionableInstance(
-                    userId: userId,
-                    entityType: "routine",
-                    entityId: entityIdString,
-                    date: Date()
-                )
-                newInstance.status = "completed"
-                newInstance.completedAt = Date()
-                modelContext.insert(newInstance)
-            }
-            try? modelContext.save()
         default:
             break
+        }
+    }
+
+    /// Write a routine/event occurrence's status to THIS card's day, mirroring
+    /// the web: find the (entity, date) instance — household-shared ones
+    /// included, since the pull syncs every RLS-visible row — update it if
+    /// present, otherwise create one owned by the current user. Every path
+    /// queues a sync push; without it the completion never left the phone (and
+    /// the next pull's reconciler deleted the local instance — completions
+    /// silently vanished).
+    private func setInstanceStatus(entityType: String, entityId entityIdString: String, status: String) {
+        let cal = Calendar.current
+        let allInstances = (try? modelContext.fetch(FetchDescriptor<ActionableInstance>())) ?? []
+        let instance = allInstances.first {
+            $0.entityType == entityType && (entityType == "routine" ? $0.entityId.lowercased() == entityIdString : $0.entityId == entityIdString) &&
+            cal.isDate($0.date, inSameDayAs: date)
+        }
+
+        let now = Date()
+        if let instance {
+            instance.status = status
+            instance.completedAt = status == "completed" ? now : nil
+            instance.skippedAt = status == "skipped" ? now : nil
+            instance.updatedAt = now
+            instance.syncStatus = .pending
+            modelContext.queueSync(table: "actionable_instances", recordId: instance.id, type: "update")
+        } else if status != "pending" {
+            let newInstance = ActionableInstance(
+                userId: userId,
+                entityType: entityType,
+                entityId: entityIdString,
+                date: date
+            )
+            newInstance.status = status
+            newInstance.completedAt = status == "completed" ? now : nil
+            newInstance.skippedAt = status == "skipped" ? now : nil
+            modelContext.insert(newInstance)
+            modelContext.queueSync(table: "actionable_instances", recordId: newInstance.id, type: "insert")
+        }
+        try? modelContext.save()
+    }
+}
+
+extension URL: @retroactive Identifiable { public var id: String { absoluteString } }
+
+// MARK: - Source Pill (landing `.pill`: "From an email" / "From the calendar" / "Shared")
+
+struct SourcePill: View {
+    let source: TimelineItem.Source
+
+    var body: some View {
+        Text(source.label)
+            .font(.captionBold)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(background, in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var foreground: Color { source == .calendar ? .infoBlue : .primaryTint }
+    private var background: Color { source == .calendar ? .infoBlueBg : .accentBg }
+}
+
+// MARK: - Free pill ("the kids just show up" — informational, no expectation)
+
+struct FreePill: View {
+    var body: some View {
+        Text("Free")
+            .font(.captionBold)
+            .foregroundStyle(Color.textTertiary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.bgSurface, in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+// MARK: - Check circle (plain rows + child rows)
+
+struct CheckCircle: View {
+    let checked: Bool
+    var size: CGFloat = 20
+    /// What it completes, for VoiceOver ("Complete Renew the passport").
+    var label: String? = nil
+    let action: () -> Void
+
+    @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
+
+    var body: some View {
+        let side = size * min(scale, 1.6)
+        ZStack {
+            // Muted, not light: the ring must read as a control (3:1).
+            Circle().strokeBorder(checked ? Color.successGreen : Color.textTertiary, lineWidth: 1.5)
+            if checked {
+                Circle().fill(Color.successGreen)
+                Image(systemName: "checkmark").font(.system(size: side * 0.45, weight: .bold)).foregroundStyle(.white)
+            }
+        }
+        .frame(width: side, height: side)
+        // 44pt hit target around a smaller ring.
+        .frame(minWidth: 44, minHeight: 44)
+        .padding(-((44 - side) / 2))
+        .contentShape(Rectangle())
+        // A tap gesture, not a Button: inside a swipeable row a Button fires
+        // when a swipe ends on it, completing the task by accident. A tap
+        // gesture fails as soon as the finger moves.
+        .onTapGesture(perform: action)
+        .accessibilityElement()
+        .accessibilityAddTraits(checked ? [.isButton, .isSelected] : .isButton)
+        .accessibilityLabel(label.map { checked ? "Completed: \($0)" : "Complete \($0)" } ?? (checked ? "Completed" : "Mark complete"))
+        .accessibilityAction { action() }
+    }
+}
+
+/// Holds the completion circle's place on an event row: events aren't
+/// ticked off from the circle.
+struct EventMark: View {
+    @ScaledMetric(relativeTo: .body) private var side: CGFloat = 24
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(Color.textLight)
+            .frame(width: 3, height: min(side, 38) * 0.8)
+            .frame(width: min(side, 38))
+            .accessibilityHidden(true)
+    }
+}
+
+/// The small life-area dot.
+struct ContextDot: View {
+    let context: String?
+    var body: some View {
+        Circle()
+            .fill(Color.forContext(context))
+            .frame(width: 9, height: 9)
+            .accessibilityLabel(context?.capitalized ?? "No life area")
+    }
+}
+
+extension Color {
+    static func forContext(_ context: String?) -> Color {
+        switch context {
+        case "work": .contextWork
+        case "family": .contextFamily
+        case "personal": .contextPersonal
+        default: .textTertiary
+        }
+    }
+}
+
+// MARK: - Child row (per-kid item under a block)
+
+struct ChildRow: View {
+    let child: TimelineItem.ChildItem
+    let members: [FamilyMember]
+    let onToggle: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            CheckCircle(checked: child.completed, size: 20, label: child.title, action: onToggle)
+            if let m = members.first(where: { child.assignedTo.contains($0.id) }) {
+                Text(m.name.split(separator: " ").first.map(String.init) ?? m.name)
+                    .font(.captionBold)
+                    .foregroundStyle(Color.memberColor(m.color))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.memberColor(m.color).opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+            }
+            Text(child.title)
+                .font(.bodySmall)
+                .foregroundStyle(child.completed ? Color.textTertiary : Color.textPrimary)
+                .strikethrough(child.completed)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -204,7 +649,7 @@ struct ContextBadge: View {
 
     var body: some View {
         Text(context.capitalized)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.captionBold)
             .foregroundStyle(color)
             .padding(.horizontal, 7)
             .padding(.vertical, 2.5)
@@ -218,6 +663,43 @@ struct ContextBadge: View {
         case "family": .contextFamily
         case "personal": .contextPersonal
         default: .textTertiary
+        }
+    }
+}
+
+// MARK: - Assignee Avatars
+
+/// Overlapping initial-circles for the assigned family members (up to 3, then +N).
+struct AssigneeAvatars: View {
+    let memberIds: [UUID]
+    let members: [FamilyMember]
+    var size: CGFloat = 22
+
+    var body: some View {
+        let assigned = members
+            .filter { memberIds.contains($0.id) }
+            .sorted { $0.displayOrder < $1.displayOrder }
+        if !assigned.isEmpty {
+            HStack(spacing: -6) {
+                ForEach(assigned.prefix(3), id: \.id) { member in
+                    Text(member.initials)
+                        .font(.system(size: size * 0.42, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: size, height: size)
+                        .background(Color.memberColor(member.color))
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color.bgElevated, lineWidth: 1.5))
+                }
+                if assigned.count > 3 {
+                    Text("+\(assigned.count - 3)")
+                        .font(.system(size: size * 0.38, weight: .bold))
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(width: size, height: size)
+                        .background(Color.bgSurface)
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color.bgElevated, lineWidth: 1.5))
+                }
+            }
         }
     }
 }

@@ -14,6 +14,10 @@ final class ActionableInstance {
     var deferredTo: Date?
     var completedAt: Date?
     var skippedAt: Date?
+    /// The day this occurrence was chosen for (web: "Choose" on Today's
+    /// chooser). An untimed routine occurrence joins the day's list only
+    /// when chosen. Inline default for lightweight migration.
+    var plannedOn: Date? = nil
 
     // Sync
     var syncStatus: SyncStatus

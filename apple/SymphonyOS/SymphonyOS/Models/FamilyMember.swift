@@ -69,3 +69,16 @@ extension FamilyMember {
         "createdAt": "created_at",
     ]
 }
+
+extension FamilyMember {
+    /// The signed-in person's own member row. Mirrors `getCurrentUserMember` in
+    /// src/hooks/useFamilyMembers.ts: auth link first (joined members like
+    /// Iris), then the household creator, then any full user (legacy data).
+    static func current(in members: [FamilyMember], authUserId: UUID?) -> FamilyMember? {
+        if let authUserId {
+            if let linked = members.first(where: { $0.authUserId == authUserId }) { return linked }
+            if let owner = members.first(where: { $0.userId == authUserId }) { return owner }
+        }
+        return members.first(where: { $0.isFullUser })
+    }
+}

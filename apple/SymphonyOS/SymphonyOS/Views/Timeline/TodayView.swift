@@ -1,173 +1,384 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
+/// The Planner's Today: the displayed date's untimed work ("For today"), the
+/// way into this week's shelf ("Choose from this week"), tonight's dinner,
+/// then the day drawn to scale ("The day", as on the web since 2026-10-06).
+/// Unfinished work is one calm line to review deliberately — nothing carries
+/// forward on its own.
 struct TodayView: View {
+    /// Opens the horizon switcher (the title is its button).
+    var onTitle: () -> Void = {}
+
     @Environment(AppState.self) private var appState
     @Environment(AuthService.self) private var auth
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = TimelineViewModel()
+    @State private var calendar = GoogleCalendarService.shared
+    @State private var dinners = DinnerService.shared
+    @State private var showSearch = false
+    @State private var searchText = ""
+    @State private var showChooser = false
+    @State private var showUnfinished = false
+    /// A thing tapped on the day column, opened in its details.
+    @State private var opened: TimelineItem?
+    @Query private var familyMembers: [FamilyMember]
+    @FocusState private var searchFocused: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
 
-    // SwiftData queries
     @Query private var allTasks: [SymphonyTask]
-    @Query(filter: #Predicate<Routine> { $0.visibility == "active" })
-    private var routines: [Routine]
+    @Query private var routines: [Routine]
     @Query private var instances: [ActionableInstance]
-    @Query private var playbookBlocks: [PlaybookBlock]
-    @Query private var playbookInstances: [PlaybookInstance]
+    @Query private var eventNotes: [EventNote]
+    @Query private var focusRows: [TaskFocus]
+    @Query private var commitments: [TaskCommitment]
+
+    private var userId: UUID { auth.currentUser?.id ?? UUID() }
+    private var date: Date { appState.selectedDate }
+
+    private var plan: PlanSnapshot {
+        PlanSnapshot(tasks: allTasks, commitments: commitments, focus: focusRows, routines: routines,
+                     instances: instances, userId: auth.currentUser?.id, domain: appState.domainFilter.contextValue)
+    }
+
+    /// The night's planned dinner, when the view includes family (meals are
+    /// the household's; a Work or Personal view leaves them out).
+    private var dinner: Dinner? {
+        let context = appState.domainFilter.contextValue
+        guard context == nil || context == "family" else { return nil }
+        return dinners.dinner(on: date)
+    }
 
     var body: some View {
-        ZStack {
-            Color.bgBase.ignoresSafeArea()
+        let plan = plan
+        let dinner = dinner
+        let offerTasks = plan.chooserTasks(on: date).count
+        let offerRoutines = plan.chooserRoutines(on: date).filter { !$0.chosen }.count
 
-            VStack(spacing: 0) {
-                // Editorial header
-                editorialHeader
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                header
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
-                    .padding(.bottom, 4)
 
-                // Domain switcher
+                if showSearch {
+                    searchField
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 DomainSwitcher()
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+                    .padding(.top, 10)
 
-                // Timeline
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        // Sections
-                        ForEach(TimelineViewModel.TimeSection.allCases, id: \.self) { section in
-                            let sectionItems = viewModel.timelineItems.filter { viewModel.section(for: $0) == section }
-                            if !sectionItems.isEmpty {
-                                TimelineSectionView(
-                                    title: section.rawValue,
-                                    items: sectionItems,
-                                    modelContext: modelContext,
-                                    userId: auth.currentUser?.id ?? UUID()
-                                )
-                            }
-                        }
+                if isSearching {
+                    searchResultsContent
+                } else {
+                    if !viewModel.carriedOverTasks.isEmpty {
+                        let n = viewModel.carriedOverTasks.count
+                        CalmRow(text: "Review \(n) unfinished \(n == 1 ? "item" : "items")") { showUnfinished = true }
+                            .accessibilityHint("Decide what happens to each. Nothing moves on its own.")
+                    }
 
-                        // Inbox section
-                        if !viewModel.inboxTasks.isEmpty {
-                            InboxSectionView(
-                                tasks: viewModel.inboxTasks,
-                                modelContext: modelContext,
-                                userId: auth.currentUser?.id ?? UUID()
-                            )
-                        }
-
-                        // Empty state
-                        if viewModel.timelineItems.isEmpty && viewModel.inboxTasks.isEmpty {
-                            emptyState
-                                .padding(.top, 60)
+                    let forToday = viewModel.forToday
+                    if !forToday.isEmpty || offerTasks + offerRoutines > 0 {
+                        Eyebrow(text: "For today")
+                        ForEach(forToday) { item in card(item) }
+                    }
+                    if offerTasks + offerRoutines > 0 {
+                        CalmRow(text: "Choose from this week", detail: offerDetail(offerTasks, offerRoutines)) {
+                            showChooser = true
                         }
                     }
-                    .padding(.bottom, 80) // Space for quick capture bar
+
+                    // Tonight's dinner, after what you chose and before the
+                    // timed day (Scott, 2026-10-07).
+                    if let dinner {
+                        Eyebrow(text: appState.isToday ? "Dinner tonight" : "Dinner")
+                        DinnerCard(dinner: dinner)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 3)
+                    }
+
+                    // The day, to scale — every timed thing where it falls,
+                    // free time named. Always drawn: an empty day says so.
+                    Eyebrow(text: "The day")
+                    TodayDayColumn(items: viewModel.schedule, isToday: appState.isToday,
+                                   members: familyMembers) { opened = $0 }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 6)
+
+                    // First visit to a day: say the calendar is coming instead
+                    // of showing an empty schedule that then fills in.
+                    let eventsPending = calendar.items(for: date) == nil && calendar.isLoading(date)
+                    if eventsPending {
+                        CalendarLoadingRow()
+                            .padding(.horizontal, 20)
+                            .padding(.top, 18)
+                    }
                 }
             }
-
-            // Quick capture bar
-            VStack {
-                Spacer()
-                QuickCaptureBar(userId: auth.currentUser?.id ?? UUID())
-            }
+            .padding(.bottom, 12)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color.bgBase.ignoresSafeArea())
+        .statusBarScrim()
+        // The capture bar is an inset, not an overlay: the list's scroll
+        // extent ends above it, so the last card (and every subtask) can
+        // always scroll fully into view — with the keyboard up too.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            QuickCaptureBar(userId: userId, defaultDate: date)
+                .padding(.top, 4)
+                .background(alignment: .bottom) {
+                    LinearGradient(colors: [Color.bgBase.opacity(0), Color.bgBase], startPoint: .top, endPoint: .center)
+                        .ignoresSafeArea()
+                }
+                .padding(.bottom, appState.bottomInset)
+        }
+        #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
+        #endif
+        .sheet(isPresented: $showChooser) {
+            ChooserSheet(date: date)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $opened) { item in openedDetail(item) }
+        .sheet(isPresented: $showUnfinished) {
+            UnfinishedSheet(tasks: viewModel.carriedOverTasks)
+                .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        // Rebuild from the shared cache first (no blank schedule on return),
+        // then refresh the day in the background.
         .onAppear { rebuildTimeline() }
-        .onChange(of: appState.selectedDate) { _, _ in rebuildTimeline() }
+        .task { await calendar.refresh(date, maxAge: 60) }
+        .task { await dinners.refresh(date) }
+        .onChange(of: appState.selectedDate) { _, _ in
+            rebuildTimeline()
+            Task { await calendar.refresh(appState.selectedDate, maxAge: 60) }
+            Task { await dinners.refresh(appState.selectedDate) }
+        }
         .onChange(of: appState.domainFilter) { _, _ in rebuildTimeline() }
-        .onChange(of: allTasks.count) { _, _ in rebuildTimeline() }
-        .onChange(of: playbookInstances.count) { _, _ in rebuildTimeline() }
+        .onChange(of: tasksRevision) { _, _ in rebuildTimeline() }
+        .onChange(of: instancesRevision) { _, _ in rebuildTimeline() }
+        .onChange(of: focusRows.count) { _, _ in rebuildTimeline() }
+        .onChange(of: eventNotesRevision) { _, _ in rebuildTimeline() }
+        .onChange(of: eventsRevision) { _, _ in rebuildTimeline() }
     }
 
-    // MARK: - Editorial Header
-
-    private var editorialHeader: some View {
-        HStack(alignment: .bottom) {
-            // Left: Title + date
-            VStack(alignment: .leading, spacing: 2) {
-                Text(appState.isToday ? "Today" : appState.selectedDate.formatted(.dateTime.weekday(.wide)))
-                    .font(.displayLarge)
-                    .foregroundStyle(Color.textPrimary)
-
-                Text(appState.selectedDate.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                    .font(.bodySmall)
-                    .foregroundStyle(Color.textTertiary)
-            }
-
-            Spacer()
-
-            // Right: Day navigation arrows
-            HStack(spacing: 12) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        appState.goToPreviousDay()
-                    }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.textTertiary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.bgSurface.opacity(0.6))
-                        .clipShape(Circle())
+    /// What a tap on the day column opens: a task's details, an event's, or
+    /// the routine occurrence (Done / Move / Skip / Edit routine).
+    @ViewBuilder
+    private func openedDetail(_ item: TimelineItem) -> some View {
+        switch item.type {
+        case .task:
+            if let task = allTasks.first(where: { $0.id == item.entityId }) {
+                NavigationStack {
+                    TaskDetailView(task: task)
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { opened = nil } } }
                 }
-                .buttonStyle(.plain)
+                .presentationDetents([.large, .medium])
+            }
+        case .routine:
+            if let routine = routines.first(where: { $0.id == item.entityId }) {
+                RoutineOccurrenceSheet(routine: routine, date: date, completed: item.completed)
+                    .presentationDetents([.medium, .large])
+            }
+        case .event:
+            if let key = item.eventKey {
+                NavigationStack {
+                    EventDetailView(googleEventId: key, eventTitle: item.title, eventStart: item.startTime,
+                                    eventLocation: item.location, recurringEventId: item.recurringEventId,
+                                    date: date, userId: userId)
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { opened = nil } } }
+                }
+                .presentationDetents([.large, .medium])
+            }
+        }
+    }
 
+    private func card(_ item: TimelineItem) -> some View {
+        TimelineItemCard(item: item, modelContext: modelContext, userId: userId, date: date)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 3)
+    }
+
+    private func offerDetail(_ tasks: Int, _ routines: Int) -> String {
+        var parts: [String] = []
+        if tasks > 0 { parts.append("\(tasks) \(tasks == 1 ? "task" : "tasks")") }
+        if routines > 0 { parts.append("\(routines) \(routines == 1 ? "routine" : "routines")") }
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        PlannerHeader(
+            title: appState.isToday ? "Today" : date.formatted(.dateTime.weekday(.wide)),
+            subtitle: date.formatted(.dateTime.weekday(.wide).month(.wide).day()),
+            onTitle: onTitle
+        ) {
+            HStack(spacing: 0) {
+                CircleIconButton(systemImage: "magnifyingglass", label: showSearch ? "Close search" : "Search", active: showSearch) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSearch.toggle()
+                        if !showSearch { searchText = "" }
+                    }
+                    searchFocused = showSearch
+                }
+                CircleIconButton(systemImage: "chevron.left", label: "Previous day") {
+                    withAnimation(.easeInOut(duration: 0.2)) { appState.goToPreviousDay() }
+                }
                 if !appState.isToday {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            appState.goToToday()
-                        }
-                    } label: {
-                        Text("Today")
-                            .font(.captionBold)
-                            .foregroundStyle(Color.primaryTint)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.primaryTint.opacity(0.1))
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
+                    Button("Today") { withAnimation(.easeInOut(duration: 0.2)) { appState.goToToday() } }
+                        .font(.captionBold)
+                        .foregroundStyle(Color.ink)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 32)
+                        .background(Color.bgWarm, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.cardBorder, lineWidth: 1))
+                        .frame(minHeight: 44)
+                        .buttonStyle(.plain)
                 }
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        appState.goToNextDay()
-                    }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.textTertiary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.bgSurface.opacity(0.6))
-                        .clipShape(Circle())
+                CircleIconButton(systemImage: "chevron.right", label: "Next day") {
+                    withAnimation(.easeInOut(duration: 0.2)) { appState.goToNextDay() }
                 }
-                .buttonStyle(.plain)
             }
         }
     }
 
-    // MARK: - Empty State
+    // MARK: - Search
 
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.bgSurface)
-                .frame(width: 64, height: 64)
-                .overlay(
-                    Image(systemName: "sun.max")
-                        .font(.system(size: 28))
-                        .foregroundStyle(Color.textTertiary)
-                )
+    private var isSearching: Bool {
+        showSearch && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
-            Text("Your day is clear")
-                .font(.displaySmall)
-                .foregroundStyle(Color.textSecondary)
+    private var searchResults: [SymphonyTask] {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return [] }
+        return allTasks
+            .filter { $0.parentTaskId == nil }
+            .filter { $0.title.lowercased().contains(q) || ($0.notes?.lowercased().contains(q) ?? false) }
+            .sorted { $0.title.lowercased() < $1.title.lowercased() }
+    }
 
-            Text("Add a task below to get started")
-                .font(.bodySmall)
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14))
                 .foregroundStyle(Color.textTertiary)
+            TextField("Search tasks…", text: $searchText)
+                .font(.bodyMedium)
+                .foregroundStyle(Color.textPrimary)
+                .focused($searchFocused)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.textTertiary)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 4)
+        .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.cardBorder, lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private var searchResultsContent: some View {
+        if searchResults.isEmpty {
+            VStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 28))
+                    .foregroundStyle(Color.textTertiary)
+                Text("No matches")
+                    .font(.bodyMedium)
+                    .foregroundStyle(Color.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 60)
+        } else {
+            Eyebrow(text: "Results", count: searchResults.count)
+            ForEach(searchResults, id: \.id) { task in
+                PlanTaskRow(task: task)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 3)
+            }
+        }
+    }
+
+    // MARK: - Rebuild triggers
+
+    /// A content fingerprint of the task list — completion/reschedule/edits
+    /// leave the count unchanged, so keying on count alone went stale.
+    private var tasksRevision: Int {
+        var hasher = Hasher()
+        hasher.combine(allTasks.count)
+        for task in allTasks {
+            hasher.combine(task.id)
+            hasher.combine(task.completed)
+            hasher.combine(task.scheduledFor)
+            hasher.combine(task.bucket)
+            hasher.combine(task.title)
+            hasher.combine(task.notes)
+            hasher.combine(task.phoneNumber)
+            hasher.combine(task.links?.count)
+            hasher.combine(task.location)
+            hasher.combine(task.parentTaskId)
+            hasher.combine(task.captureId)
+            hasher.combine(task.scope)
+            hasher.combine(task.context)
+            hasher.combine(task.assignedTo)
+            hasher.combine(task.assignedToAll?.count)
+        }
+        return hasher.finalize()
+    }
+
+    /// Changes when the displayed day's cached events arrive or change.
+    private var eventsRevision: Int {
+        var hasher = Hasher()
+        let items = calendar.items(for: appState.selectedDate)
+        hasher.combine(items == nil)
+        for item in items ?? [] {
+            hasher.combine(item.id)
+            hasher.combine(item.startTime)
+            hasher.combine(item.title)
+        }
+        return hasher.finalize()
+    }
+
+    private var eventNotesRevision: Int {
+        var hasher = Hasher()
+        hasher.combine(eventNotes.count)
+        for note in eventNotes {
+            hasher.combine(note.id)
+            hasher.combine(note.notes)
+            hasher.combine(note.links?.count)
+            hasher.combine(note.isFree)
+        }
+        return hasher.finalize()
+    }
+
+    /// Routine completions and choices write `ActionableInstance` in place.
+    private var instancesRevision: Int {
+        var hasher = Hasher()
+        hasher.combine(instances.count)
+        for instance in instances {
+            hasher.combine(instance.id)
+            hasher.combine(instance.status)
+            hasher.combine(instance.plannedOn)
+            hasher.combine(instance.deferredTo)
+        }
+        return hasher.finalize()
     }
 
     private func rebuildTimeline() {
@@ -175,78 +386,44 @@ struct TodayView: View {
             tasks: allTasks,
             routines: routines,
             instances: instances,
-            playbookBlocks: playbookBlocks,
-            playbookInstances: playbookInstances,
             date: appState.selectedDate,
             domainFilter: appState.domainFilter,
-            showCoaching: !appState.hideCoaching
+            eventItems: calendar.items(for: appState.selectedDate) ?? [],
+            eventNotes: eventNotes,
+            focus: focusRows,
+            userId: auth.currentUser?.id
         )
+        NotificationManager.reconcile(allTasks)
     }
 }
 
-// MARK: - Timeline Section
+// MARK: - Local notifications
 
-struct TimelineSectionView: View {
-    let title: String
-    let items: [TimelineItem]
-    let modelContext: ModelContext
-    let userId: UUID
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.captionBold)
-                .foregroundStyle(Color.primaryTint.opacity(0.6))
-                .textCase(.uppercase)
-                .kerning(1.2)
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
-                .padding(.bottom, 2)
-
-            ForEach(items) { item in
-                TimelineItemCard(item: item, modelContext: modelContext, userId: userId)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 3)
-            }
-        }
+/// Schedules a local reminder at each timed task's time. No server/APNs needed —
+/// works on any signing configuration.
+enum NotificationManager {
+    static func requestAuthorization() {
+        UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
-}
 
-// MARK: - Inbox Section
+    /// Reconcile scheduled reminders with the current tasks: one per timed,
+    /// future, incomplete task. Re-built each call so reschedules are reflected.
+    static func reconcile(_ tasks: [SymphonyTask]) {
+        let center = UNUserNotificationCenter.current()
+        let now = Date()
+        let due = tasks.filter { !$0.completed && !$0.isAllDay && ($0.scheduledFor ?? .distantPast) > now }
 
-struct InboxSectionView: View {
-    let tasks: [SymphonyTask]
-    let modelContext: ModelContext
-    let userId: UUID
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center) {
-                Text("Inbox")
-                    .font(.captionBold)
-                    .foregroundStyle(Color.primaryTint.opacity(0.6))
-                    .textCase(.uppercase)
-                    .kerning(1.2)
-
-                Spacer()
-
-                Text("\(tasks.count)")
-                    .font(.captionBold)
-                    .foregroundStyle(Color.primaryTint)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.primaryTint.opacity(0.1))
-                    .clipShape(Capsule())
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 28)
-            .padding(.bottom, 2)
-
-            ForEach(tasks, id: \.id) { task in
-                InboxTaskRow(task: task, modelContext: modelContext, userId: userId)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 3)
-            }
+        center.removeAllPendingNotificationRequests()
+        for task in due {
+            guard let when = task.scheduledFor else { continue }
+            let content = UNMutableNotificationContent()
+            content.title = task.title
+            if let ctx = task.context { content.subtitle = ctx.capitalized }
+            content.sound = .default
+            let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: when)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            center.add(UNNotificationRequest(identifier: task.id.uuidString, content: content, trigger: trigger))
         }
     }
 }

@@ -2,34 +2,62 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-/// Builds the blended timeline for a given date from tasks, routines, and playbook blocks.
+/// Builds the blended timeline for a given date from tasks, routines, and events.
 @Observable
 final class TimelineViewModel {
     var timelineItems: [TimelineItem] = []
     var inboxTasks: [SymphonyTask] = []
+    /// Overdue, incomplete tasks (scheduled before today) — the "Carried over" section.
+    var carriedOverTasks: [SymphonyTask] = []
 
-    enum TimeSection: String, CaseIterable {
-        case morning = "Morning"
-        case afternoon = "Afternoon"
-        case evening = "Evening"
-        case allDay = "All Day"
+    /// How many days past its date a task keeps a slot on Today.
+    ///
+    /// Mirrors `GRACE_DAYS` in `src/lib/today/taskPools.ts` — the web and the
+    /// phone must agree on what "carried over" means, or the two Todays show
+    /// different work. Two days covers a weekend of slippage.
+    static let graceDays = 2
+
+    /// Untimed work for the day: all-day/untimed tasks, tasks I chose for it,
+    /// and chosen or pinned untimed routine occurrences. Chosen first.
+    var forToday: [TimelineItem] {
+        timelineItems
+            .filter { $0.type != .event && $0.startTime == nil }
+            .sorted { ($0.isFocused ? 0 : 1) < ($1.isFocused ? 0 : 1) }
+    }
+
+    /// Timed work and events, including all-day events (the web's Schedule).
+    var schedule: [TimelineItem] {
+        timelineItems.filter { $0.type == .event || $0.startTime != nil }
     }
 
     func buildTimeline(
         tasks: [SymphonyTask],
         routines: [Routine],
         instances: [ActionableInstance],
-        playbookBlocks: [PlaybookBlock],
-        playbookInstances: [PlaybookInstance],
         date: Date,
         domainFilter: DomainFilter,
-        showCoaching: Bool
+        eventItems: [TimelineItem] = [],
+        eventNotes: [EventNote] = [],
+        focus: [TaskFocus] = [],
+        userId: UUID? = nil
     ) {
         var items: [TimelineItem] = []
         var inbox: [SymphonyTask] = []
 
         let cal = Calendar.current
         let startOfDay = cal.startOfDay(for: date)
+        let plan = PlanSnapshot(tasks: tasks, commitments: [], focus: focus, routines: routines,
+                                instances: instances, userId: userId, domain: domainFilter.contextValue)
+        let focusedExtras = plan.focusedExtras(on: date)
+        let focusedIds = Set(focusedExtras.map(\.id))
+
+        // Subtasks attach to their parent's card. Not filtered by domain — they
+        // inherit the parent's placement. Orphans (parent not on this day) are
+        // excluded, the same stance as before.
+        var childrenByParent: [UUID: [SymphonyTask]] = [:]
+        for task in tasks {
+            if let pid = task.parentTaskId { childrenByParent[pid, default: []].append(task) }
+        }
 
         // Tasks scheduled for this date
         for task in tasks {
@@ -39,48 +67,55 @@ final class TimelineViewModel {
             // Skip subtasks (they show under parent)
             if task.parentTaskId != nil { continue }
 
-            guard let scheduled = task.scheduledFor,
-                  cal.isDate(scheduled, inSameDayAs: date) else {
-                // Unscheduled, not someday → inbox
-                if task.scheduledFor == nil && !task.isSomeday && !task.completed {
-                    if let contextValue = domainFilter.contextValue {
-                        if task.context == contextValue { inbox.append(task) }
-                    } else {
-                        inbox.append(task)
-                    }
+            let chosen = focusedIds.contains(task.id)
+            guard chosen || (task.scheduledFor.map { cal.isDate($0, inSameDayAs: date) } ?? false) else {
+                // Not on this day. Undated inbox work is collected for the
+                // Inbox; past-dated work is reviewed via `plan.unfinished`.
+                if !task.completed && task.scheduledFor == nil && task.bucket == "inbox" {
+                    inbox.append(task)   // true inbox only; week/month/someday excluded
                 }
                 continue
             }
 
+            let kids = (childrenByParent[task.id] ?? [])
+                .sorted { $0.createdAt < $1.createdAt }
+                .map { TimelineItem.ChildItem(id: $0.id, title: $0.title, completed: $0.completed,
+                                              assignedTo: $0.assignedToAll ?? ($0.assignedTo.map { [$0] } ?? [])) }
             items.append(TimelineItem(
                 id: "task-\(task.id.uuidString)",
                 type: .task,
                 title: task.title,
-                startTime: task.isAllDay ? nil : task.scheduledFor,
-                isAllDay: task.isAllDay,
+                // A task chosen for this day but dated elsewhere lists untimed.
+                startTime: (task.isAllDay || chosen && !(task.scheduledFor.map { cal.isDate($0, inSameDayAs: date) } ?? false))
+                    ? nil : task.scheduledFor,
+                isAllDay: task.isAllDay || chosen,
                 completed: task.completed,
                 context: task.context,
-                entityId: task.id
+                entityId: task.id,
+                assignedTo: task.assignedToAll ?? (task.assignedTo.map { [$0] } ?? []),
+                location: task.location,
+                notes: task.notes,
+                links: task.links ?? [],
+                phoneNumber: task.phoneNumber,
+                locationPlaceId: task.locationPlaceId,
+                source: Self.source(type: .task, captureId: task.captureId, scope: task.scope),
+                children: kids,
+                isFocused: chosen || plan.isFocused(task, on: date),
+                isWaiting: task.isWaiting,
+                waitingFor: task.waitingFor
             ))
         }
 
-        // Routines that should appear today
-        for routine in routines {
-            if let contextValue = domainFilter.contextValue, routine.context != contextValue { continue }
-            guard shouldShowRoutine(routine, on: date) else { continue }
+        // Routines on the day: timed or pinned ones that are due, plus untimed
+        // occurrences chosen for it. Other untimed occurrences wait in the
+        // chooser (web dayPlan: they stay off the main list until chosen).
+        for routine in plan.dayRoutines(on: date) {
+            // The day's instance. entity_id is text: the web writes lowercase
+            // uuids, so compare case-insensitively.
+            let instanceStatus = plan.instance(for: routine, on: date)?.status
 
-            // Check if there's an instance for this routine+date
-            let instanceStatus = instances.first {
-                $0.entityType == "routine" && $0.entityId == routine.id.uuidString &&
-                cal.isDate($0.date, inSameDayAs: date)
-            }?.status
-
-            let startTime: Date? = {
-                guard let timeStr = routine.timeOfDay else { return nil }
-                let parts = timeStr.split(separator: ":").compactMap { Int($0) }
-                guard parts.count >= 2 else { return nil }
-                return cal.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: startOfDay)
-            }()
+            // A move or a same-day retime wins over the rule's time.
+            let startTime = plan.time(of: routine, on: startOfDay)
 
             items.append(TimelineItem(
                 id: "routine-\(routine.id.uuidString)",
@@ -88,43 +123,37 @@ final class TimelineViewModel {
                 title: routine.name,
                 startTime: startTime,
                 isAllDay: false,
-                completed: instanceStatus == "completed",
+                // Skipped reads as "off my plate today" — render it done-style
+                // so it doesn't invite a second completion.
+                completed: instanceStatus == "completed" || instanceStatus == "skipped",
                 context: routine.context,
-                entityId: routine.id
+                entityId: routine.id,
+                // Everyone who carries it, as the web's avatars show.
+                assignedTo: routine.assignedToAll ?? (routine.assignedTo.map { [$0] } ?? []),
+                isFocused: plan.isChosen(routine, on: date)
             ))
         }
 
-        // Playbook blocks (if coaching is ON)
-        if showCoaching {
-            let dayType = date.isWeekend ? "weekend" : "school-day"
-
-            for block in playbookBlocks {
-                guard block.dayTypes.contains(dayType) else { continue }
-
-                // Check for instance
-                let instance = playbookInstances.first {
-                    $0.blockId == block.id && cal.isDate($0.date, inSameDayAs: date)
+        // Google Calendar events (already mapped to TimelineItems by
+        // GoogleCalendarService). Events bypass the domain filter — they mirror the
+        // wall/kiosk, which shows every calendar regardless of work/family/personal.
+        // Overlay each event's actionable_instances status (checked off on any
+        // device → shows done here too).
+        for var event in eventItems {
+            if let key = event.eventKey {
+                let status = instances.first {
+                    $0.entityType == "calendar_event" && $0.entityId == key &&
+                    cal.isDate($0.date, inSameDayAs: date)
+                }?.status
+                event.completed = status == "completed" || status == "skipped"
+                if let note = eventNotes.first(where: { $0.googleEventId == key }) {
+                    event.notes = note.notes
+                    event.links = note.links ?? []
                 }
-
-                let startTime: Date? = {
-                    let timeStr = block.timeSlot.split(separator: "-").first.map(String.init) ?? block.timeSlot
-                    let parts = timeStr.trimmingCharacters(in: .whitespaces).split(separator: ":").compactMap { Int($0) }
-                    guard parts.count >= 2 else { return nil }
-                    return cal.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: startOfDay)
-                }()
-
-                items.append(TimelineItem(
-                    id: "playbook-\(block.id.uuidString)",
-                    type: .playbook,
-                    title: block.label,
-                    startTime: startTime,
-                    isAllDay: false,
-                    completed: instance?.completed ?? false,
-                    context: "family",
-                    entityId: block.id,
-                    blockType: block.blockType
-                ))
             }
+            event.isFree = Self.isEventFree(eventKey: event.eventKey, seriesKey: event.recurringEventId, notes: eventNotes)
+            event.source = Self.source(type: .event, captureId: nil, scope: nil)
+            items.append(event)
         }
 
         // Sort: all-day first, then by time, then untimed
@@ -139,32 +168,41 @@ final class TimelineViewModel {
 
         self.timelineItems = items
         self.inboxTasks = inbox
+        self.carriedOverTasks = plan.unfinished(on: date)
     }
 
-    func section(for item: TimelineItem) -> TimeSection {
-        guard !item.isAllDay else { return .allDay }
-        guard let time = item.startTime else { return .morning }
-        let hour = Calendar.current.component(.hour, from: time)
-        if hour < 12 { return .morning }
-        if hour < 17 { return .afternoon }
-        return .evening
+    /// "Free" resolution — mirrors the web's `isEventFree` in
+    /// `src/lib/today/eventFree.ts` exactly: instance OR series, plain OR,
+    /// no per-occurrence opt-out (an instance note that exists but was never
+    /// marked free must not defeat a flagged series).
+    static func isEventFree(eventKey: String?, seriesKey: String?, notes: [EventNote]) -> Bool {
+        let instanceFree = eventKey.flatMap { key in notes.first { $0.googleEventId == key } }?.isFree ?? false
+        let seriesFree = seriesKey.flatMap { key in notes.first { $0.googleEventId == key } }?.isFree ?? false
+        return instanceFree || seriesFree
     }
 
-    private func shouldShowRoutine(_ routine: Routine, on date: Date) -> Bool {
-        guard routine.visibility == "active" else { return false }
+    /// Source pill rule (spec §3): event → calendar; capture → email;
+    /// couple/compound scope → shared; otherwise none.
+    static func source(type: TimelineItem.ItemType, captureId: UUID?, scope: String?) -> TimelineItem.Source? {
+        if type == .event { return .calendar }
+        if captureId != nil { return .email }
+        if scope == "couple" || scope == "compound" { return .shared }
+        return nil
+    }
 
-        let pattern = routine.recurrencePattern
+    /// True when a routine effectively recurs every weekday (>=5×/week):
+    /// `daily`, or `weekly`/`specific_days` whose days cover all of Mon–Fri.
+    /// Ported from the web app's `isEverydayRoutine` (lib/routineUtils.ts).
+    /// Day keys are normalized to their first 3 lowercase chars so both
+    /// "mon" and "monday" forms match.
+    static func isEverydayRoutine(_ pattern: RecurrencePattern) -> Bool {
         switch pattern.type {
         case "daily":
             return true
-        case "weekly":
+        case "weekly", "specific_days":
             guard let days = pattern.days else { return false }
-            return days.contains(date.dayOfWeek)
-        case "monthly":
-            if let dom = pattern.dayOfMonth {
-                return Calendar.current.component(.day, from: date) == dom
-            }
-            return false
+            let set = Set(days.map { String($0.lowercased().prefix(3)) })
+            return ["mon", "tue", "wed", "thu", "fri"].allSatisfy { set.contains($0) }
         default:
             return false
         }
@@ -182,13 +220,80 @@ struct TimelineItem: Identifiable {
     var completed: Bool
     let context: String?
     let entityId: UUID
-    var blockType: String? = nil
+    var assignedTo: [UUID] = []
+    var location: String? = nil
+    /// Google event id — the actionable_instances entity_id for events
+    /// (matches the web: entity_id = google_event_id).
+    var eventKey: String? = nil
+
+    // Context that surfaces on the card (landing: "every block carries everything you need")
+    var notes: String? = nil
+    var links: [TaskLink] = []
+    var phoneNumber: String? = nil
+    var locationPlaceId: String? = nil
+    var source: Source? = nil
+    var children: [ChildItem] = []
+    /// The series id for a recurring calendar event (from
+    /// `GoogleCalendarEvent.recurringEventId`) — where the "Free" flag's
+    /// series note is keyed. Nil for tasks/routines and one-off events.
+    var recurringEventId: String? = nil
+    /// Resolved by `TimelineViewModel.isEventFree` (instance note OR series
+    /// note). Free events render dimmed, unactionable, no check circle.
+    var isFree: Bool = false
+    /// Chosen for this day (my task_focus row, or a chosen routine occurrence).
+    var isFocused: Bool = false
+    /// Waiting on someone else (web #115) — and on what, in your words.
+    var isWaiting: Bool = false
+    var waitingFor: String? = nil
+    /// When a calendar event ends, for the day drawn to scale. Tasks and
+    /// routines have none (they take half an hour there, as on the web).
+    var endTime: Date? = nil
 
     enum ItemType: String {
         case task
         case routine
         case event
-        case playbook
+    }
+
+    /// Where a block came from — the pill in its top-right corner.
+    enum Source: String {
+        case email, calendar, shared
+
+        var label: String {
+            switch self {
+            case .email:    return "From an email"
+            case .calendar: return "From the calendar"
+            case .shared:   return "Shared"
+            }
+        }
+    }
+
+    /// A subtask rendered as a check-circle row under its parent.
+    struct ChildItem: Identifiable, Equatable {
+        let id: UUID
+        let title: String
+        var completed: Bool
+        let assignedTo: [UUID]
+    }
+
+    /// Block (rich card) vs plain row. A bare calendar event is a plain row —
+    /// the calendar pill only shows once the event carries something else.
+    var isBlock: Bool {
+        noteLine != nil
+            || !links.isEmpty
+            || phoneNumber != nil
+            || location != nil
+            || !children.isEmpty
+            || source == .email
+            || source == .shared
+    }
+
+    /// First non-empty line of `notes`, for the italic serif line. `notes` may
+    /// be Tiptap HTML — `NotesHTML.firstLine` renders it (or markdown-style
+    /// text) down to plain prose so a block card never shows a raw tag.
+    var noteLine: String? {
+        guard let notes else { return nil }
+        return NotesHTML.firstLine(notes)
     }
 
     var timeString: String? {
@@ -197,4 +302,33 @@ struct TimelineItem: Identifiable {
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: time)
     }
+}
+
+// MARK: - Steps, folded to their next one
+
+/// Web parity (ScheduleItem.tsx, "Today, calmer" 2026-10-06): a row's steps
+/// fold to "Next: … · 5 steps". Only a PER-PERSON step stays open — one for
+/// someone the row doesn't already name, or any open step of a row that came
+/// from an email ("Picture Day" means nothing without "Liam: collared shirt").
+/// A step given to the row's own person is an ordinary step.
+extension TimelineItem {
+    func isPerPerson(_ step: ChildItem) -> Bool {
+        if source == .email { return true }
+        guard let who = step.assignedTo.first else { return false }
+        return !assignedTo.contains(who)
+    }
+
+    /// Open per-person steps — always shown, under the title.
+    var perPersonSteps: [ChildItem] { children.filter { !$0.completed && isPerPerson($0) } }
+
+    /// Everything else — behind the "N steps" disclosure. Split on the
+    /// predicate, not the shown list, so a finished per-person step doesn't
+    /// reappear here as a plain one.
+    var plainSteps: [ChildItem] { children.filter { !isPerPerson($0) } }
+
+    /// The first open plain step: the "Next: …" line.
+    var nextStep: ChildItem? { plainSteps.first { !$0.completed } }
+
+    /// The disclosure's count, as the web counts it.
+    var stepsTotal: Int { perPersonSteps.isEmpty ? children.count : plainSteps.count }
 }

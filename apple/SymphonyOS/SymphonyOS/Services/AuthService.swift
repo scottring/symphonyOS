@@ -12,6 +12,14 @@ final class AuthService {
     private var authStateTask: Task<Void, Never>?
 
     init() {
+        #if DEBUG
+        if DemoMode.isOn {
+            currentUser = DemoMode.user
+            isAuthenticated = true
+            isLoading = false
+            return
+        }
+        #endif
         startListening()
     }
 

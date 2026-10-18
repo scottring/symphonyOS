@@ -1,9 +1,11 @@
 import Testing
-@testable import SymphonyOS
+import Foundation
+@testable import Symphony
 
 @Test func appStateDefaults() async throws {
     let state = AppState()
-    #expect(state.activeTab == .today)
+    #expect(state.activeTab == .planner)
+    #expect(state.horizon == .today)
     #expect(state.domainFilter == .all)
     #expect(state.isToday)
 }

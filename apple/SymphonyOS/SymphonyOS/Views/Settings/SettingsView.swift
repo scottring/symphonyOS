@@ -3,7 +3,6 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(AuthService.self) private var auth
-    @Environment(AppState.self) private var appState
     @Query private var familyMembers: [FamilyMember]
 
     var body: some View {
@@ -20,15 +19,12 @@ struct SettingsView: View {
                 }
             }
 
-            // Coaching
-            Section("Coaching") {
-                Toggle("Show Coaching Blocks", isOn: Binding(
-                    get: { !appState.hideCoaching },
-                    set: { appState.hideCoaching = !$0 }
-                ))
-
-                NavigationLink("Family Rules") {
-                    FamilyRulesView()
+            // Integrations
+            Section("Integrations") {
+                NavigationLink {
+                    CalendarSettingsView()
+                } label: {
+                    Label("Google Calendar", systemImage: "calendar")
                 }
             }
 
@@ -73,7 +69,7 @@ struct SettingsView: View {
                 Button("Sign Out") {
                     Task { await auth.signOut() }
                 }
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.feedbackRed)
             }
         }
         .navigationTitle("Settings")

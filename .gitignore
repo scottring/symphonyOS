@@ -58,3 +58,11 @@ apple/**/.build/
 /output/
 /outputs/
 /tmp/
+
+# native iOS build artifacts
+apple/SymphonyOS/.build/
+apple/SymphonyOS/Package.resolved
+
+# Xcode per-user state (editor noise, not source)
+*.xcuserstate
+xcuserdata/

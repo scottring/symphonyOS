@@ -13,6 +13,14 @@ struct LinkedActivity: Codable, Hashable {
     var id: String
 }
 
+/// Mirrors the `tasks.capture_meta` jsonb column (photo-first capture).
+/// status: "pending" (awaiting AI analysis) | "done" | "failed".
+struct CaptureMeta: Codable, Hashable {
+    var status: String?
+    var storage_path: String?
+    var suggested_task_id: String?
+}
+
 // MARK: - SymphonyTask
 
 @Model
@@ -22,6 +30,22 @@ final class SymphonyTask {
     var userId: UUID
     var title: String
     var completed: Bool
+    /// When it was done (web: "Done Tue"); nil while open. Set and cleared
+    /// only through `setCompleted`, which flags `completedAtDirty` so the
+    /// push sends it — an UPDATE otherwise leaves the column alone, so a row
+    /// pulled before the phone read this column can't wipe the web's stamp.
+    /// Inline defaults for SwiftData's lightweight migration.
+    var completedAt: Date? = nil
+    var completedAtDirty: Bool = false
+
+    /// Waiting on someone (web #115): what the wait is on, and since when.
+    /// The check-back day is the task's own date — dated then, it leaves
+    /// Today and comes back. READ-ONLY on the phone: the push never sends
+    /// these columns, so a wait set on the web can't be cleared from here by
+    /// a stale row. Inline defaults for SwiftData's lightweight migration.
+    var isWaiting: Bool = false
+    var waitingFor: String? = nil
+    var waitingSince: Date? = nil
 
     // Scheduling
     var scheduledFor: Date?
@@ -29,6 +53,9 @@ final class SymphonyTask {
     var deferCount: Int
     var isAllDay: Bool
     var isSomeday: Bool
+    /// Triage bucket — mirrors the web: "inbox" | "week" | "month" | "quarter" |
+    /// "someday" | "timed". The inbox is bucket == "inbox" (NOT "no date").
+    var bucket: String?
     var estimatedDuration: Int? // minutes
 
     // Context
@@ -48,10 +75,58 @@ final class SymphonyTask {
     var assignedToAll: [UUID]? // multi-member assignment
     var projectId: UUID?
     var parentTaskId: UUID?
+    /// Who can SEE it: "individual" | "couple" | "compound". Derived at
+    /// creation (PageParse.taskFields) and recomputed on every context/
+    /// assignee edit (TaskViewModel.reconcileScope), both mirroring
+    /// ScopeRule.scopeForDomain. Pushed on INSERT, and on UPDATE only when
+    /// `scopeDirty` — otherwise a web-side relabel is echoed back over.
+    var scope: String?
+    /// True when `scope` was recomputed locally by a context/assignee edit
+    /// (TaskViewModel.reconcileScope) and hasn't pushed yet. Never sent to
+    /// Supabase itself — SyncEngine reads it to decide whether an UPDATE
+    /// should include `scope`, then clears it after a successful push.
+    /// Inline default (not just in `init`) so SwiftData's lightweight
+    /// migration can add this column to an existing on-device store without
+    /// a value — an existing install losing its local store on this build
+    /// bricks it, not just fails to compile.
+    var scopeDirty: Bool = false
+    /// Set when this task was extracted from a capture (school email, paper
+    /// page). Read-only on the phone; drives the "From an email" source pill.
+    var captureId: UUID?
+    /// Which week a bucket=="week" row belongs to (placement cascade). Local
+    /// midnight. Sent as a DATE column — see `SyncEngine.taskRow`.
+    var weekStart: Date?
+    /// Placement cache for month/season (bucket "month"/"quarter") and the
+    /// weekend (a Saturday) — kept current by database triggers from
+    /// `task_commitments`. Inline defaults so SwiftData's lightweight
+    /// migration can add them to an existing on-device store.
+    var monthStart: Date? = nil
+    var seasonStart: Date? = nil
+    var weekendStart: Date? = nil
+    /// A month/season goal row (an outcome), not an action.
+    var isGoal: Bool = false
+    /// A step under a goal row.
+    var goalTaskId: UUID? = nil
+    /// The year goal (`goals` row) this serves.
+    var goalId: UUID? = nil
+    /// Legacy shared "chosen for this day" date. Read-only: the web now keeps
+    /// focus per person in `task_focus` and only reads this when a task has no
+    /// focus rows at all.
+    var plannedOn: Date? = nil
+    /// True when a local placement change set the period stamps
+    /// (week/month/season/weekend) and they haven't pushed yet. Like
+    /// `scopeDirty`: an UPDATE otherwise leaves those columns alone, so an
+    /// ordinary edit here never nulls a placement made on the web.
+    var placementDirty: Bool = false
 
     // Linked activity
     var linkedTo: LinkedActivity?
     var linkType: String? // "prep", "followup"
+
+    // Photo-first capture (tasks.capture_meta jsonb, flattened for SwiftUI)
+    var captureStatus: String? // "pending" | "done" | "failed"
+    var captureStoragePath: String?
+    var captureSuggestedTaskId: UUID?
 
     // Sync
     var syncStatus: SyncStatus
@@ -91,8 +166,15 @@ final class SymphonyTask {
         self.assignedToAll = nil
         self.projectId = nil
         self.parentTaskId = nil
+        self.scope = nil
+        self.scopeDirty = false
+        self.captureId = nil
+        self.weekStart = nil
         self.linkedTo = nil
         self.linkType = nil
+        self.captureStatus = nil
+        self.captureStoragePath = nil
+        self.captureSuggestedTaskId = nil
         self.syncStatus = syncStatus
         self.lastSyncedAt = nil
         self.createdAt = Date()
@@ -129,9 +211,22 @@ extension SymphonyTask {
         "assignedToAll": "assigned_to_all",
         "projectId": "project_id",
         "parentTaskId": "parent_task_id",
+        "scope": "scope",
+        "captureId": "capture_id",
+        "weekStart": "week_start",
         "linkedTo": "linked_to",
         "linkType": "link_type",
         "createdAt": "created_at",
         "updatedAt": "updated_at",
     ]
+}
+
+extension SymphonyTask {
+    /// Complete or reopen, stamping `completed_at` the way the web does
+    /// (now on complete, cleared on reopen). Does not save or queue.
+    func setCompleted(_ done: Bool, at now: Date = Date()) {
+        completed = done
+        completedAt = done ? now : nil
+        completedAtDirty = true
+    }
 }

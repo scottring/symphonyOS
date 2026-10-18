@@ -5,9 +5,17 @@ struct DomainSwitcher: View {
     @Namespace private var pillAnimation
 
     var body: some View {
+        // Large text: scroll sideways rather than breaking words mid-pill.
+        ViewThatFits(in: .horizontal) {
+            pills
+            ScrollView(.horizontal, showsIndicators: false) { pills }
+        }
+    }
+
+    private var pills: some View {
         @Bindable var state = appState
 
-        HStack(spacing: 4) {
+        return HStack(spacing: 4) {
             ForEach(DomainFilter.allCases) { filter in
                 let isSelected = state.domainFilter == filter
 
@@ -17,19 +25,24 @@ struct DomainSwitcher: View {
                     }
                 } label: {
                     Text(filter.rawValue)
-                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                        .foregroundStyle(isSelected ? pillForeground(for: filter) : Color.textTertiary)
+                        .font(isSelected ? .bodySmallBold : .bodySmall)
+                        .foregroundStyle(isSelected ? Color.ink : Color.textSecondary)
+                        .fixedSize()
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
                         .background {
                             if isSelected {
                                 Capsule()
-                                    .fill(pillBackground(for: filter))
+                                    .fill(Color.bgElevated)
+                                    .overlay(
+                                        Capsule().strokeBorder(Color.cardBorder, lineWidth: 1)
+                                    )
                                     .matchedGeometryEffect(id: "pill", in: pillAnimation)
                             }
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
         .padding(3)
@@ -37,25 +50,5 @@ struct DomainSwitcher: View {
             Capsule()
                 .fill(Color.bgSurface.opacity(0.6))
         )
-    }
-
-    // MARK: - Domain Colors
-
-    private func pillBackground(for filter: DomainFilter) -> Color {
-        switch filter {
-        case .all: Color.primaryTint.opacity(0.12)
-        case .work: Color.contextWork.opacity(0.12)
-        case .family: Color.contextFamily.opacity(0.12)
-        case .personal: Color.contextPersonal.opacity(0.12)
-        }
-    }
-
-    private func pillForeground(for filter: DomainFilter) -> Color {
-        switch filter {
-        case .all: Color.primaryTint
-        case .work: Color.contextWork
-        case .family: Color.contextFamily
-        case .personal: Color.contextPersonal
-        }
     }
 }

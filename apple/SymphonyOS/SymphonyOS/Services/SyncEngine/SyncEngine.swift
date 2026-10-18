@@ -3,16 +3,21 @@ import SwiftData
 import Supabase
 import Realtime
 import Network
+import OSLog
 
 /// Coordinates bidirectional sync between SwiftData (local) and Supabase (remote).
 /// Actor isolation prevents race conditions.
 actor SyncEngine {
+    static let syncLog = Logger(subsystem: "com.symphonyos.app", category: "sync")
+
     private let modelContainer: ModelContainer
     private var realtimeChannels: [RealtimeChannelV2] = []
+    private var statusTasks: [Task<Void, Never>] = []
     private var networkMonitor: NWPathMonitor?
     private var isOnline = true
     private var isSyncing = false
     private var userId: UUID?
+    private var pushTask: Task<Void, Never>?
 
     // Tables we sync (in dependency order)
     static let syncedTables: [(tableName: String, modelType: any PersistentModel.Type)] = [
@@ -23,12 +28,14 @@ actor SyncEngine {
         ("projects", Project.self),
         ("tasks", SymphonyTask.self),
         ("routines", Routine.self),
+        ("lists", SymphonyList.self),
+        ("list_items", SymphonyListItem.self),
         ("actionable_instances", ActionableInstance.self),
+        ("event_notes", EventNote.self),
         ("weekly_templates", WeeklyTemplate.self),
-        ("playbook_blocks", PlaybookBlock.self),
-        ("playbook_instances", PlaybookInstance.self),
-        ("family_rules", FamilyRule.self),
-        ("responsibilities", Responsibility.self),
+        ("task_commitments", TaskCommitment.self),
+        ("task_focus", TaskFocus.self),
+        ("goals", Goal.self),
     ]
 
     init(modelContainer: ModelContainer) {
@@ -40,16 +47,84 @@ actor SyncEngine {
     /// Start sync for the given user. Call after login.
     func start(userId: UUID) async {
         self.userId = userId
+        // Diagnostic + safeguard: force the auth session to load so PostgREST
+        // requests carry the user's JWT (anon requests return 0 rows under RLS).
+        do {
+            let session = try await supabase.auth.session
+            Self.syncLog.info("auth at sync: user=\(session.user.id.uuidString, privacy: .public) tokenLen=\(session.accessToken.count)")
+        } catch {
+            Self.syncLog.error("auth at sync: NO SESSION (\(error.localizedDescription, privacy: .public)) — requests will be anon")
+        }
         startNetworkMonitoring()
         await performInitialSync()
         await subscribeToRealtime()
+        startPushLoop()
+    }
+
+    /// Re-sync after the app returns to the foreground.
+    ///
+    /// iOS suspends a backgrounded app, which kills the realtime socket, and
+    /// `postgres_changes` has **no replay** — anything that happened while we were
+    /// away is never delivered, not even after the socket reconnects. Since
+    /// `performInitialSync` previously ran only at login, the only way to see that
+    /// work was to force-relaunch the app: Scott deleted "Jax to good doggie
+    /// daycare" on the web and the row sat on his phone until he restarted it.
+    ///
+    /// Push first so local edits are on the server before the pull reconciles
+    /// against it, then re-establish the socket so live changes flow again.
+    func resync() async {
+        guard userId != nil, isOnline, !isSyncing else { return }
+        await pushPendingChanges()
+        await performInitialSync()
+        await resubscribeToRealtime()
+    }
+
+    /// Tear the channels down and re-subscribe. A socket that was suspended can
+    /// come back in a half-dead state that still accepts `subscribe()` but never
+    /// delivers, so this replaces rather than tops up — and without the teardown
+    /// every foreground would stack another set of channels.
+    private func resubscribeToRealtime() async {
+        for task in statusTasks { task.cancel() }
+        statusTasks.removeAll()
+        // removeChannel, NOT unsubscribe: unsubscribe leaves the topic registered on
+        // the realtime client, and `channel(topic)` hands back that same instance —
+        // so re-subscribing would stack a second postgresChange callback on it and
+        // every event would be handled twice. removeChannel clears the registry so
+        // subscribeToRealtime builds genuinely fresh channels.
+        for channel in realtimeChannels {
+            await supabase.realtimeV2.removeChannel(channel)
+        }
+        realtimeChannels.removeAll()
+        await subscribeToRealtime()
+    }
+
+    /// Periodically flush local edits up to Supabase. Edits enqueue a PendingChange;
+    /// this loop pushes them within a few seconds (previously push only ran on a
+    /// network reconnect, so edits effectively never synced).
+    private func startPushLoop() {
+        pushTask?.cancel()
+        pushTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                await self?.pushPendingChanges()
+            }
+        }
     }
 
     /// Stop sync. Call on logout.
     func stop() async {
         self.userId = nil
+        pushTask?.cancel()
+        pushTask = nil
+        for task in statusTasks { task.cancel() }
+        statusTasks.removeAll()
+        // removeChannel, NOT unsubscribe: unsubscribe leaves the topic registered on
+        // the realtime client, and `channel(topic)` hands back that same instance —
+        // so re-subscribing would stack a second postgresChange callback on it and
+        // every event would be handled twice. removeChannel clears the registry so
+        // subscribeToRealtime builds genuinely fresh channels.
         for channel in realtimeChannels {
-            await channel.unsubscribe()
+            await supabase.realtimeV2.removeChannel(channel)
         }
         realtimeChannels.removeAll()
         networkMonitor?.cancel()
@@ -73,11 +148,34 @@ actor SyncEngine {
                 do {
                     try await pushChange(change, context: context)
                     context.delete(change)
+                    // The phone's locally-derived scope just pushed — stop
+                    // sending it on the next UPDATE until another edit
+                    // recomputes it (SyncEngine.taskRow gates on this flag).
+                    if change.tableName == "tasks",
+                       let task = (try? context.fetch(FetchDescriptor<SymphonyTask>()))?.first(where: { $0.id == change.recordId }) {
+                        task.scopeDirty = false
+                        task.placementDirty = false
+                        task.completedAtDirty = false
+                    }
+                    if change.tableName == "routines",
+                       let routine = (try? context.fetch(FetchDescriptor<Routine>()))?.first(where: { $0.id == change.recordId }) {
+                        routine.scopeDirty = false
+                    }
                 } catch {
                     change.attempts += 1
                     change.lastAttemptAt = Date()
-                    // Keep in queue for retry (up to 10 attempts)
-                    if change.attempts >= 10 {
+                    // Surface the failure — silent push errors hid a schema drift
+                    // (phantom columns) that dropped every iOS write for days.
+                    Self.syncLog.error("push \(change.tableName, privacy: .public) \(change.changeType, privacy: .public) FAILED (attempt \(change.attempts)): \(error.localizedDescription, privacy: .public)")
+                    // Keep in queue for retry (up to 10 attempts) — EXCEPT inserts,
+                    // which retry forever. A queued change is also what shields its
+                    // row from pull-reconcile, so dropping a failed insert would let
+                    // the next launch delete a task the user typed on the phone and
+                    // that exists nowhere else. That failure mode is real: a schema
+                    // drift once rejected every iOS write for days. Updates/deletes
+                    // are safe to give up on — the server row survives them.
+                    if change.attempts >= 10 && change.changeType != "insert" {
+                        Self.syncLog.error("DROPPING \(change.tableName, privacy: .public) \(change.changeType, privacy: .public) after 10 failed attempts")
                         context.delete(change)
                     }
                 }
@@ -95,89 +193,548 @@ actor SyncEngine {
         isSyncing = true
         defer { isSyncing = false }
 
-        let context = ModelContext(modelContainer)
-
-        // Pull each table
-        await pullTable("households", as: Household.self, userId: userId, context: context)
-        await pullTable("user_profiles", as: UserProfile.self, userId: userId, context: context)
-        await pullTable("family_members", as: FamilyMember.self, userId: userId, context: context)
-        await pullTable("contacts", as: Contact.self, userId: userId, context: context)
-        await pullTable("projects", as: Project.self, userId: userId, context: context)
-        await pullTable("tasks", as: SymphonyTask.self, userId: userId, context: context)
-        await pullTable("routines", as: Routine.self, userId: userId, context: context)
-        await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId, context: context)
-        await pullTable("weekly_templates", as: WeeklyTemplate.self, userId: userId, context: context)
-        await pullTable("playbook_blocks", as: PlaybookBlock.self, userId: userId, context: context)
-        await pullTable("playbook_instances", as: PlaybookInstance.self, userId: userId, context: context)
-        await pullTable("family_rules", as: FamilyRule.self, userId: userId, context: context)
-        await pullTable("responsibilities", as: Responsibility.self, userId: userId, context: context)
-
-        do {
-            try context.save()
-        } catch {
-            print("[SyncEngine] Error saving initial sync: \(error)")
-        }
+        // Each table pulls + saves independently, so one bad row/table can't
+        // roll back the entire sync (the previous single-shared-context save did).
+        await pullTable("households", as: Household.self, userId: userId)
+        adoptHouseholdWeekStart()
+        await pullTable("user_profiles", as: UserProfile.self, userId: userId)
+        await pullTable("family_members", as: FamilyMember.self, userId: userId)
+        await pullTable("contacts", as: Contact.self, userId: userId)
+        await pullTable("projects", as: Project.self, userId: userId)
+        // Tasks reconcile like every other table. They used to be exempt, to protect
+        // locally-created rows that hadn't pushed yet — but `pendingIds` in
+        // `pullTable` already does exactly that, so the exemption bought nothing and
+        // cost correctness: a task deleted or completed on the web while the app was
+        // closed was never removed, because realtime only delivers deletes to a
+        // RUNNING app. Scott's phone showed nine carried-over rows on 2026-08-08 of
+        // which six no longer existed in the database at all.
+        await pullTable("tasks", as: SymphonyTask.self, userId: userId)
+        await pullTable("routines", as: Routine.self, userId: userId)
+        // Lists before their items, so a pull never leaves items pointing at a
+        // list that isn't there yet.
+        await pullTable("lists", as: SymphonyList.self, userId: userId)
+        await pullTable("list_items", as: SymphonyListItem.self, userId: userId)
+        await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId)
+        await pullTable("event_notes", as: EventNote.self, userId: userId)
+        await pullTable("weekly_templates", as: WeeklyTemplate.self, userId: userId)
+        // Planning: which week/month/season each task is committed to, who
+        // chose what for which day, and the year's goals.
+        await pullTable("task_commitments", as: TaskCommitment.self, userId: userId)
+        await pullTable("task_focus", as: TaskFocus.self, userId: userId)
+        await pullTable("goals", as: Goal.self, userId: userId)
     }
 
     // MARK: - Pull
 
-    private func pullTable<T: PersistentModel>(_ table: String, as type: T.Type, userId: UUID, context: ModelContext) async {
+    private func pullTable<T: PersistentModel & HasUUID>(_ table: String, as type: T.Type, userId: UUID, reconcile: Bool = true) async {
+        let context = ModelContext(modelContainer)
         do {
-            let rows: [[String: AnyJSON]] = try await supabase
-                .from(table)
-                .select()
-                .execute()
-                .value
+            // PostgREST caps a bare select at the project's `max_rows` (1000 here).
+            // Reconcile DELETES local rows missing from the response, so a single
+            // truncated page would wipe every row past the cap off the device —
+            // Scott already owns 514 tasks. Page until a short page comes back.
+            var rows: [[String: AnyJSON]] = []
+            let pageSize = 500
+            var offset = 0
+            while true {
+                let page: [[String: AnyJSON]] = try await supabase
+                    .from(table)
+                    .select()
+                    .range(from: offset, to: offset + pageSize - 1)
+                    .execute()
+                    .value
+                rows.append(contentsOf: page)
+                if page.count < pageSize { break }
+                offset += pageSize
+            }
 
-            for row in rows {
-                if let model = RowMapper.toModel(type, from: row) {
-                    context.insert(model)
+            // Ids come from the mapped models, not the raw `id` column:
+            // task_focus has no id column (its key is task/user/date) and
+            // derives a stable local id from that key.
+            let models = rows.compactMap { RowMapper.toModel(type, from: $0) }
+            let serverIds = Set(models.map { $0.id.uuidString.lowercased() })
+
+            // Rows with a queued (not-yet-pushed) local change are off-limits in
+            // BOTH phases: deleting one as "gone from server" destroys a local
+            // creation before it ever pushes (write-then-vanish), and replacing
+            // one with the server row silently reverts a local edit.
+            let pendingIds: Set<UUID> = Set(
+                ((try? context.fetch(FetchDescriptor<PendingChange>())) ?? [])
+                    .filter { $0.tableName == table }
+                    .map(\.recordId)
+            )
+
+            // Phase 1: delete any local row we're about to replace (same id), plus
+            // rows that no longer exist on the server (stale duplicates, deleted
+            // people, tasks completed or deleted on another device). Locally-created
+            // rows that haven't pushed yet are protected by `pendingIds` above.
+            //
+            // We delete-then-insert (with a save between the phases) rather than a
+            // bare insert because SwiftData's implicit unique-id upsert does NOT
+            // reliably overwrite an existing row's fields — so a server change like
+            // a task completed on the web was silently dropped on any device that
+            // already had that task locally.
+            var deleted = 0
+            if let locals = try? context.fetch(FetchDescriptor<T>()) {
+                for item in locals {
+                    if pendingIds.contains(item.id) { continue }   // local edit wins until pushed
+                    let idStr = item.id.uuidString.lowercased()
+                    if serverIds.contains(idStr) {
+                        context.delete(item)            // replaced by the fresh row below
+                    } else if reconcile {
+                        context.delete(item)            // gone from server
+                        deleted += 1
+                    }
                 }
             }
+            try context.save()
+
+            // Phase 2: insert the fresh server rows (skipping ones we kept above).
+            var inserted = 0
+            for model in models {
+                if pendingIds.contains(model.id) { continue }
+                context.insert(model)
+                inserted += 1
+            }
+            try context.save()
+
+            Self.syncLog.info("pull \(table, privacy: .public): fetched \(rows.count) inserted \(inserted) deleted \(deleted)")
         } catch {
-            print("[SyncEngine] Error pulling \(table): \(error)")
+            Self.syncLog.error("pull \(table, privacy: .public) FAILED: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     // MARK: - Push
 
     private func pushChange(_ change: PendingChange, context: ModelContext) async throws {
-        guard let payload = change.payload else { return }
-
         switch change.changeType {
         case "insert":
-            let dict = try JSONSerialization.jsonObject(with: payload) as? [String: Any] ?? [:]
-            try await supabase
-                .from(change.tableName)
-                .insert(AnyJSON.object(dict.mapValues { AnyJSON.from($0) }))
-                .execute()
+            // INSERT for a brand-new local row (its user_id is the current user, so
+            // the INSERT policy's `auth.uid() = user_id` check passes). Upsert keeps
+            // it idempotent on retry. actionable_instances additionally has a
+            // UNIQUE(user_id, entity_type, entity_id, date) key — if the web/wall
+            // created the same day's instance first (different id), conflict on
+            // that natural key and update it instead of failing the push forever.
+            guard let row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context, forInsert: true) else { return }
+            let conflictKey = Self.naturalKey(for: change.tableName)?.joined(separator: ",")
+            if change.tableName == "task_focus" {
+                // Focus rows are insert-or-nothing: the table has no UPDATE
+                // policy, so an upsert that hit an existing row would fail RLS.
+                var focusRow = row
+                focusRow.removeValue(forKey: "id")
+                try await supabase
+                    .from(change.tableName)
+                    .upsert(AnyJSON.object(focusRow), onConflict: "task_id,user_id,date", ignoreDuplicates: true)
+                    .execute()
+            } else if let conflictKey {
+                var naturalRow = row
+                naturalRow.removeValue(forKey: "id")   // let the existing row keep its id
+                try await supabase
+                    .from(change.tableName)
+                    .upsert(AnyJSON.object(naturalRow), onConflict: conflictKey)
+                    .execute()
+            } else {
+                try await supabase
+                    .from(change.tableName)
+                    .upsert(AnyJSON.object(row))
+                    .execute()
+            }
+            Self.syncLog.info("pushed insert \(change.tableName, privacy: .public)")
 
         case "update":
-            let dict = try JSONSerialization.jsonObject(with: payload) as? [String: Any] ?? [:]
-            try await supabase
-                .from(change.tableName)
-                .update(AnyJSON.object(dict.mapValues { AnyJSON.from($0) }))
-                .eq("id", value: change.recordId.uuidString)
-                .execute()
+            // Plain UPDATE — NOT upsert. The tasks INSERT policy requires
+            // auth.uid() == user_id, so upserting a household member's task (which
+            // you can edit but don't own) is rejected by the insert check. A bare
+            // UPDATE only evaluates the UPDATE policy, which allows household edits.
+            // Drop id/user_id so we never try to change ownership.
+            guard var row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context) else { return }
+            let matchColumns = Self.naturalKey(for: change.tableName)
+            var filters: [(String, String)] = []
+            if let matchColumns {
+                // Match on the natural key: a locally-created instance may have a
+                // different id than the server row it landed on (insert upserts on
+                // the natural key and lets the server keep its id), so an id match
+                // would silently update 0 rows.
+                for column in matchColumns {
+                    guard let value = row[column]?.stringValue else { return }
+                    filters.append((column, value))
+                    row.removeValue(forKey: column)
+                }
+            } else {
+                filters.append(("id", change.recordId.uuidString))
+            }
+            row.removeValue(forKey: "id")
+            row.removeValue(forKey: "user_id")
+            var query = try supabase.from(change.tableName).update(AnyJSON.object(row))
+            for (column, value) in filters {
+                query = query.eq(column, value: value)
+            }
+            try await query.execute()
+            Self.syncLog.info("pushed update \(change.tableName, privacy: .public)")
 
         case "delete":
-            try await supabase
-                .from(change.tableName)
-                .delete()
-                .eq("id", value: change.recordId.uuidString)
-                .execute()
+            if let payload = change.payload,
+               let match = try? JSONDecoder().decode([String: String].self, from: payload) {
+                // Keyed delete (task_focus has no id): the row is already gone
+                // locally, so its key rode along in the payload.
+                var query = supabase.from(change.tableName).delete()
+                for (column, value) in match.sorted(by: { $0.key < $1.key }) {
+                    query = query.eq(column, value: value)
+                }
+                try await query.execute()
+            } else {
+                try await supabase
+                    .from(change.tableName)
+                    .delete()
+                    .eq("id", value: change.recordId.uuidString)
+                    .execute()
+            }
+            Self.syncLog.info("pushed delete \(change.tableName, privacy: .public)")
 
         default:
             break
         }
     }
 
+    /// Tables whose pushes match rows by a semantic unique key instead of `id`
+    /// (values are read from the serialized row, so household-owned rows keep
+    /// their true user_id).
+    private static func naturalKey(for table: String) -> [String]? {
+        switch table {
+        case "actionable_instances": ["user_id", "entity_type", "entity_id", "date"]
+        case "event_notes": ["user_id", "google_event_id"]
+        // One commitment per (task, level, period): a web-made row for the same
+        // key has a different id, so match on the key, never the local id.
+        case "task_commitments": ["task_id", "level", "period_start"]
+        default: nil
+        }
+    }
+
+    // MARK: - Model → Row serialization (for push)
+
+    private static let isoOut = ISO8601DateFormatter()
+
+    static func serializeRow(table: String, id: UUID, context: ModelContext, forInsert: Bool = false) -> [String: AnyJSON]? {
+        func find<T: PersistentModel & HasUUID>(_ type: T.Type) -> T? {
+            (try? context.fetch(FetchDescriptor<T>()))?.first(where: { $0.id == id })
+        }
+        switch table {
+        case "tasks":
+            guard let t = find(SymphonyTask.self) else { return nil }
+            return taskRow(t, forInsert: forInsert)
+        case "routines":
+            guard let r = find(Routine.self) else { return nil }
+            return routineRow(r, forInsert: forInsert)
+        case "projects":
+            guard let p = find(Project.self) else { return nil }
+            return projectRow(p)
+        case "contacts":
+            guard let c = find(Contact.self) else { return nil }
+            return contactRow(c)
+        case "actionable_instances":
+            guard let i = find(ActionableInstance.self) else { return nil }
+            return instanceRow(i)
+        case "event_notes":
+            guard let n = find(EventNote.self) else { return nil }
+            return eventNoteRow(n)
+        case "lists":
+            guard let l = find(SymphonyList.self) else { return nil }
+            return listRow(l)
+        case "list_items":
+            guard let i = find(SymphonyListItem.self) else { return nil }
+            return listItemRow(i)
+        case "task_commitments":
+            guard let c = find(TaskCommitment.self) else { return nil }
+            return commitmentRow(c)
+        case "task_focus":
+            guard let f = find(TaskFocus.self) else { return nil }
+            return focusRow(f)
+        case "goals":
+            guard let g = find(Goal.self) else { return nil }
+            return goalRow(g, forInsert: forInsert)
+        default:
+            return nil   // other tables aren't edited from iOS
+        }
+    }
+
+    /// Local-day formatter for Postgres DATE columns (yyyy-MM-dd, user's timezone —
+    /// an ISO timestamp here would shift the day near midnight and break the
+    /// (user, entity, date) unique key that routine completions dedupe on).
+    private static let dateOnlyOut: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    // Shared column encoders for the row builders below.
+    private static func s(_ v: String?) -> AnyJSON { v.map { .string($0) } ?? .null }
+    private static func i(_ v: Int?) -> AnyJSON { v.map { .integer($0) } ?? .null }
+    private static func d(_ v: Date?) -> AnyJSON { v.map { .string(isoOut.string(from: $0)) } ?? .null }
+    private static func dateOnly(_ v: Date?) -> AnyJSON { v.map { .string(dateOnlyOut.string(from: $0)) } ?? .null }
+    private static func u(_ v: UUID?) -> AnyJSON { v.map { .string($0.uuidString) } ?? .null }
+    private static func us(_ v: [UUID]?) -> AnyJSON { v.map { .array($0.map { .string($0.uuidString) }) } ?? .null }
+    private static func j<T: Encodable>(_ v: T?) -> AnyJSON {
+        guard let v, let data = try? JSONEncoder().encode(v),
+              let any = try? JSONDecoder().decode(AnyJSON.self, from: data) else { return .null }
+        return any
+    }
+
+    private static func taskRow(_ t: SymphonyTask, forInsert: Bool = false) -> [String: AnyJSON] {
+        var row: [String: AnyJSON] = [
+            "id": .string(t.id.uuidString),
+            "user_id": .string(t.userId.uuidString),
+            "title": .string(t.title),
+            "completed": .bool(t.completed),
+            "scheduled_for": d(t.scheduledFor),
+            "deferred_until": d(t.deferredUntil),
+            "defer_count": .integer(t.deferCount),
+            "is_all_day": .bool(t.isAllDay),
+            "bucket": s(t.bucket),
+            "estimated_duration": i(t.estimatedDuration),
+            "context": s(t.context),
+            "category": s(t.category),
+            "notes": s(t.notes),
+            "links": j(t.links),
+            "phone_number": s(t.phoneNumber),
+            "location": s(t.location),
+            "location_place_id": s(t.locationPlaceId),
+            "contact_id": u(t.contactId),
+            "assigned_to": u(t.assignedTo),
+            "assigned_to_all": us(t.assignedToAll),
+            "project_id": u(t.projectId),
+            "parent_task_id": u(t.parentTaskId),
+            "link_type": s(t.linkType),
+            "created_at": .string(isoOut.string(from: t.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+        // Only send capture_meta when this task IS a photo capture — a blanket
+        // null would wipe server-side capture state written by analyze-capture
+        // (UPDATE only touches the columns present in the row).
+        if let status = t.captureStatus {
+            row["capture_meta"] = j(CaptureMeta(
+                status: status,
+                storage_path: t.captureStoragePath,
+                suggested_task_id: t.captureSuggestedTaskId?.uuidString
+            ))
+        }
+        // Only when set: a blanket null would wipe a week placement made on the
+        // web. DATE column → local yyyy-MM-dd (dateOnly), never ISO.
+        // A placement made on the phone (placementDirty) sends every period
+        // stamp — nulls included, so moving a weekend task to a weekday clears
+        // `weekend_start`. Otherwise only a set week_start rides along, so an
+        // ordinary edit never nulls a placement made on the web.
+        if t.placementDirty {
+            row["week_start"] = dateOnly(t.weekStart)
+            row["month_start"] = dateOnly(t.monthStart)
+            row["season_start"] = dateOnly(t.seasonStart)
+            row["weekend_start"] = dateOnly(t.weekendStart)
+        } else if let ws = t.weekStart {
+            row["week_start"] = dateOnly(ws)
+        }
+        // scope is derived on the phone at creation (PageParse.taskFields) and
+        // whenever a context/assignee edit recomputes it (TaskViewModel.
+        // reconcileScope, which flags scopeDirty). Sending it on every UPDATE
+        // would echo a possibly-stale local value over a web-side relabel
+        // (scope is otherwise server/web-owned) — only send it on INSERT, or
+        // on an UPDATE the phone itself just changed.
+        if (forInsert || t.scopeDirty), let scope = t.scope {
+            row["scope"] = .string(scope)
+        }
+        // Only when the phone itself completed or reopened it (see
+        // SymphonyTask.completedAt) — never a stale nil over the web's stamp.
+        if forInsert || t.completedAtDirty {
+            row["completed_at"] = d(t.completedAt)
+        }
+        return row
+    }
+
+    // Column sets below are the intersection of the iOS model's fields and the
+    // production schema — pushing a column Postgres doesn't have rejects the
+    // whole row (the "phantom columns" incident), and omitted server-only
+    // columns (e.g. routines.times_per_day) are left untouched by UPDATE.
+
+    private static func routineRow(_ r: Routine, forInsert: Bool = false) -> [String: AnyJSON] {
+        var row: [String: AnyJSON] = [
+            "id": .string(r.id.uuidString),
+            "user_id": .string(r.userId.uuidString),
+            "name": .string(r.name),
+            "description": s(r.routineDescription),
+            "visibility": .string(r.visibility),
+            "recurrence_pattern": j(r.recurrencePattern),
+            "time_of_day": s(r.timeOfDay),
+            "context": s(r.context),
+            "assigned_to": u(r.assignedTo),
+            "created_at": .string(isoOut.string(from: r.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+        // Like tasks: on INSERT, or an UPDATE whose context/assignee edit
+        // recomputed it — otherwise a web-side change is never echoed back.
+        if (forInsert || r.scopeDirty), let scope = r.scope {
+            row["scope"] = .string(scope)
+        }
+        return row
+    }
+
+    private static func listRow(_ l: SymphonyList) -> [String: AnyJSON] {
+        [
+            "id": .string(l.id.uuidString),
+            "user_id": .string(l.userId.uuidString),
+            "title": .string(l.title),
+            "icon": s(l.icon),
+            "category": .string(l.category),
+            "visibility": .string(l.visibility),
+            "sort_order": .double(Double(l.sortOrder)),
+            "created_at": .string(isoOut.string(from: l.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func listItemRow(_ i: SymphonyListItem) -> [String: AnyJSON] {
+        // `is_checked` is deliberately absent: it's the legacy twin of
+        // `completed`, NOT NULL but defaulted, so leaving it out is safe on
+        // insert and avoids writing a column the web no longer reads.
+        [
+            "id": .string(i.id.uuidString),
+            "user_id": .string(i.userId.uuidString),
+            "list_id": .string(i.listId.uuidString),
+            "text": .string(i.text),
+            "note": s(i.note),
+            "completed": .bool(i.completed),
+            "completed_at": i.completedAt.map { AnyJSON.string(isoOut.string(from: $0)) } ?? .null,
+            "sort_order": .double(Double(i.sortOrder)),
+            "parent_item_id": u(i.parentItemId),
+            "created_at": .string(isoOut.string(from: i.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func projectRow(_ p: Project) -> [String: AnyJSON] {
+        [
+            "id": .string(p.id.uuidString),
+            "user_id": .string(p.userId.uuidString),
+            "name": .string(p.name),
+            "status": .string(p.status),
+            "context": s(p.context),
+            "type": s(p.type),
+            "notes": s(p.notes),
+            "links": j(p.links),
+            "phone_number": s(p.phoneNumber),
+            "parent_id": u(p.parentId),
+            "created_at": .string(isoOut.string(from: p.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func contactRow(_ c: Contact) -> [String: AnyJSON] {
+        [
+            "id": .string(c.id.uuidString),
+            "user_id": .string(c.userId.uuidString),
+            "name": .string(c.name),
+            "phone": s(c.phone),
+            "email": s(c.email),
+            "notes": s(c.notes),
+            "category": s(c.category),
+            "birthday": dateOnly(c.birthday),
+            "relationship": s(c.relationship),
+            "preferences": s(c.preferences),
+            "created_at": .string(isoOut.string(from: c.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func instanceRow(_ i: ActionableInstance) -> [String: AnyJSON] {
+        [
+            "id": .string(i.id.uuidString),
+            "user_id": .string(i.userId.uuidString),
+            "entity_type": .string(i.entityType),
+            "entity_id": .string(i.entityId),
+            "date": dateOnly(i.date),
+            "status": .string(i.status),
+            "assignee": u(i.assignee),
+            "assigned_to_override": u(i.assignedToOverride),
+            "deferred_to": d(i.deferredTo),
+            "completed_at": d(i.completedAt),
+            "skipped_at": d(i.skippedAt),
+            "planned_on": dateOnly(i.plannedOn),
+            "created_at": .string(isoOut.string(from: i.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    /// Exact `event_notes` column set (model ∩ schema). Notes/links are what the
+    /// card edits; the rest are round-tripped so an iOS write never nulls a
+    /// server-set field. natural key (user_id, google_event_id) is dropped from
+    /// the row by the UPDATE path, which matches on it instead.
+    private static func eventNoteRow(_ n: EventNote) -> [String: AnyJSON] {
+        [
+            "id": .string(n.id.uuidString),
+            "user_id": .string(n.userId.uuidString),
+            "google_event_id": .string(n.googleEventId),
+            "notes": s(n.notes),
+            "links": j(n.links),
+            "event_title": s(n.eventTitle),
+            "event_start_time": d(n.eventStartTime),
+            "context": s(n.context),
+            "shared_with_family": .bool(n.sharedWithFamily),
+            "share_nudge_dismissed": .bool(n.shareNudgeDismissed),
+            "assigned_to": u(n.assignedTo),
+            "assigned_to_all": us(n.assignedToAll),
+            "recipe_url": s(n.recipeUrl),
+            "project_id": u(n.projectId),
+            "is_free": .bool(n.isFree),
+            "created_at": .string(isoOut.string(from: n.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func commitmentRow(_ c: TaskCommitment) -> [String: AnyJSON] {
+        [
+            "id": .string(c.id.uuidString),
+            "task_id": .string(c.taskId.uuidString),
+            "level": .string(c.level),
+            "period_start": dateOnly(c.periodStart),
+            "status": .string(c.status),
+            "carried_to": dateOnly(c.carriedTo),
+            "created_by": u(c.createdBy),
+            "ended_at": d(c.endedAt),
+        ]
+    }
+
+    /// The fields the phone edits — the web's addGoal / updateGoal columns.
+    /// area/strategy/domain/layer/carried_from are web-owned and omitted, so an
+    /// UPDATE leaves them untouched. `scope` rides on INSERT only (derived from
+    /// the life area, as the web does); an update never re-derives sharing.
+    private static func goalRow(_ g: Goal, forInsert: Bool) -> [String: AnyJSON] {
+        var row: [String: AnyJSON] = [
+            "id": .string(g.id.uuidString),
+            "user_id": .string(g.userId.uuidString),
+            "name": .string(g.name),
+            "year": .integer(g.year),
+            "status": .string(g.status),
+            "notes": s(g.notes),
+            "context": s(g.context),
+            "sort_order": .integer(g.sortOrder),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+        if forInsert { row["scope"] = .string(g.scope ?? "individual") }
+        return row
+    }
+
+    private static func focusRow(_ f: TaskFocus) -> [String: AnyJSON] {
+        [
+            "id": .string(f.id.uuidString),   // dropped before the push
+            "task_id": .string(f.taskId.uuidString),
+            "user_id": .string(f.userId.uuidString),
+            "date": dateOnly(f.date),
+        ]
+    }
+
     // MARK: - Realtime Subscriptions
 
     private func subscribeToRealtime() async {
         let tablesToWatch = ["tasks", "projects", "routines", "contacts", "family_members",
-                             "actionable_instances", "playbook_blocks", "playbook_instances",
-                             "family_rules", "responsibilities"]
+                             "actionable_instances", "event_notes"]
 
         for table in tablesToWatch {
             let channel = supabase.realtimeV2.channel("public:\(table)")
@@ -186,13 +743,32 @@ actor SyncEngine {
 
             Task { [weak self] in
                 for await change in changes {
+                    Self.syncLog.info("realtime \(table, privacy: .public): event received")
                     await self?.handleRealtimeChange(table: table, change: change)
                 }
             }
 
+            // A channel that silently fails to join delivers nothing forever, and
+            // looks identical to "nothing changed" — log the transition so the next
+            // "sync is broken" report starts with evidence instead of a guess.
+            let statusTask = Task {
+                for await status in channel.statusChange {
+                    Self.syncLog.info("realtime \(table, privacy: .public): channel \(String(describing: status), privacy: .public)")
+                }
+            }
+            statusTasks.append(statusTask)
+
             await channel.subscribe()
             realtimeChannels.append(channel)
         }
+    }
+
+    /// Every week the phone computes must start on the household's day, as the
+    /// database stamps them (the household it answers for: the oldest one).
+    private func adoptHouseholdWeekStart() {
+        let context = ModelContext(modelContainer)
+        let households = (try? context.fetch(FetchDescriptor<Household>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+        PlanCalendar.weekStartsOn = households.first?.weekStartsOn ?? 0
     }
 
     private func handleRealtimeChange(table: String, change: AnyAction) async {
@@ -217,48 +793,44 @@ actor SyncEngine {
     private func handleInsertOrUpdate(table: String, record: [String: AnyJSON], context: ModelContext) {
         switch table {
         case "tasks":
-            if let model = RowMapper.toModel(SymphonyTask.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(SymphonyTask.self, from: record) { upsert(model, context: context) }
         case "projects":
-            if let model = RowMapper.toModel(Project.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(Project.self, from: record) { upsert(model, context: context) }
         case "routines":
-            if let model = RowMapper.toModel(Routine.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(Routine.self, from: record) { upsert(model, context: context) }
         case "contacts":
-            if let model = RowMapper.toModel(Contact.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(Contact.self, from: record) { upsert(model, context: context) }
         case "family_members":
-            if let model = RowMapper.toModel(FamilyMember.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(FamilyMember.self, from: record) { upsert(model, context: context) }
         case "actionable_instances":
-            if let model = RowMapper.toModel(ActionableInstance.self, from: record) {
-                context.insert(model)
-            }
-        case "playbook_blocks":
-            if let model = RowMapper.toModel(PlaybookBlock.self, from: record) {
-                context.insert(model)
-            }
-        case "playbook_instances":
-            if let model = RowMapper.toModel(PlaybookInstance.self, from: record) {
-                context.insert(model)
-            }
-        case "family_rules":
-            if let model = RowMapper.toModel(FamilyRule.self, from: record) {
-                context.insert(model)
-            }
-        case "responsibilities":
-            if let model = RowMapper.toModel(Responsibility.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(ActionableInstance.self, from: record) { upsert(model, context: context) }
+        case "event_notes":
+            if let model = RowMapper.toModel(EventNote.self, from: record) { upsert(model, context: context) }
         default:
             break
         }
+    }
+
+    /// Replace any locally-stored row with the same id, then insert the fresh
+    /// model. SwiftData's implicit unique-constraint upsert does NOT reliably
+    /// overwrite an existing row's fields (especially across ModelContexts), so a
+    /// realtime UPDATE — e.g. a task checked off on the web — was being dropped on
+    /// devices that already had the row. Deleting (and saving) before inserting
+    /// guarantees the local row matches the server and avoids a unique-constraint
+    /// conflict within a single transaction.
+    private func upsert<T: PersistentModel & HasUUID>(_ model: T, context: ModelContext) {
+        let targetId = model.id
+        // A queued-but-unpushed local edit outranks the incoming server row —
+        // replacing it here would silently revert the edit (the push loop will
+        // send it up within seconds, and the resulting realtime echo converges).
+        let hasPendingLocalChange = ((try? context.fetch(FetchDescriptor<PendingChange>())) ?? [])
+            .contains { $0.recordId == targetId }
+        if hasPendingLocalChange { return }
+        if let existing = try? context.fetch(FetchDescriptor<T>()).first(where: { $0.id == targetId }) {
+            context.delete(existing)
+            try? context.save()
+        }
+        context.insert(model)
     }
 
     private func handleDelete(table: String, oldRecord: [String: AnyJSON], context: ModelContext) {
@@ -278,14 +850,8 @@ actor SyncEngine {
             deleteById(FamilyMember.self, id: id, context: context)
         case "actionable_instances":
             deleteById(ActionableInstance.self, id: id, context: context)
-        case "playbook_blocks":
-            deleteById(PlaybookBlock.self, id: id, context: context)
-        case "playbook_instances":
-            deleteById(PlaybookInstance.self, id: id, context: context)
-        case "family_rules":
-            deleteById(FamilyRule.self, id: id, context: context)
-        case "responsibilities":
-            deleteById(Responsibility.self, id: id, context: context)
+        case "event_notes":
+            deleteById(EventNote.self, id: id, context: context)
         default:
             break
         }
@@ -296,10 +862,7 @@ actor SyncEngine {
         do {
             let results = try context.fetch(descriptor)
             for item in results {
-                // Check id via reflection since we can't use protocol with associated type
-                let mirror = Mirror(reflecting: item)
-                if let idValue = mirror.children.first(where: { $0.label == "id" })?.value as? UUID,
-                   idValue == id {
+                if let identifiable = item as? HasUUID, identifiable.id == id {
                     context.delete(item)
                     return
                 }
@@ -352,3 +915,27 @@ extension AnyJSON {
         }
     }
 }
+
+// MARK: - Stable id access for reconciliation
+//
+// SwiftData @Model instances don't expose stored properties via Mirror (they're
+// backed by a hidden store), so the sync engine reads `id` through this protocol
+// instead of reflection — which silently returned nil before, making deletion
+// reconciliation a no-op (stale duplicates like a second "Iris" never cleared).
+protocol HasUUID { var id: UUID { get } }
+
+extension SymphonyTask: HasUUID {}
+extension Project: HasUUID {}
+extension Routine: HasUUID {}
+extension Contact: HasUUID {}
+extension FamilyMember: HasUUID {}
+extension TaskCommitment: HasUUID {}
+extension TaskFocus: HasUUID {}
+extension Goal: HasUUID {}
+extension ActionableInstance: HasUUID {}
+extension EventNote: HasUUID {}
+extension WeeklyTemplate: HasUUID {}
+extension Household: HasUUID {}
+extension UserProfile: HasUUID {}
+extension SymphonyList: HasUUID {}
+extension SymphonyListItem: HasUUID {}

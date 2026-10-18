@@ -3,10 +3,74 @@ import SwiftData
 
 // MARK: - Recurrence Pattern
 
+/// Mirrors the web's `RecurrencePattern` (src/types/actionable.ts). Every field
+/// round-trips, so saving a routine from the phone never strips a field the
+/// web set (interval, dates, …).
 struct RecurrencePattern: Codable, Hashable {
-    var type: String // "daily", "weekly", "monthly"
-    var days: [String]? // ["monday", "wednesday", "friday"]
+    /// daily | weekly | monthly | quarterly | yearly | specific_days | since_last | weekend
+    var type: String
+    /// Weekday keys, "sun"…"sat" (older rows may spell them out).
+    var days: [String]?
     var dayOfMonth: Int?
+    /// Monthly by position ("first weekend", "last Friday"): 1…4, or -1 for
+    /// the last. With `dayOfWeek` set it wins over `dayOfMonth`.
+    var weekOfMonth: Int?
+    /// "weekend" | "sun"…"sat", for a monthly-by-position rule.
+    var dayOfWeek: String?
+    var monthOfYear: Int?
+    /// YYYY-MM-DD dates for `specific_days`.
+    var dates: [String]?
+    var interval: Int?
+    /// "days" | "weeks" | "months" (since_last)
+    var unit: String?
+    /// YYYY-MM-DD anchor for interval > 1.
+    var startDate: String?
+
+    init(type: String, days: [String]? = nil, dayOfMonth: Int? = nil) {
+        self.type = type
+        self.days = days
+        self.dayOfMonth = dayOfMonth
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type, days, dates, interval, unit
+        case dayOfMonth = "day_of_month"
+        case weekOfMonth = "week_of_month"
+        case dayOfWeek = "day_of_week"
+        case monthOfYear = "month_of_year"
+        case startDate = "start_date"
+        case legacyDayOfMonth = "dayOfMonth"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type = try c.decode(String.self, forKey: .type)
+        days = try c.decodeIfPresent([String].self, forKey: .days)
+        // Older phone builds wrote camelCase; the web writes day_of_month.
+        dayOfMonth = try c.decodeIfPresent(Int.self, forKey: .dayOfMonth)
+            ?? c.decodeIfPresent(Int.self, forKey: .legacyDayOfMonth)
+        weekOfMonth = try c.decodeIfPresent(Int.self, forKey: .weekOfMonth)
+        dayOfWeek = try c.decodeIfPresent(String.self, forKey: .dayOfWeek)
+        monthOfYear = try c.decodeIfPresent(Int.self, forKey: .monthOfYear)
+        dates = try c.decodeIfPresent([String].self, forKey: .dates)
+        interval = try c.decodeIfPresent(Int.self, forKey: .interval)
+        unit = try c.decodeIfPresent(String.self, forKey: .unit)
+        startDate = try c.decodeIfPresent(String.self, forKey: .startDate)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(type, forKey: .type)
+        try c.encodeIfPresent(days, forKey: .days)
+        try c.encodeIfPresent(dayOfMonth, forKey: .dayOfMonth)
+        try c.encodeIfPresent(weekOfMonth, forKey: .weekOfMonth)
+        try c.encodeIfPresent(dayOfWeek, forKey: .dayOfWeek)
+        try c.encodeIfPresent(monthOfYear, forKey: .monthOfYear)
+        try c.encodeIfPresent(dates, forKey: .dates)
+        try c.encodeIfPresent(interval, forKey: .interval)
+        try c.encodeIfPresent(unit, forKey: .unit)
+        try c.encodeIfPresent(startDate, forKey: .startDate)
+    }
 }
 
 // MARK: - Routine
@@ -22,6 +86,22 @@ final class Routine {
     var timeOfDay: String? // "HH:MM" or "HH:MM:SS"
     var context: String? // "work", "family", "personal"
     var assignedTo: UUID? // family member
+
+    // Read-only on the phone (never pushed): what `resolveRoutine` needs.
+    var showOnTimeline: Bool = true
+    var pinToTimeline: Bool = false
+    /// Set on a collection's Step — the collection renders it, not the day.
+    var parentRoutineId: UUID? = nil
+    var pausedUntil: Date? = nil
+    /// Every assignee (read from the row; the phone edits only `assignedTo`).
+    /// Counts toward `scope` like the web's `[assigned_to, ...assigned_to_all]`.
+    var assignedToAll: [UUID]? = nil
+    /// Who can SEE it — the only column routines RLS reads. Derived, never
+    /// chosen (ScopeRule.derive(for routine:)): pushed on INSERT, and on
+    /// UPDATE only when `scopeDirty`, exactly as for tasks. Inline defaults so
+    /// SwiftData's lightweight migration can add them to an existing store.
+    var scope: String? = nil
+    var scopeDirty: Bool = false
 
     // Sync
     var syncStatus: SyncStatus
