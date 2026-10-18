@@ -6,10 +6,11 @@ import { placementOf } from '@/lib/planning/placement'
 import { lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { timingRemoval } from '@/lib/planning/planActions'
 
-const runs: { label: string; undo?: () => Promise<boolean | void> }[] = []
+const runs: { label: string; undo?: () => Promise<boolean | void>; opts?: Record<string, unknown> }[] = []
 const run = vi.fn(async (label: string, command: () => Promise<unknown>, opts?: { undo?: () => Promise<boolean | void> }) => {
-  runs.push({ label, undo: opts?.undo })
-  return (await command()) !== false
+  const ok = (await command()) !== false
+  runs.push({ label, undo: opts?.undo, opts: opts as Record<string, unknown> })
+  return ok
 })
 vi.mock('@/contexts/CanvasActivityContext', () => ({ useCanvasActivity: () => ({ run }) }))
 
@@ -74,8 +75,10 @@ describe('useDeckActions', () => {
     const { deps, a } = setup()
     await a.keepThisWeek(card('last-week'))
     expect(deps.keepForward).toHaveBeenCalledWith('t1', { weekStart: weekAnchor }, lastWeekStart)
+    deps.keepForward.mockClear()
     await a.keepThisWeek(card('inbox', { bucket: 'inbox' }))
-    expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', 'week')
+    expect(deps.keepForward).toHaveBeenCalledWith('t1', { weekStart: weekAnchor }, undefined)
+    expect(deps.gated.setBucket).not.toHaveBeenCalled()
   })
 
   it('later next-week clears the day, keeps forward to next week; undo restores placement', async () => {
@@ -94,17 +97,40 @@ describe('useDeckActions', () => {
     expect(deps.keepForward).toHaveBeenCalledWith('t1', { weekStart: nextWeekStart }, lastWeekStart)
   })
 
-  it('later buckets go through applyTriageWhen; undo restores placementOf', async () => {
+  const withMonth = (over: Partial<Task> = {}) => ({
+    bucket: 'month', monthStart: new Date(2026, 9, 1),
+    commitments: [{ id: 'c1', level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }],
+    ...over,
+  }) as Partial<Task>
+
+  it.each([
+    ['this-month', 'month'], ['this-season', 'quarter'], ['someday', 'someday'],
+  ] as const)('later %s sets the bucket; undo restores commitments when the task has them', async (when, bucket) => {
     const { deps, a } = setup()
-    const c = card('inbox', { bucket: 'inbox' })
-    await a.later(c, 'this-month')
-    expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', 'month')
+    const c = card('last-week', withMonth())
+    await a.later(c, when)
+    expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', bucket)
+    await runs[0].undo!()
+    expect(deps.updateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ commitments: expect.arrayContaining([expect.objectContaining({ level: 'month' })]) }))
+  })
+
+  it('later undo uses placementOf when the task has no live commitments', async () => {
+    const { deps, a } = setup()
+    const c = card('inbox', { bucket: 'inbox', commitments: [] })
     await a.later(c, 'someday')
-    expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', 'someday')
-    await a.later(c, 'next-month')
-    expect(deps.gated.pushTask).toHaveBeenCalled()
     await runs[0].undo!()
     expect(deps.onUpdateTask).toHaveBeenCalledWith('t1', placementOf(c.task))
+  })
+
+  it('later next-month commits to the month via keepForward, no date on the 1st', async () => {
+    const { deps, a } = setup()
+    const c = card('this-week', withMonth())
+    await a.later(c, 'next-month')
+    const now = new Date()
+    expect(deps.keepForward).toHaveBeenCalledWith('t1', { monthStart: new Date(now.getFullYear(), now.getMonth() + 1, 1) }, weekAnchor)
+    expect(deps.gated.pushTask).not.toHaveBeenCalled()
+    await runs[0].undo!()
+    expect(deps.updateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ commitments: expect.any(Array) }))
   })
 
   it('laterOnDate pushes to the date', async () => {
@@ -112,6 +138,9 @@ describe('useDeckActions', () => {
     const d = new Date(2026, 10, 3)
     await a.laterOnDate(card('inbox'), d)
     expect(deps.gated.pushTask).toHaveBeenCalledWith('t1', d)
+    await a.laterOnDate(card('this-week', withMonth()), d)
+    await runs[1].undo!()
+    expect(deps.updateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ commitments: expect.any(Array) }))
   })
 
   it('letGo: week cards remove timing, inbox goes to someday', async () => {
@@ -126,16 +155,34 @@ describe('useDeckActions', () => {
     expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', 'someday')
   })
 
-  it('drain is one run, sets someday for each, undo restores placements', async () => {
+  it('drain: one run, ungated onUpdateTask, undo restores', async () => {
     const { deps, a } = setup()
-    const ts = [mk({ id: 'a' }), mk({ id: 'b', bucket: 'inbox' })]
-    await a.drain(ts)
+    const ts = [mk({ id: 'a' }), mk({ id: 'b', bucket: 'inbox' }), mk({ id: 'c', ...withMonth() })]
+    expect(await a.drain(ts)).toBe(true)
     expect(run).toHaveBeenCalledTimes(1)
-    expect(runs[0].label).toBe('Move 2 untouched things to Later')
-    expect(deps.gated.setBucket).toHaveBeenCalledWith('a', 'someday')
-    expect(deps.gated.setBucket).toHaveBeenCalledWith('b', 'someday')
+    expect(runs[0].label).toBe('Move 3 untouched things to Later')
+    for (const id of ['a', 'b', 'c']) expect(deps.onUpdateTask).toHaveBeenCalledWith(id, { bucket: 'someday' })
+    expect(deps.gated.setBucket).not.toHaveBeenCalled()
     await runs[0].undo!()
     expect(deps.onUpdateTask).toHaveBeenCalledWith('a', placementOf(ts[0]))
-    expect(deps.onUpdateTask).toHaveBeenCalledWith('b', placementOf(ts[1]))
+    expect(deps.updateTask).toHaveBeenCalledWith('c', expect.objectContaining({ commitments: expect.any(Array) }))
+  })
+
+  it('drain with one failing write still succeeds; undo covers only the ones that wrote', async () => {
+    const { deps, a } = setup()
+    deps.onUpdateTask.mockImplementation(async (id: string) => id !== 'b')
+    const ts = [mk({ id: 'a' }), mk({ id: 'b' }), mk({ id: 'c' })]
+    expect(await a.drain(ts)).toBe(true)
+    expect(runs[0].opts).toMatchObject({ failureSummary: "1 couldn't move" })
+    deps.onUpdateTask.mockClear()
+    await runs[0].undo!()
+    const undone = deps.onUpdateTask.mock.calls.map((c) => c[0])
+    expect(undone.sort()).toEqual(['a', 'c'])
+  })
+
+  it('drain where every write fails returns false', async () => {
+    const { deps, a } = setup()
+    deps.onUpdateTask.mockImplementation(async () => false)
+    expect(await a.drain([mk({ id: 'a' })])).toBe(false)
   })
 })
