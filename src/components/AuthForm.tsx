@@ -1,14 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { WAITLIST_URL } from '@/lib/signupGate'
+import { SUPPORT_EMAIL, readAuthEmailFlow, type AuthCallbackError } from '@/lib/authCallback'
+import { EmailLinkProblem } from '@/components/auth/EmailLinkProblem'
 
 interface AuthFormProps {
   /** A banner shown above the form fields — e.g. after a session ended
    *  unexpectedly, so the sign-in card explains why the user landed here. */
   message?: string
+  /** An email link that came back broken (read from the URL by AuthGate).
+   *  When set, the card explains it first and offers a way forward. */
+  callbackError?: AuthCallbackError
 }
 
-export function AuthForm({ message }: AuthFormProps = {}) {
+export function AuthForm({ message, callbackError }: AuthFormProps = {}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
@@ -26,14 +31,42 @@ export function AuthForm({ message }: AuthFormProps = {}) {
   // The invite gate is not a fault the user can retry away, so it reads as
   // an explanation with a way forward rather than a red failure.
   const [inviteOnly, setInviteOnly] = useState(false)
+  // A sign-up failure we can't explain: offer support rather than a guess.
+  const [unexpected, setUnexpected] = useState(false)
   const [loading, setLoading] = useState(false)
-  const { signInWithEmail, signUpWithEmail, resetPassword } = useAuth()
+  // The broken-link explanation, until the user moves on to sign in.
+  const [linkProblem, setLinkProblem] = useState<AuthCallbackError | null>(callbackError ?? null)
+  // Which kind of email this browser last asked for (confirmation or reset):
+  // an expired link of either kind arrives as the same otp_expired.
+  const [linkFlow] = useState(() => readAuthEmailFlow())
+  const emailRef = useRef<HTMLInputElement>(null)
+  const focusEmailRef = useRef(false)
+  const { signInWithEmail, signUpWithEmail, resetPassword, resendConfirmation } = useAuth()
+
+  // Leaving the broken-link view removes the button that had focus; put the
+  // keyboard on the sign-in email field instead of dropping it on the page.
+  useEffect(() => {
+    if (!linkProblem && focusEmailRef.current) {
+      focusEmailRef.current = false
+      emailRef.current?.focus()
+    }
+  }, [linkProblem])
+
+  const leaveLinkProblem = () => {
+    focusEmailRef.current = true
+    setIsSignUp(false)
+    setIsForgotPassword(false)
+    setError(null)
+    setNotice(null)
+    setLinkProblem(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setNotice(null)
     setInviteOnly(false)
+    setUnexpected(false)
     setLoading(true)
 
     if (isForgotPassword) {
@@ -52,6 +85,7 @@ export function AuthForm({ message }: AuthFormProps = {}) {
       if (error) {
         setError(error.message)
         setInviteOnly(Boolean(error.inviteOnly))
+        setUnexpected(Boolean(error.unexpected))
       } else {
         setNotice('signup-sent')
       }
@@ -91,6 +125,17 @@ export function AuthForm({ message }: AuthFormProps = {}) {
 
         {/* Form card */}
         <div className="card p-8">
+          {linkProblem ? (
+            <EmailLinkProblem
+              problem={linkProblem}
+              email={email}
+              onEmailChange={setEmail}
+              onResend={resendConfirmation}
+              onSendReset={resetPassword}
+              initialFlow={linkFlow}
+              onSignIn={leaveLinkProblem}
+            />
+          ) : (<>
           {message && (
             <div className="mb-5 p-3 rounded-lg text-sm bg-primary-50 text-primary-700">
               {message}
@@ -106,6 +151,7 @@ export function AuthForm({ message }: AuthFormProps = {}) {
                 Email
               </label>
               <input
+                ref={emailRef}
                 id="email"
                 type="email"
                 value={email}
@@ -152,7 +198,19 @@ export function AuthForm({ message }: AuthFormProps = {}) {
 
             {error && !inviteOnly && (
               <div role="alert" className="p-3 rounded-lg text-sm bg-danger-50 text-danger-700">
-                {error}
+                {unexpected ? (
+                  <>
+                    <p>{error}</p>
+                    <a
+                      href={`mailto:${SUPPORT_EMAIL}`}
+                      className="mt-2 inline-block font-medium underline hover:no-underline"
+                    >
+                      Email {SUPPORT_EMAIL}
+                    </a>
+                  </>
+                ) : (
+                  error
+                )}
               </div>
             )}
 
@@ -255,6 +313,7 @@ export function AuthForm({ message }: AuthFormProps = {}) {
               </p>
             )}
           </div>
+          </>)}
         </div>
       </div>
     </div>
