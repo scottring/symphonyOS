@@ -163,6 +163,11 @@ interface WeekViewV2Props {
   dayCount?: number
   /** From HomeView's useUndo. Called after successful mutations to surface an undo toast. */
   pushAction?: (message: string, undo: () => void) => void
+  /** The page's own optimistic order writer (the container's
+   *  `updateTaskOrders`, `ctx.onReorderTasks` — what Today uses): the drop
+   *  shows at once, and the next drag plans from it. A null order puts a row
+   *  back to never-ordered (Undo). */
+  onReorderTasks?: (writes: { id: string; sortOrder: number | null }[]) => Promise<boolean>
 }
 
 const weekIsCurrentFor = (anchor: Date) => sameDay(anchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
@@ -209,11 +214,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
     densityTasks,
     densityEvents,
     pushAction,
+    onReorderTasks,
   } = props
 
   // Create-gesture wiring
   const navigate = useNavigate()
   const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, updateTaskOrders, pushTask, userId, keepForward } = useSupabaseTasks()
+  // Orders go through the rendered list's own writer, so a drop moves the row
+  // at once; this page's hook instance is only the fallback (its optimistic
+  // state is not what the page draws).
+  const writeOrders = onReorderTasks ?? updateTaskOrders
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember, members: familyMembers } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
@@ -875,15 +885,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
       // Drag to order within a day (Task 13): the shared sort_order Today's All
       // Day and the wall read, usually one row; Undo writes back every order
       // it changed, a never-ordered row back to never-ordered.
-      reorderTask: (t, orderedIds, toIndex) => {
-        const byId = new Map(tasks.map((x) => [x.id, x]))
-        const was = new Map(orderedIds.map((id) => [id, byId.get(id)?.sortOrder ?? null]))
+      // The orders it had are read from the day's own rows (a subtask's too).
+      reorderTask: (t, dayTasks, toIndex) => {
+        const orderedIds = dayTasks.map((x) => x.id)
+        const was = new Map(dayTasks.map((x) => [x.id, x.sortOrder ?? null]))
         const writes = reorderTasksToIndex(orderedIds, t.id, toIndex, was)
         if (writes.length === 0) return
         const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))
         const up = toIndex < orderedIds.indexOf(t.id)
-        void activity.run(`Move “${t.title}” ${up ? 'up' : 'down'}`, () => updateTaskOrders(writes), {
-          ids: writes.map((w) => w.id), undo: async () => { await updateTaskOrders(before) },
+        void activity.run(`Move “${t.title}” ${up ? 'up' : 'down'}`, () => writeOrders(writes), {
+          ids: writes.map((w) => w.id), undo: async () => { await writeOrders(before) },
         })
       },
       scheduleTask: (t, at, isAllDay) => {
@@ -895,7 +906,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, toggleTask, updateTaskOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated])
+  }, [activity, onUpdateTask, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated])
   const canvasSpans = useMemo(() => {
     const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }
     const wd = (i: number) => journalDays[i].date.toLocaleDateString('en-US', { weekday: 'short' })

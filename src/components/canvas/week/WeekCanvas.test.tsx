@@ -640,7 +640,7 @@ describe('WeekCanvas — drag to order within a day', () => {
     layOut()
     const d = lift('Charlie')
     dropAt(wedCol(), d, 45)
-    expect(w.reorderTask).toHaveBeenCalledWith(C, ['ta', 'tb', 'tc'], 1)
+    expect(w.reorderTask).toHaveBeenCalledWith(C, [A, B, C], 1)
     expect(w.moveTask).not.toHaveBeenCalled()
   })
 
@@ -659,8 +659,8 @@ describe('WeekCanvas — drag to order within a day', () => {
   it('the day then shows the new top two', () => {
     function Page() {
       const [tasks, setTasks] = useState([A, B, C])
-      const w = { ...writers(), reorderTask: (t: Task, ids: string[], to: number) => {
-        const writes = reorderTasksToIndex(ids, t.id, to, new Map(tasks.map((x) => [x.id, x.sortOrder ?? null])))
+      const w = { ...writers(), reorderTask: (t: Task, dayTasks: Task[], to: number) => {
+        const writes = reorderTasksToIndex(dayTasks.map((x) => x.id), t.id, to, new Map(dayTasks.map((x) => [x.id, x.sortOrder ?? null])))
         setTasks((was) => was.map((x) => { const hit = writes.find((wr) => wr.id === x.id); return hit ? { ...x, sortOrder: hit.sortOrder } : x }))
       } }
       return <WeekCanvas weekStart={weekStart} days={withDay(inDayOrder(tasks.map(asItem)))} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />
@@ -685,7 +685,7 @@ describe('WeekCanvas — drag to order within a day', () => {
     for (const b of events) expect(b.closest('[draggable="true"]')).toBeNull()
     layOut()
     dropAt(wedCol(), lift('Bravo'), 5)
-    expect(w.reorderTask).toHaveBeenCalledWith(B, ['ta', 'tb'], 0)
+    expect(w.reorderTask).toHaveBeenCalledWith(B, [A, B], 0)
     expect(within(within(wedCol()).getByRole('list', { name: 'Wednesday events' })).getAllByRole('button').map((b) => b.textContent))
       .toEqual(['9aDentist', '12pLunch with Sam'])
   })
@@ -725,6 +725,20 @@ describe('WeekCanvas — drag to order within a day', () => {
       expect(row).toHaveClass('is-lifted')
       fireEvent.touchEnd(document, touch(60))
       // dnd-kit takes its after-drag click guard off 50ms later.
+      act(() => { vi.advanceTimersByTime(100) })
+      expect(row).not.toHaveClass('is-lifted')
+    })
+
+    // Fix round 1: a trackpad or mouse on a touch device (the iPad's) drags
+    // after 5px, as on Today, since the browser's own drag is off there.
+    it('a mouse or trackpad on a touch device drags after a 5px move', () => {
+      const w = orderWriters()
+      render(<WeekCanvas weekStart={weekStart} days={withDay([A, B].map(asItem))} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+      const row = within(wedCol()).getByText('Alpha').closest('li')!
+      fireEvent.mouseDown(row, { button: 0, clientX: 10, clientY: 10 })
+      fireEvent.mouseMove(document, { clientX: 10, clientY: 30 })
+      expect(row).toHaveClass('is-lifted')
+      fireEvent.mouseUp(document, { clientX: 10, clientY: 30 })
       act(() => { vi.advanceTimersByTime(100) })
       expect(row).not.toHaveClass('is-lifted')
     })

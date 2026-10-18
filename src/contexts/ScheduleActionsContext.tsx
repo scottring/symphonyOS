@@ -52,9 +52,10 @@ export interface ScheduleActionsValue {
     date: Date,
     isAllDay: boolean,
   ) => Promise<string | undefined>
-  /** Persist a reorder: a different sort_order per row, one round trip. */
+  /** Persist a reorder: a different sort_order per row, one round trip. A
+   *  null order puts a row back to never-ordered (the Week page's Undo). */
   onReorderTasks?: (
-    writes: import('@/lib/today/taskOrdering').OrderWrite[],
+    writes: { id: string; sortOrder: number | null }[],
   ) => Promise<boolean>
   /**
    * Offer an undo for the action just performed. Surfaces as the toast the

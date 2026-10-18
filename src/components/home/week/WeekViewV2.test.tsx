@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
 import { render, screen, within, fireEvent, waitFor, act, cleanup, createEvent } from '@/test/test-utils'
 import { WeekViewV2 } from './WeekViewV2'
@@ -27,11 +28,9 @@ afterEach(() => { for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.re
 // The real tasks hook, with the tick's result under the test's control — the
 // Undo toast is only pushed once the write says it succeeded.
 const toggleResult = { ok: true }
-// The day's order writer (Task 13), a spy.
-const orders = vi.hoisted(() => ({ update: vi.fn(async (_w: { id: string; sortOrder: number | null }[]) => true) }))
 vi.mock('@/hooks/useSupabaseTasks', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useSupabaseTasks')>()
-  return { ...actual, useSupabaseTasks: () => ({ ...actual.useSupabaseTasks(), toggleTask: async () => toggleResult.ok, updateTaskOrders: orders.update }) }
+  return { ...actual, useSupabaseTasks: () => ({ ...actual.useSupabaseTasks(), toggleTask: async () => toggleResult.ok }) }
 })
 
 // The assistant launcher, stubbed: the page draws no walk entry of its own (calm pass 2).
@@ -370,34 +369,68 @@ describe('WeekViewV2 journal spread', () => {
   // Task 13 (Scott, 2026-10-18): the order is the priority. A drag within a
   // day writes the shared sort_order through the activity strip, and Undo
   // puts back the orders it had, never-ordered included.
-  it('dropping a task between two in its day orders it through the activity, with an Undo that restores the old orders', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
-    orders.update.mockClear()
-    const mon = new Date(2026, 8, 14)
-    const tasks = [
-      createMockTask({ id: 'a', title: 'Alpha', scheduledFor: mon, isAllDay: true, sortOrder: 0 }),
-      createMockTask({ id: 'b', title: 'Bravo', scheduledFor: mon, isAllDay: true, sortOrder: 1000 }),
-      createMockTask({ id: 'c', title: 'Charlie', scheduledFor: new Date(2026, 8, 14, 9), isAllDay: false }),
-    ]
-    render(withActivity(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} />))
-    vi.useRealTimers()
-    const day = screen.getByTestId('journal-day-2026-09-14')
-    // Ordered first, so the never-ordered timed one waits behind "+1 more".
-    fireEvent.click(within(day).getByRole('button', { name: '+1 more' }))
-    day.querySelectorAll<HTMLElement>('li[data-order-id]').forEach((li, i) => {
+  // Task 13: three tasks on Monday, two ordered and one never ordered.
+  const orderTasks = () => [
+    createMockTask({ id: 'a', title: 'Alpha', scheduledFor: new Date(2026, 8, 14), isAllDay: true, sortOrder: 0 }),
+    createMockTask({ id: 'b', title: 'Bravo', scheduledFor: new Date(2026, 8, 14), isAllDay: true, sortOrder: 1000 }),
+    createMockTask({ id: 'c', title: 'Charlie', scheduledFor: new Date(2026, 8, 14, 9), isAllDay: false }),
+  ]
+  const monCol = () => screen.getByTestId('journal-day-2026-09-14')
+  const entryTitles = () => [...monCol().querySelectorAll('.wc-items li')].map((li) => li.querySelector('.cw-title')?.textContent)
+  // Rows 40px tall, one under another; a native drag let go at clientY.
+  const dragWithin = (title: string, clientY: number) => {
+    monCol().querySelectorAll<HTMLElement>('li[data-order-id]').forEach((li, i) => {
       li.getBoundingClientRect = () => ({ top: i * 40, bottom: i * 40 + 40 }) as DOMRect
     })
     const data: Record<string, string> = {}
     const dt = { setData: (k: string, v: string) => { data[k] = v }, getData: (k: string) => data[k] ?? '', types: [] as string[], effectAllowed: '', dropEffect: '' }
-    fireEvent.dragStart(within(day).getByText('Charlie').closest('li')!, { dataTransfer: dt })
+    fireEvent.dragStart(within(monCol()).getByText(title).closest('li')!, { dataTransfer: dt })
     dt.types = Object.keys(data)
-    const drop = createEvent.drop(day, { dataTransfer: dt })
-    Object.defineProperty(drop, 'clientY', { value: 45 })
-    fireEvent(day, drop)
-    await waitFor(() => expect(orders.update).toHaveBeenCalledWith([{ id: 'c', sortOrder: 500 }]))
+    const drop = createEvent.drop(monCol(), { dataTransfer: dt })
+    Object.defineProperty(drop, 'clientY', { value: clientY })
+    fireEvent(monCol(), drop)
+  }
+
+  it('dropping a task between two in its day orders it through the activity, with an Undo that restores the old orders', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
+    const onReorderTasks = vi.fn(async (_w: { id: string; sortOrder: number | null }[]) => true)
+    render(withActivity(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={orderTasks()} onReorderTasks={onReorderTasks} />))
+    vi.useRealTimers()
+    fireEvent.click(within(monCol()).getByRole('button', { name: '+1 more' }))
+    dragWithin('Charlie', 45)
+    await waitFor(() => expect(onReorderTasks).toHaveBeenCalledWith([{ id: 'c', sortOrder: 500 }]))
     await waitFor(() => expect(screen.getByTestId('receipt')).toHaveTextContent('saved:true'))
     fireEvent.click(screen.getByRole('button', { name: 'Undo it' }))
-    await waitFor(() => expect(orders.update).toHaveBeenLastCalledWith([{ id: 'c', sortOrder: null }]))
+    await waitFor(() => expect(onReorderTasks).toHaveBeenLastCalledWith([{ id: 'c', sortOrder: null }]))
+  })
+
+  // Fix round 1: the order goes through the page's own optimistic writer
+  // (the container's updateTaskOrders), so the row moves on the drop, and a
+  // second drag right after plans from the new order, not the old props.
+  it('the drop shows at once, before the save is back, and the next drag plans from it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
+    const sent: { id: string; sortOrder: number | null }[][] = []
+    function Container() {
+      const [tasks, setTasks] = React.useState(orderTasks)
+      // As the container's updateTaskOrders: applied now, saved later (never, here).
+      const onReorderTasks = (writes: { id: string; sortOrder: number | null }[]) => {
+        sent.push(writes)
+        setTasks((was) => was.map((t) => { const w = writes.find((x) => x.id === t.id); return w ? { ...t, sortOrder: w.sortOrder } : t }))
+        return new Promise<boolean>(() => {})
+      }
+      return <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} onReorderTasks={onReorderTasks} />
+    }
+    render(withActivity(<Container />))
+    vi.useRealTimers()
+    fireEvent.click(within(monCol()).getByRole('button', { name: '+1 more' }))
+    dragWithin('Charlie', 45)
+    await waitFor(() => expect(entryTitles()).toEqual(['Alpha', 'Charlie', 'Bravo']))
+    expect(sent).toEqual([[{ id: 'c', sortOrder: 500 }]])
+    // Bravo into the gap between Alpha and Charlie: read from the new order
+    // (from the old one it would be where it already is, and write nothing).
+    dragWithin('Bravo', 45)
+    await waitFor(() => expect(sent).toEqual([[{ id: 'c', sortOrder: 500 }], [{ id: 'b', sortOrder: 250 }]]))
+    await waitFor(() => expect(entryTitles()).toEqual(['Alpha', 'Bravo', 'Charlie']))
   })
 
   // Scott, 2026-10-03: routines are always on the week (folded per day); the

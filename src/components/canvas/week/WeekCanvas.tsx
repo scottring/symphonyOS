@@ -38,7 +38,7 @@
 
 import { useContext, useState, type DragEvent, type HTMLAttributes, type ReactNode } from 'react'
 import {
-  DndContext, DragOverlay, TouchSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors,
+  DndContext, DragOverlay, MouseSensor, TouchSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragMoveEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { createPortal } from 'react-dom'
@@ -128,9 +128,9 @@ export interface WeekCanvasWriters {
   /** No day yet triage: a specific date (and time). */
   scheduleTask?: (task: Task, at: Date, isAllDay: boolean) => void
   /** Within its day, put `task` in the gap at `toIndex` of the day's tasks
-   *  (`orderedIds`, as the day reads them; `reorderTasksToIndex`'s terms).
-   *  Absent: a drop on the task's own day does nothing. */
-  reorderTask?: (task: Task, orderedIds: string[], toIndex: number) => void
+   *  (`dayTasks`, as the day reads them, with the orders they have now;
+   *  `reorderTasksToIndex`'s terms). Absent: a drop on its own day does nothing. */
+  reorderTask?: (task: Task, dayTasks: Task[], toIndex: number) => void
 }
 
 export interface WeekCanvasProps {
@@ -166,8 +166,10 @@ type Picker = { key: string } | null
 type Lift = { payload: PlanDragPayload; drag: Drag; title: string }
 
 /** Touch: press and hold, then drag (Today's TodayDragProvider constraints) —
- *  a tap still opens the row and a swipe still scrolls the page. */
+ *  a tap still opens the row and a swipe still scrolls the page. A mouse or
+ *  trackpad on a touch device drags after 5px, as on Today. */
 const TOUCH_HOLD = { delay: 250, tolerance: 5 }
+const MOUSE_MOVE = { distance: 5 }
 
 /** A day (or the No day yet line) a touch drag can land on. */
 function DropZone({ id, as: Tag = 'div', ...rest }: { id: string; as?: 'div' | 'section' } & HTMLAttributes<HTMLElement> & Record<`data-${string}`, string | undefined>) {
@@ -194,7 +196,10 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // Touch first (the iPad, the wall): rows lift on a held press instead of the
   // browser's own drag, which a long press would otherwise start too.
   const coarse = useMediaQuery('(pointer: coarse)')
-  const touchSensors = useSensors(useSensor(TouchSensor, { activationConstraint: TOUCH_HOLD }))
+  const touchSensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: MOUSE_MOVE }),
+    useSensor(TouchSensor, { activationConstraint: TOUCH_HOLD }),
+  )
   const slots = useContext(PlanMastheadSlotsContext)
   // The page's view choices, remembered on this device (calm pass 2).
   const prefs = useWeekViewPrefs()
@@ -278,9 +283,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const reorderAt = (day: CanvasDay, taskId: string, section: Element, y: number) => {
     const placed = dayTask(taskId)
     if (!placed?.item.task || placed.day.key !== day.key) return
-    const ids = taskIds(dayLists(day).all)
-    const to = gapToListIndex(gapIn(section, y), orderRows(section).map((r) => r.dataset.orderId!), ids)
-    writers.reorderTask?.(placed.item.task, ids, to)
+    const dayTasks = tasksOf(dayLists(day).all)
+    const to = gapToListIndex(gapIn(section, y), orderRows(section).map((r) => r.dataset.orderId!), dayTasks.map((t) => t.id))
+    writers.reorderTask?.(placed.item.task, dayTasks, to)
   }
   const dayDrop = (day: CanvasDay) => ({
     onDragOver: (e: DragEvent) => {
@@ -379,7 +384,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const shown = openDays.has(day.key) ? all : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
     return { all, fold, shown }
   }
-  const taskIds = (items: CanvasDayItem[]) => items.flatMap((it) => (it.task && !it.proposed ? [it.task.id] : []))
+  const tasksOf = (items: CanvasDayItem[]) => items.flatMap((it) => (it.task && !it.proposed ? [it.task] : []))
 
   // ── the shelf ──────────────────────────────────────────────────────────
   const pick = (rowKey: string, title: string, onPick: (d: Date) => void, current?: string) => (picker?.key === rowKey && (

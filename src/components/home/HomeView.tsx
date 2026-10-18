@@ -455,6 +455,7 @@ export function HomeView({
             onUpdateEvent={ctx.onUpdateEvent}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
+            onReorderTasks={ctx.onReorderTasks}
           />
         </>
       )
@@ -504,6 +505,7 @@ export function HomeView({
             onUpdateEvent={ctx.onUpdateEvent}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
+            onReorderTasks={ctx.onReorderTasks}
           />
         </>
       )
