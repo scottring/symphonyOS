@@ -203,6 +203,8 @@ function Inner() {
   const showDone = prefs.done
   const [expanded, setExpanded] = useState<string | null>(null)
   const [composer, setComposer] = useState<Composer | null>(null)
+  // Each add hands over a fresh line, so the cursor waits for the next one.
+  const [added, setAdded] = useState(0)
   // The optional "For" pick while writing a new goal (a node key, or none).
   const [forKey, setForKey] = useState('')
   const aboveOpen = !prefs.hideAbove
@@ -229,8 +231,14 @@ function Inner() {
     return () => window.removeEventListener('symphony-plan-updated', refresh)
   }, [refetch])
 
+  // Ready once the first load lands. A reload after that (every save
+  // refetches) keeps the page on screen: blanking it lost the open line and
+  // its cursor, and flashed the page, on every add.
+  const loadedOnce = useRef(false)
+  if (!loading && !goalsLoading) loadedOnce.current = true
+  const dataReady = loadedOnce.current
+
   // A conversation's saved item: bring it into view.
-  const dataReady = !loading && !goalsLoading
   useEffect(() => {
     if (!savedKey || !dataReady) return
     mainRef.current?.querySelector(`[data-plan-key="${savedKey}"]`)?.scrollIntoView?.({ block: 'center' })
@@ -573,7 +581,8 @@ function Inner() {
   const addHere = async (text: string) => {
     const id = crypto.randomUUID()
     const ok = await runCreate(level, text, forParent, `Add “${text}”${forParent ? ` for “${forParent.title}”` : ''}`, id)
-    if (ok) { reveal.current = `${level}:${id}`; closeAdd() }
+    // The line stays open for the next one; Cancel closes it.
+    if (ok) { reveal.current = `${level}:${id}`; setAdded((x) => x + 1) }
     return ok
   }
   const forPicker = level > 0 && above.length > 0 && <label className="plan-for">
@@ -767,7 +776,7 @@ function Inner() {
             <span className="plan-done-fold-text">{doneLine}</span>
             <span className="canvas-link plan-done-fold-go">{showDone ? 'Hide' : 'Show'}</span>
           </button>}
-          {adding && <InlineComposer label={`New ${periodWord} goal`} saveLabel="Add"
+          {adding && <InlineComposer key={added} label={`New ${periodWord} goal`} saveLabel="Add"
             // A goal for something above takes its life area from it.
             extra={<>{forPicker}{!forParent && area.picker}</>}
             onSave={addHere} onCancel={closeAdd} />}

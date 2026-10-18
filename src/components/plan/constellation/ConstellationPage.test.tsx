@@ -3,7 +3,7 @@ import {MemoryRouter,Routes,Route,useLocation} from 'react-router-dom'
 import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
 import {ConversationWalkContext} from '@/components/canvas/conversationWalk'
-const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),updateTaskOrders:vi.fn(),redraw:(()=>{}) as ()=>void,tasks:[] as any[],goals:[] as any[]}))
+const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),updateTaskOrders:vi.fn(),redraw:(()=>{}) as ()=>void,tasks:[] as any[],goals:[] as any[],loading:false}))
 const activity=vi.hoisted(()=>({calls:[] as {label:string;ok:boolean;opts:any}[],proposals:[] as any[],changeSet:null as any,setProposalState:vi.fn(),removeProposal:vi.fn()}))
 const launcher=vi.hoisted(()=>({openAssistant:vi.fn()}))
 const selection=vi.hoisted(()=>({setSelection:vi.fn()}))
@@ -82,7 +82,7 @@ const choose=(name:string)=>{menu();fireEvent.click(screen.getByRole(/^Show done
 const at=(d:Date)=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(d)}
 const REVIEWED={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
 beforeEach(()=>{
- vi.clearAllMocks();review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
+ vi.clearAllMocks();api.loading=false;api.refetch.mockReset();review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
  HTMLElement.prototype.scrollIntoView=vi.fn()
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
@@ -236,6 +236,33 @@ describe('the level above, folded to one line',()=>{
 })
 
 describe('writing a goal, with an optional For',()=>{
+ it.each([['Year',()=>open(),'Add a 2026 goal','New 2026 goal'],['Season',()=>season(),'Add a Fall goal','New Fall goal'],['Month',()=>month(),'Add an October goal','New October goal']] as const)(
+  '%s: after an add the page stays put and the cursor waits on an empty line for the next',async(_,show,button,field)=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month'},{id:'s',title:'Autumn outings',bucket:'quarter'}]
+  // The save reloads the lists behind the page, as the real hooks do.
+  api.refetch.mockImplementation(async()=>{api.loading=true;act(()=>api.redraw());await Promise.resolve();api.loading=false;act(()=>api.redraw())})
+  show()
+  fireEvent.click(screen.getByRole('button',{name:button}))
+  fireEvent.change(screen.getByLabelText(field),{target:{value:'First'}})
+  fireEvent.submit(screen.getByLabelText(field).closest('form')!)
+  await waitFor(()=>expect(api.refetch).toHaveBeenCalled())
+  await waitFor(()=>expect(screen.getByLabelText(field)).toHaveValue(''))
+  expect(screen.getByLabelText(field)).toHaveFocus()
+  expect(screen.queryByText('Loading your plans…')).toBeNull()
+  fireEvent.change(screen.getByLabelText(field),{target:{value:'Second'}})
+  fireEvent.submit(screen.getByLabelText(field).closest('form')!)
+  await waitFor(()=>expect(activity.calls.map(c=>c.label)).toEqual(['Add “First”','Add “Second”']))
+ })
+ it('a reload behind the page never blanks the list',()=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Add an October goal'}))
+  fireEvent.change(screen.getByLabelText('New October goal'),{target:{value:'Half-typed'}})
+  api.loading=true;act(()=>api.redraw())
+  expect(titles('October goals')).toEqual(['Picnic'])
+  expect(screen.getByLabelText('New October goal')).toHaveValue('Half-typed')
+  expect(screen.queryByText('Loading your plans…')).toBeNull()
+ })
  it('Month: one of its own takes the page area; one for a season goal is linked in the same write',async()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
   month()
@@ -245,8 +272,8 @@ describe('writing a goal, with an optional For',()=>{
   await waitFor(()=>expect(api.addTask).toHaveBeenCalledTimes(1))
   expect(api.addTask).toHaveBeenLastCalledWith('Taxes',undefined,undefined,undefined,expect.objectContaining({bucket:'month',context:'personal',monthStart:new Date(2026,9,1)}))
   expect(api.addTask.mock.calls[0][4].sourceId).toBeUndefined()
-  await waitFor(()=>expect(screen.queryByLabelText('New October goal')).not.toBeInTheDocument())
-  fireEvent.click(screen.getByRole('button',{name:'Add an October goal'}))
+  // The line stays open, empty and ready for the next one.
+  await waitFor(()=>expect(screen.getByLabelText('New October goal')).toHaveValue(''))
   fireEvent.change(screen.getByLabelText('For a Fall goal (optional)'),{target:{value:'1:s'}})
   fireEvent.change(screen.getByLabelText('New October goal'),{target:{value:'Picnic'}})
   fireEvent.click(screen.getByRole('button',{name:'Add'}))
@@ -270,7 +297,8 @@ describe('writing a goal, with an optional For',()=>{
   await screen.findByText(/Your wording is still here/)
   expect(screen.getByLabelText('New 2026 goal')).toHaveValue('A meaningful year')
   fireEvent.click(screen.getByRole('button',{name:'Add'}))
-  await waitFor(()=>expect(screen.queryByLabelText('New 2026 goal')).not.toBeInTheDocument())
+  await waitFor(()=>expect(screen.getByLabelText('New 2026 goal')).toHaveValue(''))
+  expect(screen.queryByText(/Your wording is still here/)).toBeNull()
   expect(api.addGoal).toHaveBeenLastCalledWith(null,'A meaningful year','personal',expect.objectContaining({year:2026,id:expect.any(String)}))
   expect(lastRun().opts.ids).toEqual([api.addGoal.mock.calls[1][3].id])
  })
