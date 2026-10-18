@@ -54,7 +54,7 @@ describe('PlanningNudge', () => {
     cleanup()
     render(<MemoryRouter><PlanningNudge uid="u1" only="week" /></MemoryRouter>)
     expect(screen.getByRole('status')).toHaveTextContent(/isn't planned yet/)
-    expect(screen.getByText('Plan the week →')).toHaveAttribute('href', '/week')
+    expect(screen.getByText('Plan the week →')).toHaveAttribute('href', '/week?view=alongside&date=2026-12-20&start=2026-12-20&review=1')
     expect(screen.getByText('Not now')).toBeInTheDocument()
     expect(screen.queryByText('optional')).toBeNull()
   })
