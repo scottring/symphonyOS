@@ -34,6 +34,8 @@ vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,sco
 vi.mock('../v2/AddArea',()=>({useAddArea:()=>({area:'personal',picker:null})}))
 vi.mock('@/lib/planning/periodPage',async(importOriginal)=>({...await importOriginal<any>(),selectPeriodTasks:(tasks:any[],level:string,start:Date)=>tasks.filter(t=>t.bucket===(level==='season'?'quarter':'month')&&(!t.monthStart||+t.monthStart===+start))}))
 vi.mock('@/lib/placement/model',async(importOriginal)=>({...await importOriginal<any>(),committedTo:(t:any)=>t.bucket==='week'?{}:undefined}))
+const toast=vi.hoisted(()=>({showToast:vi.fn()}))
+vi.mock('@/hooks/useToast',async(importOriginal)=>({...await importOriginal<any>(),showToast:toast.showToast}))
 vi.mock('@/components/domain/DomainGate',()=>({useDomainGate:()=>({requireDomain:vi.fn().mockResolvedValue('personal')})}))
 
 // Year, Season and Month, one page shape (2026-10-13): the period's goals as
@@ -132,7 +134,7 @@ describe('one plain list',()=>{
   expect(screen.queryAllByRole('region').filter(r=>/^Under /.test(r.getAttribute('aria-label')??''))).toHaveLength(0)
   // Linked: what it is for, and what is under it one horizon down, by name.
   expect(row('Unhurried weekends')).toHaveTextContent('For Together')
-  expect(row('Unhurried weekends')).toHaveTextContent('October: Picnic · Leaf pile')
+  expect(row('Unhurried weekends').querySelector('.plan-item-below')).toHaveTextContent(/^In October: Picnic · Leaf pile$/)
   // On its own: nothing more is said.
   expect(row('Fix the gate').querySelector('.plan-item-parent')).toBeNull()
   expect(row('Fix the gate').querySelector('.plan-item-below')).toBeNull()
@@ -958,11 +960,40 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
   api.goals=[{...GOALS[0],sortOrder:0},{...GOALS[1],sortOrder:1000},{id:'h',name:'Home',year:2026,status:'active',context:'personal',sortOrder:2000}]
   open()
   dragTo('Home','2026 goals',5)
-  await waitFor(()=>expect(api.updateGoal).toHaveBeenCalledWith('h',{sortOrder:-1000}))
+  await waitFor(()=>expect(api.updateGoal).toHaveBeenCalledWith('h',{sortOrder:-1000},{quiet:true}))
   await waitFor(()=>expect(lastRun()?.label).toBe('Move “Home” up'))
   await lastRun().opts.undo()
-  expect(api.updateGoal).toHaveBeenLastCalledWith('h',{sortOrder:2000})
+  expect(api.updateGoal).toHaveBeenLastCalledWith('h',{sortOrder:2000},{quiet:true})
   expect(api.updateTaskOrders).not.toHaveBeenCalled()
+ })
+ // Goals made in one area share an order, so the first drag renumbers them.
+ const tied=()=>[{...GOALS[0],sortOrder:0},{...GOALS[1],sortOrder:0},{id:'h',name:'Home',year:2026,status:'active',context:'personal',sortOrder:0}]
+ it('a renumber of year goals, and its Undo, writes every goal back',async()=>{
+  api.goals=tied()
+  open()
+  dragTo('Home','2026 goals',45)
+  await waitFor(()=>expect(lastRun()?.label).toBe('Move “Home” up'))
+  expect(lastRun().ok).toBe(true)
+  expect(api.updateGoal.mock.calls).toEqual([['g',{sortOrder:0},{quiet:true}],['h',{sortOrder:1000},{quiet:true}],['other',{sortOrder:2000},{quiet:true}]])
+  api.updateGoal.mockClear()
+  expect(await lastRun().opts.undo()).toBe(true)
+  expect(api.updateGoal.mock.calls).toEqual([['g',{sortOrder:0},{quiet:true}],['h',{sortOrder:0},{quiet:true}],['other',{sortOrder:0},{quiet:true}]])
+ })
+ it('a refused year-goal write rolls back the ones already written, says so, and the page stays',async()=>{
+  api.goals=tied()
+  api.updateGoal.mockImplementation(async(id:string,u:any)=>!(id==='other'&&u.sortOrder===2000))
+  open()
+  dragTo('Home','2026 goals',45)
+  await waitFor(()=>expect(lastRun()?.label).toBe('Move “Home” up'))
+  expect(lastRun().ok).toBe(false)
+  // Written one at a time; the refusal stops it, and h and g go back.
+  expect(api.updateGoal.mock.calls).toEqual([
+   ['g',{sortOrder:0},{quiet:true}],['h',{sortOrder:1000},{quiet:true}],['other',{sortOrder:2000},{quiet:true}],
+   ['h',{sortOrder:0},{quiet:true}],['g',{sortOrder:0},{quiet:true}],
+  ])
+  expect(toast.showToast).toHaveBeenCalledWith('Couldn’t save the new order','warning')
+  expect(screen.queryByText(/Plans could not load/)).toBeNull()
+  expect(titles('2026 goals')).toEqual(['Together','Health','Home'])
  })
  it('a row that drags still triages from its row, and a done line does not drag',async()=>{
   api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]

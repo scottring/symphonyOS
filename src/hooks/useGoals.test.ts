@@ -74,8 +74,8 @@ vi.mock('@/lib/supabase', () => ({
           },
           update: (payload: Record<string, unknown>) => ({
             eq: (_field: string, id: unknown) => {
-              updateMock(id, payload)
-              return Promise.resolve({ error: null })
+              // A test can refuse a write: updateMock.mockReturnValueOnce({ error }).
+              return Promise.resolve(updateMock(id, payload) ?? { error: null })
             },
           }),
           insert: (row: Record<string, unknown>) => {
@@ -247,5 +247,33 @@ describe('useGoals: assigning a year goal', () => {
     result = await load(dbGoal({ id: 'goal-1', assigned_to_all: [], scope: 'individual', context: 'personal' }))
     await act(async () => { await result.current.updateGoal('goal-1', { context: 'family' }) })
     expect(updateMock).toHaveBeenLastCalledWith('goal-1', { context: 'family', scope: 'compound' })
+  })
+})
+
+// A reorder reports its own refusals (ConstellationPage's writer rolls its
+// siblings back and says so): quiet, a refused write rolls back and answers
+// false without raising the hook's error, which a page reads as "could not load".
+describe('useGoals: a quiet write', () => {
+  beforeEach(() => { updateMock.mockReset() })
+  const load = async () => {
+    goalRows = [dbGoal({ sort_order: 5 })]
+    const { result } = renderHook(() => useGoals())
+    await waitFor(() => expect(result.current.goals).toHaveLength(1))
+    return result
+  }
+  it('refused and quiet: rolled back, false, and no error', async () => {
+    const result = await load()
+    updateMock.mockReturnValueOnce({ error: { message: 'refused' } })
+    let ok: boolean | void = true
+    await act(async () => { ok = await result.current.updateGoal('goal-1', { sortOrder: 9 }, { quiet: true }) })
+    expect(ok).toBe(false)
+    expect(result.current.goals[0].sortOrder).toBe(5)
+    expect(result.current.error).toBeNull()
+  })
+  it('refused without it: the error is raised as before', async () => {
+    const result = await load()
+    updateMock.mockReturnValueOnce({ error: { message: 'refused' } })
+    await act(async () => { await result.current.updateGoal('goal-1', { sortOrder: 9 }) })
+    expect(result.current.error).toBe('refused')
   })
 })

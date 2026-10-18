@@ -72,7 +72,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { compareSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
-import { FoldToggle, PlanOrderList, useFold, type RowOrder } from './PlanOrderList'
+import { FoldToggle, PlanOrderList, type RowOrder } from './PlanOrderList'
+import { useFold } from './useFold'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { periodMoves } from './horizonPanel'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
@@ -128,6 +129,8 @@ function Inner() {
   // Someday asks for a domain first on an Unsorted item, as every triage does.
   const gated = useGatedTaskActions({ updateTask, pushTask, setBucket, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const activity = useCanvasActivity()
+  const updateGoalRef = useRef(updateGoal)
+  useEffect(() => { updateGoalRef.current = updateGoal }, [updateGoal])
   const { openAssistant } = useAssistantLauncher()
   const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember, members } = useFamilyMembers(), { seasons } = useHouseholdSeasons()
   const { user } = useAuth()
@@ -455,10 +458,12 @@ function Inner() {
   const belowLabel = level === 2 ? (thisWeek ? 'This week' : `Week of ${week.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)
     : level === 1 ? monthWord : seasonWord
   const belowOf = (node: PlanNode) => allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && isOpen(n)).map((n) => n.title)
-  // Year names no season goals, it counts them: "In Fall: 3 goals".
+  // "In October: Picnic · Leaf pile" on Season; Year names no season goals,
+  // it counts them: "In Fall: 3 goals"; Month keeps "This week: …".
   const belowFor = (node: PlanNode) => {
     const titles = belowOf(node)
-    return level === 0 ? { label: `In ${seasonWord}`, titles: titles.length ? [goalCount(titles.length)] : [] } : { label: belowLabel, titles }
+    return level === 0 ? { label: `In ${seasonWord}`, titles: titles.length ? [goalCount(titles.length)] : [] }
+      : level === 1 ? { label: `In ${monthWord}`, titles } : { label: belowLabel, titles }
   }
 
   // ---- The review by hand (Scott, 2026-10-17) ---------------------------------
@@ -484,8 +489,24 @@ function Inner() {
   // ---- Drag to order (calm pass, 2026-10-18) ---------------------------------
   // The gap a line was dropped in, as Week's day order does: usually one
   // write; Undo writes back every order it changed.
-  const writeGoalOrders = async (writes: readonly { id: string; sortOrder: number }[]) =>
-    (await Promise.all(writes.map((w) => updateGoal(w.id, { sortOrder: w.sortOrder })))).every((ok) => ok !== false)
+  // Year goals write one at a time, quietly (a refusal never reads as the
+  // page failing to load); one refused rolls back those already written and
+  // says so, as the task path does, so a renumber is never left half-done.
+  // The latest writer, so an Undo pressed later rolls back to the goals as
+  // they are then, not as they were at the drop.
+  const writeGoalOrders = async (writes: readonly { id: string; sortOrder: number }[], was: ReadonlyMap<string, number | null>): Promise<boolean> => {
+    const write = (id: string, sortOrder: number) => updateGoalRef.current(id, { sortOrder }, { quiet: true })
+    const written: string[] = []
+    for (const w of writes) {
+      if ((await write(w.id, w.sortOrder)) === false) {
+        for (const id of written.reverse()) await write(id, was.get(id) ?? 0)
+        showToast('Couldn’t save the new order', 'warning')
+        return false
+      }
+      written.push(w.id)
+    }
+    return true
+  }
   const reorderLine = (id: string, orderedIds: string[], toIndex: number) => {
     const node = openNodes.find((n) => n.id === id)
     if (!node) return
@@ -497,7 +518,8 @@ function Inner() {
     const opts = { ids: writes.map((w) => w.id) }
     if (node.goal) {
       const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? 0 }))
-      void activity.run(label, () => writeGoalOrders(writes), { ...opts, undo: async () => writeGoalOrders(before) })
+      const after = new Map(writes.map((w) => [w.id, w.sortOrder]))
+      void activity.run(label, () => writeGoalOrders(writes, was), { ...opts, undo: async () => writeGoalOrders(before, after) })
     } else {
       const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))
       void activity.run(label, () => updateTaskOrders(writes), { ...opts, undo: async () => updateTaskOrders(before) })
