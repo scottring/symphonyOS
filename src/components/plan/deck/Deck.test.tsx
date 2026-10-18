@@ -33,8 +33,8 @@ const stripDays: StripDay[] = Array.from({ length: 7 }, (_, i) => {
     date,
     label: `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${date.getDate()}`,
     isWeekend: i < 2,
-    lines: i === 0 ? ['Soccer, 9:30', 'Groceries', 'Birthday party', 'Clean the garage'] : [],
-    more: i === 0 ? 1 : 0,
+    lines: i === 0 ? ['Soccer, 9:30', 'Groceries', 'Birthday party'] : [],
+    more: i === 0 ? 2 : 0,
   }
 })
 
@@ -147,8 +147,10 @@ describe('Reveals', () => {
   })
 
   it('Pick a date… calls laterOnDate with the local date', async () => {
+    vi.setSystemTime(new Date(2026, 9, 18, 15))
     const { props } = setup()
     tap('Later')
+    expect(screen.getByLabelText('Pick a date…')).toHaveAttribute('min', '2026-10-18')
     fireEvent.change(screen.getByLabelText('Pick a date…'), { target: { value: '2026-11-03' } })
     await settle()
     expect(props.actions.laterOnDate).toHaveBeenCalledWith(props.cards[0], new Date(2026, 10, 3))
@@ -167,6 +169,22 @@ describe('Reveals', () => {
     expect(props.actions.letGo).toHaveBeenCalledWith(props.cards[1])
     expect(screen.getByRole('img', { name: 'let go — let go' })).toBeInTheDocument()
   })
+
+  it('Pick a date… ignores partial, impossible and past values; today is allowed', async () => {
+    vi.setSystemTime(new Date(2026, 9, 18, 15))
+    const { props } = setup()
+    tap('Later')
+    const input = screen.getByLabelText('Pick a date…')
+    for (const value of ['0002-11-03', '2026-02-31', '2026-10-17', '']) {
+      fireEvent.change(input, { target: { value } })
+      await settle()
+    }
+    expect(props.actions.laterOnDate).not.toHaveBeenCalled()
+    expect(screen.queryByRole('img')).toBeNull()
+    fireEvent.change(input, { target: { value: '2026-10-18' } })
+    await settle()
+    expect(props.actions.laterOnDate).toHaveBeenCalledWith(props.cards[0], new Date(2026, 9, 18))
+  })
 })
 
 describe('After a choice', () => {
@@ -179,6 +197,52 @@ describe('After a choice', () => {
     expect(title()).toBe('Task c1')
     act(() => { vi.advanceTimersByTime(150) })
     expect(title()).toBe('Task c2')
+    expect(screen.queryByRole('img')).toBeNull()
+  })
+
+  it('holds the card while its optimistic save is in flight', async () => {
+    const cards = cardsOf(3)
+    let resolve!: (ok: boolean) => void
+    const actions = { ...mockActions(), done: vi.fn(() => new Promise<boolean>((r) => { resolve = r })) }
+    const { rerender } = setup({ cards, actions })
+    tap('Done')
+    // The writer marks the task completed before the save settles.
+    rerender({ cards: [{ ...cards[0], task: { ...cards[0].task, completed: true } }, cards[1], cards[2]], actions })
+    expect(title()).toBe('Task c1')
+    expect(screen.getByText('1 of 3')).toBeInTheDocument()
+    await act(async () => { resolve(true) })
+    expect(title()).toBe('Task c1')
+    expect(screen.getByRole('img', { name: 'done — done' })).toBeInTheDocument()
+    hold()
+    expect(title()).toBe('Task c2')
+  })
+
+  it('the last card never flashes the empty screen mid-save', async () => {
+    const cards = cardsOf(1)
+    let resolve!: (ok: boolean) => void
+    const actions = { ...mockActions(), done: vi.fn(() => new Promise<boolean>((r) => { resolve = r })) }
+    const { rerender } = setup({ cards, actions })
+    tap('Done')
+    rerender({ cards: [{ ...cards[0], task: { ...cards[0].task, completed: true } }], actions })
+    expect(screen.queryByText('Nothing left without a home')).toBeNull()
+    expect(title()).toBe('Task c1')
+    await act(async () => { resolve(true) })
+    expect(screen.queryByText('Nothing left without a home')).toBeNull()
+    hold()
+    expect(screen.getByRole('heading', { name: 'Nothing left without a home' })).toBeInTheDocument()
+  })
+
+  it('a failed optimistic save that rolls back keeps the card', async () => {
+    const cards = cardsOf(2)
+    let resolve!: (ok: boolean) => void
+    const actions = { ...mockActions(), done: vi.fn(() => new Promise<boolean>((r) => { resolve = r })) }
+    const { rerender } = setup({ cards, actions })
+    tap('Done')
+    rerender({ cards: [{ ...cards[0], task: { ...cards[0].task, completed: true } }, cards[1]], actions })
+    rerender({ cards, actions }) // rolled back
+    await act(async () => { resolve(false) })
+    hold()
+    expect(title()).toBe('Task c1')
     expect(screen.queryByRole('img')).toBeNull()
   })
 
@@ -304,13 +368,22 @@ describe('Empty deck', () => {
 })
 
 describe('WeekStrip', () => {
+  it('shows +more from `more` alone, and never more than 3 lines', () => {
+    const days = stripDays.map((d, i) => (i === 0 ? { ...d, lines: ['a', 'b', 'c', 'd'], more: 1 } : d))
+    render(<WeekStrip days={days} onPick={vi.fn()} onNoDay={vi.fn()} />)
+    const sat = screen.getByRole('button', { name: /^Sat 24/ })
+    expect(within(sat).queryByText('d')).toBeNull()
+    expect(within(sat).getByText('+1 more')).toBeInTheDocument()
+  })
+
   it('shows seven tiles, at most 3 lines each, then +more', () => {
     const onPick = vi.fn()
     const onNoDay = vi.fn()
     render(<WeekStrip days={stripDays} onPick={onPick} onNoDay={onNoDay} />)
     const sat = screen.getByRole('button', { name: /^Sat 24/ })
     expect(within(sat).getByText('Soccer, 9:30')).toBeInTheDocument()
-    expect(within(sat).queryByText('Clean the garage')).toBeNull()
+    expect(within(sat).getByText('Birthday party')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^(Sat|Sun|Mon|Tue|Wed|Thu|Fri) \d+/ })).toHaveLength(7)
     expect(within(sat).getByText('+2 more')).toBeInTheDocument()
     fireEvent.click(sat)
     expect(onPick).toHaveBeenCalledWith(SAT)
