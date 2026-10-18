@@ -17,6 +17,12 @@ import { onThreadRead } from '@/lib/discussions/readSignal'
 import { buildInboxRows, type InboxRow, type InboxSession } from '@/lib/discussions/inbox'
 import type { WaitingMember } from '@/lib/discussions/waiting'
 
+// Monotonic suffix so every hook instance gets its own realtime channel topic
+// (as useSupabaseTasks does). One shared 'discussions-inbox' topic made the
+// second instance's subscribe fail, and unmounting any instance removed the
+// channel the others were listening on.
+let discussionsChannelSeq = 0
+
 type InboxLoad = { sessions: InboxSession[]; reads: Array<{ session_id: string; last_read_at: string }>; people: WaitingMember[] }
 
 // The three reads, together and shared (2026-10-18). Each instance — the top
@@ -77,7 +83,7 @@ export function useDiscussionInbox({ defer = false }: { defer?: boolean } = {}) 
     if (defer) void afterPageData().then(() => { if (live) void reload() })
     else void reload()
     const channel = supabase
-      .channel('discussions-inbox')
+      .channel(`discussions-inbox-${++discussionsChannelSeq}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'chat_sessions' },

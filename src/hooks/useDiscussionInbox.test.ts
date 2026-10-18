@@ -7,6 +7,7 @@ const db = vi.hoisted(() => ({
   realtime: { filter: null as unknown, cb: null as null | (() => void) },
   calls: [] as string[],
   hold: null as null | Promise<void>,
+  channels: [] as string[],
 }))
 
 vi.mock('@/lib/supabase', () => {
@@ -26,7 +27,8 @@ vi.mock('@/lib/supabase', () => {
     getAuthUser: async () => ({ data: { user: { id: 'u1' } }, error: null }),
     supabase: {
       from: (name: string) => { db.calls.push(name); return name === 'chat_sessions' ? table(() => db.sessions) : table(() => db.reads) },
-      channel: () => {
+      channel: (name: string) => {
+        db.channels.push(name)
         const ch = {
           on: (_e: string, filter: unknown, cb: () => void) => { db.realtime = { filter, cb }; return ch },
           subscribe: () => ch,
@@ -53,8 +55,19 @@ describe('useDiscussionInbox', () => {
     db.realtime = { filter: null, cb: null }
     db.calls = []
     db.hold = null
+    db.channels = []
     __resetSharedRequests()
     __resetLoadPriority(false)
+  })
+
+  it('gives every instance its own realtime channel topic', () => {
+    // A shared topic: the second subscribe fails and any unmount silences the
+    // rest (the top bar badge, Today, Home and item labels all mount this).
+    const a = renderHook(() => useDiscussionInbox())
+    const b = renderHook(() => useDiscussionInbox())
+    expect(db.channels).toHaveLength(2)
+    expect(new Set(db.channels).size).toBe(2)
+    a.unmount(); b.unmount()
   })
 
   it('instances mounting together share one load, its three reads asked at once', async () => {
