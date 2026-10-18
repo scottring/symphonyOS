@@ -206,8 +206,7 @@ existing Undo and its matching stamp:
 
 **Every triage card shows the same four buttons and nothing else at first: Done ·
 This week · Later · Let go** (Scott, 2026-10-18, on seeing the Inbox's twelve
-when-chips on one card: "are you KIDDING"). This week opens the days (plus "No day
-yet"). Later opens Next week, This month, Next month, This season, Someday and Pick a
+when-chips on one card: "are you KIDDING"). This week opens **the week strip**: seven small day tiles showing what is already on each day (events and tasks, up to three lines, then "+N more"), plus "No day yet". Tapping a tile places the item there, and it appears in that tile for the rest of the session (Scott, 2026-10-18: "dont' we need to be able to see the week's current commitments?"). Later opens Next week, This month, Next month, This season, Someday and Pick a
 date. The month tiles keep their own verbs, but they too sit behind a tap. A card
 never shows more than four choices before one is tapped.
 
