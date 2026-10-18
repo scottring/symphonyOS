@@ -18,7 +18,10 @@ const DAY_MS = 86_400_000
 function onAWeek(t: Task): boolean {
   const live = liveCommitments({ commitments: bootstrapCommitments(t) })
   if (live.some((c) => c.level === 'week' && c.status === 'open')) return true
-  return t.bucket === 'week' && live.length === 0 && !t.weekStart
+  // Judge "legacy" by the absence of stored records, not of bootstrapped ones:
+  // a month/season stamp bootstraps a commitment, yet the Week page still shows
+  // the row on the current week.
+  return t.bucket === 'week' && !t.commitments?.length && !t.weekStart
 }
 
 export function staleForDrain(tasks: Task[], now: Date, afterDays = DRAIN_AFTER_DAYS): Task[] {
