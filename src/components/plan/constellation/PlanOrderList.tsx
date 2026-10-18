@@ -1,10 +1,8 @@
 // src/components/plan/constellation/PlanOrderList.tsx
 //
 // The period's lines as a compact card (calm pass, mockup approved
-// 2026-10-18): the list never runs off the page. The first 8 show, then
-// "+N more", which opens in place, with "Show less" to fold it again — the
-// Week's fold (foldDay) with room for 8. A line Symphony is pointing at stays
-// in sight.
+// 2026-10-18): the list never runs off the page — 8, then "+N more"
+// (useFold). A line Symphony is pointing at stays in sight.
 //
 // The order is the priority, as on the Week (Task 13): an open line drops
 // into the gap between two lines (dayReorder's gap maths). The desk drags
@@ -18,12 +16,9 @@ import {
   type DragEndEvent, type DragMoveEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { createPortal } from 'react-dom'
-import { foldDay } from '@/lib/week/foldDay'
 import { gapAt, gapToListIndex } from '@/lib/week/dayReorder'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-
-/** Lines a compact list (and the card beside it) shows before "+N more". */
-export const LIST_SHOWN = 8
+import { useFold, type FoldToggleState } from './useFold'
 
 // The Week's constraints (WeekCanvas): a held press on touch, a 5px move for
 // a mouse or trackpad on a touch device.
@@ -38,18 +33,8 @@ export interface RowOrder {
   liProps: HTMLAttributes<HTMLLIElement> & { ref?: Ref<HTMLLIElement>; 'data-order-id'?: string }
 }
 
-/** The first `cap` of `items` (pinned ones kept in sight), or all once opened. */
-export function useFold<T>(items: T[], pinned: (t: T) => boolean = () => false, cap = LIST_SHOWN) {
-  const [open, setOpen] = useState(false)
-  const fold = foldDay(items.map((it) => ({ event: false, pinned: pinned(it), it })), cap)
-  const shown = open ? items : fold.shown.map((x) => x.it)
-  const toggle = items.length > cap && (open || fold.hidden > 0)
-    ? { label: open ? 'Show less' : `+${fold.hidden} more`, open, onClick: () => setOpen((o) => !o) }
-    : null
-  return { shown, toggle }
-}
-
-export function FoldToggle({ toggle, className = '' }: { toggle: ReturnType<typeof useFold>['toggle']; className?: string }) {
+/** "+N more" / "Show less", when the list folds. */
+export function FoldToggle({ toggle, className = '' }: { toggle: FoldToggleState | null; className?: string }) {
   if (!toggle) return null
   return <button type="button" className={`canvas-link plan-more ${className}`.trim()} aria-expanded={toggle.open} onClick={toggle.onClick}>{toggle.label}</button>
 }
