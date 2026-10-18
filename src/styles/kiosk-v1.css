@@ -555,3 +555,43 @@
 .is-v1 .kw-day-n { font: 400 calc(46 * var(--p)) / 1 var(--kw-serif); margin-bottom: calc(6 * var(--p)); }
 .is-v1 .kw-de-none, .is-v1 .kw-de-more { font-size: calc(20 * var(--p)); color: var(--kw-muted); }
 .is-v1 .kw-de-none { font-style: italic; }
+
+/* ---- Stickies on Home (Scott, 2026-10-18) --------------------------------
+   The house's notes pinned in the top band between the date and the weather,
+   one line of them: a sticky that doesn't fit wraps out of sight. */
+.is-v1 .kw-band-stickies { display: flex; justify-content: center; min-width: 0; align-self: stretch; align-items: center; }
+.is-v1 .kw-stickies { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 calc(20 * var(--p)); height: calc(96 * var(--p)); overflow: hidden; margin: 0; padding: 0 calc(8 * var(--p)); list-style: none; min-width: 0; }
+.is-v1 .kw-stickies li { display: flex; align-items: center; height: calc(96 * var(--p)); }
+.is-v1 .kw-sticky {
+  display: flex; flex-direction: column; justify-content: center; width: calc(290 * var(--p)); height: calc(84 * var(--p)); padding: calc(10 * var(--p)) calc(18 * var(--p));
+  border: 0; border-radius: calc(4 * var(--p)); background: var(--kw-note); color: var(--kw-note-ink); text-align: left; font: inherit;
+  transform: rotate(var(--tilt, 0deg)); box-shadow: 0 calc(4 * var(--p)) calc(10 * var(--p)) rgba(40, 32, 10, .14);
+}
+.is-v1 .kw-sticky:active { transform: rotate(var(--tilt, 0deg)) scale(.97); }
+.is-v1 .kw-sticky span { font-size: calc(22 * var(--p)); font-weight: 500; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.is-v1 .kw-sticky small { font-size: calc(20 * var(--p)); font-weight: 400; opacity: .7; }
+
+/* A sticky to write on. */
+.is-v1 .kw-sticky-over { position: absolute; z-index: 20; inset: 0; display: grid; place-items: center; background: rgba(20, 28, 26, .38); }
+.is-v1 .kw-sticky-new {
+  width: calc(880 * var(--p)); display: flex; flex-direction: column; gap: calc(26 * var(--p)); padding: calc(44 * var(--p)) calc(48 * var(--p));
+  border-radius: calc(8 * var(--p)); background: var(--kw-note); color: var(--kw-note-ink); transform: rotate(-.6deg);
+  box-shadow: 0 calc(20 * var(--p)) calc(60 * var(--p)) rgba(20, 16, 4, .3);
+}
+.is-v1 .kw-sticky-new textarea {
+  width: 100%; resize: none; border: 0; border-bottom: 2px solid color-mix(in srgb, var(--kw-note-ink) 25%, transparent); background: transparent;
+  color: var(--kw-note-ink); font: 500 calc(44 * var(--p)) / 1.25 var(--kw-sans); outline: none; padding: 0 0 calc(10 * var(--p));
+}
+.is-v1 .kw-sticky-new textarea::placeholder { color: color-mix(in srgb, var(--kw-note-ink) 38%, transparent); }
+.is-v1 .kw-sticky-from { display: flex; flex-wrap: wrap; align-items: center; gap: calc(12 * var(--p)); }
+.is-v1 .kw-sticky-from .kw-eyebrow { color: color-mix(in srgb, var(--kw-note-ink) 65%, transparent); margin-right: calc(6 * var(--p)); }
+.is-v1 .kw-sticky-from button {
+  display: inline-flex; align-items: center; gap: calc(10 * var(--p)); min-height: calc(80 * var(--p)); padding: 0 calc(22 * var(--p)) 0 calc(12 * var(--p));
+  border-radius: 999px; border: 2px solid color-mix(in srgb, var(--kw-note-ink) 22%, transparent); background: transparent; color: var(--kw-note-ink);
+  font: 600 calc(26 * var(--p)) var(--kw-sans);
+}
+.is-v1 .kw-sticky-from button[aria-pressed="true"] { border-color: var(--kw-note-ink); background: color-mix(in srgb, var(--kw-note-ink) 10%, transparent); }
+.is-v1 .kw-sticky-new .kw-acts { justify-content: flex-end; }
+.is-v1 .kw-sticky-new .kw-btn.is-quiet { color: var(--kw-note-ink); border-color: color-mix(in srgb, var(--kw-note-ink) 30%, transparent); }
+.is-v1 .kw-sticky-new .kw-btn:disabled { opacity: .45; }
+.is-v1 .kw-sticky-err { margin: 0; font-size: calc(24 * var(--p)); font-weight: 600; color: #a23b16; }

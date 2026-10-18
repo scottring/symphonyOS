@@ -44,6 +44,15 @@ describe('KioskCanvasPreview (dev fixture)', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('This weekend')
   })
 
+  it('stickies sit in the band on Home, and the dock’s Sticky opens one to write', () => {
+    render(<KioskCanvasPreview scene="quiet" v1Screen="home" />)
+    expect(within(screen.getByRole('list', { name: 'Notes for the house' })).getAllByRole('button')).toHaveLength(2)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wall' })).getByRole('button', { name: 'Add a sticky' }))
+    expect(screen.getByRole('dialog', { name: 'New sticky' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog', { name: 'New sticky' })).toBeNull()
+  })
+
   it('reads and writes nothing, and never dials', () => {
     render(<KioskCanvasPreview scene="call" />)
     expect(screen.getByRole('heading', { name: 'Call Grandma?' })).toBeInTheDocument()

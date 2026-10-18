@@ -61,6 +61,7 @@ import { MathStage } from './MathStage'
 import type { KidMath } from '@/hooks/useKidMath'
 import { EnergyStage } from './EnergyStage'
 import { AgendaStage, AgendaViews } from './AgendaStage'
+import { StickySheet, StickyStrip } from './KioskStickies'
 import type { AgendaDay, AgendaRow, AgendaView } from '@/lib/wall/wallAgenda'
 import { formatWatts, hasReading, type EnergyLive, type EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
 
@@ -116,6 +117,8 @@ export interface KioskCanvasProps {
   /** All of today · This weekend (the dock's Today), and its checks both ways. */
   agenda?: Record<AgendaView, AgendaDay[]>
   onSetDone?: (row: AgendaRow, done: boolean) => void
+  /** Saves a sticky for Home: its words and who it's from (a member id). */
+  onAddSticky?: (text: string, by: string | null) => Promise<boolean>
   onTick: (member: FamilyMember, row: KidRow) => void
   onClaim: () => void
   onTapQuestion: () => void
@@ -198,6 +201,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const next = nextCommitment(p.rows, p.now)
   const showHeld = showsHeldColumn(state)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [stickyOpen, setStickyOpen] = useState(false)
 
   // ─── Commands: buttons, typing and speech all land here ───
   const startCooking = useCallback((): string => {
@@ -512,7 +516,11 @@ export function KioskCanvas(p: KioskCanvasProps) {
           {p.freshness}
           {stage.kind === 'agenda'
             ? <span className="kw-grow ka-band"><AgendaViews view={stage.view} onView={(view) => dispatch({ type: 'OPEN', stage: { kind: 'agenda', view } })} /></span>
-            : <span className="kw-grow" />}
+            // Stickies ride the band on every Home moment but the quiet one,
+            // which lays them out large in its lead.
+            : stage.kind === 'home' && v1.pick.screen !== 'rest' && !moreOpen
+              ? <span className="kw-grow kw-band-stickies"><StickyStrip notes={v1.notes} onOpen={v1.onNotes} /></span>
+              : <span className="kw-grow" />}
           {W && <span className="kw-wx" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
           <h1 className="kw-moment" ref={placeRef} tabIndex={-1} aria-live="polite">{title}</h1>
         </header>
@@ -534,11 +542,13 @@ export function KioskCanvas(p: KioskCanvasProps) {
           next={v1.next}
           replyInSide={talkInSide}
           math={math && math.kids.length > 0 ? { onOpen: () => { setMoreOpen(false); openMath() }, open: mathLeft > 0, current: stage.kind === 'math' && !moreOpen } : undefined}
+          onSticky={p.onAddSticky ? () => { setMoreOpen(false); setStickyOpen(true) } : undefined}
           agenda={p.agenda && p.onSetDone ? {
             onOpen: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'agenda', view: p.now.getDay() === 0 || p.now.getDay() === 6 ? 'weekend' : 'today' } }) },
             current: stage.kind === 'agenda' && !moreOpen,
           } : undefined}
         />
+        {stickyOpen && p.onAddSticky && <StickySheet members={p.members} onSave={p.onAddSticky} onClose={() => setStickyOpen(false)} />}
       </div>
     )
   }

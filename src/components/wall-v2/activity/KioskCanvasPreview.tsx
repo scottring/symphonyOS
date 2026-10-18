@@ -354,6 +354,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         loadEnergyPeriod={energyPeriodFixture}
         agenda={AGENDA}
         onSetDone={noop}
+        onAddSticky={async () => true}
         listenerPreview={v1Screen ? dock ?? (v1Screen === 'night' ? 'quiet' : 'idle') : undefined}
       />
     </div>

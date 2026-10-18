@@ -1063,6 +1063,13 @@ export function WallV2Shell() {
     const of = (view: 'today' | 'weekend') => agendaDays(wallData.days, view, now).map((d) => agendaDay(d, wallData.familyMembers, now));
     return { today: of('today'), weekend: of('weekend') };
   }, [wallData.days, wallData.familyMembers, now]);
+  // A sticky written on the wall (Scott, 2026-10-18): a scratchpad note, so
+  // it's on Home, in Notes and in the app's scratchpad alike.
+  const handleAddSticky = useCallback(async (text: string, by: string | null) => {
+    const ok = await scratchpad.add(text, 'note', by);
+    if (ok) showFlash('Sticky added');
+    return ok;
+  }, [scratchpad, showFlash]);
   const handleSetDone = useCallback((row: AgendaRow, done: boolean) => {
     handleToggleComplete(row.id, done, row.on);
     showFlash(done ? `Done · ${row.title}` : `Not done · ${row.title}`);
@@ -1233,6 +1240,7 @@ export function WallV2Shell() {
           onCompleteRow={handleCompleteRow}
           agenda={agenda}
           onSetDone={handleSetDone}
+          onAddSticky={handleAddSticky}
           onTick={handleTick}
           onClaim={() => setShowWhoSheet(true)}
           onTapQuestion={() => (handoffAsk ? setShowWhoSheet(true) : setShowQuestionSheet(true))}
