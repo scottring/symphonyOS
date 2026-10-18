@@ -933,6 +933,13 @@ describe('WeekViewV2 — the deck', () => {
     expect(props().cards.map((c) => c.key).sort()).toEqual(['missed', 'noDay'])
   })
 
+  // I5: mid-week the strip's days already gone cannot be given.
+  it('the strip marks the days before today as past', () => {
+    vi.setSystemTime(new Date(2026, 9, 20, 9)) // Tuesday
+    open('?review=1', [])
+    expect(props().stripDays.map((d) => !!(d as { past?: boolean }).past)).toEqual([true, true, true, false, false, false, false])
+  })
+
   // I4: one record of last week's review — finishing the deck flips the line.
   it('after finishing the deck the page says "reviewed {Weekday}" without a reload', async () => {
     open('?review=1', [createMockTask({ id: 'a', title: 'Fix the gate', scheduledFor: new Date(2026, 9, 12), isAllDay: true, updatedAt: recent })])

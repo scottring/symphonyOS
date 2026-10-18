@@ -126,6 +126,8 @@
 }
 .deck-day.is-empty span { color: var(--color-neutral-500); }
 .deck-day i { font-style: normal; font-size: 11px; color: var(--color-neutral-500); }
+/* A day already gone: still there to read, quiet, not a choice. */
+.deck-day.is-past { opacity: .45; cursor: default; }
 .deck-noday { margin-top: 8px; }
 
 .deck-counter { margin: 26px 0 0; text-align: center; font-size: 13px; color: var(--color-neutral-600); }

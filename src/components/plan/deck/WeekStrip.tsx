@@ -8,6 +8,8 @@ export interface StripDay {
   date: Date
   label: string
   isWeekend: boolean
+  /** Already gone: shown, but a card cannot be given it. */
+  past?: boolean
   lines: string[]
   more: number
 }
@@ -31,9 +33,9 @@ export function WeekStrip({ days, onPick, onNoDay, disabled }: {
             <button
               key={d.key}
               type="button"
-              className={`deck-day${shown.length ? '' : ' is-empty'}`}
+              className={`deck-day${shown.length ? '' : ' is-empty'}${d.past ? ' is-past' : ''}`}
               onClick={() => onPick(d.date)}
-              disabled={disabled}
+              disabled={disabled || d.past}
             >
               <b className={d.isWeekend ? 'is-weekend' : undefined}>{d.label}</b>
               {shown.length ? shown.map((line, i) => <span key={i}>{line}</span>) : <span>Nothing yet</span>}
