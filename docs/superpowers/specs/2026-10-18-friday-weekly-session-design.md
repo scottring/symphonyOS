@@ -284,6 +284,29 @@ session must not build a second one. Instead:
   presentation applies there too, so the four horizons stay one process. The tile
   screen ("From the month") is the general form: the level above as tiles.
 
+### The cascade stays visible (Scott, 2026-10-18)
+
+Nothing here changes the nested structure (Year → Season → Month → Week → Day):
+the data, verbs and writers are the existing ones, and "From the month" is the
+cascade step itself. The card presentation must **not drop the context the current
+screens carry**:
+
+- **Every card shows what it serves, one level up**, above its title ("For
+  October · Get the house ready for winter"). This is `ReviewLine.note` /
+  `PlaceLine.note` today.
+- **Every tile of the level above shows what is already under it**, by name ("This
+  week: sign the kids up for Coppermine, Nov 3 and 6"), the way `PlanParent.children`
+  does today. A goal with nothing under it shows just its name. "Nothing in this
+  week yet" is not repeated.
+- **A step added from a tile is created under that goal**, through `PlanParent.onAdd`.
+  A top-3 item tapped from a goal's step keeps its parent. A dropped-in item that
+  Symphony sorts may name a parent in its proposal, but only one the person can
+  see and change before approving. Unparented items stay allowed ("the cascade is
+  not mandatory").
+- **Moves keep commitments:** placing on a day keeps the task's week and its
+  parent; Later and Let go use the existing period moves, so a goal's history and
+  links behave exactly as they do on the pages today.
+
 ## Relationship to what exists
 
 - **Builds on:** `PeriodReview` / `usePeriodReview` (verdicts and the session
