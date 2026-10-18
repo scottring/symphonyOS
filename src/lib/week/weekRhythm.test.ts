@@ -79,7 +79,7 @@ describe('weekRhythm', () => {
       days[3].entries.push({ id: 'task-dentist', kind: 'task', title: 'Dentist forms', completed: false })
       const r = weekRhythm(days, '2026-10-06', { tasks: true })
       const line = rhythmLines(r).find((l) => l.label === 'Weekdays')!
-      expect(line.items.map((i) => i.title)).toContain('5:15 Pick up from FFG')
+      expect(line.items.map((i) => i.title)).toContain('5:15p Pick up from FFG')
       expect(line.items[0].openId).toBe('task-ffg-2026-10-06')
       expect(r.days.flatMap((d) => d.entries).map((e) => e.title)).toEqual(['Dentist forms'])
     })
@@ -128,7 +128,7 @@ describe('weekRhythm', () => {
       const days = week()
       days.forEach((d) => d.entries.push(pickup(d, 'Feed the fish')))
       const r = weekRhythm(days, '2026-10-06', { tasks: true })
-      expect(rhythmLines(r).find((l) => l.label === 'Every day')!.items.map((i) => i.title)).toEqual(['5:15 Feed the fish'])
+      expect(rhythmLines(r).find((l) => l.label === 'Every day')!.items.map((i) => i.title)).toEqual(['5:15p Feed the fish'])
       expect(r.days.flatMap((d) => d.entries)).toEqual([])
     })
 
@@ -136,6 +136,89 @@ describe('weekRhythm', () => {
       const days = week()
       weekdays(days).forEach((d) => d.entries.push(pickup(d)))
       expect(weekRhythm(days, '2026-10-06').days.flatMap((d) => d.entries)).toHaveLength(5)
+    })
+  })
+
+  // Calm pass 2 (Scott approved the mockup 2026-10-18): a repeat folds even
+  // with exceptions — at least 3 of the week's weekdays, labelled with its days.
+  describe('a repeat on some of the weekdays (partial)', () => {
+    const at = (day: JournalDay, h: number, m: number) => new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), h, m)
+    const task = (day: JournalDay, title: string, h: number, m: number, people?: string[]): JournalEntry => ({
+      id: `task-${title}-${day.key}`, kind: 'task', title, completed: false, time: at(day, h, m), people,
+    })
+    // days[2] Mon … days[6] Fri.
+    const on = (days: JournalDay[], names: string[]) => days.filter((d) => names.includes(d.date.toLocaleDateString('en-US', { weekday: 'short' })))
+    const opts = { tasks: true, partial: true }
+
+    it('Mon–Thu pickups for the same person fold once as "Mon–Thu" and leave those days', () => {
+      const days = week()
+      on(days, ['Mon', 'Tue', 'Wed', 'Thu']).forEach((d) => {
+        d.entries.push(task(d, 'Pick up from FFG', 17, 15, ['scott']))
+        d.entries.push(task(d, 'Home from school', 17, 45))
+      })
+      days[6].entries.push(task(days[6], 'Pick up from FFG', 13, 0, ['scott']))
+      const r = weekRhythm(days, '2026-10-06', opts)
+      expect(r.repeats.map((g) => g.label)).toEqual(['Mon–Thu'])
+      expect(r.repeats[0].items.map((x) => x.title)).toEqual(['Pick up from FFG', 'Home from school'])
+      expect(r.repeats[0].items[0].openId).toBe('task-Pick up from FFG-2026-10-06')
+      expect(r.days.slice(2, 6).every((d) => d.entries.length === 0)).toBe(true)
+      // Friday's early pickup is particular to Friday.
+      expect(r.days[6].entries.map((e) => e.time?.getHours())).toEqual([13])
+      const line = rhythmLines(r).find((l) => l.label === 'Mon–Thu')!
+      expect(line.items.map((i) => i.title)).toEqual(['5:15p Pick up from FFG', '5:45p Home from school'])
+      // The days handed in are untouched (Today and the wall still tick them off).
+      expect(days[2].entries).toHaveLength(2)
+    })
+
+    it('on only 2 weekdays, stays in its days', () => {
+      const days = week()
+      on(days, ['Mon', 'Tue']).forEach((d) => d.entries.push(task(d, 'Pick up from FFG', 17, 15)))
+      const r = weekRhythm(days, '2026-10-06', opts)
+      expect(r.repeats).toEqual([])
+      expect(r.days.flatMap((d) => d.entries)).toHaveLength(2)
+    })
+
+    it('for different people, stays in its days', () => {
+      const days = week()
+      on(days, ['Mon', 'Tue', 'Wed', 'Thu']).forEach((d, i) => d.entries.push(task(d, 'Pick up from FFG', 17, 15, [i % 2 ? 'iris' : 'scott'])))
+      const r = weekRhythm(days, '2026-10-06', opts)
+      expect(r.repeats).toEqual([])
+      expect(r.days.flatMap((d) => d.entries)).toHaveLength(4)
+    })
+
+    it('days that are not in a run read as a list: "Mon, Wed, Fri"', () => {
+      const days = week()
+      on(days, ['Mon', 'Wed', 'Fri']).forEach((d) => d.entries.push(task(d, 'Piano', 16, 0)))
+      const r = weekRhythm(days, '2026-10-06', opts)
+      expect(r.repeats.map((g) => g.label)).toEqual(['Mon, Wed, Fri'])
+      expect(r.days.flatMap((d) => d.entries)).toEqual([])
+    })
+
+    it('a routine on Mon–Thu folds the same way', () => {
+      const days = week()
+      on(days, ['Mon', 'Tue', 'Wed', 'Thu']).forEach((d) => d.entries.push(occ('home', 'Home from school', d, at(d, 17, 45))))
+      const r = weekRhythm(days, '2026-10-06', opts)
+      expect(r.repeats).toEqual([{ label: 'Mon–Thu', items: [expect.objectContaining({ routineId: 'home', title: 'Home from school', openId: 'routine-home-2026-10-06' })] }])
+      expect(r.days.flatMap((d) => d.entries)).toEqual([])
+    })
+
+    it('every weekday still reads "Weekdays", and every day "Every day"', () => {
+      const days = week()
+      on(days, ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']).forEach((d) => d.entries.push(task(d, 'School morning', 6, 45)))
+      days.forEach((d) => d.entries.push(task(d, 'Kids bedtime', 19, 30)))
+      const r = weekRhythm(days, '2026-10-06', opts)
+      expect(r.repeats).toEqual([])
+      expect(rhythmLines(r).map((l) => [l.label, l.items.map((i) => i.title)])).toEqual([
+        ['Every day', ['7:30p Kids bedtime']], ['Weekdays', ['6:45a School morning']],
+      ])
+    })
+
+    it('only where asked: other views keep a part-week repeat in its days', () => {
+      const days = week()
+      on(days, ['Mon', 'Tue', 'Wed', 'Thu']).forEach((d) => d.entries.push(occ('home', 'Home from school', d)))
+      const r = weekRhythm(days, '2026-10-06')
+      expect(r.repeats).toEqual([])
+      expect(r.days.flatMap((d) => d.entries)).toHaveLength(4)
     })
   })
 

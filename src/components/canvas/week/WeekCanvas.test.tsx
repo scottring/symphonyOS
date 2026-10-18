@@ -264,6 +264,19 @@ describe('WeekCanvas — restored functions', () => {
     expect(screen.getByRole('button', { name: 'Hide daily' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  // Calm pass 2: Every day, Weekdays and part-week repeats are one quiet line.
+  it('the repeats are one quiet line of groups', () => {
+    render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
+      rhythm={[
+        { label: 'Every day', items: [{ title: '7:30p Kids bedtime', openId: 'routine-bed' }] },
+        { label: 'Weekdays', items: [{ title: '6:45a School morning', openId: 'routine-school' }] },
+        { label: 'Mon–Thu', items: [{ title: '5:15p Pick up from FFG', openId: 'task-ffg' }, { title: '5:45p Home from school', openId: 'routine-home' }] },
+      ]} />)
+    const band = document.querySelector('.wc-rhythm')!
+    expect(band.querySelectorAll('p')).toHaveLength(1)
+    expect(band.textContent).toBe('Every day 7:30p Kids bedtime · Weekdays 6:45a School morning · Mon–Thu 5:15p Pick up from FFG · 5:45p Home from school')
+  })
+
 })
 
 // Scott, 2026-10-12: a page left open showed last week as if it were this one.

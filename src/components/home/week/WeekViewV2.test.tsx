@@ -516,11 +516,23 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     render(<WeekViewV2 {...defaultProps} routines={[daily]} weekStart={sunday} />)
     // Written once, with its time (rhythmLines).
     expect(screen.getAllByText(/Walk the dog/)).toHaveLength(1)
-    expect(screen.getByRole('button', { name: '7:00 Walk the dog' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '7a Walk the dog' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show daily' }))
     expect(localStorage.getItem('symphony-week-daily')).toBe('shown')
     expect(screen.getAllByText('Walk the dog').length).toBeGreaterThan(1)
     expect(screen.getByRole('button', { name: 'Hide daily' })).toBeInTheDocument()
+  })
+
+  // Calm pass 2: a repeat on Mon–Thu folds once, labelled with its days;
+  // "Show daily" puts it back in each day.
+  it('a Mon–Thu routine is written once as "Mon–Thu" until "Show daily"', () => {
+    const home = createMockRoutine({ id: 'home', name: 'Home from school', time_of_day: '17:45:00', recurrence_pattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu'] } as RecurrencePattern, show_on_timeline: true })
+    render(<WeekViewV2 {...defaultProps} routines={[home]} weekStart={sunday} />)
+    expect(screen.getByText('Mon–Thu')).toBeInTheDocument()
+    expect(screen.getAllByText(/Home from school/)).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '5:45p Home from school' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show daily' }))
+    expect(screen.getAllByText('Home from school')).toHaveLength(4)
   })
 })
 

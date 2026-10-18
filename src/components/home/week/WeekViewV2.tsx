@@ -767,10 +767,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const toggleDaily = useCallback(() => setWeekPref('dailyInDays', !dailyShown), [setWeekPref, dailyShown])
   const canvasDays = useMemo(() => {
     const onShelf = new Set(shelf.flatMap((g) => g.rows.map((r) => r.task.id)))
-    // Repeated tasks too ("Pick up from FFG" each weekday): written once above.
-    const found = weekRhythm(journalDays, undefined, { tasks: true })
-    const hasDaily = found.everyDay.length + found.weekdays.length > 0
-    const rhythm = dailyShown ? { everyDay: [], weekdays: [], days: journalDays } : found
+    // Repeated tasks too ("Pick up from FFG" each weekday), and repeats on
+    // part of the week ("Mon–Thu"): written once above.
+    const found = weekRhythm(journalDays, undefined, { tasks: true, partial: true })
+    const hasDaily = found.everyDay.length + found.weekdays.length + found.repeats.length > 0
+    const rhythm = dailyShown ? { everyDay: [], weekdays: [], repeats: [], days: journalDays } : found
     const toItem = (e: JournalEntry): CanvasDayItem => ({ id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId, people: e.people })
     // Open calendar time is planning information: today and the days ahead,
     // counted from the whole day — every-day routines too, though written above.

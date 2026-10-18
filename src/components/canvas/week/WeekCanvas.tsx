@@ -392,15 +392,21 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       {daily.shown ? 'Hide daily' : 'Show daily'}
     </button>
   )
+  // Calm pass 2: one quiet line of groups — "Every day 7:30p Kids bedtime ·
+  // Weekdays 6:45a School morning · Mon–Thu 5:15p Pick up from FFG · …".
   const rhythmNode = (shownLines.length > 0 || daily?.shown) && (
     <div className="wc-rhythm">
       {daily?.shown && <p><span className="wc-rhythm-label">Daily routines are in each day</span>{' · '}{dailyToggle}</p>}
-      {shownLines.map((r, li) => (
-        <p key={r.label}><span className="wc-rhythm-label">{r.label}</span>{' '}
-          {r.items.map((it, i) => <span key={it.openId}>{i > 0 && ' · '}<button type="button" className="wc-rhythm-item" onClick={() => writers.open(it.openId)}>{it.title}</button></span>)}
-          {li === 0 && !daily?.shown && dailyToggle && <>{' · '}{dailyToggle}</>}
+      {shownLines.length > 0 && (
+        <p>
+          {shownLines.map((r, li) => (
+            <span key={r.label} className="wc-rhythm-group">{li > 0 && ' · '}<span className="wc-rhythm-label">{r.label}</span>{' '}
+              {r.items.map((it, i) => <span key={it.openId}>{i > 0 && ' · '}<button type="button" className="wc-rhythm-item" onClick={() => writers.open(it.openId)}>{it.title}</button></span>)}
+            </span>
+          ))}
+          {!daily?.shown && dailyToggle && <>{' · '}{dailyToggle}</>}
         </p>
-      ))}
+      )}
     </div>
   )
   // A past week says so, with the way back (Scott, 2026-10-12: a page left
