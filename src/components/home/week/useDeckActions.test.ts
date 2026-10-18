@@ -143,14 +143,47 @@ describe('useDeckActions', () => {
     expect(deps.updateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ commitments: expect.any(Array) }))
   })
 
-  it('letGo: week cards remove timing, inbox goes to someday', async () => {
+  it('letGo: a week card a month still holds loses its week and stays on the month', async () => {
     const { deps, a } = setup()
-    const c = card('last-week')
+    const c = card('last-week', withMonth({
+      bucket: 'week', weekStart: lastWeekStart,
+      commitments: [
+        { id: 'c1', level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' },
+        { id: 'c2', level: 'week', periodStart: lastWeekStart, status: 'open' },
+      ],
+    }))
     await a.letGo(c)
     const off = timingRemoval(c.task, 'all')
     expect(deps.updateTask).toHaveBeenCalledWith('t1', off.updates)
+    expect(deps.gated.setBucket).not.toHaveBeenCalled()
     await runs[0].undo!()
     expect(deps.updateTask).toHaveBeenLastCalledWith('t1', off.previous)
+  })
+
+  // Nothing broader left: the Inbox would deal it again next week.
+  it.each(['last-week', 'this-week'] as const)('letGo: a %s card with nothing broader goes to Someday; undo restores its commitments', async (source) => {
+    const { deps, a } = setup()
+    const commitments = [{ id: 'c2', level: 'week', periodStart: source === 'last-week' ? lastWeekStart : weekAnchor, status: 'open' }] as Task['commitments']
+    const c = card(source, { bucket: 'week', scheduledFor: new Date(2026, 9, 6), commitments })
+    await a.letGo(c)
+    expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', 'someday')
+    expect(deps.updateTask).not.toHaveBeenCalled()
+    await runs[0].undo!()
+    expect(deps.updateTask).toHaveBeenLastCalledWith('t1', timingRemoval(c.task, 'all').previous)
+    expect(deps.updateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ commitments, scheduledFor: new Date(2026, 9, 6) }))
+  })
+
+  it('letGo: a legacy week row with no records also goes to Someday; undo restores its placement', async () => {
+    const { deps, a } = setup()
+    const c = card('this-week', { bucket: 'week', commitments: [] })
+    await a.letGo(c)
+    expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', 'someday')
+    await runs[0].undo!()
+    expect(deps.onUpdateTask).toHaveBeenLastCalledWith('t1', placementOf(c.task))
+  })
+
+  it('letGo: an inbox card goes to Someday', async () => {
+    const { deps, a } = setup()
     await a.letGo(card('inbox', { bucket: 'inbox' }))
     expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', 'someday')
   })

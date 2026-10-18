@@ -122,9 +122,18 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
         if (c.source === 'inbox') {
           return activity.run(`Let go of “${t.title}”`, async () => ok(await setBucket(t.id, 'someday')), { ids: [t.id], undo: undoFor(t) })
         }
+        // The week goes. A month or season still holding it keeps it on that
+        // list; with nothing broader it would fall to the Inbox and be dealt
+        // again next week, so it goes to Someday instead.
+        // The Undo is the commitments snapshot (with the day, focus and
+        // weekend); a row with no commitments at all is restored from its
+        // placement.
         const off = timingRemoval(t, 'all')
-        return activity.run(`Let go of “${t.title}”`, async () => ok(await updateTask(t.id, off.updates)),
-          { ids: [t.id], undo: async () => ok(await updateTask(t.id, off.previous)) })
+        const broader = (off.updates.commitments ?? []).some((c) => c.status === 'open' && c.level !== 'week')
+        const snapshot = (off.previous.commitments ?? []).length > 0
+        return activity.run(`Let go of “${t.title}”`,
+          async () => ok(broader ? await updateTask(t.id, off.updates) : await setBucket(t.id, 'someday')),
+          { ids: [t.id], undo: snapshot ? async () => ok(await updateTask(t.id, off.previous)) : restorePlacement(t) })
       },
 
       // Ungated: the drain is one deliberate sweep, not a question per task.
