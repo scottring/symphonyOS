@@ -204,6 +204,13 @@ existing Undo and its matching stamp:
   same as Week's "No day yet" triage (`1f2f4296`). "Leave the rest without a day"
   is always available.
 
+**Every triage card shows the same four buttons and nothing else at first: Done ·
+This week · Later · Let go** (Scott, 2026-10-18, on seeing the Inbox's twelve
+when-chips on one card: "are you KIDDING"). This week opens the days (plus "No day
+yet"). Later opens Next week, This month, Next month, This season, Someday and Pick a
+date. The month tiles keep their own verbs, but they too sit behind a tap. A card
+never shows more than four choices before one is tapped.
+
 Stamps follow the verb: Done → `done`; a day or this week → `carried`; Next month,
 This season or Someday → `someday`; Let go or Remove → `dropped`.
 
