@@ -2,9 +2,9 @@
 // shared by the three pages and remembered on this device, like the Week
 // page's (useWeekViewPrefs): `done` shows finished work; `hideAbove` hides the
 // read-only list of the level above. `hideAbove` is the page's existing
-// "Show/Hide {Fall} list" preference, so it keeps that key: stored as
-// "aboveOpen" ('1' open, '0' closed), and a page that never opened it has it
-// hidden.
+// "Show/Hide {Fall} list" preference, so it keeps that key, stored as
+// "aboveOpen" ('1' open, '0' closed). The level above is shown unless the
+// viewer explicitly hid it: only '0' means hidden; an absent key means shown.
 import { useCallback, useSyncExternalStore } from 'react'
 
 export type PlanPagePref = 'done' | 'hideAbove'
@@ -36,9 +36,8 @@ function subscribe(listener: () => void) {
 }
 
 const getDone = () => read(PLAN_PAGE_PREF_KEYS.done) === 'shown'
-const getHideAbove = () => read(PLAN_PAGE_PREF_KEYS.hideAbove) !== '1'
+const getHideAbove = () => read(PLAN_PAGE_PREF_KEYS.hideAbove) === '0'
 const off = () => false
-const on = () => true
 
 export function usePlanPagePrefs(): {
   done: boolean
@@ -46,7 +45,7 @@ export function usePlanPagePrefs(): {
   set: (k: PlanPagePref, v: boolean) => void
 } {
   const done = useSyncExternalStore(subscribe, getDone, off)
-  const hideAbove = useSyncExternalStore(subscribe, getHideAbove, on)
+  const hideAbove = useSyncExternalStore(subscribe, getHideAbove, off)
   const set = useCallback((k: PlanPagePref, v: boolean) => {
     if (k === 'done') write(PLAN_PAGE_PREF_KEYS.done, v ? 'shown' : 'hidden')
     else write(PLAN_PAGE_PREF_KEYS.hideAbove, v ? '0' : '1')
