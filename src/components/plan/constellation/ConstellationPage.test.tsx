@@ -20,11 +20,11 @@ vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[],soleDomain:'personal
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null,members:[{auth_user_id:'u2',name:'Iris'}]})}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'u1'}})}))
-const review=vi.hoisted(()=>({reviewed:null as any,prevReviewed:null as any,mine:null as any,finish:vi.fn(async()=>true),seen:[] as string[]}))
-const plan=vi.hoisted(()=>({saved:null as any,save:vi.fn(async()=>true)}))
-vi.mock('@/hooks/usePlanningSession',async(importOriginal)=>({...await importOriginal<any>(),usePlanningSession:()=>({saved:plan.saved,mine:null,loading:false,loadedToken:'',error:null,reload:vi.fn(),save:plan.save})}))
+const review=vi.hoisted(()=>({reviewed:null as any,prevReviewed:null as any,loading:false,prevLoading:false,mine:null as any,finish:vi.fn(async()=>true),seen:[] as string[]}))
+const plan=vi.hoisted(()=>({saved:null as any,loading:false,save:vi.fn(async()=>true)}))
+vi.mock('@/hooks/usePlanningSession',async(importOriginal)=>({...await importOriginal<any>(),usePlanningSession:()=>({saved:plan.saved,mine:null,loading:plan.loading,loadedToken:'',error:null,reload:vi.fn(),save:plan.save})}))
 // The page reads two: the period on screen's, then the one before's (its own Review, or last period's).
-vi.mock('@/hooks/usePeriodReview',()=>({usePeriodReview:(horizon:string,token:string)=>{const first=!review.seen.length||review.seen.length%2===0;review.seen.push(`${horizon}:${token}`);return{reviewed:first?review.reviewed:review.prevReviewed,mine:review.mine,loading:false,error:null,reload:vi.fn(),finish:review.finish}}}))
+vi.mock('@/hooks/usePeriodReview',()=>({usePeriodReview:(horizon:string,token:string)=>{const first=!review.seen.length||review.seen.length%2===0;review.seen.push(`${horizon}:${token}`);return{reviewed:first?review.reviewed:review.prevReviewed,mine:review.mine,loading:first?review.loading:review.prevLoading,error:null,reload:vi.fn(),finish:review.finish}}}))
 // This file's committedTo stub says nothing about status; the review reads it from the fixture.
 vi.mock('@/lib/planning/periodReview',async(importOriginal)=>({...await importOriginal<any>(),taskReviewState:(t:any)=>t.completed?'done':t.carried?'moved':'open',movedOn:(t:any)=>t.carried&&!t.completed?{to:t.carriedTo}:null}))
 vi.mock('@/hooks/useHouseholdSeasons',()=>({useHouseholdSeasons:()=>({seasons:[{name:'Spring',month:3,day:1},{name:'Summer',month:6,day:1},{name:'Fall',month:9,day:1},{name:'Winter',month:12,day:1}]})}))
@@ -452,7 +452,7 @@ describe('the fact line (calm pass, 2026-10-18)',()=>{
 })
 
 describe('the calm header (approved mockup 2026-10-18)',()=>{
- afterEach(()=>{vi.useRealTimers();review.reviewed=null;review.prevReviewed=null;plan.saved=null})
+ afterEach(()=>{vi.useRealTimers();review.reviewed=null;review.prevReviewed=null;review.loading=false;review.prevLoading=false;plan.saved=null;plan.loading=false})
  it('is the title row and fact line, then one primary button and ⋯',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
   month()
@@ -484,13 +484,56 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   choose('Review March')
   expect(screen.getByTestId('where').textContent).toContain('review=1')
  })
- it('Year keeps the offers it had: Review last year while due, else Plan the year',()=>{
+ it('once the period is planned, the primary plans the next one (Month and Season)',()=>{
+  at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED;plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
+  month()
+  expect(primaries()).toEqual(['Plan November'])
+  fireEvent.click(within(head()).getByRole('button',{name:'Plan November'}))
+  expect(screen.getByTestId('where').textContent).toContain('start=2026-11-01')
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+  cleanup();plan.saved=null
+  season()
+  expect(primaries()).toEqual(['Plan Fall'])
+  cleanup();plan.saved={at:new Date(2026,8,3),authorId:'u1',notes:{}}
+  season()
+  expect(primaries()).toEqual(['Plan Winter'])
+  fireEvent.click(within(head()).getByRole('button',{name:'Plan Winter'}))
+  expect(screen.getByTestId('where').textContent).toContain('start=2026-12-01')
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+ })
+ it('Year has no primary but the review that is due, or Plan next year inside its window',()=>{
   at(new Date(2026,9,17,12))
   open()
   expect(primaries()).toEqual(['Review 2025'])
   cleanup();review.prevReviewed=REVIEWED
   open()
-  expect(primaries()).toEqual(['Plan 2026'])
+  // Reference in October: planning waits in ⋯.
+  expect(primaries()).toEqual([])
+  expect(menu()).toContain('Plan 2026')
+  cleanup()
+  // From Dec 25, next year's window: Plan 2027 (2026 already reviewed).
+  at(new Date(2026,11,27,9));review.reviewed=REVIEWED
+  open('/year?view=constellation')
+  expect(primaries()).toEqual(['Plan 2027'])
+  fireEvent.click(within(head()).getByRole('button',{name:'Plan 2027'}))
+  expect(screen.getByTestId('where').textContent).toContain('start=2027-01-01')
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+ })
+ it('holds the primary until the reviews and the plan record have loaded',()=>{
+  at(new Date(2026,9,17,12))
+  for(const k of ['loading','prevLoading'] as const){
+   review[k]=true
+   month()
+   expect(primaries()).toEqual([])
+   expect(menu().filter(t=>/^(Plan|Review) /.test(t??''))).toEqual([])
+   cleanup();review[k]=false
+  }
+  plan.loading=true
+  month()
+  expect(primaries()).toEqual([])
+  cleanup();plan.loading=false
+  month()
+  expect(primaries()).toEqual(['Review September'])
  })
  it('⋯ holds the page’s choices, the way in, and its help',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
