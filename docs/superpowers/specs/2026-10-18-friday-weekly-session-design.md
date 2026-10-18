@@ -178,6 +178,14 @@ The coming week, starting on the week-start day.
   pickups, activities and chores. Each item shows **who's on it**, and can be
   reassigned right there (existing `assignedTo`). Clashes are called out on the card
   ("Two pickups at 10:30").
+- **Mark a priority.** Either person can tap any task or event on a Look ahead card
+  to mark it a priority, and tap again to unmark it. A priority carries one clear
+  mark and sorts first within its day everywhere the day shows (Week, Today, and
+  the wall). Symphony never chooses priorities; it only shows the ones people set.
+  This is new: nothing on tasks or events holds it today. Calendar events come
+  from Google, so the mark is stored on the Symphony side. How it is stored is
+  the builder's call, but it must work for both tasks and events and follow the
+  same privacy as the item.
 - **Weekdays get light cards:** only the fixed commitments (meetings, appointments,
   trips), plus anything unassigned.
 - **Last card: the top 3 for the week.** Three empty places. They name them by
