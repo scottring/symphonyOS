@@ -65,6 +65,18 @@ describe('buildDeck', () => {
     expect(deck.map((c) => c.source)).toEqual(['this-week'])
   })
 
+  // The No day yet line counts these too: a day this week that passed undone
+  // is spent, so "Place them" deals the task again. A day still ahead keeps it.
+  it('this week: a day that passed undone is dealt; a day today or ahead is not', () => {
+    const now = new Date(2026, 9, 15, 12) // Thursday
+    const at = (id: string, d: Date, completed = false) => createMockTask({ id, scheduledFor: d, completed, bucket: 'timed', weekStart: THIS })
+    const deck = buildDeck({ ...base, now, only: 'this-week', tasks: [
+      at('missed', new Date(2026, 9, 13)), at('today', new Date(2026, 9, 15, 9)), at('ahead', new Date(2026, 9, 17)),
+      at('doneMissed', new Date(2026, 9, 13), true), thisWeek('t'),
+    ] })
+    expect(deck.map((c) => c.key)).toEqual(['missed', 't'])
+  })
+
   it('Saturday weeks: the previous Saturday-week is last week', () => {
     const sat = new Date(2026, 9, 17)
     const prevSat = new Date(2026, 9, 10)

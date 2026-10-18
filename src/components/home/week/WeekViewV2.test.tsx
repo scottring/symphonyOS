@@ -81,6 +81,18 @@ vi.mock('@/hooks/usePeriodReview', () => ({
   usePeriodReview: (_h: string, token: string) => ({ reviewed: periodReview.reviewed, mine: null, loading: false, error: null, reload: () => {},
     finish: (notes: unknown) => { periodReview.token = token; return periodReview.finish(notes) } }),
 }))
+// Who is looking (the deck's people scope); unset, the hook's own answer.
+const viewer = vi.hoisted(() => ({ me: null as null | { id: string } }))
+vi.mock('@/hooks/useFamilyMembers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/hooks/useFamilyMembers')>()
+  return {
+    ...actual,
+    useFamilyMembers: () => {
+      const real = actual.useFamilyMembers()
+      return viewer.me ? { ...real, getCurrentUserMember: () => viewer.me } : real
+    },
+  }
+})
 
 const monday = new Date(2026, 4, 18) // Monday
 
@@ -643,10 +655,12 @@ describe('WeekViewV2 — the deck', () => {
     periodReview.finish.mockClear()
     periodReview.token = ''
     periodReview.reviewed = null
+    viewer.me = null
   })
   afterEach(() => {
     vi.useRealTimers()
     localStorage.removeItem('symphony-cadence-config')
+    localStorage.removeItem('symphony-assignee-filter-v2')
     window.history.replaceState({}, '', '/')
   })
 
@@ -671,6 +685,44 @@ describe('WeekViewV2 — the deck', () => {
     // The drain is scoped the same way: the private inbox capture stays put.
     expect(deckActions.drain).not.toHaveBeenCalled()
     expect(props().aged).toBe(0)
+  })
+
+  // I2: with nobody chosen, the deck is what the Week list shows the viewer.
+  it('in the everyone view, a task assigned only to Iris is neither dealt, counted nor drained', async () => {
+    viewer.me = { id: 'scott' }
+    const tasks = [
+      createMockTask({ id: 'mine', title: 'Fix the gate', assignedTo: 'scott', scheduledFor: new Date(2026, 9, 12), isAllDay: true, updatedAt: recent }),
+      createMockTask({ id: 'hers', title: 'Pot the ferns', assignedTo: 'iris', scheduledFor: new Date(2026, 9, 13), isAllDay: true, updatedAt: recent }),
+      createMockTask({ id: 'hersDone', title: 'Book the vet', assignedTo: 'iris', scheduledFor: new Date(2026, 9, 13), isAllDay: true, completed: true, updatedAt: recent }),
+      createMockTask({ id: 'staleHers', title: 'Old idea of hers', assignedTo: 'iris', bucket: 'inbox', updatedAt: old }),
+      createMockTask({ id: 'staleShared', title: 'Old shared idea', bucket: 'inbox', updatedAt: old }),
+    ]
+    open('?review=1', tasks)
+    expect(props().cards.map((c) => c.key)).toEqual(['mine', 'staleShared'])
+    expect(props().doneLastWeek).toBe(0)
+    expect(deckActions.drain).toHaveBeenCalledTimes(1)
+    expect((deckActions.drain.mock.calls[0] as unknown as [Task[]])[0].map((t) => t.id)).toEqual(['staleShared'])
+    await act(async () => { await props().onFinish(new Set()) })
+    expect(deckActions.drain).toHaveBeenCalledTimes(2)
+    expect((deckActions.drain.mock.calls[1] as unknown as [Task[]])[0].map((t) => t.id)).toEqual(['mine'])
+  })
+
+  // Choosing Iris shows her tasks, but the drains still never move them.
+  it('with Iris chosen her cards are dealt, but neither drain moves a task only she carries', async () => {
+    viewer.me = { id: 'scott' }
+    localStorage.setItem('symphony-assignee-filter-v2', JSON.stringify(['iris']))
+    const tasks = [
+      createMockTask({ id: 'hers', title: 'Pot the ferns', assignedTo: 'iris', scheduledFor: new Date(2026, 9, 13), isAllDay: true, updatedAt: recent }),
+      createMockTask({ id: 'staleHers', title: 'Old idea of hers', assignedTo: 'iris', bucket: 'inbox', updatedAt: old }),
+    ]
+    open('?review=1', tasks)
+    // Not drained, so her old capture is still an Inbox card here.
+    expect(props().cards.map((c) => c.key)).toEqual(['hers', 'staleHers'])
+    expect(deckActions.drain).not.toHaveBeenCalled()
+    expect(props().aged).toBe(0)
+    await act(async () => { await props().onFinish(new Set()) })
+    expect(deckActions.drain).not.toHaveBeenCalled()
+    expect(periodReview.finish).toHaveBeenCalledTimes(1)
   })
 
   it('opening the full deck drains what is stale once, and says how many', async () => {
@@ -848,6 +900,24 @@ describe('WeekViewV2 — the deck', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Place them' }))
     expect(new URLSearchParams(window.location.search).get('place')).toBe('1')
     expect(new URLSearchParams(window.location.search).get('date')).toBeNull()
+  })
+
+  // I3: the line counts exactly what "Place them" deals, a passed day included.
+  it('"{n} without a day" is the number of cards Place them deals, including a day that passed undone', () => {
+    vi.setSystemTime(new Date(2026, 9, 20, 9)) // Tuesday of the week of Oct 17
+    viewer.me = { id: 'scott' }
+    const onWeek = { bucket: 'week' as const, weekStart: sat, commitments: [{ level: 'week' as const, periodStart: sat, status: 'open' as const }], updatedAt: recent }
+    const tasks = [
+      createMockTask({ id: 'noDay', title: 'Call the plumber', ...onWeek }),
+      createMockTask({ id: 'missed', title: 'Return the drill', ...onWeek, scheduledFor: new Date(2026, 9, 18), isAllDay: true }),
+      createMockTask({ id: 'ahead', title: 'Book the vet', ...onWeek, scheduledFor: new Date(2026, 9, 22), isAllDay: true }),
+      createMockTask({ id: 'hers', title: 'Pot the ferns', ...onWeek, assignedTo: 'iris' }),
+    ]
+    const view = open('', tasks)
+    expect(screen.getByText(/without a day/).textContent).toBe('2 without a day')
+    view.unmount()
+    open('?place=1', tasks)
+    expect(props().cards.map((c) => c.key).sort()).toEqual(['missed', 'noDay'])
   })
 
   it('Review sets review=1 on the viewed week', () => {

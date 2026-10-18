@@ -5,6 +5,7 @@
 import type { Task } from '@/types/task'
 import { weekReviewState } from './periodReview'
 import { localYmd, weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
+import { isMissedPlacement } from '@/lib/week/missedPlacement'
 
 export type DeckSource = 'this-week' | 'last-week' | 'inbox'
 
@@ -62,12 +63,18 @@ export function buildDeck(input: {
   isCurrent: boolean
   servesOf?: (t: Task) => string | undefined
   only?: DeckSource
+  now?: Date
 }): DeckCard[] {
-  const { tasks, weekStart, lastWeekStart, isCurrent, servesOf, only } = input
+  const { tasks, weekStart, lastWeekStart, isCurrent, servesOf, only, now = new Date() } = input
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
+  // No day yet on this week: none at all, or a day in it that passed undone
+  // (the day is spent; the task is the week's again, as the No day yet line counts it).
+  const noDay = (t: Task) => !t.scheduledFor
+    || (t.scheduledFor >= weekStart && t.scheduledFor < weekEnd && isMissedPlacement(t.scheduledFor, t.completed, now))
   const groups: Record<DeckSource, Task[]> = { 'this-week': [], 'last-week': [], inbox: [] }
   for (const t of tasks) {
     if (t.completed || t.isGoal) continue
-    if (!t.scheduledFor && weekReviewState(t, weekStart, { isCurrent }) === 'open') groups['this-week'].push(t)
+    if (noDay(t) && weekReviewState(t, weekStart, { isCurrent }) === 'open') groups['this-week'].push(t)
     else if (weekReviewState(t, lastWeekStart, { isCurrent: false }) === 'open') groups['last-week'].push(t)
     else if (t.bucket === 'inbox') groups.inbox.push(t)
   }

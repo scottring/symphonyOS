@@ -81,6 +81,17 @@ describe('useDeckActions', () => {
     expect(deps.gated.setBucket).not.toHaveBeenCalled()
   })
 
+  it('keepThisWeek: a this-week card with no day is already there; one whose day passed loses the day', async () => {
+    const { deps, a } = setup()
+    expect(await a.keepThisWeek(card('this-week'))).toBe(true)
+    expect(run).not.toHaveBeenCalled()
+    const c = card('this-week', { scheduledFor: new Date(2026, 9, 13) })
+    expect(await a.keepThisWeek(c)).toBe(true)
+    expect(deps.updateTask).toHaveBeenCalledWith('t1', timingRemoval(c.task, 'day').updates)
+    await runs[0].undo!()
+    expect(deps.updateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ scheduledFor: new Date(2026, 9, 13), commitments: expect.any(Array) }))
+  })
+
   it('later next-week clears the day, keeps forward to next week; undo restores placement', async () => {
     const { deps, a } = setup()
     const c = card('this-week', { scheduledFor: new Date(2026, 9, 13) })

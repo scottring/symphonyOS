@@ -143,6 +143,9 @@ export interface WeekCanvasProps {
   /** "Place them": opens the deck on this week's unplaced cards. Absent where
    *  the deck may not open; the count then stands alone. */
   onPlaceUnplaced?: () => void
+  /** "{n} without a day": how many cards "Place them" deals (WeekViewV2
+   *  counts them with the deck's own rule). Absent, the shelf's rows. */
+  unplacedCount?: number
   /** Who is looking: a row only they carry shows no face. */
   viewerId?: string
 }
@@ -155,7 +158,7 @@ const NODAY_FOLD_AT = 4
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing, loaded = true, progress, onPlaceUnplaced, viewerId }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing, loaded = true, progress, onPlaceUnplaced, unplacedCount, viewerId }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
   const [showDone, setShowDone] = useState(false)
@@ -479,11 +482,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // day's row dropped on it, to take its day away.
   // The count is tasks only: what "Place them" deals. Routines that need a day
   // keep their rows, because the deck cannot place them.
-  const nodayLine = (unplaced.length > 0 || routinesToPlace.length > 0 || draggingPlaced) && (
+  const toPlace = unplacedCount ?? unplaced.length
+  const nodayLine = (toPlace > 0 || routinesToPlace.length > 0 || draggingPlaced) && (
     <div className={`wc-noday wc-noday-line${overShelf ? ' is-over' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
       <p className="wc-noday-text">
-        {unplaced.length > 0 && <span className="wc-noday-n">{unplaced.length} without a day</span>}
-        {unplaced.length > 0 && onPlaceUnplaced && <> · <button type="button" className="canvas-link wc-quiet-link wc-noday-place" onClick={onPlaceUnplaced}>Place them</button></>}
+        {toPlace > 0 && <span className="wc-noday-n">{toPlace} without a day</span>}
+        {toPlace > 0 && onPlaceUnplaced && <> · <button type="button" className="canvas-link wc-quiet-link wc-noday-place" onClick={onPlaceUnplaced}>Place them</button></>}
         {draggingPlaced && <span className="wc-noday-hint">Drop here to take its day away</span>}
       </p>
       {routinesToPlace.length > 0 && (

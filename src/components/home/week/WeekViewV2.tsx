@@ -79,6 +79,7 @@ import { weekReviewState } from '@/lib/planning/periodReview'
 import type { WeekDeck } from '@/components/plan/v2/WeekV2'
 import { buildDeck, deckModeOf, deckWeekAllowed } from '@/lib/planning/deck'
 import { staleForDrain, undealtLastWeek } from '@/lib/planning/drain'
+import { doableBy } from '@/lib/planning/poolViews'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import { useDeckActions } from './useDeckActions'
@@ -902,7 +903,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}
       pointing={activity.pointing}
       progress={deckAvailable ? { done: doneLastWeek, reviewedOn: lastReview.reviewed?.at, onReview: openReview } : undefined}
-      onPlaceUnplaced={deckAvailable ? openPlace : undefined}
+      onPlaceUnplaced={deckAvailable ? openPlace : undefined} unplacedCount={placeCount}
       // A calendar that is not connected has nothing to load.
       loaded={(sources?.tasks ?? 'ready') === 'ready' && ['ready', 'not-connected'].includes(sources?.events ?? 'ready')} />
   )
@@ -915,7 +916,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // (?place=1) only this week's cards. Everything it deals, counts and drains
   // comes from the page's own scoped list: the layers (domain filter) and the
   // people lens, never the unfiltered tasks — a private Work task never
-  // reaches a Family view, as a card or as a count.
+  // reaches a Family view, as a card or as a count. With nobody chosen, the
+  // list is what the Week list shows the viewer (weekListTasks' doableBy):
+  // unassigned or theirs, never a task only someone else carries.
   // Only on this week, or next week on this week's last day; elsewhere the
   // deck's URL is ignored and the week shows itself.
   const [params, setParams] = useSearchParams()
@@ -926,6 +929,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const nextWeekStart = useMemo(() => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7), [weekAnchor])
   const layerTasks = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
   const scopedTasks = useMemo(() => layerTasks.filter((t) => !t.isGoal).filter(lens.keep), [layerTasks, lens])
+  const deckTasks = useMemo(() => scopedTasks.filter((t) => lens.on || !meId || doableBy(t, meId)), [scopedTasks, lens, meId])
+  // The drains never move a task assigned only to someone else, even where
+  // the lens shows it (Stage 2's household session decides those together).
+  // Not knowing who is looking, only unassigned tasks move.
+  const drainable = useCallback((t: Task) => doableBy(t, meId ?? ''), [meId])
   const deckActions = useDeckActions({ toggleTask, updateTask, onUpdateTask, keepForward, gated, weekAnchor, lastWeekStart, nextWeekStart })
   // What each card serves, one level up: "For October · {goal title}".
   const servesOf = useCallback((t: Task) => {
@@ -937,12 +945,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
     return `For ${month} · ${parent.title}`
   }, [layerTasks])
   const deckCards = useMemo(() => buildDeck({
-    tasks: scopedTasks, weekStart: weekAnchor, lastWeekStart, isCurrent: weekIsCurrent, servesOf,
+    tasks: deckTasks, weekStart: weekAnchor, lastWeekStart, isCurrent: weekIsCurrent, servesOf,
     only: deckMode === 'place' ? 'this-week' : undefined,
-  }), [scopedTasks, weekAnchor, lastWeekStart, weekIsCurrent, servesOf, deckMode])
+  }), [deckTasks, weekAnchor, lastWeekStart, weekIsCurrent, servesOf, deckMode])
+  // "{n} without a day" counts exactly what "Place them" deals.
+  const placeCount = useMemo(() => buildDeck({
+    tasks: deckTasks, weekStart: weekAnchor, lastWeekStart, isCurrent: weekIsCurrent, only: 'this-week',
+  }).length, [deckTasks, weekAnchor, lastWeekStart, weekIsCurrent])
   const doneLastWeek = useMemo(
-    () => scopedTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) === 'done').length,
-    [scopedTasks, lastWeekStart],
+    () => deckTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) === 'done').length,
+    [deckTasks, lastWeekStart],
   )
   // The page's own way into the deck, the same URLs WeekV2's buttons set, on
   // the week being viewed. The deck on a week reviews the week before it,
@@ -964,10 +976,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
   useEffect(() => {
     if (deckMode !== 'full' || !tasksLoaded || drained.current || !planV2Enabled()) return
     drained.current = true
-    const stale = staleForDrain(scopedTasks, new Date())
+    const stale = staleForDrain(deckTasks, new Date()).filter(drainable)
     setAged(stale.length)
     if (stale.length > 0) void deckActions.drain(stale)
-  }, [deckMode, tasksLoaded, scopedTasks, deckActions])
+  }, [deckMode, tasksLoaded, deckTasks, drainable, deckActions])
   // The strip inside a card's "This week": the week's seven days from its own
   // start (weekStartsOn), each with what is already there — the day's timed
   // events and tasks by time, three at most, the rest counted.
@@ -1004,7 +1016,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     // task with a day today or later keeps it). "Place them" never drains.
     onFinish: async (decided) => {
       if (deckMode !== 'full') return true
-      const left = undealtLastWeek(deckCards, decided, new Date())
+      const left = undealtLastWeek(deckCards, decided, new Date()).filter(drainable)
       return left.length > 0 ? deckActions.drain(left, `Move ${left.length} left from last week to Later`) : true
     },
     onSeeAged: () => navigate('/someday'),
