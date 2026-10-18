@@ -45,7 +45,7 @@ export const PAGE_TOURS: Record<string, TourPart[]> = {
     { target: 'week-facts', title: 'This week’s facts', text: 'How many things were done last week, whether last week was reviewed (Review opens the review), and today’s first event.' },
     { target: 'still-to-place', title: 'No day yet', text: 'What is chosen for this week but has no day. Drag one onto a day, or on a phone press + to pick its day.' },
     { target: 'plan-deck', title: 'Plan this week', text: 'Opens the deck: everything without a home this week, one card at a time. Finishing it marks the week planned.' },
-    { target: 'week-options', title: 'Week options', text: 'Show free time, weather, done work and the daily routines in each day, all off until turned on; How this page works; Watch the guide.' },
+    { target: 'week-options', title: 'Week options', text: 'Show free time, weather, done work and the daily routines in each day, all off until turned on; How this page works; Watch the guide; on a phone, Talk it through.' },
   ],
   today: [
     { target: 'page-title', title: 'Today', text: 'Today is for doing: what you are doing today, with what you need to do it.' },

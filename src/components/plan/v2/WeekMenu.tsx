@@ -4,6 +4,8 @@
 // view choices and its help, out of the way. The four choices are
 // useWeekViewPrefs, remembered on this device; ticking one keeps the menu
 // open. "How this page works" is the title's old ?, "Watch the guide" its ▷.
+// On a phone, which has no Chat bar, "Talk it through" starts the planning
+// conversation (WeekV2 passes `talk` there only).
 
 import { useContext, useEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
@@ -19,7 +21,7 @@ const CHOICES: { pref: WeekViewPref; label: string; hint?: string }[] = [
   { pref: 'dailyInDays', label: 'Show daily routines in each day' },
 ]
 
-export function WeekMenu() {
+export function WeekMenu({ talk }: { talk?: () => void } = {}) {
   const [open, setOpen] = useState(false)
   const [playing, setPlaying] = useState<LearnVideo | null>(null)
   const prefs = useWeekViewPrefs()
@@ -54,6 +56,9 @@ export function WeekMenu() {
       </button>
       {open && (
         <div id="week-options-menu" role="menu" aria-label="Week options" className="wk-menu"
+          // Focus leaving the menu (and not to its own button) closes it, as
+          // the range menu does.
+          onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && e.relatedTarget !== buttonRef.current) setOpen(false) }}
           onKeyDown={(e) => {
             if (e.key === 'Escape') { e.preventDefault(); close(true); return }
             if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
@@ -73,7 +78,12 @@ export function WeekMenu() {
               </button>
             )
           })}
-          {(help || video) && <hr className="wk-menu-rule" />}
+          {(talk || help || video) && <hr className="wk-menu-rule" />}
+          {talk && (
+            <button type="button" role="menuitem" className="wk-menu-item" onClick={() => { close(false); talk() }}>
+              <span className="wk-menu-check" aria-hidden="true" /><span>Talk it through</span>
+            </button>
+          )}
           {help && (
             <button type="button" role="menuitem" className="wk-menu-item" onClick={() => { close(false); help() }}>
               <span className="wk-menu-check" aria-hidden="true" /><span>How this page works</span>

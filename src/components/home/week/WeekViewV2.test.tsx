@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
 import { render, screen, within, fireEvent, waitFor, act, cleanup } from '@/test/test-utils'
 import { WeekViewV2 } from './WeekViewV2'
 import { useSearchParams } from 'react-router-dom'
@@ -123,6 +123,16 @@ const defaultProps = {
   onUpdateEvent: vi.fn(),
   onUpdateRoutine: vi.fn(),
   layers: ALL_LAYERS,
+}
+
+// A phone-width screen (useMediaQuery reads matchMedia), for this test only.
+function asPhone() {
+  const original = window.matchMedia
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes('max-width: 767px'), media: query, onchange: null,
+    addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia
+  onTestFinished(() => { window.matchMedia = original })
 }
 
 // The page's view choices live in the header's ⋯ menu (calm pass 2).
@@ -573,13 +583,22 @@ describe('WeekViewV2 — Help me plan the rest of my week in the bar', () => {
   })
 
   // Calm pass 2: the page no longer draws the entry; the Chat bar has it.
-  it('draws no "Help me plan the rest of my week" in the page, on any width', () => {
+  // Fix round 1: phones have no Chat bar, so there the ⋯ menu carries
+  // "Talk it through", which starts the same walk. The desk has no such item.
+  it('on a phone, ⋯ "Talk it through" starts the walk mid-week; the desk has no such item', () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     mount(new Date(2026, 9, 10))
     expect(screen.queryByRole('button', { name: 'Help me plan the rest of my week' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
+    expect(screen.queryByRole('menuitem', { name: 'Talk it through' })).toBeNull()
     cleanup()
+    asPhone()
+    launcher.openAssistant.mockClear()
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
     expect(screen.queryByRole('button', { name: 'Help me plan the rest of my week' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Talk it through' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Help me plan the rest of my week.', autoSend: true })
   })
 
   it('offers nothing on a past week', () => {
@@ -598,10 +617,17 @@ describe('WeekViewV2 — Help me plan the rest of my week in the bar', () => {
     expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: 'Help me plan the rest of my week' }))
   })
 
-  it('on the last day the page draws no walk of its own either', () => {
+  it('on the last day a phone talks through next week from ⋯, and the note points there', () => {
     vi.setSystemTime(new Date(2026, 9, 16, 18))
+    asPhone()
+    launcher.openAssistant.mockClear()
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
     expect(screen.queryByRole('button', { name: 'Help me plan week 43' })).toBeNull()
+    expect(screen.getByText(/ends today/).closest('.pv2-endsweek')?.textContent).toMatch(/Talk it through.*⋯/)
+    expect(screen.queryByText(/Open Chat/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Talk it through' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Help me plan the week of Oct 17.', autoSend: true })
   })
 
   it('next week\'s page offers "Help me plan the week", naming its start', () => {
@@ -902,7 +928,8 @@ describe('WeekViewV2 — the deck', () => {
     expect(deckActions.drain).not.toHaveBeenCalled()
   })
 
-  it('on this week’s last day, Review this week opens the deck on next week; finishing records this week and stays there', async () => {
+  // Fix round 1 ruling: the last day's one button reads "Plan next week".
+  it('on this week’s last day, Plan next week opens the deck on next week; finishing records this week and stays there', async () => {
     vi.setSystemTime(new Date(2026, 9, 23, 18)) // Friday, the last day of the week of Oct 17
     // The page's week follows the URL's date, as HomeView's does.
     function Page() {
@@ -914,7 +941,7 @@ describe('WeekViewV2 — the deck', () => {
     }
     window.history.replaceState({}, '', '/week')
     render(<Page />)
-    fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan next week' }))
     expect(screen.getByTestId('deck')).toHaveAttribute('data-mode', 'full')
     expect(document.querySelector('.pv2-week')).toHaveAttribute('data-week', '2026-10-24')
     expect(props().cards.map((c) => [c.key, c.source])).toEqual([['b', 'last-week']])

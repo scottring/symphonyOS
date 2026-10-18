@@ -36,7 +36,7 @@ export const PAGE_GUIDES: Record<string, string> = {
     'Tick a task to finish it, drag it to move it, tap it to open it. ' +
     'Plan this week opens the deck: everything without a home this week, one card at a time. Finishing it marks the week planned. ' +
     'Free time (the hours with nothing scheduled, "Calendar clear") and the weather are off until turned on under ⋯, as are done work and the daily routines in each day; each choice is remembered on this device. The ⋯ menu also holds How this page works and Watch the guide. ' +
-    'To plan the week by talking, use Chat.',
+    'To plan the week by talking, use Chat; on a phone, Talk it through under ⋯.',
   today:
     'Today is for doing: what you are doing today, with what you need to do it. ' +
     '"The day" shows the day\'s hours with timed things on them and how many hours are still open. ' +

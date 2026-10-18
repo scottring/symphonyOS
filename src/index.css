@@ -4304,6 +4304,7 @@ a.home-step { color: var(--home-accent); font-weight: 500; }
   color: var(--color-neutral-600); cursor: pointer;
 }
 .daybook-title-arrow:hover { border-color: var(--color-neutral-300); color: var(--color-neutral-900); }
+@media (max-width: 767px) { .daybook-title-arrow { width: 44px; height: 44px; } }
 .daybook-title-arrow:focus-visible, .daybook-title-trigger:focus-visible, .wk-more:focus-visible, .wk-menu-item:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .daybook-title-trigger { display: inline-flex; align-items: center; gap: 8px; font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 8px; }
 .daybook-title-caret { width: 14px; height: 14px; color: var(--color-neutral-400); flex-shrink: 0; }

@@ -290,6 +290,8 @@ export function HomeHeader(props: HomeHeaderProps) {
         </>
       )}
       controls={<HomeChromeControls className="flex" />}
+      // v2 Workweek draws WeekV2, whose ⋯ menu holds the ? and ▷.
+      help={!(currentView === 'workweek' && planV2Enabled())}
     />
   )
 }

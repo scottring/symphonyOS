@@ -165,6 +165,11 @@ describe('HomeHeader week masthead card', () => {
     render(<PageHelpContext.Provider value={help}><HomeHeader currentView="month" onViewChange={() => {}} viewedDate={new Date(2026, 8, 9)} onDateChange={() => {}}
       weekStart={new Date(2026, 8, 6)} onWeekChange={() => {}} monthStart={new Date(2026, 8, 1)} onMonthChange={() => {}} /></PageHelpContext.Provider>)
     expect(screen.getByRole('button', { name: EXPLAIN_LABEL })).toBeInTheDocument()
+    cleanup()
+    // Workweek draws the same WeekV2, ⋯ and all: its masthead drops them too.
+    render(<PageHelpContext.Provider value={help}><HomeHeader currentView="workweek" onViewChange={() => {}} viewedDate={new Date(2026, 8, 9)} onDateChange={() => {}}
+      weekStart={new Date(2026, 8, 6)} onWeekChange={() => {}} monthStart={new Date(2026, 8, 1)} onMonthChange={() => {}} /></PageHelpContext.Provider>)
+    expect(screen.queryByRole('button', { name: EXPLAIN_LABEL })).toBeNull()
   })
 
   // The eyebrow names what is on screen: a Sat–Sun run is a weekend however

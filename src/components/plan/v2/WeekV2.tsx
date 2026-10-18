@@ -9,8 +9,9 @@
 // primary button, "Plan this week", where the deck may open, and a ⋯ menu
 // (WeekMenu). On the desk they fold into HomeHeader's masthead; on a phone
 // they are the page's own row. "Help me plan the rest of my week" lives in the
-// Chat bar only (WeekViewV2 still hands it the walk), and there is no "I’m
-// happy with this week": finishing the full deck marks the week planned.
+// Chat bar (WeekViewV2 still hands it the walk); a phone, which has no bar,
+// gets "Talk it through" in the ⋯ menu instead. There is no "I’m happy with
+// this week": finishing the full deck marks the week planned.
 //
 // It is chrome AROUND the existing week: the canvas, drag and drop and
 // add-to-day are WeekViewV2's, unchanged. Review (?review=1) and Plan
@@ -22,6 +23,7 @@
 import { useContext, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { Deck } from '@/components/plan/deck/Deck'
@@ -61,7 +63,7 @@ export interface WeekDeck {
   onSeeAged: () => void
 }
 
-export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
+export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   weekStart: Date
   isCurrent: boolean
   /** The week at rest: WeekViewV2's canvas. */
@@ -69,10 +71,14 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   /** Today's first item, for the fact line ("Today: …"); null when there is
    *  none, the week is not this one, or it has not loaded. */
   today?: string | null
+  /** Starts the planning conversation (the walk the Chat bar carries). Offered
+   *  in the ⋯ menu on phones only, which have no Chat bar. */
+  talk?: () => void
   /** The deck for Review, Plan and Place them (WeekViewV2). */
   deck?: WeekDeck
 }) {
   const session = usePlanningSession('weekly', weekToken(weekStart))
+  const phoneTalk = useMediaQuery('(max-width: 767px)') ? talk : undefined
   // Early in a week, the review on offer is last week's, until it is done.
   const lastWeek = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7)
   // One record of it: the page's when it passes one (an empty token reads
@@ -111,11 +117,12 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   // deck on the week after it, and last week's review opens it here.
   const target = reviewTarget({ start: weekStart, end: nextWeek }, new Date(), REVIEW_WINDOW_DAYS.week)
   // On the week's own last day there is nothing left of it to plan: the one
-  // button reviews it instead, opening the deck on the week after.
-  const lastDayReview = target === 'this' && isCurrent && !!deck
+  // button plans the next week, opening the deck on it (fix round 1 ruling).
+  const lastDayPlan = target === 'this' && isCurrent && !!deck
   // Full deck: the undealt last-week cards go to Later (WeekViewV2's drain),
-  // then last week is recorded reviewed, then this week is marked planned.
-  // "Place them" does none of these. Either way the deck gives way to the week.
+  // then last week is recorded reviewed, then this week is marked planned —
+  // unless this week ends today: a week on its last day is not marked planned
+  // (the old bar offered no mark then either). "Place them" does none of these. Either way the deck gives way to the week.
   // A drain that failed records nothing and keeps the deck open: the
   // activity strip says why, and "That's enough for this week" tries again.
   const finishDeck = async (decided: ReadonlySet<string>) => {
@@ -124,7 +131,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
       try { drained = await deck.onFinish(decided) } catch { drained = false }
       if (!drained) return
       if (!(await lastReview.finish({ wentWell: '', didnt: '' }))) showToast('Couldn’t mark last week reviewed — try again.', 'error', 5000)
-      else if (!(await markPlanned())) showToast('Couldn’t mark this week planned — try again.', 'error', 5000)
+      else if (!endsToday && !(await markPlanned())) showToast('Couldn’t mark this week planned — try again.', 'error', 5000)
     }
     setMode(null)
   }
@@ -133,7 +140,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   // One primary button, where the deck may open; none while it is open.
   const primary = deckMode ? null
     : plannable ? { label: `Plan ${reviewWord}`, onClick: () => setMode('plan') }
-      : lastDayReview ? { label: `Review ${reviewWord}`, onClick: () => setMode('review', nextWeek) }
+      : lastDayPlan ? { label: 'Plan next week', onClick: () => setMode('plan', nextWeek) }
         : null
   // The fact line: last week's progress where the deck may open (the deck on
   // this week reviews it), and today's first item.
@@ -151,7 +158,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   const controls = (
     <>
       {primary && <button type="button" className="pv2-btn wk-plan" onClick={primary.onClick} data-explain="plan-deck" data-explain-label={primary.label}>{primary.label}</button>}
-      <WeekMenu />
+      <WeekMenu talk={phoneTalk} />
     </>
   )
   // HomeHeader's masthead, when it offers a place for the header (desktop
@@ -183,7 +190,9 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
         // The week's last day: nothing left in it to plan, so say so and
         // point at planning the next one by talking.
         <div className="pv2-saved pv2-endsweek" role="note">
-          <span className="pv2-saved-text"><b>Week {weekNo} ends today.</b> Open Chat to talk through the week ahead.</span>
+          <span className="pv2-saved-text"><b>Week {weekNo} ends today.</b> {phoneTalk
+            ? <>Use “Talk it through” under ⋯ to talk through the week ahead.</>
+            : <>Open Chat to talk through the week ahead.</>}</span>
         </div>
       )}
       {deckMode && deck

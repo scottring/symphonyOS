@@ -109,6 +109,24 @@ describe('WeekV2 header — one primary button and the ⋯ menu', () => {
     expect(screen.getByRole('button', { name: 'Week options' })).toHaveFocus()
   })
 
+  it('the ⋯ menu closes when focus leaves it, but not when it moves inside it', () => {
+    const { container } = renderWeek({ deck: makeDeck() })
+    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
+    const [first, second] = screen.getAllByRole('menuitemcheckbox')
+    fireEvent.focusOut(first, { relatedTarget: second })
+    expect(screen.getByRole('menu')).toBeTruthy()
+    const outside = document.createElement('button'); container.append(outside)
+    fireEvent.focusOut(second, { relatedTarget: outside })
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('“Talk it through” is offered only where the page has one (phones)', () => {
+    const talk = vi.fn()
+    renderWeek({ deck: makeDeck(), talk })
+    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
+    expect(screen.queryByRole('menuitem', { name: 'Talk it through' })).toBeNull()
+  })
+
   it('How this page works and Watch the guide open what the ? and ▷ opened', () => {
     const help = vi.fn()
     render(
@@ -218,19 +236,23 @@ const renderAt = (url: string, props: Partial<React.ComponentProps<typeof WeekV2
 describe('WeekV2 — Review opens the deck', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null; review.finish.mockClear(); review.reviewed = null })
 
-  it('on the week’s last day, reviewing it opens the deck on the week after (whose last week it is); Leave closes it', () => {
+  // Fix round 1 ruling: on the week's last day the one button is "Plan next
+  // week", opening the deck on the week after (whose last week this is).
+  it('on the week’s last day, "Plan next week" opens the deck on the week after; Leave closes it', () => {
     vi.setSystemTime(new Date(2026, 9, 3, 9))
     const deck = makeDeck()
     renderAt('/week', { deck })
-    fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
+    expect(screen.queryByRole('button', { name: 'Review this week' })).toBeNull()
+    expect(document.querySelectorAll('.pv2-btn')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Plan next week' }))
     expect(screen.getByRole('region', { name: 'The deck' })).toBeTruthy()
     expect(screen.queryByText('The days')).toBeNull()
-    expect(where().get('review')).toBe('1')
+    expect(where().get('plan')).toBe('1')
     expect(where().get('date')).toBe('2026-10-04')
-    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^(Review|Plan) / })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Leave' }))
     expect(screen.getByText('The days')).toBeTruthy()
-    expect(where().get('review')).toBeNull()
+    expect(where().get('plan')).toBeNull()
     expect(deck.onFinish).not.toHaveBeenCalled()
     expect(review.finish).not.toHaveBeenCalled()
   })
@@ -267,6 +289,19 @@ describe('WeekV2 — Review opens the deck', () => {
     expect(session.save).toHaveBeenCalledWith({ wentWell: '', didnt: '', focus: undefined })
     expect(order).toEqual(['drain', 'review', 'planned'])
     expect(await screen.findByText('The days')).toBeTruthy()
+  })
+
+  // Fix round 1 ruling: on the week's own last day, finishing the deck there
+  // records last week's review but marks nothing planned (the old bar offered
+  // no mark on the last day either).
+  it('finishing the full deck on the current week’s last day does not mark it planned', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 9)) // Saturday, the last day of Sep 27 – Oct 3
+    session.save.mockReset(); review.finish.mockClear()
+    renderAt('/week?review=1', { deck: makeDeck() })
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
+    await vi.waitFor(() => expect(review.finish).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('The days')).toBeTruthy()
+    expect(session.save).not.toHaveBeenCalled()
   })
 
   it('a failed drain or review leaves the week unmarked; Place them never marks it', async () => {
