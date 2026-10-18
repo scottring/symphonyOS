@@ -175,7 +175,6 @@
 
 /* The days: seven equal columns in the household's week order. */
 .wc-days-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.wc-done { font-size: 12.5px; }
 .wc-spans { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .wc-span, .wc-rhythm-item {
   border: 0; background: none; padding: 0; text-align: left; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-700);
@@ -279,7 +278,6 @@
 .wc-people { display: flex; padding-top: 3px; }
 .wc-avatar { width: 18px; height: 18px; font-size: 8px; box-shadow: 0 0 0 1.5px var(--color-bg-elevated); }
 .wc-avatar + .wc-avatar { margin-left: -4px; }
-.wc-days-head .wc-done { margin-left: auto; }
 .wc-days-head .wc-rhythm { margin: 0; }
 .wc-day .wk-free { margin-top: 8px; }
 /* "+3 more" / "Show less": a day's folded rest (foldDay). */
@@ -316,13 +314,12 @@
 .wc-daychip.is-today { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
 .wc-daychip[aria-pressed="true"]:not(.is-today) { border-color: var(--color-primary-500); box-shadow: 0 0 0 2px var(--color-primary-100); }
 .wc-daychip.is-today[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--color-primary-200); }
-.wc-done-row { display: flex; justify-content: flex-end; }
 @media (max-width: 767px) {
   .wc-phone .wc-day { display: block; border-left: 0; padding: 8px 10px 12px; }
   .wc-masonry { columns: 1; }
   .wc-group-head { position: sticky; top: 0; z-index: 2; background: var(--color-bg-elevated); }
   .cw-daychip { min-width: 44px; min-height: 44px; }
-  .wc-add, .wc-done { min-height: 44px; }
+  .wc-add { min-height: 44px; }
   .cw-giveday.is-inline .cw-giveday-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) {

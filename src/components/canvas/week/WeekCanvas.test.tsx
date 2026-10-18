@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import type { Task } from '@/types/task'
 import { WeekCanvas, type CanvasDay, type WeekCanvasWriters } from './WeekCanvas'
 import { buildShelf, type ShelfGroup } from './weekShelf'
@@ -7,7 +7,8 @@ import { WEEK_PREF_KEYS } from '@/hooks/useWeekViewPrefs'
 
 // The week composition (2026-10-10, calendar first 2026-10-12): seven equal
 // days are the page; work with no day sits in one quiet "No day yet" line
-// under the title; drag places it; done waits behind one "Show done".
+// under the title; drag places it; done waits behind "Show done" in the
+// header's ⋯ menu (calm pass 2).
 
 const weekStart = new Date(2026, 9, 3) // Sat Oct 3 – Fri Oct 9
 const dayOf = (i: number) => new Date(2026, 9, 3 + i)
@@ -155,12 +156,14 @@ describe('WeekCanvas — the days', () => {
     expect(w.open).toHaveBeenCalled()
   })
 
-  it('one “Show done” reveals done work in the days, and is remembered', () => {
+  // Calm pass 2: the choice lives in the header's ⋯ menu; the page has no
+  // link of its own.
+  it('done work shows only once "Show done" is on', () => {
     show()
     expect(screen.queryByText('Old receipt')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Show done' }))
+    expect(screen.queryByRole('button', { name: /^(Show|Hide) done$/ })).toBeNull()
+    act(() => { localStorage.setItem(WEEK_PREF_KEYS.done, 'shown'); window.dispatchEvent(new Event('symphony:week-view-prefs')) })
     expect(screen.getByText('Old receipt')).toBeInTheDocument()
-    expect(localStorage.getItem(WEEK_PREF_KEYS.done)).toBe('shown')
   })
 })
 
@@ -188,28 +191,15 @@ describe('WeekCanvas — phone', () => {
     expect(screen.getByTestId(`journal-day-${d[1].key}`)).toBeInTheDocument()
   })
 
-  // 2026-10-14 browser check: at 390px the line said "Friday is wide open"
-  // while Friday had four calendar events. The sentence must read the same
-  // days at every width.
-  it('the week sentence counts events on the phone as it does on the desk', () => {
+  // Calm pass 2: the week sentence and last week's progress moved to the
+  // header's fact line (WeekV2); the phone canvas draws neither, nor a
+  // Show done link.
+  it('the phone canvas has no sentence, no progress line and no Show done', () => {
     vi.setSystemTime(new Date(2026, 9, 7, 9)) // Wed
-    const evt = (id: string, title: string) => ({ id, kind: 'event' as const, title, completed: false })
-    const week = days().map((d, i) => i === 6
-      ? { ...d, events: [evt('e1', 'No School'), evt('e2', 'iPhone Pre-order'), evt('e3', 'Kami PT'), evt('e4', 'Grampappa')] }
-      : i === 4 ? { ...d, events: [evt('c1', 'CEPI standby')] } : d)
-    show(writers(), { days: week })
-    const line = document.querySelector('.wc-week-sentence')
-    expect(line?.textContent).toContain('Today: CEPI standby.')
-    expect(line?.textContent).toContain('Friday is the full one.')
-    expect(line?.textContent).not.toMatch(/Friday is wide open/)
-  })
-
-  // Final review 2026-10-14 #5: while the week was still loading, the line
-  // said every day was wide open.
-  it('the week sentence waits until the week has loaded', () => {
-    vi.setSystemTime(new Date(2026, 9, 7, 9)) // Wed
-    show(writers(), { loaded: false })
+    show()
     expect(document.querySelector('.wc-week-sentence')).toBeNull()
+    expect(screen.queryByText(/done last week/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /^(Show|Hide) done$/ })).toBeNull()
   })
 
   it('a row of day chips picks the day shown; No day yet chips show and open on tap, but do not drag', () => {
@@ -251,17 +241,17 @@ describe('WeekCanvas — restored functions', () => {
     expect(within(screen.getByTestId('journal-day-2026-10-03')).getByRole('img', { name: /Sunny, high 64°/ })).toBeInTheDocument()
   })
 
-  it('every-day routines are written once, with a quiet Show daily / Hide daily', () => {
-    const onToggle = vi.fn()
+  // "Show daily routines in each day" is the header's ⋯ menu's (calm pass 2):
+  // the band carries no Show daily / Hide daily link, and with every line
+  // back in the days there is no band at all.
+  it('every-day routines are written once, with no link of their own', () => {
     const { rerender } = render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
-      rhythm={[{ label: 'Every day', items: [{ title: 'Walk the dog', openId: 'routine-r9-day0' }] }]} daily={{ shown: false, onToggle }} />)
+      rhythm={[{ label: 'Every day', items: [{ title: 'Walk the dog', openId: 'routine-r9-day0' }] }]} />)
     expect(screen.getByText('Walk the dog')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Show daily' }))
-    expect(onToggle).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /^(Show|Hide) daily$/ })).toBeNull()
     rerender(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
-      rhythm={[{ label: 'Every day', items: [] }]} daily={{ shown: true, onToggle }} />)
-    expect(screen.getByText('Daily routines are in each day')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Hide daily' })).toHaveAttribute('aria-pressed', 'true')
+      rhythm={[{ label: 'Every day', items: [] }]} />)
+    expect(document.querySelector('.wc-rhythm')).toBeNull()
   })
 
   // Calm pass 2: Every day, Weekdays and part-week repeats are one quiet line.
@@ -306,7 +296,8 @@ describe('WeekCanvas — calendar first', () => {
     for (const t of ['Book the cabin', 'Call the bank', 'Service the car']) expect(screen.queryByText(t)).toBeNull()
     expect(within(screen.getByRole('list', { name: 'No day yet' })).getByText('Mow the lawn')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Place them' })).toBeNull()
-    expect(screen.getByText('3 days ahead are wide open.')).toBeInTheDocument()
+    // The week sentence is gone (calm pass 2): "Today: …" is the header's.
+    expect(screen.queryByText(/wide open/)).toBeNull()
   })
 
   it('“Place them” opens the deck on this week’s cards', () => {
@@ -324,21 +315,8 @@ describe('WeekCanvas — calendar first', () => {
     expect(screen.queryByRole('button', { name: 'Place them' })).toBeNull()
   })
 
-  it('opens with last week’s progress and a way to review', () => {
-    const onReview = vi.fn()
-    show(writers(), { progress: { done: 9, onReview } })
-    expect(screen.getByText(/9 done last week/).textContent).toBe('9 done last week · Review')
-    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
-    expect(onReview).toHaveBeenCalledTimes(1)
-  })
-
-  it('once reviewed, the line says which day', () => {
-    show(writers(), { progress: { done: 9, reviewedOn: new Date(2026, 9, 2, 17), onReview: vi.fn() } }) // Fri Oct 2
-    expect(screen.getByText(/9 done last week/).textContent).toBe('9 done last week · reviewed Friday')
-    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
-  })
-
-  it('without progress there is no line', () => {
+  // The progress line is the header's fact line now (WeekV2).
+  it('draws no progress line of its own', () => {
     show()
     expect(screen.queryByText(/done last week/)).toBeNull()
   })

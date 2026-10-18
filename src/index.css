@@ -4293,6 +4293,49 @@ a.home-step { color: var(--home-accent); font-weight: 500; }
   .home-library a { min-height: 44px; align-items: center; background: color-mix(in srgb, var(--color-bg-elevated) 70%, transparent); }
 }
 
+/* Week header, calm pass 2 (approved mockup 2026-10-18): the title row
+   "‹ Oct 17 – 23 ›" (MastheadCard titleNav, HomeHeader), one quiet fact line,
+   one primary button and a ⋯ menu (WeekV2, WeekMenu). */
+.daybook-title-nav { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.daybook-title-nav > h1 { min-width: 0; margin: 0 2px; }
+.daybook-title-arrow {
+  display: inline-grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0;
+  border: 1px solid var(--color-neutral-200); border-radius: 9999px; background: var(--color-bg-elevated);
+  color: var(--color-neutral-600); cursor: pointer;
+}
+.daybook-title-arrow:hover { border-color: var(--color-neutral-300); color: var(--color-neutral-900); }
+.daybook-title-arrow:focus-visible, .daybook-title-trigger:focus-visible, .wk-more:focus-visible, .wk-menu-item:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.daybook-title-trigger { display: inline-flex; align-items: center; gap: 8px; font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 8px; }
+.daybook-title-caret { width: 14px; height: 14px; color: var(--color-neutral-400); flex-shrink: 0; }
+.daybook-title-trigger:hover .daybook-title-caret { color: var(--color-neutral-700); }
+.daybook-title-run { font: 500 12px var(--font-family-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.wk-facts { margin: 0; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
+.wk-facts .wc-quiet-link { font-size: 13px; }
+.wk-facts-reviewed { font-weight: 500; color: var(--color-sage-400); }
+.wk-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 12px; flex-wrap: wrap; margin: 0 0 12px; }
+.wk-head > .wk-facts { flex: 1 1 14rem; min-width: 0; }
+.wk-head > .wk-head-actions { margin-left: auto; }
+.wk-head-actions, .pv2-mcontrols:has(.wk-more) { display: flex; align-items: center; gap: 8px; }
+.wk-plan { border-radius: 12px; padding: 10px 18px; font-size: 14px; }
+.wk-more-wrap { position: relative; }
+.wk-more {
+  display: inline-grid; place-items: center; width: 38px; height: 38px;
+  border: 1px solid var(--color-neutral-200); border-radius: 11px; background: var(--color-bg-elevated);
+  font-size: 18px; line-height: 1; color: var(--color-neutral-600); cursor: pointer;
+}
+.wk-more:hover, .wk-more[aria-expanded="true"] { border-color: var(--color-neutral-300); color: var(--color-neutral-900); }
+.wk-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; width: 250px; padding: 6px;
+  display: flex; flex-direction: column; text-align: left;
+  background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 12px;
+  box-shadow: 0 14px 34px -16px rgb(0 0 0 / .35); font-family: var(--font-family-sans);
+}
+.wk-menu-item { display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13.5px; color: var(--color-neutral-800); text-align: left; cursor: pointer; }
+.wk-menu-item:hover, .wk-menu-item:focus-visible { background: var(--color-sage-50); }
+.wk-menu-item small { display: block; font-size: 11.5px; color: var(--color-neutral-500); }
+.wk-menu-check { display: inline-grid; place-items: center; width: 14px; height: 18px; flex-shrink: 0; color: var(--color-sage-400); }
+.wk-menu-rule { border: 0; border-top: 1px solid var(--color-neutral-200); margin: 4px 6px; }
+
 /* "What is this page?" — a small "?" beside the page title (PageHelp.tsx). */
 .page-help {
   display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 10px; vertical-align: middle;

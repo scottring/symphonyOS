@@ -1,18 +1,24 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
 import { HomeHeader } from './HomeHeader'
 import { ReferenceListsProvider } from '@/components/reference/ReferenceListsContext'
+import { PageHelpContext } from '@/components/explain/PageHelp'
+import { EXPLAIN_LABEL } from '@/lib/explain/pageGuides'
 
 vi.mock('./HomeChromeControls', () => ({ HomeChromeControls: () => null }))
 
 const ymd = (x: Date) => `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`
 
-// The shorter runs live in a menu hung off the eyebrow label, not in a row of
-// buttons under the dates.
+// The shorter runs live in a menu hung off the dates (calm pass 2: the
+// title row is "‹ {range} ›", no WEEK eyebrow), not in a row of buttons
+// under them.
+const rangeButton = () => document.querySelector<HTMLElement>('[aria-controls="week-range-menu"]')!
 function pick(name: string) {
-  fireEvent.click(screen.getByRole('button', { name: /^(Week|Weekend|Day|\d+ days)$/ }))
+  fireEvent.click(rangeButton())
   fireEvent.click(screen.getByRole('menuitem', { name }))
 }
+// The run's own name, beside the dates in the title row.
+const titleRow = () => screen.getByTestId('masthead-title-nav')
 
 function renderWeek(over: Partial<React.ComponentProps<typeof HomeHeader>> = {}) {
   const onWeekChange = vi.fn()
@@ -79,14 +85,14 @@ describe('HomeHeader week range', () => {
   // "range" of the week (Scott, 2026-09-19).
   it('does not offer Today as a range', () => {
     renderWeek()
-    fireEvent.click(screen.getByRole('button', { name: 'Week' }))
+    fireEvent.click(rangeButton())
     expect(screen.queryByRole('menuitem', { name: 'Today' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['This week', 'Weekend', '3 days', 'Custom range…'])
   })
 
   it('the menu closes on Escape and hands focus back to its button', () => {
     renderWeek()
-    const button = screen.getByRole('button', { name: 'Week' })
+    const button = rangeButton()
     fireEvent.click(button)
     expect(button).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('menuitem', { name: 'This week' })).toHaveFocus()
@@ -130,15 +136,35 @@ describe('HomeHeader week range', () => {
 })
 
 describe('HomeHeader week masthead card', () => {
-  it('is the same card Today wears, with the week named in the eyebrow and the range as the title', () => {
+  // Calm pass 2 (approved mockup 2026-10-18): the title row is
+  // "‹ Oct 17 – 23 ›" — the arrows beside the dates, no WEEK eyebrow.
+  it('is the same card Today wears: the arrows either side of the dates, no eyebrow', () => {
     renderWeek()
     const card = screen.getByTestId('masthead-card')
     expect(within(card).getByRole('heading', { level: 1, name: 'Sep 6 – 12' })).toBeInTheDocument()
-    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('Week')).toBeInTheDocument()
+    expect(screen.queryByTestId('masthead-eyebrow')).toBeNull()
+    const row = within(titleRow())
+    const order = [row.getByRole('button', { name: 'Previous week' }), row.getByRole('heading', { level: 1 }), row.getByRole('button', { name: 'Next week' })]
+    expect(order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(order[1].compareDocumentPosition(order[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText('Week')).toBeNull()
   })
   it('names a shorter range by its length', () => {
     renderWeek({ weekStart: new Date(2026, 8, 14), rangeDays: 2 })
-    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('2 days')).toBeInTheDocument()
+    expect(within(titleRow()).getByText('2 days')).toBeInTheDocument()
+  })
+
+  // The ? and ▷ live in the Week page's ⋯ menu (WeekV2); the other
+  // mastheads keep them beside the title.
+  it('on v2 the week masthead draws no ? or ▷; the month masthead keeps its ?', () => {
+    const help = vi.fn()
+    render(<PageHelpContext.Provider value={help}><ReferenceListsProvider userId="test"><HomeHeader currentView="week" onViewChange={() => {}} viewedDate={new Date(2026, 8, 9)} onDateChange={() => {}}
+      weekStart={new Date(2026, 8, 6)} onWeekChange={() => {}} monthStart={new Date(2026, 8, 1)} onMonthChange={() => {}} /></ReferenceListsProvider></PageHelpContext.Provider>)
+    expect(screen.queryByRole('button', { name: EXPLAIN_LABEL })).toBeNull()
+    cleanup()
+    render(<PageHelpContext.Provider value={help}><HomeHeader currentView="month" onViewChange={() => {}} viewedDate={new Date(2026, 8, 9)} onDateChange={() => {}}
+      weekStart={new Date(2026, 8, 6)} onWeekChange={() => {}} monthStart={new Date(2026, 8, 1)} onMonthChange={() => {}} /></PageHelpContext.Provider>)
+    expect(screen.getByRole('button', { name: EXPLAIN_LABEL })).toBeInTheDocument()
   })
 
   // The eyebrow names what is on screen: a Sat–Sun run is a weekend however
@@ -149,7 +175,7 @@ describe('HomeHeader week masthead card', () => {
     const range = onRangeChange.mock.calls[0][0] as Date[]
     // The parent stores the picked range and re-renders with it.
     rerenderWith({ weekStart: range[0], rangeDays: range.length })
-    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('Weekend')).toBeInTheDocument()
+    expect(within(titleRow()).getByText('Weekend')).toBeInTheDocument()
   })
 
   it('a custom 2-day range still says "2 days", even right after a Weekend click', () => {
@@ -160,7 +186,7 @@ describe('HomeHeader week masthead card', () => {
     // Custom's End edit computed a 2-day range from the ORIGINAL weekStart
     // (Sep 6) — feed that back in, as the real parent would.
     rerenderWith({ weekStart: new Date(2026, 8, 6), rangeDays: 2 })
-    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('2 days')).toBeInTheDocument()
+    expect(within(titleRow()).getByText('2 days')).toBeInTheDocument()
   })
 
   it('the Weekend label does not survive stepping to the next range with the chevron', () => {
@@ -168,13 +194,13 @@ describe('HomeHeader week masthead card', () => {
     pick('Weekend')
     const range = onRangeChange.mock.calls[0][0] as Date[]
     rerenderWith({ weekStart: range[0], rangeDays: range.length })
-    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('Weekend')).toBeInTheDocument()
+    expect(within(titleRow()).getByText('Weekend')).toBeInTheDocument()
 
     fireEvent.click(screen.getByLabelText('Later'))
     const stepped = onWeekChange.mock.calls[0][0] as Date
     rerenderWith({ weekStart: stepped, rangeDays: range.length })
-    expect(within(screen.getByTestId('masthead-eyebrow')).queryByText('Weekend')).not.toBeInTheDocument()
-    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('2 days')).toBeInTheDocument()
+    expect(within(titleRow()).queryByText('Weekend')).not.toBeInTheDocument()
+    expect(within(titleRow()).getByText('2 days')).toBeInTheDocument()
   })
 })
 

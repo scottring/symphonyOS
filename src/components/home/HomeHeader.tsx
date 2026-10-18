@@ -152,11 +152,12 @@ export function HomeHeader(props: HomeHeaderProps) {
   const showCustom = customOpen
 
   if (currentView === 'week') {
-    // Named by what is on screen, not by which button produced it: a Sat–Sun
-    // run is a weekend however you got there, and stepping it along to Mon–Tue
-    // makes it "2 days" with nothing to remember or clear.
-    const eyebrowLabel =
-      rangeDays === 7 ? 'Week'
+    // A shorter run is named by what is on screen, not by which button
+    // produced it: a Sat–Sun run is a weekend however you got there, and
+    // stepping it along to Mon–Tue makes it "2 days" with nothing to remember
+    // or clear. A whole week needs no name: the dates say it.
+    const runLabel =
+      rangeDays === 7 ? null
       : rangeDays === 1 ? 'Day'
       : rangeDays === 2 && weekStart.getDay() === 6 ? 'Weekend'
       : `${rangeDays} days`
@@ -164,7 +165,11 @@ export function HomeHeader(props: HomeHeaderProps) {
       setMenuOpen(false)
       if (refocus) menuButtonRef.current?.focus()
     }
-    const menuButton = onRangeChange ? (
+    // Calm pass 2 (approved mockup 2026-10-18): the title row is
+    // "‹ Oct 17 – 23 ›", no WEEK eyebrow. The dates themselves open the range
+    // menu, so the shorter runs stay one tap away.
+    const runName = runLabel && <span className="daybook-title-run">{runLabel}</span>
+    const titleNode = onRangeChange ? (
       <button
         ref={menuButtonRef}
         type="button"
@@ -173,12 +178,12 @@ export function HomeHeader(props: HomeHeaderProps) {
         aria-controls="week-range-menu"
         onClick={() => setMenuOpen((v) => !v)}
         onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setMenuOpen(true) } }}
-        className="inline-flex items-center gap-1 uppercase tracking-[0.08em] hover:text-neutral-800"
+        className="daybook-title-trigger"
       >
-        {eyebrowLabel}
-        <ChevronDown className="h-3 w-3" aria-hidden="true" />
+        {label.long}
+        <ChevronDown className="daybook-title-caret" aria-hidden="true" />
       </button>
-    ) : eyebrowLabel
+    ) : label.long
     // Rendered beside the label rather than inside it: the label slot
     // truncates (overflow hidden), which would clip a popover hung inside it.
     const menu = menuOpen && onRangeChange ? (
@@ -197,7 +202,7 @@ export function HomeHeader(props: HomeHeaderProps) {
           items[next]?.focus()
         }}
         onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && e.relatedTarget !== menuButtonRef.current) setMenuOpen(false) }}
-        className="absolute left-0 top-full z-30 mt-1 flex min-w-40 flex-col rounded-md border border-neutral-200 bg-bg-elevated py-1 shadow-lg"
+        className="absolute left-0 top-full z-30 mt-1 flex min-w-40 flex-col rounded-md border border-neutral-200 bg-bg-elevated py-1 font-sans shadow-lg"
       >
         {PRESETS.map((p) => (
           <button
@@ -250,14 +255,18 @@ export function HomeHeader(props: HomeHeaderProps) {
         />
       </span>
     ) : null
-    // Folded (desktop, v2): the week's status under the dates, and the
-    // week's own controls at the right.
+    // Folded (desktop, v2): the week's fact line under the dates, and the
+    // week's own controls (Plan this week, ⋯) at the right.
     const slots = planV2Enabled() ? props.planSlots : undefined
     return (
       <MastheadCard
         variant="page"
-        eyebrow={<PeriodNavEyebrow label={menuButton} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} trailing={menu} />}
-        title={label.long}
+        // The run's name sits after the arrows, outside the heading: the
+        // heading is the dates.
+        titleNav={{ onPrev, onNext, prevLabel, nextLabel, trailing: <>{runName}{menu}</> }}
+        title={titleNode}
+        // v2: the ? and ▷ live in the week's ⋯ menu (WeekV2).
+        help={!planV2Enabled()}
         // Shelves beside the dates, not on a row of its own (2026-09-23).
         // v2: no Shelves here — what they held is in the month column.
         action={slots || planV2Enabled() ? undefined : <ShelvesButton weekPage={weekStart} />}

@@ -31,19 +31,25 @@ describe('page-written tours', () => {
     expect(titles()).not.toContain('The shelf')
   })
 
-  it('describes the week as it is now: the days, the sentence, No day yet, planning by talking; no eight steps', () => {
+  // Calm pass 2 (2026-10-18): the header is one fact line, "Plan this week"
+  // and a ⋯ menu. The sentence and "Help me plan the rest of my week" left
+  // the page; free time and weather are off until turned on under ⋯.
+  it('describes the week as it is now: the days, the fact line, No day yet, Plan this week, the ⋯ menu', () => {
     document.body.innerHTML = `<div data-explain-root>
       <div data-explain="page-title">Oct 10 – 16</div>
-      <span data-explain="week-sentence">Three days are full.</span>
+      <p data-explain="week-facts">3 done last week · Review</p>
       <span data-explain="still-to-place">No day yet</span>
-      <button data-explain="plan-walk">Help me plan the rest of my week</button>
+      <button data-explain="plan-deck">Plan this week</button>
+      <button data-explain="week-options">⋯</button>
       <section aria-label="The days">days</section>
     </div>`
     const steps = tourFor('week')
-    expect(steps.map((s) => s.targets[0])).toEqual(['page-title', 'region:The days', 'week-sentence', 'still-to-place', 'plan-walk'])
+    expect(steps.map((s) => s.targets[0])).toEqual(['page-title', 'region:The days', 'week-facts', 'still-to-place', 'plan-deck', 'week-options'])
     const words = [PAGE_GUIDES.week, ...(PAGE_TOURS.week ?? []).map((p) => p.text)].join(' ')
-    for (const gone of [/eight steps/i, /Show opens/, /Days and Hours/, /Still to place/, /⋯/, /planning session/i]) expect(words).not.toMatch(gone)
-    expect(PAGE_GUIDES.week).toContain('Help me plan the rest of my week')
+    for (const gone of [/eight steps/i, /Show opens/, /Days and Hours/, /Still to place/, /planning session/i, /Help me plan/, /happy with this week/, /sentence/i]) expect(words).not.toMatch(gone)
+    expect(PAGE_GUIDES.week).toMatch(/"Calendar clear"[^.]*off until/)
+    expect(PAGE_GUIDES.week).toContain('Plan this week')
+    expect(PAGE_GUIDES.week).toContain('⋯')
   })
 
   it('never shows the same part twice, and a page without a tour gets none', () => {

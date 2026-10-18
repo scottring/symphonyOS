@@ -40,7 +40,8 @@ export function LearnVideoChip() {
   )
 }
 
-function LearnVideoDialog({ video, onClose }: { video: LearnVideo; onClose: () => void }) {
+/** The guide, playing; also opened from the Week page's ⋯ menu (WeekMenu). */
+export function LearnVideoDialog({ video, onClose }: { video: LearnVideo; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   useDialogFocus(true, ref, onClose)
   return createPortal(

@@ -55,7 +55,6 @@ import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
-import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import { WeekV2 } from '@/components/plan/v2/WeekV2'
 import { useWeather } from '@/hooks/useWeather'
 import { useWeekViewPrefs } from '@/hooks/useWeekViewPrefs'
@@ -74,6 +73,7 @@ import { parseSpecials } from '@/lib/today/specials'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
+import { todayItem } from '@/components/canvas/week/weekSentence'
 import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
 import { weekReviewState } from '@/lib/planning/periodReview'
@@ -231,12 +231,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // workweek); the list and the pin key on the week ANCHOR, like belongsToWeek.
   const weekAnchor = useMemo(() => weekStartAnchor(weekStart, readCadenceConfig().weekStartsOn), [weekStart])
   useEffect(() => { publishViewedWeek(weekAnchor) }, [weekAnchor])
-  // Keep the conversation invitation beside the week's status, even when
-  // Chat is closed. It is also available inside the conversation itself.
+  // The conversation's invitation, for the Chat bar. The page itself draws
+  // no entry for it (Week page, calm pass 2, 2026-10-18).
   const walk = weekWalk(weekAnchor, new Date())
   useConversationWalk(walk)
-  const { openAssistant } = useAssistantLauncher()
-  const pageWalk = walk ? { label: walk.label, onStart: () => openAssistant({ message: walk.message, autoSend: true }) } : undefined
   // Only unmount clears it — a cleanup on every change published null → week
   // and defeated the signal's same-week dedupe.
   useEffect(() => () => publishViewedWeek(null), [])
@@ -762,15 +760,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const routinesToPlace = useMemo(() => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }, { weekStart: weekAnchor, instances: weekInstances })
     .map((r) => ({ id: r.id, title: r.name })), [routines, selectedAssignees, layers, weekAnchor, weekInstances])
   // Every-day routines: written once above the days (default), or in each
-  // day — the page's remembered choice (useWeekViewPrefs, 'symphony-week-daily').
-  const { dailyInDays: dailyShown, set: setWeekPref } = useWeekViewPrefs()
-  const toggleDaily = useCallback(() => setWeekPref('dailyInDays', !dailyShown), [setWeekPref, dailyShown])
+  // day — the page's remembered choice (useWeekViewPrefs, 'symphony-week-daily',
+  // set from the header's ⋯ menu).
+  const { dailyInDays: dailyShown } = useWeekViewPrefs()
   const canvasDays = useMemo(() => {
     const onShelf = new Set(shelf.flatMap((g) => g.rows.map((r) => r.task.id)))
     // Repeated tasks too ("Pick up from FFG" each weekday), and repeats on
     // part of the week ("Mon–Thu"): written once above.
     const found = weekRhythm(journalDays, undefined, { tasks: true, partial: true })
-    const hasDaily = found.everyDay.length + found.weekdays.length + found.repeats.length > 0
     const rhythm = dailyShown ? { everyDay: [], weekdays: [], repeats: [], days: journalDays } : found
     const toItem = (e: JournalEntry): CanvasDayItem => ({ id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId, people: e.people })
     // Open calendar time is planning information: today and the days ahead,
@@ -804,7 +801,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       }
     })
     const lines = rhythmLines(rhythm)
-    return { days, lines, hasDaily }
+    return { days, lines }
   }, [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners, sources?.events])
   // Beta: drafts stay in chat. The week always shows the stored plan;
   // successful writes reach it through the shared task hooks.
@@ -896,13 +893,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
     <WeekCanvas weekStart={weekAnchor} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers} viewerId={meId ?? undefined}
-      daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}
       pointing={activity.pointing}
-      progress={deckAvailable ? { done: doneLastWeek, reviewedOn: lastReview.reviewed?.at, onReview: openReview } : undefined}
-      onPlaceUnplaced={deckAvailable ? openPlace : undefined} unplacedCount={placeCount}
-      // A calendar that is not connected has nothing to load.
-      loaded={(sources?.tasks ?? 'ready') === 'ready' && ['ready', 'not-connected'].includes(sources?.events ?? 'ready')} />
+      onPlaceUnplaced={deckAvailable ? openPlace : undefined} unplacedCount={placeCount} />
   )
+  // The header's "Today: {first item}": this week only, once its tasks and
+  // calendar are in (an unloaded day reads as empty). A calendar that is not
+  // connected has nothing to load.
+  const canvasLoaded = (sources?.tasks ?? 'ready') === 'ready' && ['ready', 'not-connected'].includes(sources?.events ?? 'ready')
+  const todayLine = weekIsCurrentFor(weekAnchor) && canvasLoaded ? todayItem(canvasDays.days, localYmd(new Date())) : null
 
   // A past week is a look-back, not a plan.
   const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
@@ -952,19 +950,19 @@ export function WeekViewV2(props: WeekViewV2Props) {
     () => deckTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) === 'done').length,
     [deckTasks, lastWeekStart],
   )
-  // The page's own way into the deck, the same URLs WeekV2's buttons set, on
-  // the week being viewed. The deck on a week reviews the week before it,
-  // which is the week the progress line counts. The one record of that
-  // review: WeekV2 finishes it through this same instance (deck.lastReview),
-  // so the line says "reviewed {Weekday}" the moment the deck closes.
+  // The page's own way into the deck ("Place them"), the same URLs WeekV2's
+  // buttons set, on the week being viewed. The deck on a week reviews the
+  // week before it, which is the week the header's fact line counts. The one
+  // record of that review: WeekV2 reads and finishes it through this same
+  // instance (deck.lastReview), so the line says "reviewed {Weekday}" the
+  // moment the deck closes.
   const lastReview = usePeriodReview('weekly', weekToken(lastWeekStart))
-  const openDeck = (mode: 'review' | 'place') => setParams((prev) => {
+  const openDeck = (mode: 'place') => setParams((prev) => {
     const p = new URLSearchParams(prev)
     p.delete('review'); p.delete('plan'); p.delete('place')
     p.set(mode, '1')
     return p
   })
-  const openReview = () => openDeck('review')
   const openPlace = () => openDeck('place')
   // The drain runs as the full deck opens, once per mount (the ref), and only
   // once the tasks are in. It is idempotent across mounts: what it moves
@@ -1044,7 +1042,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             never by dragging from it. On a narrow screen the list sits above
             the stacked days instead. */}
         {narrow && planV2Enabled() ? (
-          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} deck={deck} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} today={todayLine} deck={deck} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
             {weekListFor()}
@@ -1058,7 +1056,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {planV2Enabled() ? (
           // v2 (docs/planning/2026-09-28-planning-v2.md): the same journal and
           // list, laid out as the prototype's day column + "Any day this week".
-          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} deck={deck} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} today={todayLine} deck={deck} />
         ) : (
           <>
             {weekListFor()}

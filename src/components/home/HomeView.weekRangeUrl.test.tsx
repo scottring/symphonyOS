@@ -6,7 +6,7 @@
 // renders the real HomeView, moves the range, then renders again from the
 // URL it left behind: the same thing a reload does.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@/test/test-utils'
+import { render, screen, fireEvent, within } from '@/test/test-utils'
 import { HomeView } from './HomeView'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { AppShellChromeContext } from '@/contexts/AppShellChromeContext'
@@ -81,6 +81,10 @@ describe('/week restores the run it was showing', () => {
     window.history.replaceState(null, '', '/')
   })
 
+  // The run's name sits in the title row beside the dates (calm pass 2: no
+  // WEEK eyebrow).
+  const runName = (name: string) => within(screen.getByTestId('masthead-title-nav')).getByText(name)
+
   it('a weekend paged forward reopens on the days paged to, not this weekend', () => {
     const view = load('/week?range=weekend')
     expect(screen.getByRole('heading', { name: 'Sep 26 – 27' })).toBeInTheDocument()
@@ -88,22 +92,22 @@ describe('/week restores the run it was showing', () => {
     expect(screen.getByRole('heading', { name: 'Sep 28 – 29' })).toBeInTheDocument()
     reload(view)
     expect(screen.getByRole('heading', { name: 'Sep 28 – 29' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /2 days/ })).toBeInTheDocument()
+    expect(runName('2 days')).toBeInTheDocument()
   })
 
   it('a later weekend in the URL opens as that weekend', () => {
     load('/week?range=weekend&start=2026-10-03&days=2')
     expect(screen.getByRole('heading', { name: 'Oct 3 – 4' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Weekend/ })).toBeInTheDocument()
+    expect(runName('Weekend')).toBeInTheDocument()
   })
 
   it('a custom run picked from the inputs reopens as that run, without reopening the inputs', () => {
     const view = load('/week?range=custom')
     fireEvent.change(screen.getByLabelText('End'), { target: { value: '2026-09-22' } })
-    expect(screen.getByRole('button', { name: /3 days/ })).toBeInTheDocument()
+    expect(runName('3 days')).toBeInTheDocument()
     expect(new URLSearchParams(window.location.search).get('days')).toBe('3')
     reload(view)
-    expect(screen.getByRole('button', { name: /3 days/ })).toBeInTheDocument()
+    expect(runName('3 days')).toBeInTheDocument()
     expect(screen.queryByLabelText('End')).not.toBeInTheDocument()
   })
 

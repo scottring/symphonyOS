@@ -27,9 +27,14 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { PageMotif, type MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral }: {
+export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral, titleNav, help = true }: {
   eyebrow?: ReactNode
   title: ReactNode
+  /** Prev/next arrows either side of the title — "‹ Oct 17 – 23 ›" (Week,
+   *  calm pass 2) — with `trailing` hung beside them (a popover). */
+  titleNav?: { onPrev: () => void; onNext: () => void; prevLabel: string; nextLabel: string; trailing?: ReactNode }
+  /** The ? and ▷ beside the title. Week keeps them in its ⋯ menu instead. */
+  help?: boolean
   /** The page's one primary action, beside the title at every width —
    *  Today's "Add task". `controls` is desktop chrome; this is the verb. */
   action?: ReactNode
@@ -52,6 +57,14 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
   numeral?: string
 }) {
   const open = variant !== 'card'
+  const heading = (
+    <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'}>
+      {title}
+      {/* "What is this page?", where the page has a guide, and its
+          short video beside it until watched (learnVideos.ts). */}
+      {help && <><PageHelpButton /><LearnVideoChip /></>}
+    </h1>
+  )
   return (
     <section
       data-testid="masthead-card"
@@ -80,13 +93,18 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
           <div className="daybook-masthead-text min-w-0 flex-1">
             {eyebrow && <div data-testid="masthead-eyebrow" className="mb-1 -ml-1.5">{eyebrow}</div>}
             <div className={action ? 'daybook-title-row' : undefined}>
-              <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'}>
-                {title}
-                {/* "What is this page?", where the page has a guide, and its
-                    short video beside it until watched (learnVideos.ts). */}
-                <PageHelpButton />
-                <LearnVideoChip />
-              </h1>
+              {titleNav ? (
+                <div data-testid="masthead-title-nav" className="daybook-title-nav">
+                  <button type="button" aria-label={titleNav.prevLabel} onClick={titleNav.onPrev} className="daybook-title-arrow">
+                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  {heading}
+                  <button type="button" aria-label={titleNav.nextLabel} onClick={titleNav.onNext} className="daybook-title-arrow">
+                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  {titleNav.trailing}
+                </div>
+              ) : heading}
               {action && <div className="daybook-title-action">{action}</div>}
             </div>
             {subline && <div className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{subline}</div>}

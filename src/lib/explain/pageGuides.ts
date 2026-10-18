@@ -28,12 +28,15 @@ export const PAGE_GUIDES: Record<string, string> = {
     'Go to this week opens Week. To turn a month goal into this week\'s tasks, tell Symphony what to do this week for a goal there.',
   week:
     'Week is for doing: this week\'s tasks and when they happen. ' +
-    'The days are the picture of the week: each day column shows its events (in blue), the kids\' specials, tasks (circles) and routines (rounded squares), who carries each, and in green the hours with nothing scheduled ("Calendar clear"). ' +
+    'The arrows either side of the dates step to the previous or next week; the dates themselves open shorter runs (a weekend, 3 days, a custom range). ' +
+    'The line under the dates says how many things were done last week, whether last week was reviewed (Review opens the review), and today\'s first event. ' +
+    'The days are the picture of the week: each day column shows its events (in blue), the kids\' specials, two of its tasks (circles) and routines (rounded squares) with the rest behind "+N more", and who carries each. Things that repeat are written once above the days. ' +
     'A stay across several days is one bar over those days. Days gone by are dimmed, and this week\'s weekend folds to one line once it is over. ' +
-    'One plain sentence about the week sits under the title. ' +
-    '"No day yet" lists what is chosen for this week but has no day: drag one onto a day, or on a phone press + to pick the day. ' +
+    '"No day yet" counts what is chosen for this week but has no day; Place them deals those one card at a time. ' +
     'Tick a task to finish it, drag it to move it, tap it to open it. ' +
-    '"Help me plan the rest of my week" in the week header starts a conversation in chat. Bring your ideas, goals, tasks and routines; Symphony helps you organise them and decide what needs attention now. Review the draft and choose Save when you are ready.',
+    'Plan this week opens the deck: everything without a home this week, one card at a time. Finishing it marks the week planned. ' +
+    'Free time (the hours with nothing scheduled, "Calendar clear") and the weather are off until turned on under ⋯, as are done work and the daily routines in each day; each choice is remembered on this device. The ⋯ menu also holds How this page works and Watch the guide. ' +
+    'To plan the week by talking, use Chat.',
   today:
     'Today is for doing: what you are doing today, with what you need to do it. ' +
     '"The day" shows the day\'s hours with timed things on them and how many hours are still open. ' +
