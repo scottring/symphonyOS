@@ -382,3 +382,24 @@
   - The menu toggles prefs.
   - Finishing the full deck calls the planned mark.
   - Month, Season and Year toolbars are unchanged (existing tests stay green).
+
+### Task 13: Drag to order within a day (replaces Stage 4's priority mark)
+
+**Files:**
+- `src/lib/week/journalDays.ts`, changed so untimed and timed tasks sort by `sortOrder` (nulls last), then time, then title, sharing the comparator from `src/lib/timeUtils.ts` ~L436 where possible. Events are unchanged.
+- `src/components/canvas/week/WeekCanvas.tsx`: reorder within a day.
+  - Desktop drag drops into the gap between task rows. Dropping on another day keeps the current day-to-day move.
+  - On touch, use press and hold for about 250ms, then drag, following Today's pattern in `TodayDragProvider.tsx:75-76` and `todayDrop.ts`.
+  - The ordered list feeds `foldDay`, so the visible two are the top two.
+- `WeekViewV2.tsx`: the reorder writer uses `reorderTasksToIndex` (`src/lib/today/taskOrdering.ts`) and `updateTaskOrders` (`useSupabaseTasks`) inside `activity.run`, with an Undo that restores the previous `sortOrder` values.
+- The wall: only verify. `wallLanes.ts` leaves untimed items in their incoming order, and `useWallData` already sorts by `sortOrder`. If the wall drops that order, make it keep the order.
+
+**Tests:**
+- **journalDays:** a day with untimed and timed tasks is ordered by `sortOrder` first, then time; `null` sorts last.
+- **WeekCanvas:**
+  - Dropping task C between A and B calls the reorder writer with C at index 1.
+  - The day shows the new top two.
+  - Events never move.
+  - Dropping on another day still moves the task to that day.
+- **WeekViewV2:** the reorder goes through `activity.run`, and its Undo restores the old orders.
+- **Touch:** with a pointer or touch press held for 250ms, then a move, the drag starts. A quick tap still opens the task.

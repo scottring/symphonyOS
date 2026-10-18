@@ -107,6 +107,18 @@ Stage 1's rules ran correctly on real data, but the page was still busy (Scott's
 - **Each day shows calendar events plus at most two tasks** (timed or not, routines included), then "+N more". Only calendar events always show.
 - **Free time ("Calendar clear …") and weather are off by default.** Each can be turned on from ⋯ and is remembered per device. Class chips stay as one small line under the date.
 
+
+## Drag to order replaces the priority mark (Scott, 2026-10-18)
+
+With each day showing two tasks, **the order is the priority**. Scott drags the tasks that matter to the top, and the rest fold behind "+N more". This replaces Stage 4's tap-to-mark priority, so there is only one way to say "this matters".
+- **Which tasks:** tasks reorder within a day on the Week page by drag on desktop, and by press and hold then drag on touch (the iPad and the wall).
+- **Events never move:** calendar events stay in time order.
+- **Moving between days** works as it does today.
+- **One shared order:** it uses the existing `tasks.sort_order` (`Task.sortOrder`) and its writers (`reorderTasksToIndex` and `updateTaskOrders`, with gap 1000), so Today's All Day list and the wall's untimed list follow the same order.
+- **How a Week column sorts tasks:** by `sortOrder` (nulls last), then time, then title. The fold shows the top two, so dragging a timed task above an untimed one puts it in view.
+- **Today keeps its time sections** for timed tasks.
+- **Every reorder has Undo**, through the canvas activity.
+
 ## Why
 
 Scott and Iris have a weekly planning ritual on paper
