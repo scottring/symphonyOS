@@ -42,6 +42,24 @@ The top 3 is dropped.
 
 **Close:** priorities, the weekend at a glance, wins, and "N things are in Later".
 
+**The Week page is in this first build** (Scott, 2026-10-18). Landing on today's
+Week page after a calm session undoes it: it opens on "This past weekend · Not
+done…", gives routines, repeats, tasks and events equal weight (Today showed nine
+rows), repeats the same pickups four days running, and ends on a "No day yet"
+list. The Week page follows the same rules as the session:
+- **Open with progress, never the undone list.** The "This past weekend · Not
+  done: …" banner goes. Once a review has run, those items are decided. Before it
+  runs, one quiet line ("9 done last week · Review") links to the deck.
+- **Repeats show once.** Routines and same-time repeating tasks fold into the
+  existing "Every day / Weekdays" line at the top ("Weekdays · 5:15 Pick up from
+  FFG · 5:45 Home from school"), not into every column. Each still ticks off on its
+  day, from Today and the wall.
+- **Each day shows a few things, priorities first**, then fixed events, then tasks.
+  Past about 4 items the rest fold into "+N more", which opens that day.
+- **"No day yet" is a count, not a list:** "4 without a day · Place them" opens the
+  deck with just those cards.
+- **The session ends on Close, then lands on Today**, not on the full week.
+
 **Meals and Money** are not steps. Dinners show in The week from the meal plan;
 the meal drop-in and Monarch remain separate pieces.
 
