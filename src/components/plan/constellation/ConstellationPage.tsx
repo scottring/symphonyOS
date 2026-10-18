@@ -176,6 +176,9 @@ function Inner() {
   // say, as on Week — not a list that merely has lines. Home's checklist
   // reads it. The plan flow (PeriodPlan) says it; the header shows when.
   const planSession = usePlanningSession(SESSION_HORIZONS[level], sessionToken)
+  // The next period's record: "Plan {next}" is offered only while it is unplanned.
+  const nextToken = level === 0 ? yearToken(year + 1) : level === 1 ? seasonToken(bounds.next, seasons) : monthToken(bounds.next)
+  const nextPlanSession = usePlanningSession(SESSION_HORIZONS[level], nextToken)
   const markPlanned = async (): Promise<boolean> => {
     const mine = planSession.mine
     const ok = await planSession.save({ wentWell: mine?.wentWell ?? '', didnt: mine?.didnt ?? '', ...(mine?.focus ? { focus: mine.focus } : {}) })
@@ -640,14 +643,16 @@ function Inner() {
   // One primary button that changes with the moment (fix round 1 rulings):
   // the review that is due (the period before's while under way, its own in
   // its last days); else planning — this period until it is planned, then the
-  // next one. Year is reference: its primary is only the review that is due,
-  // or "Plan 2027" inside next year's planning window (talkFor, from Dec 25).
+  // next one while that is unplanned; both planned, nothing (final review
+  // ruling, 2026-10-18). Year is reference: its primary is only the review
+  // that is due, or planning inside a planning window (talkFor: next year's
+  // from Dec 25, this year's through Jan 14) while that year is unplanned.
   // Whatever isn't the button waits in ⋯; neither while a flow is open.
   type Offer = { label: string; due: boolean; run: () => void }
   const inFlow = reviewing || planning
   // Held until the reviews and the plan record have loaded, so the button
   // doesn't flicker from one offer to another.
-  const settled = !review.loading && !prevReview.loading && !planSession.loading
+  const settled = !review.loading && !prevReview.loading && !planSession.loading && !nextPlanSession.loading
   const reviewOffer: Offer | null = inFlow ? null
     : target === 'this' ? { label: `Review ${periodWord}`, due: !review.loading && !review.error && !review.reviewed, run: () => setReviewing(true) }
       : target === 'previous' && !prevReview.loading && !prevReview.error && !prevReview.reviewed
@@ -655,12 +660,16 @@ function Inner() {
         : null
   const planThis: Offer = { label: `Plan ${periodWord}`, due: level !== 0, run: () => setMode('plan') }
   const planNextOffer: Offer = { label: `Plan ${nextWord}`, due: level !== 0, run: () => setMode('plan', bounds.next) }
+  // A record that failed to load reads as unplanned, so planning stays offered.
+  const thisPlanned = !planSession.error && !!planSession.saved
+  const nextPlanned = !nextPlanSession.error && !!nextPlanSession.saved
   const yearTalk = level === 0 && talk
-    ? localYmd(talk.start) === localYmd(bounds.next) ? { ...planNextOffer, due: true }
-      : localYmd(talk.start) === localYmd(bounds.start) ? { ...planThis, due: true } : null
+    ? localYmd(talk.start) === localYmd(bounds.next) ? (nextPlanned ? null : { ...planNextOffer, due: true })
+      : localYmd(talk.start) === localYmd(bounds.start) ? (thisPlanned ? null : { ...planThis, due: true }) : null
     : null
+  // Both planned, planning this period waits in ⋯, as Year's does.
   const planOffer: Offer | null = inFlow ? null
-    : yearTalk ?? (!plannable ? null : !planSession.error && planSession.saved ? planNextOffer : planThis)
+    : yearTalk ?? (!plannable ? null : !thisPlanned ? planThis : !nextPlanned ? planNextOffer : { ...planThis, due: false })
   const primary = !settled ? null : reviewOffer?.due ? reviewOffer : planOffer?.due ? planOffer : null
   // One quiet fact line: Month "19 open · 26 done", Season "Sep 22 – Dec 20 ·
   // 21 goals · 4 done", Year "5 goals"; then when it was planned.
