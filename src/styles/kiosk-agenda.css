@@ -1,0 +1,52 @@
+/* ===== All of today · This weekend ===========================================
+   Everything on the family's day, or the weekend (Scott, 2026-10-18), with
+   the side column's timeline rows and checks. Columns split by hairlines; a
+   long day scrolls inside its column (the only list on the wall that does). */
+.kiosk-canvas .ka-stage { height: 100%; display: flex; flex-direction: column; gap: calc(14 * var(--p)); min-height: 0; }
+.kiosk-canvas .ka-band { display: flex; justify-content: center; }
+.kiosk-canvas .ka-views { display: flex; gap: calc(8 * var(--p)); width: calc(520 * var(--p)); flex: none; }
+.kiosk-canvas .ka-views button {
+  flex: 1; min-width: 0; height: calc(72 * var(--p)); border-radius: 999px;
+  border: calc(2 * var(--p)) solid var(--kw-line); background: var(--kw-surface); color: var(--kw-ink);
+  font: 600 calc(26 * var(--p)) var(--kw-sans); white-space: nowrap;
+}
+.kiosk-canvas .ka-views button[aria-pressed="true"] { border-color: var(--kw-sym); background: var(--kw-sym-tint); }
+.kiosk-canvas .ka-views button:active { transform: scale(.97); }
+.kiosk-canvas .ka-cols { flex: 1; min-height: 0; display: flex; column-gap: calc(48 * var(--p)); }
+.kiosk-canvas .ka-col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.kiosk-canvas .ka-rule { flex: none; width: 1px; background: var(--kw-line); }
+.kiosk-canvas .ka-lab { flex: none; margin-bottom: calc(10 * var(--p)); }
+.kiosk-canvas .ka-lab.is-gap { margin-top: calc(28 * var(--p)); }
+.kiosk-canvas .ka-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding-bottom: calc(24 * var(--p)); }
+.kiosk-canvas .ka-row.is-anytime .kw-tl { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+.kiosk-canvas .ka-row.is-anytime .kw-tl-t { display: none; }
+.kiosk-canvas .ka-row.is-done .kw-tl-w > span:first-child { text-decoration: line-through; text-decoration-thickness: calc(2 * var(--p)); color: var(--kw-muted); }
+.kiosk-canvas .ka-row.is-past { opacity: .55; }
+.kiosk-canvas .ka-allday { list-style: none; margin: 0 0 calc(12 * var(--p)); padding: 0; display: flex; flex-wrap: wrap; gap: calc(10 * var(--p)); }
+.kiosk-canvas .ka-allday li { padding: calc(10 * var(--p)) calc(20 * var(--p)); border-radius: 999px; background: var(--kw-surface); border: 1px solid var(--kw-line); font-size: calc(24 * var(--p)); font-weight: 600; color: var(--kw-ink); }
+.kiosk-canvas .ka-empty { margin-top: 0; }
+
+/* Less scrolling (Scott, 2026-10-18: "as little as possible"): one line a
+   row, who beside the title; the row is still a full touch target. */
+.kiosk-canvas .ka-row { align-items: center; min-height: calc(80 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl-ck { min-height: calc(80 * var(--p)); padding: 0; align-items: center; }
+.kiosk-canvas .ka-row .kw-tl-ck > span { width: calc(46 * var(--p)); height: calc(46 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl { min-height: calc(80 * var(--p)); padding: calc(12 * var(--p)) 0; align-items: center; grid-template-columns: calc(92 * var(--p)) minmax(0, 1fr); column-gap: calc(16 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl-t { font-size: calc(28 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl-w { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: calc(14 * var(--p)); font-size: calc(30 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl-w > span:first-child { flex: 0 1 auto; max-width: 100%; min-width: 0; }
+/* Who sits beside the title, or under it when both don't fit. */
+.kiosk-canvas .ka-row .kw-tl-by { flex: 0 1 auto; max-width: 100%; margin-top: 0; }
+.kiosk-canvas .ka-allday { margin-bottom: calc(8 * var(--p)); }
+.kiosk-canvas .ka-lab.is-gap { margin-top: calc(20 * var(--p)); }
+
+.kiosk-canvas .ka-fold {
+  flex: none; display: flex; align-items: center; gap: calc(14 * var(--p)); width: 100%; min-height: calc(72 * var(--p));
+  padding: 0 calc(12 * var(--p)); border: 0; border-top: 1px solid var(--kw-line); background: none;
+  font: 600 calc(24 * var(--p)) var(--kw-sans); color: var(--kw-muted); text-align: left;
+}
+.kiosk-canvas .ka-fold svg { width: calc(28 * var(--p)); height: calc(28 * var(--p)); }
+.kiosk-canvas .ka-fold svg:first-child { color: var(--kw-done); }
+.kiosk-canvas .ka-fold:active { background: var(--kw-sym-tint); }
+/* Today with the weekend's column: the clock's column is the widest. */
+.kiosk-canvas .ka-cols.is-3 > .ka-col:first-child { flex: 1.5; }

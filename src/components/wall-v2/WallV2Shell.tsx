@@ -103,6 +103,7 @@ import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines';
 import { isIngredientLine } from '@/lib/wall/activity/cookingModel';
 import { wallMoment } from '@/lib/wall/wallMoment';
 import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, type WallTodayRow } from '@/lib/wall/wallMomentsModel';
+import { agendaDays, agendaDay, type AgendaRow } from '@/lib/wall/wallAgenda';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
 import { memberShape } from '@/lib/wall/memberPageModel';
 import { useMemberInstanceHistory } from './useMemberInstanceHistory';
@@ -612,16 +613,16 @@ export function WallV2Shell() {
   // completed (or undone) actionable_instance for today. Refetch to refresh.
   const { skip, markDone, undoDone } = useActionableInstances();
   const [actionSheetItem, setActionSheetItem] = useState<WallV2TimelineEvent | null>(null);
-  const handleToggleComplete = useCallback((id: string, completed: boolean) => {
+  const handleToggleComplete = useCallback((id: string, completed: boolean, on: Date = now) => {
     void (async () => {
       if (id.startsWith('task-')) {
         await updateTask(id.slice('task-'.length), { completed });
       } else if (id.startsWith('routine-')) {
         const rid = id.slice('routine-'.length);
-        await (completed ? markDone('routine', rid, now) : undoDone('routine', rid, now));
+        await (completed ? markDone('routine', rid, on) : undoDone('routine', rid, on));
       } else if (id.startsWith('event-')) {
         const eid = id.slice('event-'.length);
-        await (completed ? markDone('calendar_event', eid, now) : undoDone('calendar_event', eid, now));
+        await (completed ? markDone('calendar_event', eid, on) : undoDone('calendar_event', eid, on));
       }
       await wallData.refetch();
     })();
@@ -1056,6 +1057,17 @@ export function WallV2Shell() {
     if (row) showFlash(`Done · ${row.title}`);
   }, [handleToggleComplete, todayRows, showFlash]);
 
+  // All of today · This weekend (Scott, 2026-10-18): every item the wall
+  // holds for those days, and a check that goes both ways.
+  const agenda = useMemo(() => {
+    const of = (view: 'today' | 'weekend') => agendaDays(wallData.days, view, now).map((d) => agendaDay(d, wallData.familyMembers, now));
+    return { today: of('today'), weekend: of('weekend') };
+  }, [wallData.days, wallData.familyMembers, now]);
+  const handleSetDone = useCallback((row: AgendaRow, done: boolean) => {
+    handleToggleComplete(row.id, done, row.on);
+    showFlash(done ? `Done · ${row.title}` : `Not done · ${row.title}`);
+  }, [handleToggleComplete, showFlash]);
+
   const handleWallSkip = useCallback(async (id: string, kind: 'event' | 'routine') => {
     const entityType = kind === 'routine' ? 'routine' : 'calendar_event';
     const entityId = id.replace(/^(routine-|event-)/, '');
@@ -1219,6 +1231,8 @@ export function WallV2Shell() {
           onOpenRecipe={() => { setMealDayKey(null); setRecipeViewerMeal('dinner'); }}
           onTapRow={handleTapRow}
           onCompleteRow={handleCompleteRow}
+          agenda={agenda}
+          onSetDone={handleSetDone}
           onTick={handleTick}
           onClaim={() => setShowWhoSheet(true)}
           onTapQuestion={() => (handoffAsk ? setShowWhoSheet(true) : setShowQuestionSheet(true))}

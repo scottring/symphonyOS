@@ -60,6 +60,8 @@ import { WallV2PhoneScreen, type PhoneFixture } from '../WallV2PhoneScreen'
 import { MathStage } from './MathStage'
 import type { KidMath } from '@/hooks/useKidMath'
 import { EnergyStage } from './EnergyStage'
+import { AgendaStage, AgendaViews } from './AgendaStage'
+import type { AgendaDay, AgendaRow, AgendaView } from '@/lib/wall/wallAgenda'
 import { formatWatts, hasReading, type EnergyLive, type EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
 
 /** The household tools in the bottom bar. Call is the canvas's own (it opens
@@ -111,6 +113,9 @@ export interface KioskCanvasProps {
   onTapRow: (id: string) => void
   /** Ticks a task or routine on the day's lists off. */
   onCompleteRow?: (id: string) => void
+  /** All of today · This weekend (the dock's Today), and its checks both ways. */
+  agenda?: Record<AgendaView, AgendaDay[]>
+  onSetDone?: (row: AgendaRow, done: boolean) => void
   onTick: (member: FamilyMember, row: KidRow) => void
   onClaim: () => void
   onTapQuestion: () => void
@@ -445,6 +450,11 @@ export function KioskCanvas(p: KioskCanvasProps) {
     case 'energy':
       content = <EnergyStage live={energy} now={p.now} loadPeriod={p.loadEnergyPeriod} />
       break
+    case 'agenda':
+      content = p.agenda && p.onSetDone
+        ? <AgendaStage view={stage.view} days={p.agenda} members={p.members} onSetDone={p.onSetDone} onTapRow={p.onTapRow} />
+        : <div className="kc-card kc-fill"><p className="kc-quiet-line">Nothing to show.</p></div>
+      break
   }
 
   if (takeover && week) {
@@ -500,7 +510,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
           <span className="kw-clock" {...pressClock}>{p.clock.replace(/\s?[AP]M$/i, '')}<small>{ampm}</small></span>
           <span className="kw-date">{p.dateLabel}</span>
           {p.freshness}
-          <span className="kw-grow" />
+          {stage.kind === 'agenda'
+            ? <span className="kw-grow ka-band"><AgendaViews view={stage.view} onView={(view) => dispatch({ type: 'OPEN', stage: { kind: 'agenda', view } })} /></span>
+            : <span className="kw-grow" />}
           {W && <span className="kw-wx" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
           <h1 className="kw-moment" ref={placeRef} tabIndex={-1} aria-live="polite">{title}</h1>
         </header>
@@ -522,6 +534,10 @@ export function KioskCanvas(p: KioskCanvasProps) {
           next={v1.next}
           replyInSide={talkInSide}
           math={math && math.kids.length > 0 ? { onOpen: () => { setMoreOpen(false); openMath() }, open: mathLeft > 0, current: stage.kind === 'math' && !moreOpen } : undefined}
+          agenda={p.agenda && p.onSetDone ? {
+            onOpen: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'agenda', view: p.now.getDay() === 0 || p.now.getDay() === 6 ? 'weekend' : 'today' } }) },
+            current: stage.kind === 'agenda' && !moreOpen,
+          } : undefined}
         />
       </div>
     )

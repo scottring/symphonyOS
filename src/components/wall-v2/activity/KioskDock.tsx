@@ -21,7 +21,7 @@
 // Presentation only: what a sentence does lives in useTellSymphony.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Home, LayoutGrid, Mic, MicOff, Square, Undo2, ArrowLeft, Send, Calculator } from 'lucide-react'
+import { Home, LayoutGrid, Mic, MicOff, Square, Undo2, ArrowLeft, Send, Calculator, ListChecks } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { DockCopy } from '@/lib/wall/activity/dockCopy'
 import { TALK_IDLE_MS } from '@/lib/wall/wallTalk'
@@ -45,6 +45,8 @@ export interface KioskDockProps {
   replyInSide?: boolean
   /** Math of the day, one tap from any screen; the dot means a kid's problem is still open. */
   math?: { onOpen: () => void; open: boolean; current: boolean }
+  /** Everything on today or the weekend, one tap from any screen (Scott, 2026-10-18). */
+  agenda?: { onOpen: () => void; current: boolean }
 }
 
 function NavButton({ icon: Icon, label, onClick, current, dot, aria }: { icon: LucideIcon; label: string; onClick: () => void; current?: boolean; dot?: boolean; aria?: string }) {
@@ -195,6 +197,7 @@ export function KioskDock(p: KioskDockProps) {
         <nav className="kw-nav" aria-label="Wall">
           {p.onHome && <NavButton icon={Home} label="Home" onClick={p.onHome} />}
           {p.onBack && <NavButton icon={ArrowLeft} label="Back" onClick={p.onBack} />}
+          {p.agenda && <NavButton icon={ListChecks} label="Today" onClick={p.agenda.onOpen} current={p.agenda.current} aria="All of today and this weekend" />}
           <NavButton icon={LayoutGrid} label="More" onClick={p.onMore} current={p.moreOpen} />
           {p.math && (
             <NavButton icon={Calculator} label="Math" onClick={p.math.onOpen} current={p.math.current} dot={p.math.open}

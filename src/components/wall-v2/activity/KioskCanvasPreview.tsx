@@ -34,6 +34,7 @@ import type { KidMath } from '@/hooks/useKidMath'
 import type { MathRow } from '@/lib/wall/math/mathProgress'
 import { useLocalKidMath } from './useLocalKidMath'
 import type { EnergyLive, EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
+import type { AgendaDay, AgendaRow } from '@/lib/wall/wallAgenda'
 
 /** Math of the day with fixed problems: Liam's long division (with a story,
  *  six days in a row behind it), Mia's fractions in plain words. */
@@ -77,6 +78,8 @@ const SCENE_CLOCK: Record<KioskScene, { moment: WallMoment; h: number; min: numb
   call: { moment: 'after', h: 16, min: 52 },
   math: { moment: 'after', h: 15, min: 42 },
   energy: { moment: 'dinner', h: 18, min: 20 },
+  agenda: { moment: 'after', h: 14, min: 5 },
+  'agenda-weekend': { moment: 'after', h: 14, min: 5 },
 }
 
 // Wall v2 moments (mockups 2026-10-14): each at the time its mockup shows.
@@ -156,11 +159,53 @@ function sceneState(scene: KioskScene, dateKey: string, nowMs: number): KioskSta
     call: [{ type: 'OPEN', stage: { kind: 'calling' } }],
     math: [{ type: 'OPEN', stage: { kind: 'math' } }],
     energy: [{ type: 'OPEN', stage: { kind: 'energy' } }],
+    agenda: [{ type: 'OPEN', stage: { kind: 'agenda', view: 'today' } }],
+    'agenda-weekend': [{ type: 'OPEN', stage: { kind: 'agenda', view: 'weekend' } }],
   }
   let s = events[scene].reduce(kioskReducer, initialKioskState(dateKey))
   // "Cumin — probably in the pantry": the board shows one line left off.
   if (scene === 'groceries' && s.groceries) s = kioskReducer(s, { type: 'GROCERY_TOGGLE', key: s.groceries.lines[3].key })
   return s
+}
+
+// All of today · This weekend: a school day's family items, and a weekend.
+const ar = (id: string, kind: AgendaRow['kind'], time: string | null, title: string, owners: string[], o: Partial<AgendaRow> = {}): AgendaRow =>
+  ({ id, kind, time, title, sub: null, owners, done: false, past: false, checkable: kind !== 'event', on: new Date(), ...o })
+const AGENDA: Record<'today' | 'weekend', AgendaDay[]> = {
+  today: [{
+    key: 'today', label: 'Today', isToday: true, allDay: ['Specials — Liam: Library · Mia: Art', 'Grandma visiting'],
+    timed: [
+      ar('event-school', 'event', '7:30a', 'School — Liam & Mia', [], { sub: 'Hampden Elementary', past: true }),
+      ar('task-vet', 'task', '9a', 'Call the vet about Biscuit', ['sk'], { done: true, past: true }),
+      ar('task-poop', 'task', '10a', 'Pick up dog poop in the yard', ['sk', 'li'], { past: true }),
+      ar('routine-piano', 'routine', '4:15p', 'Piano practice', ['mi']),
+      ar('event-swim', 'event', '5p', 'Swim lessons', ['li'], { sub: 'Y on Elm St' }),
+      ar('task-chili', 'task', '6p', 'Start the chili', ['ir']),
+      ar('routine-trash', 'routine', '7:30p', 'Trash and recycling out', ['li']),
+    ],
+    anytime: [
+      ar('task-form', 'task', null, 'Sign the field trip form', ['ir']),
+      ar('task-library', 'task', null, 'Return library books', ['mi']),
+      ar('routine-plants', 'routine', null, 'Water the plants', []),
+      ar('task-batteries', 'task', null, 'Buy AA batteries', [], { done: true }),
+    ],
+  }],
+  weekend: [
+    { key: 'sat', label: 'Saturday', isToday: false, allDay: ['Grandma visiting'],
+      timed: [
+        ar('event-soccer', 'event', '9a', 'Soccer — Liam', ['li'], { sub: 'Field 3' }),
+        ar('task-mow', 'task', '11a', 'Mow the lawn', ['sk']),
+        ar('event-party', 'event', '2p', 'Ava’s birthday party', ['mi']),
+        ar('routine-pizza', 'routine', '6p', 'Pizza night', []),
+      ],
+      anytime: [ar('task-gift', 'task', null, 'Wrap Ava’s present', ['mi']), ar('task-garage', 'task', null, 'Clean out the garage', ['sk', 'ir'])] },
+    { key: 'sun', label: 'Sunday', isToday: false, allDay: [],
+      timed: [
+        ar('event-brunch', 'event', '10a', 'Brunch with the Parks', []),
+        ar('routine-plan', 'routine', '4p', 'Plan the week', ['sk', 'ir']),
+      ],
+      anytime: [ar('task-bags', 'task', null, 'Pack school bags', ['li', 'mi'])] },
+  ],
 }
 
 // The Energy scene: an evening with the car charging, the sun nearly down.
@@ -307,6 +352,8 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         math={math}
         energy={energyFixture(now)}
         loadEnergyPeriod={energyPeriodFixture}
+        agenda={AGENDA}
+        onSetDone={noop}
         listenerPreview={v1Screen ? dock ?? (v1Screen === 'night' ? 'quiet' : 'idle') : undefined}
       />
     </div>

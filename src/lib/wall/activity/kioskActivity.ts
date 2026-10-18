@@ -35,6 +35,8 @@ export type KioskStage =
   | { kind: 'math' }
   /** The house's power right now (the home-energy bridge on the wall Pi). */
   | { kind: 'energy' }
+  /** Everything on today, or the weekend, each task and routine with its check. */
+  | { kind: 'agenda'; view: 'today' | 'weekend' }
 
 export type KioskStageKind = KioskStage['kind']
 
@@ -135,6 +137,7 @@ function sameStage(a: KioskStage, b: KioskStage): boolean {
   if (a.kind !== b.kind) return false
   if (a.kind === 'person' && b.kind === 'person') return a.memberId === b.memberId
   if (a.kind === 'recipe' && b.kind === 'recipe') return a.source === b.source
+  if (a.kind === 'agenda' && b.kind === 'agenda') return a.view === b.view
   return true
 }
 
@@ -170,6 +173,7 @@ export function stageHoldsOpen(s: KioskState, ctx: HoldContext): boolean {
     case 'dinner':
     case 'math':
     case 'energy':
+    case 'agenda':
       return false
     case 'cooking':
     case 'calling':
@@ -339,6 +343,8 @@ export function kioskPlace(s: KioskState, ctx: PlaceContext): string {
       return 'Math of the day'
     case 'energy':
       return 'Energy'
+    case 'agenda':
+      return stage.view === 'today' ? 'All of today' : 'This weekend'
   }
 }
 

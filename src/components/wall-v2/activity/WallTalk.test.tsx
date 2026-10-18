@@ -291,7 +291,10 @@ describe('talking to the wall: the change card', () => {
 })
 
 describe('talking to the wall: plan the week', () => {
-  beforeEach(() => { localStorage.clear() })
+  // The opening phrase reads the clock ("the rest of my week" until Sunday,
+  // then "the week of …"): pin it to the fixture's Saturday.
+  beforeEach(() => { localStorage.clear(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW) })
+  afterEach(() => { vi.useRealTimers() })
 
   it('More → Plan the week starts the session with the desktop’s opening phrase and shows the family week', async () => {
     const { ask } = setup(async (t, h) => reply(t, h, 'Let’s plan the rest of the week. Sunday has swim and a party; Friday is open.'))

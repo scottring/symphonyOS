@@ -82,6 +82,8 @@ await import('./styles/kiosk-v1.css')
 await import('./styles/kiosk-math.css')
 // The house's power (the wall's Energy stage).
 await import('./styles/kiosk-energy.css')
+// All of today · This weekend on the wall.
+await import('./styles/kiosk-agenda.css')
 await import('./styles/canvas-routines.css')
 // Discussions with someone: the top-bar count, the phone's Waiting on you.
 await import('./styles/discussions.css')
