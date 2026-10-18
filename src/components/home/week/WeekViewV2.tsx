@@ -958,7 +958,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   )
   // The page's own way into the deck, the same URLs WeekV2's buttons set, on
   // the week being viewed. The deck on a week reviews the week before it,
-  // which is the week the progress line counts.
+  // which is the week the progress line counts. The one record of that
+  // review: WeekV2 finishes it through this same instance (deck.lastReview),
+  // so the line says "reviewed {Weekday}" the moment the deck closes.
   const lastReview = usePeriodReview('weekly', weekToken(lastWeekStart))
   const openDeck = (mode: 'review' | 'place') => setParams((prev) => {
     const p = new URLSearchParams(prev)
@@ -1011,7 +1013,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const deck: WeekDeck = {
     mode: deckMode, available: deckAvailable,
     cards: deckCards, doneLastWeek, aged, actions: deckActions, stripDays,
-    loading: !tasksLoaded,
+    loading: !tasksLoaded, lastReview,
     // One run, one Undo: last week's undealt cards go to Later together (a
     // task with a day today or later keeps it). "Place them" never drains.
     onFinish: async (decided) => {

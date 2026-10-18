@@ -76,11 +76,24 @@ const deckActions = vi.hoisted(() => ({
   later: vi.fn(async () => true), laterOnDate: vi.fn(async () => true), letGo: vi.fn(async () => true), drain: vi.fn(async () => true),
 }))
 vi.mock('@/components/home/week/useDeckActions', () => ({ useDeckActions: () => deckActions }))
+// Each instance keeps its own state, as the real hook does: a finish through
+// one instance is seen only by whoever reads that instance.
 const periodReview = vi.hoisted(() => ({ token: '' as string, reviewed: null as null | { at: Date }, finish: vi.fn(async () => true) }))
-vi.mock('@/hooks/usePeriodReview', () => ({
-  usePeriodReview: (_h: string, token: string) => ({ reviewed: periodReview.reviewed, mine: null, loading: false, error: null, reload: () => {},
-    finish: (notes: unknown) => { periodReview.token = token; return periodReview.finish(notes) } }),
-}))
+vi.mock('@/hooks/usePeriodReview', async () => {
+  const { useState } = await import('react')
+  return {
+    usePeriodReview: (_h: string, token: string) => {
+      const [reviewed, setReviewed] = useState(periodReview.reviewed)
+      return { reviewed, mine: null, loading: false, error: null, reload: () => {},
+        finish: async (notes: unknown) => {
+          periodReview.token = token
+          const ok = await periodReview.finish(notes)
+          if (ok) setReviewed({ at: new Date() })
+          return ok
+        } }
+    },
+  }
+})
 // Who is looking (the deck's people scope); unset, the hook's own answer.
 const viewer = vi.hoisted(() => ({ me: null as null | { id: string } }))
 vi.mock('@/hooks/useFamilyMembers', async (importOriginal) => {
@@ -918,6 +931,16 @@ describe('WeekViewV2 — the deck', () => {
     view.unmount()
     open('?place=1', tasks)
     expect(props().cards.map((c) => c.key).sort()).toEqual(['missed', 'noDay'])
+  })
+
+  // I4: one record of last week's review — finishing the deck flips the line.
+  it('after finishing the deck the page says "reviewed {Weekday}" without a reload', async () => {
+    open('?review=1', [createMockTask({ id: 'a', title: 'Fix the gate', scheduledFor: new Date(2026, 9, 12), isAllDay: true, updatedAt: recent })])
+    await act(async () => { await props().onFinish(new Set(['a'])) })
+    await waitFor(() => expect(screen.queryByTestId('deck')).toBeNull())
+    expect(screen.getByText(/done last week/).textContent).toBe('0 done last week · reviewed Saturday')
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Review last week/ })).toBeNull()
   })
 
   it('Review sets review=1 on the viewed week', () => {

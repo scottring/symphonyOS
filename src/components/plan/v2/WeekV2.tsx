@@ -49,6 +49,9 @@ export interface WeekDeck {
   stripDays: StripDay[]
   /** The page's tasks are still loading: the deck waits rather than open empty. */
   loading?: boolean
+  /** Last week's review, the page's own record (WeekViewV2's progress line
+   *  reads it): finishing the deck writes through it, so the line updates. */
+  lastReview?: ReturnType<typeof usePeriodReview>
   /** The deck's own closing writes (the full deck's end-of-deck drain),
    *  resolving false when they failed. The review is recorded and the deck
    *  left here, in WeekV2. */
@@ -75,7 +78,10 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, deck }: {
   const session = usePlanningSession('weekly', weekToken(weekStart))
   // Early in a week, the review on offer is last week's, until it is done.
   const lastWeek = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7)
-  const lastReview = usePeriodReview('weekly', weekToken(lastWeek))
+  // One record of it: the page's when it passes one (an empty token reads
+  // nothing), so finishing the deck updates the page's line too.
+  const ownReview = usePeriodReview('weekly', deck?.lastReview ? '' : weekToken(lastWeek))
+  const lastReview = deck?.lastReview ?? ownReview
   const [, setParams] = useSearchParams()
   const deckMode = deck?.mode ?? null
   const setMode = (mode: 'review' | 'plan' | 'place' | null, week?: Date) => setParams((prev) => {
