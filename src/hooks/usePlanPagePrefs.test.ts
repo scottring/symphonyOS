@@ -8,9 +8,9 @@ afterEach(() => {
 })
 
 describe('usePlanPagePrefs', () => {
-  it('done is off and the level above is hidden by default', () => {
+  it('done is off and the level above is shown by default', () => {
     const { result } = renderHook(() => usePlanPagePrefs())
-    expect(result.current).toMatchObject({ done: false, hideAbove: true })
+    expect(result.current).toMatchObject({ done: false, hideAbove: false })
   })
 
   it('choices are remembered on this device', () => {
@@ -31,6 +31,15 @@ describe('usePlanPagePrefs', () => {
     expect(result.current.hideAbove).toBe(false)
     act(() => result.current.set('hideAbove', true))
     expect(localStorage.getItem('symphony.plan.aboveOpen')).toBe('0')
+  })
+
+  it('hideAbove is true only when explicitly hidden', () => {
+    localStorage.setItem('symphony.plan.aboveOpen', '0')
+    expect(renderHook(() => usePlanPagePrefs()).result.current.hideAbove).toBe(true)
+    localStorage.setItem('symphony.plan.aboveOpen', '1')
+    expect(renderHook(() => usePlanPagePrefs()).result.current.hideAbove).toBe(false)
+    localStorage.removeItem('symphony.plan.aboveOpen')
+    expect(renderHook(() => usePlanPagePrefs()).result.current.hideAbove).toBe(false)
   })
 
   it('a blocked storage still holds the choice for the visit', () => {
