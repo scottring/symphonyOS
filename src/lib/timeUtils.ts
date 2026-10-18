@@ -1,4 +1,5 @@
 import type { TimelineItem, TimeSection } from '@/types/timeline'
+import { compareSortOrder } from '@/lib/today/taskOrdering'
 
 /** Ambience only ("This Morning" in FocusMode). Deliberately NOT widened:
  *  wallBackground.ts already keeps its own richer local time-of-day type,
@@ -432,14 +433,8 @@ export function groupByDaySection(
   //
   // Unscheduled stays insertion-ordered: it holds routine instances, which
   // carry no sortOrder to order by.
-  groups.allday.sort((a, b) => {
-    const ao = a.originalTask?.sortOrder ?? null
-    const bo = b.originalTask?.sortOrder ?? null
-    if (ao != null && bo != null) return ao - bo || a.title.localeCompare(b.title)
-    if (ao != null) return -1
-    if (bo != null) return 1
-    return a.title.localeCompare(b.title)
-  })
+  groups.allday.sort((a, b) =>
+    compareSortOrder(a.originalTask?.sortOrder, b.originalTask?.sortOrder) || a.title.localeCompare(b.title))
   for (const { section } of DAY_SECTION_BOUNDS) groups[section].sort(sortByTime)
 
   return groups

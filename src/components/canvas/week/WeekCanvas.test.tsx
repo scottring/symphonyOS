@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within, act } from '@testing-library/react'
+import { render, screen, fireEvent, within, act, createEvent } from '@testing-library/react'
+import { useState } from 'react'
+import { reorderTasksToIndex } from '@/lib/today/taskOrdering'
+import { inDayOrder } from '@/lib/week/journalDays'
 import type { Task } from '@/types/task'
 import { WeekCanvas, type CanvasDay, type WeekCanvasWriters } from './WeekCanvas'
 import { buildShelf, type ShelfGroup } from './weekShelf'
@@ -589,5 +592,155 @@ describe('WeekCanvas — a few things a day', () => {
     const strip = screen.getByTestId('journal-day-2026-10-03').parentElement!
     const cols = getComputedStyle(strip).gridTemplateColumns.replace(/\s+/g, '')
     expect(cols).toBe(['1.5fr', '1.5fr', '1fr', '1fr', '1fr', '1fr', '1fr'].map((f) => `minmax(0,${f})`).join(''))
+  })
+})
+
+// Task 13 (Scott, 2026-10-18): with two things shown a day, the order IS the
+// priority. Drag a task within its day to put it where it belongs: on the
+// desk into the gap between two rows; on touch, press and hold, then drag.
+describe('WeekCanvas — drag to order within a day', () => {
+  const wed = dayOf(4) // Wed Oct 7
+  const A = task({ id: 'ta', title: 'Alpha', scheduledFor: wed, isAllDay: true, sortOrder: 0 })
+  const B = task({ id: 'tb', title: 'Bravo', scheduledFor: wed, isAllDay: true, sortOrder: 1000 })
+  const C = task({ id: 'tc', title: 'Charlie', scheduledFor: wed, isAllDay: true, sortOrder: 2000 })
+  const asItem = (t: Task) => ({ id: `task-${t.id}`, kind: 'task' as const, title: t.title, completed: t.completed, task: t })
+  const dentist = { id: 'event-e2', kind: 'event' as const, title: 'Dentist', time: new Date(2026, 9, 7, 9), completed: false }
+  const lunch = { id: 'event-e3', kind: 'event' as const, title: 'Lunch with Sam', time: new Date(2026, 9, 7, 12), completed: false }
+  const withDay = (items: ReturnType<typeof asItem>[], events = [dentist, lunch]): CanvasDay[] =>
+    days().map((d, i) => (i === 4 ? { ...d, events, items } : { ...d, items: [] }))
+  const wedCol = () => screen.getByTestId('journal-day-2026-10-07')
+  const shownTitles = () => within(within(wedCol()).getByRole('list', { name: 'Wednesday entries' })).getAllByRole('listitem')
+    .map((li) => li.querySelector('.cw-title')?.textContent)
+  // The rows stand 40px tall, one under another, from the top of the page.
+  const layOut = () => {
+    wedCol().querySelectorAll<HTMLElement>('li[data-order-id]').forEach((li, i) => {
+      li.getBoundingClientRect = () => ({ top: i * 40, bottom: i * 40 + 40, left: 0, right: 100, width: 100, height: 40, x: 0, y: i * 40, toJSON: () => ({}) }) as DOMRect
+    })
+  }
+  const dropAt = (target: Element, d: ReturnType<typeof dt>, clientY: number) => {
+    const over = createEvent.dragOver(target, { dataTransfer: d.t })
+    Object.defineProperty(over, 'clientY', { value: clientY })
+    fireEvent(target, over)
+    const drop = createEvent.drop(target, { dataTransfer: d.t })
+    Object.defineProperty(drop, 'clientY', { value: clientY })
+    fireEvent(target, drop)
+  }
+  const lift = (title: string) => {
+    const d = dt()
+    fireEvent.dragStart(within(wedCol()).getByText(title).closest('li')!, { dataTransfer: d.t })
+    d.arm()
+    return d
+  }
+  const orderWriters = () => ({ ...writers(), reorderTask: vi.fn() })
+
+  it('dropping C between A and B asks to put C at place 1', () => {
+    const w = orderWriters()
+    render(<WeekCanvas weekStart={weekStart} days={withDay([A, B, C].map(asItem))} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+    fireEvent.click(within(wedCol()).getByRole('button', { name: '+1 more' }))
+    layOut()
+    const d = lift('Charlie')
+    dropAt(wedCol(), d, 45)
+    expect(w.reorderTask).toHaveBeenCalledWith(C, ['ta', 'tb', 'tc'], 1)
+    expect(w.moveTask).not.toHaveBeenCalled()
+  })
+
+  it('while dragging within its day, the gap it would land in is marked, not "Drop on"', () => {
+    const w = orderWriters()
+    render(<WeekCanvas weekStart={weekStart} days={withDay([A, B].map(asItem))} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+    layOut()
+    const d = lift('Bravo')
+    const over = createEvent.dragOver(wedCol(), { dataTransfer: d.t })
+    Object.defineProperty(over, 'clientY', { value: 5 })
+    fireEvent(wedCol(), over)
+    expect(within(wedCol()).getByText('Alpha').closest('li')).toHaveClass('is-gap-above')
+    expect(within(wedCol()).queryByText(/Drop on/)).toBeNull()
+  })
+
+  it('the day then shows the new top two', () => {
+    function Page() {
+      const [tasks, setTasks] = useState([A, B, C])
+      const w = { ...writers(), reorderTask: (t: Task, ids: string[], to: number) => {
+        const writes = reorderTasksToIndex(ids, t.id, to, new Map(tasks.map((x) => [x.id, x.sortOrder ?? null])))
+        setTasks((was) => was.map((x) => { const hit = writes.find((wr) => wr.id === x.id); return hit ? { ...x, sortOrder: hit.sortOrder } : x }))
+      } }
+      return <WeekCanvas weekStart={weekStart} days={withDay(inDayOrder(tasks.map(asItem)))} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />
+    }
+    render(<Page />)
+    expect(shownTitles()).toEqual(['Alpha', 'Bravo'])
+    fireEvent.click(within(wedCol()).getByRole('button', { name: '+1 more' }))
+    layOut()
+    dropAt(wedCol(), lift('Charlie'), 5)
+    fireEvent.click(within(wedCol()).getByRole('button', { name: 'Show less' }))
+    expect(shownTitles()).toEqual(['Charlie', 'Alpha'])
+    expect(within(wedCol()).getByRole('button', { name: '+1 more' })).toBeInTheDocument()
+  })
+
+  it('events never move: they do not drag, and the order asked for holds tasks only', () => {
+    const w = orderWriters()
+    const walk = { id: 'routine-r9', kind: 'routine' as const, title: 'Walk Jax', time: new Date(2026, 9, 7, 7), completed: false, routineId: 'r9' }
+    render(<WeekCanvas weekStart={weekStart} days={withDay([walk as never, ...[A, B].map(asItem)])} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+    fireEvent.click(within(wedCol()).getByRole('button', { name: '+1 more' }))
+    const events = within(within(wedCol()).getByRole('list', { name: 'Wednesday events' })).getAllByRole('button')
+    expect(events.map((b) => b.textContent)).toEqual(['9aDentist', '12pLunch with Sam'])
+    for (const b of events) expect(b.closest('[draggable="true"]')).toBeNull()
+    layOut()
+    dropAt(wedCol(), lift('Bravo'), 5)
+    expect(w.reorderTask).toHaveBeenCalledWith(B, ['ta', 'tb'], 0)
+    expect(within(within(wedCol()).getByRole('list', { name: 'Wednesday events' })).getAllByRole('button').map((b) => b.textContent))
+      .toEqual(['9aDentist', '12pLunch with Sam'])
+  })
+
+  it('dropping on another day still moves the task to that day, and orders nothing', () => {
+    const w = orderWriters()
+    render(<WeekCanvas weekStart={weekStart} days={withDay([A, B].map(asItem))} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+    const d = lift('Alpha')
+    dropAt(screen.getByTestId('journal-day-2026-10-08'), d, 5)
+    expect(w.moveTask).toHaveBeenCalledWith(A, dayOf(5))
+    expect(w.reorderTask).not.toHaveBeenCalled()
+  })
+
+  describe('on touch', () => {
+    const original = window.matchMedia
+    beforeEach(() => {
+      window.matchMedia = ((query: string) => ({
+        matches: query.includes('pointer: coarse'), media: query, onchange: null,
+        addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia
+      vi.useRealTimers()
+      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+      vi.setSystemTime(new Date(2026, 9, 3, 9))
+    })
+    afterEach(() => { window.matchMedia = original })
+    const touch = (y: number) => ({ touches: [{ clientX: 10, clientY: y }], changedTouches: [{ clientX: 10, clientY: y }] })
+
+    it('a press held for 250ms, then a move, starts the drag; the row does not use the browser’s own drag', () => {
+      const w = orderWriters()
+      render(<WeekCanvas weekStart={weekStart} days={withDay([A, B].map(asItem))} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+      const row = within(wedCol()).getByText('Alpha').closest('li')!
+      expect(row).toHaveAttribute('draggable', 'false')
+      fireEvent.touchStart(row, touch(10))
+      act(() => { vi.advanceTimersByTime(260) })
+      fireEvent.touchMove(document, touch(60))
+      expect(screen.getByText('Drop here to take its day away')).toBeInTheDocument()
+      expect(row).toHaveClass('is-lifted')
+      fireEvent.touchEnd(document, touch(60))
+      // dnd-kit takes its after-drag click guard off 50ms later.
+      act(() => { vi.advanceTimersByTime(100) })
+      expect(row).not.toHaveClass('is-lifted')
+    })
+
+    it('a quick tap still opens the task, and starts no drag', () => {
+      const w = orderWriters()
+      render(<WeekCanvas weekStart={weekStart} days={withDay([A, B].map(asItem))} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+      const title = within(wedCol()).getByRole('button', { name: 'Alpha' })
+      fireEvent.touchStart(title, touch(10))
+      act(() => { vi.advanceTimersByTime(100) })
+      fireEvent.touchEnd(title, touch(10))
+      fireEvent.click(title)
+      act(() => { vi.advanceTimersByTime(300) })
+      expect(w.open).toHaveBeenCalledWith('task-ta')
+      expect(screen.queryByText('Drop here to take its day away')).toBeNull()
+      expect(title.closest('li')).not.toHaveClass('is-lifted')
+    })
   })
 })

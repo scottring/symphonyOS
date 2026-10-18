@@ -176,8 +176,10 @@ export interface Task {
   supportsGoalTaskId?: string
   /** Fun-audit mark (Best Laid Plans): this item exists because it's fun. */
   isFun?: boolean
-  /** Manual position among items with no time (all-day, unscheduled, group
-   *  members). Gap-based: increments of 1000 so a drag usually rewrites one
-   *  row. null = never manually ordered. Timed items sort by time, not this. */
+  /** Manual position: among items with no time on Today (all-day,
+   *  unscheduled, group members), and among all of a day's tasks, timed or
+   *  not, in a Week column (journalDays `byDayOrder`). Gap-based: increments
+   *  of 1000 so a drag usually rewrites one row. null = never manually
+   *  ordered. Today's timed sections sort by time, not this. */
   sortOrder?: number | null
 }

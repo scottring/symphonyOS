@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { buildJournalDays } from './journalDays'
+import { buildJournalDays, inDayOrder } from './journalDays'
+import type { TimelineItem } from '@/types/timeline'
 import { buildWeekRoutineItems } from '@/components/home/week/weekRoutineItems'
 import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -135,5 +136,55 @@ describe('buildJournalDays — the day’s own person', () => {
     const mon = days.find((d) => d.key === '2026-10-05')!.entries.find((e) => e.title === 'FFG pickup')!
     expect(thu.people).toEqual(['iris'])
     expect(mon.people).toEqual(['scott'])
+  })
+})
+
+// Task 13 (Scott, 2026-10-18): with two things shown a day, the order IS the
+// priority. A Week column orders its tasks by their manual order (the same
+// sort_order Today's All Day reads), then time, then title; calendar events
+// keep time order and never take part.
+describe('the day’s order', () => {
+  const on = (h?: number) => (h === undefined ? new Date(2026, 9, 5) : new Date(2026, 9, 5, h))
+  const tasks = [
+    createMockTask({ id: 'late', title: 'Late call', scheduledFor: on(16), isAllDay: false }),
+    createMockTask({ id: 'zoo', title: 'Zoo tickets', scheduledFor: on(), isAllDay: true }),
+    createMockTask({ id: 'second', title: 'Dentist forms', scheduledFor: on(15), isAllDay: false, sortOrder: 1000 }),
+    createMockTask({ id: 'early', title: 'Early call', scheduledFor: on(8), isAllDay: false }),
+    createMockTask({ id: 'apples', title: 'Apples', scheduledFor: on(), isAllDay: true }),
+    createMockTask({ id: 'first', title: 'Pay rent', scheduledFor: on(), isAllDay: true, sortOrder: 0 }),
+  ]
+  const dentist = { id: 'event-d', type: 'event', title: 'Dentist', startTime: on(9), endTime: on(10) } as unknown as TimelineItem
+
+  it('orders a day’s tasks, timed or not, by their order first, then time, then title; never ordered last', () => {
+    const { days } = build([], [], { tasks, eventItems: [dentist] })
+    expect(inDayOrder(days[2].entries).map((e) => e.task?.id)).toEqual(['first', 'second', 'early', 'late', 'apples', 'zoo'])
+  })
+
+  it('leaves the calendar events out, still in time order among the day’s entries', () => {
+    const { days } = build([], [], { tasks, eventItems: [dentist] })
+    expect(inDayOrder(days[2].entries).some((e) => e.kind === 'event')).toBe(false)
+    const timed = days[2].entries.filter((e) => e.time).map((e) => e.title)
+    expect(timed).toEqual(['Early call', 'Dentist', 'Dentist forms', 'Late call'])
+  })
+
+  it('an order of 0 is a real first place, not “never ordered”', () => {
+    const { days } = build([], [], { tasks: [
+      createMockTask({ id: 'a', title: 'A', scheduledFor: on(), isAllDay: true }),
+      createMockTask({ id: 'z', title: 'Z', scheduledFor: on(), isAllDay: true, sortOrder: 0 }),
+    ] })
+    expect(inDayOrder(days[2].entries).map((e) => e.task?.id)).toEqual(['z', 'a'])
+  })
+
+  it('a done task waits at the end, whatever its order', () => {
+    const { days } = build([], [], { tasks: [
+      createMockTask({ id: 'done', title: 'Done', scheduledFor: on(), isAllDay: true, sortOrder: 0, completed: true }),
+      createMockTask({ id: 'open', title: 'Open', scheduledFor: on(), isAllDay: true }),
+    ] })
+    expect(inDayOrder(days[2].entries).map((e) => e.task?.id)).toEqual(['open', 'done'])
+  })
+
+  it('the day’s untimed entries follow the same order (as Today’s All Day does)', () => {
+    const { days } = build([], [], { tasks })
+    expect(days[2].entries.filter((e) => !e.time).map((e) => e.task?.id)).toEqual(['first', 'apples', 'zoo'])
   })
 })

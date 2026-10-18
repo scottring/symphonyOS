@@ -286,6 +286,20 @@
 .wc-sometime { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); }
 .wc-sometime-label { font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; color: var(--color-neutral-500); }
 .wc.is-dragging .wc-day:not(.is-over) { border-left-style: dashed; }
+/* Drag to order within a day (Task 13): the gap it would land in is a line;
+   on touch the held row stays put, dimmed, and a chip follows the finger. */
+.wc-dayrow.is-gap-above { box-shadow: inset 0 2px 0 var(--color-primary-500); }
+.wc-dayrow.is-gap-below { box-shadow: inset 0 -2px 0 var(--color-primary-500); }
+.wc-dayrow.is-lifted { opacity: 0.4; }
+.wc-lift {
+  display: inline-block; max-width: 220px; padding: 6px 10px; border-radius: var(--radius-md);
+  background: var(--color-bg-elevated); border: 1px solid var(--color-primary-500); box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+  font-family: var(--font-family-sans); font-size: 13.5px; color: var(--color-neutral-900); pointer-events: none;
+}
+@media (pointer: coarse) {
+  /* A held press lifts the row: no text selection or callout under the finger. */
+  .wc-dayrow { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+}
 
 /* Narrower desks: the days stack, one under another, today first, then the
    days ahead, then the days gone by (Friday session, Stage 1) — four across

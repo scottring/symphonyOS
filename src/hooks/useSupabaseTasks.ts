@@ -2407,7 +2407,8 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
    * breakage. Returns `true` when every row persisted, `false` when the order
    * was rolled back, so a caller that needs to know can still branch.
    */
-  const updateTaskOrders = useCallback(async (writes: OrderWrite[]): Promise<boolean> => {
+  // A null order puts a row back to never-ordered (an Undo of its first order).
+  const updateTaskOrders = useCallback(async (writes: readonly (Omit<OrderWrite, 'sortOrder'> & { sortOrder: number | null })[]): Promise<boolean> => {
     if (writes.length === 0) return true
 
     const byId = new Map(writes.map((w) => [w.id, w.sortOrder]))

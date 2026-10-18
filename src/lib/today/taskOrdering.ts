@@ -15,6 +15,21 @@ export interface OrderWrite {
   sortOrder: number
 }
 
+/**
+ * Manual order, nulls last: ordered items first by their sortOrder, never-ordered
+ * ones after. 0 when they tie (both null, or the same number), so a caller adds
+ * its own tiebreak. A null must NOT be read as 0, which is a real first place.
+ * Shared by Today's All Day (timeUtils) and a Week column (journalDays).
+ */
+export function compareSortOrder(a: number | null | undefined, b: number | null | undefined): number {
+  const ao = a ?? null
+  const bo = b ?? null
+  if (ao != null && bo != null) return ao - bo
+  if (ao != null) return -1
+  if (bo != null) return 1
+  return 0
+}
+
 /** The sortOrder for a newly appended item. */
 export function nextTaskSortOrder(items: { sortOrder?: number | null }[]): number {
   const orders = items.map((i) => i.sortOrder).filter((o): o is number => o != null)

@@ -23,13 +23,24 @@
 // Drag a row onto a day to place it, a day's row onto another day to move
 // it, back onto the No day yet line to take its day away. While dragging, the
 // target day says where it will land.
+//
+// Within its own day a task drops into the gap between two rows: the order is
+// the priority (Task 13, Scott 2026-10-18 — a day shows two, so drag what
+// matters to the top). The desk drags natively; touch (the iPad, the wall, a
+// phone) presses and holds 250ms, then drags (dnd-kit's TouchSensor, Today's
+// constraints), so a tap still opens and a swipe still scrolls. Calendar
+// events never move.
 // Every write is the caller's (WeekViewV2 routes them through the canvas
 // activity strip with Undo); this component draws and asks.
 //
 // Phone (<768px): a row of day chips, the chosen day, then No day yet;
-// tap opens a chip's task (no drag on touch).
+// tap opens a chip's task; press and hold orders the day.
 
-import { useContext, useState, type DragEvent, type ReactNode } from 'react'
+import { useContext, useState, type DragEvent, type HTMLAttributes, type ReactNode } from 'react'
+import {
+  DndContext, DragOverlay, TouchSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors,
+  type DragEndEvent, type DragMoveEvent, type DragStartEvent,
+} from '@dnd-kit/core'
 import { createPortal } from 'react-dom'
 import type { Task } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
@@ -42,13 +53,15 @@ import { formatTimeCompact } from '@/lib/dateHelpers'
 import { isPlanDrag, readPlanDrag, writePlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { PlanMastheadSlotsContext } from '@/components/plan/v2/planMastheadSlots'
-import { CompactWeekRow, type CompactRow } from './CompactWeekList'
+import { CompactWeekRow, type CompactRow, type CompactWeekRowProps } from './CompactWeekList'
 import { GiveItADay } from './GiveItADay'
 import { dayChipLabel } from './compactWeek'
 import type { ShelfGroup } from './weekShelf'
 import { foldDay } from '@/lib/week/foldDay'
 import { useWeekViewPrefs } from '@/hooks/useWeekViewPrefs'
 import { isWeekend } from '@/lib/dateUtils'
+import { dragPointerY } from '@/lib/today/dragPointer'
+import { gapAt, gapToListIndex } from '@/lib/week/dayReorder'
 
 export interface CanvasDayItem {
   /** Selectable id ('task-…', 'routine-…', 'event-…'). */
@@ -114,6 +127,10 @@ export interface WeekCanvasWriters {
   triageTask?: (task: Task, when: TriageWhen) => void
   /** No day yet triage: a specific date (and time). */
   scheduleTask?: (task: Task, at: Date, isAllDay: boolean) => void
+  /** Within its day, put `task` in the gap at `toIndex` of the day's tasks
+   *  (`orderedIds`, as the day reads them; `reorderTasksToIndex`'s terms).
+   *  Absent: a drop on the task's own day does nothing. */
+  reorderTask?: (task: Task, orderedIds: string[], toIndex: number) => void
 }
 
 export interface WeekCanvasProps {
@@ -145,6 +162,27 @@ export interface WeekCanvasProps {
 
 type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
 type Picker = { key: string } | null
+/** A touch drag's row: what a native drag would have written, and the state. */
+type Lift = { payload: PlanDragPayload; drag: Drag; title: string }
+
+/** Touch: press and hold, then drag (Today's TodayDragProvider constraints) —
+ *  a tap still opens the row and a swipe still scrolls the page. */
+const TOUCH_HOLD = { delay: 250, tolerance: 5 }
+
+/** A day (or the No day yet line) a touch drag can land on. */
+function DropZone({ id, as: Tag = 'div', ...rest }: { id: string; as?: 'div' | 'section' } & HTMLAttributes<HTMLElement> & Record<`data-${string}`, string | undefined>) {
+  const { setNodeRef } = useDroppable({ id })
+  return <Tag ref={setNodeRef as (el: HTMLElement | null) => void} {...rest} />
+}
+
+/** A day's row that lifts on a held press (touch only; the desk drags natively). */
+function LiftableRow<T>({ liftId, lift, ...props }: CompactWeekRowProps<T> & { liftId: string; lift: Lift | null }) {
+  const { setNodeRef, listeners, isDragging } = useDraggable({ id: liftId, data: lift ?? undefined, disabled: !lift })
+  return (
+    <CompactWeekRow {...props} className={`${props.className ?? ''}${isDragging ? ' is-lifted' : ''}`}
+      liProps={{ ...props.liProps, ref: setNodeRef, ...(listeners as HTMLAttributes<HTMLLIElement> | undefined) }} />
+  )
+}
 
 /** More than this many with no day fold to one line under the days. */
 const NODAY_FOLD_AT = 4
@@ -153,6 +191,10 @@ const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', mo
 
 export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, unplacedCount, viewerId }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
+  // Touch first (the iPad, the wall): rows lift on a held press instead of the
+  // browser's own drag, which a long press would otherwise start too.
+  const coarse = useMediaQuery('(pointer: coarse)')
+  const touchSensors = useSensors(useSensor(TouchSensor, { activationConstraint: TOUCH_HOLD }))
   const slots = useContext(PlanMastheadSlotsContext)
   // The page's view choices, remembered on this device (calm pass 2).
   const prefs = useWeekViewPrefs()
@@ -160,6 +202,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [drag, setDrag] = useState<Drag | null>(null)
   const [overDay, setOverDay] = useState<string | null>(null)
   const [overShelf, setOverShelf] = useState(false)
+  // Dragging within its own day: the gap among the shown task rows it would land in.
+  const [overGap, setOverGap] = useState<{ key: string; gap: number } | null>(null)
+  const [lifted, setLifted] = useState<string | null>(null)
   const [picker, setPicker] = useState<Picker>(null)
   const [weekendOpen, setWeekendOpen] = useState(false)
   const [nodayOpen, setNodayOpen] = useState<boolean | null>(null)
@@ -199,7 +244,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const dayOcc = (routineId: string, key: string) => days.find((d) => d.key === key)?.items.find((it) => it.routineId === routineId) ?? null
 
   // ── drag ───────────────────────────────────────────────────────────────
-  const endDrag = () => { setDrag(null); setOverDay(null); setOverShelf(false) }
+  const endDrag = () => { setDrag(null); setOverDay(null); setOverShelf(false); setOverGap(null); setLifted(null) }
   const startDrag = (ev: DragEvent, payload: PlanDragPayload, d: Drag) => {
     writePlanDrag(ev.dataTransfer, payload)
     setDrag(d); setPicker(null)
@@ -219,11 +264,31 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     }
     writers.foreignDrop?.(day.date, p)
   }
+  // ── order within a day ────────────────────────────────────────────────
+  // Only a task orders, within the day it is on; events and routines keep
+  // their places. The gap is read from the shown task rows (a folded day
+  // shows two) and turned into a place among all the day's tasks.
+  const reorders = (d: Drag | null, key: string) => !!writers.reorderTask && d?.kind === 'task' && d.fromKey === key
+  const orderRows = (section: Element) => [...section.querySelectorAll<HTMLElement>('.wc-items li[data-order-id]')]
+  const gapIn = (section: Element, y: number) => gapAt(y, orderRows(section).map((r) => r.getBoundingClientRect()))
+  const showGap = (key: string, section: Element, y: number) => {
+    const gap = gapIn(section, y)
+    if (overGap?.key !== key || overGap.gap !== gap) setOverGap({ key, gap })
+  }
+  const reorderAt = (day: CanvasDay, taskId: string, section: Element, y: number) => {
+    const placed = dayTask(taskId)
+    if (!placed?.item.task || placed.day.key !== day.key) return
+    const ids = taskIds(dayLists(day).all)
+    const to = gapToListIndex(gapIn(section, y), orderRows(section).map((r) => r.dataset.orderId!), ids)
+    writers.reorderTask?.(placed.item.task, ids, to)
+  }
   const dayDrop = (day: CanvasDay) => ({
     onDragOver: (e: DragEvent) => {
       if (!isPlanDrag(e.dataTransfer)) return
       e.preventDefault(); e.dataTransfer.dropEffect = 'move'
       if (overDay !== day.key) setOverDay(day.key)
+      if (reorders(drag, day.key)) showGap(day.key, e.currentTarget, e.clientY)
+      else if (overGap) setOverGap(null)
     },
     onDragLeave: (e: DragEvent) => {
       if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
@@ -233,9 +298,57 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       const p = readPlanDrag(e.dataTransfer)
       if (!p) { endDrag(); return }
       e.preventDefault(); e.stopPropagation()
+      const placed = p.kind === 'task' ? dayTask(p.id) : null
+      if (writers.reorderTask && placed?.day.key === day.key) { endDrag(); reorderAt(day, p.id, e.currentTarget, e.clientY); return }
       dropOnDay(day, p)
     },
   })
+  // ── touch: press and hold, then drag ──────────────────────────────────
+  const liftOf = (e: { active: { data: { current?: unknown } } }) => (e.active.data.current ?? null) as Lift | null
+  const sectionOf = (key: string) => document.querySelector(`[data-day-key="${key}"]`)
+  const onTouchStart = (e: DragStartEvent) => {
+    const l = liftOf(e)
+    if (!l) return
+    setDrag(l.drag); setPicker(null); setLifted(l.title)
+  }
+  const onTouchMove = (e: DragMoveEvent) => {
+    const l = liftOf(e)
+    const over = e.over ? String(e.over.id) : null
+    const y = dragPointerY(e)
+    setOverShelf(over === 'noday')
+    const key = over?.startsWith('day:') ? over.slice(4) : null
+    if (overDay !== key) setOverDay(key)
+    const section = key ? sectionOf(key) : null
+    if (key && section && y != null && reorders(l?.drag ?? null, key)) showGap(key, section, y)
+    else if (overGap) setOverGap(null)
+  }
+  const onTouchEnd = (e: DragEndEvent) => {
+    const l = liftOf(e)
+    const over = e.over ? String(e.over.id) : null
+    const y = dragPointerY(e)
+    endDrag()
+    if (!l || !over) return
+    if (over === 'noday') {
+      const placed = l.drag.kind === 'task' && l.drag.fromKey ? dayTask(l.payload.id) : null
+      if (placed?.item.task) writers.unplaceTask(placed.item.task)
+      return
+    }
+    const day = days.find((d) => `day:${d.key}` === over)
+    if (!day) return
+    const section = sectionOf(day.key)
+    if (reorders(l.drag, day.key)) { if (section && y != null) reorderAt(day, l.payload.id, section, y); return }
+    dropOnDay(day, l.payload)
+  }
+  const withTouch = (node: ReactNode) => (
+    <DndContext sensors={touchSensors} collisionDetection={pointerWithin}
+      onDragStart={onTouchStart} onDragMove={onTouchMove} onDragEnd={onTouchEnd} onDragCancel={endDrag}>
+      {node}
+      {typeof document !== 'undefined' && createPortal(
+        <DragOverlay dropAnimation={null}>{lifted && <div className="wc-lift">{lifted}</div>}</DragOverlay>,
+        document.body,
+      )}
+    </DndContext>
+  )
   // A day's task dropped back on the shelf loses its day, keeps its week.
   const shelfDrop = {
     onDragOver: (e: DragEvent) => {
@@ -252,6 +365,21 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       writers.unplaceTask(placed.item.task)
     },
   }
+
+  // A few things a day (foldDay, calm pass 2): the calendar events always
+  // show, and beside them two things, timed or not, routines included, in the
+  // day's order (the top two are the priority). A row Symphony is proposing or
+  // pointing at stays in sight. The rest wait behind "+N more".
+  const dayLists = (day: CanvasDay) => {
+    const all = day.items.filter((it) => showDone || !it.completed)
+    const fold = foldDay([
+      ...day.events.map(() => ({ event: true, it: null })),
+      ...all.map((it) => ({ event: false, pinned: !!it.proposed || pointedTask(it.task?.id), it })),
+    ])
+    const shown = openDays.has(day.key) ? all : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
+    return { all, fold, shown }
+  }
+  const taskIds = (items: CanvasDayItem[]) => items.flatMap((it) => (it.task && !it.proposed ? [it.task.id] : []))
 
   // ── the shelf ──────────────────────────────────────────────────────────
   const pick = (rowKey: string, title: string, onPick: (d: Date) => void, current?: string) => (picker?.key === rowKey && (
@@ -271,7 +399,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       </span>
     )
   }
-  const dayRow = (it: CanvasDayItem, day: CanvasDay) => {
+  const dayRow = (it: CanvasDayItem, day: CanvasDay, order?: { index: number; count: number }) => {
     if (it.proposed) {
       return (
         <li key={`${day.key}:${it.id}`} className={`cw-row wc-dayrow is-proposed${it.kind === 'routine' ? ' is-routine' : ''}${pointedTask(it.task?.id) ? ' is-pointed' : ''}`} data-testid="proposed-row">
@@ -288,11 +416,20 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const key = `${day.key}:${it.id}`
     const entityId = it.task?.id ?? it.routineId ?? it.id
     const row: CompactRow<CanvasDayItem> = { key, id: entityId, title: it.title, item: it, completed: it.completed, meta: it.time ? formatTimeCompact(it.time) : null }
+    // The gap a drag within this day would land in, drawn as a line.
+    const gap = order && overGap?.key === day.key ? overGap.gap : null
+    const gapCls = gap === null ? '' : gap === order!.index ? ' is-gap-above' : gap === order!.count && order!.index === order!.count - 1 ? ' is-gap-below' : ''
+    // Touch: a day's own task or routine lifts on a held press (not "Sometime").
+    const lift: Lift | null = !coarse || !order || it.completed ? null
+      : it.task ? { payload: { kind: 'task', id: it.task.id, date: day.key, title: it.title }, drag: { kind: 'task', id: it.task.id, fromKey: day.key }, title: it.title }
+        : it.routineId ? { payload: { kind: 'routine', id: it.routineId, date: day.key, title: it.title }, drag: { kind: 'occ', id: it.routineId, fromKey: day.key }, title: it.title }
+          : null
     return (
-      <CompactWeekRow key={key} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}${pointedTask(it.task?.id) ? ' is-pointed' : ''}`}
+      <LiftableRow key={key} liftId={key} lift={lift} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}${pointedTask(it.task?.id) ? ' is-pointed' : ''}${gapCls}`}
+        liProps={{ 'data-order-id': order && it.task ? it.task.id : undefined }}
         onComplete={(x) => (x.task ? writers.toggleTask(x.task) : writers.toggleRoutine(x, day.date))}
         onOpen={(x) => writers.open(x.id)}
-        onDragStart={phone ? undefined : (x, ev) => x.task
+        onDragStart={phone || coarse ? undefined : (x, ev) => x.task
           ? startDrag(ev, { kind: 'task', id: x.task.id, date: day.key, title: x.title }, { kind: 'task', id: x.task.id, fromKey: day.key })
           : x.routineId ? startDrag(ev, { kind: 'routine', id: x.routineId, date: day.key, title: x.title }, { kind: 'occ', id: x.routineId, fromKey: day.key }) : undefined}
         onDragEnd={endDrag}
@@ -300,27 +437,23 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     )
   }
   const dayColumn = (day: CanvasDay, col?: number) => {
-    const allItems = day.items.filter((it) => showDone || !it.completed)
-    // A few things a day (foldDay, calm pass 2): the calendar events always
-    // show, and beside them two things, timed or not, routines included. A
-    // row Symphony is proposing or pointing at stays in sight. The rest wait
-    // behind "+N more".
+    const { all: allItems, fold, shown: items } = dayLists(day)
     const dayOpen = openDays.has(day.key)
-    const fold = foldDay([
-      ...day.events.map(() => ({ event: true, it: null })),
-      ...allItems.map((it) => ({ event: false, pinned: !!it.proposed || pointedTask(it.task?.id), it })),
-    ])
-    const items = dayOpen ? allItems : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
+    // The shown task rows, numbered for the gap marker.
+    const orderable = items.filter((it) => it.task && !it.proposed)
+    const orderOf = (it: CanvasDayItem) => { const index = orderable.indexOf(it); return index === -1 ? undefined : { index, count: orderable.length } }
     const sometime = (day.sometime ?? []).filter((it) => showDone || !it.completed)
     const specials = day.specials ?? []
     const empty = !day.events.length && !allItems.length && !sometime.length && !specials.length
     const over = overDay === day.key
+    // Within its own day a drag orders: the gap shows, not "Drop on …".
+    const ordering = over && reorders(drag, day.key)
     // A day gone by steps back; today and the days ahead stay at full strength.
     const gone = day.key < todayKey
     return (
-      <section key={day.key} className={`wc-day${day.key === todayKey ? ' is-today' : ''}${gone ? ' is-past' : ''}${over ? ' is-over' : ''}${empty ? ' is-empty' : ''}${pointedDay(day.key) ? ' is-pointed' : ''}`}
+      <DropZone as="section" id={`day:${day.key}`} key={day.key} className={`wc-day${day.key === todayKey ? ' is-today' : ''}${gone ? ' is-past' : ''}${over && !ordering ? ' is-over' : ''}${ordering ? ' is-ordering' : ''}${empty ? ' is-empty' : ''}${pointedDay(day.key) ? ' is-pointed' : ''}`}
         style={col ? { gridColumn: col } : undefined}
-        aria-label={longDay(day.date)} data-testid={`journal-day-${day.key}`} {...dayDrop(day)}>
+        aria-label={longDay(day.date)} data-testid={`journal-day-${day.key}`} data-day-key={day.key} {...dayDrop(day)}>
         <header className="wc-dayhead">
           <span className="wc-dayname">{day.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
           <span className="wc-daynum">{day.date.getDate()}</span>
@@ -328,7 +461,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           {prefs.weather && day.weather && <span className="wc-weather">{day.weather}</span>}
         </header>
         <div className="wc-daybody">
-        {over && <p className="wc-drop-hint" aria-live="polite">Drop on {dayChipLabel(day.date)}</p>}
+        {over && !ordering && <p className="wc-drop-hint" aria-live="polite">Drop on {dayChipLabel(day.date)}</p>}
         {specials.length > 0 && (
           <p className="today-specials wc-specials">
             {specials.map((sp) => <span key={sp.who} className="today-special-chip"><span>{sp.who}</span>{sp.special}</span>)}
@@ -346,7 +479,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             ))}
           </ul>
         )}
-        {items.length > 0 && <ul className="cw-rows wc-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{items.map((it) => dayRow(it, day))}</ul>}
+        {items.length > 0 && <ul className="cw-rows wc-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{items.map((it) => dayRow(it, day, orderOf(it)))}</ul>}
         {fold.hidden > 0 && (
           <button type="button" className="canvas-link wc-quiet-link wc-more" aria-expanded={dayOpen} onClick={() => toggleDayOpen(day.key)}>
             {dayOpen ? 'Show less' : `+${fold.hidden} more`}
@@ -367,7 +500,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         )}
         {prefs.freeTime && day.free && <p className="wk-free">{day.free}</p>}
         </div>
-      </section>
+      </DropZone>
     )
   }
   // Routines that happen every day are written once above the days; "Show
@@ -434,7 +567,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const nodayPointed = unplaced.some((t) => pointedTask(t.id))
   const nodayShown = nodayPointed || (nodayOpen ?? nodayCount <= NODAY_FOLD_AT)
   const nodayTray = (nodayCount > 0 || draggingPlaced) && (
-    <div className={`wc-noday${overShelf ? ' is-over' : ''}${nodayShown ? ' is-open' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
+    <DropZone id="noday" className={`wc-noday${overShelf ? ' is-over' : ''}${nodayShown ? ' is-open' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
       {nodayShown || nodayCount === 0 ? (
         <>
           <p className="wc-noday-head">
@@ -461,7 +594,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           <span className="wc-noday-show">{draggingPlaced ? 'Drop here to take its day away' : 'Show'}</span>
         </button>
       )}
-    </div>
+    </DropZone>
   )
   // On the desk and tablet, No day yet is one line: a count, and a way into
   // the deck. The titles live on the cards, not on the page. It still takes a
@@ -470,7 +603,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // keep their rows, because the deck cannot place them.
   const toPlace = unplacedCount ?? unplaced.length
   const nodayLine = (toPlace > 0 || routinesToPlace.length > 0 || draggingPlaced) && (
-    <div className={`wc-noday wc-noday-line${overShelf ? ' is-over' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
+    <DropZone id="noday" className={`wc-noday wc-noday-line${overShelf ? ' is-over' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
       <p className="wc-noday-text">
         {toPlace > 0 && <span className="wc-noday-n">{toPlace} without a day</span>}
         {toPlace > 0 && onPlaceUnplaced && <> · <button type="button" className="canvas-link wc-quiet-link wc-noday-place" onClick={onPlaceUnplaced}>Place them</button></>}
@@ -481,7 +614,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           {routinesToPlace.map((r) => nodayRow('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
         </ul>
       )}
-    </div>
+    </DropZone>
   )
   // This week's weekend, once over, folds to one line: when it was, what
   // happened, what was left (2026-10-05, #137) — room for the days ahead. One
@@ -519,8 +652,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
 
   if (phone) {
     const sel = days.find((d) => d.key === selectedKey)
-    return (
-      <div className="wc wc-phone">
+    return withTouch(
+      <div className={`wc wc-phone${drag ? ' is-dragging' : ''}`}>
         {subtitleNode}
         <div className="wc-daychips" role="group" aria-label="Days">
           {days.map((d) => (
@@ -534,10 +667,10 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {sel && dayColumn(sel)}
         {nodayTray}
         {rhythmNode}
-      </div>
+      </div>,
     )
   }
-  return (
+  return withTouch(
     <div className={`wc${drag ? ' is-dragging' : ''}`}>
       {subtitleNode}
       <section className="wc-days" aria-label="The days">
@@ -566,6 +699,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         </div>
         {nodayLine}
       </section>
-    </div>
+    </div>,
   )
 }

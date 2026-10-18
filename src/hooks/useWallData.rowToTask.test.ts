@@ -1,7 +1,7 @@
 // The wall's one snake_case → Task mapper. Fixtures carry the RAW column
 // shape (uuid[] in assigned_to_all), because that is what the real rows have.
 import { describe, it, expect, vi } from 'vitest'
-import { rowToTask } from './useWallData'
+import { rowToTask, TASK_COLUMNS } from './useWallData'
 
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'test-user' } }) }))
 vi.mock('@/hooks/useGoogleCalendar', () => ({ useGoogleCalendar: () => ({ isConnected: false, fetchEvents: vi.fn() }) }))
@@ -26,5 +26,17 @@ describe('rowToTask', () => {
   it('leaves assignedToAll undefined for null or empty', () => {
     expect(rowToTask({ ...raw, assigned_to_all: null }).assignedToAll).toBeUndefined()
     expect(rowToTask({ ...raw, assigned_to_all: [] }).assignedToAll).toBeUndefined()
+  })
+
+  // Task 13: the order dragged on the Week page is the wall's untimed order
+  // too (groupByDaySection reads sortOrder). Never ordered stays null, not 0.
+  it('carries sort_order through as sortOrder, null when never ordered', () => {
+    expect(rowToTask({ ...raw, sort_order: 1000 }).sortOrder).toBe(1000)
+    expect(rowToTask({ ...raw, sort_order: 0 }).sortOrder).toBe(0)
+    expect(rowToTask({ ...raw, sort_order: null }).sortOrder).toBeNull()
+  })
+
+  it('asks the database for sort_order', () => {
+    expect(TASK_COLUMNS.split(',').map((c) => c.trim())).toContain('sort_order')
   })
 })

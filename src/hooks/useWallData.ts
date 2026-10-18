@@ -32,8 +32,10 @@ const FAMILY_LAYER: ReadonlySet<Layer> = new Set(['family'])
 
 // Only the columns the wall actually renders. Avoids `select('*')`, which pulls
 // heavy/unused columns (links jsonb, codes, etc.) on every poll and dominates egress.
-const TASK_COLUMNS =
-  'id, title, completed, created_at, updated_at, scheduled_for, needed_on, is_all_day, is_waiting, context, category, notes, phone_number, contact_id, assigned_to, assigned_to_all, project_id, parent_task_id, location, location_place_id'
+// sort_order: the day's order dragged on Today or the Week page, which the
+// untimed list follows (Task 13). Exported for its test only.
+export const TASK_COLUMNS =
+  'id, title, completed, created_at, updated_at, scheduled_for, needed_on, is_all_day, is_waiting, context, category, notes, phone_number, contact_id, assigned_to, assigned_to_all, project_id, parent_task_id, location, location_place_id, sort_order'
 
 /** One snake_case → Task mapper for every task query on the wall, so a column
  *  added to TASK_COLUMNS can't reach one list and silently miss another.
@@ -66,6 +68,7 @@ export function rowToTask(t: any): Task {
     parentTaskId: t.parent_task_id ?? undefined,
     location: t.location ?? undefined,
     locationPlaceId: t.location_place_id ?? undefined,
+    sortOrder: t.sort_order ?? null,
   }
 }
 

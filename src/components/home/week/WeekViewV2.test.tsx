@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
-import { render, screen, within, fireEvent, waitFor, act, cleanup } from '@/test/test-utils'
+import { render, screen, within, fireEvent, waitFor, act, cleanup, createEvent } from '@/test/test-utils'
 import { WeekViewV2 } from './WeekViewV2'
 import { useSearchParams } from 'react-router-dom'
 import { staleForDrain } from '@/lib/planning/drain'
@@ -27,9 +27,11 @@ afterEach(() => { for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.re
 // The real tasks hook, with the tick's result under the test's control — the
 // Undo toast is only pushed once the write says it succeeded.
 const toggleResult = { ok: true }
+// The day's order writer (Task 13), a spy.
+const orders = vi.hoisted(() => ({ update: vi.fn(async (_w: { id: string; sortOrder: number | null }[]) => true) }))
 vi.mock('@/hooks/useSupabaseTasks', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useSupabaseTasks')>()
-  return { ...actual, useSupabaseTasks: () => ({ ...actual.useSupabaseTasks(), toggleTask: async () => toggleResult.ok }) }
+  return { ...actual, useSupabaseTasks: () => ({ ...actual.useSupabaseTasks(), toggleTask: async () => toggleResult.ok, updateTaskOrders: orders.update }) }
 })
 
 // The assistant launcher, stubbed: the page draws no walk entry of its own (calm pass 2).
@@ -282,7 +284,8 @@ describe('WeekViewV2 journal spread', () => {
     turnOn('Show done')
     expect(rows()).not.toContain('Renew license')
     fireEvent.click(monday.getByRole('button', { name: '+3 more' }))
-    expect(rows()).toEqual(['6:50aGutter quotes', '2:30pCall the bank', 'Return library books', 'Book the plumber', 'Renew license'])
+    // Never-ordered untimed work reads by title, as Today's All Day does (Task 13).
+    expect(rows()).toEqual(['6:50aGutter quotes', '2:30pCall the bank', 'Book the plumber', 'Return library books', 'Renew license'])
     expect(rows()).toContain('Renew license')
     expect(monday.getByText('Renew license').closest('li')).toHaveClass('is-done')
   })
@@ -362,6 +365,39 @@ describe('WeekViewV2 journal spread', () => {
     fireEvent.click(within(screen.getByTestId('journal-day-2026-09-14')).getByRole('button', { name: 'Complete Return library books' }))
     await waitFor(() => expect(screen.getByTestId('receipt')).toHaveTextContent('failed:false'))
     toggleResult.ok = true
+  })
+
+  // Task 13 (Scott, 2026-10-18): the order is the priority. A drag within a
+  // day writes the shared sort_order through the activity strip, and Undo
+  // puts back the orders it had, never-ordered included.
+  it('dropping a task between two in its day orders it through the activity, with an Undo that restores the old orders', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
+    orders.update.mockClear()
+    const mon = new Date(2026, 8, 14)
+    const tasks = [
+      createMockTask({ id: 'a', title: 'Alpha', scheduledFor: mon, isAllDay: true, sortOrder: 0 }),
+      createMockTask({ id: 'b', title: 'Bravo', scheduledFor: mon, isAllDay: true, sortOrder: 1000 }),
+      createMockTask({ id: 'c', title: 'Charlie', scheduledFor: new Date(2026, 8, 14, 9), isAllDay: false }),
+    ]
+    render(withActivity(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} />))
+    vi.useRealTimers()
+    const day = screen.getByTestId('journal-day-2026-09-14')
+    // Ordered first, so the never-ordered timed one waits behind "+1 more".
+    fireEvent.click(within(day).getByRole('button', { name: '+1 more' }))
+    day.querySelectorAll<HTMLElement>('li[data-order-id]').forEach((li, i) => {
+      li.getBoundingClientRect = () => ({ top: i * 40, bottom: i * 40 + 40 }) as DOMRect
+    })
+    const data: Record<string, string> = {}
+    const dt = { setData: (k: string, v: string) => { data[k] = v }, getData: (k: string) => data[k] ?? '', types: [] as string[], effectAllowed: '', dropEffect: '' }
+    fireEvent.dragStart(within(day).getByText('Charlie').closest('li')!, { dataTransfer: dt })
+    dt.types = Object.keys(data)
+    const drop = createEvent.drop(day, { dataTransfer: dt })
+    Object.defineProperty(drop, 'clientY', { value: 45 })
+    fireEvent(day, drop)
+    await waitFor(() => expect(orders.update).toHaveBeenCalledWith([{ id: 'c', sortOrder: 500 }]))
+    await waitFor(() => expect(screen.getByTestId('receipt')).toHaveTextContent('saved:true'))
+    fireEvent.click(screen.getByRole('button', { name: 'Undo it' }))
+    await waitFor(() => expect(orders.update).toHaveBeenLastCalledWith([{ id: 'c', sortOrder: null }]))
   })
 
   // Scott, 2026-10-03: routines are always on the week (folded per day); the

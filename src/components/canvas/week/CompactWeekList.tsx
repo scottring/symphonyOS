@@ -21,7 +21,7 @@
 // Dragging is native HTML5 drag; each caller writes its own payload, so the
 // drop targets that already read them keep working unchanged.
 
-import { useState, type DragEvent, type ReactNode } from 'react'
+import { useState, type ComponentPropsWithRef, type DragEvent, type ReactNode } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { useArrived } from '@/contexts/CanvasActivityContext'
 import { groupByParent, type ParentGroup, type RowParent } from './compactWeek'
@@ -143,17 +143,20 @@ export interface CompactWeekRowProps<T> {
   /** Drawn inside the row, after it (a picker). */
   children?: ReactNode
   className?: string
+  /** More for the row itself: a ref, data attributes, a touch drag's
+   *  listeners (the Week page's press-and-hold reorder). */
+  liProps?: ComponentPropsWithRef<'li'> & Record<`data-${string}`, string | undefined>
 }
 
 /** One compact row: check, wrapping title, small meta, and + (or a menu). */
-export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, extra, under, children, className }: CompactWeekRowProps<T>) {
+export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, extra, under, children, className, liProps }: CompactWeekRowProps<T>) {
   const arrived = useArrived(row.id)
   const done = !!row.completed
   const movable = !!onDragStart && !row.readOnly && !row.onDay && !done && !disabled
   const busy = busyKey === row.key
   const cls = ['canvas-item', 'cw-row', row.onDay ? 'is-on-today' : '', done ? 'is-done' : '', row.readOnly ? 'is-read' : '', arrived ? 'is-arrived' : '', className ?? ''].filter(Boolean).join(' ')
   return (
-    <li className={cls} draggable={movable} onDragStart={movable ? (ev) => onDragStart!(row.item, ev) : undefined}
+    <li {...liProps} className={cls} draggable={movable} onDragStart={movable ? (ev) => onDragStart!(row.item, ev) : undefined}
       onDragEnd={movable && onDragEnd ? () => onDragEnd(row.item) : undefined}>
       {row.readOnly || !onComplete
         ? <span className="cw-dash" aria-hidden="true" />

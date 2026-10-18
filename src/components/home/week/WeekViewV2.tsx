@@ -33,7 +33,8 @@ import { useDayChoices } from '@/hooks/useDayChoices'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal } from './WeekJournal'
-import { buildJournalDays, type JournalDay, type JournalEntry } from '@/lib/week/journalDays'
+import { buildJournalDays, inDayOrder, type JournalDay, type JournalEntry } from '@/lib/week/journalDays'
+import { reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { routineMoveKind } from '@/lib/week/routineMove'
 import type { DensitySources } from '@/lib/planning/dayDensity'
 import { formatWeekRange } from '@/lib/dateHelpers'
@@ -212,7 +213,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // Create-gesture wiring
   const navigate = useNavigate()
-  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask, userId, keepForward } = useSupabaseTasks()
+  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, updateTaskOrders, pushTask, userId, keepForward } = useSupabaseTasks()
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember, members: familyMembers } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
@@ -790,7 +791,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
         date: d.date, key: d.key,
         events: events.filter((ev) => !parseSpecials(ev.title)),
         specials,
-        items: [...d.entries.filter((e) => e.kind !== 'event'), ...d.foldedRoutines].filter((e) => !(e.task && onShelf.has(e.task.id))).map(toItem),
+        // The day's order (Task 13): tasks by the order dragged into them, then
+        // time, then title; the top two are what the day shows.
+        items: [...inDayOrder(d.entries), ...d.foldedRoutines].filter((e) => !(e.task && onShelf.has(e.task.id))).map(toItem),
         sometime: journalWeekend && journalWeekend.satIndex === i ? journalWeekend.sometime.map(toItem) : undefined,
         dinners: d.dinners.length
           ? d.dinners.map(({ event, label }) => ({ id: `event-${event.google_event_id || event.id}`, label }))
@@ -869,6 +872,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
           onFocus: (id, day) => onUpdateTask(id, { plannedOn: day }),
         }), { ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) } })
       },
+      // Drag to order within a day (Task 13): the shared sort_order Today's All
+      // Day and the wall read, usually one row; Undo writes back every order
+      // it changed, a never-ordered row back to never-ordered.
+      reorderTask: (t, orderedIds, toIndex) => {
+        const byId = new Map(tasks.map((x) => [x.id, x]))
+        const was = new Map(orderedIds.map((id) => [id, byId.get(id)?.sortOrder ?? null]))
+        const writes = reorderTasksToIndex(orderedIds, t.id, toIndex, was)
+        if (writes.length === 0) return
+        const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))
+        const up = toIndex < orderedIds.indexOf(t.id)
+        void activity.run(`Move “${t.title}” ${up ? 'up' : 'down'}`, () => updateTaskOrders(writes), {
+          ids: writes.map((w) => w.id), undo: async () => { await updateTaskOrders(before) },
+        })
+      },
       scheduleTask: (t, at, isAllDay) => {
         const before = placementOf(t)
         void activity.run(`Give “${t.title}” ${short(at)}`, () => gated.pushTask(t.id, isAllDay ? atMidnight(at) : at) as Promise<boolean | void>, {
@@ -878,7 +895,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, toggleTask, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated])
+  }, [activity, onUpdateTask, toggleTask, updateTaskOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated])
   const canvasSpans = useMemo(() => {
     const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }
     const wd = (i: number) => journalDays[i].date.toLocaleDateString('en-US', { weekday: 'short' })

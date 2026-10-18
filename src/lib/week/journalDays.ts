@@ -17,6 +17,7 @@ import { eventDays, isMultiDayEvent } from '@/lib/week/journalSpread'
 import { routineDayIndex, routineDayState, routineIdOf } from '@/lib/planning/weekDensity'
 import { weekendBand, sometimeThisWeekend } from '@/lib/week/weekendBand'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
+import { compareSortOrder } from '@/lib/today/taskOrdering'
 
 export interface JournalEntry {
   /** Selectable id — 'task-<uuid>', 'event-<id>', 'routine-<id>'. */
@@ -43,7 +44,8 @@ export interface JournalDay {
   key: string
   /** Single-day all-day calendar events (a holiday, "no school"). */
   notes: CalendarEvent[]
-  /** Timed entries in time order, then untimed tasks. */
+  /** Timed entries in time order, then untimed tasks in day order
+   *  (`byDayOrder`). A Week column reads its tasks through `inDayOrder`. */
   entries: JournalEntry[]
   /** Untimed routine occurrences that are the day's, behind one fold line. */
   foldedRoutines: JournalEntry[]
@@ -196,11 +198,34 @@ export function buildJournalDays(a: BuildJournalDaysArgs): { days: JournalDay[];
 
   for (const d of days) {
     const t = timed.get(d.key)!.sort((x, y) => x.time!.getTime() - y.time!.getTime())
-    const u = untimed.get(d.key)!.sort((x, y) => Number(x.completed) - Number(y.completed))
+    const u = untimed.get(d.key)!.sort(byDayOrder)
     d.entries = [...t, ...u]
     d.foldedRoutines.sort((x, y) => Number(x.completed) - Number(y.completed))
   }
   return { days, weekend }
+}
+
+type Orderable = Pick<JournalEntry, 'kind' | 'time' | 'title' | 'completed' | 'task'>
+
+/**
+ * A day's order (Task 13, Scott 2026-10-18: with two things shown a day, the
+ * order IS the priority). Done waits at the end; then the manual order the
+ * user dragged (`Task.sortOrder`, nulls last, the same one Today's All Day
+ * reads); then time, a timed thing before an untimed one; then the title.
+ * Routines and events carry no order of their own, so they sit among the
+ * never-ordered by their time.
+ */
+export function byDayOrder(a: Orderable, b: Orderable): number {
+  return Number(a.completed) - Number(b.completed)
+    || compareSortOrder(a.task?.sortOrder, b.task?.sortOrder)
+    || (a.time && b.time ? a.time.getTime() - b.time.getTime() : a.time ? -1 : b.time ? 1 : 0)
+    || a.title.localeCompare(b.title)
+}
+
+/** A Week column's things in day order: the entries without the calendar
+ *  events, which keep their time order and never move (Task 13). */
+export function inDayOrder<T extends Orderable>(entries: T[]): T[] {
+  return entries.filter((e) => e.kind !== 'event').sort(byDayOrder)
 }
 
 /** A routine's people: the day's own person when this occurrence has one
