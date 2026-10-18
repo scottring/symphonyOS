@@ -4,6 +4,7 @@
 
 import type { Task } from '@/types/task'
 import { weekReviewState } from './periodReview'
+import { localYmd, weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 
 export type DeckSource = 'this-week' | 'last-week' | 'inbox'
 
@@ -24,6 +25,18 @@ export type DeckMode = 'full' | 'place'
 export function deckModeOf(params: URLSearchParams): DeckMode | null {
   if (params.get('review') === '1' || params.get('plan') === '1') return 'full'
   return params.get('place') === '1' ? 'place' : null
+}
+
+/** The deck reviews the week that is ending, opened from the week after it
+ *  (the deck on week W looks back at W − 1). So it opens only on this week,
+ *  and on next week during this week's last day. Any other week ignores the
+ *  deck's URL and shows itself. */
+export function deckWeekAllowed(weekStart: Date, now: Date, weekStartsOn: WeekStart): boolean {
+  const current = weekStartAnchor(now, weekStartsOn)
+  if (localYmd(weekStart) === localYmd(current)) return true
+  const next = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 7)
+  const lastDay = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 6)
+  return localYmd(weekStart) === localYmd(next) && localYmd(now) === localYmd(lastDay)
 }
 
 /** How many weeks a task has been carried on (week commitments marked carried). */

@@ -75,7 +75,7 @@ import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
 import { weekReviewState } from '@/lib/planning/periodReview'
 import type { WeekDeck } from '@/components/plan/v2/WeekV2'
-import { buildDeck, deckModeOf } from '@/lib/planning/deck'
+import { buildDeck, deckModeOf, deckWeekAllowed } from '@/lib/planning/deck'
 import { staleForDrain, undealtLastWeek } from '@/lib/planning/drain'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
@@ -914,8 +914,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // comes from the page's own scoped list: the layers (domain filter) and the
   // people lens, never the unfiltered tasks — a private Work task never
   // reaches a Family view, as a card or as a count.
+  // Only on this week, or next week on this week's last day; elsewhere the
+  // deck's URL is ignored and the week shows itself.
   const [params] = useSearchParams()
-  const deckMode = deckModeOf(params)
+  const deckAvailable = deckWeekAllowed(weekAnchor, new Date(), readCadenceConfig().weekStartsOn)
+  const deckMode = deckAvailable ? deckModeOf(params) : null
   const tasksLoaded = (sources?.tasks ?? 'ready') === 'ready'
   const lastWeekStart = useMemo(() => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() - 7), [weekAnchor])
   const nextWeekStart = useMemo(() => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7), [weekAnchor])
@@ -980,14 +983,15 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
   }), [weekAnchor, events, scopedTasks])
   const deck: WeekDeck = {
+    mode: deckMode, available: deckAvailable,
     cards: deckCards, doneLastWeek, aged, actions: deckActions, stripDays,
     loading: !tasksLoaded,
-    // One run, one Undo: last week's undealt cards go to Later together.
-    // "Place them" deals no last-week cards, so it never drains.
-    onFinish: (decided) => {
-      if (deckMode !== 'full') return
-      const left = undealtLastWeek(deckCards, decided)
-      return left.length > 0 ? deckActions.drain(left) : undefined
+    // One run, one Undo: last week's undealt cards go to Later together (a
+    // task with a day today or later keeps it). "Place them" never drains.
+    onFinish: async (decided) => {
+      if (deckMode !== 'full') return true
+      const left = undealtLastWeek(deckCards, decided, new Date())
+      return left.length > 0 ? deckActions.drain(left, `Move ${left.length} left from last week to Later`) : true
     },
     onSeeAged: () => navigate('/someday'),
   }

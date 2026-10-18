@@ -43,4 +43,11 @@ describe('undealtLastWeek', () => {
     const cards = [card('a', 'this-week'), card('b', 'last-week'), card('c', 'last-week'), card('d', 'inbox')]
     expect(undealtLastWeek(cards, new Set(['b'])).map((t) => t.id)).toEqual(['c'])
   })
+
+  // A task with a day today or later still has a home: the end drain leaves it.
+  it('leaves a last-week card scheduled for today or later', () => {
+    const card = (key: string, scheduledFor?: Date): DeckCard => ({ key, task: createMockTask({ id: key, scheduledFor }), source: 'last-week', facts: '' })
+    const cards = [card('none'), card('past', new Date(2026, 9, 16)), card('today', new Date(2026, 9, 18, 7)), card('ahead', new Date(2026, 9, 21))]
+    expect(undealtLastWeek(cards, new Set(), NOW).map((t) => t.id)).toEqual(['none', 'past'])
+  })
 })

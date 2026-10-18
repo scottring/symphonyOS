@@ -20,7 +20,7 @@ import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { Deck } from '@/components/plan/deck/Deck'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
-import { deckModeOf, type DeckCard } from '@/lib/planning/deck'
+import type { DeckCard, DeckMode } from '@/lib/planning/deck'
 import type { DeckActions } from '@/components/home/week/useDeckActions'
 import { REVIEW_WINDOW_DAYS, reviewTarget, weekPhrase } from '@/lib/planning/periodReview'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -37,6 +37,11 @@ const DAY = 86_400_000
 
 /** What WeekViewV2 knows for the deck, read off the page's own scoped tasks. */
 export interface WeekDeck {
+  /** The deck the URL opens on this week, or null (also null on a week the
+   *  deck may not open on). */
+  mode: DeckMode | null
+  /** Whether this week may open the deck at all (deckWeekAllowed). */
+  available: boolean
   cards: DeckCard[]
   doneLastWeek: number
   aged: number
@@ -44,9 +49,10 @@ export interface WeekDeck {
   stripDays: StripDay[]
   /** The page's tasks are still loading: the deck waits rather than open empty. */
   loading?: boolean
-  /** The deck's own closing writes (the full deck's end-of-deck drain). The
-   *  review is recorded and the deck left here, in WeekV2. */
-  onFinish: (decided: ReadonlySet<string>) => void | Promise<unknown>
+  /** The deck's own closing writes (the full deck's end-of-deck drain),
+   *  resolving false when they failed. The review is recorded and the deck
+   *  left here, in WeekV2. */
+  onFinish: (decided: ReadonlySet<string>) => Promise<boolean>
   onSeeAged: () => void
 }
 
@@ -70,8 +76,8 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, deck }: {
   // Early in a week, the review on offer is last week's, until it is done.
   const lastWeek = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7)
   const lastReview = usePeriodReview('weekly', weekToken(lastWeek))
-  const [params, setParams] = useSearchParams()
-  const deckMode = deck ? deckModeOf(params) : null
+  const [, setParams] = useSearchParams()
+  const deckMode = deck?.mode ?? null
   const setMode = (mode: 'review' | 'plan' | 'place' | null, week?: Date) => setParams((prev) => {
     const p = new URLSearchParams(prev)
     p.delete('review'); p.delete('plan'); p.delete('place')
@@ -116,21 +122,26 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk, deck }: {
   const weekNo = weekOfYear(weekStart, readCadenceConfig().weekStartsOn)
   const endsToday = isCurrent && localYmd(new Date(weekStart.getTime() + 6 * DAY)) === localYmd(new Date())
   // A week that is over, or ends today, is reviewed, not planned.
-  const plannable = !!deck && !endsToday && weekStart.getTime() + 7 * DAY > Date.now()
+  const plannable = !!deck?.available && !endsToday && weekStart.getTime() + 7 * DAY > Date.now()
   // The deck on week W looks back at the week before it (its "Last week"
   // cards) and records that week's review. So reviewing this week opens the
   // deck on the week after it, and last week's review opens it here.
   const target = reviewTarget({ start: weekStart, end: nextWeek }, new Date(), REVIEW_WINDOW_DAYS.week)
-  const reviewOffer = target === 'this' ? { label: `Review ${reviewWord}`, onClick: () => setMode('review', nextWeek) }
-    : target === 'previous' && !lastReview.loading && !lastReview.error && !lastReview.reviewed
+  // A past week offers none: the deck opens only from this week (and the next).
+  const reviewOffer = target === 'this' && isCurrent ? { label: `Review ${reviewWord}`, onClick: () => setMode('review', nextWeek) }
+    : target === 'previous' && deck?.available && !lastReview.loading && !lastReview.error && !lastReview.reviewed
       ? { label: `Review ${weekPhrase(lastWeek)}`, onClick: () => setMode('review') }
       : undefined
   // Full deck: the undealt last-week cards go to Later (WeekViewV2's drain),
   // then last week is recorded reviewed. "Place them" does neither. Either
   // way the deck gives way to the week.
+  // A drain that failed records nothing and keeps the deck open: the
+  // activity strip says why, and "That's enough for this week" tries again.
   const finishDeck = async (decided: ReadonlySet<string>) => {
     if (deckMode === 'full' && deck) {
-      try { await deck.onFinish(decided) } catch { /* the activity strip reports it */ }
+      let drained = false
+      try { drained = await deck.onFinish(decided) } catch { drained = false }
+      if (!drained) return
       if (!(await lastReview.finish({ wentWell: '', didnt: '' }))) showToast('Couldn’t mark last week reviewed — try again.', 'error', 5000)
     }
     setMode(null)

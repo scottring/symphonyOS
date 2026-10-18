@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within, fireEvent, waitFor, act, cleanup } from '@/test/test-utils'
 import { WeekViewV2 } from './WeekViewV2'
+import { useSearchParams } from 'react-router-dom'
 import { staleForDrain } from '@/lib/planning/drain'
 import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
@@ -754,6 +755,72 @@ describe('WeekViewV2 — the deck', () => {
     expect(deckActions.drain.mock.invocationCallOrder[0]).toBeLessThan(periodReview.finish.mock.invocationCallOrder[0])
     await waitFor(() => expect(screen.queryByTestId('deck')).toBeNull())
     expect(new URLSearchParams(window.location.search).get('review')).toBeNull()
+  })
+
+  it('the end drain is labelled for what it moves, and leaves a last-week task due today', async () => {
+    const tasks = [
+      createMockTask({ id: 'b', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 13), isAllDay: true, updatedAt: recent }),
+      // Committed to last week, but given today: it still has a home.
+      createMockTask({ id: 'today', title: 'Pick up the cake', bucket: 'week', weekStart: new Date(2026, 9, 10), scheduledFor: new Date(2026, 9, 17), isAllDay: true,
+        commitments: [{ level: 'week', periodStart: new Date(2026, 9, 10), status: 'open' }], updatedAt: recent }),
+    ]
+    open('?review=1', tasks)
+    expect(props().cards.map((c) => c.key)).toEqual(expect.arrayContaining(['b', 'today']))
+    await act(async () => { await props().onFinish(new Set()) })
+    expect(deckActions.drain).toHaveBeenCalledTimes(1)
+    const [moved, label] = deckActions.drain.mock.calls[0] as unknown as [Task[], string]
+    expect(moved.map((t) => t.id)).toEqual(['b'])
+    expect(label).toBe('Move 1 left from last week to Later')
+  })
+
+  it('an end drain that fails records no review and keeps the deck open', async () => {
+    open('?review=1', [createMockTask({ id: 'b', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 13), isAllDay: true, updatedAt: recent })])
+    deckActions.drain.mockResolvedValueOnce(false)
+    await act(async () => { await props().onFinish(new Set()) })
+    expect(deckActions.drain).toHaveBeenCalledTimes(1)
+    expect(periodReview.finish).not.toHaveBeenCalled()
+    expect(screen.getByTestId('deck')).toBeInTheDocument()
+    expect(new URLSearchParams(window.location.search).get('review')).toBe('1')
+  })
+
+  // Controller ruling: the deck reviews the week that is ending, opened from the
+  // week after it — so only this week, and next week on this week's last day.
+  it('ignores the deck on a past week, and on next week before this week’s last day', () => {
+    const stale = createMockTask({ id: 'stale', title: 'Old capture', bucket: 'inbox', updatedAt: old })
+    const view = open('?review=1', [stale], { weekStart: new Date(2026, 9, 10) })
+    expect(screen.queryByTestId('deck')).toBeNull()
+    expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
+    view.unmount()
+    open('?plan=1', [stale], { weekStart: new Date(2026, 9, 24) })
+    expect(screen.queryByTestId('deck')).toBeNull()
+    cleanup()
+    open('?place=1', [stale], { weekStart: new Date(2026, 9, 3) })
+    expect(screen.queryByTestId('deck')).toBeNull()
+    expect(deckActions.drain).not.toHaveBeenCalled()
+  })
+
+  it('on this week’s last day, Review this week opens the deck on next week; finishing records this week and stays there', async () => {
+    vi.setSystemTime(new Date(2026, 9, 23, 18)) // Friday, the last day of the week of Oct 17
+    // The page's week follows the URL's date, as HomeView's does.
+    function Page() {
+      const [p] = useSearchParams()
+      const d = p.get('date')
+      const asked = d ? new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10))) : sat
+      return <WeekViewV2 {...defaultProps} routines={[]} weekStart={weekStartAnchor(asked, 6)}
+        tasks={[createMockTask({ id: 'b', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 20), isAllDay: true, updatedAt: new Date(2026, 9, 20) })]} />
+    }
+    window.history.replaceState({}, '', '/week')
+    render(<Page />)
+    fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
+    expect(screen.getByTestId('deck')).toHaveAttribute('data-mode', 'full')
+    expect(document.querySelector('.pv2-week')).toHaveAttribute('data-week', '2026-10-24')
+    expect(props().cards.map((c) => [c.key, c.source])).toEqual([['b', 'last-week']])
+    await act(async () => { await props().onFinish(new Set()) })
+    expect(periodReview.finish).toHaveBeenCalledTimes(1)
+    expect(periodReview.token).toBe('2026-10-17')
+    await waitFor(() => expect(screen.queryByTestId('deck')).toBeNull())
+    expect(document.querySelector('.pv2-week')).toHaveAttribute('data-week', '2026-10-24')
+    expect(new URLSearchParams(window.location.search).get('date')).toBe('2026-10-24')
   })
 
   it('finishing with every last-week card decided drains nothing more', async () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom'
+import { deckModeOf } from '@/lib/planning/deck'
 
 const session = { saved: null as null | { authorId: string; at: Date }, mine: null, loading: false, loadedToken: '', error: null as null | string, reload: vi.fn(), save: vi.fn() }
 const activity = { changeSet: null as null | { state: string }, receipt: null as null | { state: string } }
@@ -151,13 +152,20 @@ describe('WeekV2 toolbar — folded into the masthead', () => {
 function Where() { return <output data-testid="where">{useLocation().search}</output> }
 const where = () => new URLSearchParams(screen.getByTestId('where').textContent ?? '')
 const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
-  cards: [], doneLastWeek: 3, aged: 0, stripDays: [], onSeeAged: vi.fn(), onFinish: vi.fn(async () => true),
+  mode: null, available: true, cards: [], doneLastWeek: 3, aged: 0, stripDays: [], onSeeAged: vi.fn(), onFinish: vi.fn(async () => true),
   actions: { done: vi.fn(), placeOnDay: vi.fn(), keepThisWeek: vi.fn(), later: vi.fn(), laterOnDate: vi.fn(), letGo: vi.fn(), drain: vi.fn() },
   ...over,
 })
+// WeekViewV2's part, standing in: the deck's mode is read off the URL, on a
+// week that may open it.
+function WithDeck({ deck, ...props }: Partial<React.ComponentProps<typeof WeekV2>>) {
+  const [params] = useSearchParams()
+  const withMode = deck && { ...deck, mode: deck.available ? deckModeOf(params) : null }
+  return <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent canvas={<p>The days</p>} {...props} deck={withMode} />
+}
 const renderAt = (url: string, props: Partial<React.ComponentProps<typeof WeekV2>> = {}) => render(
   <MemoryRouter initialEntries={[url]}>
-    <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent canvas={<p>The days</p>} {...props} />
+    <WithDeck {...props} />
     <Where />
   </MemoryRouter>,
 )
@@ -202,7 +210,7 @@ describe('WeekV2 — Review opens the deck', () => {
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     cleanup()
     review.reviewed = null
-    renderAt('/week', { isCurrent: false, weekStart: new Date(2026, 9, 4), deck: makeDeck() })
+    renderAt('/week', { isCurrent: false, weekStart: new Date(2026, 9, 4), deck: makeDeck({ available: false }) })
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
   })
 
@@ -235,9 +243,19 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
     expect(screen.getByText('The days')).toBeTruthy()
   })
 
+  it('a week the deck may not open on offers neither Review nor Plan, and ignores the URL', () => {
+    renderAt('/week?review=1', { deck: makeDeck({ available: false }) })
+    expect(screen.queryByRole('region', { name: 'The deck' })).toBeNull()
+    expect(screen.getByText('The days')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Plan this week' })).toBeNull()
+  })
+
   it('a week that is over, or ends today, has no Plan', () => {
-    renderAt('/week', { isCurrent: false, weekStart: new Date(2026, 8, 20), deck: makeDeck() })
+    // A past week: the deck may not open there, so neither Plan nor Review.
+    renderAt('/week', { isCurrent: false, weekStart: new Date(2026, 8, 20), deck: makeDeck({ available: false }) })
     expect(screen.queryByRole('button', { name: /^Plan the week of/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     cleanup()
     vi.setSystemTime(new Date(2026, 9, 3, 12))
     renderAt('/week', { deck: makeDeck() })

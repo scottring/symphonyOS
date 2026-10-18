@@ -20,7 +20,12 @@ export function staleForDrain(tasks: Task[], now: Date, afterDays = DRAIN_AFTER_
   })
 }
 
-/** Last week's cards the hand never decided. Inbox and this-week cards are never returned. */
-export function undealtLastWeek(cards: DeckCard[], decided: ReadonlySet<string>): Task[] {
-  return cards.filter((c) => c.source === 'last-week' && !decided.has(c.key)).map((c) => c.task)
+/** Last week's cards the hand never decided. Inbox and this-week cards are
+ *  never returned, nor is a task with a day today or later: it still has a home. */
+export function undealtLastWeek(cards: DeckCard[], decided: ReadonlySet<string>, now: Date = new Date()): Task[] {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  return cards
+    .filter((c) => c.source === 'last-week' && !decided.has(c.key))
+    .filter((c) => !c.task.scheduledFor || c.task.scheduledFor.getTime() < today)
+    .map((c) => c.task)
 }
