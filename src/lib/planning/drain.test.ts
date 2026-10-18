@@ -46,6 +46,15 @@ describe('staleForDrain', () => {
     expect(staleForDrain([unloaded, empty, later, unstamped], NOW)).toEqual([])
   })
 
+  // bootstrapCommitments turns a month/season stamp into a commitment, but the
+  // Week page still shows a week row with no weekStart on the current week.
+  it('leaves a legacy week task with a month or season stamp on this week', () => {
+    const month = createMockTask({ id: 'month-stamp', bucket: 'week', weekStart: undefined, commitments: undefined, monthStart: new Date(2026, 9, 1), updatedAt: daysAgo(30) })
+    const monthEmpty = createMockTask({ id: 'month-empty', bucket: 'week', weekStart: undefined, commitments: [], monthStart: new Date(2026, 9, 1), updatedAt: daysAgo(30) })
+    const season = createMockTask({ id: 'season-stamp', bucket: 'week', weekStart: undefined, commitments: [], seasonStart: new Date(2026, 9, 1), updatedAt: daysAgo(30) })
+    expect(staleForDrain([month, monthEmpty, season], NOW)).toEqual([])
+  })
+
   it('leaves anything with an open commitment to this week or a later one', () => {
     const old = { updatedAt: daysAgo(30) }
     const tasks = [
