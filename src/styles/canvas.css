@@ -280,6 +280,11 @@
 .wc-noday.is-open { padding: 10px 14px 12px; }
 .wc-noday.is-over { outline: 2px dashed var(--color-primary-400); outline-offset: 2px; background: color-mix(in srgb, var(--color-primary-50, #eef6f3) 60%, transparent); }
 .wc-noday-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; }
+.wc-noday-line { padding: 8px 14px; }
+.wc-noday-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; margin: 0; font-size: 13px; color: var(--color-neutral-600); }
+.wc-noday-place { font-size: 13px; }
+.wc-progress { margin: 0 0 12px; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
+.wc-progress .wc-quiet-link { font-size: 13px; }
 .wc-noday-label { font-family: var(--font-family-display); font-size: 17px; line-height: 1.2; color: var(--color-neutral-700); }
 .wc-noday-count { font-size: 12.5px; color: var(--color-neutral-500); }
 .wc-noday-hint { font-size: 12.5px; font-weight: 600; color: var(--color-primary-800); }

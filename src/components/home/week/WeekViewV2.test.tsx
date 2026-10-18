@@ -122,12 +122,16 @@ describe('WeekViewV2 layout', () => {
     expect(screen.queryByRole('button', { name: 'Shelves' })).not.toBeInTheDocument()
   })
 
-  it('a week task with no day sits in the No day yet line', () => {
+  it('a week task with no day is counted, not listed', () => {
     const anchor = weekStartAnchor(monday, readCadenceConfig().weekStartsOn)
     const t = createMockTask({ id: 'w', title: 'Call the plumber', bucket: 'week', weekStart: anchor, commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] })
     render(<WeekViewV2 {...defaultProps} tasks={[t]} routines={[]} />)
     expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
-    expect(within(screen.getByRole('list', { name: 'No day yet' })).getByText('Call the plumber')).toBeInTheDocument()
+    expect(screen.queryByText('Call the plumber')).toBeNull()
+    expect(screen.getByText('1 without a day')).toBeInTheDocument()
+    // This week is not the current one, so the deck may not open here: no link, no progress line.
+    expect(screen.queryByRole('button', { name: 'Place them' })).toBeNull()
+    expect(screen.queryByText(/done last week/)).toBeNull()
   })
 })
 

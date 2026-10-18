@@ -251,7 +251,6 @@
 .wc-weekend-fold-title { font-family: var(--font-family-display); font-size: 17px; line-height: 1.2; color: var(--color-neutral-700); }
 .wc-weekend-fold-events { display: inline-flex; flex-wrap: wrap; gap: 3px 12px; min-width: 0; }
 .wc-weekend-fold-events > span::before { content: ""; display: inline-block; width: 2px; height: 11px; margin-right: 6px; border-radius: 1px; background: hsl(214 50% 47%); vertical-align: -1px; }
-.wc-weekend-fold-left { color: var(--color-neutral-700); }
 .wc-weekend-fold-open { font-weight: 500; color: var(--color-neutral-600); white-space: nowrap; }
 .wc-tray-aside { color: var(--color-neutral-500); }
 .wc-drop-hint { margin: 0 0 6px; font-family: var(--font-family-sans); font-size: 12px; font-weight: 600; color: var(--color-primary-800); }

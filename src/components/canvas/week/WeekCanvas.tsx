@@ -135,6 +135,12 @@ export interface WeekCanvasProps {
   /** The week's tasks and calendar have loaded. Until then the sentence says
    *  nothing: an unloaded day reads as wide open. */
   loaded?: boolean
+  /** Last week's progress, opening the page: "9 done last week · Review". Only
+   *  where the deck may open (WeekViewV2 decides). */
+  progress?: { done: number; reviewedOn?: Date; onReview: () => void }
+  /** "Place them": opens the deck on this week's unplaced cards. Absent where
+   *  the deck may not open; the count then stands alone. */
+  onPlaceUnplaced?: () => void
 }
 
 type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
@@ -145,7 +151,7 @@ const NODAY_FOLD_AT = 4
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing, loaded = true }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing, loaded = true, progress, onPlaceUnplaced }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
   const [showDone, setShowDone] = useState(false)
@@ -441,6 +447,26 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       )}
     </div>
   )
+  // On the desk and tablet, No day yet is one line: a count, and a way into
+  // the deck. The titles live on the cards, not on the page. It still takes a
+  // day's row dropped on it, to take its day away.
+  const nodayLine = (nodayCount > 0 || draggingPlaced) && (
+    <div className={`wc-noday wc-noday-line${overShelf ? ' is-over' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
+      <p className="wc-noday-text">
+        {nodayCount > 0 && <span className="wc-noday-n">{nodayCount} without a day</span>}
+        {nodayCount > 0 && onPlaceUnplaced && <> · <button type="button" className="canvas-link wc-quiet-link wc-noday-place" onClick={onPlaceUnplaced}>Place them</button></>}
+        {draggingPlaced && <span className="wc-noday-hint">Drop here to take its day away</span>}
+      </p>
+    </div>
+  )
+  // Last week, said once at the top of the page; the review waits behind it.
+  const progressLine = progress && (
+    <p className="wc-progress" data-explain="last-week-progress" data-explain-label="Last week">
+      {progress.done} done last week · {progress.reviewedOn
+        ? <>reviewed {progress.reviewedOn.toLocaleDateString('en-US', { weekday: 'long' })}</>
+        : <button type="button" className="canvas-link wc-quiet-link" onClick={progress.onReview}>Review</button>}
+    </p>
+  )
   const subline = sentence && <span className="wc-tray-aside wc-week-sentence" data-explain="week-sentence" data-explain-label="The week in a sentence">{sentence}</span>
   // This week's weekend, once over, folds to one line: when it was, what
   // happened, what was left (2026-10-05, #137) — room for the days ahead. One
@@ -450,7 +476,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const goneWeekend = phone || !isCurrent ? [] : days.filter((d) => isWeekend(d) && d.key < todayKey)
   const stripDays = weekendOpen ? days : days.filter((d) => !goneWeekend.includes(d))
   const shortDay = (d: CanvasDay) => `${d.date.toLocaleDateString('en-US', { weekday: 'short' })} ${d.date.getDate()}`
-  const leftOpen = goneWeekend.flatMap((d) => [...d.items, ...(d.sometime ?? [])].filter((it) => !it.completed && it.kind !== 'event'))
   const weekendFold = goneWeekend.length > 0 && (
     <button type="button" className="wc-weekend-fold" aria-expanded={weekendOpen} onClick={() => setWeekendOpen((o) => !o)}>
       {/* One label, "This past weekend · Sat 10 – Sun 11 (open)" (Scott,
@@ -458,9 +483,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       <span className="wc-weekend-fold-title">This past weekend</span>
       <span>{goneWeekend.map(shortDay).join(' – ')} <span className="wc-weekend-fold-open">({weekendOpen ? 'fold' : 'open'})</span></span>
       {!weekendOpen && <span className="wc-weekend-fold-events">{goneWeekend.flatMap((d) => d.events).map((ev) => <span key={ev.id}>{ev.title}</span>)}</span>}
-      {!weekendOpen && leftOpen.length > 0 && (
-        <span className="wc-weekend-fold-left">Not done: {leftOpen.slice(0, 2).map((it) => it.title).join(', ')}{leftOpen.length > 2 ? `, and ${leftOpen.length - 2} more` : ''}</span>
-      )}
     </button>
   )
   // A stay across several days: one bar over the columns it covers, under
@@ -481,6 +503,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     return (
       <div className="wc wc-phone">
         {subtitleNode}
+        {progressLine}
         <div className="wc-daychips" role="group" aria-label="Days">
           {days.map((d) => (
             <button key={d.key} type="button" className={`wc-daychip${d.key === todayKey ? ' is-today' : ''}${pointedDay(d.key) ? ' is-pointed' : ''}`} aria-pressed={d.key === selectedKey}
@@ -500,6 +523,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   return (
     <div className={`wc${drag ? ' is-dragging' : ''}`}>
       {subtitleNode}
+      {progressLine}
       <section className="wc-days" aria-label="The days">
         <div className="wc-days-head"><h2 className="wc-label sr-only">The days</h2>{rhythmNode}{doneToggle}</div>
         {spans.length > 0 && (
@@ -524,7 +548,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             </div>
           )}
         </div>
-        {nodayTray}
+        {nodayLine}
       </section>
     </div>
   )
