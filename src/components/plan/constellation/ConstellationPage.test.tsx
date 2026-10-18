@@ -1,9 +1,9 @@
-import {render,screen,fireEvent,waitFor,within,cleanup} from '@testing-library/react'
+import {render,screen,fireEvent,waitFor,within,cleanup,createEvent,act} from '@testing-library/react'
 import {MemoryRouter,Routes,Route,useLocation} from 'react-router-dom'
 import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
 import {ConversationWalkContext} from '@/components/canvas/conversationWalk'
-const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),tasks:[] as any[],goals:[] as any[]}))
+const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),updateTaskOrders:vi.fn(),redraw:(()=>{}) as ()=>void,tasks:[] as any[],goals:[] as any[]}))
 const activity=vi.hoisted(()=>({calls:[] as {label:string;ok:boolean;opts:any}[],proposals:[] as any[],changeSet:null as any,setProposalState:vi.fn(),removeProposal:vi.fn()}))
 const launcher=vi.hoisted(()=>({openAssistant:vi.fn()}))
 const selection=vi.hoisted(()=>({setSelection:vi.fn()}))
@@ -15,7 +15,8 @@ vi.mock('@/contexts/CanvasActivityContext',()=>({
 }))
 vi.mock('@/contexts/AssistantLaunchContext',()=>({useAssistantLauncher:()=>launcher}))
 vi.mock('@/shell/providers/SelectionProvider',()=>({useSelectionOptional:()=>selection}))
-vi.mock('@/hooks/useSupabaseTasks',()=>({useSupabaseTasks:()=>({tasks:api.tasks,loading:false,error:null,...api})}))
+// The page's own task list: a write that changes it (an optimistic order) redraws it, as the hook does.
+vi.mock('@/hooks/useSupabaseTasks',async()=>{const {useReducer}=await import('react');return{useSupabaseTasks:()=>{const [,redraw]=useReducer((n:number)=>n+1,0);api.redraw=redraw;return{tasks:api.tasks,loading:false,error:null,...api}}}})
 vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[],soleDomain:'personal'})}))
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null,members:[{auth_user_id:'u2',name:'Iris'}]})}))
@@ -146,11 +147,11 @@ describe('one plain list',()=>{
   expect(row('Picnic').querySelector('.plan-item-below')).toHaveTextContent(/^(This week|Week of Oct \d+): Book the shelter$/)
   expect(row('Taxes').querySelector('.plan-item-parent')).toBeNull()
  })
- it('Year lists the year goals and names the season goals under them',()=>{
+ it('Year lists the year goals and says how many season goals are under them',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
   open()
   expect(titles('2026 goals')).toEqual(['Together','Health'])
-  expect(row('Together')).toHaveTextContent('Fall: Autumn outings')
+  expect(row('Together').querySelector('.plan-item-below')).toHaveTextContent(/^In Fall: 1 goal$/)
   expect(row('Health').querySelector('.plan-item-below')).toBeNull()
  })
  it('an empty period says so plainly',()=>{
@@ -186,9 +187,6 @@ describe('the level above, folded to one line',()=>{
   cleanup()
   season()
   expect(screen.getByRole('button',{name:/2026 goals/})).toHaveTextContent(/Show 2026 list$/)
-  cleanup();localStorage.clear()
-  open()
-  expect(screen.getByRole('button',{name:/2025 goals/})).toHaveTextContent(/Hide 2025 list$/)
  })
  it('sits beside the list, and stays hidden for this viewer once hidden',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
@@ -207,10 +205,13 @@ describe('the level above, folded to one line',()=>{
   expect(screen.getByRole('button',{name:/2026 goals.*the year Fall serves/})).toHaveAttribute('aria-expanded','true')
   expect(within(list('2026 goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Together','Health'])
  })
- it('Year: last year, for reference, and says when nothing was written',()=>{
+ it('Year is a single list: nothing beside it, and nothing to show or hide',()=>{
+  api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
   open()
-  expect(screen.getByRole('button',{name:/2025 goals.*last year, for reference/})).toHaveAttribute('aria-expanded','true')
-  expect(screen.getByText('Nothing was written for 2025.')).toBeInTheDocument()
+  expect(screen.queryByRole('complementary')).toBeNull()
+  expect(screen.queryByRole('button',{name:/2025 goals/})).toBeNull()
+  expect(screen.queryByText('Learn to sail')).toBeNull()
+  expect(menu().filter(l=>/list$/.test(l??''))).toEqual([])
  })
 })
 
@@ -852,5 +853,203 @@ describe('planning by hand (2026-10-17)',()=>{
   open('/month?view=constellation&horizon=2&start=2025-03-09&plan=1')
   expect(screen.queryByRole('button',{name:'Plan March'})).toBeNull()
   expect(screen.queryByRole('heading',{name:'Plan March'})).toBeNull()
+ })
+})
+
+// The list never runs off the page (calm pass, mockup approved 2026-10-18):
+// a compact card of 8 then "+N more", ordered by drag, with the level above
+// beside it, quieter and read-only.
+describe('the compact list, ordered by drag, and the level above beside it',()=>{
+ const lines=(n:number)=>Array.from({length:n},(_,i)=>({id:`m${i+1}`,title:`Line ${i+1}`,bucket:'month'}))
+ const sectionOf=(name:string)=>list(name).closest('section')!
+ const dt=()=>{const data:Record<string,string>={};return{setData:(k:string,v:string)=>{data[k]=v},getData:(k:string)=>data[k]??'',types:[] as string[],effectAllowed:'',dropEffect:''}}
+ // The rows stand 40px tall, one under another, from the top of the page.
+ const layOut=(name:string)=>{
+  const ul=list(name),rows=ul.querySelectorAll<HTMLElement>('li[data-order-id]')
+  const rect=(top:number,bottom:number)=>()=>({top,bottom,left:0,right:300,width:300,height:bottom-top,x:0,y:top,toJSON:()=>({})}) as DOMRect
+  rows.forEach((li,i)=>{li.getBoundingClientRect=rect(i*40,i*40+40)})
+  ul.getBoundingClientRect=rect(0,rows.length*40)
+ }
+ const dragTo=(title:string,name:string,y:number)=>{
+  layOut(name)
+  const t=dt(),ul=list(name)
+  fireEvent.dragStart(row(title),{dataTransfer:t})
+  for(const type of ['dragOver','drop'] as const){const ev=createEvent[type](ul,{dataTransfer:t});Object.defineProperty(ev,'clientY',{value:y});fireEvent(ul,ev)}
+ }
+ const ABC=()=>[{id:'a',title:'Alpha',bucket:'month',sortOrder:0},{id:'b',title:'Bravo',bucket:'month',sortOrder:1000},{id:'c',title:'Charlie',bucket:'month',sortOrder:2000}]
+ // The hook's optimistic order: the list changes now, the save answers later.
+ const optimistic=()=>{
+  const pending:((ok:boolean)=>void)[]=[]
+  api.updateTaskOrders.mockImplementation((writes:{id:string;sortOrder:number|null}[])=>{
+   api.tasks=api.tasks.map(t=>{const w=writes.find(x=>x.id===t.id);return w?{...t,sortOrder:w.sortOrder}:t})
+   api.redraw()
+   return new Promise<boolean>(r=>{pending.push(r)})
+  })
+  return {settle:()=>pending.splice(0).forEach(r=>r(true))}
+ }
+
+ it('19 lines: the first 8 show, then +11 more, which opens in place and folds back',()=>{
+  api.tasks=lines(19)
+  month()
+  expect(titles('October goals')).toEqual(lines(8).map(l=>l.title))
+  const more=within(sectionOf('October goals')).getByRole('button',{name:'+11 more'})
+  expect(more).toHaveAttribute('aria-expanded','false')
+  fireEvent.click(more)
+  expect(titles('October goals')).toEqual(lines(19).map(l=>l.title))
+  fireEvent.click(within(sectionOf('October goals')).getByRole('button',{name:'Show less'}))
+  expect(titles('October goals')).toHaveLength(8)
+  expect(within(sectionOf('October goals')).getByRole('button',{name:'+11 more'})).toBeInTheDocument()
+  // The add box stays at the bottom, folded or not.
+  expect(within(sectionOf('October goals')).getByRole('button',{name:'Add an October goal'})).toBeInTheDocument()
+ })
+ it('8 or fewer lines show whole, with nothing to open',()=>{
+  api.tasks=lines(8)
+  month()
+  expect(titles('October goals')).toHaveLength(8)
+  expect(within(sectionOf('October goals')).queryByRole('button',{name:/more$|Show less/})).toBeNull()
+ })
+ it('a line Symphony just saved stays in sight when the list folds',()=>{
+  api.tasks=lines(12)
+  month('&focus=2:m12')
+  expect(titles('October goals')).toContain('Line 12')
+  expect(within(sectionOf('October goals')).getByRole('button',{name:'+4 more'})).toBeInTheDocument()
+ })
+ it('open lines follow their order, the never-ordered after them as they came',()=>{
+  api.tasks=[{id:'a',title:'Alpha',bucket:'month'},{id:'b',title:'Bravo',bucket:'month',sortOrder:1000},{id:'c',title:'Charlie',bucket:'month',sortOrder:0},{id:'d',title:'Delta',bucket:'month'}]
+  month()
+  expect(titles('October goals')).toEqual(['Charlie','Bravo','Alpha','Delta'])
+ })
+ it('a month line dropped between two others moves there at once, through the page’s own writer, with Undo',async()=>{
+  api.tasks=ABC()
+  const save=optimistic()
+  month()
+  expect(row('Charlie')).toHaveAttribute('draggable','true')
+  dragTo('Charlie','October goals',45)
+  expect(api.updateTaskOrders).toHaveBeenCalledWith([{id:'c',sortOrder:500}])
+  // Before the save answers.
+  expect(titles('October goals')).toEqual(['Alpha','Charlie','Bravo'])
+  await act(async()=>{save.settle()})
+  await waitFor(()=>expect(lastRun()?.label).toBe('Move “Charlie” up'))
+  expect(lastRun().opts.ids).toEqual(['c'])
+  await act(async()=>{const undone=lastRun().opts.undo();save.settle();await undone})
+  expect(api.updateTaskOrders).toHaveBeenLastCalledWith([{id:'c',sortOrder:2000}])
+  expect(titles('October goals')).toEqual(['Alpha','Bravo','Charlie'])
+ })
+ it('while dragging, the gap it would land in is marked',()=>{
+  api.tasks=ABC()
+  month()
+  layOut('October goals')
+  const t=dt(),ul=list('October goals')
+  fireEvent.dragStart(row('Charlie'),{dataTransfer:t})
+  const ev=createEvent.dragOver(ul,{dataTransfer:t});Object.defineProperty(ev,'clientY',{value:5});fireEvent(ul,ev)
+  expect(row('Alpha')).toHaveClass('is-gap-above')
+  fireEvent.dragEnd(row('Charlie'))
+  expect(row('Alpha')).not.toHaveClass('is-gap-above')
+ })
+ it('a season line orders the same way',async()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',sortOrder:0},{id:'t',title:'Strength',bucket:'quarter',sortOrder:1000}]
+  optimistic()
+  season()
+  dragTo('Autumn outings','Fall goals',75)
+  expect(api.updateTaskOrders).toHaveBeenCalledWith([{id:'s',sortOrder:2000}])
+  expect(titles('Fall goals')).toEqual(['Strength','Autumn outings'])
+ })
+ it('a year goal dropped writes its sort order through updateGoal, with Undo',async()=>{
+  api.goals=[{...GOALS[0],sortOrder:0},{...GOALS[1],sortOrder:1000},{id:'h',name:'Home',year:2026,status:'active',context:'personal',sortOrder:2000}]
+  open()
+  dragTo('Home','2026 goals',5)
+  await waitFor(()=>expect(api.updateGoal).toHaveBeenCalledWith('h',{sortOrder:-1000}))
+  await waitFor(()=>expect(lastRun()?.label).toBe('Move “Home” up'))
+  await lastRun().opts.undo()
+  expect(api.updateGoal).toHaveBeenLastCalledWith('h',{sortOrder:2000})
+  expect(api.updateTaskOrders).not.toHaveBeenCalled()
+ })
+ it('a row that drags still triages from its row, and a done line does not drag',async()=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
+  api.toggleTask.mockResolvedValue(true)
+  localStorage.setItem('symphony-plan-done','shown')
+  month()
+  expect(row('Picnic')).toHaveAttribute('draggable','true')
+  expect(row('Pay taxes')).toHaveAttribute('draggable','false')
+  expect(within(screen.getByRole('group',{name:'Triage Picnic'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Done','Move to November','Someday','Remove from October'])
+  fireEvent.click(screen.getByRole('button',{name:'Done: Picnic'}))
+  await waitFor(()=>expect(api.toggleTask).toHaveBeenCalledWith('m'))
+  expect(api.updateTaskOrders).not.toHaveBeenCalled()
+ })
+ describe('on touch',()=>{
+  const original=window.matchMedia
+  beforeEach(()=>{
+   window.matchMedia=((query:string)=>({matches:query.includes('pointer: coarse'),media:query,onchange:null,addListener:()=>{},removeListener:()=>{},addEventListener:()=>{},removeEventListener:()=>{},dispatchEvent:()=>false})) as unknown as typeof window.matchMedia
+   vi.useFakeTimers({toFake:['Date','setTimeout','clearTimeout']});vi.setSystemTime(new Date(2026,9,9,9))
+  })
+  afterEach(()=>{window.matchMedia=original;vi.useRealTimers()})
+  const touch=(y:number)=>({touches:[{clientX:10,clientY:y}],changedTouches:[{clientX:10,clientY:y}]})
+  it('press and hold, then drag: the line lifts and lands in the gap it is let go in',()=>{
+   api.tasks=ABC()
+   optimistic()
+   month()
+   layOut('October goals')
+   const charlie=row('Charlie')
+   expect(charlie).toHaveAttribute('draggable','false')
+   fireEvent.touchStart(charlie,touch(85))
+   act(()=>{vi.advanceTimersByTime(260)})
+   fireEvent.touchMove(document,touch(45))
+   expect(charlie).toHaveClass('is-lifted')
+   expect(row('Bravo')).toHaveClass('is-gap-above')
+   fireEvent.touchEnd(document,touch(45))
+   act(()=>{vi.advanceTimersByTime(100)})
+   expect(api.updateTaskOrders).toHaveBeenCalledWith([{id:'c',sortOrder:500}])
+   expect(titles('October goals')).toEqual(['Alpha','Charlie','Bravo'])
+  })
+  it('a quick tap still opens the line, and orders nothing',()=>{
+   api.tasks=ABC()
+   month()
+   const title=screen.getByRole('button',{name:'Alpha'})
+   fireEvent.touchStart(title,touch(10))
+   act(()=>{vi.advanceTimersByTime(100)})
+   fireEvent.touchEnd(title,touch(10))
+   fireEvent.click(title)
+   act(()=>{vi.advanceTimersByTime(300)})
+   expect(selection.setSelection).toHaveBeenCalledWith({kind:'task',id:'a'})
+   expect(api.updateTaskOrders).not.toHaveBeenCalled()
+  })
+ })
+ it('Month: the Fall goals beside it, 8 then +13 more, marked when October has a line under one, read-only',()=>{
+  api.tasks=[...Array.from({length:21},(_,i)=>({id:`s${i+1}`,title:`Fall goal ${i+1}`,bucket:'quarter'})),{id:'m',title:'Picnic',bucket:'month',sourceId:'s2'}]
+  month()
+  const side=screen.getByRole('complementary',{name:'Fall goals'})
+  const items=()=>within(list('Fall goals')).getAllByRole('listitem')
+  expect(items()).toHaveLength(8)
+  expect(items()[0].textContent).toBe('Fall goal 1')
+  expect(within(items()[1]).getByText('in October')).toBeInTheDocument()
+  expect(items().filter(li=>/in October/.test(li.textContent??''))).toHaveLength(1)
+  fireEvent.click(within(side).getByRole('button',{name:'+13 more'}))
+  expect(items()).toHaveLength(21)
+  fireEvent.click(within(side).getByRole('button',{name:'Show less'}))
+  expect(items()).toHaveLength(8)
+  // Read-only: no triage, no drag.
+  expect(within(side).queryAllByRole('group')).toHaveLength(0)
+  expect(side.querySelector('[draggable="true"]')).toBeNull()
+  // Phones stack it under the list: it comes after the list.
+  expect(list('October goals').compareDocumentPosition(side)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+ })
+ it('Season: a year goal with a Fall goal under it is marked in Fall',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+  season()
+  const items=within(list('2026 goals')).getAllByRole('listitem')
+  expect(within(items[0]).getByText('in Fall')).toBeInTheDocument()
+  expect(items[1].textContent).toBe('Health')
+ })
+ it('the side card is hidden when this viewer hid it',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}]
+  localStorage.setItem('symphony.plan.aboveOpen','0')
+  month()
+  expect(screen.queryByRole('complementary',{name:'Fall goals'})).toBeNull()
+ })
+ it('Year: a goal notes how many Fall goals it has, In Fall: 3 goals',()=>{
+  api.tasks=['a','b','c'].map(id=>({id,title:`Fall ${id}`,bucket:'quarter',goalId:'g'}))
+  open()
+  expect(row('Together').querySelector('.plan-item-below')).toHaveTextContent(/^In Fall: 3 goals$/)
+  expect(row('Health').querySelector('.plan-item-below')).toBeNull()
  })
 })

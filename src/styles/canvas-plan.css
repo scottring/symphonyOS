@@ -368,38 +368,59 @@
 .plan-above-title { font-family: var(--font-family-display); font-size: 18px; font-weight: 500; color: var(--color-neutral-900); }
 .plan-above-what { font-size: 13px; color: var(--color-neutral-500); }
 .plan-above-go { margin-left: auto; font-size: 13px; }
-/* Open, the level above sits beside the list and stays in view while the
-   list scrolls; narrow screens show it above the list (Scott, 2026-10-13). */
-.plan-horizon-body { display: grid; grid-template-columns: minmax(0, 46rem); gap: 0 48px; align-items: start; }
-.plan-above-panel { min-width: 0; margin: 0 0 14px; }
-.plan-above-panel-head { display: none; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; margin: 0 0 6px; }
+/* Calm pass (mockup approved 2026-10-18): the list is a compact card that
+   never runs off the page, and the level above a lighter card beside it —
+   under it on narrow screens. Shown, the card carries its own title and
+   Hide, so the line above steps aside. */
+.plan-horizon-body { display: grid; grid-template-columns: minmax(0, 46rem); gap: 14px 18px; align-items: start; }
+.plan-card {
+  min-width: 0; padding: 14px 18px 16px; border: 1px solid var(--color-neutral-200); border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-bg-elevated) 85%, transparent);
+}
+.plan-card.plan-side { background: color-mix(in srgb, var(--color-bg-elevated) 55%, transparent); }
+.plan-above.is-open { display: none; }
+.plan-above-panel { min-width: 0; margin: 0; }
+.plan-above-panel-head { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; margin: 0 0 6px; }
 .plan-above-panel-title { margin: 0; font-family: var(--font-family-display); font-size: 17px; font-weight: 500; color: var(--color-neutral-900); }
 .plan-above-hide { margin-left: auto; font-size: 13px; }
-.plan-above-list { list-style: none; margin: 0; padding: 2px 2px 14px; columns: 2 16rem; column-gap: 32px; }
-.plan-above-list > li { break-inside: avoid; padding: 3px 0; font-family: var(--font-family-display); font-size: 15px; line-height: 1.3; color: var(--color-neutral-700); }
+.plan-above-list { list-style: none; margin: 0; padding: 0; }
+.plan-above-list > li {
+  display: flex; align-items: baseline; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--color-neutral-100);
+  font-family: var(--font-family-display); font-size: 15px; line-height: 1.3; color: var(--color-neutral-700);
+}
+.plan-above-list > li:last-child { border-bottom: 0; }
+/* "in October": this period has a line under it. */
+.plan-above-here { margin-left: auto; font-family: var(--font-family-sans); font-size: 10.5px; font-style: normal; font-weight: 500; color: var(--color-primary-700); white-space: nowrap; }
 .plan-above-none { margin: 0; padding: 2px 2px 12px; font-family: var(--font-family-display); font-style: italic; font-size: 15px; color: var(--color-neutral-600); }
 @media (min-width: 1100px) {
-  .plan-horizon-body.has-above { grid-template-columns: minmax(0, 46rem) minmax(15rem, 22rem); }
+  .plan-horizon-body.has-above { grid-template-columns: minmax(0, 46rem) minmax(15rem, 24rem); }
   .plan-horizon-body.has-above > .plan-list { grid-column: 1; grid-row: 1; }
   .plan-above-panel {
     /* Clear of the pinned top bar, as the other reference panels sit
        (.pv2-ref, .today-ref), and of the docked bar at the foot. */
-    grid-column: 2; grid-row: 1; position: sticky; top: 64px; margin: 0;
+    grid-column: 2; grid-row: 1; position: sticky; top: 64px;
     max-height: calc(100vh - 150px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
-    padding: 2px 4px 8px 20px; border-left: 1px solid var(--color-neutral-200);
   }
-  /* Open, the panel carries the title and its own Hide, right on the list;
-     the fold line above steps aside (Scott, 2026-10-16). */
-  .plan-above-panel-head { display: flex; }
-  .plan-above.is-open { display: none; }
-  .plan-above-panel .plan-above-list { columns: 1; padding: 0; }
-  .plan-above-panel .plan-above-list > li { padding: 4px 0; }
 }
 
 .plan-list { max-width: 46rem; min-width: 0; }
-.plan-goal-list > .plan-item { padding: 6px 0 8px; border-bottom: 1px solid var(--color-neutral-200); }
-.plan-goal-list > .plan-item:last-child { border-bottom: 1px solid var(--color-neutral-200); }
-.plan-goal-list .plan-item-title { font-family: var(--font-family-display); font-size: 19px; line-height: 1.3; }
+.plan-goal-list > .plan-item { padding: 5px 0 6px; border-bottom: 1px solid var(--color-neutral-100); }
+.plan-goal-list > .plan-item:last-child { border-bottom: 0; }
+.plan-goal-list .plan-item-title { font-family: var(--font-family-display); font-size: 17px; line-height: 1.25; }
+/* Drag to order: a grip on hover; the gap it would land in is a line; on
+   touch the held line stays put, dimmed, and a chip follows the finger. */
+.plan-grip { flex: none; width: 10px; margin-right: -4px; font-size: 12px; letter-spacing: -2px; color: var(--color-neutral-400); opacity: 0; cursor: grab; user-select: none; }
+.plan-item:hover > .canvas-item > .plan-grip { opacity: 1; }
+.plan-goal-list > .plan-item.is-gap-above { box-shadow: inset 0 2px 0 var(--color-primary-500); }
+.plan-goal-list > .plan-item.is-gap-below { box-shadow: inset 0 -2px 0 var(--color-primary-500); }
+.plan-goal-list > .plan-item.is-lifted { opacity: 0.4; }
+@media (hover: none), (pointer: coarse) {
+  .plan-grip { display: none; }
+  .plan-goal-list > .plan-item[data-order-id] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+}
+/* "+11 more" / "Show less": the rest of a list, opened in place. */
+.plan-more { display: block; margin: 0; padding: 8px 6px 2px; font-size: 12.5px; font-weight: 500; color: var(--color-primary-700); }
+@media (max-width: 767px) { .plan-more { min-height: 44px; } }
 .plan-goal-list > .plan-item > .plan-item-parent, .plan-item-below { margin: 0; padding: 0 6px 0; font-size: 12.5px; line-height: 1.4; color: var(--color-neutral-600); overflow-wrap: anywhere; }
 .plan-item-below { color: var(--color-primary-700); }
 .plan-item-below-kind { font-weight: 600; }
@@ -418,7 +439,7 @@
 .plan-list-foot > .plan-next { margin-left: auto; }
 @media (max-width: 767px) {
   .plan-horizon .plan-period h1 { font-size: 28px; }
-  .plan-above-list { columns: 1; }
+  .plan-card { padding: 10px 12px 12px; }
   .plan-above-line, .plan-list-foot > .plan-add, .plan-list-foot > .canvas-link { min-height: 44px; }
   .plan-list-foot > .plan-next { margin-left: 0; }
 }
