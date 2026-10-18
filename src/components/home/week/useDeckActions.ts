@@ -46,7 +46,7 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
   const { toggleTask, updateTask, onUpdateTask, keepForward, gated, weekAnchor, lastWeekStart, nextWeekStart } = deps
 
   return useMemo<DeckActions>(() => {
-    const setBucket = gated.setBucket ?? ((id: string, bucket: TaskBucket) => onUpdateTask(id, { bucket }))
+    const setBucket = gated.setBucket ?? (async (id: string, bucket: TaskBucket): Promise<boolean> => ok(await onUpdateTask(id, { bucket })))
     const handlers = { onPushTask: gated.pushTask, onSetBucket: setBucket }
     const fromWeek = (c: DeckCard) => (c.source === 'last-week' ? lastWeekStart : weekAnchor)
     const restoreOf = (t: Task) => {
