@@ -291,7 +291,11 @@ describe('talking to the wall: the change card', () => {
 })
 
 describe('talking to the wall: plan the week', () => {
-  beforeEach(() => { localStorage.clear() })
+  // The opening phrase reads the real clock (startPlanning's `now = new Date()`),
+  // not the wall's `now` prop, so pin it to NOW (Sat Oct 10): otherwise these fail
+  // on the last day of a Monday week, when the phrase names next week.
+  beforeEach(() => { localStorage.clear(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW) })
+  afterEach(() => { vi.useRealTimers() })
 
   it('More → Plan the week starts the session with the desktop’s opening phrase and shows the family week', async () => {
     const { ask } = setup(async (t, h) => reply(t, h, 'Let’s plan the rest of the week. Sunday has swim and a party; Friday is open.'))
