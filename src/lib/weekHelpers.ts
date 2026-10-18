@@ -80,6 +80,16 @@ export function weekEventSpan(d: Date): { start: Date; end: Date } {
   return { start, end }
 }
 
+/** The event window for one day: its midnight to the next. Home and Today
+ *  both ask for exactly this, so one fetch serves both (see fetchEvents). */
+export function dayEventSpan(d: Date): { start: Date; end: Date } {
+  const start = new Date(d)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  return { start, end }
+}
+
 /** The event window for /week: two weeks from the Sunday of `d`. The grid can
  *  show any run of up to seven days starting in the viewed week (a weekend, a
  *  custom Thu–Wed), so one week's fetch left the spill-over days empty. */

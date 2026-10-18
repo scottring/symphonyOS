@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { emitCalendarChanged } from '@/lib/calendarChangedSignal'
+import { shareInFlight } from '@/lib/sharedRequest'
+import { getCurrentAccount } from '@/lib/currentAccount'
+import { recentEventsFor, rememberEvents, RECENT_EVENTS_MS } from './recentCalendarEvents'
 import { setCalendarConnected } from '@/lib/calendarConnection'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { afterPageData } from '@/lib/loadPriority'
@@ -431,13 +434,17 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     setIsFetching(true)
 
     try {
-      const { data, error: fetchError } = await supabase.functions.invoke('google-calendar-events', {
-        body: {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          domain: domainOverride ?? 'universal', // Always fetch all calendars — domain filtering applies to tasks only
-        },
-      })
+      const domain = domainOverride ?? 'universal' // Always fetch all calendars — domain filtering applies to tasks only
+      const key = `${getCurrentAccount() ?? 'anon'}|${startDate.toISOString()}|${endDate.toISOString()}|${domain}`
+      const recent = recentEventsFor(key)
+      if (recent && Date.now() - recent.at < RECENT_EVENTS_MS) {
+        if (typeof recent.data.calendarListMissing === 'boolean') setCalendarListMissing(recent.data.calendarListMissing)
+        setEvents(recent.data.events || [])
+        return recent.data.events || []
+      }
+      const { data, error: fetchError } = await shareInFlight(`google-calendar-events|${key}`, () => supabase.functions.invoke('google-calendar-events', {
+        body: { startDate: startDate.toISOString(), endDate: endDate.toISOString(), domain },
+      }))
 
       // A non-2xx carries the function's reason in its body; without reading
       // it the banner could only say "Edge Function returned a non-2xx status
@@ -464,6 +471,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
 
       // Domain-filtered answers can return early without the flag; keep the last known.
       if (typeof data?.calendarListMissing === 'boolean') setCalendarListMissing(data.calendarListMissing)
+      rememberEvents(key, data)
       setEvents(data.events || [])
       return data.events || []
     } catch (err) {
