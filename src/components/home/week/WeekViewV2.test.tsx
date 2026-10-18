@@ -76,9 +76,9 @@ const deckActions = vi.hoisted(() => ({
   later: vi.fn(async () => true), laterOnDate: vi.fn(async () => true), letGo: vi.fn(async () => true), drain: vi.fn(async () => true),
 }))
 vi.mock('@/components/home/week/useDeckActions', () => ({ useDeckActions: () => deckActions }))
-const periodReview = vi.hoisted(() => ({ token: '' as string, finish: vi.fn(async () => true) }))
+const periodReview = vi.hoisted(() => ({ token: '' as string, reviewed: null as null | { at: Date }, finish: vi.fn(async () => true) }))
 vi.mock('@/hooks/usePeriodReview', () => ({
-  usePeriodReview: (_h: string, token: string) => ({ reviewed: null, mine: null, loading: false, error: null, reload: () => {},
+  usePeriodReview: (_h: string, token: string) => ({ reviewed: periodReview.reviewed, mine: null, loading: false, error: null, reload: () => {},
     finish: (notes: unknown) => { periodReview.token = token; return periodReview.finish(notes) } }),
 }))
 
@@ -636,6 +636,7 @@ describe('WeekViewV2 — the deck', () => {
     Object.values(deckActions).forEach((f) => f.mockClear())
     periodReview.finish.mockClear()
     periodReview.token = ''
+    periodReview.reviewed = null
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -825,6 +826,51 @@ describe('WeekViewV2 — the deck', () => {
     await waitFor(() => expect(screen.queryByTestId('deck')).toBeNull())
     expect(document.querySelector('.pv2-week')).toHaveAttribute('data-week', '2026-10-24')
     expect(new URLSearchParams(window.location.search).get('date')).toBe('2026-10-24')
+  })
+
+  // Task 7: the page opens with last week's progress; No day yet is a count.
+  it('on the current week the progress line counts the scoped tasks done last week; Review and Place them set the deck on the viewed week', () => {
+    const tasks = [
+      createMockTask({ id: 'famDone', title: 'Book the vet', context: 'family', scheduledFor: new Date(2026, 9, 12), isAllDay: true, completed: true, updatedAt: recent }),
+      createMockTask({ id: 'workDone', title: 'Quarterly numbers', context: 'work', scheduledFor: new Date(2026, 9, 14), isAllDay: true, completed: true, updatedAt: recent }),
+      createMockTask({ id: 'w', title: 'Call the plumber', context: 'family', bucket: 'week', weekStart: sat, commitments: [{ level: 'week', periodStart: sat, status: 'open' }], updatedAt: recent }),
+    ]
+    open('', tasks, { layers: familyOnly })
+    expect(screen.getByText(/done last week/).textContent).toBe('1 done last week · Review')
+    expect(screen.getByText(/without a day/).closest('.wc-noday')).toHaveTextContent('1 without a day · Place them')
+    expect(screen.queryByText('Call the plumber')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Place them' }))
+    expect(new URLSearchParams(window.location.search).get('place')).toBe('1')
+    expect(new URLSearchParams(window.location.search).get('date')).toBeNull()
+  })
+
+  it('Review sets review=1 on the viewed week', () => {
+    open('', [])
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+    const q = new URLSearchParams(window.location.search)
+    expect(q.get('review')).toBe('1')
+    expect(q.get('date')).toBeNull()
+    expect(screen.getByTestId('deck')).toHaveAttribute('data-mode', 'full')
+  })
+
+  it('once last week is reviewed the line says the weekday, with no Review link', () => {
+    periodReview.reviewed = { at: new Date(2026, 9, 16, 17) } // Friday
+    open('', [])
+    expect(screen.getByText(/done last week/).textContent).toBe('0 done last week · reviewed Friday')
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
+  })
+
+  it('next week on this week’s last day: Review stays on that week', () => {
+    vi.setSystemTime(new Date(2026, 9, 23, 18))
+    const next = new Date(2026, 9, 24)
+    const tasks = [createMockTask({ id: 'd', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 20), isAllDay: true, completed: true, updatedAt: recent })]
+    open('', tasks, { weekStart: next })
+    expect(screen.getByText(/done last week/).textContent).toBe('1 done last week · Review')
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+    const q = new URLSearchParams(window.location.search)
+    expect(q.get('review')).toBe('1')
+    expect(q.get('date')).toBeNull()
+    expect(document.querySelector('.pv2-week')).toHaveAttribute('data-week', '2026-10-24')
   })
 
   it('finishing with every last-week card decided drains nothing more', async () => {

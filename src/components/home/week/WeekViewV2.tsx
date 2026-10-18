@@ -946,18 +946,17 @@ export function WeekViewV2(props: WeekViewV2Props) {
     () => scopedTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) === 'done').length,
     [scopedTasks, lastWeekStart],
   )
-  // The page's own way into the deck, the same URLs WeekV2's buttons set.
-  // Review opens on the current week (the deck looks back at the week before
-  // it); Place them on the week being viewed.
+  // The page's own way into the deck, the same URLs WeekV2's buttons set, on
+  // the week being viewed. The deck on a week reviews the week before it,
+  // which is the week the progress line counts.
   const lastReview = usePeriodReview('weekly', weekToken(lastWeekStart))
-  const openDeck = (mode: 'review' | 'place', week?: Date) => setParams((prev) => {
+  const openDeck = (mode: 'review' | 'place') => setParams((prev) => {
     const p = new URLSearchParams(prev)
     p.delete('review'); p.delete('plan'); p.delete('place')
     p.set(mode, '1')
-    if (week) { p.set('date', localYmd(week)); p.set('start', localYmd(week)) }
     return p
   })
-  const openReview = () => openDeck('review', weekIsCurrent ? undefined : weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
+  const openReview = () => openDeck('review')
   const openPlace = () => openDeck('place')
   // The drain runs as the full deck opens, once per mount (the ref), and only
   // once the tasks are in. It is idempotent across mounts: what it moves

@@ -279,9 +279,10 @@ describe('WeekCanvas — calendar first', () => {
   it('things with no day are one count, no titles, no tray', () => {
     show()
     expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
-    expect(screen.queryByRole('list', { name: 'No day yet' })).toBeNull()
-    expect(screen.getByText('4 without a day')).toBeInTheDocument()
-    for (const t of ['Book the cabin', 'Call the bank', 'Service the car', 'Mow the lawn']) expect(screen.queryByText(t)).toBeNull()
+    // Tasks only: the count is what Place them deals. The routine keeps its row.
+    expect(screen.getByText('3 without a day')).toBeInTheDocument()
+    for (const t of ['Book the cabin', 'Call the bank', 'Service the car']) expect(screen.queryByText(t)).toBeNull()
+    expect(within(screen.getByRole('list', { name: 'No day yet' })).getByText('Mow the lawn')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Place them' })).toBeNull()
     expect(screen.getByText('3 days ahead are wide open.')).toBeInTheDocument()
   })

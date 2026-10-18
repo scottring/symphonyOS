@@ -450,13 +450,20 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // On the desk and tablet, No day yet is one line: a count, and a way into
   // the deck. The titles live on the cards, not on the page. It still takes a
   // day's row dropped on it, to take its day away.
-  const nodayLine = (nodayCount > 0 || draggingPlaced) && (
+  // The count is tasks only: what "Place them" deals. Routines that need a day
+  // keep their rows, because the deck cannot place them.
+  const nodayLine = (unplaced.length > 0 || routinesToPlace.length > 0 || draggingPlaced) && (
     <div className={`wc-noday wc-noday-line${overShelf ? ' is-over' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
       <p className="wc-noday-text">
-        {nodayCount > 0 && <span className="wc-noday-n">{nodayCount} without a day</span>}
-        {nodayCount > 0 && onPlaceUnplaced && <> · <button type="button" className="canvas-link wc-quiet-link wc-noday-place" onClick={onPlaceUnplaced}>Place them</button></>}
+        {unplaced.length > 0 && <span className="wc-noday-n">{unplaced.length} without a day</span>}
+        {unplaced.length > 0 && onPlaceUnplaced && <> · <button type="button" className="canvas-link wc-quiet-link wc-noday-place" onClick={onPlaceUnplaced}>Place them</button></>}
         {draggingPlaced && <span className="wc-noday-hint">Drop here to take its day away</span>}
       </p>
+      {routinesToPlace.length > 0 && (
+        <ul className="wc-noday-chips" aria-label="No day yet">
+          {routinesToPlace.map((r) => nodayRow('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
+        </ul>
+      )}
     </div>
   )
   // Last week, said once at the top of the page; the review waits behind it.
