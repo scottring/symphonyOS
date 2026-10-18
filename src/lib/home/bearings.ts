@@ -32,6 +32,8 @@ export interface BearingsFacts {
   now: Date
   /** Days of the household week still ahead, today included (7 on its first day). */
   weekDaysLeft: number
+  /** First day (YYYY-MM-DD) of the household week: "Plan the week" opens the review deck on it. */
+  weekStart?: string
   week: { planned: boolean; open: number; done: number }
   month: LevelFacts
   season: LevelFacts
@@ -86,7 +88,7 @@ export function nextSteps(f: BearingsFacts): NextStep[] {
       id: 'plan-week',
       title: f.weekDaysLeft >= 6 ? 'The week ahead hasn’t been planned yet.' : 'This week hasn’t been planned yet.',
       body: `${f.weekDaysLeft >= 6 ? '' : `${capital(numberWord(f.weekDaysLeft))} days left.`}${waiting} ${f.month.name}’s list sits beside you while you choose.`.trim(),
-      action: { label: 'Plan the week', to: '/week' },
+      action: { label: 'Plan the week', to: f.weekStart ? `/week?view=alongside&date=${f.weekStart}&start=${f.weekStart}&review=1` : '/week' },
     })
   }
   if (f.month.review > 0) {
