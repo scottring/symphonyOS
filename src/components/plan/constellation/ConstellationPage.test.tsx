@@ -173,22 +173,24 @@ describe('one plain list',()=>{
 })
 
 describe('the level above, folded to one line',()=>{
- it('Month: the season goals are shown unless hidden, and fold and open in place, without writing',()=>{
+ it('Month: the season goals are hidden until opened, and open and fold in place, without writing',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'t',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
   month()
   const line=screen.getByRole('button',{name:/Fall goals.*the season October serves/})
-  expect(line).toHaveAttribute('aria-expanded','true')
-  expect(within(list('Fall goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Autumn outings','Strength'])
-  fireEvent.click(line)
+  expect(line).toHaveAttribute('aria-expanded','false')
   expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
   fireEvent.click(line)
   expect(within(list('Fall goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Autumn outings','Strength'])
+  fireEvent.click(line)
+  expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
   expect(api.updateTask).not.toHaveBeenCalled()
  })
  it('the toggle names the list it opens, and the open list carries its own Hide',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
   month()
   const line=screen.getByRole('button',{name:/Fall goals.*the season October serves/})
+  expect(line).toHaveTextContent(/Show Fall list$/)
+  fireEvent.click(line)
   expect(line).toHaveTextContent(/Hide Fall list$/)
   const panel=screen.getByRole('complementary',{name:'Fall goals'})
   fireEvent.click(within(panel).getByRole('button',{name:'Hide Fall list'}))
@@ -199,8 +201,12 @@ describe('the level above, folded to one line',()=>{
   season()
   expect(screen.getByRole('button',{name:/2026 goals/})).toHaveTextContent(/Show 2026 list$/)
  })
- it('sits beside the list, and stays hidden for this viewer once hidden',()=>{
+ it('sits beside the list once opened, and stays as this viewer left it',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:/Fall goals.*the season October serves/}))
+  expect(localStorage.getItem('symphony.plan.aboveOpen')).toBe('1')
+  cleanup()
   month()
   expect(screen.getByRole('complementary',{name:'Fall goals'})).toContainElement(list('Fall goals'))
   expect(titles('October goals')).toEqual(['Picnic'])
@@ -211,9 +217,12 @@ describe('the level above, folded to one line',()=>{
   expect(screen.getByRole('button',{name:/Fall goals.*the season October serves/})).toHaveAttribute('aria-expanded','false')
   expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
  })
- it('Season: the year goals',()=>{
+ it('Season: the year goals, hidden until opened',()=>{
   season()
-  expect(screen.getByRole('button',{name:/2026 goals.*the year Fall serves/})).toHaveAttribute('aria-expanded','true')
+  const line=screen.getByRole('button',{name:/2026 goals.*the year Fall serves/})
+  expect(line).toHaveAttribute('aria-expanded','false')
+  fireEvent.click(line)
+  expect(line).toHaveAttribute('aria-expanded','true')
   expect(within(list('2026 goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Together','Health'])
  })
  it('Year is a single list: nothing beside it, and nothing to show or hide',()=>{
@@ -593,6 +602,7 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
  it('⋯ holds the page’s choices, the way in, and its help',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
+  localStorage.setItem('symphony.plan.aboveOpen','1')
   month()
   expect(menu()).toEqual(['Show done','Hide the Fall list','Start with a goal · guided introduction','Talk it through','How this page works'])
   // Show done: a tick, remembered on this device, and the list agrees.
@@ -914,6 +924,8 @@ describe('planning by hand (2026-10-17)',()=>{
 // a compact card of 8 then "+N more", ordered by drag, with the level above
 // beside it, quieter and read-only.
 describe('the compact list, ordered by drag, and the level above beside it',()=>{
+ // The side card is hidden until opened; these tests look at it open.
+ beforeEach(()=>{localStorage.setItem('symphony.plan.aboveOpen','1')})
  const lines=(n:number)=>Array.from({length:n},(_,i)=>({id:`m${i+1}`,title:`Line ${i+1}`,bucket:'month'}))
  const sectionOf=(name:string)=>list(name).closest('section')!
  const dt=()=>{const data:Record<string,string>={};return{setData:(k:string,v:string)=>{data[k]=v},getData:(k:string)=>data[k]??'',types:[] as string[],effectAllowed:'',dropEffect:''}}
