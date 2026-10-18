@@ -12,8 +12,14 @@
 }
 
 /* ---- Header: horizon switch, then the period by name (approved board) ---- */
-.plan-head { display: flex; flex-direction: column; gap: 14px; margin: 12px 0 20px; }
-.plan-head-row { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+/* Calm pass (approved mockup 2026-10-18): "‹ October 2026 ›" over one quiet
+   fact line, then one primary button and ⋯ (wk-* in index.css, as on Week). */
+.plan-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; margin: 12px 0 20px; }
+.plan-head-main { display: flex; flex-direction: column; gap: 6px; flex: 1 1 16rem; min-width: 0; }
+.plan-head-main > .plan-facts { margin-left: 2px; }
+.plan-head-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.plan-primary:disabled { opacity: .5; cursor: default; }
+@media (hover: none), (pointer: coarse) { .plan-primary { min-height: 44px; } }
 .plan-step {
   display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none;
   border: 1px solid var(--color-neutral-200); border-radius: var(--radius-md);
@@ -39,7 +45,6 @@
   margin: 0; min-width: 0; font-family: var(--font-family-display); font-weight: 400;
   font-size: clamp(28px, 3vw, 40px); line-height: 1.15; color: var(--color-neutral-900);
 }
-.plan-period-range { font-size: 14px; color: var(--color-neutral-600); white-space: nowrap; }
 .plan-period .canvas-icon { font-size: 22px; line-height: 1; }
 
 .plan-head-actions { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
@@ -350,7 +355,10 @@
 /* ---- Year, Season, Month: one plain list (2026-10-13) ----------------------
    The period's goals as one list, drawn one way; the level above folded into
    one line, like Week's "Still to place". No cards, no counts. */
-.plan-horizon .plan-period h1 { font-size: 34px; }
+.plan-horizon .plan-period h1 { font-size: 34px; margin: 0 2px; }
+/* The title's arrows: round, as on Week's "‹ Oct 17 – 23 ›". */
+.plan-horizon .plan-step { width: 30px; height: 30px; border-radius: 9999px; }
+@media (max-width: 767px) { .plan-horizon .plan-step { width: 44px; height: 44px; } }
 .plan-above { max-width: 46rem; margin: 6px 0 14px; border-top: 1px solid var(--color-neutral-200); border-bottom: 1px solid var(--color-neutral-200); }
 .plan-above-line {
   all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
@@ -420,7 +428,6 @@
    a pending change card drawn dashed (Week's look: teal arrives or changes
    here, grey leaves), and the coming period opened beside while the card
    adds to it. */
-.plan-sentence { margin: -6px 0 0; max-width: 46rem; font-family: var(--font-family-display); font-size: 19px; line-height: 1.35; color: var(--color-neutral-700); overflow-wrap: anywhere; }
 .plan-done-fold {
   all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: baseline; gap: 10px;
   width: 100%; max-width: 100%; min-width: 0; margin-top: 8px; padding: 6px 2px;
@@ -544,8 +551,4 @@
 .plan-review-finish.is-next:hover { background: var(--color-primary-800); }
 .plan-review-finished { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; color: var(--color-neutral-800); }
 .plan-review-onward { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
-.plan-review-open:disabled { opacity: .5; cursor: default; }
-.plan-planned { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--color-neutral-700); }
-.plan-mark { font-size: 13.5px; }
-.plan-mark:disabled { opacity: .5; cursor: default; }
-@media (hover: none), (pointer: coarse) { .plan-review-open, .plan-review-finish { min-height: 44px; } }
+@media (hover: none), (pointer: coarse) { .plan-review-finish { min-height: 44px; } }

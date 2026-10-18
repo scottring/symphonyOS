@@ -45,6 +45,7 @@ function open(url='/year?view=constellation&start=2026-10-09'){
  render(<MemoryRouter initialEntries={[url]}><Routes>
   {['/year','/season','/month'].map(p=><Route key={p} path={p} element={<><ConstellationPage/><Where/></>}/>)}
   <Route path="/week" element={<><p>Week page</p><Where/></>}/>
+  <Route path="/getting-started" element={<Where/>}/>
  </Routes></MemoryRouter>)
 }
 const season=(extra='')=>open('/season?view=constellation&horizon=1&start=2026-10-09'+extra)
@@ -53,6 +54,21 @@ const list=(name:string)=>screen.getByRole('list',{name})
 const titles=(name:string)=>within(list(name)).getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)
 const row=(title:string)=>screen.getByText(title,{selector:'.plan-item-title'}).closest('li')!
 const lastRun=()=>activity.calls[activity.calls.length-1]
+// The header (calm pass, 2026-10-18): title row, fact line, one primary, ⋯.
+const head=()=>document.querySelector<HTMLElement>('header.plan-head')!
+const facts=()=>document.querySelector('.plan-facts')?.textContent??null
+const primaries=()=>Array.from(head().querySelectorAll('.plan-primary')).map(b=>b.textContent)
+const MENU=['Year options','Season options','Month options']
+const menuLabel=()=>MENU.find(l=>within(head()).queryByRole('button',{name:l}))!
+/** Opens the header's ⋯ and returns what it offers, in order. */
+const menu=()=>{
+ const label=menuLabel()
+ if(!screen.queryByRole('menu',{name:label}))fireEvent.click(within(head()).getByRole('button',{name:label}))
+ return Array.from(screen.getByRole('menu',{name:label}).querySelectorAll('[role^="menuitem"]')).map(b=>b.textContent)
+}
+const choose=(name:string)=>{menu();fireEvent.click(screen.getByRole(/^Show done$/.test(name)?'menuitemcheckbox':'menuitem',{name}))}
+const at=(d:Date)=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(d)}
+const REVIEWED={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
 beforeEach(()=>{
  vi.clearAllMocks();review.seen=[];review.prevReviewed=null;api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
@@ -61,23 +77,26 @@ beforeEach(()=>{
 })
 
 describe('where you are',()=>{
- it('opens the horizon its URL names, with the period and its dates, and no horizon tabs of its own',()=>{
+ it('opens the horizon its URL names, with the period, and no horizon tabs of its own',()=>{
   month()
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('October 2026')
-  expect(screen.getByText('Oct 1 – 31')).toBeInTheDocument()
+  // Calm pass: a month's dates go without saying; a season's are its fact line.
+  expect(screen.queryByText('Oct 1 – 31')).toBeNull()
   // The top bar names the horizon now (Today · Week · Month · Season · Year).
   expect(screen.queryByRole('navigation',{name:'Planning horizon'})).toBeNull()
   expect(screen.queryByRole('link',{name:'Week →'})).toBeNull()
   open('/year?view=constellation&horizon=1&start=2026-10-09')
   expect(screen.getAllByRole('heading',{level:1})[1]).toHaveTextContent('Fall 2026')
-  expect(screen.getByText('Sep 1 – Nov 30')).toBeInTheDocument()
+  expect(document.querySelectorAll('.plan-facts')[1]).toHaveTextContent(/^Sep 1 – Nov 30 · /)
  })
- it('steps periods with the arrows and offers the way back',()=>{
+ it('steps periods with the arrows and offers the way back in ⋯',()=>{
   season()
+  expect(menu()).not.toContain('Back to this season')
   fireEvent.click(screen.getByRole('button',{name:'Next season'}))
   expect(screen.getByTestId('where').textContent).toContain('start=2026-12-01')
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Winter')
-  fireEvent.click(screen.getByRole('button',{name:'Back to this season'}))
+  expect(screen.queryByRole('button',{name:'Back to this season'})).toBeNull()
+  choose('Back to this season')
   expect(screen.getByTestId('where').textContent).not.toContain('start=')
  })
  it('hands the week horizon over to the Week page',()=>{
@@ -142,56 +161,55 @@ describe('one plain list',()=>{
 })
 
 describe('the level above, folded to one line',()=>{
- it('Month: the season goals open in place and fold again, without writing',()=>{
+ it('Month: the season goals are shown unless hidden, and fold and open in place, without writing',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'t',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
   month()
   const line=screen.getByRole('button',{name:/Fall goals.*the season October serves/})
-  expect(line).toHaveAttribute('aria-expanded','false')
-  expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
-  fireEvent.click(line)
+  expect(line).toHaveAttribute('aria-expanded','true')
   expect(within(list('Fall goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Autumn outings','Strength'])
   fireEvent.click(line)
   expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
+  fireEvent.click(line)
+  expect(within(list('Fall goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Autumn outings','Strength'])
   expect(api.updateTask).not.toHaveBeenCalled()
  })
  it('the toggle names the list it opens, and the open list carries its own Hide',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
   month()
   const line=screen.getByRole('button',{name:/Fall goals.*the season October serves/})
-  expect(line).toHaveTextContent(/Show Fall list$/)
-  fireEvent.click(line)
   expect(line).toHaveTextContent(/Hide Fall list$/)
   const panel=screen.getByRole('complementary',{name:'Fall goals'})
   fireEvent.click(within(panel).getByRole('button',{name:'Hide Fall list'}))
   expect(screen.queryByRole('complementary',{name:'Fall goals'})).toBeNull()
   expect(line).toHaveAttribute('aria-expanded','false')
+  expect(line).toHaveTextContent(/Show Fall list$/)
   cleanup()
   season()
   expect(screen.getByRole('button',{name:/2026 goals/})).toHaveTextContent(/Show 2026 list$/)
-  cleanup()
+  cleanup();localStorage.clear()
   open()
-  expect(screen.getByRole('button',{name:/2025 goals/})).toHaveTextContent(/Show 2025 list$/)
+  expect(screen.getByRole('button',{name:/2025 goals/})).toHaveTextContent(/Hide 2025 list$/)
  })
- it('opens beside the list, and stays open for this viewer next time',()=>{
+ it('sits beside the list, and stays hidden for this viewer once hidden',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
   month()
-  fireEvent.click(screen.getByRole('button',{name:/Fall goals.*the season October serves/}))
   expect(screen.getByRole('complementary',{name:'Fall goals'})).toContainElement(list('Fall goals'))
-  expect(localStorage.getItem('symphony.plan.aboveOpen')).toBe('1')
+  expect(titles('October goals')).toEqual(['Picnic'])
+  fireEvent.click(screen.getByRole('button',{name:/Fall goals.*the season October serves/}))
+  expect(localStorage.getItem('symphony.plan.aboveOpen')).toBe('0')
   cleanup()
   month()
-  expect(screen.getByRole('button',{name:/Fall goals.*the season October serves/})).toHaveAttribute('aria-expanded','true')
-  expect(within(list('Fall goals')).getByText('Autumn outings')).toBeInTheDocument()
-  expect(titles('October goals')).toEqual(['Picnic'])
+  expect(screen.getByRole('button',{name:/Fall goals.*the season October serves/})).toHaveAttribute('aria-expanded','false')
+  expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
  })
  it('Season: the year goals',()=>{
   season()
-  fireEvent.click(screen.getByRole('button',{name:/2026 goals.*the year Fall serves/}))
+  expect(screen.getByRole('button',{name:/2026 goals.*the year Fall serves/})).toHaveAttribute('aria-expanded','true')
   expect(within(list('2026 goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Together','Health'])
  })
  it('Year: last year, for reference, and says when nothing was written',()=>{
   open()
-  fireEvent.click(screen.getByRole('button',{name:/2025 goals.*last year, for reference/}))
+  expect(screen.getByRole('button',{name:/2025 goals.*last year, for reference/})).toHaveAttribute('aria-expanded','true')
   expect(screen.getByText('Nothing was written for 2025.')).toBeInTheDocument()
  })
 })
@@ -406,16 +424,120 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
  })
 })
 
-describe('the header sentence',()=>{
- it('says the counts and how many serve the season, from rules',()=>{
+describe('the fact line (calm pass, 2026-10-18)',()=>{
+ afterEach(()=>{plan.saved=null})
+ it('Month: open · done · planned {date}',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'a',title:'Picnic',bucket:'month',sourceId:'s'},{id:'b',title:'Leaves',bucket:'month',sourceId:'s'},
    {id:'c',title:'Taxes',bucket:'month'},{id:'d',title:'Done one',bucket:'month',completed:true}]
   month()
-  expect(screen.getByText('3 open, 1 done. Two serve a Fall goal.')).toHaveClass('plan-sentence')
- })
- it('an empty list says nothing',()=>{
+  expect(facts()).toBe('3 open · 1 done')
+  cleanup();plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
   month()
+  expect(facts()).toBe('3 open · 1 done · planned Oct 3')
+  // No summary sentence any more.
   expect(document.querySelector('.plan-sentence')).toBeNull()
+ })
+ it('Season: its dates · goals · done',()=>{
+  api.tasks=[{id:'a',title:'Autumn outings',bucket:'quarter'},{id:'b',title:'Strength',bucket:'quarter'},{id:'c',title:'Fix the gate',bucket:'quarter',completed:true}]
+  season()
+  expect(facts()).toBe('Sep 1 – Nov 30 · 2 goals · 1 done')
+ })
+ it('Year: {n} goals',()=>{
+  open()
+  expect(facts()).toBe('2 goals')
+  cleanup();api.goals=[GOALS[0]]
+  open()
+  expect(facts()).toBe('1 goal')
+ })
+})
+
+describe('the calm header (approved mockup 2026-10-18)',()=>{
+ afterEach(()=>{vi.useRealTimers();review.reviewed=null;review.prevReviewed=null;plan.saved=null})
+ it('is the title row and fact line, then one primary button and ⋯',()=>{
+  at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
+  month()
+  expect(within(head()).getAllByRole('button').map(b=>b.getAttribute('aria-label')??b.textContent)).toEqual(['Previous month','Next month','Plan October','Month options'])
+ })
+ it('Review {previous} while that review is due; Plan moves into ⋯',()=>{
+  at(new Date(2026,9,17,12))
+  month()
+  expect(primaries()).toEqual(['Review September'])
+  expect(menu()).toContain('Plan October')
+  expect(menu()).not.toContain('Review September')
+  fireEvent.click(within(head()).getByRole('button',{name:'Review September'}))
+  expect(screen.getByTestId('where').textContent).toContain('review=1')
+  expect(screen.getByTestId('where').textContent).toContain('start=2026-09-01')
+ })
+ it('Plan {period} while planning is open and no review is due; ⋯ plans it too',()=>{
+  at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
+  month()
+  expect(primaries()).toEqual(['Plan October'])
+  expect(menu().filter(t=>/^(Plan|Review) /.test(t??''))).toEqual([])
+  fireEvent.click(within(head()).getByRole('button',{name:'Plan October'}))
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+ })
+ it('neither: a period over and already reviewed has no primary; its review stays in ⋯',()=>{
+  at(new Date(2026,9,17,12));review.reviewed=REVIEWED
+  open('/month?view=constellation&horizon=2&start=2025-03-09')
+  expect(primaries()).toEqual([])
+  expect(menu()).toContain('Review March')
+  choose('Review March')
+  expect(screen.getByTestId('where').textContent).toContain('review=1')
+ })
+ it('Year keeps the offers it had: Review last year while due, else Plan the year',()=>{
+  at(new Date(2026,9,17,12))
+  open()
+  expect(primaries()).toEqual(['Review 2025'])
+  cleanup();review.prevReviewed=REVIEWED
+  open()
+  expect(primaries()).toEqual(['Plan 2026'])
+ })
+ it('⋯ holds the page’s choices, the way in, and its help',()=>{
+  at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
+  month()
+  expect(menu()).toEqual(['Show done','Hide the Fall list','Start with a goal · guided introduction','Talk it through','How this page works'])
+  // Show done: a tick, remembered on this device, and the list agrees.
+  const done=screen.getByRole('menuitemcheckbox',{name:'Show done'})
+  expect(done).toHaveAttribute('aria-checked','false')
+  fireEvent.click(done)
+  expect(screen.getByRole('menuitemcheckbox',{name:'Show done'})).toHaveAttribute('aria-checked','true')
+  expect(titles('October goals')).toEqual(['Picnic','Pay taxes'])
+  expect(localStorage.getItem('symphony-plan-done')).toBe('shown')
+  // The done fold says the same.
+  expect(screen.getByRole('button',{name:/1 done/})).toHaveAttribute('aria-expanded','true')
+  // Hide the Fall list: the page's own toggle agrees.
+  choose('Hide the Fall list')
+  expect(screen.queryByRole('complementary',{name:'Fall goals'})).toBeNull()
+  expect(screen.getByRole('button',{name:/Fall goals.*the season October serves/})).toHaveAttribute('aria-expanded','false')
+  expect(menu()).toContain('Show the Fall list')
+  choose('How this page works')
+  expect(launcher.openAssistant).toHaveBeenCalledWith(expect.objectContaining({autoSend:true,stayOnPage:true}))
+  choose('Start with a goal · guided introduction')
+  expect(screen.getByTestId('where').textContent).toBe('/getting-started?journey=goals')
+ })
+ it('the removed pieces are gone from the header',()=>{
+  at(new Date(2026,9,17,12));plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month'}]
+  open('/month?view=constellation&horizon=2&start=2026-11-09')
+  expect(screen.queryByText('Nov 1 – 30')).toBeNull()
+  expect(screen.queryByRole('button',{name:/I’m happy with/})).toBeNull()
+  expect(screen.queryByText(/November planned/)).toBeNull()
+  expect(document.querySelector('.plan-sentence')).toBeNull()
+  expect(screen.queryByRole('button',{name:'Back to this month'})).toBeNull()
+  expect(screen.queryByRole('link',{name:/guided introduction/})).toBeNull()
+  expect(head().querySelector('.page-help')).toBeNull()
+  expect(screen.queryByRole('button',{name:/with me$/})).toBeNull()
+  // The date the period was planned is in the fact line instead.
+  expect(facts()).toMatch(/· planned Oct 3$/)
+  expect(menu()).toContain('Back to this month')
+ })
+ it('while reviewing or planning, the header keeps only the title and ⋯',()=>{
+  at(new Date(2026,9,17,12))
+  month('&review=1')
+  expect(primaries()).toEqual([])
+  expect(facts()).toBeNull()
+  expect(menu().filter(t=>/^(Plan|Review) |guided/.test(t??''))).toEqual([])
  })
 })
 
@@ -469,12 +591,13 @@ describe('one conversation, at the foot (approved Season board, 2026-10-10)',()=
    <Route path="/season" element={<ConstellationPage/>}/>
   </Routes></MemoryRouter></ConversationWalkContext.Provider>)
   expect(screen.queryByRole('button',{name:/with me$/})).not.toBeInTheDocument()
+  expect(menu()).not.toContain('Talk it through')
   expect(setWalk).toHaveBeenLastCalledWith({label:'Plan this season with me',message:expect.stringContaining('Fall 2026 across my year goals')})
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Fall 2026')
  })
- it('without the bar, offers the walk itself, naming a past period, and asks without supplying',()=>{
+ it('without the bar, ⋯ offers Talk it through, naming a past period, and asks without supplying',()=>{
   open('/season?view=constellation&horizon=1&start=2025-10-01')
-  fireEvent.click(screen.getByRole('button',{name:'Plan Fall 2025 with me'}))
+  choose('Talk it through')
   const message=launcher.openAssistant.mock.calls[0][0].message
   expect(message).toContain('Fall 2025 across my year goals, one at a time')
   expect(message).toContain("don't suggest season goals of your own")
@@ -515,10 +638,10 @@ describe('on schedule (spec 2026-10-14, "The schedule")',()=>{
   api.goals=[...api.goals,{id:'n',name:'Run a half marathon',year:2027,status:'active',context:'personal'}]
   expect(inBar('/year?view=constellation')).toHaveBeenLastCalledWith({label:'Plan this year with me',message:expect.any(String)})
  })
- it('without the bar (phones) the page’s own walk names the talk and sends it',()=>{
+ it('without the bar (phones) Talk it through sends the talk that is due',()=>{
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,9))
   open('/month?view=constellation&horizon=2')
-  fireEvent.click(screen.getByRole('button',{name:'Plan November'}))
+  choose('Talk it through')
   expect(launcher.openAssistant).toHaveBeenCalledWith({message:'Plan November.',autoSend:true})
  })
 })
@@ -533,8 +656,8 @@ describe('the review by hand (2026-10-17)',()=>{
   expect(review.seen.slice(0,2)).toEqual(['monthly:2026-10','monthly:2026-9'])
   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
   expect(screen.getByTestId('where').textContent).toContain('review=1')
-  expect(screen.queryByRole('link',{name:/guided introduction/})).toBeNull()
-  expect(document.querySelector('.plan-sentence')).toBeNull()
+  expect(primaries()).toEqual([])
+  expect(facts()).toBeNull()
   const open=screen.getByRole('list',{name:'Still open in October'})
   expect(within(open).getAllByRole('listitem')).toHaveLength(1)
   expect(within(open).getAllByRole('button').map(b=>b.textContent)).toEqual(['Done','Move to November','Someday','Remove from October'])
@@ -597,7 +720,7 @@ describe('a line moved on is not open here (2026-10-17)',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'a',title:'Come up with October business plan',bucket:'month',sourceId:'s',carried:true,carriedTo:new Date(2026,10,1)},
    {id:'b',title:'Book the cabin',bucket:'month'},{id:'c',title:'Pay taxes',bucket:'month',completed:true}]
   month()
-  expect(screen.getByText('1 open, 1 done, 1 moved on.')).toBeInTheDocument()
+  expect(facts()).toBe('1 open · 1 done')
   expect(titles('October goals')).toEqual(['Book the cabin'])
   const fold=screen.getByRole('button',{name:/1 done, 1 moved on/})
   fireEvent.click(fold)
@@ -618,16 +741,16 @@ describe('a line moved on is not open here (2026-10-17)',()=>{
 })
 
 describe('I’m happy with October (2026-10-17)',()=>{
- it('the period on screen can be marked planned; once it is, the page says so',async()=>{
+ it('the plan flow marks the period planned; the header says when, not asks',async()=>{
   plan.saved=null
-  month()
+  month('&plan=1')
   fireEvent.click(screen.getByRole('button',{name:'I’m happy with October'}))
   await waitFor(()=>expect(plan.save).toHaveBeenCalledWith({wentWell:'',didnt:''}))
   cleanup()
   plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
   try{
    month()
-   expect(screen.getByText(/October planned Oct 3/)).toBeInTheDocument()
+   expect(facts()).toMatch(/planned Oct 3$/)
    expect(screen.queryByRole('button',{name:'I’m happy with October'})).toBeNull()
   }finally{plan.saved=null}
  })
@@ -642,6 +765,8 @@ describe('I’m happy with October (2026-10-17)',()=>{
 describe('planning by hand (2026-10-17)',()=>{
  const SEP=new Date(2026,8,1),OCT=new Date(2026,9,1)
  it('Month: Plan October brings in September’s leftovers, adds for each Fall goal and on its own, then marks it planned',async()=>{
+  at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
+  try{
   api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},
    {id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP},{id:'gone',title:'Pay taxes',bucket:'month',monthStart:SEP,completed:true},
    {id:'a',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'}]
@@ -649,7 +774,7 @@ describe('planning by hand (2026-10-17)',()=>{
   month()
   fireEvent.click(screen.getByRole('button',{name:'Plan October'}))
   expect(screen.getByTestId('where').textContent).toContain('plan=1')
-  expect(document.querySelector('.plan-sentence')).toBeNull()
+  expect(facts()).toBeNull()
   expect(screen.queryByRole('button',{name:'Review October'})).toBeNull()
   const left=screen.getByRole('list',{name:'Left from September'})
   expect(within(left).getAllByRole('listitem')).toHaveLength(1)
@@ -668,6 +793,7 @@ describe('planning by hand (2026-10-17)',()=>{
   fireEvent.click(await screen.findByRole('button',{name:'Plan this week →'}))
   expect(screen.getByText('Week page')).toBeInTheDocument()
   expect(screen.getByTestId('where').textContent).toContain('plan=1')
+  }finally{vi.useRealTimers();review.prevReviewed=null}
  })
  it('Year: last year’s open goals can be brought in as a copy that remembers them',async()=>{
   api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]

@@ -16,18 +16,23 @@
 // {next} · Someday · Remove from {period} on a month or season goal, Done ·
 // Archive on a year goal. Tapping a month or season goal opens its task panel
 // (which holds every verb — horizonPanel.tsx), and a year goal opens in place
-// with Done and Archive. Done goals fold into one line. Under the heading, one sentence
-// from rules (horizonSentence.ts). The bar's walk becomes "Plan November"
-// while that talk is due (planSchedule.ts), and a pending change card is
-// drawn dashed on the list (planPreview.ts).
+// with Done and Archive. Done goals fold into one line. The bar's walk becomes
+// "Plan November" while that talk is due (planSchedule.ts), and a pending
+// change card is drawn dashed on the list (planPreview.ts).
+//
+// The header, calm pass (Scott approved the mockup 2026-10-18, as on Week):
+// "‹ October 2026 ›", one quiet fact line, one primary button that changes
+// with the moment (the review that is due, else planning the period), and a
+// ⋯ menu (PageMenu) for everything else.
 //
 // URL: `horizon` (0 Year, 1 Season, 2 Month; 3 hands over to Week), `start`
 // (any date in the period) and `focus` (an item a conversation just saved).
 // Every manual write goes through the canvas activity, so it reports saving /
 // saved / didn't save, with Undo when the previous fields can be restored.
 
-import { PageHelpButton } from '@/components/explain/PageHelp'
-import { LearnVideoChip } from '@/components/learn/LearnVideoChip'
+import { PageHelpContext, usePageHelp } from '@/components/explain/PageHelp'
+import { PageMenu, type PageMenuChoice } from '@/components/plan/PageMenu'
+import { usePlanPagePrefs } from '@/hooks/usePlanPagePrefs'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
@@ -42,7 +47,6 @@ import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { periodBounds, selectPeriodTasks, isCurrentPeriod } from '@/lib/planning/periodPage'
-import { horizonSentence } from '@/lib/planning/horizonSentence'
 import { talkFor, listIsEmpty, isPutOff, readDismissals } from '@/lib/planning/planSchedule'
 import { committedTo } from '@/lib/placement/model'
 import { localYmd, parseLocalYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
@@ -82,16 +86,6 @@ const aOrAn = (word: string) => /^[aeiou8]/i.test(word) ? 'an' : 'a'
 
 type Composer = { kind: 'add' } | { kind: 'edit'; key: string }
 
-// Whether the level above is open beside the list: one viewer's preference
-// (the page works the same without it).
-const ABOVE_OPEN_KEY = 'symphony.plan.aboveOpen'
-function readAboveOpen(): boolean {
-  try { return localStorage.getItem(ABOVE_OPEN_KEY) === '1' } catch { return false }
-}
-function writeAboveOpen(open: boolean) {
-  try { localStorage.setItem(ABOVE_OPEN_KEY, open ? '1' : '0') } catch { /* private window */ }
-}
-
 function Inner() {
   const selection = useSelectionOptional()
   const { goals, loading: goalsLoading, error: goalsError, addGoal, updateGoal, deleteGoal } = useGoalsContext()
@@ -106,6 +100,8 @@ function Inner() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const area = useAddArea()
+  // The shell's "How this page works", or the page's own ask where it offers none.
+  const shellHelp = usePageHelp()
 
   // ---- Where we are -------------------------------------------------------
   const raw = params.get('start')
@@ -140,14 +136,11 @@ function Inner() {
   const target = reviewTarget(bounds, now, REVIEW_WINDOW_DAYS[PERIODS[level]])
   // "I'm happy with October" (Scott, 2026-10-17): planned is a thing you
   // say, as on Week — not a list that merely has lines. Home's checklist
-  // reads it.
+  // reads it. The plan flow (PeriodPlan) says it; the header shows when.
   const planSession = usePlanningSession(SESSION_HORIZONS[level], sessionToken)
-  const [marking, setMarking] = useState(false)
   const markPlanned = async (): Promise<boolean> => {
-    setMarking(true)
     const mine = planSession.mine
     const ok = await planSession.save({ wentWell: mine?.wentWell ?? '', didnt: mine?.didnt ?? '', ...(mine?.focus ? { focus: mine.focus } : {}) })
-    setMarking(false)
     if (!ok) showToast('Couldn’t save that — try again.', 'error', 5000)
     return ok
   }
@@ -163,13 +156,16 @@ function Inner() {
     visible.filter((t) => committedTo(t, 'week', week, { isCurrent: thisWeek }) !== undefined),
   ])
 
-  const [showDone, setShowDone] = useState(false)
+  // Show done and the level above: this viewer's choices, shared with the
+  // ⋯ menu and remembered on this device (usePlanPagePrefs).
+  const prefs = usePlanPagePrefs()
+  const showDone = prefs.done
   const [expanded, setExpanded] = useState<string | null>(null)
   const [composer, setComposer] = useState<Composer | null>(null)
   // The optional "For" pick while writing a new goal (a node key, or none).
   const [forKey, setForKey] = useState('')
-  const [aboveOpen, setAboveOpen] = useState(readAboveOpen)
-  const toggleAbove = () => setAboveOpen((open) => { writeAboveOpen(!open); return !open })
+  const aboveOpen = !prefs.hideAbove
+  const toggleAbove = () => prefs.set('hideAbove', aboveOpen)
   // A link just made: the goal's "For" line lights up.
   const [linked, setLinked] = useState<string | null>(null)
   const mainRef = useRef<HTMLElement>(null)
@@ -391,10 +387,6 @@ function Inner() {
   const doneNodes = levelNodes.filter(isDone)
   const movedNodes = levelNodes.filter((n) => !isDone(n) && !!movedLabel(n))
   const items = showDone ? [...openNodes, ...movedNodes, ...doneNodes] : openNodes
-  const sentence = horizonSentence({
-    items: levelNodes.map((n) => ({ done: isDone(n), moved: !!movedLabel(n), hasParent: !!n.parent })),
-    parentWord: level === 2 ? seasonWord : level === 1 ? String(year) : null,
-  })
   // "5 done, 1 moved on · Taxes, Picnic…": what is no longer open, in one line.
   const folded = [...doneNodes, ...movedNodes]
   const doneLine = `${[doneNodes.length ? `${doneNodes.length} done` : '', movedNodes.length ? `${movedNodes.length} moved on` : ''].filter(Boolean).join(', ')} · ${folded.slice(0, 2).map((n) => n.title).join(', ')}${folded.length > 2 ? '…' : ''}`
@@ -544,35 +536,66 @@ function Inner() {
       ? { label: `Plan ${monthWord} →`, onClick: () => navigate(`/month?view=constellation&horizon=2${keepStart}&plan=1`) }
       : { label: `Plan ${seasonWord} →`, onClick: () => navigate(`/season?view=constellation&horizon=1${keepStart}&plan=1`) }
 
-  const walk = <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>{walkLabel}</button>
+  // ---- The header (calm pass, 2026-10-18) ------------------------------------
+  // One primary button that changes with the moment: the review that is due
+  // (the period before's while under way, its own in its last days), else
+  // planning the period; the other one waits in ⋯. Neither while one is open.
+  type Offer = { label: string; due: boolean; run: () => void }
+  const inFlow = reviewing || planning
+  const reviewOffer: Offer | null = inFlow ? null
+    : target === 'this' ? { label: `Review ${periodWord}`, due: !review.loading && !review.error && !review.reviewed, run: () => setReviewing(true) }
+      : target === 'previous' && !prevReview.loading && !prevReview.error && !prevReview.reviewed
+        ? { label: `Review ${prevWord}`, due: true, run: () => setReviewing(true, bounds.prev) }
+        : null
+  const planOffer: Offer | null = !inFlow && plannable ? { label: `Plan ${periodWord}`, due: true, run: () => setMode('plan') } : null
+  const primary = reviewOffer?.due ? reviewOffer : planOffer
+  // One quiet fact line: Month "19 open · 26 done", Season "Sep 22 – Dec 20 ·
+  // 21 goals · 4 done", Year "5 goals"; then when it was planned.
+  const goalCount = (n: number) => `${n} goal${n === 1 ? '' : 's'}`
+  const factParts = level === 2 ? [`${openNodes.length} open`, `${doneNodes.length} done`]
+    : level === 1 ? [periodRange(bounds.start, bounds.end), goalCount(openNodes.length), `${doneNodes.length} done`]
+      : [goalCount(openNodes.length)]
+  const plannedOn = !planSession.loading && !planSession.error && planSession.saved
+    ? `planned ${planSession.saved.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
+  const facts = !inFlow && dataReady && !error && !goalsError
+    ? <p className="wk-facts plan-facts" data-explain="period-facts" data-explain-label={`${periodWord} at a glance`}>
+      {factParts.join(' · ')}{plannedOn && <> · <b className="wk-facts-reviewed">{plannedOn}</b></>}
+    </p>
+    : null
+  const menuChoices: PageMenuChoice[] = [
+    ...[reviewOffer, planOffer].filter((o): o is Offer => !!o && o !== primary && dataReady)
+      .map((o) => ({ id: o === planOffer ? 'plan' : 'review', label: o.label, onSelect: o.run })),
+    ...(!current ? [{ id: 'back', label: `Back to this ${PERIODS[level]}`, onSelect: () => setStart(null) }] : []),
+    ...(inFlow ? [] : [
+      { id: 'done', label: 'Show done', checked: showDone, onSelect: () => prefs.set('done', !showDone) },
+      { id: 'above', label: `${aboveOpen ? 'Hide' : 'Show'} the ${aboveListWord} list`, onSelect: toggleAbove },
+      { id: 'intro', label: 'Start with a goal · guided introduction', onSelect: () => navigate('/getting-started?journey=goals') },
+    ]),
+  ]
+  const help = shellHelp ?? (() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true }))
+  const menuLabel = `${PERIODS[level][0].toUpperCase()}${PERIODS[level].slice(1)} options`
 
   return <main ref={mainRef} className={`plan-canvas plan-horizon ${PAGE_PLANNING}`} data-horizon={level}>
     <header className="plan-head">
-      {/* Without the docked bar (phones) the page offers both itself. */}
-      {(!walkInBar || !(reviewing || planning)) && <div className="plan-head-row">
-        {!walkInBar && walk}
-        {!reviewing && !planning && target === 'this' && <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setReviewing(true)}>Review {periodWord}</button>}
-        {!reviewing && !planning && target === 'previous' && !prevReview.loading && !prevReview.error && !prevReview.reviewed &&
-          <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setReviewing(true, bounds.prev)}>Review {prevWord}</button>}
-        {!reviewing && !planning && plannable && <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setMode('plan')}>Plan {periodWord}</button>}
-        {!reviewing && !planning && !planSession.loading && !planSession.error && (planSession.saved
-          ? <span className="plan-planned"><span className="pv2-seal" aria-hidden="true" />{periodWord} planned {planSession.saved.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-          // A period already over is reviewed, not planned.
-          : bounds.end > now && <button type="button" className="canvas-link plan-mark" disabled={marking || !dataReady} onClick={() => { void markPlanned() }}>I’m happy with {periodWord}</button>)}
-      </div>}
-      <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
-        <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
-        <h1>{periodTitle}</h1>
-        <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
-        <span className="plan-period-range">{periodRange(bounds.start, bounds.end)}</span>
-        <PageHelpButton onHelp={() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true })} />
-        <LearnVideoChip />
-        {!current && <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>Back to this {PERIODS[level]}</button>}
+      <div className="plan-head-main">
+        <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
+          <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
+          <h1>{periodTitle}</h1>
+          <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
+        </div>
+        {/* The review and the plan say where the period stands in their own
+            words: the fact line steps aside while one is open. */}
+        {facts}
       </div>
-      {/* The review says where the period stands in its own words, and is
-          no place to start a new goal: both step aside while it is open. */}
-      {!reviewing && !planning && dataReady && !error && !goalsError && sentence && <p className="plan-sentence">{sentence}</p>}
-      {!reviewing && !planning && <Link className="canvas-link" to="/getting-started?journey=goals">Start with a goal · guided introduction</Link>}
+      <div className="plan-head-tools">
+        {primary && <button type="button" className="pv2-btn wk-plan plan-primary" disabled={!dataReady} onClick={primary.run}
+          data-explain="plan-primary" data-explain-label={primary.label}>{primary.label}</button>}
+        {/* Without the docked bar (phones), ⋯ offers the talk itself. */}
+        <PageHelpContext.Provider value={help}>
+          <PageMenu label={menuLabel} choices={menuChoices}
+            talk={walkInBar ? undefined : () => openAssistant({ message: walkMessage, autoSend: true })} />
+        </PageHelpContext.Provider>
+      </div>
     </header>
 
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
@@ -625,7 +648,7 @@ function Inner() {
             })}
           </ul>
           {openNodes.length === 0 && preview.here.length === 0 && proposals.length === 0 && !adding && <p className="plan-empty">Nothing{folded.length ? ' open' : ''} for {periodWord} yet.</p>}
-          {folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>
+          {folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => prefs.set('done', !showDone)}>
             <span className="plan-done-fold-text">{doneLine}</span>
             <span className="canvas-link plan-done-fold-go">{showDone ? 'Hide' : 'Show'}</span>
           </button>}
