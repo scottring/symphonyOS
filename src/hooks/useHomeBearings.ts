@@ -243,6 +243,7 @@ export function useHomeBearings(now: Date): HomeBearings {
 
   const facts: BearingsFacts = {
     now,
+    weekStart: localYmd(weekStart),
     weekDaysLeft: Math.max(1, 7 - Math.round((today.getTime() - weekStart.getTime()) / DAY)),
     week: { planned: !!weekSession.saved, open: weekItems.filter((t) => !t.completed).length, done: weekItems.filter((t) => t.completed).length },
     month: monthFacts,

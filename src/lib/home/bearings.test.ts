@@ -36,6 +36,11 @@ describe('the next step', () => {
     expect(step.body).toContain('Three things are waiting for a day.')
     expect(step.action.to).toBe('/week')
   })
+  it('Plan the week opens the review deck on the current week, like the checklist link', () => {
+    const step = chooseNextStep(facts({ week: { planned: false, open: 3, done: 0 }, weekStart: '2026-10-11' }), new Set())
+    expect(step.id).toBe('plan-week')
+    expect(step.action.to).toBe('/week?view=alongside&date=2026-10-11&start=2026-10-11&review=1')
+  })
   it('lets a nearly finished week go', () => {
     expect(chooseNextStep(facts({ week: { planned: false, open: 3, done: 0 }, weekDaysLeft: 2 }), new Set()).id).not.toBe('plan-week')
   })
