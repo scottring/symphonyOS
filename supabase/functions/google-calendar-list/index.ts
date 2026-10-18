@@ -1,9 +1,12 @@
-// Lists calendars across EVERY provider the user has connected. Outlook
+// Lists calendars across EVERY account the user has connected (several
+// Google, several Outlook). Each calendar names its account (connectionId,
+// accountEmail). Outlook
 // calendars come back with accessRole 'reader' — reads only for now — which
 // is the signal the event panel already uses to hide edits.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
+  CONNECTION_COLUMNS,
   openConnections,
   readProviderEnv,
   type CalendarConnectionRow,
@@ -41,7 +44,7 @@ serve(async (req) => {
 
     const { data: connections, error: connError } = await supabaseAdmin
       .from('calendar_connections')
-      .select('user_id, provider, access_token, refresh_token, token_expires_at, calendar_id')
+      .select(CONNECTION_COLUMNS)
       .eq('user_id', user.id)
 
     if (connError || !connections || connections.length === 0) {
@@ -54,15 +57,15 @@ serve(async (req) => {
       readProviderEnv((n) => Deno.env.get(n)),
     )
 
-    // A permanently revoked grant: drop that provider's row so the app shows
-    // "reconnect" for it rather than failing forever. Other providers keep working.
+    // A permanently revoked grant: drop that account's row so the app shows
+    // "reconnect" for it rather than failing forever. Other accounts keep working.
     for (const err of opened.errors) {
-      if (err.needsReconnect) {
+      if (err.needsReconnect && err.connectionId) {
         await supabaseAdmin
           .from('calendar_connections')
           .delete()
           .eq('user_id', user.id)
-          .eq('provider', err.provider)
+          .eq('id', err.connectionId)
       }
     }
 

@@ -1,9 +1,10 @@
-// Reads events across EVERY calendar provider the user has connected (Google,
-// Outlook via Microsoft Graph) and returns them in one merged list. The name
+// Reads events across EVERY calendar account the user has connected (any
+// number of Google and Outlook accounts) and returns them in one merged list. The name
 // is historical — the frontend calls this one function for all calendars.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
+  CONNECTION_COLUMNS,
   fetchEventsAcross,
   openConnections,
   readProviderEnv,
@@ -43,10 +44,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Every provider this user has connected — one row per provider.
+    // Every account this user has connected — one row per account.
     const { data: connections, error: connError } = await supabaseAdmin
       .from('calendar_connections')
-      .select('user_id, provider, access_token, refresh_token, token_expires_at, calendar_id')
+      .select(CONNECTION_COLUMNS)
       .eq('user_id', user.id)
 
     if (connError || !connections || connections.length === 0) {
@@ -133,11 +134,16 @@ serve(async (req) => {
       end: new Date(endDate).toISOString(),
     })
 
-    // Cache what is new or changed. `provider` is not a column there; strip
-    // it. Every read used to rewrite every event (cache.ts); a failed read of
+    // Cache what is new or changed. `provider` and `connection_id` are not
+    // columns there; strip them. Every read used to rewrite every event (cache.ts); a failed read of
     // the cache falls back to writing them all, as before.
     if (events.length > 0) {
-      const rows = events.map(({ provider: _provider, ...row }) => row)
+      // One row per event id: an event on a calendar shared between two
+      // accounts would otherwise reach one upsert twice, which Postgres refuses.
+      const seen = new Set<string>()
+      const rows = events
+        .map(({ provider: _provider, connection_id: _connection, ...row }) => row)
+        .filter((row) => !seen.has(row.google_event_id) && seen.add(row.google_event_id))
       const stored: Partial<CachedEventRow>[] = []
       let storedOk = true
       const ids = rows.map((r) => r.google_event_id)

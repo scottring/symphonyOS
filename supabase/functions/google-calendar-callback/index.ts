@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { verifyOAuthState } from '../_shared/oauthState.ts'
+import { readProviderEnv } from '../_shared/calendar-providers/index.ts'
+import { saveConnection } from '../_shared/calendar-providers/saveConnection.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -82,32 +84,26 @@ serve(async (req) => {
       })
     }
 
-    const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+    // One row per account: the same account again refreshes its row, another
+    // account is added beside it (saveConnection.ts).
+    const saved = await saveConnection(supabaseAdmin, {
+      userId: user.id,
+      provider: 'google',
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      expiresInSeconds: tokenData.expires_in,
+      // What Google says was granted (space-separated); mail features check this.
+      grantedScopes: typeof tokenData.scope === 'string' ? tokenData.scope : null,
+    }, readProviderEnv((n) => Deno.env.get(n)))
 
-    // Use service role to store tokens securely
-    const { error: upsertError } = await supabaseAdmin
-      .from('calendar_connections')
-      .upsert({
-        user_id: user.id,
-        provider: 'google',
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        token_expires_at: expiresAt,
-        // What Google says was granted (space-separated); mail features check this.
-        granted_scopes: typeof tokenData.scope === 'string' ? tokenData.scope : null,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id,provider',
-      })
-
-    if (upsertError) {
-      return new Response(JSON.stringify({ error: upsertError.message }), {
+    if (saved.error) {
+      return new Response(JSON.stringify({ error: saved.error }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, accountEmail: saved.accountEmail }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {

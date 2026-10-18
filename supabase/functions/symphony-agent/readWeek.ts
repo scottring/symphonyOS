@@ -52,7 +52,7 @@ export async function readCalendarCoverage(
   try {
     const { data, error } = await read()
     if (error || !data) return unknownCalendar()
-    const connections = data.filter((c) => c.provider === 'google' || c.provider === 'outlook')
+    const connections = data.filter((c) => c.provider === 'google' || c.provider === 'microsoft')
     if (!connections.length) return {
       status: 'not-connected', availability: 'unknown',
       note: 'No calendar is connected. Availability is unknown. Empty event lists do not mean the person is free; plan from their tasks, routines and stated commitments.',

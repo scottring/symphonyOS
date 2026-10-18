@@ -7,6 +7,10 @@
 // verify or names another user. The JSON shape is kept, so the client's
 // providerFromOAuthState still reads `provider`.
 
+/** Where a calendar sign-in may return to. Each provider's app registration
+ *  must list the same URIs, exactly. */
+export const ALLOWED_REDIRECTS = ['http://localhost:5173/calendar-callback', 'https://symphony-rebuild.vercel.app/calendar-callback', 'https://symphony-os.com/calendar-callback', 'https://www.symphony-os.com/calendar-callback', 'https://app.symphony-os.com/calendar-callback']
+
 export interface OAuthStateBody { userId: string; provider: 'google' | 'microsoft'; access?: string; redirectUri: string; expiresAt: number; nonce: string; sig?: string }
 
 const enc = new TextEncoder()

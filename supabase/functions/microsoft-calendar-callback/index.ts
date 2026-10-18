@@ -1,7 +1,10 @@
-// Exchanges the Microsoft auth code for tokens and stores them as this user's
-// 'microsoft' calendar connection. Mirrors google-calendar-callback.
+// Exchanges the Microsoft auth code for tokens and stores them as one of this
+// user's Outlook accounts. Mirrors google-calendar-callback, state check included.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { MICROSOFT_AUTHORITY, MICROSOFT_SCOPES } from '../_shared/calendar-providers/microsoft.ts'
+import { readProviderEnv } from '../_shared/calendar-providers/index.ts'
+import { saveConnection } from '../_shared/calendar-providers/saveConnection.ts'
+import { verifyOAuthState } from '../_shared/oauthState.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,15 +31,31 @@ Deno.serve(async (req) => {
       return json({ error: 'Unauthorized' }, 401)
     }
 
-    const { code, redirectUri } = await req.json()
-    if (!code || !redirectUri) {
-      return json({ error: 'Missing code or redirectUri' }, 400)
-    }
+    const { code, redirectUri, state } = await req.json()
 
     const clientId = Deno.env.get('MICROSOFT_CLIENT_ID')
     const clientSecret = Deno.env.get('MICROSOFT_CLIENT_SECRET')
     if (!clientId || !clientSecret) {
       return json({ error: 'Microsoft credentials not configured' }, 500)
+    }
+
+    // The round trip must be the one this person started (oauthState.ts): a
+    // state that is missing, forged or someone else's is refused before any
+    // token is exchanged or stored.
+    const verified = typeof redirectUri === 'string' && await verifyOAuthState(clientSecret, state, user.id, 'microsoft', redirectUri)
+    if (!verified || typeof code !== 'string' || !code) {
+      return json({ error: 'This sign-in link has expired or is invalid. Start the connection again from Calendar settings.' }, 400)
+    }
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+    const { data: consumed, error: consumeError } = await supabaseAdmin.rpc('consume_oauth_transaction', {
+      p_nonce: verified.nonce, p_user: user.id, p_provider: 'microsoft', p_redirect: redirectUri,
+    })
+    if (consumeError || consumed !== true) {
+      return json({ error: 'This sign-in link has already been used or expired. Start the connection again from Calendar settings.' }, 400)
     }
 
     const tokenResponse = await fetch(`${MICROSOFT_AUTHORITY}/token`, {
@@ -62,31 +81,19 @@ Deno.serve(async (req) => {
       return json({ error: 'Microsoft did not return a refresh token. Please try connecting again.' }, 400)
     }
 
-    const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+    const saved = await saveConnection(supabaseAdmin, {
+      userId: user.id,
+      provider: 'microsoft',
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      expiresInSeconds: tokenData.expires_in,
+    }, readProviderEnv((n) => Deno.env.get(n)))
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    const { error: upsertError } = await supabaseAdmin
-      .from('calendar_connections')
-      .upsert({
-        user_id: user.id,
-        provider: 'microsoft',
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        token_expires_at: expiresAt,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id,provider',
-      })
-
-    if (upsertError) {
-      return json({ error: upsertError.message }, 500)
+    if (saved.error) {
+      return json({ error: saved.error }, 500)
     }
 
-    return json({ success: true })
+    return json({ success: true, accountEmail: saved.accountEmail })
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 500)
   }

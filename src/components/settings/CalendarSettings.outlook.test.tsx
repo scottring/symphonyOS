@@ -3,18 +3,24 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const connect = vi.fn().mockResolvedValue(undefined)
 const disconnect = vi.fn().mockResolvedValue(undefined)
+const GOOGLE = { id: 'g1', provider: 'google', accountEmail: null, isPrimary: true, grantsMail: false }
+const OUTLOOK = { id: 'ms1', provider: 'microsoft', accountEmail: 'me@outlook.com', isPrimary: true, grantsMail: false }
 const hookState = {
   connectedProviders: ['google'] as string[],
   calendars: [
-    { id: 'me@gmail.com', summary: 'me@gmail.com', email: 'me@gmail.com', accessRole: 'owner', primary: true, provider: 'google' },
-    { id: 'AAMk-work', summary: 'Work (Outlook)', email: 'AAMk-work', accessRole: 'reader', primary: true, provider: 'microsoft' },
+    { id: 'me@gmail.com', summary: 'me@gmail.com', email: 'me@gmail.com', accessRole: 'owner', primary: true, provider: 'google', connectionId: 'g1' },
+    { id: 'AAMk-work', summary: 'Work (Outlook)', email: 'AAMk-work', accessRole: 'reader', primary: true, provider: 'microsoft', connectionId: 'ms1' },
   ],
 }
+const accountsFor = (providers: string[]) => [GOOGLE, OUTLOOK].filter((a) => providers.includes(a.provider))
 
 vi.mock('@/hooks/useGoogleCalendar', () => ({
   useGoogleCalendar: () => ({
     isConnected: hookState.connectedProviders.length > 0,
     connectedProviders: hookState.connectedProviders,
+    accounts: accountsFor(hookState.connectedProviders),
+    reconnectAccountIds: [],
+    makePrimary: vi.fn(),
     needsReconnect: false,
     reconnectProviders: [],
     isLoading: false,
@@ -51,7 +57,7 @@ describe('Outlook card', () => {
     expect(await screen.findByText('Work (Outlook)')).toBeInTheDocument()
     const outlook = screen.getByTestId('outlook-card')
     fireEvent.click(outlook.querySelector('button[data-action="disconnect"]')!)
-    await waitFor(() => expect(disconnect).toHaveBeenCalledWith('microsoft'))
+    await waitFor(() => expect(disconnect).toHaveBeenCalledWith({ connectionId: 'ms1' }))
   })
 
   it('the Google account line and write-calendar picker never list Outlook calendars', async () => {

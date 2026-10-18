@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
+import { loadGoogleConnection } from '../_shared/calendar-providers/googleConnection.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -90,7 +91,7 @@ function getHeader(message: GmailMessage, name: string): string {
 // Refresh Google access token
 async function refreshAccessToken(
   supabase: ReturnType<typeof createClient>,
-  userId: string,
+  connectionId: string,
   refreshToken: string
 ): Promise<string> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID')!
@@ -115,9 +116,7 @@ async function refreshAccessToken(
   const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
   await supabase
     .from('calendar_connections')
-    .update({ access_token: data.access_token, token_expires_at: expiresAt })
-    .eq('user_id', userId)
-    .eq('provider', 'google')
+    .update({ access_token: data.access_token, token_expires_at: expiresAt }).eq('id', connectionId)
 
   return data.access_token
 }
@@ -166,12 +165,7 @@ Deno.serve(async (req) => {
     }
 
     // Get Google OAuth tokens
-    const { data: connection } = await supabase
-      .from('calendar_connections')
-      .select('access_token, refresh_token, token_expires_at')
-      .eq('user_id', user.id)
-      .eq('provider', 'google')
-      .single()
+    const { connection } = await loadGoogleConnection(supabase, user.id, { needs: 'mail' })
 
     if (!connection?.refresh_token) {
       return new Response(JSON.stringify({ error: 'No Google connection found. Reconnect Google with Gmail scope.' }), {
@@ -183,7 +177,7 @@ Deno.serve(async (req) => {
     // Refresh token if expired
     let accessToken = connection.access_token
     if (!accessToken || new Date(connection.token_expires_at) <= new Date()) {
-      accessToken = await refreshAccessToken(supabase, user.id, connection.refresh_token)
+      accessToken = await refreshAccessToken(supabase, connection.id, connection.refresh_token)
     }
 
     // Search Gmail for family-relevant emails from last 24 hours

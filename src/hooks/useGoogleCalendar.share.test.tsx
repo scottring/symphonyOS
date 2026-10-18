@@ -8,7 +8,7 @@ vi.mock('@/lib/supabase', () => ({
   getAuthUser: async () => ({ data: { user: { id: 'u1' } }, error: null }),
   supabase: {
     from: () => ({
-      select: () => ({ eq: () => Promise.resolve({ data: [{ provider: 'google', token_expires_at: null, calendar_id: null }], error: null }) }),
+      select: () => ({ eq: () => Promise.resolve({ data: [{ id: 'g1', provider: 'google', token_expires_at: null, calendar_id: null }], error: null }) }),
     }),
     functions: {
       invoke: async (_name: string, opts: { body: { startDate: string; endDate: string } }) => {

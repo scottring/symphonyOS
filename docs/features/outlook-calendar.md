@@ -1,4 +1,4 @@
-# Outlook / Microsoft 365 calendar (reads only)
+# Outlook / Microsoft 365 calendar (reads only), and several accounts
 
 Symphony can show events from an Outlook or Microsoft 365 calendar next to
 Google's. It is view-only: the event panel hides move, delete, and edit for
@@ -6,14 +6,33 @@ Outlook events, and "Create events on" stays Google.
 
 ## How it works
 
-- One row per provider in `calendar_connections` (`provider = 'microsoft'`).
+- One row per **account** in `calendar_connections` (since 2026-10-18), keyed
+  by `(user_id, provider, account_email)`: a person may connect several
+  Google and several Outlook accounts. Signing in to the same account again
+  refreshes its row; another account is added beside it
+  (`_shared/calendar-providers/saveConnection.ts`).
 - `google-calendar-events` and `google-calendar-list` read EVERY connection
-  for the user and merge the results. The names are historical.
+  for the user and merge the results. The names are historical. Each calendar
+  and event carries the account it came from (`connectionId` /
+  `connection_id`); a calendar two accounts can both see is read once, through
+  the one with the most access.
+- One Google account per person is `is_primary`: new events (and the "Create
+  events on" choice) go there. Edits to an existing event go through the
+  account that can write its calendar (`writable_calendar_ids`, refreshed on
+  every read; `_shared/calendar-providers/googleConnection.ts`). Mail goes
+  through an account that granted Gmail, primary first. Disconnecting the
+  primary hands the role to the oldest remaining account (a trigger).
+- Migration `20261018150000_calendar_connections_multi_account.sql`; checked
+  against a disposable Postgres by `scripts/test-calendar-accounts-migration.mjs`.
+  Rows from before it are named (`account_email`) on their next read.
 - Provider adapters live in `supabase/functions/_shared/calendar-providers/`
   (`google.ts`, `microsoft.ts`, `tokens.ts`, `index.ts`). Each normalizes
   into the same event shape; Outlook calendars report `accessRole: 'reader'`.
 - OAuth: `microsoft-calendar-auth-url` → Microsoft sign-in → `/calendar-callback`
-  (the provider rides in `state`) → `microsoft-calendar-callback`.
+  (the provider rides in `state`) → `microsoft-calendar-callback`. The state is
+  signed and one-use exactly as Google's is (`_shared/oauthState.ts`,
+  `oauth_transactions`); the callback refuses a round trip this person did
+  not start. The redirect must be one of `ALLOWED_REDIRECTS` there.
 - Microsoft rotates refresh tokens on every refresh; `tokens.ts` writes the
   new one back. A refresh without `scope` is rejected by Microsoft, so the
   refresh body always carries the scopes.
@@ -160,6 +179,8 @@ in advance is wasted work.
 ## Known limits
 
 - Reads only. Writes stay on Google.
+- An event moves only between calendars of one Google account (Google's own
+  rule); moving to another account's calendar is refused with a message.
 - "Hide this event" on a recurring Outlook series hides one occurrence, not
   the series (Graph occurrence ids do not encode the series id).
 - Graph calendar colours come as hex from `hexColor`; "auto" becomes no colour.

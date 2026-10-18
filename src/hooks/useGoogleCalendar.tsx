@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useMemo, createContext, useContext, type ReactNode } from 'react'
 import { emitCalendarChanged } from '@/lib/calendarChangedSignal'
 import { shareInFlight } from '@/lib/sharedRequest'
 import { getCurrentAccount } from '@/lib/currentAccount'
@@ -86,6 +86,8 @@ export interface CalendarEvent {
   mealNotes?: string | null
   /** Which account the event came from. Absent on cached/synthetic events = Google. */
   provider?: CalendarProvider
+  /** The connected account (calendar_connections.id) it was read through. */
+  connection_id?: string
 }
 
 export interface DeleteEventParams {
@@ -116,6 +118,47 @@ export interface GoogleCalendarInfo {
   backgroundColor?: string
   /** Absent = Google (older mocks / callers). Outlook calendars are always 'reader'. */
   provider?: CalendarProvider
+  /** The connected account this calendar belongs to. */
+  connectionId?: string
+  accountEmail?: string | null
+}
+
+/** One connected calendar account. A person may have several per provider. */
+export interface CalendarAccount {
+  id: string
+  provider: CalendarProvider
+  /** Null until the account has been read once after multi-account shipped. */
+  accountEmail: string | null
+  /** Google: where new events go and mail is read, unless something names another. */
+  isPrimary: boolean
+  /** The account granted Gmail access. */
+  grantsMail: boolean
+}
+
+const GMAIL_READ_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
+
+interface ConnectionRow {
+  id: string
+  provider: string
+  calendar_id: string | null
+  account_email?: string | null
+  is_primary?: boolean | null
+  granted_scopes?: string | null
+}
+
+/** Rows as accounts, primary first, then by email. */
+export function toCalendarAccounts(rows: ConnectionRow[]): CalendarAccount[] {
+  return rows
+    .filter((r) => isCalendarProvider(r.provider))
+    .map((r) => ({
+      id: r.id,
+      provider: r.provider as CalendarProvider,
+      accountEmail: r.account_email ?? null,
+      // Before the multi-account migration every row was its provider's only one.
+      isPrimary: r.is_primary ?? true,
+      grantsMail: typeof r.granted_scopes === 'string' && r.granted_scopes.split(/\s+/).includes(GMAIL_READ_SCOPE),
+    }))
+    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || (a.accountEmail ?? '').localeCompare(b.accountEmail ?? ''))
 }
 
 interface GoogleCalendarContextValue {
@@ -123,6 +166,10 @@ interface GoogleCalendarContextValue {
   isConnected: boolean
   /** Which providers have a stored connection. */
   connectedProviders: CalendarProvider[]
+  /** Every connected account, primary first. */
+  accounts: CalendarAccount[]
+  /** Accounts whose grant was revoked while another still works. */
+  reconnectAccountIds: string[]
   /** True when every connection is broken and the user must reconnect. */
   needsReconnect: boolean
   /** Providers whose grant was revoked while another still works. */
@@ -134,7 +181,10 @@ interface GoogleCalendarContextValue {
   events: CalendarEvent[]
   error: string | null
   connect: (provider?: CalendarProvider, options?: { mail?: boolean }) => Promise<void>
-  disconnect: (provider?: CalendarProvider) => Promise<void>
+  /** Disconnect one account, or every account of a provider. */
+  disconnect: (target?: CalendarProvider | { connectionId: string }) => Promise<void>
+  /** Make this Google account the one new events and mail go through. */
+  makePrimary: (connectionId: string) => Promise<void>
   fetchEvents: (startDate: Date, endDate: Date, domainOverride?: string) => Promise<CalendarEvent[]>
   fetchTodayEvents: () => Promise<CalendarEvent[]>
   fetchWeekEvents: () => Promise<CalendarEvent[]>
@@ -161,7 +211,9 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   // Published for readers that are not components — the day tiles' planning
   // calendar, which must tell "no calendar" from "could not read it".
   useEffect(() => { setCalendarConnected(isConnected) }, [isConnected])
-  const [connectedProviders, setConnectedProviders] = useState<CalendarProvider[]>([])
+  const [accounts, setAccounts] = useState<CalendarAccount[]>([])
+  const connectedProviders = useMemo(() => [...new Set(accounts.map((a) => a.provider))], [accounts])
+  const [reconnectAccountIds, setReconnectAccountIds] = useState<string[]>([])
   const [needsReconnect, setNeedsReconnect] = useState(false)
   const [reconnectProviders, setReconnectProviders] = useState<CalendarProvider[]>([])
   const [calendarListMissing, setCalendarListMissing] = useState(false)
@@ -238,29 +290,38 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         // RLS-invisible session retrying 20 times over ten minutes and filling
         // the console with 406s, when the honest answer was "not connected"
         // on the first try (2026-09-04, prod). An empty list is an answer.
-        const { data: connections, error: connError } = await supabase
+        //
+        // One row per ACCOUNT since 2026-10-18 (several Google, several
+        // Outlook). A database that has not had that migration yet lacks the
+        // new columns; read the old shape rather than look disconnected.
+        const read = (columns: string) => supabase
           .from('calendar_connections')
-          .select('provider, token_expires_at, calendar_id')
-          .eq('user_id', user.id)
+          .select(columns)
+          .eq('user_id', user.id) as unknown as PromiseLike<{ data: ConnectionRow[] | null; error: { code?: string } | null }>
+        let { data: connections, error: connError } = await read('id, provider, calendar_id, account_email, is_primary, granted_scopes')
+        if (connError?.code === '42703') {
+          ({ data: connections, error: connError } = await read('id, provider, calendar_id, granted_scopes'))
+        }
 
-        const providers = (connections ?? [])
-          .map((c) => c.provider)
-          .filter(isCalendarProvider)
+        const found = toCalendarAccounts(connections ?? [])
 
-        if (connError || providers.length === 0) {
+        if (connError || found.length === 0) {
           setIsConnected(false)
-          setConnectedProviders([])
+          setAccounts([])
           setNeedsReconnect(false)
           setReconnectProviders([])
+          setReconnectAccountIds([])
           setIsLoading(false)
           // No rows is a real answer; a failed read (network down) is not.
           if (connError) scheduleRetry()
           return
         }
 
-        setConnectedProviders(providers)
-        // The default write calendar lives on the Google row — writes are Google-only.
-        const googleRow = (connections ?? []).find((c) => c.provider === 'google')
+        setAccounts(found)
+        // The default write calendar lives on the primary Google account's row
+        // — writes are Google-only, and new events go to the primary account.
+        const primaryGoogle = found.find((a) => a.provider === 'google' && a.isPrimary)
+        const googleRow = (connections ?? []).find((c) => c.id === primaryGoogle?.id)
         setDefaultCalendarIdState(googleRow?.calendar_id ?? null)
 
         // A connection row is enough to start reading (2026-10-18). Pages
@@ -290,8 +351,9 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
 
           if (!validateError && !data?.error) {
             validated = true
-            const broken = (data?.providerErrors ?? []) as Array<{ provider: string; needsReconnect: boolean }>
+            const broken = (data?.providerErrors ?? []) as Array<{ provider: string; connectionId?: string; needsReconnect: boolean }>
             setReconnectProviders(broken.filter((e) => e.needsReconnect).map((e) => e.provider).filter(isCalendarProvider))
+            setReconnectAccountIds(broken.filter((e) => e.needsReconnect && e.connectionId).map((e) => e.connectionId!))
             if (typeof data?.calendarListMissing === 'boolean') setCalendarListMissing(data.calendarListMissing)
             break
           }
@@ -396,31 +458,70 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Disconnect ONE provider (Google by default). Other providers keep working.
-  const disconnect = useCallback(async (provider: CalendarProvider = 'google') => {
+  // Disconnect ONE account, or every account of a provider (Google by
+  // default). Other accounts keep working. Disconnecting the primary Google
+  // account hands that role to the next one (a database trigger).
+  const disconnect = useCallback(async (target: CalendarProvider | { connectionId: string } = 'google') => {
     try {
       const { data: { user } } = await getAuthUser()
       if (!user) return
 
-      await supabase
-        .from('calendar_connections')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('provider', provider)
+      const gone = typeof target === 'string'
+        ? accounts.filter((a) => a.provider === target)
+        : accounts.filter((a) => a.id === target.connectionId)
+      const goneIds = new Set(gone.map((a) => a.id))
 
-      const remaining = connectedProviders.filter((p) => p !== provider)
-      setConnectedProviders(remaining)
-      setReconnectProviders((prev) => prev.filter((p) => p !== provider))
+      const query = supabase.from('calendar_connections').delete().eq('user_id', user.id)
+      const { error: deleteError } = typeof target === 'string'
+        ? await query.eq('provider', target)
+        : await query.eq('id', target.connectionId)
+      if (deleteError) throw deleteError
+
+      const remaining = accounts.filter((a) => !goneIds.has(a.id)).map((a) => ({ ...a }))
+      // Mirror the trigger: the oldest remaining account of that provider takes primary.
+      for (const provider of new Set(gone.filter((a) => a.isPrimary).map((a) => a.provider))) {
+        const next = remaining.find((a) => a.provider === provider)
+        if (next) next.isPrimary = true
+      }
+      setAccounts(remaining)
+      setReconnectAccountIds((prev) => prev.filter((id) => !goneIds.has(id)))
+      setReconnectProviders((prev) => prev.filter((p) => remaining.some((a) => a.provider === p)))
       setIsConnected(remaining.length > 0)
       setNeedsReconnect(false)
       // Events without a provider tag are Google's (cache / older shape).
-      setEvents((prev) => (remaining.length === 0 ? [] : prev.filter((e) => (e.provider ?? 'google') !== provider)))
+      setEvents((prev) => (remaining.length === 0 ? [] : prev.filter((e) => {
+        if (e.connection_id) return !goneIds.has(e.connection_id)
+        return typeof target === 'string' ? (e.provider ?? 'google') !== target : true
+      })))
       setError(null)
     } catch (err) {
       console.error('Failed to disconnect:', err)
       throw err
     }
-  }, [connectedProviders])
+  }, [accounts])
+
+  const makePrimary = useCallback(async (connectionId: string) => {
+    const { data, error: rpcError } = await supabase.rpc('make_calendar_connection_primary', { p_connection_id: connectionId })
+    if (rpcError || data !== true) {
+      console.error('Failed to make account primary:', rpcError)
+      throw rpcError ?? new Error('Could not change the primary account')
+    }
+    const target = accounts.find((a) => a.id === connectionId)
+    setAccounts(toCalendarAccounts(accounts.map((a) => ({
+      id: a.id,
+      provider: a.provider,
+      calendar_id: null,
+      account_email: a.accountEmail,
+      is_primary: a.provider === target?.provider ? a.id === connectionId : a.isPrimary,
+      granted_scopes: a.grantsMail ? GMAIL_READ_SCOPE : null,
+    }))))
+    // The default write calendar is the new primary's own.
+    if (target?.provider === 'google') {
+      const { data: row } = await supabase.from('calendar_connections').select('calendar_id').eq('id', connectionId).maybeSingle()
+      setDefaultCalendarIdState(row?.calendar_id ?? null)
+    }
+    emitCalendarChanged()
+  }, [accounts])
 
   // Fetch events for a date range
   const fetchEvents = useCallback(async (startDate: Date, endDate: Date, domainOverride?: string) => {
@@ -778,27 +879,33 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     }
   }, [isConnected])
 
-  /** Persist the default write calendar (null = Google primary). */
+  /** Persist the default write calendar (null = Google primary). It belongs
+   *  to the primary Google account, where new events go. */
   const setDefaultCalendarId = useCallback(async (calendarId: string | null) => {
     const previous = defaultCalendarId
     setDefaultCalendarIdState(calendarId)
     const { data: { user } } = await getAuthUser()
     if (!user) return
-    const { error: updateError } = await supabase
+    const primary = accounts.find((a) => a.provider === 'google' && a.isPrimary)
+    const query = supabase
       .from('calendar_connections')
       .update({ calendar_id: calendarId, updated_at: new Date().toISOString() })
       .eq('user_id', user.id)
-      .eq('provider', 'google')
+    const { error: updateError } = primary
+      ? await query.eq('id', primary.id)
+      : await query.eq('provider', 'google')
     if (updateError) {
       console.error('Failed to save default calendar:', updateError)
       setDefaultCalendarIdState(previous)
       throw updateError
     }
-  }, [defaultCalendarId])
+  }, [defaultCalendarId, accounts])
 
   const value: GoogleCalendarContextValue = {
     isConnected,
     connectedProviders,
+    accounts,
+    reconnectAccountIds,
     needsReconnect,
     reconnectProviders,
     calendarListMissing,
@@ -808,6 +915,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     error,
     connect,
     disconnect,
+    makePrimary,
     fetchEvents,
     fetchTodayEvents,
     fetchWeekEvents,

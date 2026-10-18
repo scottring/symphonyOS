@@ -21,6 +21,7 @@ import {
 import { buildHomeworkPrompt, parseHomework, planHomework, type ExistingHomework } from './lib/homework.ts'
 import type { Member } from '../extract-email/lib/types.ts'
 import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
+import { loadGoogleConnection } from '../_shared/calendar-providers/googleConnection.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,7 +53,7 @@ async function callClaude(prompt: string, apiKey: string, transport: typeof fetc
 // ── Gmail ──────────────────────────────────────────────────────────────
 
 async function refreshAccessToken(
-  supabase: ReturnType<typeof createClient>, userId: string, refreshToken: string,
+  supabase: ReturnType<typeof createClient>, connectionId: string, refreshToken: string,
 ): Promise<string> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -70,19 +71,16 @@ async function refreshAccessToken(
     access_token: data.access_token,
     token_expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
     updated_at: new Date().toISOString(),
-  }).eq('user_id', userId).eq('provider', 'google')
+  }).eq('id', connectionId)
   return data.access_token
 }
 
 async function gmailAccessToken(supabase: ReturnType<typeof createClient>, userId: string): Promise<string> {
-  const { data: conn, error } = await supabase
-    .from('calendar_connections')
-    .select('access_token, refresh_token, token_expires_at')
-    .eq('user_id', userId).eq('provider', 'google').single()
+  const { connection: conn, error } = await loadGoogleConnection(supabase, userId, { needs: 'mail' })
   if (error || !conn?.refresh_token) throw new Error('No Google connection with a refresh token for this user')
   const expiresAt = new Date(conn.token_expires_at).getTime()
   if (!conn.access_token || expiresAt - Date.now() < 5 * 60 * 1000) {
-    return refreshAccessToken(supabase, userId, conn.refresh_token)
+    return refreshAccessToken(supabase, conn.id, conn.refresh_token)
   }
   return conn.access_token
 }

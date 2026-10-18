@@ -161,3 +161,9 @@ export async function fetchGoogleEvents(
     return []
   }
 }
+
+/** The account's email: Google's primary calendar id IS the account address. */
+export function googleAccountEmail(calendars: NormalizedCalendar[]): string | null {
+  const primary = calendars.find((c) => c.primary)
+  return primary && primary.id.includes('@') ? primary.id.toLowerCase() : null
+}

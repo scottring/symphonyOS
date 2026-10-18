@@ -77,7 +77,7 @@ describe('openConnections', () => {
     const opened = await openConnections(admin, [row('google', past), row('microsoft')], env, fetchImpl as never)
     expect(opened.calendars.map((c) => c.provider)).toEqual(['microsoft'])
     expect(opened.errors).toEqual([
-      { provider: 'google', message: 'Token has been expired or revoked', needsReconnect: true },
+      expect.objectContaining({ provider: 'google', message: 'Token has been expired or revoked', needsReconnect: true }),
     ])
   })
 
@@ -102,5 +102,137 @@ describe('fetchEventsAcross', () => {
       ['google', 'g-ev', 'Soccer'],
       ['microsoft', 'm-ev', 'Standup'],
     ])
+  })
+})
+
+describe('several accounts of one provider', () => {
+  // Two Google accounts: each token sees its own primary calendar, and both
+  // see a shared family calendar — the personal account as writer, work as reader.
+  function twoAccountFetch() {
+    return vi.fn(async (input: string, init?: RequestInit) => {
+      const url = String(input)
+      const auth = new Headers(init?.headers).get('Authorization')
+      if (url.includes('/users/me/calendarList')) {
+        if (auth === 'Bearer personal-tok') {
+          return new Response(JSON.stringify({ items: [
+            { id: 'me@gmail.com', accessRole: 'owner', primary: true },
+            { id: 'family@group.calendar.google.com', summary: 'Family', accessRole: 'writer' },
+          ] }))
+        }
+        return new Response(JSON.stringify({ items: [
+          { id: 'me@work.com', accessRole: 'owner', primary: true },
+          { id: 'family@group.calendar.google.com', summary: 'Family', accessRole: 'reader' },
+        ] }))
+      }
+      if (url.includes('/calendar/v3/calendars/')) {
+        const cal = decodeURIComponent(url.split('/calendars/')[1].split('/')[0])
+        return new Response(JSON.stringify({ items: [
+          { id: `ev-${cal}`, summary: `${cal} via ${auth}`, start: { date: '2026-10-19' }, end: { date: '2026-10-20' } },
+        ] }))
+      }
+      throw new Error(`unexpected fetch ${url}`)
+    })
+  }
+
+  const account = (id: string, token: string, extra: Partial<CalendarConnectionRow> = {}): CalendarConnectionRow => ({
+    ...row('google'), id, access_token: token, ...extra,
+  })
+
+  function recordingAdmin() {
+    const updates: Array<{ values: Record<string, unknown>; filters: Array<[string, unknown]> }> = []
+    const client = {
+      from: () => ({
+        update: (values: Record<string, unknown>) => {
+          const entry = { values, filters: [] as Array<[string, unknown]> }
+          updates.push(entry)
+          const chain = {
+            eq: (col: string, val: unknown) => { entry.filters.push([col, val]); return chain },
+            then: (r: (v: { error: null }) => void) => r({ error: null }),
+          }
+          return chain
+        },
+      }),
+    }
+    return { client: client as never, updates }
+  }
+
+  it('reads every account with its own token and tags each calendar and event with its account', async () => {
+    const fetchImpl = twoAccountFetch()
+    const { client } = recordingAdmin()
+    const opened = await openConnections(client, [
+      account('work', 'work-tok', { account_email: 'me@work.com' }),
+      account('personal', 'personal-tok', { is_primary: true, account_email: 'me@gmail.com' }),
+    ], env, fetchImpl as never)
+
+    expect(opened.errors).toEqual([])
+    expect(opened.tokens).toEqual({ personal: 'personal-tok', work: 'work-tok' })
+    expect(opened.calendars.map((c) => [c.id, c.connectionId, c.accountEmail])).toEqual([
+      ['me@gmail.com', 'personal', 'me@gmail.com'],
+      ['family@group.calendar.google.com', 'personal', 'me@gmail.com'],
+      ['me@work.com', 'work', 'me@work.com'],
+    ])
+
+    const events = await fetchEventsAcross(opened, opened.calendars, 'u1',
+      { start: '2026-10-19T00:00:00.000Z', end: '2026-10-20T00:00:00.000Z' }, fetchImpl as never)
+    expect(events.map((e) => [e.google_event_id, e.connection_id, e.title])).toEqual([
+      ['ev-me@gmail.com', 'personal', 'me@gmail.com via Bearer personal-tok'],
+      ['ev-family@group.calendar.google.com', 'personal', 'family@group.calendar.google.com via Bearer personal-tok'],
+      ['ev-me@work.com', 'work', 'me@work.com via Bearer work-tok'],
+    ])
+  })
+
+  it('a calendar both accounts can see is read once, through the account that can write it', async () => {
+    const { client } = recordingAdmin()
+    // Work is primary here, so only access decides the shared calendar.
+    const opened = await openConnections(client, [
+      account('work', 'work-tok', { is_primary: true }),
+      account('personal', 'personal-tok'),
+    ], env, twoAccountFetch() as never)
+    const family = opened.calendars.filter((c) => c.id === 'family@group.calendar.google.com')
+    expect(family).toHaveLength(1)
+    expect(family[0]).toMatchObject({ connectionId: 'personal', accessRole: 'writer' })
+  })
+
+  it('names an account read for the first time and records the calendars it can write', async () => {
+    const { client, updates } = recordingAdmin()
+    await openConnections(client, [account('personal', 'personal-tok')], env, twoAccountFetch() as never)
+    expect(updates).toEqual([{
+      values: { account_email: 'me@gmail.com', writable_calendar_ids: ['family@group.calendar.google.com', 'me@gmail.com'] },
+      filters: [['id', 'personal']],
+    }])
+  })
+
+  it('writes nothing when the account is already named and its calendars are unchanged', async () => {
+    const { client, updates } = recordingAdmin()
+    await openConnections(client, [account('personal', 'personal-tok', {
+      account_email: 'me@gmail.com',
+      writable_calendar_ids: ['me@gmail.com', 'family@group.calendar.google.com'],
+    })], env, twoAccountFetch() as never)
+    expect(updates).toEqual([])
+  })
+
+  it('one revoked account is reported by id; the other keeps answering', async () => {
+    const fetchImpl = vi.fn(async (input: string, init?: RequestInit) => {
+      if (String(input).startsWith('https://oauth2.googleapis.com/token')) {
+        return new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'Token has been expired or revoked' }))
+      }
+      return twoAccountFetch()(input, init)
+    })
+    const { client } = recordingAdmin()
+    const opened = await openConnections(client, [
+      account('personal', 'personal-tok', { is_primary: true, account_email: 'me@gmail.com' }),
+      account('work', 'work-tok', { token_expires_at: past, account_email: 'me@work.com' }),
+    ], env, fetchImpl as never)
+    expect(opened.errors).toEqual([expect.objectContaining({ connectionId: 'work', accountEmail: 'me@work.com', needsReconnect: true })])
+    expect(opened.calendars.every((c) => c.connectionId === 'personal')).toBe(true)
+  })
+
+  it('a refreshed token is written to that account only', async () => {
+    const { client, updates } = recordingAdmin()
+    await openConnections(client, [
+      account('work', 'work-tok', { token_expires_at: past, account_email: 'me@work.com', writable_calendar_ids: ['me@work.com'] }),
+    ], env, routedFetch() as never)
+    expect(updates[0].filters).toEqual([['id', 'work']])
+    expect(updates[0].values).toMatchObject({ access_token: 'g2' })
   })
 })

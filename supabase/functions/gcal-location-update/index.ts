@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { loadGoogleConnection } from '../_shared/calendar-providers/googleConnection.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,7 @@ class TokenRefreshError extends Error {
 
 async function refreshAccessToken(
   supabaseAdmin: ReturnType<typeof createClient>,
-  userId: string,
+  connectionId: string,
   refreshToken: string
 ): Promise<string> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
@@ -54,9 +55,7 @@ async function refreshAccessToken(
       access_token: tokenData.access_token,
       token_expires_at: expiresAt,
       updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
-    .eq('provider', 'google')
+    }).eq('id', connectionId)
 
   return tokenData.access_token
 }
@@ -102,12 +101,7 @@ serve(async (req) => {
     )
 
     // Get user's calendar connection
-    const { data: connection, error: connError } = await supabaseAdmin
-      .from('calendar_connections')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('provider', 'google')
-      .single()
+    const { connection, error: connError } = await loadGoogleConnection(supabaseAdmin, user.id)
 
     if (connError || !connection) {
       return new Response(JSON.stringify({ error: 'No calendar connection found' }), {
@@ -124,7 +118,7 @@ serve(async (req) => {
 
     if (expiresAt.getTime() - now.getTime() < fiveMinutes) {
       try {
-        accessToken = await refreshAccessToken(supabaseAdmin, user.id, connection.refresh_token)
+        accessToken = await refreshAccessToken(supabaseAdmin, connection.id, connection.refresh_token)
       } catch (err) {
         if (err instanceof TokenRefreshError) {
           return new Response(JSON.stringify({

@@ -72,12 +72,21 @@ const PERMANENT_ERRORS = ['invalid_grant', 'invalid_client', 'unauthorized_clien
 const REFRESH_MARGIN_MS = 5 * 60 * 1000
 
 // The slice of a supabase-js admin client this module touches.
-interface AdminLike {
+interface EqChain extends PromiseLike<{ error: unknown }> {
+  eq(column: string, value: unknown): EqChain
+}
+export interface AdminLike {
   from(table: string): {
-    update(values: Record<string, unknown>): {
-      eq(column: string, value: unknown): { eq(column: string, value: unknown): PromiseLike<{ error: unknown }> }
-    }
+    update(values: Record<string, unknown>): EqChain
   }
+}
+
+/** Write to exactly this connection's row. A person may now have several
+ *  accounts of one provider, so user + provider no longer names one row. */
+export function updateConnection(admin: AdminLike, connection: Pick<CalendarConnectionRow, 'id' | 'user_id' | 'provider' | 'account_email'>, values: Record<string, unknown>): PromiseLike<{ error: unknown }> {
+  const q = admin.from('calendar_connections').update(values)
+  if (connection.id) return q.eq('id', connection.id)
+  return q.eq('user_id', connection.user_id).eq('provider', connection.provider)
 }
 
 /** Return a usable access token for this connection, refreshing (and persisting) if it is about to expire. */
@@ -104,11 +113,7 @@ export async function ensureFreshAccessToken(
     throw new TokenRefreshError(tokenData.error_description || code, PERMANENT_ERRORS.includes(code))
   }
 
-  await admin
-    .from('calendar_connections')
-    .update(connectionUpdateFromToken(tokenData))
-    .eq('user_id', connection.user_id)
-    .eq('provider', connection.provider)
+  await updateConnection(admin, connection, connectionUpdateFromToken(tokenData))
 
   return tokenData.access_token
 }

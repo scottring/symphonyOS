@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useGoogleCalendar, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
+import { useGoogleCalendar, type CalendarAccount, type CalendarProvider, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import { CalendarSetupWizard } from '@/components/calendar/CalendarSetupWizard'
 import { SectionHeading } from '@/components/layout/SectionHeading'
 
@@ -37,28 +37,63 @@ const DisconnectedBadge = () => (
   </div>
 )
 
+const GoogleCalendarLogo = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </svg>
+)
+
+const MicrosoftLogo = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+    <rect x="2" y="2" width="9" height="9" fill="#F25022" />
+    <rect x="13" y="2" width="9" height="9" fill="#7FBA00" />
+    <rect x="2" y="13" width="9" height="9" fill="#00A4EF" />
+    <rect x="13" y="13" width="9" height="9" fill="#FFB900" />
+  </svg>
+)
+
+/** The calendars that belong to this account. Calendars without an account
+ *  tag (older responses) belong to the provider's only account. */
+export function calendarsForAccount(
+  calendars: GoogleCalendarInfo[],
+  account: CalendarAccount,
+  accountsOfProvider: number,
+): GoogleCalendarInfo[] {
+  return calendars.filter((c) => {
+    if ((c.provider ?? 'google') !== account.provider) return false
+    if (c.connectionId) return c.connectionId === account.id
+    return accountsOfProvider === 1
+  })
+}
+
 export function CalendarSettings() {
   const {
     isConnected,
-    connectedProviders,
+    accounts,
+    reconnectAccountIds,
     needsReconnect,
     reconnectProviders,
     isLoading,
     error,
     connect,
     disconnect,
+    makePrimary,
     fetchCalendarList,
     defaultCalendarId,
     setDefaultCalendarId,
   } = useGoogleCalendar()
 
-  const [disconnecting, setDisconnecting] = useState<'google' | 'microsoft' | null>(null)
-  const [connecting, setConnecting] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [connecting, setConnecting] = useState<CalendarProvider | null>(null)
   const [showSetupWizard, setShowSetupWizard] = useState(() => new URLSearchParams(window.location.search).get('connected') === '1')
   const [calendars, setCalendars] = useState<GoogleCalendarInfo[]>([])
   const [defaultSaveState, setDefaultSaveState] = useState<'idle' | 'saving' | 'error'>('idle')
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  // One list across providers; each card shows only its own calendars.
+  // One list across every account; each card shows only its own calendars.
   useEffect(() => {
     if (!isConnected || needsReconnect) {
       setCalendars([])
@@ -72,23 +107,29 @@ export function CalendarSettings() {
     return () => {
       cancelled = true
     }
-  }, [isConnected, needsReconnect, fetchCalendarList])
+  }, [isConnected, needsReconnect, fetchCalendarList, accounts.length])
 
-  const googleConnected = connectedProviders.includes('google') && !reconnectProviders.includes('google') && !needsReconnect
-  const googleNeedsReconnect = reconnectProviders.includes('google') || (needsReconnect && connectedProviders.includes('google'))
-  const outlookOffered = import.meta.env.VITE_MICROSOFT_CALENDAR_ENABLED === '1' || connectedProviders.includes('microsoft')
-  const outlookConnected = connectedProviders.includes('microsoft') && !reconnectProviders.includes('microsoft') && !needsReconnect
-  const outlookNeedsReconnect = reconnectProviders.includes('microsoft') || (needsReconnect && connectedProviders.includes('microsoft'))
+  const googleAccounts = accounts.filter((a) => a.provider === 'google')
+  const outlookAccounts = accounts.filter((a) => a.provider === 'microsoft')
+  const outlookOffered = import.meta.env.VITE_MICROSOFT_CALENDAR_ENABLED === '1' || outlookAccounts.length > 0
 
-  // Older callers and mocks omit `provider`; they are Google.
-  const googleCalendars = calendars.filter((c) => (c.provider ?? 'google') === 'google')
-  const outlookCalendars = calendars.filter((c) => c.provider === 'microsoft')
-  const accountEmail = pickAccountEmail(googleCalendars)
+  const accountNeedsReconnect = (account: CalendarAccount) =>
+    needsReconnect ||
+    reconnectAccountIds.includes(account.id) ||
+    // Older answers name only the provider: true when it has a single account.
+    (reconnectProviders.includes(account.provider) && accounts.filter((a) => a.provider === account.provider).length === 1)
 
-  // Only calendars Google will actually let this account write to.
-  const writableCalendars = googleCalendars.filter(
-    (c) => c.accessRole === 'owner' || c.accessRole === 'writer',
-  )
+  const calendarsOf = (account: CalendarAccount) =>
+    calendarsForAccount(calendars, account, accounts.filter((a) => a.provider === account.provider).length)
+
+  const nameOf = (account: CalendarAccount) =>
+    account.accountEmail ?? pickAccountEmail(calendarsOf(account)) ?? (account.provider === 'microsoft' ? 'Outlook account' : 'Google account')
+
+  // New events go to the primary Google account; only calendars it can write to.
+  const primaryGoogle = googleAccounts.find((a) => a.isPrimary) ?? googleAccounts[0]
+  const writableCalendars = primaryGoogle
+    ? calendarsOf(primaryGoogle).filter((c) => c.accessRole === 'owner' || c.accessRole === 'writer')
+    : []
 
   const handleDefaultChange = async (value: string) => {
     setDefaultSaveState('saving')
@@ -101,28 +142,41 @@ export function CalendarSettings() {
     }
   }
 
-  const handleDisconnect = async (provider: 'google' | 'microsoft') => {
-    const label = provider === 'microsoft' ? 'Outlook Calendar' : 'Google Calendar'
-    if (!confirm(`Disconnect ${label}? Its events will no longer appear in Symphony.`)) {
+  const handleDisconnect = async (account: CalendarAccount) => {
+    if (!confirm(`Disconnect ${nameOf(account)}? Its events will no longer appear in Symphony.`)) {
       return
     }
-    setDisconnecting(provider)
+    setBusy(account.id)
+    setActionError(null)
     try {
-      await disconnect(provider)
+      await disconnect({ connectionId: account.id })
     } catch (err) {
       console.error('Failed to disconnect:', err)
+      setActionError('Could not disconnect that account. Try again.')
     } finally {
-      setDisconnecting(null)
+      setBusy(null)
     }
   }
 
-  const handleConnectOutlook = async () => {
-    setConnecting(true)
+  const handleMakePrimary = async (account: CalendarAccount) => {
+    setBusy(account.id)
+    setActionError(null)
     try {
-      await connect('microsoft')
+      await makePrimary(account.id)
+    } catch {
+      setActionError('Could not change the primary account. Try again.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleConnect = async (provider: CalendarProvider) => {
+    setConnecting(provider)
+    try {
+      await connect(provider)
     } catch (err) {
-      console.error('Failed to connect Outlook:', err)
-      setConnecting(false)
+      console.error(`Failed to connect ${provider}:`, err)
+      setConnecting(null)
     }
   }
 
@@ -155,138 +209,198 @@ export function CalendarSettings() {
     )
   }
 
+  const accountCard = (account: CalendarAccount, count: number) => {
+    const broken = accountNeedsReconnect(account)
+    const own = calendarsOf(account)
+    const isOutlook = account.provider === 'microsoft'
+    return (
+      <div key={account.id} data-testid="calendar-account" className="p-4 bg-white rounded-lg border border-neutral-100">
+        <div className="flex items-center gap-3">
+          {broken ? <DisconnectedBadge /> : <ConnectedBadge />}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-neutral-800 truncate">{nameOf(account)}</p>
+            <p className="text-sm text-neutral-500">
+              {broken
+                ? 'Connection expired. Reconnect this account.'
+                : isOutlook
+                  ? 'View only'
+                  : count > 1 && account.isPrimary
+                    ? 'Primary: new events go here'
+                    : 'Connected'}
+            </p>
+          </div>
+        </div>
+
+        {isOutlook && !broken && own.length > 0 && (
+          <ul className="mt-3 p-3 bg-neutral-50 rounded-lg space-y-1">
+            {own.map((c) => (
+              <li key={c.id} className="flex items-center gap-2 text-sm text-neutral-600">
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: c.backgroundColor ?? '#0078d4' }}
+                  aria-hidden
+                />
+                <span className="truncate">{c.summary}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {broken && (
+            <button
+              type="button"
+              onClick={() => void handleConnect(account.provider)}
+              className="flex-1 py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+            >
+              Reconnect
+            </button>
+          )}
+          {!isOutlook && count > 1 && !account.isPrimary && !broken && (
+            <button
+              type="button"
+              data-action="make-primary"
+              onClick={() => void handleMakePrimary(account)}
+              disabled={busy === account.id}
+              className="flex-1 py-2 px-4 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
+            >
+              Make primary
+            </button>
+          )}
+          <button
+            type="button"
+            data-action="disconnect"
+            onClick={() => void handleDisconnect(account)}
+            disabled={busy === account.id}
+            className="flex-1 py-2 px-4 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
+          >
+            {busy === account.id ? 'Working…' : 'Disconnect'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const addButton = (provider: CalendarProvider, label: string) => (
+    <button
+      type="button"
+      onClick={() => void handleConnect(provider)}
+      disabled={connecting === provider}
+      className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
+    >
+      {provider === 'microsoft' ? <MicrosoftLogo /> : <GoogleCalendarLogo />}
+      {connecting === provider ? (provider === 'microsoft' ? 'Opening Microsoft sign-in…' : 'Opening Google sign-in…') : label}
+    </button>
+  )
+
   return (
     <div className="space-y-6">
+      {actionError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg" role="alert">
+          <p className="text-sm text-red-700">{actionError}</p>
+        </div>
+      )}
+
       <section data-testid="google-card">
         <SectionHeading>Google Calendar</SectionHeading>
         <p className="text-sm text-neutral-500 mb-6">
-          Connect your Google Calendar to see events alongside your tasks and routines.
+          Connect one or more Google accounts to see their events alongside your tasks and routines.
         </p>
 
-        {/* Connection Status Card */}
-        <div className="p-4 bg-white rounded-lg border border-neutral-100">
-          {googleConnected ? (
-            <>
-              {/* Connected state */}
-              <div className="flex items-center gap-3 mb-4">
-                <ConnectedBadge />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-800">Connected</p>
-                  <p className="text-sm text-neutral-500 truncate">
-                    {accountEmail ?? 'Your Google Calendar events are synced'}
-                  </p>
+        {googleAccounts.length > 0 ? (
+          <div className="space-y-3">
+            {googleAccounts.map((a) => accountCard(a, googleAccounts.length))}
+
+            {primaryGoogle && !accountNeedsReconnect(primaryGoogle) && (
+              <div className="p-4 bg-white rounded-lg border border-neutral-100 space-y-4">
+                {/* Default write calendar — where Symphony-created events land,
+                    on the primary account. Read-only calendars are excluded:
+                    Google refuses writes to them no matter what. */}
+                {writableCalendars.length > 0 && (
+                  <div>
+                    <label htmlFor="default-calendar" className="block text-sm font-medium text-neutral-700 mb-1">
+                      Create events on
+                    </label>
+                    <select
+                      id="default-calendar"
+                      value={defaultCalendarId ?? ''}
+                      onChange={(e) => handleDefaultChange(e.target.value)}
+                      disabled={defaultSaveState === 'saving'}
+                      className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
+                    >
+                      <option value="">Primary ({nameOf(primaryGoogle)})</option>
+                      {writableCalendars.filter((c) => !c.primary).map((c) => (
+                        <option key={c.id} value={c.id}>{c.summary}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-neutral-400">
+                      {defaultSaveState === 'error'
+                        ? 'Could not save — try again.'
+                        : googleAccounts.length > 1
+                          ? 'New events from Symphony go here, on your primary account. Calendars you can only view are not listed.'
+                          : 'New events from Symphony go here. Calendars you can only view are not listed.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Mail is optional and consented to separately (beta plan B05):
+                    school email and drafts need it; the calendar does not. */}
+                <div className="p-3 rounded-lg border border-dashed border-neutral-200">
+                  {googleAccounts.some((a) => a.grantsMail) ? (
+                    <p className="text-sm text-neutral-700">
+                      Gmail is connected for {nameOf(googleAccounts.find((a) => a.grantsMail)!)}.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-neutral-700">Gmail is optional.</p>
+                      <p className="text-xs text-neutral-500 mt-0.5 mb-2">Connect it only if you want school email read into the week and email drafts written for you. Symphony never sends mail itself.</p>
+                      <button type="button" onClick={() => { void connect('google', { mail: true }) }} className="text-sm font-medium text-primary-600 hover:text-primary-700">
+                        Also connect Gmail
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
+            )}
 
-              {/* Google Calendar Logo */}
-              <div className="flex items-center gap-2 p-3 bg-neutral-50 rounded-lg mb-4">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 3H6C4.34 3 3 4.34 3 6v12c0 1.66 1.34 3 3 3h12c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3z" fill="#4285F4"/>
-                  <path d="M18 3H6c-.83 0-1.58.34-2.12.88L12 12l8.12-8.12A2.99 2.99 0 0018 3z" fill="#4285F4"/>
-                  <path d="M3.88 3.88L12 12l8.12-8.12A2.99 2.99 0 0018 3H6c-.83 0-1.58.34-2.12.88z" fill="#EA4335"/>
-                  <path d="M12 12L3.88 3.88A2.99 2.99 0 003 6v12c0 .83.34 1.58.88 2.12L12 12z" fill="#FBBC04"/>
-                  <path d="M12 12l8.12 8.12c.54-.54.88-1.29.88-2.12V6c0-.83-.34-1.58-.88-2.12L12 12z" fill="#34A853"/>
-                  <path d="M3.88 20.12A2.99 2.99 0 006 21h12c.83 0 1.58-.34 2.12-.88L12 12l-8.12 8.12z" fill="#188038"/>
-                </svg>
-                <span className="text-sm text-neutral-600">Google Calendar</span>
+            <button
+              type="button"
+              onClick={() => setShowSetupWizard(true)}
+              className="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+            >
+              Choose areas for calendars
+            </button>
+            {addButton('google', 'Add another Google account')}
+          </div>
+        ) : (
+          <div className="p-4 bg-white rounded-lg border border-neutral-100">
+            <div className="flex items-center gap-3 mb-4">
+              <DisconnectedBadge />
+              <div className="flex-1">
+                <p className="font-medium text-neutral-800">Not Connected</p>
+                <p className="text-sm text-neutral-500">Connect to see your calendar events</p>
               </div>
+            </div>
 
-              {/* Mail is optional and consented to separately (beta plan B05):
-                  school email and drafts need it; the calendar does not. */}
-              <div className="mb-4 p-3 rounded-lg border border-dashed border-neutral-200">
-                <p className="text-sm text-neutral-700">Gmail is optional.</p>
-                <p className="text-xs text-neutral-500 mt-0.5 mb-2">Connect it only if you want school email read into the week and email drafts written for you. Symphony never sends mail itself.</p>
-                <button type="button" onClick={() => { void connect('google', { mail: true }) }} className="text-sm font-medium text-primary-600 hover:text-primary-700">
-                  Also connect Gmail
-                </button>
+            {error && (
+              <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{error}</p>
               </div>
+            )}
 
-              {/* Default write calendar — where Symphony-created events land.
-                  Read-only calendars are excluded: Google refuses writes to
-                  them ("You need to have writer access") no matter what. */}
-              {writableCalendars.length > 0 && (
-                <div className="mb-4">
-                  <label htmlFor="default-calendar" className="block text-sm font-medium text-neutral-700 mb-1">
-                    Create events on
-                  </label>
-                  <select
-                    id="default-calendar"
-                    value={defaultCalendarId ?? ''}
-                    onChange={(e) => handleDefaultChange(e.target.value)}
-                    disabled={defaultSaveState === 'saving'}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
-                  >
-                    <option value="">Primary ({accountEmail ?? 'your account'})</option>
-                    {writableCalendars.filter((c) => !c.primary).map((c) => (
-                      <option key={c.id} value={c.id}>{c.summary}</option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-neutral-400">
-                    {defaultSaveState === 'error'
-                      ? 'Could not save — try again.'
-                      : 'New events from Symphony go here. Calendars you can only view are not listed.'}
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowSetupWizard(true)}
-                  className="flex-1 py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  Choose areas for calendars
-                </button>
-                <button
-                  data-action="disconnect"
-                  onClick={() => handleDisconnect('google')}
-                  disabled={disconnecting === 'google'}
-                  className="flex-1 py-2 px-4 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
-                >
-                  {disconnecting === 'google' ? 'Disconnecting...' : 'Disconnect'}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Not connected state */}
-              <div className="flex items-center gap-3 mb-4">
-                <DisconnectedBadge />
-                <div className="flex-1">
-                  <p className="font-medium text-neutral-800">
-                    {googleNeedsReconnect ? 'Reconnection Required' : 'Not Connected'}
-                  </p>
-                  <p className="text-sm text-neutral-500">
-                    {googleNeedsReconnect
-                      ? 'Your calendar connection expired. Please reconnect.'
-                      : 'Connect to see your calendar events'}
-                  </p>
-                </div>
-              </div>
-
-              {error && (
-                <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
-              )}
-
-              <button
-                // First connection ever: the wizard walks connect → domains.
-                // With Outlook already connected the wizard would skip its
-                // connect step (isConnected is true), so go straight to Google.
-                onClick={() => (isConnected ? void connect('google') : setShowSetupWizard(true))}
-                className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 transition-colors"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                </svg>
-                {googleNeedsReconnect ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
-              </button>
-            </>
-          )}
-        </div>
+            <button
+              type="button"
+              // First connection ever: the wizard walks connect → domains.
+              // With Outlook already connected the wizard would skip its
+              // connect step (isConnected is true), so go straight to Google.
+              onClick={() => (isConnected ? void handleConnect('google') : setShowSetupWizard(true))}
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 transition-colors"
+            >
+              <GoogleCalendarLogo />
+              Connect Google Calendar
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Outlook is offered only once it has been tested on real personal and
@@ -295,87 +409,21 @@ export function CalendarSettings() {
         <section data-testid="outlook-card">
           <SectionHeading>Outlook Calendar</SectionHeading>
           <p className="text-sm text-neutral-500 mb-6">
-            Connect an Outlook or Microsoft 365 calendar. Its events show alongside everything else; editing stays in Outlook.
+            Connect one or more Outlook or Microsoft 365 accounts. Their events show alongside everything else; editing stays in Outlook.
           </p>
 
-          <div className="p-4 bg-white rounded-lg border border-neutral-100">
-            {outlookConnected ? (
-              <>
-                <div className="flex items-center gap-3 mb-4">
-                  <ConnectedBadge />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-neutral-800">Connected</p>
-                    <p className="text-sm text-neutral-500">View only</p>
-                  </div>
+          <div className="space-y-3">
+            {outlookAccounts.map((a) => accountCard(a, outlookAccounts.length))}
+            {outlookAccounts.length === 0 && (
+              <div className="p-4 bg-white rounded-lg border border-neutral-100 flex items-center gap-3">
+                <DisconnectedBadge />
+                <div className="flex-1">
+                  <p className="font-medium text-neutral-800">Not Connected</p>
+                  <p className="text-sm text-neutral-500">Connect to see Outlook events</p>
                 </div>
-
-                {outlookCalendars.length > 0 && (
-                  <ul className="mb-4 p-3 bg-neutral-50 rounded-lg space-y-1">
-                    {outlookCalendars.map((c) => (
-                      <li key={c.id} className="flex items-center gap-2 text-sm text-neutral-600">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: c.backgroundColor ?? '#0078d4' }}
-                          aria-hidden
-                        />
-                        <span className="truncate">{c.summary}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowSetupWizard(true)}
-                    className="flex-1 py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Choose areas for calendars
-                  </button>
-                  <button
-                    data-action="disconnect"
-                    onClick={() => handleDisconnect('microsoft')}
-                    disabled={disconnecting === 'microsoft'}
-                    className="flex-1 py-2 px-4 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
-                  >
-                    {disconnecting === 'microsoft' ? 'Disconnecting...' : 'Disconnect'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 mb-4">
-                  <DisconnectedBadge />
-                  <div className="flex-1">
-                    <p className="font-medium text-neutral-800">
-                      {outlookNeedsReconnect ? 'Reconnection Required' : 'Not Connected'}
-                    </p>
-                    <p className="text-sm text-neutral-500">
-                      {outlookNeedsReconnect
-                        ? 'Your Outlook connection expired. Please reconnect.'
-                        : 'Connect to see Outlook events'}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleConnectOutlook}
-                  disabled={connecting}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                    <rect x="2" y="2" width="9" height="9" fill="#F25022" />
-                    <rect x="13" y="2" width="9" height="9" fill="#7FBA00" />
-                    <rect x="2" y="13" width="9" height="9" fill="#00A4EF" />
-                    <rect x="13" y="13" width="9" height="9" fill="#FFB900" />
-                  </svg>
-                  {connecting
-                    ? 'Opening Microsoft sign-in…'
-                    : outlookNeedsReconnect
-                      ? 'Reconnect Outlook Calendar'
-                      : 'Connect Outlook Calendar'}
-                </button>
-              </>
+              </div>
             )}
+            {addButton('microsoft', outlookAccounts.length > 0 ? 'Add another Outlook account' : 'Connect Outlook Calendar')}
           </div>
         </section>
       )}
@@ -386,7 +434,7 @@ export function CalendarSettings() {
         <ul className="text-sm text-neutral-500 space-y-1">
           <li className="flex items-start gap-2">
             <CheckIcon />
-            <span>Your calendar events appear on your daily schedule</span>
+            <span>Events from every connected account appear on your daily schedule</span>
           </li>
           <li className="flex items-start gap-2">
             <CheckIcon />

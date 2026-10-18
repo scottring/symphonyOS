@@ -186,3 +186,17 @@ export async function fetchGraphEvents(
   }
   return out
 }
+
+/** The signed-in account's address (User.Read). Personal accounts can lack `mail`. */
+export async function fetchGraphAccountEmail(
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  const res = await fetchImpl(`${GRAPH_BASE}/me?$select=mail,userPrincipalName`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!res.ok) return null
+  const data = await res.json().catch(() => null)
+  const email = data?.mail || data?.userPrincipalName
+  return typeof email === 'string' && email ? email.toLowerCase() : null
+}

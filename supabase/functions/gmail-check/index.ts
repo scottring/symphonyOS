@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
+import { loadGoogleConnection } from '../_shared/calendar-providers/googleConnection.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -115,7 +116,7 @@ function getHeader(message: GmailMessage, name: string): string {
 // Refresh Google access token (same pattern as google-calendar-events)
 async function refreshAccessToken(
   supabase: ReturnType<typeof createClient>,
-  userId: string,
+  connectionId: string,
   refreshToken: string
 ): Promise<string> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID')!
@@ -144,9 +145,7 @@ async function refreshAccessToken(
       access_token: data.access_token,
       token_expires_at: expiresAt,
       updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
-    .eq('provider', 'google')
+    }).eq('id', connectionId)
 
   return data.access_token
 }
@@ -221,12 +220,7 @@ Deno.serve(async (req) => {
     }
 
     // Get Google OAuth tokens from calendar_connections
-    const { data: connection, error: connError } = await supabaseAdmin
-      .from('calendar_connections')
-      .select('access_token, refresh_token, token_expires_at')
-      .eq('user_id', userId)
-      .eq('provider', 'google')
-      .single()
+    const { connection, error: connError } = await loadGoogleConnection(supabaseAdmin, userId, { needs: 'mail' })
 
     if (connError || !connection?.refresh_token) {
       return new Response(JSON.stringify({
@@ -242,7 +236,7 @@ Deno.serve(async (req) => {
     const expiresAt = new Date(connection.token_expires_at)
     const fiveMinutes = 5 * 60 * 1000
     if (!accessToken || expiresAt.getTime() - Date.now() < fiveMinutes) {
-      accessToken = await refreshAccessToken(supabaseAdmin, userId, connection.refresh_token)
+      accessToken = await refreshAccessToken(supabaseAdmin, connection.id, connection.refresh_token)
     }
 
     // ── Fetch unread emails from Gmail ──────────────────────────

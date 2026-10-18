@@ -12,6 +12,9 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
   useGoogleCalendar: () => ({
     isConnected: true,
     connectedProviders: ['google'],
+    accounts: [{ id: 'g1', provider: 'google', accountEmail: 'smkaufman@gmail.com', isPrimary: true, grantsMail: false }],
+    reconnectAccountIds: [],
+    makePrimary: vi.fn(),
     needsReconnect: false,
     reconnectProviders: [],
     isLoading: false,

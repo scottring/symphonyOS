@@ -76,6 +76,10 @@ vi.mock('@/lib/supabase', () => {
 vi.mock('@/hooks/useGoogleCalendar', () => ({
   useGoogleCalendar: () => ({
     isConnected: false,
+    connectedProviders: [],
+    accounts: [],
+    reconnectAccountIds: [],
+    reconnectProviders: [],
     needsReconnect: false,
     calendarListMissing: false,
     isLoading: false,
@@ -84,6 +88,7 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
     error: null,
     connect: vi.fn(),
     disconnect: vi.fn(),
+    makePrimary: vi.fn(),
     fetchTodayEvents: vi.fn(),
     fetchWeekEvents: vi.fn(),
     fetchEvents: vi.fn(),

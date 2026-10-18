@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { parseAccess, scopesFor } from './scopes.ts'
-import { signOAuthState } from '../_shared/oauthState.ts'
+import { parseAccess, scopesFor } from '../_shared/calendar-providers/scopes.ts'
+import { ALLOWED_REDIRECTS, signOAuthState } from '../_shared/oauthState.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,8 +39,7 @@ Deno.serve(async (req) => {
 
     const { redirectUri } = body
 
-    const allowedRedirects = ['http://localhost:5173/calendar-callback', 'https://symphony-rebuild.vercel.app/calendar-callback', 'https://symphony-os.com/calendar-callback', 'https://www.symphony-os.com/calendar-callback', 'https://app.symphony-os.com/calendar-callback']
-    if (typeof redirectUri !== 'string' || !allowedRedirects.includes(redirectUri)) {
+    if (typeof redirectUri !== 'string' || !ALLOWED_REDIRECTS.includes(redirectUri)) {
       return new Response(JSON.stringify({ error: 'Start the calendar connection from Symphony’s published app or approved test version.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

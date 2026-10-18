@@ -6,6 +6,7 @@ import { facetRuleSuggestions } from './lib/facetRules.ts'
 import { documentExpirySuggestions, type DocumentRow } from './lib/documentRules.ts'
 import { computeUrgency, deriveUrgencyFacts, type UrgencyInput } from '../_shared/urgency.ts'
 import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
+import { loadGoogleConnection } from '../_shared/calendar-providers/googleConnection.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -429,12 +430,7 @@ async function fetchCalendarEvents(
   userId: string,
 ): Promise<CalendarEventRow[]> {
   // Get calendar connection
-  const { data: connection } = await supabase
-    .from('calendar_connections')
-    .select('access_token, refresh_token, token_expires_at')
-    .eq('user_id', userId)
-    .eq('provider', 'google')
-    .single()
+  const { connection } = await loadGoogleConnection(supabase, userId)
 
   if (!connection) return []
 
@@ -465,9 +461,7 @@ async function fetchCalendarEvents(
       .update({
         access_token: tokenData.access_token,
         token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-      })
-      .eq('user_id', userId)
-      .eq('provider', 'google')
+      }).eq('id', connection.id)
   }
 
   // Fetch today's events from primary calendar
