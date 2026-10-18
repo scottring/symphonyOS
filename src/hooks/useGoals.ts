@@ -263,7 +263,7 @@ export function useGoals(supabase = defaultSupabase) {
     areaId: string | null,
     name: string,
     context?: 'work' | 'family' | 'personal',
-    extra?: { notes?: string | null; scope?: Scope; id?: string; year?: number; strategy?: string | null; carriedFrom?: string | null; assignedToAll?: string[] },
+    extra?: { notes?: string | null; scope?: Scope; id?: string; year?: number; strategy?: string | null; carriedFrom?: string | null; assignedToAll?: string[]; sortOrder?: number },
   ) => {
     if (!user) return null
 
@@ -278,7 +278,9 @@ export function useGoals(supabase = defaultSupabase) {
       strategy: extra?.strategy ?? undefined,
       context: context ?? undefined,
       status: 'active',
-      sortOrder: goals.filter(g => g.areaId === areaId).length,
+      // A caller that orders its list passes its own place (the year page puts
+      // a new goal last); otherwise the count of goals in that area.
+      sortOrder: extra?.sortOrder ?? goals.filter(g => g.areaId === areaId).length,
       actions: [],
       milestones: [],
       carriedFrom: extra?.carriedFrom ?? undefined,
