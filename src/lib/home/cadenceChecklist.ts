@@ -38,9 +38,11 @@ const word = (label: string) => label.replace(/\s\d{4}$/, '')
 export function checklistSlots(today: Date, weekStartsOn: WeekStart, seasons: Seasons): Record<ChecklistLevel, ChecklistSlots> {
   const week = weekStartAnchor(today, weekStartsOn)
   const lastWeek = new Date(week.getFullYear(), week.getMonth(), week.getDate() - 7)
+  // Last week is reviewed by the deck opened on THIS week: the deck on week W
+  // looks back at W − 1 and records W − 1's review (the token read here).
   const weekSlot = (start: Date, review: boolean): Slot => ({
     horizon: 'weekly', token: weekToken(start), word: `week ${weekOfYear(start, weekStartsOn)}`, dates: weekDates(start),
-    to: review ? `/week?view=alongside&date=${localYmd(start)}&start=${localYmd(start)}&review=1` : '/week?view=alongside&plan=1',
+    to: review ? `/week?view=alongside&date=${localYmd(week)}&start=${localYmd(week)}&review=1` : '/week?view=alongside&plan=1',
   })
   const month = periodBounds('month', today, seasons), lastMonth = periodBounds('month', month.prev, seasons)
   const season = periodBounds('season', today, seasons), lastSeason = periodBounds('season', season.prev, seasons)

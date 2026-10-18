@@ -22,7 +22,8 @@ export interface DeckActions {
   later(c: DeckCard, when: LaterWhen): Promise<boolean>
   laterOnDate(c: DeckCard, date: Date): Promise<boolean>
   letGo(c: DeckCard): Promise<boolean>
-  drain(tasks: Task[]): Promise<boolean>
+  /** One run, one Undo. `label` names the run; by default the stale drain's. */
+  drain(tasks: Task[], label?: string): Promise<boolean>
 }
 
 export interface DeckDeps {
@@ -127,7 +128,7 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
       },
 
       // Ungated: the drain is one deliberate sweep, not a question per task.
-      drain: (tasks) => {
+      drain: (tasks, label) => {
         const wrote: Task[] = []
         const options: { ids: string[]; failureState: 'partial'; failureSummary?: string; undo: () => Promise<boolean> } = {
           ids: tasks.map((t) => t.id),
@@ -138,7 +139,7 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
             return all
           },
         }
-        return activity.run(`Move ${tasks.length} untouched things to Later`, async () => {
+        return activity.run(label ?? `Move ${tasks.length} untouched things to Later`, async () => {
           for (const t of tasks) {
             try { if (ok(await onUpdateTask(t.id, { bucket: 'someday' }))) wrote.push(t) } catch { /* counted below */ }
           }

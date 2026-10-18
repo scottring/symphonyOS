@@ -168,6 +168,13 @@ describe('useDeckActions', () => {
     expect(deps.updateTask).toHaveBeenCalledWith('c', expect.objectContaining({ commitments: expect.any(Array) }))
   })
 
+  it('drain takes the run\'s label when given one (the end of the deck)', async () => {
+    const { a } = setup()
+    expect(await a.drain([mk({ id: 'a' }), mk({ id: 'b' })], 'Move 2 left from last week to Later')).toBe(true)
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(runs[0].label).toBe('Move 2 left from last week to Later')
+  })
+
   it('drain with one failing write still succeeds; undo covers only the ones that wrote', async () => {
     const { deps, a } = setup()
     deps.onUpdateTask.mockImplementation(async (id: string) => id !== 'b')

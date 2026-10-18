@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createMockTask } from '@/test/mocks/factories'
-import { buildDeck, carriedWeeks } from './deck'
+import { buildDeck, carriedWeeks, deckWeekAllowed } from './deck'
 
 const THIS = new Date(2026, 9, 12) // Monday
 const LAST = new Date(2026, 9, 5)
@@ -71,5 +71,21 @@ describe('buildDeck', () => {
     const t = createMockTask({ id: 'p', commitments: [{ level: 'week', periodStart: prevSat, status: 'open' }] })
     const deck = buildDeck({ tasks: [t], weekStart: sat, lastWeekStart: prevSat, isCurrent: true })
     expect(deck.map((c) => c.source)).toEqual(['last-week'])
+  })
+})
+
+describe('deckWeekAllowed (Saturday weeks)', () => {
+  const thisWeek = new Date(2026, 9, 17), nextWeek = new Date(2026, 9, 24), lastWeek = new Date(2026, 9, 10)
+  it('opens on this week, any day of it', () => {
+    expect(deckWeekAllowed(thisWeek, new Date(2026, 9, 17, 9), 6)).toBe(true)
+    expect(deckWeekAllowed(thisWeek, new Date(2026, 9, 23, 20), 6)).toBe(true)
+  })
+  it('opens on next week only during this week’s last day', () => {
+    expect(deckWeekAllowed(nextWeek, new Date(2026, 9, 22, 20), 6)).toBe(false)
+    expect(deckWeekAllowed(nextWeek, new Date(2026, 9, 23, 8), 6)).toBe(true)
+  })
+  it('never on a past week or one further ahead', () => {
+    expect(deckWeekAllowed(lastWeek, new Date(2026, 9, 17, 9), 6)).toBe(false)
+    expect(deckWeekAllowed(new Date(2026, 9, 31), new Date(2026, 9, 23, 8), 6)).toBe(false)
   })
 })

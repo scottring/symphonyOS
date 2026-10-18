@@ -8,7 +8,7 @@ const slots = checklistSlots(new Date(2026, 9, 17), 6, SEASONS as never)
 describe('cadenceChecklist', () => {
   it('names last period to review and this one to plan, with week dates', () => {
     const rows = checklistRows(slots, [])
-    expect(rows.week.review).toMatchObject({ label: expect.stringMatching(/^Review week \d+$/), done: false, dates: 'Oct 10 – 16', to: '/week?view=alongside&date=2026-10-10&start=2026-10-10&review=1' })
+    expect(rows.week.review).toMatchObject({ label: expect.stringMatching(/^Review week \d+$/), done: false, dates: 'Oct 10 – 16', to: '/week?view=alongside&date=2026-10-17&start=2026-10-17&review=1' })
     expect(rows.week.plan).toMatchObject({ label: expect.stringMatching(/^Plan week \d+$/), dates: 'Oct 17 – 23', to: '/week?view=alongside&plan=1' })
     expect(rows.month.review).toMatchObject({ label: 'Review September', to: '/month?start=2026-09-01&review=1' })
     expect(rows.month.plan).toMatchObject({ label: 'Plan October', to: '/month?plan=1' })
@@ -30,6 +30,17 @@ describe('cadenceChecklist', () => {
     expect(rows.month.review.done).toBe(false)
     expect(rows.month.plan.done).toBe(false)
     expect(rows.season.plan).toMatchObject({ done: true, label: 'Planned Fall' })
+  })
+
+  // The deck on week W reviews W − 1: the link opens this week, and the week
+  // it opens, less seven days, is the week whose review the checklist reads.
+  it('the week review link opens the week whose last week is the one it reads', () => {
+    const to = new URLSearchParams(slots.week.review.to.split('?')[1])
+    expect(to.get('review')).toBe('1')
+    const [y, m, d] = to.get('date')!.split('-').map(Number)
+    const lastWeek = new Date(y, m - 1, d - 7)
+    expect(`${lastWeek.getFullYear()}-${lastWeek.getMonth() + 1}-${lastWeek.getDate()}`).toBe(slots.week.review.token)
+    expect(to.get('start')).toBe(to.get('date'))
   })
 
   it('reads every period in one query', () => {
