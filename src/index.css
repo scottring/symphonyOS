@@ -4375,6 +4375,45 @@ button.domain-switcher-trigger[data-filtered="true"] { color: var(--color-primar
   --home-shadow: 0 8px 24px -12px hsl(0 0% 0% / .5);
 }
 
+/* INBOX (/inbox) — Home's paper cards (2026-10-18): the masthead is the
+   title and one quiet line; "To sort" holds the captures in one card with its
+   tools beside the heading; Waiting on and Expired are matching folds. */
+.inbox-page {
+  --home-accent: var(--color-primary-600);
+  --home-fill: var(--color-primary-500);
+  --home-tint: color-mix(in srgb, var(--color-primary-500) 9%, var(--color-bg-elevated));
+  --home-line: var(--color-neutral-200);
+  --home-shadow: 0 1px 2px hsl(220 20% 20% / .04), 0 8px 24px -12px hsl(220 20% 20% / .14);
+}
+[data-scenery-lighting='nighttime'] .inbox-page {
+  --home-accent: var(--color-primary-300);
+  --home-fill: color-mix(in oklab, var(--color-primary-500) 70%, var(--color-primary-300));
+  --home-shadow: 0 8px 24px -12px hsl(0 0% 0% / .5);
+}
+.inbox-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--home-tint); color: var(--home-accent); }
+.inbox-sort { margin: 8px 0 22px; }
+.inbox-sort-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.inbox-sort-head h2 { margin: 0; font: 500 22px/1.2 var(--font-family-display); color: var(--color-neutral-950); }
+.inbox-sort-head .home-count { margin-left: 0; vertical-align: 0; }
+.inbox-sort-tools { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.inbox-sort-card { padding: 6px 10px; }
+.inbox-sort-empty { padding: 10px 14px; }
+.inbox-rows > * + * { border-top: 1px solid var(--color-neutral-100); }
+.inbox-fold { padding: 14px 16px; margin-bottom: 14px; }
+.inbox-fold-head { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; }
+.inbox-fold-title { flex: none; white-space: nowrap; font-size: 15px; font-weight: 600; color: var(--color-neutral-900); }
+.inbox-fold-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--color-neutral-500); }
+.inbox-fold-sub.is-due { color: var(--color-warning-600); font-weight: 500; }
+.inbox-fold-chevron { flex: none; margin-left: auto; width: 16px; height: 16px; color: var(--color-neutral-400); transition: transform .15s ease; }
+.inbox-fold-list { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--color-neutral-100); display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 768px) {
+  .inbox-sort-card { padding: 4px 6px; }
+  .inbox-sort-head > .inbox-icon { display: none; }
+  .inbox-sort-tools { gap: 4px; }
+  .inbox-fold { padding: 12px 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .inbox-fold-chevron { transition: none; } }
+
 /* Home shows the place at full strength, in flow below the page (the faint
    scene's position, without its fade). */
 .place-scenery.is-faint.is-vivid { opacity: 1; }

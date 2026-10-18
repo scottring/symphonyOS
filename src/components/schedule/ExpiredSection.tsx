@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, CalendarX2 } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { ExpiredRow } from '@/lib/today/expired'
 import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
@@ -87,24 +87,25 @@ export function ExpiredSection({
     days === 1 ? 'yesterday' : days < 14 ? `${days} days ago` : `${Math.floor(days / 7)} weeks ago`
 
   return (
-    <section aria-label="Expired" className="card p-4 mb-4">
+    <section aria-label="Expired" className="home-card inbox-fold">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="w-full flex items-center gap-2 text-left"
+        className="inbox-fold-head"
       >
-        <ChevronRight className={`w-4 h-4 shrink-0 text-neutral-400 transition-transform ${open ? 'rotate-90' : ''}`} />
-        <span className="text-sm font-medium text-neutral-700">Expired · {rows.length}</span>
-        <span className="text-xs text-neutral-400">
+        <span className="inbox-icon" aria-hidden="true"><CalendarX2 className="w-4 h-4" /></span>
+        <span className="inbox-fold-title">Expired · {rows.length}</span>
+        <span className="inbox-fold-sub">
           {open || rows.length === 0
             ? 'dated, then the day passed'
             : `oldest ${ageLabel(rows[rows.length - 1].ageDays)}`}
         </span>
+        <ChevronRight className={`inbox-fold-chevron ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
       </button>
 
       {open && (
-        <ul className="mt-3 space-y-1.5">
+        <ul className="inbox-fold-list">
           {shown.map((row) => (
             <TriageRow
               key={row.task.id}

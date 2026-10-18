@@ -4,7 +4,7 @@ import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { EmptyState } from '@/components/layout/EmptyState'
-import { X, CornerDownRight, CalendarDays, Sun } from 'lucide-react'
+import { X, CornerDownRight, CalendarDays, Sun, Inbox as InboxIcon } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { Task, TaskContext } from '@/types/task'
 import { mergeCaptureIntoTask } from '@/lib/captureMerge'
@@ -791,7 +791,7 @@ export function InboxView({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className={PAGE_COLUMN}>
+      <div className={`${PAGE_COLUMN} inbox-page`}>
       {/* The same open masthead the rest of the top group wears (Today, This
           Week, the period pages). No eyebrow — the inbox has no period to step
           through. Its own controls ride along the foot, as Today's do. */}
@@ -805,20 +805,8 @@ export function InboxView({
             : `${totalCount} item${totalCount !== 1 ? 's' : ''} to triage`
         }
         controls={undefined /* area + assistant: the top bar (2026-09-30) */}
-        footer={totalCount > 0 ? (
-          <div className="flex flex-wrap items-center gap-3">
-            {totalCount > 0 && (
-              <button
-                type="button"
-                onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
-                className={`text-sm font-medium px-2.5 py-1.5 rounded-lg transition-colors ${selectionMode ? 'text-primary-700 bg-primary-50' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
-              >
-                {selectionMode ? 'Done' : 'Select'}
-              </button>
-            )}
-            {totalCount > 0 && <InboxModeToggle mode={mode} onChange={setMode} />}
-          </div>
-        ) : undefined}
+        /* Select and List / Focus ride on "To sort", the list they act on —
+           the masthead is the title and one quiet line, as on Week. */
       />
 
       <SupernotePagesSection />
@@ -828,17 +816,37 @@ export function InboxView({
 
       <RefileStrip rows={refileRows} onFile={(t, context) => onUpdateTask?.(t.id, { context })} />
 
+      {/* "To sort": the captures, in one paper card like Home's (2026-10-18).
+          Focus mode brings its own card, so it sits under the head bare. */}
+      <section aria-labelledby="inbox-sort-h" className="inbox-sort">
+      <div className="inbox-sort-head">
+        <span className="inbox-icon" aria-hidden="true"><InboxIcon className="h-4 w-4" /></span>
+        <h2 id="inbox-sort-h">To sort</h2>
+        {totalCount > 0 && <span className="home-count" aria-hidden="true">{totalCount}</span>}
+        {totalCount > 0 && (
+          <div className="inbox-sort-tools">
+            <button
+              type="button"
+              onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+              className={`text-sm font-medium px-2.5 py-1.5 rounded-lg transition-colors ${selectionMode ? 'text-primary-700 bg-primary-50' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
+            >
+              {selectionMode ? 'Done' : 'Select'}
+            </button>
+            <InboxModeToggle mode={mode} onChange={setMode} />
+          </div>
+        )}
+      </div>
       {totalCount === 0 && loading ? (
-        <EmptyState title="Loading your inbox…" />
+        <div className="home-card inbox-sort-card inbox-sort-empty"><EmptyState title="Loading your inbox…" /></div>
       ) : totalCount === 0 && loadFailed && onRetryLoad ? (
-        <LoadFailedNotice
+        <div className="home-card inbox-sort-card inbox-sort-empty"><LoadFailedNotice
           className="py-4"
           title="Your Inbox didn’t load."
           body="Your captures are safe — this is a connection problem."
           onRetry={onRetryLoad}
-        />
+        /></div>
       ) : hiddenByFilter ? (
-        <EmptyState
+        <div className="home-card inbox-sort-card inbox-sort-empty"><EmptyState
           title="Nothing matches these filters"
           action={
             <button
@@ -851,9 +859,9 @@ export function InboxView({
           }
         >
           Captures in other domains or for other people are hidden right now.
-        </EmptyState>
+        </EmptyState></div>
       ) : totalCount === 0 ? (
-        <EmptyState
+        <div className="home-card inbox-sort-card inbox-sort-empty"><EmptyState
           title="Inbox zero"
           action={
             <div className="flex flex-wrap items-center">
@@ -877,7 +885,7 @@ export function InboxView({
           }
         >
           Nothing is waiting for a decision.
-        </EmptyState>
+        </EmptyState></div>
       ) : mode === 'focus' ? (
         <FocusInboxCard
           tasks={inboxTasks}
@@ -892,10 +900,11 @@ export function InboxView({
           sending={sendingTaskId !== null}
         />
       ) : (
-        <div>
+        <div className="home-card inbox-sort-card inbox-rows">
           {inboxTasks.map(renderRow)}
         </div>
       )}
+      </section>
 
       <WaitingSection
         rows={waitingRows}
