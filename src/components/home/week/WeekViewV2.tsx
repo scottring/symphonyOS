@@ -66,7 +66,7 @@ import { weekListTasks } from '@/lib/planning/weekList'
 import { selectPeriodTasks } from '@/lib/planning/periodPage'
 import { monthsOfWeek } from '@/lib/planning/periodPlacement'
 import { readSeasons } from '@/lib/cadence/seasons'
-import { weekRhythm } from '@/lib/week/weekRhythm'
+import { weekRhythm, rhythmLines } from '@/lib/week/weekRhythm'
 import { densityDescription } from '@/lib/planning/dayDensity'
 import { dayFreeWindows, formatFree } from '@/lib/week/dayShape'
 import { parseSpecials } from '@/lib/today/specials'
@@ -771,7 +771,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
   }), [])
   const canvasDays = useMemo(() => {
     const onShelf = new Set(shelf.flatMap((g) => g.rows.map((r) => r.task.id)))
-    const found = weekRhythm(journalDays)
+    // Repeated tasks too ("Pick up from FFG" each weekday): written once above.
+    const found = weekRhythm(journalDays, undefined, { tasks: true })
     const hasDaily = found.everyDay.length + found.weekdays.length > 0
     const rhythm = dailyShown ? { everyDay: [], weekdays: [], days: journalDays } : found
     const toItem = (e: JournalEntry): CanvasDayItem => ({ id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId, people: e.people })
@@ -805,10 +806,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           ? formatFree(dayFreeWindows(whole.get(d.key)?.entries ?? d.entries)) : undefined,
       }
     })
-    const lines = [
-      { label: 'Every day', items: rhythm.everyDay.map((r) => ({ title: r.title, openId: r.openId })) },
-      { label: 'Weekdays', items: rhythm.weekdays.map((r) => ({ title: r.title, openId: r.openId })) },
-    ]
+    const lines = rhythmLines(rhythm)
     return { days, lines, hasDaily }
   }, [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners, sources?.events])
   // Beta: drafts stay in chat. The week always shows the stored plan;
@@ -900,7 +898,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const weekCanvas = () => (
     <WeekCanvas weekStart={weekAnchor} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
-      spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers}
+      spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers} viewerId={meId ?? undefined}
       daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}
       pointing={activity.pointing}
       progress={deckAvailable ? { done: doneLastWeek, reviewedOn: lastReview.reviewed?.at, onReview: openReview } : undefined}

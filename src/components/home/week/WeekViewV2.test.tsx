@@ -231,6 +231,10 @@ describe('WeekViewV2 journal spread', () => {
       .map((li) => `${li.querySelector('.cw-meta')?.textContent ?? ''}${li.querySelector('.cw-title')?.textContent}`)
     expect(rows()).toEqual(['6:50aGutter quotes', '2:30pCall the bank', 'Return library books', 'Book the plumber'])
     fireEvent.click(screen.getByRole('button', { name: 'Show done' }))
+    // A few things a day (foldDay): with four timed, two untimed show; the
+    // done one waits behind "+1 more".
+    expect(rows()).not.toContain('Renew license')
+    fireEvent.click(monday.getByRole('button', { name: '+1 more' }))
     expect(rows()).toContain('Renew license')
     expect(monday.getByText('Renew license').closest('li')).toHaveClass('is-done')
   })
@@ -474,7 +478,9 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   it('every-day routines are written once until "Show daily", which is remembered', () => {
     const daily = createMockRoutine({ id: 'dog', name: 'Walk the dog', time_of_day: '07:00:00', recurrence_pattern: { type: 'daily' } as RecurrencePattern, show_on_timeline: true })
     render(<WeekViewV2 {...defaultProps} routines={[daily]} weekStart={sunday} />)
-    expect(screen.getAllByText('Walk the dog')).toHaveLength(1)
+    // Written once, with its time (rhythmLines).
+    expect(screen.getAllByText(/Walk the dog/)).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '7:00 Walk the dog' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show daily' }))
     expect(localStorage.getItem('symphony-week-daily')).toBe('shown')
     expect(screen.getAllByText('Walk the dog').length).toBeGreaterThan(1)
