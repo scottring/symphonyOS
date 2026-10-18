@@ -2,9 +2,17 @@
 //
 // Year, Season and Month: one page shape for each (mockup approved
 // 2026-10-13, after the Week redesign). The period's goals are one plain list,
-// drawn one way; the level above folds into one line that opens in place, the
-// way Week's "Still to place" does. The top bar names the horizon (Today ·
-// Week · Month · Season · Year), so the page carries no horizon tabs of its own.
+// drawn one way. The top bar names the horizon (Today · Week · Month · Season
+// · Year), so the page carries no horizon tabs of its own.
+//
+// The list, calm pass (Scott approved the mockup 2026-10-18): it never runs
+// off the page — a compact card of 8, then "+N more" (PlanOrderList). Lines
+// order by drag, and the order is the priority: month and season lines write
+// the task's one sortOrder (the same order as Today and the Week), year goals
+// goals.sort_order, each with Undo. The level above sits beside it, quieter
+// and read-only, 8 then "+N more", a goal marked "in {period}" when this
+// period has a line under it; phones stack it under the list. Year is a
+// single list, each goal noting "In {season}: {n} goals".
 //
 // Levels connect by looking, not linking (Scott, 2026-07-08 and 2026-10-13):
 // a link is made while writing (an optional "For" pick) or from the goal's
@@ -63,6 +71,8 @@ import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { compareSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
+import { FoldToggle, PlanOrderList, useFold, type RowOrder } from './PlanOrderList'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { periodMoves } from './horizonPanel'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
@@ -81,15 +91,40 @@ const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
 const PERIODS = ['year', 'season', 'month'] as const
 const SESSION_HORIZONS: readonly SessionHorizon[] = ['annual', 'seasonal', 'monthly']
 const ROUTE_LEVEL: Record<string, number> = { '/year': 0, '/season': 1, '/month': 2 }
+/** "1 goal", "3 goals". */
+const goalCount = (n: number) => `${n} goal${n === 1 ? '' : 's'}`
 /** "an October goal", "a Fall goal". */
 const aOrAn = (word: string) => /^[aeiou8]/i.test(word) ? 'an' : 'a'
 
 type Composer = { kind: 'add' } | { kind: 'edit'; key: string }
 
+/** The level above, beside the list: lighter, read-only, 8 then "+N more";
+ *  a goal with a line of this period under it is marked "in {period}". */
+function AboveCard({ title, hideLabel, none, onHide, goals, hereWord }: {
+  title: string; hideLabel: string; none: string; onHide: () => void
+  goals: { key: string; title: string; here: boolean }[]; hereWord: string
+}) {
+  const { shown, toggle } = useFold(goals)
+  return <aside id="plan-above-panel" className="plan-above-panel plan-card plan-side" aria-label={title}>
+    <div className="plan-above-panel-head">
+      <p className="plan-above-panel-title">{title}</p>
+      <button type="button" className="canvas-link plan-above-hide" aria-expanded aria-controls="plan-above-panel" onClick={onHide}>{hideLabel}</button>
+    </div>
+    {goals.length > 0
+      ? <ul className="plan-above-list" aria-label={title}>
+        {shown.map((g) => <li key={g.key}>{g.title}{g.here && <i className="plan-above-here">in {hereWord}</i>}</li>)}
+      </ul>
+      : <p className="plan-above-none">{none}</p>}
+    <FoldToggle toggle={toggle} />
+  </aside>
+}
+
 function Inner() {
   const selection = useSelectionOptional()
   const { goals, loading: goalsLoading, error: goalsError, addGoal, updateGoal, deleteGoal } = useGoalsContext()
-  const { tasks, loading, error, addTask, updateTask, refetch, deleteTask, toggleTask, pushTask, setBucket, updateTasksBulk, keepForward, dropCommitment } = useSupabaseTasks()
+  // `tasks` is what the page draws, so its own `updateTaskOrders` (optimistic)
+  // moves a dropped line at once — never another hook instance's.
+  const { tasks, loading, error, addTask, updateTask, refetch, deleteTask, toggleTask, pushTask, setBucket, updateTasksBulk, keepForward, dropCommitment, updateTaskOrders } = useSupabaseTasks()
   // Someday asks for a domain first on an Unsorted item, as every triage does.
   const gated = useGatedTaskActions({ updateTask, pushTask, setBucket, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const activity = useCanvasActivity()
@@ -369,9 +404,14 @@ function Inner() {
   const goalsById = new Map(allNodes.filter((n) => n.goal).map((n) => [n.id, n.goal!]))
   const prepLookup: ReadinessLookup = { task: (id) => visibleById.get(id), goal: (id) => goalsById.get(id) }
 
-  // ---- The level above, folded into one line ------------------------------
-  const above = level > 0 ? allNodes.filter((n) => n.level === level - 1 && isOpen(n)) : []
-  const aboveTitles = level > 0 ? above.map((n) => n.title) : goalsOf(year - 1).filter((g) => g.status !== 'completed').map((g) => g.name)
+  // ---- The order: by drag, nulls last, then as they came --------------------
+  // A month or season line orders by its task's sortOrder, a year goal by
+  // goals.sort_order; a never-ordered line keeps the list's own order after.
+  const orderOf = (n: PlanNode) => n.goal ? n.goal.sortOrder : n.task?.sortOrder
+  const inOrder = (nodes: PlanNode[]) => [...nodes].sort((a, b) => compareSortOrder(orderOf(a), orderOf(b)))
+
+  // ---- The level above, beside the list -------------------------------------
+  const above = level > 0 ? inOrder(allNodes.filter((n) => n.level === level - 1 && isOpen(n))) : []
   const aboveWord = level === 2 ? seasonWord : String(year)
   // The toggle names the list it opens ("Show Fall list"), and once open it
   // sits on the list itself (Scott, 2026-10-16).
@@ -379,11 +419,14 @@ function Inner() {
   const showAbove = `Show ${aboveListWord} list`, hideAbove = `Hide ${aboveListWord} list`
   const aboveTitle = level === 2 ? `${seasonWord} goals` : level === 1 ? `${year} goals` : `${year - 1} goals`
   const aboveWhat = level === 2 ? `the season ${periodWord} serves` : level === 1 ? `the year ${periodWord} serves` : 'last year, for reference'
-  const aboveNone = level === 2 ? `No ${seasonWord} goals yet.` : level === 1 ? `No ${year} goals yet.` : `Nothing was written for ${year - 1}.`
+  const aboveNone = level === 2 ? `No ${seasonWord} goals yet.` : `No ${year} goals yet.`
+  // Year is a single list: nothing sits beside it (calm pass mockup).
+  const hasAbove = level > 0
+  const aboveShown = hasAbove && aboveOpen
 
   // ---- The period's goals: open first, done folded into one line -----------
   const levelNodes = allNodes.filter((n) => n.level === level)
-  const openNodes = levelNodes.filter(isOpen)
+  const openNodes = inOrder(levelNodes.filter(isOpen))
   const doneNodes = levelNodes.filter(isDone)
   const movedNodes = levelNodes.filter((n) => !isDone(n) && !!movedLabel(n))
   const items = showDone ? [...openNodes, ...movedNodes, ...doneNodes] : openNodes
@@ -412,6 +455,11 @@ function Inner() {
   const belowLabel = level === 2 ? (thisWeek ? 'This week' : `Week of ${week.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)
     : level === 1 ? monthWord : seasonWord
   const belowOf = (node: PlanNode) => allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && isOpen(n)).map((n) => n.title)
+  // Year names no season goals, it counts them: "In Fall: 3 goals".
+  const belowFor = (node: PlanNode) => {
+    const titles = belowOf(node)
+    return level === 0 ? { label: `In ${seasonWord}`, titles: titles.length ? [goalCount(titles.length)] : [] } : { label: belowLabel, titles }
+  }
 
   // ---- The review by hand (Scott, 2026-10-17) ---------------------------------
   const setMode = (mode: 'review' | 'plan' | null, start?: Date) => setParams((prev) => {
@@ -433,7 +481,30 @@ function Inner() {
   })
   const byWhom = (authorId: string) => authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === authorId)?.name ?? 'your household'
 
-  const renderItem = (node: PlanNode) => {
+  // ---- Drag to order (calm pass, 2026-10-18) ---------------------------------
+  // The gap a line was dropped in, as Week's day order does: usually one
+  // write; Undo writes back every order it changed.
+  const writeGoalOrders = async (writes: readonly { id: string; sortOrder: number }[]) =>
+    (await Promise.all(writes.map((w) => updateGoal(w.id, { sortOrder: w.sortOrder })))).every((ok) => ok !== false)
+  const reorderLine = (id: string, orderedIds: string[], toIndex: number) => {
+    const node = openNodes.find((n) => n.id === id)
+    if (!node) return
+    const was = new Map(openNodes.map((n) => [n.id, orderOf(n) ?? null]))
+    const writes: OrderWrite[] = reorderTasksToIndex(orderedIds, id, toIndex, was)
+    if (writes.length === 0) return
+    const up = toIndex < orderedIds.indexOf(id)
+    const label = `Move “${node.title}” ${up ? 'up' : 'down'}`
+    const opts = { ids: writes.map((w) => w.id) }
+    if (node.goal) {
+      const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? 0 }))
+      void activity.run(label, () => writeGoalOrders(writes), { ...opts, undo: async () => writeGoalOrders(before) })
+    } else {
+      const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))
+      void activity.run(label, () => updateTaskOrders(writes), { ...opts, undo: async () => updateTaskOrders(before) })
+    }
+  }
+
+  const renderItem = (node: PlanNode, order?: RowOrder) => {
     const scheduled = node.task?.scheduledFor
     const editing = composer?.kind === 'edit' && composer.key === node.key
     const parent = parentOf(node)
@@ -452,7 +523,7 @@ function Inner() {
       : () => selection?.setSelection({ kind: 'task', id: node.id })
     return <PlanItemRow key={node.key} node={node}
       parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
-      below={{ label: belowLabel, titles: belowOf(node) }}
+      below={belowFor(node)}
       linked={linked === node.key}
       done={isDone(node)} movedTo={movedLabel(node) ?? undefined} saved={savedKey === node.key}
       onOpen={onOpen} expanded={expanded === node.key} more={more} quick={quickFor(node)}
@@ -461,7 +532,8 @@ function Inner() {
       onCancelEdit={() => setComposer(null)}
       preview={preview.marks.get(node.id)}
       readiness={node.task ? readinessOf(node.task, prepLookup) : undefined}
-      meta={scheduled ? `Scheduled ${scheduled.toLocaleDateString()}${!node.task?.isAllDay ? ` · ${scheduled.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : null} />
+      meta={scheduled ? `Scheduled ${scheduled.toLocaleDateString()}${!node.task?.isAllDay ? ` · ${scheduled.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : null}
+      {...order} />
   }
 
   // ---- Writing a goal: one quiet line, with an optional "For" -------------
@@ -522,6 +594,8 @@ function Inner() {
         ] }]
       })
     })()
+  // The card beside the list: a goal marked "in October" when this period has
+  // an open line under it (the same children the plan flow reads).
   const planParents: PlanParent[] = above.map((n) => ({
     key: n.key, title: n.title,
     children: levelNodes.filter((c) => c.parent === n.key && isOpen(c)).map((c) => c.title),
@@ -564,7 +638,6 @@ function Inner() {
   const primary = !settled ? null : reviewOffer?.due ? reviewOffer : planOffer?.due ? planOffer : null
   // One quiet fact line: Month "19 open · 26 done", Season "Sep 22 – Dec 20 ·
   // 21 goals · 4 done", Year "5 goals"; then when it was planned.
-  const goalCount = (n: number) => `${n} goal${n === 1 ? '' : 's'}`
   const factParts = level === 2 ? [`${openNodes.length} open`, `${doneNodes.length} done`]
     : level === 1 ? [periodRange(bounds.start, bounds.end), goalCount(openNodes.length), `${doneNodes.length} done`]
       : [goalCount(openNodes.length)]
@@ -581,7 +654,7 @@ function Inner() {
     ...(!current ? [{ id: 'back', label: `Back to this ${PERIODS[level]}`, onSelect: () => setStart(null) }] : []),
     ...(inFlow ? [] : [
       { id: 'done', label: 'Show done', checked: showDone, onSelect: () => prefs.set('done', !showDone) },
-      { id: 'above', label: `${aboveOpen ? 'Hide' : 'Show'} the ${aboveListWord} list`, onSelect: toggleAbove },
+      ...(hasAbove ? [{ id: 'above', label: `${aboveOpen ? 'Hide' : 'Show'} the ${aboveListWord} list`, onSelect: toggleAbove }] : []),
       { id: 'intro', label: 'Start with a goal · guided introduction', onSelect: () => navigate('/getting-started?journey=goals') },
     ]),
   ]
@@ -628,38 +701,32 @@ function Inner() {
           planned={planSession.saved ? { at: planSession.saved.at, by: byWhom(planSession.saved.authorId) } : null}
           onMark={markPlanned} next={planNext} onClose={() => setMode(null)} />
       : <>
-        {/* Wide screens: open, the panel beside the list carries the title
-            and its own Hide, so this line steps aside (canvas-plan.css). */}
-        <div className={`plan-above${aboveOpen ? ' is-open' : ''}`} data-explain="above" data-explain-label={`${aboveTitle}, ${aboveWhat}`}>
+        {/* Hidden, one line offers the level above back; shown, the card
+            beside the list carries its title and its own Hide. */}
+        {hasAbove && <div className={`plan-above${aboveOpen ? ' is-open' : ''}`} data-explain="above" data-explain-label={`${aboveTitle}, ${aboveWhat}`}>
           <button type="button" className="plan-above-line" aria-expanded={aboveOpen} aria-controls="plan-above-panel" onClick={toggleAbove}>
             <span className="plan-above-title">{aboveTitle}</span>
             <span className="plan-above-what">{aboveWhat}</span>
             <span className="canvas-link plan-above-go">{aboveOpen ? hideAbove : showAbove}</span>
           </button>
-        </div>
+        </div>}
 
-        <div className={`plan-horizon-body${aboveOpen ? ' has-above' : ''}${preview.next.length ? ' has-next' : ''}`}>
-        {/* Open, the level above sits beside the list and stays in view while
-            the list scrolls (Scott, 2026-10-13); narrow screens show it above. */}
-        {aboveOpen && <aside id="plan-above-panel" className="plan-above-panel" aria-label={aboveTitle}>
-          <div className="plan-above-panel-head">
-            <p className="plan-above-panel-title">{aboveTitle}</p>
-            <button type="button" className="canvas-link plan-above-hide" aria-expanded aria-controls="plan-above-panel" onClick={toggleAbove}>{hideAbove}</button>
-          </div>
-          {aboveTitles.length > 0
-            ? <ul className="plan-above-list" aria-label={aboveTitle}>{aboveTitles.map((t, i) => <li key={`${i}:${t}`}>{t}</li>)}</ul>
-            : <p className="plan-above-none">{aboveNone}</p>}
-        </aside>}
-        <section className="plan-list" data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
-          <ul className="plan-items plan-goal-list" aria-label={`${periodWord} goals`}>
-            {items.map(renderItem)}
-            {preview.here.map(previewRow)}
-            {proposals.map((p) => {
-              const parent = level > 0 ? allNodes.find((n) => n.level === level - 1 && n.id === p.parentId) : undefined
-              return <ProposalRow key={p.key} proposal={p} parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
-                onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />
-            })}
-          </ul>
+        <div className={`plan-horizon-body${aboveShown ? ' has-above' : ''}${preview.next.length ? ' has-next' : ''}`}>
+        <section className="plan-list plan-card" data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
+          <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items}
+            keyOf={(n) => n.key} titleOf={(n) => n.title}
+            // Only an open line orders; done and moved-on lines keep their place.
+            orderIdOf={(n) => isOpen(n) ? n.id : null}
+            pinnedOf={(n) => n.key === savedKey || preview.marks.has(n.id)}
+            renderRow={renderItem} onReorder={reorderLine}
+            tail={<>
+              {preview.here.map(previewRow)}
+              {proposals.map((p) => {
+                const parent = level > 0 ? allNodes.find((n) => n.level === level - 1 && n.id === p.parentId) : undefined
+                return <ProposalRow key={p.key} proposal={p} parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
+                  onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />
+              })}
+            </>} />
           {openNodes.length === 0 && preview.here.length === 0 && proposals.length === 0 && !adding && <p className="plan-empty">Nothing{folded.length ? ' open' : ''} for {periodWord} yet.</p>}
           {folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => prefs.set('done', !showDone)}>
             <span className="plan-done-fold-text">{doneLine}</span>
@@ -683,6 +750,10 @@ function Inner() {
             {preview.next.map(previewRow)}
           </ul>
         </section>}
+        {/* The level above, beside the list on wide screens and under it on
+            narrow ones: lighter, read-only, 8 then "+N more". */}
+        {aboveShown && <AboveCard key={`${level}:${localYmd(bounds.start)}`} title={aboveTitle} hideLabel={hideAbove} none={aboveNone}
+          onHide={toggleAbove} goals={planParents.map((p) => ({ key: p.key, title: p.title, here: p.children.length > 0 }))} hereWord={periodWord} />}
         </div>
       </>}
   </main>
