@@ -40,7 +40,9 @@ unhurried by default, with a Quick path.
 | 1 | **Settle in** | A labeled place for each person's check-in, a word or a line. |
 | 2 | **Talk** | The topics either person saved during the week, one card at a time. The conversation is theirs; anything said out loud or typed can be dropped in and Symphony sorts it. |
 | 3 | **Wins** | A place for each person's wins; they are kept. |
+| 3½ | **Inbox** | Captures waiting to be placed, dealt in small hands, one card at a time, with the Inbox's own when-chips. |
 | 4 | **Look back** | Last week's open commitments, one card at a time, with the facts: Done · Carry · Change · Let go. |
+| 4½ | **From the month** | The month's list as one screenful of tiles: give one a step this week, or move it along. |
 | 5 | **Look ahead** | The coming week, one card per day. The weekend gets full cards; weekdays are light. Ends on the top 3 they name. |
 | 6 | **Meals** | The week's dinners (see "Meals" below). |
 | 7 | **Money** | Spent this week vs budget (a placeholder card until the Monarch piece exists). |
@@ -79,6 +81,12 @@ is the design target**; the others adapt.
    cards.
 2. **One card at a time** for any list: a stack, with a counter ("2 of 5") and pips
    for the session's progress. Scott chose this over "a screenful at a time."
+2b. **Never show the size of the pile** (Scott, 2026-10-18: the problem is "when you
+   first look at the list, it's seemingly endlessly long"). Long sources (the Inbox)
+   are dealt in hands of 5, closest-first. After each hand the main button is
+   "That's enough for this week," and "Deal 5 more" is secondary. Counters count the
+   hand ("2 of 5"), never the backlog. Nothing repeats an empty state per item ("Nothing in
+   this week yet" × 10 is the anti-pattern, from the current Plan this week screen).
 3. **Symphony sorts first.** Only things that need a decision become cards. Things
    already done become a single number ("9 things got done"), never a list.
 4. **Facts, not suggestions.** A card shows what's true (planned when, touched or
@@ -169,6 +177,35 @@ about it" in the Talk step stamps `done` the same way. The component was
 `src/components/plan/v2/Stamp.tsx`, removed from main in `3e86d655` (#220).
 Restore it from `3e86d655^`. Its styles (`.pv2-stamp`, `pv2-thump`, the four inks,
 the night-lighting rule, and reduced motion) are still in `src/index.css`.
+
+### Triage: the existing verbs, on cards
+
+The session uses Symphony's existing triage verbs and writers unchanged (Scott,
+2026-10-18: "i worry we're forgetting some functionality (triage)"), each with its
+existing Undo and its matching stamp:
+
+- **Inbox step** (after Wins): each capture gets the Inbox's when-chips (Today,
+  Tonight, Tomorrow · This week, Next week, This weekend · This month, Next month,
+  This season · Someday), Done, and "Pick a date". This is the same gated writer as
+  the Inbox (`applyTriageWhen`). Captures not dealt stay in the Inbox. "Leave the
+  rest in the Inbox" is always available.
+- **Look back:** the verbs become **Done · This week · Later · Let go**. This week
+  opens the days (Sat to Fri, or "No day yet"). Later opens Next week, This month,
+  Next month, This season, Someday.
+- **From the month** (between Look back and Look ahead): the month's open goals as
+  one screen of tiles, at most about 8, the rest folded into "+N more on October".
+  Tapping a tile opens: a step this week (a typed line that becomes a week task
+  serving that goal), **Done · Move to November · Someday · Remove from October**,
+  the month row verbs from `0149dd5c` sharing `periodMoves`. Untouched tiles stay
+  on the month without comment. A tile that already has a step this week wears a
+  quiet "This week" tag.
+- **No day yet** (a card run inside Look ahead, before the top 3): each week task
+  without a day gets the days, plus Next week, This month, Someday and Done, the
+  same as Week's "No day yet" triage (`1f2f4296`). "Leave the rest without a day"
+  is always available.
+
+Stamps follow the verb: Done → `done`; a day or this week → `carried`; Next month,
+This season or Someday → `someday`; Let go or Remove → `dropped`.
 
 ### 5. Look ahead
 The coming week, starting on the week-start day.
