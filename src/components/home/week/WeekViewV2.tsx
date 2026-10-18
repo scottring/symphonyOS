@@ -1,5 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { usePeriodReview } from '@/hooks/usePeriodReview'
+import { weekToken } from '@/hooks/usePlanningSession'
 import {
   DndContext,
   DragOverlay,
@@ -901,6 +903,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers}
       daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}
       pointing={activity.pointing}
+      progress={deckAvailable ? { done: doneLastWeek, reviewedOn: lastReview.reviewed?.at, onReview: openReview } : undefined}
+      onPlaceUnplaced={deckAvailable ? openPlace : undefined}
       // A calendar that is not connected has nothing to load.
       loaded={(sources?.tasks ?? 'ready') === 'ready' && ['ready', 'not-connected'].includes(sources?.events ?? 'ready')} />
   )
@@ -916,7 +920,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // reaches a Family view, as a card or as a count.
   // Only on this week, or next week on this week's last day; elsewhere the
   // deck's URL is ignored and the week shows itself.
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const deckAvailable = deckWeekAllowed(weekAnchor, new Date(), readCadenceConfig().weekStartsOn)
   const deckMode = deckAvailable ? deckModeOf(params) : null
   const tasksLoaded = (sources?.tasks ?? 'ready') === 'ready'
@@ -942,6 +946,19 @@ export function WeekViewV2(props: WeekViewV2Props) {
     () => scopedTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) === 'done').length,
     [scopedTasks, lastWeekStart],
   )
+  // The page's own way into the deck, the same URLs WeekV2's buttons set.
+  // Review opens on the current week (the deck looks back at the week before
+  // it); Place them on the week being viewed.
+  const lastReview = usePeriodReview('weekly', weekToken(lastWeekStart))
+  const openDeck = (mode: 'review' | 'place', week?: Date) => setParams((prev) => {
+    const p = new URLSearchParams(prev)
+    p.delete('review'); p.delete('plan'); p.delete('place')
+    p.set(mode, '1')
+    if (week) { p.set('date', localYmd(week)); p.set('start', localYmd(week)) }
+    return p
+  })
+  const openReview = () => openDeck('review', weekIsCurrent ? undefined : weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
+  const openPlace = () => openDeck('place')
   // The drain runs as the full deck opens, once per mount (the ref), and only
   // once the tasks are in. It is idempotent across mounts: what it moves
   // leaves the Inbox and the week, so the next opening finds nothing.
