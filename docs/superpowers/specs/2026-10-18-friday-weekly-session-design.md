@@ -249,7 +249,8 @@ commitments, the dinners, and the wins. One button: **Done**. The session is sav
   others) are **not loosened**. Note found while checking: the 2026-10-17 kiosk
   tick-off (`0032f449`) writes tasks through the same writer as Done with no
   database change. A wall signed in as a true display would have those writes
-  refused. Check how the live wall is signed in before building on it.
+  refused. Scott confirmed (2026-10-18) the live wall is signed in as him, not as a
+  display, which is why tick-off works there today.
 - **One shared screen.** The family session runs on one device. Check-ins, wins
   and dropped-in items carry **who added them**, picked with a one-tap person
   toggle on the screen, not inferred from the signed-in account. **One family
