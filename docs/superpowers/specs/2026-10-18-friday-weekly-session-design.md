@@ -93,6 +93,20 @@ month appear only as the `For October · …` line on cards.
 
 Prototype: `friday-session-prototype-v15.html` (with a Month mode).
 
+
+## Week page, calm pass 2 (Scott approved the mockup 2026-10-18)
+
+Stage 1's rules ran correctly on real data, but the page was still busy (Scott's preview screenshot, week of Oct 17–23). Approved mockup: `week-page-calm-v2.html`.
+- **Header: six things become two.**
+  - The title row is "‹ Oct 17 – 23 ›".
+  - One quiet fact line sits under it: "{n} done last week · reviewed {Weekday} · Today: {first item}", or "· Review" while it isn't reviewed.
+  - One primary button, **Plan this week**, opens the deck.
+  - A **⋯** menu holds: Show free time, Show weather, Show done, Show daily routines in each day, How this page works (the ?), and Watch the guide (the ▷).
+  - Removed from the Week page: "Help me plan the rest of my week" (the Chat bar does that) and "I'm happy with this week". Finishing the full deck now marks the week planned.
+- **Repeats fold even with exceptions.** A task or routine with the same title, time and people on at least 3 of the week's weekdays folds into the band once, labelled with its days ("Mon–Thu", or "Mon, Wed, Fri"). The Every day / Weekdays lines and these merge into one quiet band.
+- **Each day shows calendar events plus at most two tasks** (timed or not, routines included), then "+N more". Only calendar events always show.
+- **Free time ("Calendar clear …") and weather are off by default.** Each can be turned on from ⋯ and is remembered per device. Class chips stay as one small line under the date.
+
 ## Why
 
 Scott and Iris have a weekly planning ritual on paper

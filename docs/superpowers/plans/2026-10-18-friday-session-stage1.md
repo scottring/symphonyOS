@@ -343,3 +343,42 @@
 - Tap any task or event on the Week page (and in the session's week cards) to mark it a priority.
 - Stored on the Symphony side for calendar events, following the item's privacy.
 - Priorities sort first in the Week, Today and the wall.
+
+---
+
+## Calm pass 2 (added 2026-10-18 after the preview; spec section "Week page, calm pass 2")
+
+### Task 10: View preferences and the day fold
+**Files:**
+- Create: `src/hooks/useWeekViewPrefs.ts` with `export function useWeekViewPrefs(): { freeTime: boolean; weather: boolean; done: boolean; dailyInDays: boolean; set: (k: 'freeTime'|'weather'|'done'|'dailyInDays', v: boolean) => void }`. Values persist in localStorage, and the existing `symphony-week-daily` key keeps meaning `dailyInDays`. Defaults: all false.
+- Modify: `src/lib/week/foldDay.ts`, so that `foldDay(items, cap)` keeps every **calendar event** and shows at most `TASKS_SHOWN = 2` other items (timed tasks and routines included). The rest are hidden and counted.
+- Modify: `WeekCanvas.tsx` and `WeekViewV2.tsx`, so that `showDone`, free time ("Calendar clear") and weather read from the prefs hook instead of local state. Free time and weather render only when on.
+- Tests: `foldDay.test.ts`; `WeekCanvas.test.tsx` (free time and weather are hidden by default and shown when on; a day with 2 events and 5 tasks shows both events, 2 tasks and "+3 more"; a timed task folds); `useWeekViewPrefs` persistence.
+
+### Task 11: Repeats fold with exceptions
+**Files:** `src/lib/week/weekRhythm.ts` (+ test) and the band rendering in `WeekCanvas.tsx`.
+- A routine or task with the same normalised title, time and people on **at least 3 of the week's weekdays** (weekdays as `isWeekend` defines them) is lifted once and labelled with its days.
+  - Contiguous days use a range: "Mon–Thu".
+  - Other days use a list: "Mon, Wed, Fri".
+  - All weekdays read "Weekdays"; all seven days read "Every day".
+- It leaves those days' columns. Each occurrence still ticks off from Today and the wall.
+- The band renders as one quiet line of groups: "Every day 7:30p Kids bedtime · Weekdays 6:45a School morning · Mon–Thu 5:15p Pick up from FFG · 5:45p Home from school". Times use `formatTimeCompact`.
+- Tests:
+  - Mon–Thu pickups with the same assignee → "Mon–Thu" and removed from Mon–Thu.
+  - Present on only 2 weekdays → not lifted.
+  - Different assignees → not lifted.
+  - Mon/Wed/Fri → "Mon, Wed, Fri".
+
+### Task 12: The Week header
+**Files:** `src/components/plan/v2/WeekV2.tsx`, the Week masthead in `HomeHeader` (Week only; Today, Month, Season and Year are unchanged), `PlanStatus.tsx` only if needed, and the related tests.
+- **Title row:** "‹ {range} ›". Under it, the fact line "{n} done last week · reviewed {Weekday} · Today: {first item}". While the week isn't reviewed it reads "… · Review" and the link opens the deck. The progress line moves here from `WeekCanvas`.
+- **One primary button, "Plan this week",** opens the deck (`plan=1`) where the deck may open. Elsewhere it is absent.
+- **The ⋯ menu** (a button with `aria-label="Week options"`) holds Show free time, Show weather, Show done, Show daily routines in each day, How this page works, and Watch the guide. The first four are bound to `useWeekViewPrefs`; the last two open what the ? and ▷ open today.
+- **Removed on Week:** the "Help me plan the rest of my week" button and the "I'm happy with this week" mark.
+- **Finishing the full deck also marks the week planned:** `usePlanningSession('weekly', weekToken(weekAnchor)).save`, the same mark the old button wrote, so Home's checklist reads it.
+- Tests:
+  - The header shows exactly one primary button and the ⋯ menu.
+  - Neither removed action renders.
+  - The menu toggles prefs.
+  - Finishing the full deck calls the planned mark.
+  - Month, Season and Year toolbars are unchanged (existing tests stay green).
