@@ -10,6 +10,7 @@ import { monthToken, weekToken, yearToken } from '@/hooks/usePlanningSession'
 import { seasonToken, type Seasons } from '@/lib/cadence/seasons'
 import { localYmd, weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
+import { deckWeekUrl } from '@/lib/planning/deck'
 import { periodBounds } from '@/lib/planning/periodPage'
 
 export type ChecklistLevel = 'year' | 'season' | 'month' | 'week'
@@ -42,7 +43,7 @@ export function checklistSlots(today: Date, weekStartsOn: WeekStart, seasons: Se
   // looks back at W − 1 and records W − 1's review (the token read here).
   const weekSlot = (start: Date, review: boolean): Slot => ({
     horizon: 'weekly', token: weekToken(start), word: `week ${weekOfYear(start, weekStartsOn)}`, dates: weekDates(start),
-    to: review ? `/week?view=alongside&date=${localYmd(week)}&start=${localYmd(week)}&review=1` : '/week?view=alongside&plan=1',
+    to: review ? deckWeekUrl(week) : '/week?view=alongside&plan=1',
   })
   const month = periodBounds('month', today, seasons), lastMonth = periodBounds('month', month.prev, seasons)
   const season = periodBounds('season', today, seasons), lastSeason = periodBounds('season', season.prev, seasons)

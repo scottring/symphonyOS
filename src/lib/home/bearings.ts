@@ -7,6 +7,7 @@
 // scoreboards, so small numbers are written out and nothing is a tally.
 
 import { ALL_LAYERS, LAYER_LABELS, type Layer } from '@/lib/domains'
+import { deckWeekUrl } from '@/lib/planning/deck'
 
 export interface LevelFacts {
   /** "Fall", "October". */
@@ -88,7 +89,7 @@ export function nextSteps(f: BearingsFacts): NextStep[] {
       id: 'plan-week',
       title: f.weekDaysLeft >= 6 ? 'The week ahead hasn’t been planned yet.' : 'This week hasn’t been planned yet.',
       body: `${f.weekDaysLeft >= 6 ? '' : `${capital(numberWord(f.weekDaysLeft))} days left.`}${waiting} ${f.month.name}’s list sits beside you while you choose.`.trim(),
-      action: { label: 'Plan the week', to: f.weekStart ? `/week?view=alongside&date=${f.weekStart}&start=${f.weekStart}&review=1` : '/week' },
+      action: { label: 'Plan the week', to: f.weekStart ? deckWeekUrl(f.weekStart) : '/week' },
     })
   }
   if (f.month.review > 0) {

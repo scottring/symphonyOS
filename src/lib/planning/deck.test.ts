@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createMockTask } from '@/test/mocks/factories'
-import { buildDeck, carriedWeeks, deckWeekAllowed } from './deck'
+import { buildDeck, carriedWeeks, deckWeekAllowed, deckWeekUrl } from './deck'
 
 const THIS = new Date(2026, 9, 12) // Monday
 const LAST = new Date(2026, 9, 5)
@@ -99,5 +99,14 @@ describe('deckWeekAllowed (Saturday weeks)', () => {
   it('never on a past week or one further ahead', () => {
     expect(deckWeekAllowed(lastWeek, new Date(2026, 9, 17, 9), 6)).toBe(false)
     expect(deckWeekAllowed(new Date(2026, 9, 31), new Date(2026, 9, 23, 8), 6)).toBe(false)
+  })
+})
+
+describe('deckWeekUrl', () => {
+  it('opens the review deck on the given week', () => {
+    expect(deckWeekUrl(new Date(2026, 9, 17))).toBe('/week?view=alongside&date=2026-10-17&start=2026-10-17&review=1')
+  })
+  it('accepts a YYYY-MM-DD week start', () => {
+    expect(deckWeekUrl('2026-10-11')).toBe('/week?view=alongside&date=2026-10-11&start=2026-10-11&review=1')
   })
 })

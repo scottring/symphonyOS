@@ -7,6 +7,13 @@ import { weekReviewState } from './periodReview'
 import { localYmd, weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
 
+/** The Week page's review deck, opened on the given week start (a Date or a
+ *  YYYY-MM-DD). The deck only opens on the current household week. */
+export function deckWeekUrl(weekStart: Date | string): string {
+  const ymd = typeof weekStart === 'string' ? weekStart : localYmd(weekStart)
+  return `/week?view=alongside&date=${ymd}&start=${ymd}&review=1`
+}
+
 export type DeckSource = 'this-week' | 'last-week' | 'inbox'
 
 export interface DeckCard {

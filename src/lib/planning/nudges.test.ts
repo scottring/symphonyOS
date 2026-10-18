@@ -65,6 +65,18 @@ describe('planningNudge', () => {
       },
     },
     {
+      name: 'Tuesday nudges the CURRENT week and opens its deck',
+      now: new Date(2026, 8, 29, 9, 0),
+      completed: ['monthly:2026-10', 'seasonal:2026-fall', 'annual:2026'],
+      expected: {
+        kind: 'week',
+        token: '2026-9-27',
+        text: "The week of Sep 27 – Oct 3 isn't planned yet.",
+        cta: 'Plan the week →',
+        to: '/week?view=alongside&date=2026-09-27&start=2026-09-27&review=1',
+      },
+    },
+    {
       name: 'a planned week is silent',
       now: SAT_SEP_26,
       completed: ['monthly:2026-10', 'seasonal:2026-fall', 'annual:2026', 'weekly:2026-9-27'],
