@@ -15,6 +15,7 @@
 // `completedCadenceTokens` prefixes with — so a caller cannot wire it up wrong.
 
 import type { WeekStart } from '@/lib/cadence/config'
+import { deckWeekUrl } from '@/lib/planning/deck'
 import { weekStartAnchor, localYmd } from '@/lib/cadence/config'
 import {
   seasonEndFor,
@@ -209,7 +210,7 @@ function weekCandidate(now: Date, weekStartsOn: WeekStart): Candidate | null {
   // The page opens on the current week, so a week that is not the current one
   // has to say which.
   const current = weekStartAnchor(now, weekStartsOn)
-  const to = anchor.getTime() === current.getTime() ? '/week' : `/week?start=${localYmd(anchor)}`
+  const to = anchor.getTime() === current.getTime() ? deckWeekUrl(current) : `/week?start=${localYmd(anchor)}`
 
   return {
     kind: 'week',

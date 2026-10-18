@@ -3,6 +3,7 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { DayPlanPanel, PLAN_GROUP_CAP, planningSubtitle, routinePlaceDay, type DayPlanPanelActions } from './DayPlanPanel'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { deckWeekUrl } from '@/lib/planning/deck'
 
 afterEach(() => { cleanup(); localStorage.removeItem('symphony.chooser.folded'); localStorage.removeItem('symphony.chooser.hideCompleted') })
 // The unfinished fold remembers itself for the session; each test starts closed.
@@ -74,7 +75,7 @@ describe('DayPlanPanel — the Planning panel', () => {
     p.chooserRoutines = [{ key: 'routine:r1', kind: 'routine', id: 'r1', title: 'Take a walk', completed: false, planned: false, group: 'available', context: 'Daily routine' }]
     render(<DayPlanPanel plan={p} day={day} actions={actions} />)
     expect(screen.getByText(/No week tasks in this view/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Plan your week →' })).toHaveAttribute('href', '/week')
+    expect(screen.getByRole('link', { name: 'Plan your week →' })).toHaveAttribute('href', deckWeekUrl(weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)))
     fireEvent.click(screen.getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
     expect(screen.getByRole('heading', { name: /Routines/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Choose Take a walk for today' })).toHaveAttribute('aria-pressed', 'false')

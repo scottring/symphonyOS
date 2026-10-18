@@ -13,6 +13,7 @@ import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { weekendStartFor, weekendLabel } from '@/lib/planning/weekend'
 import { committedTo } from '@/lib/placement/model'
 import { requestQuickAdd } from '@/lib/quickAddSignal'
+import { deckWeekUrl } from '@/lib/planning/deck'
 
 /** Rows a group shows before "+N more" — the pin is a fixed-space surface. */
 export const PLAN_GROUP_CAP = 6
@@ -732,7 +733,7 @@ function TodayChooser({ plan, day, actions, draggable, wide }: {
             <span>{query ? "No matching week tasks." : tasks.length ? "Every task on this week's list has a day." : "No week tasks in this view. Add work on Week, or check your people and domain filters."}</span>
             {/* A plain anchor, like the fold's Inbox link: this panel is
                 drawn inside and outside the router. */}
-            <a href="/week">Plan your week →</a>
+            <a href={deckWeekUrl(weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))}>Plan your week →</a>
           </>
         }
         allDone={<span>{placed.length ? "Everything on this week's list has a day or is done." : "Everything on this week's list is done."}</span>}
