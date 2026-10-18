@@ -39,9 +39,11 @@ describe('AgendaStage', () => {
     expect(screen.getByRole('button', { name: 'Mark Buy batteries not done' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('shows the weekend’s unfinished anytime things beside today’s', () => {
+  it('is two columns; the weekend’s unfinished anytime things sit under today’s', () => {
     setup()
-    const soon = screen.getByRole('region', { name: 'Anytime · Saturday' })
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['On the clock', 'Anytime today'])
+    const soon = screen.getByRole('region', { name: 'Anytime today' })
+    expect(soon).toHaveTextContent('Anytime · Saturday')
     expect(soon).toHaveTextContent('Wrap the present')
     expect(soon).not.toHaveTextContent('Already wrapped')
     expect(screen.queryByText('Pizza night')).toBeNull()

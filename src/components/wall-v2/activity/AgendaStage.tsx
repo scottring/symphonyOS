@@ -2,9 +2,9 @@
 // today/this weekend … an option on the main screen, and the items shown need
 // to have a check circle"). The dock's Today button opens it; Today · This
 // weekend switch in place from the top band (AgendaViews), so the lists get
-// the stage's full height. Today is on the clock and anytime side by side,
-// with a third column for the weekend's unfinished anytime things; the
-// weekend is a column a day. Every task and routine, on any of those days,
+// the stage's full height. Two columns, compact (Scott, 2026-10-18): Today
+// is on the clock beside anytime, the weekend's unfinished anytime things
+// under today's; the weekend is a column a day. Every task and routine, on any of those days,
 // leads with a check that ticks it off or back on; an event keeps a blank of
 // the same width so the times line up. Less scrolling ("as little as
 // possible"): one line a row, and done things fold to one line at the foot.
@@ -116,8 +116,13 @@ export function AgendaStage(p: AgendaStageProps) {
     const soonLab = later.length === 1 ? later[0].label : 'This weekend'
     cols = d ? [
       col('On the clock', <><AllDay titles={d.allDay} />{d.timed.length ? <Rows rows={d.timed} p={p} flipped={flipped} flip={flip} /> : empty('Nothing on the clock today.')}</>, 'timed'),
-      col('Anytime today', d.anytime.length ? <Rows rows={d.anytime} p={p} flipped={flipped} flip={flip} anytime /> : empty('Nothing else today.'), 'anytime'),
-      ...(soon.length ? [col(`Anytime · ${soonLab}`, <Rows rows={soon} p={p} flipped={flipped} flip={flip} anytime />, 'soon')] : []),
+      col('Anytime today', (
+        <>
+          {d.anytime.length ? <Rows rows={d.anytime} p={p} flipped={flipped} flip={flip} anytime /> : empty('Nothing else today.')}
+          {soon.length > 0 && <p className="kw-eyebrow ka-lab is-gap">Anytime · {soonLab}</p>}
+          <Rows rows={soon} p={p} flipped={flipped} flip={flip} anytime />
+        </>
+      ), 'anytime'),
     ] : [col('Today', empty('Nothing on today.'), 'none')]
   } else {
     cols = days.length ? days.map((d) => col(d.label, (
@@ -133,7 +138,7 @@ export function AgendaStage(p: AgendaStageProps) {
 
   return (
     <div className="ka-stage">
-      <div className={`ka-cols ${cols.length === 3 ? 'is-3' : ''}`}>
+      <div className="ka-cols">
         {cols.flatMap((c, i) => (i ? [<div key={`rule-${i}`} className="ka-rule" aria-hidden="true" />, c] : [c]))}
       </div>
     </div>

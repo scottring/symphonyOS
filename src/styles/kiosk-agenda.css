@@ -48,5 +48,24 @@
 .kiosk-canvas .ka-fold svg { width: calc(28 * var(--p)); height: calc(28 * var(--p)); }
 .kiosk-canvas .ka-fold svg:first-child { color: var(--kw-done); }
 .kiosk-canvas .ka-fold:active { background: var(--kw-sym-tint); }
-/* Today with the weekend's column: the clock's column is the widest. */
-.kiosk-canvas .ka-cols.is-3 > .ka-col:first-child { flex: 1.5; }
+
+/* Compact, two columns (Scott, 2026-10-18: "a more compact, 2 column view"):
+   tighter rows and type; the check's touch area stays the row's full height. */
+.kiosk-canvas .ka-stage { gap: calc(8 * var(--p)); }
+.kiosk-canvas .ka-cols { column-gap: calc(40 * var(--p)); }
+.kiosk-canvas .ka-lab { margin-bottom: calc(4 * var(--p)); }
+.kiosk-canvas .ka-lab.is-gap { margin-top: calc(14 * var(--p)); }
+.kiosk-canvas .ka-list { padding-bottom: calc(8 * var(--p)); }
+.kiosk-canvas .ka-row,
+.kiosk-canvas .ka-row .kw-tl-ck,
+.kiosk-canvas .ka-row .kw-tl { min-height: calc(62 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl { padding: calc(8 * var(--p)) 0; grid-template-columns: calc(80 * var(--p)) minmax(0, 1fr); column-gap: calc(12 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl-ck { width: calc(64 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl-ck > span { width: calc(40 * var(--p)); height: calc(40 * var(--p)); border-width: 2px; }
+.kiosk-canvas .ka-row .kw-tl-ck svg { width: calc(24 * var(--p)); height: calc(24 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl-t { font-size: calc(25 * var(--p)); }
+.kiosk-canvas .ka-row .kw-tl-w { font-size: calc(27 * var(--p)); line-height: 1.15; }
+.kiosk-canvas .ka-row .kw-tl-by { font-size: calc(22 * var(--p)); }
+.kiosk-canvas .ka-fold { min-height: calc(56 * var(--p)); font-size: calc(22 * var(--p)); }
+.kiosk-canvas .ka-allday { gap: calc(8 * var(--p)); margin-bottom: calc(6 * var(--p)); }
+.kiosk-canvas .ka-allday li { padding: calc(6 * var(--p)) calc(16 * var(--p)); font-size: calc(22 * var(--p)); }
