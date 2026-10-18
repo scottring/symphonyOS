@@ -98,6 +98,32 @@ describe('weekRhythm', () => {
       expect(weekRhythm(days, '2026-10-06', { tasks: true }).weekdays).toEqual([])
     })
 
+    // Alternating pickups: the same title and time, different people. Each
+    // day keeps its row (and its face).
+    it('lifts only when the people match every day; alternating pickups stay in their days', () => {
+      const days = week()
+      weekdays(days).forEach((d, i) => d.entries.push({ ...pickup(d), people: [i % 2 === 0 ? 'scott' : 'iris'] }))
+      const r = weekRhythm(days, '2026-10-06', { tasks: true })
+      expect(r.weekdays).toEqual([])
+      expect(r.days.flatMap((d) => d.entries).map((e) => e.people)).toEqual([['scott'], ['iris'], ['scott'], ['iris'], ['scott']])
+    })
+
+    it('an untimed repeat is lifted too, with no time on its line', () => {
+      const days = week()
+      weekdays(days).forEach((d) => d.entries.push({ ...pickup(d, 'Pack lunches'), time: undefined }))
+      const r = weekRhythm(days, '2026-10-06', { tasks: true })
+      expect(rhythmLines(r).find((l) => l.label === 'Weekdays')!.items.map((i) => i.title)).toEqual(['Pack lunches'])
+      expect(r.days.flatMap((d) => d.entries)).toEqual([])
+    })
+
+    it('the same people every day, in any order, is one line', () => {
+      const days = week()
+      weekdays(days).forEach((d, i) => d.entries.push({ ...pickup(d), people: i === 1 ? ['scott', 'iris'] : ['iris', 'scott'] }))
+      const r = weekRhythm(days, '2026-10-06', { tasks: true })
+      expect(r.weekdays.map((x) => x.title)).toEqual(['Pick up from FFG'])
+      expect(r.days.flatMap((d) => d.entries)).toEqual([])
+    })
+
     it('every day of the week is written under Every day', () => {
       const days = week()
       days.forEach((d) => d.entries.push(pickup(d, 'Feed the fish')))

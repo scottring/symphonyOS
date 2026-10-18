@@ -74,17 +74,19 @@ export function weekRhythm(days: JournalDay[], todayKey: string = localKey(new D
     lifted.set(routineId, new Set(usualKeys))
   }
   // Repeated tasks: the same title (case and spacing aside) at the same time,
-  // on every day of the week or on exactly its weekdays. One a different time
-  // any day is particular to its days and stays in them.
+  // for the same people, on every day of the week or on exactly its weekdays.
+  // One a different time, or someone else's, any day is particular to its days
+  // and stays in them: pickups that alternate between Scott and Iris keep
+  // their faces in their days.
   const liftedTasks = new Set<string>()
   if (opts.tasks) {
-    // normalised title @ clock → day key → that day's rows (a duplicate row
-    // goes with the rest).
+    // normalised title @ clock @ people → day key → that day's rows (a
+    // duplicate row goes with the rest).
     const groups = new Map<string, Map<string, JournalEntry[]>>()
     for (const d of days) {
       for (const e of d.entries) {
         if (e.kind !== 'task') continue
-        const k = `${e.title.trim().replace(/\s+/g, ' ').toLowerCase()}@${clock(e.time)}`
+        const k = `${e.title.trim().replace(/\s+/g, ' ').toLowerCase()}@${clock(e.time)}@${[...(e.people ?? [])].sort().join(',')}`
         const byDay = groups.get(k) ?? new Map<string, JournalEntry[]>()
         byDay.set(d.key, [...(byDay.get(d.key) ?? []), e])
         groups.set(k, byDay)
