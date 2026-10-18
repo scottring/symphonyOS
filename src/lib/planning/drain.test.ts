@@ -33,6 +33,44 @@ describe('staleForDrain', () => {
     ]
     expect(staleForDrain(tasks, NOW)).toEqual([])
   })
+
+  // Every placement reader goes through the cached stamps when the records
+  // are missing or did not load: such a row is still on its week.
+  it('leaves a legacy week task with no commitment records on this week', () => {
+    const thisWeek = new Date(2026, 9, 18)
+    const unloaded = createMockTask({ id: 'unloaded', bucket: 'week', weekStart: thisWeek, commitments: undefined, updatedAt: daysAgo(30) })
+    const empty = createMockTask({ id: 'empty', bucket: 'week', weekStart: thisWeek, commitments: [], updatedAt: daysAgo(30) })
+    const later = createMockTask({ id: 'later', bucket: 'week', weekStart: new Date(2026, 9, 25), commitments: [], updatedAt: daysAgo(30) })
+    // No week of its own: a legacy week row reads as the current week's.
+    const unstamped = createMockTask({ id: 'unstamped', bucket: 'week', weekStart: undefined, commitments: [], updatedAt: daysAgo(30) })
+    expect(staleForDrain([unloaded, empty, later, unstamped], NOW)).toEqual([])
+  })
+
+  it('leaves anything with an open commitment to this week or a later one', () => {
+    const old = { updatedAt: daysAgo(30) }
+    const tasks = [
+      createMockTask({ id: 'this', bucket: 'week', ...old, commitments: [{ level: 'week', periodStart: new Date(2026, 9, 18), status: 'open' }] }),
+      createMockTask({ id: 'next', bucket: 'week', ...old, commitments: [{ level: 'week', periodStart: new Date(2026, 9, 25), status: 'open' }] }),
+      createMockTask({ id: 'inbox-held', bucket: 'inbox', ...old, commitments: [{ level: 'week', periodStart: new Date(2026, 9, 18), status: 'open' }] }),
+    ]
+    expect(staleForDrain(tasks, NOW)).toEqual([])
+  })
+
+  it('drains at more than 21 days untouched, not at exactly 21', () => {
+    const at = createMockTask({ id: 'at', bucket: 'inbox', updatedAt: daysAgo(21) })
+    const past = createMockTask({ id: 'past', bucket: 'inbox', updatedAt: new Date(daysAgo(21).getTime() - 1) })
+    expect(staleForDrain([at, past], NOW).map((t) => t.id)).toEqual(['past'])
+  })
+
+  it('leaves an inbox task dated today or later', () => {
+    const old = { updatedAt: daysAgo(30) }
+    const tasks = [
+      createMockTask({ id: 'future', bucket: 'inbox', scheduledFor: new Date(2026, 9, 25), ...old }),
+      createMockTask({ id: 'today', bucket: 'inbox', scheduledFor: new Date(2026, 9, 18, 7), ...old }),
+      createMockTask({ id: 'yesterday', bucket: 'inbox', scheduledFor: new Date(2026, 9, 17), ...old }),
+    ]
+    expect(staleForDrain(tasks, NOW).map((t) => t.id)).toEqual(['yesterday'])
+  })
 })
 
 describe('undealtLastWeek', () => {

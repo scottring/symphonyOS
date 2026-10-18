@@ -3,20 +3,34 @@
 
 import type { Task } from '@/types/task'
 import type { DeckCard } from './deck'
+import { liveCommitments } from '@/lib/placement/model'
+import { bootstrapCommitments } from '@/lib/placement/intentions'
 
 export const DRAIN_AFTER_DAYS = 21
 
 const DAY_MS = 86_400_000
 
+/** Still on a week's list: an open week commitment, read the way every
+ *  placement reader reads it — a row whose records are missing or did not
+ *  load answers from its cached stamps (bootstrapCommitments). A legacy week
+ *  row with no week of its own reads as the current week's (weekList), so it
+ *  is on a list too. Such a task has a home; the drain leaves it alone. */
+function onAWeek(t: Task): boolean {
+  const live = liveCommitments({ commitments: bootstrapCommitments(t) })
+  if (live.some((c) => c.level === 'week' && c.status === 'open')) return true
+  return t.bucket === 'week' && live.length === 0 && !t.weekStart
+}
+
 export function staleForDrain(tasks: Task[], now: Date, afterDays = DRAIN_AFTER_DAYS): Task[] {
   const cutoff = now.getTime() - afterDays * DAY_MS
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   return tasks.filter((t) => {
     if (t.completed || t.isGoal) return false
-    if (t.scheduledFor && t.scheduledFor.getTime() > now.getTime()) return false
+    // A day today or later is a home.
+    if (t.scheduledFor && t.scheduledFor.getTime() >= today) return false
     if (t.updatedAt.getTime() >= cutoff) return false
-    if (t.bucket === 'inbox') return true
-    if (t.bucket === 'week') return !(t.commitments ?? []).some((c) => c.level === 'week' && c.status === 'open')
-    return false
+    if (onAWeek(t)) return false
+    return t.bucket === 'inbox' || t.bucket === 'week'
   })
 }
 
