@@ -29,10 +29,21 @@ const LATER: { when: LaterWhen; label: string }[] = [
   { when: 'someday', label: 'Someday' },
 ]
 
-/** A native date input's "YYYY-MM-DD", as that day at local midnight. */
-function localDate(value: string): Date | null {
+const isoDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+/**
+ * A native date input's "YYYY-MM-DD" as that day at local midnight — only when
+ * it is a complete, real date that is today or later. Typing a year digit by
+ * digit fires partial values ("0002-11-03"); those are ignored.
+ */
+function pickedDate(value: string, now = new Date()): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
-  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null
+  if (!m) return null
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  if (isoDay(d) !== value) return null // 2026-02-31 and the like
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return d >= today ? d : null
 }
 
 export function DeckCardView({ card, stripDays, stamp, busy, focusOnMount, onChoose }: {
@@ -97,8 +108,9 @@ export function DeckCardView({ card, stripDays, stamp, busy, focusOnMount, onCho
                   type="date"
                   aria-label="Pick a date…"
                   disabled={locked}
+                  min={isoDay(new Date())}
                   onClick={(e) => { try { e.currentTarget.showPicker?.() } catch { /* the browser opens its own */ } }}
-                  onChange={(e) => { const d = localDate(e.currentTarget.value); if (d) onChoose({ type: 'date', date: d }) }}
+                  onChange={(e) => { const d = pickedDate(e.currentTarget.value); if (d) onChoose({ type: 'date', date: d }) }}
                 />
               </label>
             </div>

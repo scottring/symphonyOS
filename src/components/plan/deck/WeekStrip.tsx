@@ -2,6 +2,7 @@
 // a day to give the card that day. Each tile shows what's already there (at
 // most three lines) so the choice is made with the week in view.
 
+/** One day of the strip. `lines` holds at most 3 entries; `more` is the remainder. */
 export interface StripDay {
   key: string
   date: Date
@@ -23,8 +24,9 @@ export function WeekStrip({ days, onPick, onNoDay, disabled }: {
     <>
       <div className="deck-strip">
         {days.map((d) => {
+          // `lines` holds at most three; `more` is the rest. Sliced anyway.
           const shown = d.lines.slice(0, SHOWN)
-          const more = d.more + Math.max(0, d.lines.length - SHOWN)
+          const more = d.more
           return (
             <button
               key={d.key}

@@ -63,6 +63,10 @@ export function Deck({ cards, doneLastWeek, aged, onSeeAged, actions, stripDays,
   const [handCount, setHandCount] = useState(0)
   const [busy, setBusy] = useState(false)
   const [stamped, setStamped] = useState<{ card: DeckCard; stamp: CardStamp } | null>(null)
+  // The card being saved. The writers are optimistic, so its task can read
+  // completed (and drop out of `live`) before the save settles; holding it
+  // keeps the card on screen instead of flickering to the next one.
+  const [pending, setPending] = useState<DeckCard | null>(null)
   const [touched, setTouched] = useState(false)
   const busyRef = useRef(false)
   const alive = useRef(true)
@@ -80,6 +84,7 @@ export function Deck({ cards, doneLastWeek, aged, onSeeAged, actions, stripDays,
     if (busyRef.current || stamped) return
     busyRef.current = true
     setBusy(true)
+    setPending(card)
     setTouched(true)
     setHandSize(size)
     let ok = false
@@ -87,6 +92,7 @@ export function Deck({ cards, doneLastWeek, aged, onSeeAged, actions, stripDays,
     if (!alive.current) return
     busyRef.current = false
     setBusy(false)
+    setPending(null)
     // A failed or cancelled save keeps the card; the activity shows why.
     if (!ok) return
     setStamped({ card, stamp: stampFor(choice) })
@@ -108,7 +114,7 @@ export function Deck({ cards, doneLastWeek, aged, onSeeAged, actions, stripDays,
   )
 
   let body: ReactNode
-  const current = stamped?.card ?? live[0]
+  const current = stamped?.card ?? pending ?? live[0]
   if (!current) {
     body = (
       <div className="deck-screen" key="empty">
@@ -133,7 +139,7 @@ export function Deck({ cards, doneLastWeek, aged, onSeeAged, actions, stripDays,
         </div>
       </div>
     )
-  } else if (!stamped && handSize !== null && handCount >= handSize) {
+  } else if (!stamped && !pending && handSize !== null && handCount >= handSize) {
     const more = Math.min(HAND_SIZE, live.length)
     body = (
       <div className="deck-screen" key="hand-end">
