@@ -1,0 +1,52 @@
+// The week, seven tiles across, inside a deck card's "This week" reveal: tap
+// a day to give the card that day. Each tile shows what's already there (at
+// most three lines) so the choice is made with the week in view.
+
+/** One day of the strip. `lines` holds at most 3 entries; `more` is the remainder. */
+export interface StripDay {
+  key: string
+  date: Date
+  label: string
+  isWeekend: boolean
+  /** Already gone: shown, but a card cannot be given it. */
+  past?: boolean
+  lines: string[]
+  more: number
+}
+
+const SHOWN = 3
+
+export function WeekStrip({ days, onPick, onNoDay, disabled }: {
+  days: StripDay[]
+  onPick: (d: Date) => void
+  onNoDay: () => void
+  disabled?: boolean
+}) {
+  return (
+    <>
+      <div className="deck-strip">
+        {days.map((d) => {
+          // `lines` holds at most three; `more` is the rest. Sliced anyway.
+          const shown = d.lines.slice(0, SHOWN)
+          const more = d.more
+          return (
+            <button
+              key={d.key}
+              type="button"
+              className={`deck-day${shown.length ? '' : ' is-empty'}${d.past ? ' is-past' : ''}`}
+              onClick={() => onPick(d.date)}
+              disabled={disabled || d.past}
+            >
+              <b className={d.isWeekend ? 'is-weekend' : undefined}>{d.label}</b>
+              {shown.length ? shown.map((line, i) => <span key={i}>{line}</span>) : <span>Nothing yet</span>}
+              {more > 0 && <i>+{more} more</i>}
+            </button>
+          )
+        })}
+      </div>
+      <div className="deck-noday">
+        <button type="button" className="deck-when is-quiet" onClick={onNoDay} disabled={disabled}>This week, no day yet</button>
+      </div>
+    </>
+  )
+}

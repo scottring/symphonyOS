@@ -3,10 +3,16 @@
 // is written once above the days, not seven times down them; one that
 // happens every weekday is written once under "Weekdays". What is left in a
 // day is what is particular to it.
+//
+// A task can repeat too: one row a day with the same title and time ("Pick up
+// from FFG" at 5:15 each weekday). Where asked (the Week page), it is written
+// once the same way (Friday session, Stage 1: repeats show once).
 import type { JournalDay, JournalEntry } from './journalDays'
+import { isWeekend } from '@/lib/dateUtils'
 
 export interface RhythmItem {
-  routineId: string
+  /** The routine's id; absent for a repeated task. */
+  routineId?: string
   title: string
   /** Its time, when it has one (the first day's). */
   time?: Date
@@ -22,7 +28,9 @@ export interface WeekRhythm {
   days: JournalDay[]
 }
 
-const isWeekday = (d: Date) => d.getDay() >= 1 && d.getDay() <= 5
+// The weekend as the page draws it (WeekCanvas's weekend columns): a
+// Saturday-start week has the same five weekdays.
+const isWeekday = (d: Date) => !isWeekend(d)
 const clock = (t?: Date) => (t ? `${t.getHours()}:${t.getMinutes()}` : '')
 const localKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
@@ -32,7 +40,7 @@ const localKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).pad
  * most days' (Walk Jax at 8p on Wednesday) is particular to its day and stays
  * in it (review 2026-10-04).
  */
-export function weekRhythm(days: JournalDay[], todayKey: string = localKey(new Date())): WeekRhythm {
+export function weekRhythm(days: JournalDay[], todayKey: string = localKey(new Date()), opts: { tasks?: boolean } = {}): WeekRhythm {
   const none: WeekRhythm = { everyDay: [], weekdays: [], days }
   if (days.length < 7) return none
   const seen = new Map<string, { title: string; people?: string[]; byDay: Map<string, JournalEntry> }>()
@@ -65,8 +73,38 @@ export function weekRhythm(days: JournalDay[], todayKey: string = localKey(new D
     ;(all ? everyDay : weekdays).push(item)
     lifted.set(routineId, new Set(usualKeys))
   }
+  // Repeated tasks: the same title (case and spacing aside) at the same time,
+  // for the same people, on every day of the week or on exactly its weekdays.
+  // One a different time, or someone else's, any day is particular to its days
+  // and stays in them: pickups that alternate between Scott and Iris keep
+  // their faces in their days.
+  const liftedTasks = new Set<string>()
+  if (opts.tasks) {
+    // normalised title @ clock @ people → day key → that day's rows (a
+    // duplicate row goes with the rest).
+    const groups = new Map<string, Map<string, JournalEntry[]>>()
+    for (const d of days) {
+      for (const e of d.entries) {
+        if (e.kind !== 'task') continue
+        const k = `${e.title.trim().replace(/\s+/g, ' ').toLowerCase()}@${clock(e.time)}@${[...(e.people ?? [])].sort().join(',')}`
+        const byDay = groups.get(k) ?? new Map<string, JournalEntry[]>()
+        byDay.set(d.key, [...(byDay.get(d.key) ?? []), e])
+        groups.set(k, byDay)
+      }
+    }
+    for (const byDay of groups.values()) {
+      const keys = [...byDay.keys()]
+      const all = keys.length === days.length
+      const weekdaysOnly = !all && weekdayKeys.length === 5 && keys.length === 5 && weekdayKeys.every((k) => byDay.has(k))
+      if (!all && !weekdaysOnly) continue
+      const first = byDay.get(keys.find((k) => k >= todayKey) ?? keys[keys.length - 1])![0]
+      ;(all ? everyDay : weekdays).push({ title: first.title, time: first.time, openId: first.id, people: first.people })
+      for (const rows of byDay.values()) for (const e of rows) liftedTasks.add(e.id)
+    }
+  }
   if (!everyDay.length && !weekdays.length) return none
-  const keepIn = (dayKey: string) => (e: JournalEntry) => !(e.kind === 'routine' && e.routineId && lifted.get(e.routineId)?.has(dayKey))
+  const keepIn = (dayKey: string) => (e: JournalEntry) =>
+    !(e.kind === 'routine' && e.routineId && lifted.get(e.routineId)?.has(dayKey)) && !(e.kind === 'task' && liftedTasks.has(e.id))
   const byTime = (a: RhythmItem, b: RhythmItem) =>
     (a.time ? a.time.getHours() * 60 + a.time.getMinutes() : 24 * 60) - (b.time ? b.time.getHours() * 60 + b.time.getMinutes() : 24 * 60)
   return {
@@ -74,4 +112,15 @@ export function weekRhythm(days: JournalDay[], todayKey: string = localKey(new D
     weekdays: weekdays.sort(byTime),
     days: days.map((d) => ({ ...d, entries: d.entries.filter(keepIn(d.key)), foldedRoutines: d.foldedRoutines.filter(keepIn(d.key)) })),
   }
+}
+
+/** Written above the days: "Every day" and "Weekdays", each thing with its
+ *  time when it has one ("5:15 Pick up from FFG"). */
+export function rhythmLines(r: Pick<WeekRhythm, 'everyDay' | 'weekdays'>): { label: string; items: { title: string; openId: string }[] }[] {
+  const at = (t?: Date) => (t ? `${t.getHours() % 12 || 12}:${String(t.getMinutes()).padStart(2, '0')} ` : '')
+  const items = (xs: RhythmItem[]) => xs.map((x) => ({ title: `${at(x.time)}${x.title}`, openId: x.openId }))
+  return [
+    { label: 'Every day', items: items(r.everyDay) },
+    { label: 'Weekdays', items: items(r.weekdays) },
+  ]
 }

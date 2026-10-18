@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom'
+import { deckModeOf } from '@/lib/planning/deck'
 
 const session = { saved: null as null | { authorId: string; at: Date }, mine: null, loading: false, loadedToken: '', error: null as null | string, reload: vi.fn(), save: vi.fn() }
 const activity = { changeSet: null as null | { state: string }, receipt: null as null | { state: string } }
@@ -12,7 +13,7 @@ vi.mock('@/contexts/CanvasActivityContext', () => ({ useCanvasActivity: () => ac
 const review = { reviewed: null as null | { at: Date; authorId: string; wentWell: string; didnt: string }, mine: null, loading: false, error: null, reload: vi.fn(), finish: vi.fn(async () => true) }
 vi.mock('@/hooks/usePeriodReview', () => ({ usePeriodReview: () => review }))
 
-import { WeekV2 } from './WeekV2'
+import { WeekV2, type WeekDeck } from './WeekV2'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
 
 // A fixed Tuesday: the week's own last day changes what the toolbar offers,
@@ -145,97 +146,131 @@ describe('WeekV2 toolbar — folded into the masthead', () => {
   })
 })
 
-// The review by hand (2026-10-17): the canvas gives way to the week's lines.
-describe('WeekV2 — Review week N', () => {
-  beforeEach(() => { session.saved = null; session.loading = false; session.error = null })
-  const lines = [
-    { key: 'a', title: 'Call the plumber', state: 'open' as const, verbs: [{ label: 'Done', run: vi.fn(async () => true) }, { label: 'Move to next week', run: vi.fn(async () => true) }] },
-    { key: 'b', title: 'Return library books', state: 'done' as const, verbs: [] },
-  ]
+// Review and Plan open the deck (Friday session, Stage 1): the canvas gives
+// way to it, and it gives way back. The deck itself is Deck.test's; here it is
+// dealt nothing, so it opens straight on "Nothing left without a home".
+function Where() { return <output data-testid="where">{useLocation().search}</output> }
+const where = () => new URLSearchParams(screen.getByTestId('where').textContent ?? '')
+const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
+  mode: null, available: true, cards: [], doneLastWeek: 3, aged: 0, stripDays: [], onSeeAged: vi.fn(), onFinish: vi.fn(async () => true),
+  actions: { done: vi.fn(), placeOnDay: vi.fn(), keepThisWeek: vi.fn(), later: vi.fn(), laterOnDate: vi.fn(), letGo: vi.fn(), drain: vi.fn() },
+  ...over,
+})
+// WeekViewV2's part, standing in: the deck's mode is read off the URL, on a
+// week that may open it.
+function WithDeck({ deck, ...props }: Partial<React.ComponentProps<typeof WeekV2>>) {
+  const [params] = useSearchParams()
+  const withMode = deck && { ...deck, mode: deck.available ? deckModeOf(params) : null }
+  return <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent canvas={<p>The days</p>} {...props} deck={withMode} />
+}
+const renderAt = (url: string, props: Partial<React.ComponentProps<typeof WeekV2>> = {}) => render(
+  <MemoryRouter initialEntries={[url]}>
+    <WithDeck {...props} />
+    <Where />
+  </MemoryRouter>,
+)
 
-  it('opens in place of the canvas and closes back to it', () => {
-    // A week's own review opens on its last day.
+describe('WeekV2 — Review opens the deck', () => {
+  beforeEach(() => { session.saved = null; session.loading = false; session.error = null; review.finish.mockClear(); review.reviewed = null })
+
+  it('on the week’s last day, reviewing it opens the deck on the week after (whose last week it is); Leave closes it', () => {
     vi.setSystemTime(new Date(2026, 9, 3, 9))
-    renderWeek({ canvas: <p>The days</p>, reviewLines: lines })
+    const deck = makeDeck()
+    renderAt('/week', { deck })
     fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
+    expect(screen.getByRole('region', { name: 'The deck' })).toBeTruthy()
     expect(screen.queryByText('The days')).toBeNull()
-    const open = screen.getByRole('list', { name: 'Still open in this week' })
-    expect(within(open).getByRole('button', { name: 'Move to next week: Call the plumber' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /^Review week/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Close review' }))
+    expect(where().get('review')).toBe('1')
+    expect(where().get('date')).toBe('2026-10-04')
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Leave' }))
     expect(screen.getByText('The days')).toBeTruthy()
+    expect(where().get('review')).toBeNull()
+    expect(deck.onFinish).not.toHaveBeenCalled()
+    expect(review.finish).not.toHaveBeenCalled()
   })
 
-  it('finishing points on to planning the next week, named by its date', async () => {
-    vi.setSystemTime(new Date(2026, 9, 3, 9))
-    renderWeek({ canvas: <p>The days</p>, reviewLines: [lines[1]] })
-    fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
-    expect(screen.getByText(/Every line has an answer/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Finish review' }).className).toContain('is-next')
-    fireEvent.click(screen.getByRole('button', { name: 'Finish review' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Plan the week of Oct 4 →' }))
-    expect(screen.getByText('The days')).toBeTruthy()
-  })
-
-  it('a past week offers the review too, without the conversation, and points on to this week', async () => {
-    renderWeek({ isCurrent: false, weekStart: new Date(2026, 8, 20), reviewLines: [lines[1]] })
-    fireEvent.click(screen.getByRole('button', { name: 'Review the week of Sep 20' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Finish review' }))
-    expect(await screen.findByRole('button', { name: 'Plan this week →' })).toBeTruthy()
-  })
-
-  it('early in the week it offers last week’s review, until that one is done; a coming week offers none', () => {
-    renderWeek({ canvas: <p>The days</p>, reviewLines: lines })
+  it('early in the week, last week’s review opens the deck here; finishing records it and returns to the week', async () => {
+    const deck = makeDeck()
+    renderAt('/week', { deck })
     expect(screen.queryByRole('button', { name: 'Review this week' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Review the week of Sep 20' })).toBeTruthy()
-    cleanup()
+    fireEvent.click(screen.getByRole('button', { name: 'Review the week of Sep 20' }))
+    expect(where().get('review')).toBe('1')
+    expect(where().get('date')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
+    await vi.waitFor(() => expect(review.finish).toHaveBeenCalledWith({ wentWell: '', didnt: '' }))
+    expect(deck.onFinish).toHaveBeenCalledTimes(1)
+    expect(await screen.findByText('The days')).toBeTruthy()
+    expect(where().get('review')).toBeNull()
+  })
+
+  it('offers last week’s review until that one is done; a coming week offers none', () => {
     review.reviewed = { at: new Date(2026, 8, 27), authorId: 'me', wentWell: '', didnt: '' }
-    try {
-      renderWeek({ canvas: <p>The days</p>, reviewLines: lines })
-      expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
-    } finally { review.reviewed = null }
+    renderAt('/week', { deck: makeDeck() })
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     cleanup()
-    renderWeek({ isCurrent: false, weekStart: new Date(2026, 9, 4), reviewLines: lines })
+    review.reviewed = null
+    renderAt('/week', { isCurrent: false, weekStart: new Date(2026, 9, 4), deck: makeDeck({ available: false }) })
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
   })
 
-  it('without lines (the v1 week) there is no review', () => {
+  it('waits for the tasks before dealing: neither the deck nor the canvas while they load', () => {
+    renderAt('/week?review=1', { deck: makeDeck({ loading: true }) })
+    expect(screen.queryByRole('region', { name: 'The deck' })).toBeNull()
+    expect(screen.queryByText('Nothing left without a home')).toBeNull()
+    expect(screen.queryByText('The days')).toBeNull()
+  })
+
+  it('without a deck (the v1 week) there is no review', () => {
     renderWeek()
-    expect(screen.queryByRole('button', { name: /^Review week/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
   })
 })
 
-// Planning by hand (2026-10-17): "Plan this week" swaps the canvas for the
-// steps; "I'm happy with this week" at the end is the same mark as the bar's.
-describe('WeekV2 — Plan this week by hand', () => {
-  beforeEach(() => { session.saved = null; session.loading = false; session.error = null; session.save.mockReset() })
-  const plan = {
-    carry: { fromWord: 'the week of Sep 20', lines: [{ key: 'a', title: 'Call the plumber', state: 'open' as const, verbs: [{ label: 'Bring into this week', run: vi.fn(async () => true) }] }] },
-    parents: { word: 'September', goals: [] },
-    current: ['Return library books'], onAdd: vi.fn(async () => true),
-    place: [{ key: 'b', title: 'Return library books', days: [{ label: 'Wed 30', run: vi.fn(async () => true) }] }],
-  }
+describe('WeekV2 — Plan and Place them open the deck', () => {
+  beforeEach(() => { session.saved = null; session.loading = false; session.error = null; review.finish.mockClear() })
 
-  it('sits beside Review on the left, opens in place of the canvas, and marks the week planned', async () => {
-    session.save.mockResolvedValue(true)
-    renderWeek({ canvas: <p>The days</p>, reviewLines: [], plan })
+  it('Plan this week opens the full deck in place of the canvas, with no mark in the bar', () => {
+    renderAt('/week', { deck: makeDeck() })
     fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
+    expect(screen.getByRole('region', { name: 'The deck' })).toBeTruthy()
+    // The full deck's intro facts.
+    expect(screen.getByText('done last week')).toBeTruthy()
     expect(screen.queryByText('The days')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Review this week' })).toBeNull()
-    expect(within(screen.getByRole('list', { name: 'Left from the week of Sep 20' })).getByText('Call the plumber')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '4. Give them a day' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'I’m happy with this week' }))
-    await vi.waitFor(() => expect(session.save).toHaveBeenCalledTimes(1))
-    expect(await screen.findByRole('button', { name: 'Pick something for today →' })).toBeTruthy()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Close planning' })[0])
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'I’m happy with this week' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Leave' }))
     expect(screen.getByText('The days')).toBeTruthy()
   })
 
-  it('a week that is over, or ends today, has no Plan', () => {
-    renderWeek({ isCurrent: false, weekStart: new Date(2026, 8, 20), reviewLines: [], plan })
-    expect(screen.queryByRole('button', { name: /^Plan the week of/ })).toBeNull()
-    vi.setSystemTime(new Date(2026, 9, 3, 12))
-    renderWeek({ reviewLines: [], plan })
+  it('a week the deck may not open on offers neither Review nor Plan, and ignores the URL', () => {
+    renderAt('/week?review=1', { deck: makeDeck({ available: false }) })
+    expect(screen.queryByRole('region', { name: 'The deck' })).toBeNull()
+    expect(screen.getByText('The days')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Plan this week' })).toBeNull()
+  })
+
+  it('a week that is over, or ends today, has no Plan', () => {
+    // A past week: the deck may not open there, so neither Plan nor Review.
+    renderAt('/week', { isCurrent: false, weekStart: new Date(2026, 8, 20), deck: makeDeck({ available: false }) })
+    expect(screen.queryByRole('button', { name: /^Plan the week of/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
+    cleanup()
+    vi.setSystemTime(new Date(2026, 9, 3, 12))
+    renderAt('/week', { deck: makeDeck() })
+    expect(screen.queryByRole('button', { name: 'Plan this week' })).toBeNull()
+  })
+
+  it('?place=1 opens the deck in place mode; finishing records no review and returns to the week', async () => {
+    const deck = makeDeck()
+    renderAt('/week?place=1', { deck })
+    expect(screen.getByRole('region', { name: 'The deck' })).toBeTruthy()
+    expect(screen.queryByText('done last week')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
+    expect(await screen.findByText('The days')).toBeTruthy()
+    expect(where().get('place')).toBeNull()
+    expect(deck.onFinish).not.toHaveBeenCalled()
+    expect(review.finish).not.toHaveBeenCalled()
   })
 })
