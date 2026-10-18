@@ -1,7 +1,7 @@
 # The Friday session: weekly review and plan, one card at a time
 
 **Date:** 2026-10-18
-**Status:** Draft for Scott's approval (builder-checked)
+**Status:** Approved by Scott 2026-10-18 (revision 2 governs where it conflicts with the original sections)
 **Author:** Scott + Claude (brainstorm, 2026-10-18)
 
 ## Revision 2 (2026-10-18, later): five steps, one deck, a default that drains
@@ -59,6 +59,26 @@ list. The Week page follows the same rules as the session:
 - **"No day yet" is a count, not a list:** "4 without a day · Place them" opens the
   deck with just those cards.
 - **The session ends on Close, then lands on Today**, not on the full week.
+- **Events never fold.** Anything with a time always shows. Only untimed tasks fold
+  into "+N more".
+- **The weekend gets more room.** Saturday and Sunday are wider columns. Weekdays
+  stay slim. This follows `weekStartsOn`: the first two days of the week.
+- **Narrow screens stack days**, today first, each day following the same rules.
+  Seven columns only where they fit (landscape iPad, desktop).
+- **Names only when it isn't yours:** an assignee shows when the item belongs to
+  someone other than the viewer (or to more than one person).
+
+**Build in stages, each usable on its own** (Scott approved 2026-10-18):
+1. **The Week page, the deck, and the drain default.** Calms the daily view even
+   without a Friday session. Includes restoring the stamp and the four-choice cards
+   with the week strip, and "N without a day · Place them".
+2. **The Friday session around it:** Start (family/solo/Quick), Talk, Wins, Close,
+   the scenery room, the shared-screen person toggle, the household session record,
+   and signing in on the wall.
+3. **Month, Season and Year as two screens** (carry forward or not, then the new
+   list with the level above beside it).
+4. **The priority mark** on tasks and events.
+
 
 **Meals and Money** are not steps. Dinners show in The week from the meal plan;
 the meal drop-in and Monarch remain separate pieces.
