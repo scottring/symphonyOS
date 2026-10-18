@@ -3,6 +3,7 @@ import { supabase as defaultSupabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
 import { showToast } from './useToast'
+import { markPageDataLoaded } from '@/lib/loadPriority'
 import { logger } from '@/lib/logger'
 import { findTaskById as lookupTaskById } from '@/lib/findTaskById'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCaptureMeta, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
@@ -486,6 +487,18 @@ async function loadTasks(
   if (tasksInFlight && tasksInFlight.userId === userId) return tasksInFlight.promise
 
   const request = (async (): Promise<Task[] | null> => {
+    // The records ride alongside, asked for at the same moment as the rows —
+    // they used to wait for the rows to arrive first, a second trip on every
+    // page's critical path (2026-10-18). A failure there degrades to the
+    // cached columns (legacy read path) rather than failing the whole load.
+    const records = Promise.all([
+      defaultSupabase.from('task_commitments').select('*'),
+      defaultSupabase.from('task_focus').select('*'),
+    ]).catch((e: unknown) => {
+      logger.warn('[useSupabaseTasks] records failed to load:', e instanceof Error ? e.message : String(e))
+      return null
+    })
+
     // RLS policies handle household sharing - no need to filter by user_id.
     const { data, error } = await defaultSupabase
       .from('tasks')
@@ -498,21 +511,15 @@ async function loadTasks(
       return null
     }
 
-    // The records ride alongside. A failure here degrades to the cached
-    // columns (legacy read path) rather than failing the whole load.
     let commitments: DbTaskCommitment[] | null = null
     let focus: DbTaskFocus[] | null = null
-    try {
-      const [cRes, fRes] = await Promise.all([
-        defaultSupabase.from('task_commitments').select('*'),
-        defaultSupabase.from('task_focus').select('*'),
-      ])
+    const recordsRes = await records
+    if (recordsRes) {
+      const [cRes, fRes] = recordsRes
       commitments = Array.isArray(cRes?.data) ? (cRes.data as DbTaskCommitment[]) : null
       focus = Array.isArray(fRes?.data) ? (fRes.data as DbTaskFocus[]) : null
       if (cRes?.error) logger.warn('[useSupabaseTasks] commitments failed to load:', cRes.error.message)
       if (fRes?.error) logger.warn('[useSupabaseTasks] focus failed to load:', fRes.error.message)
-    } catch (e) {
-      logger.warn('[useSupabaseTasks] records failed to load:', e instanceof Error ? e.message : String(e))
     }
 
     const rows = attachRecords(nestSubtasks((data as DbTask[]).map(dbTaskToTask)), commitments, focus)
@@ -525,6 +532,8 @@ async function loadTasks(
     return await request
   } finally {
     if (tasksInFlight?.promise === request) tasksInFlight = null
+    // The page's own list is in (or failed): the deferred reads may go.
+    markPageDataLoaded()
   }
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
+import { shareInFlight } from '@/lib/sharedRequest'
 
 interface HiddenCalendarEvent {
   id: string
@@ -30,13 +31,14 @@ export function useHiddenCalendarEvents() {
       const { data: { user } } = await getAuthUser()
       if (!user) { setLoading(false); return }
 
-      const { data, error } = await supabase
+      // Shared while in flight: the shell and the page each mount one.
+      const { data, error } = await shareInFlight(`hidden_calendar_events:${user.id}`, () => supabase
         .from('hidden_calendar_events')
         .select('id, google_event_base_id, event_title, calendar_id')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id))
 
       if (!error && data) {
-        setHiddenEvents(data)
+        setHiddenEvents([...data])
         setHiddenBaseIds(new Set(data.map(e => e.google_event_base_id)))
       }
       setLoading(false)

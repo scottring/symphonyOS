@@ -226,7 +226,7 @@ function ShellLayoutInner({ children }: Props) {
   const scopedTasks = useMemo(()=>tasks.filter(planPeopleLens(planningPeople,null).keep),[tasks,planningPeople]);
   const scopedGoals = useMemo(()=>goals.filter(planPeopleLens(planningPeople,null).keep),[goals,planningPeople]);
   // The count beside Inbox is the discussions waiting on you (2026-10-14).
-  const { waitingCount: discussionsUnread, rows: discussionRows } = useDiscussionInbox();
+  const { waitingCount: discussionsUnread, rows: discussionRows } = useDiscussionInbox({ defer: true });
   // The badge MUST mirror what the Inbox actually renders. It used to count
   // every inbox task regardless of the active domain layers, so an item in an
   // unchecked layer showed as "1 to triage" in the chrome while the Inbox —
