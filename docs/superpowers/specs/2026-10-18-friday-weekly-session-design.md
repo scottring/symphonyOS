@@ -4,6 +4,57 @@
 **Status:** Draft for Scott's approval (builder-checked)
 **Author:** Scott + Claude (brainstorm, 2026-10-18)
 
+## Revision 2 (2026-10-18, later): five steps, one deck, a default that drains
+
+Scott asked whether this design was "just adding new functionality on top of old
+without addressing the root cause." Partly, yes: each concern had become another
+step, and nothing decided what happens to things nobody touches, so the pile
+regrows weekly and every review gets longer (the GTD failure). **This revision
+supersedes the step list, Settle in, Inbox, Look back, From the month, No day yet,
+Meals, Money and the top 3 below where they conflict.** Everything else stands.
+
+**The session is five steps:** Talk (check-ins and saved topics on one screen,
+then topic cards) · Wins · **The deck** · The week · Close.
+
+**The deck** is one run of cards for everything without a home this week: tasks
+on this week with no day, last week's open commitments, and Inbox captures,
+closest first. Same card every time: what it serves (`For October · …`), title,
+one line of facts, and **Done · This week · Later · Let go**. This week opens the
+week strip; Later opens Next week, This month, Next month, This season, Someday,
+and Pick a date. Dealt in hands of 5. After each hand, "That's enough for this
+week" is primary.
+
+**The default that drains (the root-cause fix):**
+- When the deck is finished or stopped, last week's open commitments that weren't
+  dealt **go to Later on their own**. The Inbox keeps its undealt captures (it's
+  the Inbox). Nothing silently carries into the new week.
+- Anything carried or sitting in the Inbox **untouched for 3+ weeks moves to Later
+  before the session opens** and never gets a card. The deck's intro says so as one
+  fact ("4 older things, untouched for 3+ weeks, already went to Later · See them").
+- "Later" is the existing Someday list unless the builder finds a better existing
+  home. It must be recoverable and searchable, never deleted. The thresholds are
+  settings with these defaults.
+
+**The week:** the coming week as three cards (Saturday, Sunday, Monday to Friday),
+showing what was placed during the deck, who's on each item, clashes, and dinners
+from the meal plan. **One way to mark importance: the priority mark** (tap any item).
+The top 3 is dropped.
+
+**Close:** priorities, the weekend at a glance, wins, and "N things are in Later".
+
+**Meals and Money** are not steps. Dinners show in The week from the meal plan;
+the meal drop-in and Monarch remain separate pieces.
+
+**Month, Season and Year: two screens.** (1) **Carry forward or not:** one card
+per open line, with Done · To {next period} · Someday · Let go, and what each serves
+shown above the title. (2) **The new list:** a plain list to write, with the level
+above **beside it to look at, not to act on** (this repository's `CLAUDE.md`: "a
+month is a plain list written with its season beside it"). The tile screen ("From
+the month") is withdrawn for these horizons. In the Friday session, goals from the
+month appear only as the `For October · …` line on cards.
+
+Prototype: `friday-session-prototype-v15.html` (with a Month mode).
+
 ## Why
 
 Scott and Iris have a weekly planning ritual on paper
