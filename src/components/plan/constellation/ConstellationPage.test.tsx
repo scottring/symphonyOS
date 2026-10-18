@@ -17,8 +17,11 @@ vi.mock('@/contexts/AssistantLaunchContext',()=>({useAssistantLauncher:()=>launc
 vi.mock('@/shell/providers/SelectionProvider',()=>({useSelectionOptional:()=>selection}))
 // The page's own task list: a write that changes it (an optimistic order) redraws it, as the hook does.
 vi.mock('@/hooks/useSupabaseTasks',async()=>{const {useReducer}=await import('react');return{useSupabaseTasks:()=>{const [,redraw]=useReducer((n:number)=>n+1,0);api.redraw=redraw;return{tasks:api.tasks,loading:false,error:null,...api}}}})
-vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[],soleDomain:'personal'})}))
-vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
+// The area and people filters: pass-through, unless a test turns them on
+// (privacy), when the real rules run with the layers and people it names.
+const filters=vi.hoisted(()=>({on:false,layers:new Set<string>(),people:[] as string[]}))
+vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:filters.on?filters.layers:[],soleDomain:'personal'})}))
+vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[filters.on?filters.people:[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null,members:[{auth_user_id:'u2',name:'Iris'}]})}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'u1'}})}))
 const review=vi.hoisted(()=>({reviewed:null as any,prevReviewed:null as any,loading:false,prevLoading:false,mine:null as any,finish:vi.fn(async()=>true),seen:[] as string[]}))
@@ -33,8 +36,10 @@ vi.mock('@/hooks/usePeriodReview',()=>({usePeriodReview:(horizon:string,token:st
 // This file's committedTo stub says nothing about status; the review reads it from the fixture.
 vi.mock('@/lib/planning/periodReview',async(importOriginal)=>({...await importOriginal<any>(),taskReviewState:(t:any)=>t.completed?'done':t.carried?'moved':'open',movedOn:(t:any)=>t.carried&&!t.completed?{to:t.carriedTo}:null}))
 vi.mock('@/hooks/useHouseholdSeasons',()=>({useHouseholdSeasons:()=>({seasons:[{name:'Spring',month:3,day:1},{name:'Summer',month:6,day:1},{name:'Fall',month:9,day:1},{name:'Winter',month:12,day:1}]})}))
-vi.mock('@/lib/today/domainFilter',()=>({filterTasksForLayers:(t:any)=>t,matchesLayers:()=>true}))
-vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,scopeId:null})}))
+vi.mock('@/lib/today/domainFilter',async(importOriginal)=>{const real=await importOriginal<any>();return{...real,
+ filterTasksForLayers:(t:any,l:any)=>filters.on?real.filterTasksForLayers(t,l):t,matchesLayers:(c:any,l:any)=>filters.on?real.matchesLayers(c,l):true}})
+vi.mock('@/lib/planning/peopleLens',async(importOriginal)=>{const real=await importOriginal<any>();return{
+ planPeopleLens:(s:any,me:any)=>filters.on?real.planPeopleLens(s,me):{keep:()=>true,scopeId:null}}})
 vi.mock('../v2/AddArea',()=>({useAddArea:()=>({area:'personal',picker:null})}))
 vi.mock('@/lib/planning/periodPage',async(importOriginal)=>({...await importOriginal<any>(),selectPeriodTasks:(tasks:any[],level:string,start:Date)=>tasks.filter(t=>t.bucket===(level==='season'?'quarter':'month')&&(!t.monthStart||+t.monthStart===+start))}))
 vi.mock('@/lib/placement/model',async(importOriginal)=>({...await importOriginal<any>(),committedTo:(t:any)=>t.bucket==='week'?{}:undefined}))
@@ -77,7 +82,7 @@ const choose=(name:string)=>{menu();fireEvent.click(screen.getByRole(/^Show done
 const at=(d:Date)=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(d)}
 const REVIEWED={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
 beforeEach(()=>{
- vi.clearAllMocks();review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
+ vi.clearAllMocks();review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
  HTMLElement.prototype.scrollIntoView=vi.fn()
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
@@ -1079,6 +1084,53 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
   open('/year?view=constellation&start=2026-10-09&plan=1')
   fireEvent.click(screen.getByRole('button',{name:'Bring into 2026: Learn to sail'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenLastCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old',sortOrder:2000})))
+ })
+ it('privacy: with the area and people filters on, a private line from another area is not listed, counted, marked or reordered',async()=>{
+  // Family only, and Iris only.
+  filters.on=true;filters.layers=new Set(['family']);filters.people=['m-iris']
+  const iris={assignedTo:'m-iris'}
+  api.tasks=[
+   {id:'s',title:'Fall together',bucket:'quarter',context:'family',...iris},
+   {id:'sw',title:'Ship the release',bucket:'quarter',context:'work',...iris},
+   {id:'a',title:'Picnic',bucket:'month',context:'family',sortOrder:0,...iris},
+   {id:'b',title:'Leaf pile',bucket:'month',context:'family',sortOrder:0,...iris},
+   {id:'d',title:'Pumpkins',bucket:'month',context:'family',completed:true,...iris},
+   // Private: Work, under the family season goal, open and done.
+   {id:'w',title:'Board deck',bucket:'month',context:'work',sortOrder:0,sourceId:'s',...iris},
+   {id:'wd',title:'Quarterly numbers',bucket:'month',context:'work',completed:true,...iris},
+   // Family but someone else's: the people filter leaves it out too.
+   {id:'o',title:'Bob’s errand',bucket:'month',context:'family',sortOrder:0,sourceId:'s',assignedTo:'m-bob'},
+  ]
+  optimistic()
+  month()
+  expect(titles('October goals')).toEqual(['Picnic','Leaf pile'])
+  expect(screen.queryByText('Board deck')).toBeNull()
+  expect(screen.queryByText('Bob’s errand')).toBeNull()
+  // The counts are the lines shown.
+  expect(facts()).toBe('2 open · 1 done')
+  expect(screen.getByRole('button',{name:/1 done/})).toHaveTextContent(/^1 done · Pumpkins/)
+  // The side card: the private season goal is absent, and the family one is
+  // not marked "in October" by the hidden lines under it.
+  const side=within(screen.getByRole('complementary',{name:'Fall goals'}))
+  expect(side.getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Fall together'])
+  expect(side.queryByText('in October')).toBeNull()
+  // A drop that renumbers writes only the lines shown.
+  dragTo('Leaf pile','October goals',5)
+  await waitFor(()=>expect(api.updateTaskOrders).toHaveBeenCalled())
+  const written=api.updateTaskOrders.mock.calls.flatMap((c:any[])=>c[0].map((w:any)=>w.id))
+  expect(written.length).toBeGreaterThan(0)
+  expect(written.every((id:string)=>['a','b'].includes(id))).toBe(true)
+  // Year goals the same: a private Work goal is not listed or renumbered.
+  cleanup()
+  api.goals=[{id:'f1',name:'Family trips',year:2026,status:'active',context:'family',sortOrder:0,assignedToAll:['m-iris']},
+   {id:'f2',name:'Family dinners',year:2026,status:'active',context:'family',sortOrder:0,assignedToAll:['m-iris']},
+   {id:'wg',name:'Get promoted',year:2026,status:'active',context:'work',sortOrder:0,assignedToAll:['m-iris']}]
+  open()
+  expect(titles('2026 goals')).toEqual(['Family trips','Family dinners'])
+  expect(facts()).toBe('2 goals')
+  dragTo('Family dinners','2026 goals',5)
+  await waitFor(()=>expect(api.updateGoal).toHaveBeenCalled())
+  expect(api.updateGoal.mock.calls.map((c:any[])=>c[0]).every((id:string)=>id==='f1'||id==='f2')).toBe(true)
  })
  it('a row that drags still triages from its row, and a done line does not drag',async()=>{
   api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
