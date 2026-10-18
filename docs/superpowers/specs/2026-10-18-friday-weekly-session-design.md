@@ -161,6 +161,15 @@ map onto them.
 
 Above the stack: "N things got done," a single number.
 
+**Every verdict lands with the rubber stamp** (Scott, 2026-10-18), the ink seal
+with its words around the rim. Done stamps `done`, Carry and Change stamp
+`carried`, Let go stamps `dropped` (or `someday` if it went to Someday). The stamp
+thumps on, holds a moment, then the card slides away and the next rises. "Talked
+about it" in the Talk step stamps `done` the same way. The component was
+`src/components/plan/v2/Stamp.tsx`, removed from main in `3e86d655` (#220).
+Restore it from `3e86d655^`. Its styles (`.pv2-stamp`, `pv2-thump`, the four inks,
+the night-lighting rule, and reduced motion) are still in `src/index.css`.
+
 ### 5. Look ahead
 The coming week, starting on the week-start day.
 
