@@ -57,17 +57,10 @@ serve(async (req) => {
       readProviderEnv((n) => Deno.env.get(n)),
     )
 
-    // A permanently revoked grant: drop that account's row so the app shows
-    // "reconnect" for it rather than failing forever. Other accounts keep working.
-    for (const err of opened.errors) {
-      if (err.needsReconnect && err.connectionId) {
-        await supabaseAdmin
-          .from('calendar_connections')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('id', err.connectionId)
-      }
-    }
+    // A permanently revoked grant is reported, not deleted (2026-10-18). With
+    // several accounts the row carries which one was primary and its "Create
+    // events on" choice; reconnecting the same account refreshes that row in
+    // place, where deleting it handed both to another account.
 
     if (opened.calendars.length === 0 && opened.errors.length > 0) {
       const worst = opened.errors.find((e) => e.needsReconnect) ?? opened.errors[0]

@@ -20,7 +20,9 @@ Outlook events, and "Create events on" stays Google.
   events on" choice) go there. Edits to an existing event go through the
   account that can write its calendar (`writable_calendar_ids`, refreshed on
   every read; `_shared/calendar-providers/googleConnection.ts`). Mail goes
-  through an account that granted Gmail, primary first. Disconnecting the
+  through an account that granted Gmail (or an older row with unrecorded
+  scopes), primary first. A revoked account is kept and shown as needing
+  reconnection, so reconnecting it restores its row, primary role included. Disconnecting the
   primary hands the role to the oldest remaining account (a trigger).
 - Migration `20261018150000_calendar_connections_multi_account.sql`; checked
   against a disposable Postgres by `scripts/test-calendar-accounts-migration.mjs`.

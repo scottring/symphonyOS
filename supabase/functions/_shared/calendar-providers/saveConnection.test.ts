@@ -9,6 +9,7 @@ const googleFetch = vi.fn(async (input: string, init?: RequestInit) => {
   const auth = new Headers(init?.headers).get('Authorization') ?? ''
   if (String(input).includes('/users/me/calendarList')) {
     const email = auth.replace('Bearer ', '').replace(/-tok$/, '')
+    if (email === 'flaky') throw new TypeError('network down')
     if (email === 'dead') return new Response(JSON.stringify({ error: { message: 'Invalid Credentials' } }), { status: 401 })
     return new Response(JSON.stringify({ items: [{ id: email, accessRole: 'owner', primary: true }] }))
   }
@@ -88,6 +89,13 @@ describe('saveConnection', () => {
     await saveConnection(admin, input('me@work.com'), env, googleFetch as never)
     expect(updates).toEqual([{ id: 'legacy', values: { account_email: 'me@work.com' } }])
     expect(upserts[0].values).toMatchObject({ account_email: 'me@work.com', is_primary: true })
+  })
+
+  it('an only, unnamed row that cannot be read just now is left alone — never relabelled as the new account', async () => {
+    const { admin, updates, upserts } = fakeAdmin([stored('legacy', null, { access_token: 'flaky-tok', is_primary: true })])
+    await saveConnection(admin, input('me@work.com'), env, googleFetch as never)
+    expect(updates).toEqual([])
+    expect(upserts[0].values).toMatchObject({ account_email: 'me@work.com', is_primary: false })
   })
 
   it('refuses to store an account it cannot name', async () => {

@@ -477,11 +477,19 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         : await query.eq('id', target.connectionId)
       if (deleteError) throw deleteError
 
-      const remaining = accounts.filter((a) => !goneIds.has(a.id)).map((a) => ({ ...a }))
-      // Mirror the trigger: the oldest remaining account of that provider takes primary.
-      for (const provider of new Set(gone.filter((a) => a.isPrimary).map((a) => a.provider))) {
-        const next = remaining.find((a) => a.provider === provider)
-        if (next) next.isPrimary = true
+      let remaining = accounts.filter((a) => !goneIds.has(a.id))
+      // The database picks the next primary (oldest remaining, a trigger); read
+      // back what it chose, and that account's own "Create events on".
+      if (remaining.length > 0 && gone.some((a) => a.isPrimary)) {
+        const { data: rows, error: readError } = await (supabase
+          .from('calendar_connections')
+          .select('id, provider, calendar_id, account_email, is_primary, granted_scopes')
+          .eq('user_id', user.id) as unknown as PromiseLike<{ data: ConnectionRow[] | null; error: unknown }>)
+        if (!readError && rows) {
+          remaining = toCalendarAccounts(rows)
+          const primaryGoogle = remaining.find((a) => a.provider === 'google' && a.isPrimary)
+          setDefaultCalendarIdState(rows.find((r) => r.id === primaryGoogle?.id)?.calendar_id ?? null)
+        }
       }
       setAccounts(remaining)
       setReconnectAccountIds((prev) => prev.filter((id) => !goneIds.has(id)))

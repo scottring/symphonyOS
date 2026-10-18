@@ -13,7 +13,8 @@ const row = (id: string, extra: Partial<StoredConnection> = {}): StoredConnectio
   ...extra,
 })
 
-const personal = row('personal', { is_primary: true, writable_calendar_ids: ['me@gmail.com', 'family@group.calendar.google.com'] })
+const CALENDAR_ONLY = 'https://www.googleapis.com/auth/calendar.events'
+const personal = row('personal', { is_primary: true, granted_scopes: CALENDAR_ONLY, writable_calendar_ids: ['me@gmail.com', 'family@group.calendar.google.com'] })
 const work = row('work', { writable_calendar_ids: ['me@work.com'], granted_scopes: MAIL })
 
 describe('pickGoogleConnection', () => {
@@ -45,6 +46,15 @@ describe('pickGoogleConnection', () => {
 
   it('mail falls back to the primary when no account records its scopes (older rows)', () => {
     expect(pickGoogleConnection([row('a'), row('b', { is_primary: true })], { needs: 'mail' })!.id).toBe('b')
+  })
+
+  it('an older primary that may hold mail keeps it when a second account with mail is added', () => {
+    const older = row('older', { is_primary: true, granted_scopes: null })
+    expect(pickGoogleConnection([work, older], { needs: 'mail' })).toBe(older)
+  })
+
+  it('mail with no account that has it still answers with the primary (the function then reports the refusal)', () => {
+    expect(pickGoogleConnection([personal, row('w2', { granted_scopes: CALENDAR_ONLY })], { needs: 'mail' })).toBe(personal)
   })
 
   it('an explicitly named account wins', () => {

@@ -10,8 +10,8 @@
  * that same account would add a duplicate instead of refreshing it.
  */
 import { fetchGoogleCalendars, googleAccountEmail } from './google.ts'
-import { fetchGraphAccountEmail } from './microsoft.ts'
-import { ensureFreshAccessToken, updateConnection, type ProviderEnv } from './tokens.ts'
+import { fetchGraphAccountEmail, GRAPH_BASE } from './microsoft.ts'
+import { ensureFreshAccessToken, TokenRefreshError, updateConnection, type ProviderEnv } from './tokens.ts'
 import { CONNECTION_COLUMNS, type CalendarConnectionRow, type CalendarProvider } from './types.ts'
 
 /** The account a token signs in as, or null when the provider will not say. */
@@ -26,6 +26,33 @@ export async function accountEmailFor(provider: CalendarProvider, accessToken: s
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SaveAdmin = { from(table: string): any }
+
+/** Name a row made before multi-account. `refused`: the provider rejected its
+ *  grant or token, so it is dead rather than unreadable for the moment. */
+async function nameOlderRow(
+  admin: SaveAdmin,
+  row: CalendarConnectionRow,
+  env: ProviderEnv,
+  fetchImpl: typeof fetch,
+): Promise<{ email: string | null; refused: boolean }> {
+  let token: string
+  try {
+    token = await ensureFreshAccessToken(admin, row, env, fetchImpl)
+  } catch (err) {
+    console.error(`Could not refresh an older ${row.provider} connection:`, err instanceof Error ? err.message : err)
+    return { email: null, refused: err instanceof TokenRefreshError && err.shouldDisconnect }
+  }
+  const probe = row.provider === 'microsoft'
+    ? `${GRAPH_BASE}/me?$select=mail`
+    : 'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1'
+  try {
+    const res = await fetchImpl(probe, { headers: { Authorization: `Bearer ${token}` } })
+    if (res.status === 401) return { email: null, refused: true }
+  } catch {
+    return { email: null, refused: false }
+  }
+  return { email: await accountEmailFor(row.provider, token, fetchImpl), refused: false }
+}
 
 export interface SaveInput {
   userId: string
@@ -56,16 +83,12 @@ export async function saveConnection(
   const existing = (data ?? []) as CalendarConnectionRow[]
 
   for (const row of existing.filter((r) => !r.account_email && r.id)) {
-    let email: string | null = null
-    try {
-      const token = await ensureFreshAccessToken(admin, row, env, fetchImpl)
-      email = await accountEmailFor(row.provider, token, fetchImpl)
-    } catch (err) {
-      console.error(`Could not name an older ${row.provider} connection:`, err instanceof Error ? err.message : err)
-    }
-    // A dead token cannot be named. As the only account it is the one this
-    // sign-in replaces — what reconnecting always did before multi-account.
-    if (!email && existing.length === 1) email = accountEmail
+    const named = await nameOlderRow(admin, row, env, fetchImpl)
+    // A token the provider refuses outright cannot be named. As the only
+    // account it is the one this sign-in replaces — what reconnecting always
+    // did before multi-account. A row that merely could not be read right now
+    // (network, a 5xx) is left alone: guessing would overwrite another account.
+    const email = named.email ?? (named.refused && existing.length === 1 ? accountEmail : null)
     if (email) {
       await updateConnection(admin, row, { account_email: email })
       row.account_email = email

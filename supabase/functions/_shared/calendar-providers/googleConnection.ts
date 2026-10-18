@@ -36,8 +36,9 @@ export function pickGoogleConnection<T extends CalendarConnectionRow>(rows: T[],
   }
   if (opts.needs === 'mail') {
     // Rows from before 2026-10-15 record no scopes (null) and may well hold
-    // mail, so with no account that says it granted mail, the primary is tried.
-    return ordered.find((r) => grantsMail(r.granted_scopes)) ?? ordered[0]
+    // mail: they count, so adding a second account never moves mail off an
+    // older primary that was already reading it.
+    return ordered.find((r) => grantsMail(r.granted_scopes) || r.granted_scopes == null) ?? ordered[0]
   }
   if (opts.calendarId && opts.calendarId !== 'primary') {
     const owner = ordered.find((r) => (r.writable_calendar_ids ?? []).includes(opts.calendarId!))
