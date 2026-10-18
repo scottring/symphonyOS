@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
@@ -72,11 +72,14 @@ import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
 import { DayWeather } from './WeekJournal'
-import { committedTo, liveCommitments } from '@/lib/placement/model'
-import { bootstrapCommitments } from '@/lib/placement/intentions'
-import { dayNote, taskReviewState, weekPhrase, weekReviewState, weekRoutineOccurrences } from '@/lib/planning/periodReview'
-import type { ReviewLine, ReviewVerb } from '@/components/plan/review/PeriodReview'
-import type { WeekPlanData } from '@/components/plan/v2/WeekV2'
+import { committedTo } from '@/lib/placement/model'
+import { weekReviewState } from '@/lib/planning/periodReview'
+import type { WeekDeck } from '@/components/plan/v2/WeekV2'
+import { buildDeck, deckModeOf } from '@/lib/planning/deck'
+import { staleForDrain, undealtLastWeek } from '@/lib/planning/drain'
+import { filterTasksForLayers } from '@/lib/today/domainFilter'
+import type { StripDay } from '@/components/plan/deck/WeekStrip'
+import { useDeckActions } from './useDeckActions'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
@@ -474,7 +477,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // second toggle would read a stale snapshot — HomeView's rule). A routine
   // ticks its OCCURRENCE — that day's instance — so Today, the pin and this
   // page show the same completion.
-  const { markDone, undoDone, skip, setPlanned, reschedule: rescheduleInstance, undoReschedule } = useActionableInstances()
+  const { markDone, undoDone, setPlanned, reschedule: rescheduleInstance, undoReschedule } = useActionableInstances()
   const handleJournalToggle = useCallback((entry: JournalEntry, day: JournalDay) => {
     if (entry.task) {
       const task = entry.task
@@ -905,108 +908,89 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // A past week is a look-back, not a plan.
   const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
 
-  // The review by hand (PeriodReview, Scott 2026-10-17): every task on this
-  // week — committed to it or given a day in it — under the page's people
-  // lens, with the Month page's verbs. Moving a task with a day takes the day
-  // off first (it would otherwise stay on this week's day); Remove is the
-  // week's own "not this week" (timingRemoval). Undo puts back the day and
-  // the commitments as they were.
-  // Named by dates, each line with its day, so it is plain which week is
-  // which (Scott, 2026-10-17).
-  const reviewWeekWord = weekPhrase(weekAnchor)
-  const nextWeekStart = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7)
-  const nextWeekWord = weekPhrase(nextWeekStart)
-  const reviewVerbs = (t: Task): ReviewVerb[] => {
-    const before = liveCommitments({ commitments: bootstrapCommitments(t) })
-    const offDay = timingRemoval(t, 'day'), offWeek = timingRemoval(t, 'all')
-    const restore = async () => (await updateTask(t.id, { ...offDay.previous, commitments: before })) !== false
-    const toggle = async () => (await toggleTask(t.id)) !== false
-    const clearDay = async () => !t.scheduledFor || (await updateTask(t.id, offDay.updates)) !== false
-    return [
-      { label: 'Done', run: () => activity.run(`Done: “${t.title}”`, toggle, { ids: [t.id], undo: toggle }) },
-      { label: `Move to ${nextWeekWord}`, run: () => activity.run(`Move “${t.title}” to ${nextWeekWord}`, async () => await clearDay() && !!await keepForward(t.id, { weekStart: nextWeekStart }, weekAnchor), { ids: [t.id], undo: restore }) },
-      { label: 'Someday', run: () => activity.run(`${describeTriageWhen('someday')}: “${t.title}”`, async () => await clearDay() && applyTriageWhen('someday', t.id, {
-        onPushTask: gated.pushTask, onSetBucket: gated.setBucket ?? ((id, bucket) => onUpdateTask(id, { bucket })),
-      }), { ids: [t.id] }) },
-      { label: `Remove from ${reviewWeekWord}`, run: () => activity.run(`Remove “${t.title}” from ${reviewWeekWord}`, async () => (await updateTask(t.id, offWeek.updates)) !== false, { ids: [t.id], undo: async () => (await updateTask(t.id, offWeek.previous)) !== false }) },
-    ]
-  }
-  const taskReviewLines: ReviewLine[] = tasks.filter((t) => !t.isGoal).filter(lens.keep).flatMap((t) => {
-    const state = weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent })
-    return state ? [{ key: t.id, title: t.title, note: dayNote(t.scheduledFor, !!t.scheduledFor && t.isAllDay === false), state, verbs: state === 'open' ? reviewVerbs(t) : [] }] : []
-  })
-  // Routines that don't run every day (or every weekday) are reviewed too, one
-  // line per occurrence so far: Done or Skip, as the day's row offers them.
-  const routineReviewLines: ReviewLine[] = weekRoutineOccurrences(journalDays, weekInstances, { includeDaily: dailyShown, todayKey: localYmd(new Date()) }).map((o) => {
-    const name = `${o.title} (${o.date.toLocaleDateString('en-US', { weekday: 'short' })})`
-    return {
-      key: `routine:${o.routineId}:${o.dayKey}`, title: o.title, note: `Routine · ${dayNote(o.date)}`, state: o.state,
-      verbs: o.state !== 'open' ? [] : [
-        { label: 'Done', run: () => activity.run(`Done: “${name}”`, () => markDone('routine', o.routineId, o.date), { ids: [o.routineId], undo: () => undoDone('routine', o.routineId, o.date) }) },
-        { label: 'Skip', run: () => activity.run(`Skip “${name}”`, () => skip('routine', o.routineId, o.date), { ids: [o.routineId], undo: () => undoDone('routine', o.routineId, o.date) }) },
-      ],
+  // ── The deck (Friday session, Stage 1) ────────────────────────────────
+  // Review and Plan (?review=1, ?plan=1) open the full deck; "Place them"
+  // (?place=1) only this week's cards. Everything it deals, counts and drains
+  // comes from the page's own scoped list: the layers (domain filter) and the
+  // people lens, never the unfiltered tasks — a private Work task never
+  // reaches a Family view, as a card or as a count.
+  const [params] = useSearchParams()
+  const deckMode = deckModeOf(params)
+  const tasksLoaded = (sources?.tasks ?? 'ready') === 'ready'
+  const lastWeekStart = useMemo(() => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() - 7), [weekAnchor])
+  const nextWeekStart = useMemo(() => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7), [weekAnchor])
+  const layerTasks = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
+  const scopedTasks = useMemo(() => layerTasks.filter((t) => !t.isGoal).filter(lens.keep), [layerTasks, lens])
+  const deckActions = useDeckActions({ toggleTask, updateTask, onUpdateTask, keepForward, gated, weekAnchor, lastWeekStart, nextWeekStart })
+  // What each card serves, one level up: "For October · {goal title}".
+  const servesOf = useCallback((t: Task) => {
+    const parentId = t.goalTaskId ?? t.sourceId
+    // Looked up within the layers too: a goal the view hides is never named.
+    const parent = parentId ? layerTasks.find((p) => p.id === parentId) : undefined
+    if (!parent || parent.bucket !== 'month') return undefined
+    const month = (parent.monthStart ?? monthStartOf(new Date())).toLocaleDateString('en-US', { month: 'long' })
+    return `For ${month} · ${parent.title}`
+  }, [layerTasks])
+  const deckCards = useMemo(() => buildDeck({
+    tasks: scopedTasks, weekStart: weekAnchor, lastWeekStart, isCurrent: weekIsCurrent, servesOf,
+    only: deckMode === 'place' ? 'this-week' : undefined,
+  }), [scopedTasks, weekAnchor, lastWeekStart, weekIsCurrent, servesOf, deckMode])
+  const doneLastWeek = useMemo(
+    () => scopedTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) === 'done').length,
+    [scopedTasks, lastWeekStart],
+  )
+  // The drain runs as the full deck opens, once per mount (the ref), and only
+  // once the tasks are in. It is idempotent across mounts: what it moves
+  // leaves the Inbox and the week, so the next opening finds nothing.
+  const [aged, setAged] = useState(0)
+  const drained = useRef(false)
+  useEffect(() => {
+    if (deckMode !== 'full' || !tasksLoaded || drained.current || !planV2Enabled()) return
+    drained.current = true
+    const stale = staleForDrain(scopedTasks, new Date())
+    setAged(stale.length)
+    if (stale.length > 0) void deckActions.drain(stale)
+  }, [deckMode, tasksLoaded, scopedTasks, deckActions])
+  // The strip inside a card's "This week": the week's seven days from its own
+  // start (weekStartsOn), each with what is already there — the day's timed
+  // events and tasks by time, three at most, the rest counted.
+  const stripDays = useMemo<StripDay[]>(() => Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + i)
+    const key = localYmd(date)
+    const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()
+    const items: { at: number; title: string }[] = []
+    for (const ev of events) {
+      if (isAllDayEvent(ev)) continue
+      const startStr = (ev as { start_time?: string }).start_time ?? (ev as { startTime?: string }).startTime
+      const start = startStr ? new Date(startStr) : null
+      if (start && !Number.isNaN(start.getTime()) && localYmd(start) === key) items.push({ at: start.getTime(), title: ev.title })
     }
-  })
-  const weekReviewLines = [...taskReviewLines, ...routineReviewLines]
-
-  // Planning by hand (PeriodPlan, Scott 2026-10-17): what last week left open
-  // (bring it in, Someday, let it go), the month's goals with what this week
-  // does for each, anything else, and a day for each task without one. The
-  // same writes as the canvas and the review, each with its Undo.
-  const lastWeekStart = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() - 7)
-  const addToWeek = (title: string, goal?: Task): Promise<boolean> => {
-    const id = crypto.randomUUID()
-    return activity.run(`Add “${title}”${goal ? ` for “${goal.title}”` : ''}`, async () => !!await addTask(title, undefined, undefined, undefined, {
-      id, bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined, goalTaskId: goal?.id, context: goal?.context ?? undefined,
-    }), { ids: [id], undo: async () => { await deleteTask(id) } })
+    for (const t of scopedTasks) {
+      if (t.completed || !t.scheduledFor || localYmd(t.scheduledFor) !== key) continue
+      // A task with no time sits after the day's timed things.
+      items.push({ at: t.isAllDay === false ? t.scheduledFor.getTime() : endOfDay, title: t.title })
+    }
+    items.sort((a, b) => a.at - b.at)
+    return {
+      key, date,
+      label: `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${date.getDate()}`,
+      isWeekend: date.getDay() === 0 || date.getDay() === 6,
+      lines: items.slice(0, 3).map((it) => it.title),
+      more: Math.max(0, items.length - 3),
+    }
+  }), [weekAnchor, events, scopedTasks])
+  const deck: WeekDeck = {
+    cards: deckCards, doneLastWeek, aged, actions: deckActions, stripDays,
+    loading: !tasksLoaded,
+    // One run, one Undo: last week's undealt cards go to Later together.
+    // "Place them" deals no last-week cards, so it never drains.
+    onFinish: (decided) => {
+      if (deckMode !== 'full') return
+      const left = undealtLastWeek(deckCards, decided)
+      return left.length > 0 ? deckActions.drain(left) : undefined
+    },
+    onSeeAged: () => navigate('/someday'),
   }
-  const planCarry: ReviewLine[] = tasks.filter((t) => !t.isGoal).filter(lens.keep).flatMap((t): ReviewLine[] => {
-    if (weekReviewState(t, lastWeekStart, { isCurrent: false }) !== 'open') return []
-    const before = liveCommitments({ commitments: bootstrapCommitments(t) })
-    const offDay = timingRemoval(t, 'day'), offWeek = timingRemoval(t, 'all')
-    const restore = async () => (await updateTask(t.id, { ...offDay.previous, commitments: before })) !== false
-    const toggle = async () => (await toggleTask(t.id)) !== false
-    // Its old day was last week's: it comes in with no day yet, to be given one below.
-    const clearDay = async () => !t.scheduledFor || (await updateTask(t.id, offDay.updates)) !== false
-    return [{ key: t.id, title: t.title, note: dayNote(t.scheduledFor, !!t.scheduledFor && t.isAllDay === false), state: 'open', verbs: [
-      { label: `Bring into ${reviewWeekWord}`, run: () => activity.run(`Bring “${t.title}” into ${reviewWeekWord}`, async () => await clearDay() && !!await keepForward(t.id, { weekStart: weekAnchor }, lastWeekStart), { ids: [t.id], undo: restore }) },
-      { label: 'Done', run: () => activity.run(`Done: “${t.title}”`, toggle, { ids: [t.id], undo: toggle }) },
-      { label: 'Someday', run: () => activity.run(`${describeTriageWhen('someday')}: “${t.title}”`, async () => await clearDay() && applyTriageWhen('someday', t.id, {
-        onPushTask: gated.pushTask, onSetBucket: gated.setBucket ?? ((id, bucket) => onUpdateTask(id, { bucket })),
-      }), { ids: [t.id] }) },
-      { label: 'Let go', run: () => activity.run(`Let go of “${t.title}”`, async () => (await updateTask(t.id, offWeek.updates)) !== false, { ids: [t.id], undo: async () => (await updateTask(t.id, offWeek.previous)) !== false }) },
-    ] }]
-  })
-  const weekOpen = tasks.filter((t) => !t.isGoal).filter(lens.keep).filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) === 'open')
-  // The month this week mostly lives in, as the week's add box reads it.
-  const planMonth = monthStartOf(new Date(weekAnchor.getTime() + 3 * 86_400_000))
-  const planMonthCurrent = weekIsCurrent && localYmd(planMonth) === localYmd(monthStartOf(new Date()))
-  const planParents = selectPeriodTasks(tasks, 'month', planMonth, planMonthCurrent, meId, readSeasons())
-    .filter((g) => taskReviewState(g, 'month', planMonth, { isCurrent: planMonthCurrent, seasons: readSeasons() }) === 'open')
-    .map((g) => ({
-      key: g.id, title: g.title,
-      children: weekOpen.filter((t) => t.sourceId === g.id || t.goalTaskId === g.id).map((t) => t.title),
-      onAdd: (title: string) => addToWeek(title, g),
-    }))
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-  const planDays = Array.from({ length: 7 }, (_, i) => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + i)).filter((d) => d >= todayStart)
-  const weekPlan: WeekPlanData = {
-    carry: { fromWord: weekPhrase(lastWeekStart), lines: planCarry },
-    parents: { word: planMonth.toLocaleDateString('en-US', { month: 'long' }), goals: planParents },
-    current: weekOpen.map((t) => t.title),
-    onAdd: (title) => addToWeek(title),
-    place: weekOpen.filter((t) => !t.scheduledFor).map((t) => ({
-      key: t.id, title: t.title,
-      days: planDays.map((d) => {
-        const label = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })
-        const patch = lineDropUpdates(t, { kind: 'day', at: d })
-        const before = Object.fromEntries(Object.keys(patch).map((k) => [k, t[k as keyof Task]])) as Partial<Task>
-        return { label, run: () => activity.run(`Give “${t.title}” ${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
-          async () => (await onUpdateTask(t.id, patch)) !== false, { ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) } }) }
-      }),
-    })),
-  }
-
 
   return (
     <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast}>
@@ -1028,7 +1012,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             never by dragging from it. On a narrow screen the list sits above
             the stacked days instead. */}
         {narrow && planV2Enabled() ? (
-          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} reviewLines={weekReviewLines} plan={weekPlan} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} deck={deck} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
             {weekListFor()}
@@ -1042,7 +1026,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {planV2Enabled() ? (
           // v2 (docs/planning/2026-09-28-planning-v2.md): the same journal and
           // list, laid out as the prototype's day column + "Any day this week".
-          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} reviewLines={weekReviewLines} plan={weekPlan} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} deck={deck} />
         ) : (
           <>
             {weekListFor()}

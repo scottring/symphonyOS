@@ -17,6 +17,15 @@ export interface DeckCard {
 
 export const HAND_SIZE = 5
 
+export type DeckMode = 'full' | 'place'
+
+/** Which deck the Week's URL asks for: Review and Plan (?review=1, ?plan=1)
+ *  open the full deck, "Place them" (?place=1) only this week's cards. */
+export function deckModeOf(params: URLSearchParams): DeckMode | null {
+  if (params.get('review') === '1' || params.get('plan') === '1') return 'full'
+  return params.get('place') === '1' ? 'place' : null
+}
+
 /** How many weeks a task has been carried on (week commitments marked carried). */
 export function carriedWeeks(task: Task): number {
   return (task.commitments ?? []).filter((c) => c.level === 'week' && c.status === 'carried').length
