@@ -61,6 +61,8 @@ export interface Rung {
   /** Where the rhythm stands: the period before reviewed, this one planned
    *  (cadenceChecklist.ts). Not on Today; absent when the read failed. */
   steps?: ChecklistRow
+  /** How far through the period today is ("Day 18 of 31"). Not on Today. */
+  through?: { day: number; days: number }
 }
 
 export interface TodayRow { id: string; title: string; start: Date; end: Date; done: boolean; kind: 'event' | 'routine' | 'task' }
@@ -257,25 +259,31 @@ export function useHomeBearings(now: Date): HomeBearings {
   const weekNo = weekOfYear(today, wso)
   const lines = (n: number) => count(n, 'line')
   const words = numberWord
+  const through = (start: Date, end: Date) => ({
+    day: Math.round((today.getTime() - start.getTime()) / DAY) + 1,
+    days: Math.round((end.getTime() - start.getTime()) / DAY),
+  })
+  const year = periodBounds('year', today, seasons)
   const rungs: Rung[] = [
     {
-      level: 'year', name: String(today.getFullYear()), to: '/year', attention: false, steps: checklist.rows?.year,
+      level: 'year', name: String(today.getFullYear()), to: '/year', attention: false, steps: checklist.rows?.year, through: through(year.start, year.end),
       status: yearGoals.length ? `Reference · ${words(yearGoals.length)} ${yearGoals.length === 1 ? 'goal' : 'goals'}` : 'Nothing written yet',
       sample: yearGoals[0]?.name ?? null,
     },
     {
-      level: 'season', name: seasonFacts.name, to: '/season', attention: false, steps: checklist.rows?.season,
+      level: 'season', name: seasonFacts.name, to: '/season', attention: false, steps: checklist.rows?.season, through: through(season.start, season.end),
       status: seasonFacts.open ? `Brainstorm · ${lines(seasonFacts.open)}` : 'Nothing yet — a season can stay unwritten',
       sample: firstOpen(seasonFacts.lines),
     },
     {
-      level: 'month', name: monthFacts.name, to: '/month', attention: false, steps: checklist.rows?.month,
+      level: 'month', name: monthFacts.name, to: '/month', attention: false, steps: checklist.rows?.month, through: through(month.start, month.end),
       // Planned or not is the checklist's to say, under the name.
       status: monthFacts.open ? capital(lines(monthFacts.open)) : 'Nothing yet',
       sample: firstOpen(monthFacts.lines),
     },
     {
       level: 'week', name: `Week ${weekNo}`, to: '/week', attention: !facts.week.planned && facts.weekDaysLeft >= 3, steps: checklist.rows?.week,
+      through: through(weekStart, new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)),
       // Counts only the week's lines without a day, so with none it says
       // nothing rather than "Nothing yet" over a full week.
       status: facts.week.open ? `${capital(words(facts.week.open))} with no day yet` : '',

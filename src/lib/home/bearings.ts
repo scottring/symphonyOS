@@ -3,8 +3,9 @@
 // Home (/overview) is the page you come back to for your bearings (Scott,
 // 2026-10-11): what is happening today, what is waiting on you, where you are
 // in the plan, and ONE suggested next step. Everything here is plain words
-// read from facts the page has already filtered by area and people — no
-// scoreboards, so small numbers are written out and nothing is a tally.
+// read from facts the page has already filtered by area and people. Small
+// numbers in sentences are written out; the glance tiles (2026-10-18) show
+// the same facts as figures.
 
 import { ALL_LAYERS, LAYER_LABELS, type Layer } from '@/lib/domains'
 import { deckWeekUrl } from '@/lib/planning/deck'
@@ -150,7 +151,7 @@ export function chooseNextStep(f: BearingsFacts, setAside: ReadonlySet<NextStepI
 export interface TimedItem { title: string; start: Date; end: Date }
 
 /** "10:30", "2:00" — Today's own clock, no AM/PM. */
-const clock = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?(AM|PM)$/i, '')
+export const clock = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?(AM|PM)$/i, '')
 
 /** "in 20 minutes", "in an hour and a half", "in 3 hours". */
 export function inTime(from: Date, to: Date): string {
