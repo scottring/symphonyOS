@@ -58,6 +58,7 @@ import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import { WeekV2 } from '@/components/plan/v2/WeekV2'
 import { useWeather } from '@/hooks/useWeather'
+import { useWeekViewPrefs } from '@/hooks/useWeekViewPrefs'
 import { planV2Enabled, lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -161,9 +162,6 @@ interface WeekViewV2Props {
   /** From HomeView's useUndo. Called after successful mutations to surface an undo toast. */
   pushAction?: (message: string, undo: () => void) => void
 }
-
-/** The week's every-day routines: in each day ('shown') or once above. */
-const DAILY_KEY = 'symphony-week-daily'
 
 const weekIsCurrentFor = (anchor: Date) => sameDay(anchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
 
@@ -764,12 +762,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const routinesToPlace = useMemo(() => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }, { weekStart: weekAnchor, instances: weekInstances })
     .map((r) => ({ id: r.id, title: r.name })), [routines, selectedAssignees, layers, weekAnchor, weekInstances])
   // Every-day routines: written once above the days (default), or in each
-  // day — the page's remembered choice (the week's hide-daily preference).
-  const [dailyShown, setDailyShown] = useState(() => { try { return localStorage.getItem(DAILY_KEY) === 'shown' } catch { return false } })
-  const toggleDaily = useCallback(() => setDailyShown((was) => {
-    try { localStorage.setItem(DAILY_KEY, was ? 'hidden' : 'shown') } catch { /* this visit only */ }
-    return !was
-  }), [])
+  // day — the page's remembered choice (useWeekViewPrefs, 'symphony-week-daily').
+  const { dailyInDays: dailyShown, set: setWeekPref } = useWeekViewPrefs()
+  const toggleDaily = useCallback(() => setWeekPref('dailyInDays', !dailyShown), [setWeekPref, dailyShown])
   const canvasDays = useMemo(() => {
     const onShelf = new Set(shelf.flatMap((g) => g.rows.map((r) => r.task.id)))
     // Repeated tasks too ("Pick up from FFG" each weekday): written once above.

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import type { Task } from '@/types/task'
 import { WeekCanvas, type CanvasDay, type WeekCanvasWriters } from './WeekCanvas'
 import { buildShelf, type ShelfGroup } from './weekShelf'
+import { WEEK_PREF_KEYS } from '@/hooks/useWeekViewPrefs'
 
 // The week composition (2026-10-10, calendar first 2026-10-12): seven equal
 // days are the page; work with no day sits in one quiet "No day yet" line
@@ -62,7 +63,7 @@ const dt = () => {
 }
 
 beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 3, 9)) })
-afterEach(() => { vi.useRealTimers() })
+afterEach(() => { vi.useRealTimers(); for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.removeItem(k) })
 
 describe('weekShelf', () => {
   it('leaves placed work on its day, names the milestone once, offers empty milestones, and puts Unlinked last', () => {
@@ -154,11 +155,12 @@ describe('WeekCanvas — the days', () => {
     expect(w.open).toHaveBeenCalled()
   })
 
-  it('one “Show done” reveals done work in the days', () => {
+  it('one “Show done” reveals done work in the days, and is remembered', () => {
     show()
     expect(screen.queryByText('Old receipt')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Show done' }))
     expect(screen.getByText('Old receipt')).toBeInTheDocument()
+    expect(localStorage.getItem(WEEK_PREF_KEYS.done)).toBe('shown')
   })
 })
 
@@ -237,7 +239,14 @@ describe('WeekCanvas — restored functions', () => {
   // 2026-10-13 review: a month goal with nothing this week is a planning
   // decision, not the tray's. It shows only while a task is dragged, so the
   // task can still go under it.
-  it('each day wears its forecast, small, in its header', () => {
+  // Calm pass 2: weather is off until turned on (⋯), remembered per device.
+  it('weather is hidden by default', () => {
+    show()
+    expect(within(screen.getByTestId('journal-day-2026-10-03')).queryByRole('img', { name: /Sunny, high 64°/ })).toBeNull()
+  })
+
+  it('turned on, each day wears its forecast, small, in its header', () => {
+    localStorage.setItem(WEEK_PREF_KEYS.weather, 'shown')
     show()
     expect(within(screen.getByTestId('journal-day-2026-10-03')).getByRole('img', { name: /Sunny, high 64°/ })).toBeInTheDocument()
   })
@@ -337,7 +346,16 @@ describe('WeekCanvas — calendar first', () => {
     expect(within(row).getByText('IR')).toBeInTheDocument()
   })
 
-  it('names each day’s free time at its foot', () => {
+  // Calm pass 2: free time is off until turned on (⋯), remembered per device.
+  it('free time is hidden by default', () => {
+    const d = days()
+    d[2] = { ...d[2], free: 'Calendar clear 10a–9p' }
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
+    expect(screen.queryByText(/Calendar clear/)).toBeNull()
+  })
+
+  it('turned on, names each day’s free time at its foot', () => {
+    localStorage.setItem(WEEK_PREF_KEYS.freeTime, 'shown')
     const d = days()
     d[2] = { ...d[2], free: 'Calendar clear 10a–9p' }
     render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
@@ -506,25 +524,36 @@ describe('No day yet (phone)', () => {
   })
 })
 
-// Friday session, Stage 1: the page must never look endless. A day shows a
-// few things; a time is never folded away; your own name isn't news; the
-// weekend gets more room.
+// Friday session, Stage 1: the page must never look endless; calm pass 2: a
+// day shows its calendar events and at most two other things, timed or not.
+// Your own name isn't news; the weekend gets more room.
 describe('WeekCanvas — a few things a day', () => {
   const untimed = (n: number) => Array.from({ length: n }, (_, i) => {
     const t = task({ id: `u${i}`, title: `Errand ${i + 1}` })
     return { id: `task-u${i}`, kind: 'task' as const, title: t.title, completed: false, task: t }
   })
 
-  it('a day with 7 untimed tasks shows 4 and "+3 more"; asked, all 7 and "Show less"', () => {
+  it('a day with 7 untimed tasks shows 2 and "+5 more"; asked, all 7 and "Show less"', () => {
     const d = days()
     d[3] = { ...d[3], items: untimed(7) }
     render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} />)
     const day = screen.getByTestId('journal-day-2026-10-06')
-    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(4)
-    fireEvent.click(within(day).getByRole('button', { name: '+3 more' }))
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
+    fireEvent.click(within(day).getByRole('button', { name: '+5 more' }))
     expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(7)
     fireEvent.click(within(day).getByRole('button', { name: 'Show less' }))
-    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(4)
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
+  })
+
+  it('a day with 2 events and 5 tasks shows both events, 2 tasks and "+3 more"', () => {
+    const d = days()
+    const ev = (i: number) => ({ id: `event-y${i}`, kind: 'event' as const, title: `Appointment ${i + 1}`, time: new Date(2026, 9, 6, 9 + i), completed: false })
+    d[3] = { ...d[3], events: [ev(0), ev(1)], items: untimed(5) }
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} />)
+    const day = screen.getByTestId('journal-day-2026-10-06')
+    expect(within(day).getAllByText(/^Appointment \d$/)).toHaveLength(2)
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
+    expect(within(day).getByRole('button', { name: '+3 more' })).toBeInTheDocument()
   })
 
   it('a timed event is never folded', () => {
@@ -534,19 +563,20 @@ describe('WeekCanvas — a few things a day', () => {
     render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} />)
     const day = screen.getByTestId('journal-day-2026-10-06')
     expect(within(day).getAllByText(/^Meeting \d$/)).toHaveLength(5)
-    // Two task slots are kept beside a full calendar.
+    // Two things beside a full calendar.
     expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
     expect(within(day).getByRole('button', { name: '+1 more' })).toBeInTheDocument()
   })
 
-  it('a timed task is never folded', () => {
+  it('a timed task folds: only calendar events always show', () => {
     const d = days()
     const at = (i: number) => { const t = task({ id: `w${i}`, title: `Timed ${i + 1}` }); return { id: `task-w${i}`, kind: 'task' as const, title: t.title, time: new Date(2026, 9, 6, 8 + i), completed: false, task: t } }
     d[3] = { ...d[3], items: [...Array.from({ length: 5 }, (_, i) => at(i)), ...untimed(3)] }
     render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} />)
     const day = screen.getByTestId('journal-day-2026-10-06')
-    expect(within(day).getAllByText(/^Timed \d$/)).toHaveLength(5)
-    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
+    expect(within(day).getAllByText(/^Timed \d$/)).toHaveLength(2)
+    expect(within(day).queryAllByText(/^Errand \d$/)).toHaveLength(0)
+    expect(within(day).getByRole('button', { name: '+6 more' })).toBeInTheDocument()
   })
 
   it('no avatar when the viewer is the only one carrying it; another’s face shows', () => {

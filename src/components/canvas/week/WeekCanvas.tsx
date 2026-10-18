@@ -10,9 +10,10 @@
 //                    as chips, placed work as rows (tick, drag, tap to open) and who
 //                    carries it, routines as rounded squares, the hours with
 //                    nothing scheduled in green ("Calendar clear …",
-//                    ROW-LANGUAGE.md); a stay across days as one bar; past
-//                    days stepped back and a weekend that is over folded to a
-//                    line; done work hidden until "Show done".
+//                    ROW-LANGUAGE.md) and the weather, each only when turned
+//                    on; a stay across days as one bar; past days stepped
+//                    back and a weekend that is over folded to a line; done
+//                    work hidden until "Show done" (useWeekViewPrefs).
 //   No day yet       what is chosen for this week with no day, under the
 //                    days: a few as draggable rows, more folded to one line
 //                    (2026-10-14). Inbox, last week and the month's goals
@@ -46,6 +47,7 @@ import { dayChipLabel } from './compactWeek'
 import type { ShelfGroup } from './weekShelf'
 import { weekSentence } from './weekSentence'
 import { foldDay } from '@/lib/week/foldDay'
+import { useWeekViewPrefs } from '@/hooks/useWeekViewPrefs'
 import { isWeekend } from '@/lib/dateUtils'
 
 export interface CanvasDayItem {
@@ -161,7 +163,9 @@ const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', mo
 export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing, loaded = true, progress, onPlaceUnplaced, unplacedCount, viewerId }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
-  const [showDone, setShowDone] = useState(false)
+  // The page's view choices, remembered on this device (calm pass 2).
+  const prefs = useWeekViewPrefs()
+  const showDone = prefs.done
   const [drag, setDrag] = useState<Drag | null>(null)
   const [overDay, setOverDay] = useState<string | null>(null)
   const [overShelf, setOverShelf] = useState(false)
@@ -306,13 +310,14 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   }
   const dayColumn = (day: CanvasDay, col?: number) => {
     const allItems = day.items.filter((it) => showDone || !it.completed)
-    // A few things a day (foldDay): calendar events and anything with a time
-    // always show, as does a row Symphony is pointing at or proposing; the
-    // untimed rest fill what room is left, the others behind "+N more".
+    // A few things a day (foldDay, calm pass 2): the calendar events always
+    // show, and beside them two things, timed or not, routines included. A
+    // row Symphony is proposing or pointing at stays in sight. The rest wait
+    // behind "+N more".
     const dayOpen = openDays.has(day.key)
     const fold = foldDay([
-      ...day.events.map(() => ({ timed: true, it: null })),
-      ...allItems.map((it) => ({ timed: !!it.time || !!it.proposed || pointedTask(it.task?.id), it })),
+      ...day.events.map(() => ({ event: true, it: null })),
+      ...allItems.map((it) => ({ event: false, pinned: !!it.proposed || pointedTask(it.task?.id), it })),
     ])
     const items = dayOpen ? allItems : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
     const sometime = (day.sometime ?? []).filter((it) => showDone || !it.completed)
@@ -329,7 +334,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           <span className="wc-dayname">{day.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
           <span className="wc-daynum">{day.date.getDate()}</span>
           {day.key === todayKey && <span className="wc-todaytag">Today</span>}
-          {day.weather && <span className="wc-weather">{day.weather}</span>}
+          {prefs.weather && day.weather && <span className="wc-weather">{day.weather}</span>}
         </header>
         <div className="wc-daybody">
         {over && <p className="wc-drop-hint" aria-live="polite">Drop on {dayChipLabel(day.date)}</p>}
@@ -369,13 +374,13 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             <ul className="cw-rows">{sometime.map((it) => dayRow(it, day))}</ul>
           </div>
         )}
-        {day.free && <p className="wk-free">{day.free}</p>}
+        {prefs.freeTime && day.free && <p className="wk-free">{day.free}</p>}
         </div>
       </section>
     )
   }
   const doneToggle = (
-    <button type="button" className="canvas-link cw-done-toggle wc-done" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>
+    <button type="button" className="canvas-link cw-done-toggle wc-done" aria-expanded={showDone} onClick={() => prefs.set('done', !showDone)}>
       {showDone ? 'Hide done' : 'Show done'}
     </button>
   )

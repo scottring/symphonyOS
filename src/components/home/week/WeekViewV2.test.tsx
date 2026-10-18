@@ -12,10 +12,13 @@ import { ALL_LAYERS } from '@/lib/domains'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { ConversationWalkContext } from '@/components/canvas/conversationWalk'
 import { CanvasActivityProvider, useCanvasActivity } from '@/contexts/CanvasActivityContext'
+import { WEEK_PREF_KEYS } from '@/hooks/useWeekViewPrefs'
 
 // These tests cover the Lists view; Open journal is the default since
 // 2026-10-08, so they make the device's choice explicit.
 beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists') })
+// The Week page's view choices (useWeekViewPrefs) are per device: none leaks between tests.
+afterEach(() => { for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.removeItem(k) })
 
 
 // The Planning sheet (narrow screens) computes its own plan from the shared
@@ -254,12 +257,14 @@ describe('WeekViewV2 journal spread', () => {
     expect(chips.getByRole('button', { name: /PT appointment/ })).toHaveTextContent('10aPT appointment')
     const rows = () => within(monday.getByRole('list', { name: 'Monday entries' })).getAllByRole('listitem')
       .map((li) => `${li.querySelector('.cw-meta')?.textContent ?? ''}${li.querySelector('.cw-title')?.textContent}`)
-    expect(rows()).toEqual(['6:50aGutter quotes', '2:30pCall the bank', 'Return library books', 'Book the plumber'])
+    // Calm pass 2 (foldDay): the calendar events and two things, timed or
+    // not; the rest wait behind "+N more".
+    expect(rows()).toEqual(['6:50aGutter quotes', '2:30pCall the bank'])
+    expect(monday.getByRole('button', { name: '+2 more' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show done' }))
-    // A few things a day (foldDay): with four timed, two untimed show; the
-    // done one waits behind "+1 more".
     expect(rows()).not.toContain('Renew license')
-    fireEvent.click(monday.getByRole('button', { name: '+1 more' }))
+    fireEvent.click(monday.getByRole('button', { name: '+3 more' }))
+    expect(rows()).toEqual(['6:50aGutter quotes', '2:30pCall the bank', 'Return library books', 'Book the plumber', 'Renew license'])
     expect(rows()).toContain('Renew license')
     expect(monday.getByText('Renew license').closest('li')).toHaveClass('is-done')
   })
@@ -474,6 +479,7 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   afterEach(() => { vi.useRealTimers(); localStorage.removeItem('symphony-week-daily') })
 
   it.each(['not-connected', 'loading', 'stale', 'error', undefined] as const)('does not claim open calendar time when coverage is %s', (events) => {
+    localStorage.setItem(WEEK_PREF_KEYS.freeTime, 'shown')
     const { rerender } = render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday}
       sources={{ tasks: 'ready', routines: 'ready', events: 'ready' }} />)
     expect(screen.getAllByText('Calendar clear all day').length).toBeGreaterThan(0)
@@ -498,6 +504,11 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />)
     fireEvent.click(screen.getByRole('button', { name: 'Help me plan the week' }))
     expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Help me plan the week.', autoSend: true })
+  })
+
+  it('free time is off by default, even with the whole calendar loaded', () => {
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} sources={{ tasks: 'ready', routines: 'ready', events: 'ready' }} />)
+    expect(screen.queryByText(/Calendar clear/)).not.toBeInTheDocument()
   })
 
   it('every-day routines are written once until "Show daily", which is remembered', () => {

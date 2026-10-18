@@ -1,20 +1,20 @@
-// A day on the Week page shows a few things (Friday session, Stage 1: the page
-// must never look endless). Anything with a time is fixed in the day and is
-// never folded away; the untimed things fill what room is left, with at least
-// a couple always showing. The rest wait behind "+N more".
+// A day on the Week page shows a few things (Friday session; calm pass 2,
+// 2026-10-18: the page must never look endless). The day's calendar events
+// always show; beside them, at most two other things, timed or not, routines
+// included. The rest wait behind "+N more".
 
-/** About this many things a day before the rest fold. */
-export const DAY_CAP = 4
-/** Untimed things shown however full the calendar is. */
-export const MIN_TASKS_SHOWN = 2
+/** Things shown in a day beside its calendar events. */
+export const TASKS_SHOWN = 2
 
-/** `timed`: never hidden. The day's order is kept. */
-export function foldDay<T extends { timed: boolean }>(items: T[], cap = DAY_CAP, minTasks = MIN_TASKS_SHOWN): { shown: T[]; hidden: number } {
-  const timedCount = items.filter((it) => it.timed).length
-  let room = Math.max(minTasks, cap - timedCount)
+/** `event`: a calendar event, never hidden. `pinned`: a row that must stay in
+ *  sight (one Symphony proposes or points at); it shows and takes one of the
+ *  `cap` places. The day's order is kept. */
+export function foldDay<T extends { event: boolean; pinned?: boolean }>(items: T[], cap = TASKS_SHOWN): { shown: T[]; hidden: number } {
+  const pinned = items.filter((it) => !it.event && it.pinned).length
+  let room = Math.max(0, cap - pinned)
   const shown: T[] = []
   for (const it of items) {
-    if (it.timed) shown.push(it)
+    if (it.event || it.pinned) shown.push(it)
     else if (room > 0) { shown.push(it); room-- }
   }
   return { shown, hidden: items.length - shown.length }

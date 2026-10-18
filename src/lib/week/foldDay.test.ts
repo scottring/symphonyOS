@@ -1,33 +1,45 @@
 import { describe, it, expect } from 'vitest'
-import { foldDay, DAY_CAP, MIN_TASKS_SHOWN } from './foldDay'
+import { foldDay, TASKS_SHOWN } from './foldDay'
 
-// The week must never look endless (Friday session, Stage 1): a day shows a
-// few things, and never hides one with a time.
-const timed = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `t${i}`, timed: true }))
-const untimed = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `u${i}`, timed: false }))
+// The week must never look endless (Week page, calm pass 2): a day shows its
+// calendar events and at most two other things, timed or not; the rest wait
+// behind "+N more". Only calendar events always show.
+const events = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `e${i}`, event: true }))
+const others = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `u${i}`, event: false }))
 
 describe('foldDay', () => {
-  it('is four a day, at least two of them tasks', () => {
-    expect(DAY_CAP).toBe(4)
-    expect(MIN_TASKS_SHOWN).toBe(2)
+  it('is two things a day beside the calendar', () => {
+    expect(TASKS_SHOWN).toBe(2)
   })
 
-  it('3 timed + 4 untimed: the 3 timed and 2 untimed, 2 hidden', () => {
-    const r = foldDay([...timed(3), ...untimed(4)])
-    expect(r.shown.map((x) => x.id)).toEqual(['t0', 't1', 't2', 'u0', 'u1'])
-    expect(r.hidden).toBe(2)
+  it('2 events + 5 tasks: both events and 2 tasks, 3 hidden', () => {
+    const r = foldDay([...events(2), ...others(5)])
+    expect(r.shown.map((x) => x.id)).toEqual(['e0', 'e1', 'u0', 'u1'])
+    expect(r.hidden).toBe(3)
   })
 
-  it('1 timed + 5 untimed: 1 + 3 shown, 2 hidden', () => {
-    const r = foldDay([...timed(1), ...untimed(5)])
-    expect(r.shown.map((x) => x.id)).toEqual(['t0', 'u0', 'u1', 'u2'])
-    expect(r.hidden).toBe(2)
-  })
-
-  it('5 timed + 1 untimed: all 6 shown (two task slots are kept)', () => {
-    const r = foldDay([...timed(5), ...untimed(1)])
-    expect(r.shown).toHaveLength(6)
+  it('6 events + 1 task: everything shows', () => {
+    const r = foldDay([...events(6), ...others(1)])
+    expect(r.shown).toHaveLength(7)
     expect(r.hidden).toBe(0)
+  })
+
+  it('a timed task or routine folds like any other: only events are kept', () => {
+    const timed = [{ id: 't0', event: false, time: 9 }, { id: 't1', event: false, time: 10 }, { id: 't2', event: false, time: 11 }]
+    const r = foldDay(timed)
+    expect(r.shown.map((x) => x.id)).toEqual(['t0', 't1'])
+    expect(r.hidden).toBe(1)
+  })
+
+  it('a pinned row (proposed, or pointed at) always shows and takes one of the two', () => {
+    const items = [{ id: 'a', event: false }, { id: 'b', event: false }, { id: 'p', event: false, pinned: true }, { id: 'c', event: false }]
+    const r = foldDay(items)
+    expect(r.shown.map((x) => x.id)).toEqual(['a', 'p'])
+    expect(r.hidden).toBe(2)
+  })
+
+  it('takes another number of things when asked', () => {
+    expect(foldDay(others(5), 3).hidden).toBe(2)
   })
 
   it('nothing: nothing hidden', () => {
@@ -35,7 +47,7 @@ describe('foldDay', () => {
   })
 
   it('keeps the day’s order', () => {
-    const items = [untimed(1)[0], timed(1)[0], { id: 'u9', timed: false }]
-    expect(foldDay(items).shown.map((x) => x.id)).toEqual(['u0', 't0', 'u9'])
+    const items = [others(1)[0], events(1)[0], { id: 'u9', event: false }, { id: 'u10', event: false }]
+    expect(foldDay(items).shown.map((x) => x.id)).toEqual(['u0', 'e0', 'u9'])
   })
 })
