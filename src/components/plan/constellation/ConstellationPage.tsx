@@ -537,18 +537,31 @@ function Inner() {
       : { label: `Plan ${seasonWord} →`, onClick: () => navigate(`/season?view=constellation&horizon=1${keepStart}&plan=1`) }
 
   // ---- The header (calm pass, 2026-10-18) ------------------------------------
-  // One primary button that changes with the moment: the review that is due
-  // (the period before's while under way, its own in its last days), else
-  // planning the period; the other one waits in ⋯. Neither while one is open.
+  // One primary button that changes with the moment (fix round 1 rulings):
+  // the review that is due (the period before's while under way, its own in
+  // its last days); else planning — this period until it is planned, then the
+  // next one. Year is reference: its primary is only the review that is due,
+  // or "Plan 2027" inside next year's planning window (talkFor, from Dec 25).
+  // Whatever isn't the button waits in ⋯; neither while a flow is open.
   type Offer = { label: string; due: boolean; run: () => void }
   const inFlow = reviewing || planning
+  // Held until the reviews and the plan record have loaded, so the button
+  // doesn't flicker from one offer to another.
+  const settled = !review.loading && !prevReview.loading && !planSession.loading
   const reviewOffer: Offer | null = inFlow ? null
     : target === 'this' ? { label: `Review ${periodWord}`, due: !review.loading && !review.error && !review.reviewed, run: () => setReviewing(true) }
       : target === 'previous' && !prevReview.loading && !prevReview.error && !prevReview.reviewed
         ? { label: `Review ${prevWord}`, due: true, run: () => setReviewing(true, bounds.prev) }
         : null
-  const planOffer: Offer | null = !inFlow && plannable ? { label: `Plan ${periodWord}`, due: true, run: () => setMode('plan') } : null
-  const primary = reviewOffer?.due ? reviewOffer : planOffer
+  const planThis: Offer = { label: `Plan ${periodWord}`, due: level !== 0, run: () => setMode('plan') }
+  const planNextOffer: Offer = { label: `Plan ${nextWord}`, due: level !== 0, run: () => setMode('plan', bounds.next) }
+  const yearTalk = level === 0 && talk
+    ? localYmd(talk.start) === localYmd(bounds.next) ? { ...planNextOffer, due: true }
+      : localYmd(talk.start) === localYmd(bounds.start) ? { ...planThis, due: true } : null
+    : null
+  const planOffer: Offer | null = inFlow ? null
+    : yearTalk ?? (!plannable ? null : !planSession.error && planSession.saved ? planNextOffer : planThis)
+  const primary = !settled ? null : reviewOffer?.due ? reviewOffer : planOffer?.due ? planOffer : null
   // One quiet fact line: Month "19 open · 26 done", Season "Sep 22 – Dec 20 ·
   // 21 goals · 4 done", Year "5 goals"; then when it was planned.
   const goalCount = (n: number) => `${n} goal${n === 1 ? '' : 's'}`
@@ -563,7 +576,7 @@ function Inner() {
     </p>
     : null
   const menuChoices: PageMenuChoice[] = [
-    ...[reviewOffer, planOffer].filter((o): o is Offer => !!o && o !== primary && dataReady)
+    ...[reviewOffer, planOffer].filter((o): o is Offer => !!o && o !== primary && dataReady && settled)
       .map((o) => ({ id: o === planOffer ? 'plan' : 'review', label: o.label, onSelect: o.run })),
     ...(!current ? [{ id: 'back', label: `Back to this ${PERIODS[level]}`, onSelect: () => setStart(null) }] : []),
     ...(inFlow ? [] : [
