@@ -77,7 +77,7 @@ describe('useDeckActions', () => {
     expect(deps.keepForward).toHaveBeenCalledWith('t1', { weekStart: weekAnchor }, lastWeekStart)
     deps.keepForward.mockClear()
     await a.keepThisWeek(card('inbox', { bucket: 'inbox' }))
-    expect(deps.keepForward).toHaveBeenCalledWith('t1', { weekStart: weekAnchor }, undefined)
+    expect(deps.keepForward).toHaveBeenCalledWith('t1', { weekStart: weekAnchor })
     expect(deps.gated.setBucket).not.toHaveBeenCalled()
   })
 
