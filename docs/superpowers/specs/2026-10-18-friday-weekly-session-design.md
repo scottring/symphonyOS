@@ -263,6 +263,27 @@ commitments, the dinners, and the wins. One button: **Done**. The session is sav
 - The vault copy of the review (`daily/review-YYYY-MM-DD.md`) arrives with the
   Friday background summary (piece 3). Symphony does not write to the vault directly.
 
+## One planning process, not two (Scott, 2026-10-18)
+
+The Week already has its own process: **Review week N** (`?review=1`, `PeriodReview`)
+and **Plan this week** (`?plan=1`, `PeriodPlan`, steps: Left from last week · For
+{the month} · Anything else · Give them a day), hosted by `WeekV2`. The Friday
+session must not build a second one. Instead:
+
+- **Rebuild `PeriodReview` and `PeriodPlan`'s presentation as the card runs in this
+  document:** one card at a time, four choices then details, the week strip for
+  days, hands of 5, tiles for the level above, stamps, and no repeated empty states.
+  Their data, verbs, writers and Undo stay as they are. The current one-page
+  version (the screenshot that started this: "For October" as a scrolling list of
+  "Nothing in this week yet / + Add") is what's being replaced.
+- **The Friday session runs that same process as its planning steps** (Inbox, Look
+  back, From the month, No day yet), wrapped in the session's scenery, between the
+  conversation steps and Meals/Money/Close. Planning the week on a Tuesday from the
+  Week page and on Friday night in the session is the same experience.
+- `PeriodReview` and `PeriodPlan` also serve **Month, Season and Year**. The card
+  presentation applies there too, so the four horizons stay one process. The tile
+  screen ("From the month") is the general form: the level above as tiles.
+
 ## Relationship to what exists
 
 - **Builds on:** `PeriodReview` / `usePeriodReview` (verdicts and the session
