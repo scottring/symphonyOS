@@ -984,8 +984,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
   }, [deckMode, tasksLoaded, deckTasks, drainable, deckActions])
   // The strip inside a card's "This week": the week's seven days from its own
   // start (weekStartsOn), each with what is already there — the day's timed
-  // events and tasks by time, three at most, the rest counted.
+  // events and tasks by time, three at most, the rest counted. A day already
+  // gone is shown but cannot be given.
   const stripDays = useMemo<StripDay[]>(() => Array.from({ length: 7 }, (_, i) => {
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const date = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + i)
     const key = localYmd(date)
     const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()
@@ -1006,6 +1009,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       key, date,
       label: `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${date.getDate()}`,
       isWeekend: date.getDay() === 0 || date.getDay() === 6,
+      past: date < todayStart,
       lines: items.slice(0, 3).map((it) => it.title),
       more: Math.max(0, items.length - 3),
     }

@@ -390,4 +390,21 @@ describe('WeekStrip', () => {
     fireEvent.click(screen.getByRole('button', { name: 'This week, no day yet' }))
     expect(onNoDay).toHaveBeenCalledTimes(1)
   })
+
+  // Mid-week, a day already gone is shown but cannot be given.
+  it('a past day is disabled: tapping it places nothing; today and later still do', () => {
+    const onPick = vi.fn()
+    const days = stripDays.map((d, i) => ({ ...d, past: i < 3 }))
+    render(<WeekStrip days={days} onPick={onPick} onNoDay={vi.fn()} />)
+    const sat = screen.getByRole('button', { name: /^Sat 24/ })
+    expect(sat).toBeDisabled()
+    expect(sat).toHaveClass('is-past')
+    fireEvent.click(sat)
+    expect(onPick).not.toHaveBeenCalled()
+    const tue = screen.getByRole('button', { name: /^Tue 27/ })
+    expect(tue).toBeEnabled()
+    fireEvent.click(tue)
+    expect(onPick).toHaveBeenCalledWith(new Date(2026, 9, 27))
+    expect(screen.getAllByRole('button', { name: /^(Sat|Sun|Mon|Tue|Wed|Thu|Fri) \d+/ })).toHaveLength(7)
+  })
 })
