@@ -15,6 +15,7 @@ import type { Task } from '@/types/task'
 import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
 import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
 import { timingRemoval } from '@/lib/planning/planActions'
+import { placementOf } from '@/lib/planning/placement'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
@@ -182,13 +183,6 @@ function weekWalk(anchor: Date, now: Date): { label: string; message: string } |
   return anchor.getTime() > current.getTime() ? { label: 'Help me plan the week', message: named(anchor) } : null
 }
 
-
-/** Where a task sits (its horizon, day and time): what triage changes, and
- *  what Undo puts back. Cleared fields come back as null. */
-function placementOf(t: Task): Partial<Task> {
-  const keep = ['bucket', 'scheduledFor', 'isAllDay', 'plannedOn', 'weekendStart', 'weekStart', 'monthStart', 'seasonStart', 'deferCount', 'weekDeferredAt'] as const
-  return Object.fromEntries(keep.map((k) => [k, t[k] ?? null])) as Partial<Task>
-}
 
 export function WeekViewV2(props: WeekViewV2Props) {
   const {
