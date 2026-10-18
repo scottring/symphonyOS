@@ -89,7 +89,9 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
           // The page's week, not the calendar's current one.
           return activity.run(label, async () => !!(await keepForward(t.id, { weekStart: weekAnchor })), { ids: [t.id], undo: undoFor(t) })
         }
-        return Promise.resolve(true) // already on this week
+        // Already on this week. A day that passed undone is spent: it goes.
+        if (t.scheduledFor) return activity.run(label, async () => await clearDay(t), { ids: [t.id], undo: restoreOf(t) })
+        return Promise.resolve(true)
       },
 
       later: (c, when) => {
