@@ -505,3 +505,68 @@ describe('No day yet (phone)', () => {
     expect(screen.queryByRole('button', { name: 'Complete Mow the lawn' })).not.toBeInTheDocument()
   })
 })
+
+// Friday session, Stage 1: the page must never look endless. A day shows a
+// few things; a time is never folded away; your own name isn't news; the
+// weekend gets more room.
+describe('WeekCanvas — a few things a day', () => {
+  const untimed = (n: number) => Array.from({ length: n }, (_, i) => {
+    const t = task({ id: `u${i}`, title: `Errand ${i + 1}` })
+    return { id: `task-u${i}`, kind: 'task' as const, title: t.title, completed: false, task: t }
+  })
+
+  it('a day with 7 untimed tasks shows 4 and "+3 more"; asked, all 7 and "Show less"', () => {
+    const d = days()
+    d[3] = { ...d[3], items: untimed(7) }
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} />)
+    const day = screen.getByTestId('journal-day-2026-10-06')
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(4)
+    fireEvent.click(within(day).getByRole('button', { name: '+3 more' }))
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(7)
+    fireEvent.click(within(day).getByRole('button', { name: 'Show less' }))
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(4)
+  })
+
+  it('a timed event is never folded', () => {
+    const d = days()
+    const ev = (i: number) => ({ id: `event-x${i}`, kind: 'event' as const, title: `Meeting ${i + 1}`, time: new Date(2026, 9, 6, 9 + i), completed: false })
+    d[3] = { ...d[3], events: Array.from({ length: 5 }, (_, i) => ev(i)), items: untimed(3) }
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} />)
+    const day = screen.getByTestId('journal-day-2026-10-06')
+    expect(within(day).getAllByText(/^Meeting \d$/)).toHaveLength(5)
+    // Two task slots are kept beside a full calendar.
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
+    expect(within(day).getByRole('button', { name: '+1 more' })).toBeInTheDocument()
+  })
+
+  it('a timed task is never folded', () => {
+    const d = days()
+    const at = (i: number) => { const t = task({ id: `w${i}`, title: `Timed ${i + 1}` }); return { id: `task-w${i}`, kind: 'task' as const, title: t.title, time: new Date(2026, 9, 6, 8 + i), completed: false, task: t } }
+    d[3] = { ...d[3], items: [...Array.from({ length: 5 }, (_, i) => at(i)), ...untimed(3)] }
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} />)
+    const day = screen.getByTestId('journal-day-2026-10-06')
+    expect(within(day).getAllByText(/^Timed \d$/)).toHaveLength(5)
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
+  })
+
+  it('no avatar when the viewer is the only one carrying it; another’s face shows', () => {
+    const members = [{ id: 'me', name: 'Scott', initials: 'SK', color: 'blue' }, { id: 'ir', name: 'Iris', initials: 'IR', color: 'purple' }] as const
+    const d = days()
+    d[4].items[0] = { ...d[4].items[0], people: ['me'] }
+    const { unmount } = render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()}
+      members={[...members]} viewerId="me" />)
+    expect(within(screen.getByText('Pick up the keys').closest('li')!).queryByLabelText('Scott')).toBeNull()
+    unmount()
+    d[4].items[0] = { ...d[4].items[0], people: ['ir'] }
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()}
+      members={[...members]} viewerId="me" />)
+    expect(within(screen.getByText('Pick up the keys').closest('li')!).getByLabelText('Iris')).toBeInTheDocument()
+  })
+
+  it('a Saturday-first week: the first two columns (the weekend) are wider', () => {
+    show()
+    const strip = screen.getByTestId('journal-day-2026-10-03').parentElement!
+    const cols = getComputedStyle(strip).gridTemplateColumns.replace(/\s+/g, '')
+    expect(cols).toBe(['1.5fr', '1.5fr', '1fr', '1fr', '1fr', '1fr', '1fr'].map((f) => `minmax(0,${f})`).join(''))
+  })
+})

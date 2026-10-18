@@ -45,6 +45,8 @@ import { GiveItADay } from './GiveItADay'
 import { dayChipLabel } from './compactWeek'
 import type { ShelfGroup } from './weekShelf'
 import { weekSentence } from './weekSentence'
+import { foldDay } from '@/lib/week/foldDay'
+import { isWeekend } from '@/lib/dateUtils'
 
 export interface CanvasDayItem {
   /** Selectable id ('task-…', 'routine-…', 'event-…'). */
@@ -141,6 +143,8 @@ export interface WeekCanvasProps {
   /** "Place them": opens the deck on this week's unplaced cards. Absent where
    *  the deck may not open; the count then stands alone. */
   onPlaceUnplaced?: () => void
+  /** Who is looking: a row only they carry shows no face. */
+  viewerId?: string
 }
 
 type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
@@ -151,7 +155,7 @@ const NODAY_FOLD_AT = 4
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing, loaded = true, progress, onPlaceUnplaced }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing, loaded = true, progress, onPlaceUnplaced, viewerId }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
   const [showDone, setShowDone] = useState(false)
@@ -161,6 +165,13 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [picker, setPicker] = useState<Picker>(null)
   const [weekendOpen, setWeekendOpen] = useState(false)
   const [nodayOpen, setNodayOpen] = useState<boolean | null>(null)
+  // The days opened past their few ("+3 more"), by key.
+  const [openDays, setOpenDays] = useState<ReadonlySet<string>>(() => new Set())
+  const toggleDayOpen = (key: string) => setOpenDays((was) => {
+    const next = new Set(was)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
 
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
@@ -251,8 +262,10 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   ))
   // ── the days ───────────────────────────────────────────────────────────
   // Who carries it, a glance from the title (ROW-LANGUAGE: people); nothing
-  // for an id the household doesn't know.
+  // for an id the household doesn't know, and nothing when it is only the
+  // viewer's own (Friday session: names only when not yours).
   const peopleOf = (it: CanvasDayItem) => {
+    if (viewerId && it.people?.length === 1 && it.people[0] === viewerId) return null
     const who = (it.people ?? []).flatMap((id) => { const m = memberById.get(id); return m ? [m] : [] })
     return who.length > 0 && (
       <span className="wk-people wc-people" aria-label={who.map((m) => m.name).join(', ')}>
@@ -289,10 +302,19 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     )
   }
   const dayColumn = (day: CanvasDay, col?: number) => {
-    const items = day.items.filter((it) => showDone || !it.completed)
+    const allItems = day.items.filter((it) => showDone || !it.completed)
+    // A few things a day (foldDay): calendar events and anything with a time
+    // always show, as does a row Symphony is pointing at or proposing; the
+    // untimed rest fill what room is left, the others behind "+N more".
+    const dayOpen = openDays.has(day.key)
+    const fold = foldDay([
+      ...day.events.map(() => ({ timed: true, it: null })),
+      ...allItems.map((it) => ({ timed: !!it.time || !!it.proposed || pointedTask(it.task?.id), it })),
+    ])
+    const items = dayOpen ? allItems : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
     const sometime = (day.sometime ?? []).filter((it) => showDone || !it.completed)
     const specials = day.specials ?? []
-    const empty = !day.events.length && !items.length && !sometime.length && !specials.length
+    const empty = !day.events.length && !allItems.length && !sometime.length && !specials.length
     const over = overDay === day.key
     // A day gone by steps back; today and the days ahead stay at full strength.
     const gone = day.key < todayKey
@@ -326,6 +348,11 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           </ul>
         )}
         {items.length > 0 && <ul className="cw-rows wc-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{items.map((it) => dayRow(it, day))}</ul>}
+        {fold.hidden > 0 && (
+          <button type="button" className="canvas-link wc-quiet-link wc-more" aria-expanded={dayOpen} onClick={() => toggleDayOpen(day.key)}>
+            {dayOpen ? 'Show less' : `+${fold.hidden} more`}
+          </button>
+        )}
         {(day.dinners ?? []).length > 0 && (
           <p className="wc-dinner"><span className="wc-dinner-label">Dinner</span>{' '}
             {day.dinners!.map((d, i) => <span key={d.id}>{i > 0 && ' · '}{d.href
@@ -479,8 +506,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // happened, what was left (2026-10-05, #137) — room for the days ahead. One
   // still ahead stays open in full: family and household plans live there. A
   // week gone by has no days ahead to make room for, so nothing folds.
-  const isWeekend = (d: CanvasDay) => d.date.getDay() === 0 || d.date.getDay() === 6
-  const goneWeekend = phone || !isCurrent ? [] : days.filter((d) => isWeekend(d) && d.key < todayKey)
+  const goneWeekend = phone || !isCurrent ? [] : days.filter((d) => isWeekend(d.date) && d.key < todayKey)
   const stripDays = weekendOpen ? days : days.filter((d) => !goneWeekend.includes(d))
   const shortDay = (d: CanvasDay) => `${d.date.toLocaleDateString('en-US', { weekday: 'short' })} ${d.date.getDate()}`
   const weekendFold = goneWeekend.length > 0 && (
@@ -500,6 +526,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const cols = stripDays.filter((d) => d.key >= sp.from! && d.key <= sp.to!).map((d) => colOf.get(d.key)!)
     return cols.length ? [{ sp, start: Math.min(...cols), end: Math.max(...cols) }] : []
   })
+  // The weekend's days are wider: family and household plans live there. Set
+  // from the days themselves, so a Saturday-first week widens its first two.
+  const stripCols = stripDays.map((d) => (isWeekend(d.date) ? 'minmax(0,1.5fr)' : 'minmax(0,1fr)')).join(' ')
   const barTail = (sp: CanvasSpan) => sp.tail?.replace(/^,\s*/, '')
   const subtitleNode = slots?.subline && !phone
     ? createPortal(<>{pastNote}{subline && <span className="wc-subtitle">{subline}</span>}</>, slots.subline)
@@ -543,10 +572,10 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           </ul>
         )}
         {weekendFold}
-        <div className={`wc-strip${bars.length ? ' has-bars' : ''}`} style={{ ['--wc-days' as string]: stripDays.length }}>
+        <div className={`wc-strip${bars.length ? ' has-bars' : ''}`} style={{ ['--wc-days' as string]: stripDays.length, gridTemplateColumns: stripCols }}>
           {stripDays.map((d, i) => dayColumn(d, i + 1))}
           {bars.length > 0 && (
-            <div className="wc-bars" aria-hidden="true">
+            <div className="wc-bars" aria-hidden="true" style={{ gridTemplateColumns: stripCols }}>
               {bars.map(({ sp, start, end }) => (
                 <button key={sp.id} type="button" tabIndex={-1} className="wc-bar" style={{ gridColumn: `${start} / ${end + 1}` }} onClick={() => writers.open(sp.id)}>
                   <span className="wc-bar-title">{sp.title}</span>{barTail(sp) && <span className="wc-bar-tail">{barTail(sp)}</span>}
