@@ -29,7 +29,7 @@ export interface DeckDeps {
   toggleTask: (id: string) => Promise<unknown>
   updateTask: (id: string, updates: Partial<Task>) => Promise<unknown>
   onUpdateTask: (id: string, updates: Partial<Task>) => Promise<unknown> | void
-  keepForward: (id: string, period: { weekStart?: Date }, from?: Date) => Promise<string | undefined>
+  keepForward: (id: string, period: { weekStart?: Date; monthStart?: Date }, from?: Date) => Promise<string | undefined>
   gated: {
     pushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => Promise<void | boolean> | void
     setBucket?: (id: string, bucket: TaskBucket) => Promise<void | boolean> | void
@@ -56,6 +56,9 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
     }
     const clearDay = async (t: Task) => !t.scheduledFor || ok(await updateTask(t.id, timingRemoval(t, 'day').updates))
     const restorePlacement = (t: Task) => async () => ok(await onUpdateTask(t.id, placementOf(t)))
+    // Someday and its kin release every open commitment, so placementOf alone
+    // would lose them: a task with live commitments is restored from them.
+    const undoFor = (t: Task) => (liveCommitments({ commitments: bootstrapCommitments(t) }).length > 0 ? restoreOf(t) : restorePlacement(t))
     const toggle = (id: string) => async () => ok(await toggleTask(id))
 
     return {
@@ -82,7 +85,8 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
             { ids: [t.id], undo: restoreOf(t) })
         }
         if (c.source === 'inbox') {
-          return activity.run(label, () => applyTriageWhen('this-week', t.id, handlers), { ids: [t.id], undo: restorePlacement(t) })
+          // The page's week, not the calendar's current one.
+          return activity.run(label, async () => !!(await keepForward(t.id, { weekStart: weekAnchor })), { ids: [t.id], undo: undoFor(t) })
         }
         return Promise.resolve(true) // already on this week
       },
@@ -94,37 +98,55 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
             async () => await clearDay(t) && !!(await keepForward(t.id, { weekStart: nextWeekStart }, fromWeek(c))),
             { ids: [t.id], undo: restoreOf(t) })
         }
+        if (when === 'next-month') {
+          // A commitment to the month, not a date on its 1st.
+          const now = new Date()
+          const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+          return activity.run(`${describeTriageWhen(when)}: “${t.title}”`,
+            async () => await clearDay(t) && !!(await keepForward(t.id, { monthStart: nextMonth }, fromWeek(c))),
+            { ids: [t.id], undo: restoreOf(t) })
+        }
         return activity.run(`${describeTriageWhen(when)}: “${t.title}”`,
           async () => await clearDay(t) && await applyTriageWhen(when, t.id, handlers),
-          { ids: [t.id], undo: restorePlacement(t) })
+          { ids: [t.id], undo: undoFor(t) })
       },
 
       laterOnDate: (c, date) => {
         const t = c.task
-        return activity.run(`Later: “${t.title}”`, async () => ok(await gated.pushTask(t.id, date)), { ids: [t.id], undo: restorePlacement(t) })
+        return activity.run(`Later: “${t.title}”`, async () => ok(await gated.pushTask(t.id, date)), { ids: [t.id], undo: undoFor(t) })
       },
 
       letGo: (c) => {
         const t = c.task
         if (c.source === 'inbox') {
-          return activity.run(`Let go of “${t.title}”`, async () => ok(await setBucket(t.id, 'someday')), { ids: [t.id], undo: restorePlacement(t) })
+          return activity.run(`Let go of “${t.title}”`, async () => ok(await setBucket(t.id, 'someday')), { ids: [t.id], undo: undoFor(t) })
         }
         const off = timingRemoval(t, 'all')
         return activity.run(`Let go of “${t.title}”`, async () => ok(await updateTask(t.id, off.updates)),
           { ids: [t.id], undo: async () => ok(await updateTask(t.id, off.previous)) })
       },
 
-      drain: (tasks) => activity.run(`Move ${tasks.length} untouched things to Later`, async () => {
-        let all = true
-        for (const t of tasks) all = ok(await setBucket(t.id, 'someday')) && all
-        return all
-      }, {
-        ids: tasks.map((t) => t.id),
-        undo: async () => {
-          for (const t of tasks) await onUpdateTask(t.id, placementOf(t))
-          return true
-        },
-      }),
+      // Ungated: the drain is one deliberate sweep, not a question per task.
+      drain: (tasks) => {
+        const wrote: Task[] = []
+        const options: { ids: string[]; failureState: 'partial'; failureSummary?: string; undo: () => Promise<boolean> } = {
+          ids: tasks.map((t) => t.id),
+          failureState: 'partial',
+          undo: async () => {
+            let all = true
+            for (const t of wrote) all = (await undoFor(t)()) && all
+            return all
+          },
+        }
+        return activity.run(`Move ${tasks.length} untouched things to Later`, async () => {
+          for (const t of tasks) {
+            try { if (ok(await onUpdateTask(t.id, { bucket: 'someday' }))) wrote.push(t) } catch { /* counted below */ }
+          }
+          const failed = tasks.length - wrote.length
+          if (failed > 0) options.failureSummary = `${failed} couldn't move`
+          return wrote.length > 0
+        }, options)
+      },
     }
   }, [activity, toggleTask, updateTask, onUpdateTask, keepForward, gated, weekAnchor, lastWeekStart, nextWeekStart])
 }
