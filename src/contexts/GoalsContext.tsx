@@ -15,7 +15,7 @@ export interface GoalsContextValue {
     areaId: string | null,
     name: string,
     context?: 'work' | 'family' | 'personal',
-    extra?: { notes?: string | null; scope?: Scope; id?: string; year?: number; strategy?: string | null; carriedFrom?: string | null; assignedToAll?: string[] },
+    extra?: { notes?: string | null; scope?: Scope; id?: string; year?: number; strategy?: string | null; carriedFrom?: string | null; assignedToAll?: string[]; sortOrder?: number },
   ) => Promise<Goal | null>
   updateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year' | 'carriedFrom' | 'assignedToAll'>>, opts?: { quiet?: boolean }) => Promise<boolean | void>
   deleteGoal: (id: string) => Promise<void>

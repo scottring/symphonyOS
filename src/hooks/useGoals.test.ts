@@ -138,6 +138,24 @@ describe('useGoals addGoal', () => {
     })
   })
 
+  it('addGoal writes a sort order the caller gives, else the count of goals in that area', async () => {
+    goalRows = [dbGoal({ id: 'g1', sort_order: 0 }), dbGoal({ id: 'g2', sort_order: 1000 })]
+    const { result } = renderHook(() => useGoals())
+    await waitFor(() => expect(result.current.goals).toHaveLength(2))
+
+    await act(async () => {
+      await result.current.addGoal(null, 'Last in the year', undefined, { id: 'g-last', year: 2026, sortOrder: 2000 })
+    })
+    expect(insertMock.mock.calls[0][0]).toMatchObject({ id: 'g-last', sort_order: 2000 })
+    expect(result.current.goals.find((g) => g.id === 'g-last')?.sortOrder).toBe(2000)
+
+    await act(async () => {
+      await result.current.addGoal(null, 'No order given', undefined, { id: 'g-plain', year: 2026 })
+    })
+    // Unchanged for every other caller: the count of goals in that area.
+    expect(insertMock.mock.calls[1][0]).toMatchObject({ id: 'g-plain', sort_order: 3 })
+  })
+
   it('addGoal with an id that already exists returns the existing row and inserts nothing new', async () => {
     ;(insertMock as unknown as { __nextResult: () => unknown }).__nextResult = () => ({
       data: null,

@@ -995,6 +995,44 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
   expect(screen.queryByText(/Plans could not load/)).toBeNull()
   expect(titles('2026 goals')).toEqual(['Together','Health','Home'])
  })
+ // The hook as written: the goals change when a write lands, and a new goal
+ // without a given order takes the count of goals in its area.
+ const liveGoals=()=>{
+  api.updateGoal.mockImplementation(async(id:string,u:any)=>{api.goals=api.goals.map(g=>g.id===id?{...g,...u}:g);api.redraw();return true})
+  api.addGoal.mockImplementation(async(_area:any,name:string,context:any,extra:any)=>{
+   const g={id:extra.id,name,year:extra.year,status:'active',context,carriedFrom:extra.carriedFrom,sortOrder:extra.sortOrder??api.goals.filter(x=>!x.areaId).length}
+   api.goals=[...api.goals,g];api.redraw();return g})
+ }
+ it('a year goal added after a reorder lands last',async()=>{
+  // Made one after another, so their orders are the count at the time.
+  api.goals=[{...GOALS[0],sortOrder:0},{...GOALS[1],sortOrder:1},{id:'h',name:'Home',year:2026,status:'active',context:'personal',sortOrder:2},
+   {id:'p1',name:'Old one',year:2025,status:'active',context:'personal',sortOrder:3},{id:'p2',name:'Older one',year:2025,status:'active',context:'personal',sortOrder:4}]
+  liveGoals()
+  open()
+  dragTo('Home','2026 goals',45)
+  await waitFor(()=>expect(lastRun()?.label).toBe('Move “Home” up'))
+  expect(titles('2026 goals')).toEqual(['Together','Home','Health'])
+  fireEvent.click(screen.getByRole('button',{name:'Add a 2026 goal'}))
+  fireEvent.change(screen.getByLabelText('New 2026 goal'),{target:{value:'Garden'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Garden','personal',expect.objectContaining({year:2026,sortOrder:3000})))
+  await waitFor(()=>expect(titles('2026 goals')).toEqual(['Together','Home','Health','Garden']))
+ })
+ it('a year goal carried into a year lands last there',async()=>{
+  api.goals=[{...GOALS[0],sortOrder:0},{...GOALS[1],sortOrder:1000},
+   {id:'n1',name:'Next one',year:2027,status:'active',context:'personal',sortOrder:0},{id:'n2',name:'Next two',year:2027,status:'active',context:'personal',sortOrder:4000},
+   {id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal',sortOrder:0}]
+  liveGoals()
+  // Move to 2027, from the review.
+  open('/year?view=constellation&start=2026-10-09&review=1')
+  fireEvent.click(within(screen.getByRole('list',{name:'Still open in 2026'})).getByRole('button',{name:'Move to 2027: Together'}))
+  await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g',sortOrder:5000})))
+  cleanup()
+  // Bring into 2026, while planning it.
+  open('/year?view=constellation&start=2026-10-09&plan=1')
+  fireEvent.click(screen.getByRole('button',{name:'Bring into 2026: Learn to sail'}))
+  await waitFor(()=>expect(api.addGoal).toHaveBeenLastCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old',sortOrder:2000})))
+ })
  it('a row that drags still triages from its row, and a done line does not drag',async()=>{
   api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
   api.toggleTask.mockResolvedValue(true)

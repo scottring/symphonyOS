@@ -71,7 +71,7 @@ import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
-import { compareSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
+import { compareSortOrder, nextTaskSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
 import { FoldToggle, PlanOrderList, type RowOrder } from './PlanOrderList'
 import { useFold } from './useFold'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
@@ -273,9 +273,13 @@ function Inner() {
   const contextFor = (parent: PlanNode | null): TaskContext | undefined =>
     (parent ? (parent.goal ? parent.goal.context : parent.task?.context) : area.area) ?? undefined
 
+  // A goal new to a year goes last there: above that year's highest order, so a
+  // list already ordered by drag doesn't take it in second.
+  const lastInYear = (y: number) => nextTaskSortOrder(goals.filter((g) => g.year === y))
+
   /** The one create path: period and lineage in a single insert. */
   const createItem = async (lvl: number, title: string, parent: PlanNode | null, id: string, context: TaskContext | undefined): Promise<boolean> => {
-    if (lvl === 0) return !!await addGoal(null, title, context, { year, id })
+    if (lvl === 0) return !!await addGoal(null, title, context, { year, id, sortOrder: lastInYear(year) })
     return !!await addTask(title, undefined, undefined, undefined, {
       id,
       bucket: lvl === 1 ? 'quarter' : lvl === 2 ? 'month' : 'week',
@@ -338,7 +342,7 @@ function Inner() {
     const g = node.goal!
     const id = crypto.randomUUID()
     return act(label, () => addGoal(g.areaId || null, g.name, g.context ?? undefined, {
-      id, year: to, carriedFrom: g.id, notes: g.notes ?? null, strategy: g.strategy ?? null,
+      id, year: to, carriedFrom: g.id, notes: g.notes ?? null, strategy: g.strategy ?? null, sortOrder: lastInYear(to),
       ...(g.assignedToAll ? { assignedToAll: g.assignedToAll } : {}),
     }).then((made) => !!made), { ids: [id], undo: async () => { await deleteGoal(id) } })
   }
