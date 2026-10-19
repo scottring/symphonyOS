@@ -35,6 +35,7 @@ import { wallMoment } from '@/lib/wall/wallMoment'
 import { kidViewHoldsOpen } from '@/lib/wall/activity/kioskRoutines'
 import { localYmd } from '@/lib/cadence/config'
 import type { Routine } from '@/types/actionable'
+import type { WallApp } from '@/lib/wall/activity/wallApps'
 import type { FamilyMember } from '@/types/family'
 import type { Task } from '@/types/task'
 import type { WallNotice, WallDayData } from '@/hooks/useWallData'
@@ -91,6 +92,8 @@ interface KidDayViewProps {
   onOpenDinner?: () => void
   /** Opens another member's page — an adult tapping a kid in The kids. */
   onOpenMember?: (id: string) => void
+  /** Open a routine's web app on the wall (wallApps). */
+  onOpenApp?: (app: WallApp, routineId: string) => void
   /** The wall clock; tests pass a fixed one. */
   now?: Date
 }
@@ -129,7 +132,7 @@ const storage = (): Storage | null => {
 
 export function KidDayView({
   member, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, notices, screenTime, weather, onToggleTask, onClose,
-  days, tonight, onOpenDinner, onOpenMember, now,
+  days, tonight, onOpenDinner, onOpenMember, onOpenApp, now,
 }: KidDayViewProps) {
   const { markDone, undoDone, addProgress, setProgress } = useActionableInstances()
   const { history } = useMemberInstanceHistory()
@@ -415,6 +418,38 @@ export function KidDayView({
     }
 
     const onTap = row.entityType === 'task' ? () => handleTaskTap(row) : () => handlePlainRoutineTap(row)
+    // A routine with a web app: the checkbox as usual, plus Open, which shows
+    // the app on the wall and checks the row off when the app says it's done.
+    if (row.app && onOpenApp) {
+      const app = row.app
+      return (
+        <div key={row.id} className={`${WALL.cardInset} w-full min-h-[56px] flex items-stretch`}>
+          <button
+            type="button"
+            onClick={onTap}
+            aria-label={`Mark ${row.title} ${row.done ? 'not done' : 'done'}`}
+            className="flex-1 flex items-center gap-3 px-4 py-3 text-left"
+          >
+            <span
+              aria-hidden="true"
+              className={`shrink-0 w-6 h-6 rounded-full border-2 ${
+                row.done ? 'bg-[#2E4638] border-[#2E4638] dark:bg-[#6DC4A7] dark:border-[#6DC4A7]' : 'border-[#8A7D68]'
+              }`}
+            />
+            <span className={`text-[1.05rem] font-semibold ${row.done ? WALL.muted + ' line-through' : WALL.inkStrong}`}>
+              {row.title}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenApp(app, row.id)}
+            className="shrink-0 m-2 px-4 rounded-full bg-[#2E4638] text-white dark:bg-[#6DC4A7] dark:text-[#14211A] text-[0.95rem] font-semibold"
+          >
+            Open {app.title}
+          </button>
+        </div>
+      )
+    }
     return (
       <button
         key={row.id}

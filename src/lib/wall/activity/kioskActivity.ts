@@ -37,6 +37,9 @@ export type KioskStage =
   | { kind: 'energy' }
   /** Everything on today, or the weekend, each task and routine with its check. */
   | { kind: 'agenda'; view: 'today' | 'weekend' }
+  /** A web app from a kid's routine (wallApps), full screen. `routineId` is
+   *  checked off when the app says it's done. */
+  | { kind: 'webapp'; url: string; title: string; origin: string; routineId?: string }
 
 export type KioskStageKind = KioskStage['kind']
 
@@ -175,10 +178,13 @@ export function stageHoldsOpen(s: KioskState, ctx: HoldContext): boolean {
     case 'energy':
     case 'agenda':
       return false
+    // A web app: touches inside it never reach the wall, so idle can't judge
+    // it; the stage closes itself after a while instead (WebAppStage).
     case 'cooking':
     case 'calling':
     case 'person':
     case 'recipe':
+    case 'webapp':
       return true
     case 'groceries':
       return !!s.groceries?.lines.some((l) => l.state === 'saving')
@@ -345,6 +351,8 @@ export function kioskPlace(s: KioskState, ctx: PlaceContext): string {
       return 'Energy'
     case 'agenda':
       return stage.view === 'today' ? 'All of today' : 'This weekend'
+    case 'webapp':
+      return stage.title
   }
 }
 

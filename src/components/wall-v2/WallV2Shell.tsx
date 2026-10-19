@@ -1231,6 +1231,7 @@ export function WallV2Shell() {
               tonight={selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null)}
               onOpenDinner={handleTapDinnerCard}
               onOpenMember={handleTapGanttMember}
+              onOpenApp={(app, routineId) => kioskDispatch({ type: 'OPEN', stage: { kind: 'webapp', url: app.url, title: app.title, origin: app.origin, routineId } })}
             />
           )}
           recipePage={recipePage}
