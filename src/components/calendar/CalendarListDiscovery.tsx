@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { calendarSource, whereFound } from '@/lib/calendar/calendarSource'
 import { Check, Eye, EyeOff, Briefcase, Users, User } from 'lucide-react'
 import type { GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import type { TaskContext } from '@/types/task'
@@ -90,7 +91,9 @@ export function CalendarListDiscovery({ calendars, onContinue, onBack }: Calenda
             <p className={`font-medium truncate ${isHidden ? 'text-neutral-400' : 'text-neutral-800'}`}>
               {calendar.summary}
             </p>
-            {calendar.email.includes('@') && calendar.email !== calendar.summary && !calendar.email.includes('group.calendar.google.com') && (
+            {calendarSource(calendar, calendars) ? (
+              <p className="text-sm text-neutral-500 truncate">{calendarSource(calendar, calendars)}</p>
+            ) : calendar.email.includes('@') && calendar.email !== calendar.summary && !calendar.email.includes('group.calendar.google.com') && (
               <p className="text-sm text-neutral-500 truncate">{calendar.email}</p>
             )}
             <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -140,7 +143,7 @@ export function CalendarListDiscovery({ calendars, onContinue, onBack }: Calenda
         </button>
         <h2 className="text-2xl font-display text-neutral-800">Your Calendars</h2>
         <p className="text-neutral-600 mt-2">
-          We found {calendars.length} calendar{calendars.length !== 1 ? 's' : ''} in your Google account
+          We found {calendars.length} calendar{calendars.length !== 1 ? 's' : ''} {whereFound(calendars)}
         </p>
       </div>
 

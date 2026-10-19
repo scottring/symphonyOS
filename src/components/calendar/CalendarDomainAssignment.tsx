@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { calendarSource } from '@/lib/calendar/calendarSource'
 import { Check, Eye, Calendar, Info, AlertTriangle, Briefcase, Users, User } from 'lucide-react'
 import type { GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import type { TaskContext } from '@/types/task'
@@ -154,10 +155,12 @@ export function CalendarDomainAssignment({ calendars, onSave, onBack }: Calendar
                             {calendar.summary}
                           </p>
                           <p className="text-xs text-neutral-500 truncate">
-                            {/* Only show email if it's different from summary and looks like an email */}
-                            {calendar.email.includes('@') && calendar.email !== calendar.summary && !calendar.email.includes('group.calendar.google.com')
-                              ? calendar.email
-                              : isWritable ? 'Can create events' : 'View only'}
+                            {/* Which account it is, when there are several; else the email if it differs from the name */}
+                            {calendarSource(calendar, calendars)
+                              ? `${calendarSource(calendar, calendars)} · ${isWritable ? 'can create events' : 'view only'}`
+                              : (calendar.email.includes('@') && calendar.email !== calendar.summary && !calendar.email.includes('group.calendar.google.com')
+                                ? calendar.email
+                                : isWritable ? 'Can create events' : 'View only')}
                           </p>
                         </div>
                       </div>

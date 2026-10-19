@@ -308,6 +308,30 @@ describe('WeekViewV2 journal spread', () => {
     expect(onUpdateTask).toHaveBeenCalledWith('a', { scheduledFor: new Date(2026, 8, 17, 9), isAllDay: false, bucket: 'timed' })
   })
 
+  it('a timed event drags to another day and keeps its time and length; an all-day one does not drag', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
+    const onUpdateEvent = vi.fn()
+    const events = [
+      mockEvent({ id: 'pt', title: 'PT appointment', start: '2026-09-14T10:00:00', end: '2026-09-14T11:30:00' }),
+      { id: 'hol', title: 'No school', start_time: '2026-09-14T12:00:00.000Z', end_time: '2026-09-15T12:00:00.000Z', all_day: true } as unknown as CalendarEvent,
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} events={events} onUpdateEvent={onUpdateEvent} />)
+    vi.useRealTimers()
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    expect(monday.getByRole('button', { name: /No school/ })).not.toHaveAttribute('draggable', 'true')
+    const data: Record<string, string> = {}
+    const dt = { setData: (k: string, v: string) => { data[k] = v }, getData: (k: string) => data[k] ?? '', types: [] as string[], effectAllowed: '', dropEffect: '' }
+    fireEvent.dragStart(monday.getByRole('button', { name: /PT appointment/ }), { dataTransfer: dt })
+    dt.types = Object.keys(data)
+    const thursday = screen.getByTestId('journal-day-2026-09-17')
+    fireEvent.dragOver(thursday, { dataTransfer: dt })
+    expect(within(thursday).getByText('Drop on Thu 17')).toBeInTheDocument()
+    fireEvent.drop(thursday, { dataTransfer: dt })
+    await waitFor(() => expect(onUpdateEvent).toHaveBeenCalledWith('pt', {
+      startTime: new Date(2026, 8, 17, 10), endTime: new Date(2026, 8, 17, 11, 30),
+    }))
+  })
+
   // Codex, 2026-09-24: the helper supports a dedupe key, but the caller has to
   // pass one. The journal draws the same meeting twice when two calendars
   // report it, so the count must merge what the journal does not.

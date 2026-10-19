@@ -28,15 +28,19 @@
 // the priority (Task 13, Scott 2026-10-18 — a day shows two, so drag what
 // matters to the top). The desk drags natively; touch (the iPad, the wall, a
 // phone) presses and holds 250ms, then drags (dnd-kit's TouchSensor, Today's
-// constraints), so a tap still opens and a swipe still scrolls. Calendar
-// events never move.
+// constraints), so a tap still opens and a swipe still scrolls.
+//
+// A timed calendar event drags to another day and keeps its time and length
+// (Scott, 2026-10-19: "drag to another day" — the hours grid stays retired).
+// An all-day event, one on a calendar that is view-only, or a page that
+// cannot write events does not move.
 // Every write is the caller's (WeekViewV2 routes them through the canvas
 // activity strip with Undo); this component draws and asks.
 //
 // Phone (<768px): a row of day chips, the chosen day, then No day yet;
 // tap opens a chip's task; press and hold orders the day.
 
-import { useContext, useState, type DragEvent, type HTMLAttributes, type ReactNode } from 'react'
+import { useContext, useState, type ButtonHTMLAttributes, type DragEvent, type HTMLAttributes, type ReactNode } from 'react'
 import {
   DndContext, DragOverlay, MouseSensor, TouchSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragMoveEvent, type DragStartEvent,
@@ -76,6 +80,10 @@ export interface CanvasDayItem {
   routineId?: string
   /** Who carries it (household member ids); none for a calendar event. */
   people?: string[]
+  /** A calendar event: when it ends, to keep its length on another day. */
+  end?: Date
+  /** A calendar event that may be dragged to another day (timed, writable). */
+  movable?: boolean
   /** Drawn from a pending change card: dashed, not yet saved, not interactive. */
   proposed?: boolean
   /** A proposed row that would be done or skipped: struck through. */
@@ -131,6 +139,9 @@ export interface WeekCanvasWriters {
    *  (`dayTasks`, as the day reads them, with the orders they have now;
    *  `reorderTasksToIndex`'s terms). Absent: a drop on its own day does nothing. */
   reorderTask?: (task: Task, dayTasks: Task[], toIndex: number) => void
+  /** Move a timed calendar event to another day at the same time. Absent:
+   *  events do not drag. */
+  moveEvent?: (event: CanvasDayItem, day: Date) => void
 }
 
 export interface WeekCanvasProps {
@@ -160,10 +171,22 @@ export interface WeekCanvasProps {
   viewerId?: string
 }
 
-type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
+type Drag = { kind: 'task' | 'routine' | 'occ' | 'event'; id: string; groupKey?: string; fromKey?: string }
 type Picker = { key: string } | null
 /** A touch drag's row: what a native drag would have written, and the state. */
-type Lift = { payload: PlanDragPayload; drag: Drag; title: string }
+type Lift = { payload: PlanDragPayload | null; drag: Drag; title: string }
+
+/** A calendar event in flight. Its own type, so the Today pin and the other
+ *  plan drop targets never mistake it for a task or routine. */
+const EVENT_MIME = 'application/x-symphony-week-event'
+type EventDrag = { id: string; from: string }
+const isEventDrag = (dt: DataTransfer | null) => !!dt && Array.from(dt.types).includes(EVENT_MIME)
+function readEventDrag(dt: DataTransfer | null): EventDrag | null {
+  try {
+    const p = JSON.parse(dt?.getData(EVENT_MIME) || 'null') as Partial<EventDrag> | null
+    return p && typeof p.id === 'string' && typeof p.from === 'string' ? { id: p.id, from: p.from } : null
+  } catch { return null }
+}
 
 /** Touch: press and hold, then drag (Today's TodayDragProvider constraints) —
  *  a tap still opens the row and a swipe still scrolls the page. A mouse or
@@ -184,6 +207,13 @@ function LiftableRow<T>({ liftId, lift, ...props }: CompactWeekRowProps<T> & { l
     <CompactWeekRow {...props} className={`${props.className ?? ''}${isDragging ? ' is-lifted' : ''}`}
       liProps={{ ...props.liProps, ref: setNodeRef, ...(listeners as HTMLAttributes<HTMLLIElement> | undefined) }} />
   )
+}
+
+/** A calendar event's row: a button that opens it, dragged natively on the
+ *  desk and lifted on a held press on touch. */
+function EventButton({ liftId, lift, className, ...rest }: { liftId: string; lift: Lift | null } & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { setNodeRef, listeners, isDragging } = useDraggable({ id: liftId, data: lift ?? undefined, disabled: !lift })
+  return <button type="button" ref={setNodeRef} {...(lift ? listeners : undefined)} {...rest} className={`${className ?? ''}${isDragging ? ' is-lifted' : ''}`} />
 }
 
 /** More than this many with no day fold to one line under the days. */
@@ -269,6 +299,18 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     }
     writers.foreignDrop?.(day.date, p)
   }
+  const dayEvent = (id: string, key: string) => days.find((d) => d.key === key)?.events.find((ev) => ev.id === id) ?? null
+  const dropEventOnDay = (day: CanvasDay, e: EventDrag) => {
+    endDrag()
+    const ev = dayEvent(e.id, e.from)
+    if (ev?.movable && e.from !== day.key) writers.moveEvent?.(ev, day.date)
+  }
+  const startEventDrag = (ev: DragEvent, item: CanvasDayItem, key: string) => {
+    ev.dataTransfer.setData(EVENT_MIME, JSON.stringify({ id: item.id, from: key } satisfies EventDrag))
+    ev.dataTransfer.setData('text/plain', item.title)
+    ev.dataTransfer.effectAllowed = 'move'
+    setDrag({ kind: 'event', id: item.id, fromKey: key }); setPicker(null)
+  }
   // ── order within a day ────────────────────────────────────────────────
   // Only a task orders, within the day it is on; events and routines keep
   // their places. The gap is read from the shown task rows (a folded day
@@ -289,7 +331,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   }
   const dayDrop = (day: CanvasDay) => ({
     onDragOver: (e: DragEvent) => {
-      if (!isPlanDrag(e.dataTransfer)) return
+      if (!isPlanDrag(e.dataTransfer) && !isEventDrag(e.dataTransfer)) return
       e.preventDefault(); e.dataTransfer.dropEffect = 'move'
       if (overDay !== day.key) setOverDay(day.key)
       if (reorders(drag, day.key)) showGap(day.key, e.currentTarget, e.clientY)
@@ -300,6 +342,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       setOverDay((k) => (k === day.key ? null : k))
     },
     onDrop: (e: DragEvent) => {
+      const moved = readEventDrag(e.dataTransfer)
+      if (moved) { e.preventDefault(); e.stopPropagation(); dropEventOnDay(day, moved); return }
       const p = readPlanDrag(e.dataTransfer)
       if (!p) { endDrag(); return }
       e.preventDefault(); e.stopPropagation()
@@ -333,6 +377,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const y = dragPointerY(e)
     endDrag()
     if (!l || !over) return
+    if (l.drag.kind === 'event') {
+      const day = days.find((d) => `day:${d.key}` === over)
+      if (day && l.drag.fromKey) dropEventOnDay(day, { id: l.drag.id, from: l.drag.fromKey })
+      return
+    }
+    if (!l.payload) return
     if (over === 'noday') {
       const placed = l.drag.kind === 'task' && l.drag.fromKey ? dayTask(l.payload.id) : null
       if (placed?.item.task) writers.unplaceTask(placed.item.task)
@@ -474,14 +524,20 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         )}
         {day.events.length > 0 && (
           <ul className="wc-events" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} events`}>
-            {day.events.map((ev) => (
-              <li key={ev.id}>
-                <button type="button" className="wc-event" onClick={() => writers.open(ev.id)}>
-                  {ev.time && <span className="wc-event-time">{formatTimeCompact(ev.time)}</span>}
-                  <span className="wc-event-title">{ev.title}{ev.subtitle && <span className="wc-event-sub">{ev.subtitle}</span>}</span>
-                </button>
-              </li>
-            ))}
+            {day.events.map((ev) => {
+              const movable = !!writers.moveEvent && !!ev.movable && !phone
+              const lift: Lift | null = movable && coarse ? { payload: null, drag: { kind: 'event', id: ev.id, fromKey: day.key }, title: ev.title } : null
+              return (
+                <li key={ev.id}>
+                  <EventButton liftId={`${day.key}:${ev.id}`} lift={lift} className={`wc-event${movable ? ' is-movable' : ''}`} onClick={() => writers.open(ev.id)}
+                    draggable={movable && !coarse} onDragStart={movable && !coarse ? (e) => startEventDrag(e, ev, day.key) : undefined}
+                    onDragEnd={movable && !coarse ? endDrag : undefined}>
+                    {ev.time && <span className="wc-event-time">{formatTimeCompact(ev.time)}</span>}
+                    <span className="wc-event-title">{ev.title}{ev.subtitle && <span className="wc-event-sub">{ev.subtitle}</span>}</span>
+                  </EventButton>
+                </li>
+              )
+            })}
           </ul>
         )}
         {items.length > 0 && <ul className="cw-rows wc-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{items.map((it) => dayRow(it, day, orderOf(it)))}</ul>}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useGoogleCalendar, type CalendarAccount, type CalendarProvider, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import { homeAccount } from '@/lib/calendar/homeAccount'
+import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { CalendarSetupWizard } from '@/components/calendar/CalendarSetupWizard'
 import { SectionHeading } from '@/components/layout/SectionHeading'
 
@@ -93,6 +94,7 @@ export function CalendarSettings() {
   const [calendars, setCalendars] = useState<GoogleCalendarInfo[]>([])
   const [defaultSaveState, setDefaultSaveState] = useState<'idle' | 'saving' | 'error'>('idle')
   const [actionError, setActionError] = useState<string | null>(null)
+  const { mappings, loading: mappingsLoading } = useCalendarDomainMappings()
 
   // One list across every account; each card shows only its own calendars.
   useEffect(() => {
@@ -292,6 +294,8 @@ export function CalendarSettings() {
     )
   }
 
+  const defaultHidden = !!defaultCalendarId && !mappingsLoading && mappings.length > 0 &&
+    !mappings.some((m) => m.calendarId === defaultCalendarId)
   // Default write calendar — where Symphony-created events land. Read-only
   // calendars are excluded: the provider refuses writes to them regardless.
   const createOn = home && (createOnGroups.length > 0 || calendarsOf(home).some(isWritable)) ? (
@@ -320,6 +324,13 @@ export function CalendarSettings() {
           ? 'Could not save — try again.'
           : 'New events from Symphony go here. Calendars you can only view are not listed.'}
       </p>
+      {/* A calendar in no area is hidden from every page, so its new events
+          would vanish from view (2026-10-19, the Outlook test). */}
+      {defaultHidden && (
+        <p className="mt-1 text-xs text-amber-700" role="note">
+          This calendar isn’t in any area, so events created here won’t show in Symphony. Assign it with “Choose areas for calendars”.
+        </p>
+      )}
     </div>
   ) : null
 

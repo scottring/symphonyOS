@@ -263,6 +263,10 @@
   font-family: var(--font-family-sans); font-size: 12.5px; line-height: 1.3;
 }
 .wc-event:hover { background: var(--event-tint-hover); }
+/* A timed event drags to another day (2026-10-19). */
+.wc-event.is-movable { cursor: grab; }
+.wc-event.is-movable:active { cursor: grabbing; }
+.wc-event.is-lifted { opacity: 0.4; }
 .wc-event:focus-visible, .wc-span:focus-visible, .wc-rhythm-item:focus-visible, .wc-daychip:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .wc-event-time { flex: none; font-weight: 600; }
 .wc-event-title { min-width: 0; overflow-wrap: anywhere; }

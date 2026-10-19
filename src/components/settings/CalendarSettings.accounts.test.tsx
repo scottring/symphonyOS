@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 const connect = vi.fn().mockResolvedValue(undefined)
 const disconnect = vi.fn().mockResolvedValue(undefined)
 const makePrimary = vi.fn().mockResolvedValue(undefined)
-const state = { reconnectAccountIds: [] as string[] }
+const state = { reconnectAccountIds: [] as string[], defaultCalendarId: null as string | null, mappings: [] as { calendarId: string; calendarName: string; domain: string }[] }
 
 const ACCOUNTS = [
   { id: 'personal', provider: 'google', accountEmail: 'me@gmail.com', isPrimary: true, grantsMail: false },
@@ -31,9 +31,13 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
     disconnect,
     makePrimary,
     fetchCalendarList: vi.fn().mockResolvedValue(CALENDARS),
-    defaultCalendarId: null,
+    defaultCalendarId: state.defaultCalendarId,
     setDefaultCalendarId: vi.fn(),
   }),
+}))
+
+vi.mock('@/hooks/useCalendarDomainMappings', () => ({
+  useCalendarDomainMappings: () => ({ mappings: state.mappings, loading: false }),
 }))
 
 import { CalendarSettings } from './CalendarSettings'
@@ -41,10 +45,34 @@ import { CalendarSettings } from './CalendarSettings'
 beforeEach(() => {
   connect.mockClear(); disconnect.mockClear(); makePrimary.mockClear()
   state.reconnectAccountIds = []
+  state.defaultCalendarId = null
+  state.mappings = [{ calendarId: 'me@gmail.com', calendarName: 'me@gmail.com', domain: 'personal' }]
   vi.spyOn(window, 'confirm').mockReturnValue(true)
 })
 
 const card = (email: string) => screen.getAllByTestId('calendar-account').find((c) => c.textContent?.includes(email))!
+
+describe('Create events on — a calendar in no area', () => {
+  it('says new events there will not show in Symphony', async () => {
+    state.defaultCalendarId = 'team@work.com'
+    render(<CalendarSettings />)
+    await screen.findByLabelText('Create events on')
+    expect(screen.getByRole('note')).toHaveTextContent('isn’t in any area')
+  })
+
+  it('says nothing for a calendar that is in an area, or for Primary', async () => {
+    state.mappings.push({ calendarId: 'team@work.com', calendarName: 'Team', domain: 'work' })
+    state.defaultCalendarId = 'team@work.com'
+    const { unmount } = render(<CalendarSettings />)
+    await screen.findByLabelText('Create events on')
+    expect(screen.queryByRole('note')).toBeNull()
+    unmount()
+    state.defaultCalendarId = null
+    render(<CalendarSettings />)
+    await screen.findByLabelText('Create events on')
+    expect(screen.queryByRole('note')).toBeNull()
+  })
+})
 
 describe('several Google accounts', () => {
   it('shows one card per account, the primary marked', async () => {

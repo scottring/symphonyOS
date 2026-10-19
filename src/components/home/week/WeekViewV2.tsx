@@ -89,6 +89,7 @@ import { useDeckActions } from './useDeckActions'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
+import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
  *  a full-day span (midnight start, 24h+ duration — how a holiday reads from
@@ -778,13 +779,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // day — the page's remembered choice (useWeekViewPrefs, 'symphony-week-daily',
   // set from the header's ⋯ menu).
   const { dailyInDays: dailyShown } = useWeekViewPrefs()
+  // A timed event drags to another day when this page can write events and
+  // its calendar is not view-only (the event's calendar, from the events read).
+  const { isReadOnlyCalendar } = useCalendarPermissions()
+  const eventCalendar = useMemo(() => new Map(events.map((ev) => [`event-${ev.google_event_id || ev.id}`, ev.calendar_id ?? ev.calendarId ?? null])), [events])
   const canvasDays = useMemo(() => {
     const onShelf = new Set(shelf.flatMap((g) => g.rows.map((r) => r.task.id)))
     // Repeated tasks too ("Pick up from FFG" each weekday), and repeats on
     // part of the week ("Mon–Thu"): written once above.
     const found = weekRhythm(journalDays, undefined, { tasks: true, partial: true })
     const rhythm = dailyShown ? { everyDay: [], weekdays: [], repeats: [], days: journalDays } : found
-    const toItem = (e: JournalEntry): CanvasDayItem => ({ id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId, people: e.people })
+    const toItem = (e: JournalEntry): CanvasDayItem => ({
+      id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId, people: e.people,
+      ...(e.kind === 'event' ? { end: e.end, movable: !!onUpdateEvent && !!e.time && eventCalendar.has(e.id) && !isReadOnlyCalendar(eventCalendar.get(e.id)) } : {}),
+    })
     // Open calendar time is planning information: today and the days ahead,
     // counted from the whole day — every-day routines too, though written above.
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
@@ -819,7 +827,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     })
     const lines = rhythmLines(rhythm)
     return { days, lines }
-  }, [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners, sources?.events])
+  }, [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners, sources?.events, onUpdateEvent, eventCalendar, isReadOnlyCalendar])
   // Beta: drafts stay in chat. The week always shows the stored plan;
   // successful writes reach it through the shared task hooks.
 
@@ -903,10 +911,23 @@ export function WeekViewV2(props: WeekViewV2Props) {
           ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) },
         })
       },
+      // A timed event keeps its time and length on the new day; Undo puts it back.
+      ...(onUpdateEvent ? {
+        moveEvent: (ev: CanvasDayItem, day: Date) => {
+          if (!ev.time) return
+          const eventId = ev.id.replace(/^event-/, '')
+          const length = ev.end ? ev.end.getTime() - ev.time.getTime() : 30 * 60_000
+          const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), ev.time.getHours(), ev.time.getMinutes())
+          const was = { startTime: ev.time, endTime: new Date(ev.time.getTime() + length) }
+          void activity.run(`Move “${ev.title}” to ${short(day)}`,
+            async () => { await onUpdateEvent(eventId, { startTime: start, endTime: new Date(start.getTime() + length) }) },
+            { ids: [ev.id], undo: async () => { await onUpdateEvent(eventId, was) } })
+        },
+      } : {}),
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated])
+  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated])
   const canvasSpans = useMemo(() => {
     const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }
     const wd = (i: number) => journalDays[i].date.toLocaleDateString('en-US', { weekday: 'short' })

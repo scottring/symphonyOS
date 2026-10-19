@@ -95,6 +95,58 @@ describe('weekShelf', () => {
 })
 
 describe('WeekCanvas — drag', () => {
+  // Scott 2026-10-19: a timed event drags to another day, keeping its time.
+  const movableDays = (movable = true) => days().map((d, i) => i === 2
+    ? { ...d, events: [{ id: 'event-e1', kind: 'event' as const, title: 'Dentist', time: new Date(2026, 9, 5, 9), end: new Date(2026, 9, 5, 10), completed: false, movable }] }
+    : d)
+  const dentist = () => screen.getByRole('button', { name: /Dentist/ })
+
+  it('a movable event dragged to another day is handed to moveEvent with that day', () => {
+    const w = { ...writers(), moveEvent: vi.fn() }
+    render(<WeekCanvas weekStart={weekStart} days={movableDays()} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+    expect(dentist()).toHaveAttribute('draggable', 'true')
+    const d = dt()
+    fireEvent.dragStart(dentist(), { dataTransfer: d.t })
+    d.arm()
+    const target = screen.getByTestId(`journal-day-${key(dayOf(4))}`)
+    fireEvent.dragOver(target, { dataTransfer: d.t })
+    expect(target).toHaveClass('is-over')
+    fireEvent.drop(target, { dataTransfer: d.t })
+    expect(w.moveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: 'event-e1', title: 'Dentist' }), dayOf(4))
+    expect(w.foreignDrop).not.toHaveBeenCalled()
+  })
+
+  it('dropped back on its own day, an event does not move', () => {
+    const w = { ...writers(), moveEvent: vi.fn() }
+    render(<WeekCanvas weekStart={weekStart} days={movableDays()} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+    const d = dt()
+    fireEvent.dragStart(dentist(), { dataTransfer: d.t })
+    d.arm()
+    fireEvent.drop(screen.getByTestId(`journal-day-${key(dayOf(2))}`), { dataTransfer: d.t })
+    expect(w.moveEvent).not.toHaveBeenCalled()
+  })
+
+  it('an event that may not move (view-only, all-day) or a page that cannot write events does not drag', () => {
+    const w = { ...writers(), moveEvent: vi.fn() }
+    const { unmount } = render(<WeekCanvas weekStart={weekStart} days={movableDays(false)} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
+    expect(dentist()).not.toHaveAttribute('draggable', 'true')
+    unmount()
+    render(<WeekCanvas weekStart={weekStart} days={movableDays()} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} />)
+    expect(dentist()).not.toHaveAttribute('draggable', 'true')
+  })
+
+  it('an event in flight is not a plan row: the No day yet line ignores it', () => {
+    const w = { ...writers(), moveEvent: vi.fn() }
+    render(<WeekCanvas weekStart={weekStart} days={movableDays()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w} />)
+    const d = dt()
+    fireEvent.dragStart(dentist(), { dataTransfer: d.t })
+    d.arm()
+    expect(d.data['application/x-symphony-plan']).toBeUndefined()
+    fireEvent.drop(screen.getByText(/without a day/).closest('.wc-noday')!, { dataTransfer: d.t })
+    expect(w.unplaceTask).not.toHaveBeenCalled()
+    expect(w.moveEvent).not.toHaveBeenCalled()
+  })
+
   it('a day’s row dropped on the No day yet line loses its day', () => {
     const w = show()
     const d = dt()
@@ -675,7 +727,7 @@ describe('WeekCanvas — drag to order within a day', () => {
     expect(within(wedCol()).getByRole('button', { name: '+1 more' })).toBeInTheDocument()
   })
 
-  it('events never move: they do not drag, and the order asked for holds tasks only', () => {
+  it('events that cannot move do not drag, and the order asked for holds tasks only', () => {
     const w = orderWriters()
     const walk = { id: 'routine-r9', kind: 'routine' as const, title: 'Walk Jax', time: new Date(2026, 9, 7, 7), completed: false, routineId: 'r9' }
     render(<WeekCanvas weekStart={weekStart} days={withDay([walk as never, ...[A, B].map(asItem)])} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
