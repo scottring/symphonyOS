@@ -1,0 +1,105 @@
+/* src/styles/choose.css — planning a period: Choose, then Give them a day
+ * (spec 2026-10-19, plan from the level above). On the deck's scenery shell
+ * (.deck) and its buttons; every step says what it is planned for in one pill.
+ */
+
+.choose { width: min(860px, 100%); display: flex; flex-direction: column; gap: 14px; text-align: left; }
+.choose-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.choose-h { margin: 0; font: 400 34px/1.1 var(--font-family-display); color: var(--color-neutral-900); }
+.choose-facts, .choose-was { margin: -6px 0 0; font-size: 13.5px; color: var(--color-neutral-600); }
+.choose-empty { margin: 0; font-size: 14px; color: var(--color-neutral-500); }
+
+/* The view switch: All at once · One at a time */
+.choose-switch { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--color-neutral-100); }
+.choose-switch-btn { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: none; cursor: pointer; font: 500 13px var(--font-family-sans); color: var(--color-neutral-600); }
+.choose-switch-btn.is-on { background: var(--color-bg-elevated); color: var(--color-neutral-900); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+
+/* Planned for: one pill, the only thing planning changes */
+.choose-pill { display: inline-flex; align-items: center; white-space: nowrap; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--color-neutral-200);
+  font: 600 10.5px var(--font-family-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-600); background: var(--color-bg-elevated); }
+.choose-pill.is-here, .choose-pill.is-day { background: var(--color-primary-500); border-color: var(--color-primary-500); color: var(--color-bg-elevated); }
+.choose-pill.is-done { background: var(--color-success-50); border-color: transparent; color: var(--color-success-600); }
+.choose-pill.is-last { background: color-mix(in oklab, var(--color-bg-elevated), hsl(36 80% 60%) 18%); border-color: transparent; color: hsl(32 60% 32%); }
+.choose-note { font-size: 12px; color: var(--color-neutral-500); }
+
+/* All at once: every line one folded row */
+.choose-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.choose-line { background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 14px; }
+.choose-line.is-open { box-shadow: 0 14px 30px -20px rgb(20 40 60 / .4); }
+.choose-line-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 10px 16px; border: 0; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.choose-line-title { flex: 1; min-width: 0; font: 400 19px/1.25 var(--font-family-display); color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.choose-counts { flex: none; font-size: 12.5px; color: var(--color-neutral-500); }
+.choose-chev { flex: none; width: 14px; color: var(--color-neutral-400); }
+.choose-line-body { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+/* Steps */
+.choose-steps, .choose-sub { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.choose-steps { padding-left: 12px; border-left: 2px solid var(--color-neutral-200); }
+.choose-sub { margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--color-neutral-200); }
+.choose-step { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--color-neutral-50); }
+.choose-step.is-sub { background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); }
+.choose-step.is-done .choose-step-title { color: var(--color-neutral-500); text-decoration: line-through; }
+.choose-step-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.choose-step-title { margin: 0; font: 400 17px/1.25 var(--font-family-display); color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.choose-verbs { display: flex; flex-wrap: wrap; gap: 6px; }
+.choose-verb { min-height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--color-primary-200); background: var(--color-primary-100);
+  cursor: pointer; font: 500 13px var(--font-family-sans); color: var(--color-neutral-900); }
+.choose-verb:hover:not(:disabled) { background: var(--color-primary-200); }
+.choose-verb.is-quiet { background: transparent; border-color: var(--color-neutral-200); color: var(--color-neutral-600); }
+.choose-verb.is-quiet:hover:not(:disabled), .choose-verb.is-open { background: var(--color-neutral-100); }
+.choose-verb:disabled { opacity: .6; cursor: default; }
+.choose-menu { display: flex; flex-wrap: wrap; gap: 6px; }
+.choose-when { min-height: 32px; padding: 0 11px; border-radius: 99px; border: 1px solid var(--color-primary-200); background: var(--color-primary-50, var(--color-bg-elevated)); cursor: pointer; font: 500 12.5px var(--font-family-sans); color: var(--color-neutral-800); }
+.choose-status { margin: 0; font-size: 12.5px; color: var(--color-neutral-500); }
+.choose-status.is-failed { color: var(--color-error-600, #b42318); }
+.choose-add-row { padding-left: 14px; }
+.choose-add { font-size: 14px; }
+
+/* Not under a line */
+.choose-loose { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 14px; background: color-mix(in oklab, var(--color-bg-elevated), transparent 40%); border: 1px solid var(--color-neutral-200); }
+.choose-loose-title { margin: 0; font: 600 11px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
+.choose-loose .choose-steps { padding-left: 0; border-left: 0; }
+
+/* One at a time: the line as a card, its steps as smaller cards */
+.choose-card { display: flex; flex-direction: column; gap: 12px; padding: 22px 24px; border-radius: 18px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); box-shadow: 0 18px 40px -20px rgb(20 40 60 / .35); }
+.choose-card-head { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.choose-card-title { margin: 0; font: 400 30px/1.15 var(--font-family-display); color: var(--color-neutral-900); text-wrap: balance; }
+.choose[data-view='one'] .choose-card > .choose-steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); padding-left: 0; border-left: 0; }
+.choose[data-view='one'] .choose-card > .choose-steps > .choose-step { background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); box-shadow: 0 10px 24px -18px rgb(20 40 60 / .4); }
+.choose[data-view='one'] .choose-card .choose-loose { padding: 0; border: 0; background: none; }
+.choose-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.choose-pager-count { font-size: 13px; color: var(--color-neutral-600); }
+
+/* Drop something in, and the way on */
+.choose-dropin { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 16px; border-radius: 14px; border: 1px dashed var(--color-neutral-300); background: color-mix(in oklab, var(--color-bg-elevated), transparent 30%); }
+.choose-dropin input { flex: 1 1 220px; min-width: 0; min-height: 40px; border: 0; background: transparent; outline: none; font: 400 18px var(--font-family-display); color: var(--color-neutral-900); }
+.choose-dropin-hint { font-size: 12px; color: var(--color-neutral-500); }
+.choose-foot { display: flex; justify-content: flex-end; }
+.choose-foot .deck-btn { min-width: 180px; }
+
+/* Give them a day */
+.choose-strip .deck-day { min-height: 130px; }
+.choose-strip .deck-day.is-target:hover:not(:disabled) { border-color: var(--color-primary-500); }
+.choose-place-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.choose-place { display: flex; align-items: baseline; gap: 12px; width: 100%; padding: 10px 14px; border-radius: 11px; border: 1px solid var(--color-neutral-200); background: var(--color-bg-elevated); cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.choose-place.is-on { border-color: var(--color-primary-500); box-shadow: 0 0 0 1.5px var(--color-primary-500) inset; }
+.choose-place-from { flex: none; width: 34%; font-size: 11.5px; color: var(--color-neutral-500); overflow-wrap: anywhere; }
+.choose-place-title { flex: 1; min-width: 0; font: 400 18px/1.25 var(--font-family-display); color: var(--color-neutral-900); }
+.choose-place-hint { flex: none; font-size: 12px; color: var(--color-primary-500); }
+
+:is(.choose-verb, .choose-when, .choose-switch-btn, .choose-line-row, .choose-place):focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .choose-h { font-size: 28px; }
+  .choose-line-row { flex-wrap: wrap; }
+  .choose-counts { width: 100%; order: 3; }
+  .choose-card { padding: 18px 16px; }
+  .choose-place { flex-direction: column; gap: 2px; }
+  .choose-place-from { width: auto; }
+}
+
+/* Lines already done on the level above: the record, folded */
+.choose-done-fold { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 40px; padding: 6px 16px; border: 0; border-radius: 12px; background: none; cursor: pointer; font: inherit; font-size: 13.5px; color: var(--color-neutral-500); text-align: left; }
+.choose-done-list { list-style: none; margin: 0; padding: 0 16px 8px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--color-neutral-500); }
+.choose-line-verbs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.choose-line-verbs-label { font: 600 10.5px var(--font-family-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }

@@ -26,7 +26,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
-import { Deck } from '@/components/plan/deck/Deck'
+import { PlanWeekFlow, type WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import type { DeckCard, DeckMode } from '@/lib/planning/deck'
 import type { DeckActions } from '@/components/home/week/useDeckActions'
@@ -61,6 +61,8 @@ export interface WeekDeck {
    *  left here, in WeekV2. */
   onFinish: (decided: ReadonlySet<string>) => Promise<boolean>
   onSeeAged: () => void
+  /** Plan this week (spec 2026-10-19): Choose from the month, then Give them a day. */
+  choose: WeekChoose
 }
 
 export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
@@ -196,10 +198,9 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
         </div>
       )}
       {deckMode && deck
-        // Dealt only once the tasks are in: no flash of "Nothing left".
-        ? (deck.loading ? null : <Deck key={`${localYmd(weekStart)}-${deckMode}`} mode={deckMode} cards={deck.cards}
-            doneLastWeek={deck.doneLastWeek} aged={deck.aged} onSeeAged={deck.onSeeAged} actions={deck.actions}
-            stripDays={deck.stripDays} onFinish={finishDeck} onExit={() => setMode(null)} />)
+        // Drawn only once the tasks are in: no flash of an empty October.
+        ? (deck.loading ? null : <PlanWeekFlow key={`${localYmd(weekStart)}-${deckMode}`} mode={deckMode} choose={deck.choose}
+            stripDays={deck.stripDays} aged={deck.aged} onSeeAged={deck.onSeeAged} onFinish={() => finishDeck(new Set())} onLeave={() => setMode(null)} />)
         : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
     </div>
   )

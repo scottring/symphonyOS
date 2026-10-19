@@ -81,7 +81,11 @@ import { committedTo } from '@/lib/placement/model'
 import { weekReviewState } from '@/lib/planning/periodReview'
 import type { WeekDeck } from '@/components/plan/v2/WeekV2'
 import { buildDeck, deckModeOf, deckWeekAllowed } from '@/lib/planning/deck'
-import { staleForDrain, undealtLastWeek } from '@/lib/planning/drain'
+import { staleForDrain } from '@/lib/planning/drain'
+import { withPlacedSubtasks } from '@/lib/planning/plannedSubtasks'
+import { useChooseWeek } from './useChooseWeek'
+import { openCommitment } from '@/lib/placement/model'
+import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { doableBy } from '@/lib/planning/poolViews'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
@@ -198,7 +202,7 @@ function weekWalk(anchor: Date, now: Date): { label: string; message: string } |
 
 export function WeekViewV2(props: WeekViewV2Props) {
   const {
-    tasks,
+    tasks: listedTasks,
     events,
     sources,
     routines,
@@ -218,9 +222,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
     onReorderTasks,
   } = props
 
+  // A step planned for a week or given a day is week work, even when it is
+  // a subtask still nested under its line (spec 2026-10-19).
+  const tasks = useMemo(() => withPlacedSubtasks(listedTasks), [listedTasks])
+
   // Create-gesture wiring
   const navigate = useNavigate()
-  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, updateTaskOrders, pushTask, userId, keepForward } = useSupabaseTasks()
+  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, updateTaskOrders, pushTask, userId, keepForward, dropCommitment } = useSupabaseTasks()
   // Orders go through the rendered list's own writer, so a drop moves the row
   // at once; this page's hook instance is only the fallback (its optimistic
   // state is not what the page draws).
@@ -1061,18 +1069,39 @@ export function WeekViewV2(props: WeekViewV2Props) {
       more: Math.max(0, items.length - 3),
     }
   }), [weekAnchor, events, scopedTasks])
+  // ── Plan this week (spec 2026-10-19): Choose from the month, then days ──
+  // October's lines from the same scoped rows (areas and the people lens),
+  // the month this week mostly lives in.
+  const planMonth = useMemo(() => monthStartOf(new Date(weekAnchor.getTime() + 3 * 86_400_000)), [weekAnchor])
+  const planLines = useMemo(() => selectPeriodTasks(layerTasks.filter(lens.keep), 'month', planMonth,
+    planMonth.getTime() === monthStartOf(new Date()).getTime(), lens.scopeId, readSeasons()), [layerTasks, lens, planMonth])
+  const planPool = useMemo(() => {
+    const ids = new Set(deckTasks.map((t) => t.id))
+    return [...deckTasks, ...planLines.filter((t) => !ids.has(t.id))]
+  }, [deckTasks, planLines])
+  const chooseWeek = useChooseWeek({
+    lines: planLines, pool: planPool, weekAnchor, lastWeekStart, monthStart: planMonth, isCurrent: weekIsCurrent,
+    actions: deckActions, keepForward, dropCommitment, updateTask, addTask, deleteTask,
+  })
   const deck: WeekDeck = {
     mode: deckMode, available: deckAvailable,
     cards: deckCards, doneLastWeek, aged, actions: deckActions, stripDays,
     loading: !tasksLoaded, lastReview,
-    // One run, one Undo: last week's undealt cards go to Later together (a
-    // task with a day today or later keeps it). "Place them" never drains.
-    onFinish: async (decided) => {
+    // Last week's leftovers nobody answered: one on October goes back to
+    // October (its week ends, its line keeps it); any other goes to Later,
+    // together, one Undo. "Place them" never drains.
+    onFinish: async () => {
       if (deckMode !== 'full') return true
-      const left = undealtLastWeek(deckCards, decided, new Date()).filter(drainable)
-      return left.length > 0 ? deckActions.drain(left, `Move ${left.length} left from last week to Later`) : true
+      const left = chooseWeek.unanswered.filter(drainable)
+      const backUp = left.filter((t) => openCommitment({ commitments: bootstrapCommitments(t) }, 'month'))
+      const rest = left.filter((t) => !backUp.includes(t))
+      let ok = true
+      for (const t of backUp) ok = (await dropCommitment(t.id, 'week', lastWeekStart)) && ok
+      if (rest.length > 0) ok = (await deckActions.drain(rest, `Move ${rest.length} left from last week to Later`)) && ok
+      return ok
     },
     onSeeAged: () => navigate('/someday'),
+    choose: chooseWeek,
   }
 
   return (

@@ -77,6 +77,7 @@ await import('./styles/canvas-today.css')
 await import('./styles/canvas-plan.css')
 // The deck: one card at a time (Friday session).
 await import('./styles/deck.css')
+await import('./styles/choose.css')
 await import('./styles/canvas-kiosk.css')
 await import('./styles/kiosk-v1.css')
 // Math of the day's stage, with the wall's other styles (a component-level
