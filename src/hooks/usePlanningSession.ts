@@ -41,13 +41,16 @@ export function usePlanningSession(horizon: SessionHorizon, token: string) {
     const req = ++latest.current
     // No period (the guide bar with nothing to guide): nothing to read.
     if (!token) { setLoading(false); return }
+    // Not signed in yet: wait. A read now is thrown away a moment later, when
+    // the user arrives and the period is read again.
+    if (!user?.id) return
     setLoading(true)
     setLoadedToken(null)
     setError(null)
     // Shared while in flight: Home mounts this week, month and season more
     // than once in a render pass (prod, 2026-10-19: each read four times).
     const { data, error: readError } = await shareInFlight(
-      `planning_sessions:${user?.id ?? 'anon'}|${horizon}|${token}`,
+      `planning_sessions:${user.id}|${horizon}|${token}`,
       async () => await supabase.from('planning_sessions')
         .select('author_id, updated_at, notes').eq('horizon', horizon).eq('period_token', token)
         .order('updated_at', { ascending: false }),

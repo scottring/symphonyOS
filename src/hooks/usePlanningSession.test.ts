@@ -17,12 +17,13 @@ vi.mock('@/lib/supabase', () => ({
     }),
   },
 }))
-vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
+let authUser: { id: string } | null = { id: 'u1' }
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: authUser }) }))
 
 import { usePlanningSession, monthToken, weekToken, yearToken } from './usePlanningSession'
 
 describe('usePlanningSession', () => {
-  beforeEach(() => { rows.length = 0; ownRow = null; upsert.mockClear(); orderImpl = async () => ({ data: rows, error: null }) })
+  beforeEach(() => { authUser = { id: 'u1' }; rows.length = 0; ownRow = null; upsert.mockClear(); orderImpl = async () => ({ data: rows, error: null }) })
 
   it('builds the month token the cadence code uses', () => {
     expect(monthToken(new Date(2026, 9, 1))).toBe('2026-10')
@@ -162,5 +163,19 @@ describe('usePlanningSession', () => {
     const other = renderHook(() => usePlanningSession('monthly', '2026-10'))
     await waitFor(() => expect(other.result.current.loading).toBe(false))
     expect(reads).toBe(2)
+  })
+  // The app starts each useAuth with no user and fills it in a moment later.
+  it('waits for the signed-in user instead of reading twice', async () => {
+    let reads = 0
+    orderImpl = async () => { reads++; return { data: rows, error: null } }
+    authUser = null
+    const h = renderHook(() => usePlanningSession('weekly', '2026-10-17'))
+    await act(async () => { await Promise.resolve() })
+    expect(reads).toBe(0)
+    expect(h.result.current.loading).toBe(true)
+    authUser = { id: 'u1' }
+    h.rerender()
+    await waitFor(() => expect(h.result.current.loading).toBe(false))
+    expect(reads).toBe(1)
   })
 })

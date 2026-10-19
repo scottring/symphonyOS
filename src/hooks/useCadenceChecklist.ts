@@ -14,10 +14,11 @@ export function useCadenceChecklist(today: Date, weekStartsOn: WeekStart, season
   const slots = useMemo(() => checklistSlots(today, weekStartsOn, seasons), [today, weekStartsOn, seasons])
   const key = checklistTokens(slots).join('|')
   const { user } = useAuth()
-  const userId = user?.id ?? 'anon'
+  const userId = user?.id ?? null
   const [data, setData] = useState<{ key: string; rows: SessionRow[] | null } | null>(null)
   useEffect(() => {
-    if (!ready) return
+    // Not signed in yet: wait, or this read is repeated once the user arrives.
+    if (!ready || !userId) return
     let live = true
     // Shared while in flight: Home asked for the same checklist twice per load.
     void shareInFlight(`planning_sessions:checklist:${userId}|${key}`,
