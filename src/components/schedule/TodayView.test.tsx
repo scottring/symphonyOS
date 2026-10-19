@@ -596,27 +596,45 @@ describe('TodayView — the day card carries the date nav', () => {
   })
 })
 
-describe('TodayView — no review button (Today, trimmed)', () => {
-  afterEach(() => { mockUseMobile.mockReturnValue(true) })
-  it('the desktop day list ends without "Review today": reviewing is asked for in the bar', async () => {
+// Plan today / Review today (spec 2026-10-19, Today mockup approved): the
+// same choosing as every horizon, one level down — "This week → today" until
+// 4 pm, "Today → tomorrow" after. The ⋯ menu still has no review of its own.
+describe('TodayView — Plan today / Review today', () => {
+  afterEach(() => { mockUseMobile.mockReturnValue(true); vi.useRealTimers(); window.history.replaceState({}, '', '/') })
+  const renderAt = (hour: number) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), hour, 0))
     mockUseMobile.mockReturnValue(false)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const { user } = render(
+    const view = render(
       <DesktopControlsContext.Provider value={host}>
         <ScheduleActionsProvider value={ctxValue as never}>
           <TodayView
             tasks={[]} events={[]} routines={[]} dateInstances={[]}
             selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
             onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
-            viewedDate={TODAY} onDateChange={vi.fn()} projects={[]}
+            viewedDate={new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), hour, 0)} onDateChange={vi.fn()} projects={[]}
           />
         </ScheduleActionsProvider>
       </DesktopControlsContext.Provider>,
     )
+    return { ...view, host }
+  }
+  it('in the morning the page offers Plan today, which opens This week → today', async () => {
+    const { user, host } = renderAt(10)
     expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Plan today' }))
+    expect(screen.getByText('This week → today')).toBeInTheDocument()
+    host.remove()
+  })
+  it('from 4 pm it offers Review today, which opens Today → tomorrow; ⋯ has no end-of-day review', async () => {
+    const { user, host } = renderAt(17)
     await openOverflow(user)
     expect(screen.queryByRole('button', { name: /End of day review/i })).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'Review today' }))
+    expect(screen.getByText('Today → tomorrow')).toBeInTheDocument()
     host.remove()
   })
 })

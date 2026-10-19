@@ -80,6 +80,8 @@ const menu=()=>{
 }
 const choose=(name:string)=>{menu();fireEvent.click(screen.getByRole(/^Show done$/.test(name)?'menuitemcheckbox':'menuitem',{name}))}
 const at=(d:Date)=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(d)}
+/** Planning opens on Looking back (the period before's review); this moves past it to Choose. */
+const pastLookingBack=async()=>{fireEvent.click(screen.getByRole('button',{name:/^On to /}));await screen.findByRole('radiogroup',{name:'View'})}
 const REVIEWED={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
 beforeEach(()=>{
  vi.clearAllMocks();review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
@@ -484,8 +486,9 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   expect(menu()).toContain('Plan October')
   expect(menu()).not.toContain('Review September')
   fireEvent.click(within(head()).getByRole('button',{name:'Review September'}))
-  expect(screen.getByTestId('where').textContent).toContain('review=1')
-  expect(screen.getByTestId('where').textContent).toContain('start=2026-09-01')
+  // Reviewing September is the first card of planning October.
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+  expect(screen.getByTestId('where').textContent).toContain('start=2026-10-01')
  })
  it('Plan {period} while planning is open and no review is due; ⋯ plans it too',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
@@ -501,7 +504,8 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   expect(primaries()).toEqual([])
   expect(menu()).toContain('Review March')
   choose('Review March')
-  expect(screen.getByTestId('where').textContent).toContain('review=1')
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+  expect(screen.getByTestId('where').textContent).toContain('start=2025-04-01')
  })
  it('once the period is planned, the primary plans the next one (Month and Season)',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED;plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
@@ -751,29 +755,25 @@ describe('on schedule (spec 2026-10-14, "The schedule")',()=>{
  })
 })
 
-describe('the review by hand (2026-10-17)',()=>{
- it('Month: Review October lists the open lines with the row verbs; each saves through the activity',async()=>{
-  api.tasks=[{id:'a',title:'Book the cabin',bucket:'month'},{id:'b',title:'Pay taxes',bucket:'month',completed:true},{id:'c',title:'Plan sabbatical',bucket:'month',carried:true}]
-  api.toggleTask.mockResolvedValue(true)
-  // Its own review opens in October's last three days.
+// Reviewing is the first card of planning the period after it (spec
+// 2026-10-19): Looking back — the count, What went well, What didn't — saved
+// as that period's review, then the same Choose.
+describe('reviewing: Looking back, then plan',()=>{
+ it('Review October opens Plan November on Looking back; its notes save as the review, then Choose follows',async()=>{
+  api.tasks=[{id:'a',title:'Book the cabin',bucket:'month'},{id:'b',title:'Pay taxes',bucket:'month',completed:true}]
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,12))
-  month()
-  expect(review.seen.slice(0,2)).toEqual(['monthly:2026-10','monthly:2026-9'])
-  fireEvent.click(screen.getByRole('button',{name:'Review October'}))
-  expect(screen.getByTestId('where').textContent).toContain('review=1')
-  expect(primaries()).toEqual([])
-  expect(facts()).toBeNull()
-  const open=screen.getByRole('list',{name:'Still open in October'})
-  expect(within(open).getAllByRole('listitem')).toHaveLength(1)
-  expect(within(open).getAllByRole('button').map(b=>b.textContent)).toEqual(['Done','Move to November','Someday','Remove from October'])
-  expect(screen.getByText('Plan sabbatical').closest('li')).toHaveTextContent('Moved on')
-  fireEvent.click(within(open).getByRole('button',{name:'Done: Book the cabin'}))
-  await waitFor(()=>expect(lastRun().label).toBe('Complete “Book the cabin”'))
-  expect(lastRun().opts.undo).toBeDefined()
-  fireEvent.click(screen.getAllByRole('button',{name:'Close review'})[0])
-  expect(screen.getByTestId('where').textContent).not.toContain('review=1')
-  expect(screen.getByRole('list',{name:'October goals'})).toBeInTheDocument()
-  vi.useRealTimers()
+  try{
+   month()
+   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
+   expect(screen.getByTestId('where').textContent).toContain('plan=1')
+   expect(screen.getByTestId('where').textContent).toContain('start=2026-11-01')
+   const look=within(screen.getByRole('article',{name:'Looking back at October'}))
+   expect(screen.getByText('Review October · then plan November')).toBeInTheDocument()
+   fireEvent.change(look.getByRole('textbox',{name:'What went well'}),{target:{value:'Cabin booked'}})
+   fireEvent.click(screen.getByRole('button',{name:'On to Fall goals → November'}))
+   await waitFor(()=>expect(review.finish).toHaveBeenCalledWith({wentWell:'Cabin booked',didnt:''}))
+   expect(await screen.findByText('Fall goals → November')).toBeInTheDocument()
+  }finally{vi.useRealTimers()}
  })
  it('under way, the page offers last period’s review until it is done; a coming period offers none',()=>{
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,17,12))
@@ -781,8 +781,8 @@ describe('the review by hand (2026-10-17)',()=>{
    month()
    expect(screen.queryByRole('button',{name:'Review October'})).toBeNull()
    fireEvent.click(screen.getByRole('button',{name:'Review September'}))
-   expect(screen.getByTestId('where').textContent).toContain('start=2026-09-01')
-   expect(screen.getByRole('heading',{name:'Review September'})).toBeInTheDocument()
+   expect(screen.getByTestId('where').textContent).toContain('start=2026-10-01')
+   expect(screen.getByRole('article',{name:'Looking back at September'})).toBeInTheDocument()
    cleanup();review.prevReviewed={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
    month()
    expect(screen.queryByRole('button',{name:/^Review /})).toBeNull()
@@ -791,32 +791,25 @@ describe('the review by hand (2026-10-17)',()=>{
    expect(screen.queryByRole('button',{name:/^Review /})).toBeNull()
   }finally{vi.useRealTimers()}
  })
- it('Season and Year review under their own records; a year goal can move on to next year',async()=>{
-  season('&review=1')
-  expect(review.seen[0]).toBe('seasonal:2026-fall')
-  expect(screen.getByRole('heading',{name:'Review Fall'})).toBeInTheDocument()
-  cleanup()
-  review.seen=[];open('/year?view=constellation&start=2026-10-09&review=1')
-  expect(review.seen[0]).toBe('annual:2026')
-  const open2=screen.getByRole('list',{name:'Still open in 2026'})
-  expect(within(open2).getAllByRole('button',{name:/Together$/}).map(b=>b.textContent)).toEqual(['Done','Move to 2027','Archive'])
-  fireEvent.click(within(open2).getByRole('button',{name:'Move to 2027: Together'}))
-  await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g'})))
-  expect(lastRun().label).toBe('Move “Together” to 2027')
- })
- it('finishing says who reviewed; the onward step goes to the next period',async()=>{
-  review.reviewed={wentWell:'',didnt:'',at:new Date(2026,9,31),authorId:'u2'}
+ it('says who reviewed it already, and keeps what they wrote',()=>{
+  review.prevReviewed={wentWell:'Cabin booked',didnt:'',at:new Date(2026,9,31),authorId:'u2'}
+  review.mine={wentWell:'Cabin booked',didnt:''}
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,12))
   try{
-   month('&review=1')
-   expect(screen.getByText(/Reviewed Oct 31 by Iris/)).toBeInTheDocument()
-   fireEvent.click(screen.getByRole('button',{name:'Update review'}))
-   await waitFor(()=>expect(review.finish).toHaveBeenCalledWith({wentWell:'',didnt:''}))
-   // Reviewed, the next step is planning the period after.
-   fireEvent.click(await screen.findByRole('button',{name:'Plan November →'}))
-   expect(screen.getByTestId('where').textContent).toContain('start=2026-11-01')
-   expect(screen.getByTestId('where').textContent).not.toContain('review=1')
-   expect(screen.getByRole('region',{name:'Plan November'})).toBeInTheDocument()
-  }finally{review.reviewed=null}
+   open('/month?view=constellation&horizon=2&start=2026-11-09&plan=1')
+   expect(screen.getByText('Reviewed Oct 31 by Iris')).toBeInTheDocument()
+   expect(screen.getByRole('textbox',{name:'What went well'})).toHaveValue('Cabin booked')
+  }finally{vi.useRealTimers();review.prevReviewed=null;review.mine=null}
+ })
+ it('Year: reviewing 2026 plans 2027, where an open 2026 goal can be brought in as a copy that remembers it',async()=>{
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,11,28,12))
+  try{
+   open('/year?view=constellation&start=2026-10-09&review=1')
+   expect(screen.getByTestId('where').textContent).toContain('start=2027-01-01')
+   fireEvent.click(screen.getByRole('button',{name:'On to 2027'}))
+   fireEvent.click(await screen.findByRole('button',{name:'In 2027: Together'}))
+   await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g'})))
+  }finally{vi.useRealTimers()}
  })
 })
 
@@ -849,6 +842,7 @@ describe('I’m happy with October (2026-10-17)',()=>{
  it('the plan flow marks the period planned; the header says when, not asks',async()=>{
   plan.saved=null
   month('&plan=1')
+  await pastLookingBack()
   fireEvent.click(screen.getByRole('button',{name:'I’m happy with October'}))
   await waitFor(()=>expect(plan.save).toHaveBeenCalledWith({wentWell:'',didnt:''}))
   cleanup()
@@ -882,6 +876,7 @@ describe('planning by hand (2026-10-17)',()=>{
   expect(screen.getByTestId('where').textContent).toContain('plan=1')
   expect(facts()).toBeNull()
   expect(screen.queryByRole('button',{name:'Review October'})).toBeNull()
+  await pastLookingBack()
   const flow=within(screen.getByRole('region',{name:'Plan October'}))
   expect(flow.getByText('Fall goals → October')).toBeInTheDocument()
   // September's open line, with its own four verbs; the done one is not asked about.
@@ -922,6 +917,7 @@ describe('planning by hand (2026-10-17)',()=>{
   api.keepForward.mockResolvedValue('p');api.dropCommitment.mockResolvedValue(true)
   localStorage.setItem('symphony-choose-view','all')
   month('&plan=1')
+  await pastLookingBack()
   const flow=within(screen.getByRole('region',{name:'Plan October'}))
   fireEvent.click(flow.getByRole('button',{name:/Get the house in order/}))
   expect(flow.getByRole('list',{name:'Steps of Get the house in order'})).toHaveTextContent('Paint the office')
@@ -935,6 +931,7 @@ describe('planning by hand (2026-10-17)',()=>{
  it('Year: last year’s open goals can be brought in as a copy that remembers them',async()=>{
   api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
   open('/year?view=constellation&start=2026-10-09&plan=1')
+  await pastLookingBack()
   expect(screen.queryByRole('heading',{name:/^From /})).toBeNull()
   fireEvent.click(screen.getByRole('button',{name:'In 2026: Learn to sail'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old'})))
@@ -1114,13 +1111,15 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
    {id:'n1',name:'Next one',year:2027,status:'active',context:'personal',sortOrder:0},{id:'n2',name:'Next two',year:2027,status:'active',context:'personal',sortOrder:4000},
    {id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal',sortOrder:0}]
   liveGoals()
-  // Move to 2027, from the review.
+  // Into 2027, from reviewing 2026 (which plans 2027).
   open('/year?view=constellation&start=2026-10-09&review=1')
-  fireEvent.click(within(screen.getByRole('list',{name:'Still open in 2026'})).getByRole('button',{name:'Move to 2027: Together'}))
+  await pastLookingBack()
+  fireEvent.click(screen.getByRole('button',{name:'In 2027: Together'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g',sortOrder:5000})))
   cleanup()
   // Bring into 2026, while planning it.
   open('/year?view=constellation&start=2026-10-09&plan=1')
+  await pastLookingBack()
   fireEvent.click(screen.getByRole('button',{name:'In 2026: Learn to sail'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenLastCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old',sortOrder:2000})))
  })

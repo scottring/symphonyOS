@@ -898,7 +898,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         </div>
       )}
 
-      <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside'} tasks={tasks} date={viewedDate} update={gated.updateTask} complete={toggleTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
+      {/* Planning or reviewing the day (Today ?plan=1 / ?review=1) is its own
+          screen: the week column beside it would list the same things twice. */}
+      <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside' && !(fixedView !== 'week' && (searchParams.get('plan') === '1' || searchParams.get('review') === '1'))} tasks={tasks} date={viewedDate} update={gated.updateTask} complete={toggleTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
       <HomeView
         registerUndo={undo.pushAction}
         // The week reminder is Today's, below its schedule (2026-09-22): a

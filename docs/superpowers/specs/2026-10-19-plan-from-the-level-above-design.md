@@ -108,3 +108,23 @@ All three built 2026-10-19 (branch `claude/plan-everywhere`):
   so a step with nothing else holding it shows in the Inbox as well.
 - Month, Season pages name a line's subtask steps that are on the period below
   alongside its linked lines ("This week: …", "In October: …").
+
+## Day, and reviews (Scott approved the mockup 2026-10-19, "yes")
+
+- **Today** gets the same step one level down. Until 4 pm the header offers
+  **Plan today** (`/today?plan=1`): "This week → today" — what wasn't done
+  ("Was Sunday"), then this week's things with no day grouped by the October
+  goal they serve, each Today / Not today / Done, with the day itself beside
+  the list. From 4 pm, **Review today** (`?review=1`): "Today → tomorrow" —
+  what today held and didn't finish, each Tomorrow / Back to this week / Done,
+  what got done in one line, and "A win today", kept as the day's review
+  (`planning_sessions`, horizon `daily`). The chat walk (Plan my day / Review my
+  day) stays in the bar. Writers are the page's own (`planActions`).
+- **Reviews become the first card of planning.** Week, Month, Season and Year
+  open on **Looking back**: the period before in one number, What went well,
+  What didn't — saved as that period's review — then Choose. "Review October"
+  opens Plan November on Looking back; the separate review screen
+  (`PeriodReview`) is removed. The week's close now keeps what Looking back
+  said instead of writing two empty notes.
+- Older finished month items carry no month stamp, so they count toward the
+  current month; a past month's Looking back can show "0 done" for them.

@@ -20,7 +20,8 @@
 // the days. Month, Season and Year plan with the same Choose step
 // (ConstellationPage).
 
-import { useContext, type ReactNode } from 'react'
+import { useContext, useState, type ReactNode } from 'react'
+import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -127,12 +128,15 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   // (the old bar offered no mark then either). "Place them" does none of these. Either way the deck gives way to the week.
   // A drain that failed records nothing and keeps the deck open: the
   // activity strip says why, and "That's enough for this week" tries again.
+  // What Looking back said about last week, so the closing record keeps it
+  // (it used to write two empty notes over whatever was there).
+  const [lookNotes, setLookNotes] = useState<ReviewNotes | null>(null)
   const finishDeck = async (decided: ReadonlySet<string>) => {
     if (deckMode === 'full' && deck) {
       let drained = false
       try { drained = await deck.onFinish(decided) } catch { drained = false }
       if (!drained) return
-      if (!(await lastReview.finish({ wentWell: '', didnt: '' }))) showToast('Couldn’t mark last week reviewed — try again.', 'error', 5000)
+      if (!(await lastReview.finish(lookNotes ?? lastReview.mine ?? { wentWell: '', didnt: '' }))) showToast('Couldn’t mark last week reviewed — try again.', 'error', 5000)
       else if (!endsToday && !(await markPlanned())) showToast('Couldn’t mark this week planned — try again.', 'error', 5000)
     }
     setMode(null)
@@ -200,7 +204,12 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
       {deckMode && deck
         // Drawn only once the tasks are in: no flash of an empty October.
         ? (deck.loading ? null : <PlanWeekFlow key={`${localYmd(weekStart)}-${deckMode}`} mode={deckMode} choose={deck.choose}
-            stripDays={deck.stripDays} aged={deck.aged} onSeeAged={deck.onSeeAged} onFinish={() => finishDeck(new Set())} onLeave={() => setMode(null)} />)
+            stripDays={deck.stripDays} aged={deck.aged} onSeeAged={deck.onSeeAged} onFinish={() => finishDeck(new Set())} onLeave={() => setMode(null)}
+            look={deckMode === 'full' ? {
+              done: deck.doneLastWeek, initial: lastReview.mine,
+              reviewed: lastReview.reviewed ? `Reviewed ${lastReview.reviewed.at.toLocaleDateString('en-US', { weekday: 'long' })}` : null,
+              onContinue: async (notes) => { setLookNotes(notes); return lastReview.finish(notes) },
+            } : undefined} />)
         : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
     </div>
   )

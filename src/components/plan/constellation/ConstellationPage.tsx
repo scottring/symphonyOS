@@ -84,7 +84,8 @@ import { showToast } from '@/hooks/useToast'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { seasonToken } from '@/lib/cadence/seasons'
 import { REVIEW_WINDOW_DAYS, movedOn, reviewTarget, taskReviewState, weekPhrase, yearGoalReviewState } from '@/lib/planning/periodReview'
-import { PeriodReview, type ReviewLine, type ReviewVerb } from '@/components/plan/review/PeriodReview'
+import type { ReviewState } from '@/lib/planning/periodReview'
+import { LookingBack } from '@/components/plan/choose/LookingBack'
 import { ChoosePlan, type ChooseItemView, type ChooseLineView, type ChooseVerb } from '@/components/plan/choose/ChoosePlan'
 import { buildChooseTree, countsLine, plannedFor, type ChooseLine, type ChooseNode, type LooseItem } from '@/lib/planning/chooseFromAbove'
 import { readChooseView, writeChooseView, type ChooseViewMode } from '@/lib/planning/chooseView'
@@ -124,6 +125,10 @@ function AboveCard({ title, hideLabel, none, onHide, goals, hereWord }: {
     <FoldToggle toggle={toggle} />
   </aside>
 }
+
+/** One line the period before left, with the verbs that answer it. */
+interface ReviewVerb { label: string; run: () => Promise<boolean> }
+interface ReviewLine { key: string; title: string; state: ReviewState; note?: string; verbs: ReviewVerb[] }
 
 /** A goal of the level above, with what this period already holds under it (the card beside the list). */
 interface PlanParent {
@@ -222,6 +227,8 @@ function Inner() {
   const [marking, setMarking] = useState(false)
   // Marked planned in this sitting: the way on is the next horizon down.
   const [justMarked, setJustMarked] = useState(false)
+  // Looking back done for this period's planning (its key), so Choose follows.
+  const [lookedKey, setLookedKey] = useState<string | null>(null)
   // The optional "For" pick while writing a new goal (a node key, or none).
   const [forKey, setForKey] = useState('')
   const aboveOpen = !prefs.hideAbove
@@ -515,14 +522,6 @@ function Inner() {
     return p
   })
   const setReviewing = (on: boolean, start?: Date) => setMode(on ? 'review' : null, start)
-  const nextYearGoals = level === 0 ? goals.filter((g) => g.year === year + 1) : []
-  const reviewLines: ReviewLine[] = levelNodes.flatMap((n) => {
-    const state = n.goal ? yearGoalReviewState(n.goal, nextYearGoals)
-      : n.task ? taskReviewState(n.task, PERIODS[level] as 'season' | 'month', bounds.start, { isCurrent: current, seasons }) : undefined
-    if (!state) return []
-    const parent = parentOf(n)
-    return [{ key: n.key, title: n.title, state, note: parent ? `For ${parent.title}` : undefined, verbs: state === 'open' ? verbsFor(n, { carryYear: true }) : [] }]
-  })
   const byWhom = (authorId: string) => authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === authorId)?.name ?? 'your household'
 
   // ---- Drag to order (calm pass, 2026-10-18) ---------------------------------
@@ -759,6 +758,8 @@ function Inner() {
       lines: (tree?.lines ?? []).map(lineView),
       doneLines: (tree?.doneLines ?? []).map(lineView),
       loose: [...carried, ...hereLoose],
+      /** The period before's lines still open (Looking back's count). */
+      carriedCount: carryLines.length,
     }
   })()
   // Planned, the next horizon down is next: Year → Season → Month → Week.
@@ -769,6 +770,15 @@ function Inner() {
     : level === 1
       ? { label: `Plan ${monthWord} →`, onClick: () => navigate(`/month?view=constellation&horizon=2${keepStart}&plan=1`) }
       : { label: `Plan ${seasonWord} →`, onClick: () => navigate(`/season?view=constellation&horizon=1${keepStart}&plan=1`) }
+  // Looking back (the period before's review, now the plan's first card):
+  // its count, what was said, and the save.
+  const periodKey = `${level}:${localYmd(bounds.start)}`
+  const looked = lookedKey === periodKey
+  const prevDone = !planning ? 0 : level === 0
+    ? goalsOf(year - 1).filter((g) => g.status === 'completed').length
+    : selectPeriodTasks(visible, PERIODS[level] as 'season' | 'month', prevB.start, isCurrentPeriod(prevB, now), lens.scopeId, seasons)
+      .filter((t) => taskReviewState(t, PERIODS[level] as 'season' | 'month', prevB.start, { isCurrent: isCurrentPeriod(prevB, now), seasons }) === 'done').length
+  const prevWordCap = prevWord[0].toUpperCase() + prevWord.slice(1)
   const markPlannedHere = async () => {
     setMarking(true)
     const ok = await markPlanned()
@@ -860,11 +870,17 @@ function Inner() {
     {(error || goalsError)
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
       : !dataReady ? null
-      : reviewing ? <PeriodReview key={`${level}:${localYmd(bounds.start)}`} periodWord={periodWord} lines={reviewLines} loading={review.loading}
-          reviewed={review.reviewed} mine={review.mine} byWhom={byWhom} onFinish={review.finish}
-          // Reviewed, the next step is planning what comes after.
-          next={{ label: `Plan ${nextWord} →`, onClick: () => setMode('plan', bounds.next) }}
-          onClose={() => setReviewing(false)} />
+      // Reviewing a period is the first card of planning the one after it
+      // (spec 2026-10-19): Review October opens Plan November on Looking back.
+      : reviewing ? <Navigate replace to={`${pathname}?${(() => { const q = new URLSearchParams(params); q.delete('review'); q.delete('focus'); q.set('plan', '1'); q.set('start', localYmd(bounds.next)); return q.toString() })()}`} />
+      : planning && choose && !looked ? <section className="deck choose-flow plan-choose" aria-label={`Plan ${periodWord}`} key={`look:${periodKey}`}>
+          <LookingBack kicker={`Review ${prevWord} · then plan ${periodWord}`} periodWord={prevWordCap} done={prevDone} notDone={choose.carriedCount}
+            initial={prevReview.mine}
+            reviewed={prevReview.reviewed ? `Reviewed ${prevReview.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} by ${byWhom(prevReview.reviewed.authorId)}` : null}
+            nextLabel={level > 0 ? `On to ${aboveWord} goals → ${periodWord}` : `On to ${periodWord}`}
+            onLeave={() => setMode(null)}
+            onContinue={async (notes) => { const ok = await prevReview.finish(notes); if (ok) setLookedKey(periodKey); return ok }} />
+        </section>
       : planning && choose ? <section className="deck choose-flow plan-choose" aria-label={`Plan ${periodWord}`} key={`${level}:${localYmd(bounds.start)}`}>
           <ChoosePlan hereWord={periodWord} aboveWord={level > 0 ? aboveWord : undefined}
             kicker={level > 0 ? `${aboveWord} goals → ${periodWord}` : `Plan ${periodWord}`} onLeave={() => setMode(null)}
