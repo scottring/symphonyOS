@@ -7,6 +7,8 @@ import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { PanelShell } from './PanelShell'
 import { PanelHeader } from './sections/PanelHeader'
+import { PanelFacts } from './sections/PanelFacts'
+import { PanelActions } from './sections/PanelActions'
 import { PanelMedia } from './sections/PanelMedia'
 import { PanelNotes } from './sections/PanelNotes'
 import { PanelLocation } from './sections/PanelLocation'
@@ -254,41 +256,94 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   return (
     <PanelShell
       identity={
+      <div>
       <PanelHeader
+        kind="Routine"
         title={routine.name}
         onTitleChange={(name) => props.onRename?.(name)}
         onClose={props.onClose}
       />
-
+      {/* What the routine IS, as labeled rows (detail pane standard,
+          2026-10-19): its schedule, who does it, its life area. */}
+      <PanelFacts
+        facts={[
+          {
+            // Schedule (recurrence + time) — the summary, which opens the editor
+            id: 'when',
+            label: 'When',
+            value: props.onScheduleChange
+              ? (
+                <button
+                  type="button"
+                  onClick={() => { setScheduleDraft({ recurrencePattern: routine.recurrence_pattern, timeOfDay: (routine.time_of_day ?? '').slice(0, 5) }); setScheduleError(false); setEditingSchedule(true) }}
+                  aria-expanded={editingSchedule}
+                  aria-label={`Edit schedule: ${recurrenceSummary(routine)}`}
+                  className="-ml-1.5 inline-flex min-h-[30px] items-center gap-2 rounded-md px-1.5 text-left text-[14px] text-neutral-800 hover:bg-neutral-100"
+                >
+                  <span>{recurrenceSummary(routine)}</span>
+                  <span className="shrink-0 text-[13px] text-neutral-500">Edit</span>
+                </button>
+              )
+              : <span className="text-neutral-800">{recurrenceSummary(routine)}</span>,
+          },
+          {
+            id: 'who',
+            label: 'Who',
+            value: familyMembers.length > 0 && props.onAssignChange ? (
+              <MultiAssigneeDropdown
+                members={familyMembers}
+                selectedIds={assigneeIds}
+                onSelect={props.onAssignChange}
+                size="sm"
+                showNames
+              />
+            ) : null,
+          },
+          {
+            id: 'area',
+            label: 'Area',
+            value: <ContextPicker value={routine.context ?? undefined} onChange={props.onContextChange} showLabel />,
+          },
+        ]}
+      />
+      {props.onScheduleChange && editingSchedule && (
+        <div className="mt-3 rounded-xl border border-neutral-200 p-3">
+          <p className="mb-3 text-xs text-neutral-500">Repeating schedule. To change just one day, use Set time in that day’s Shelves.</p>
+          <RoutineScheduleEditor
+            size="sm"
+            recurrencePattern={scheduleDraft.recurrencePattern}
+            timeOfDay={scheduleDraft.timeOfDay}
+            onChange={next => { setScheduleDraft(next); if (props.unsaved) void props.onScheduleChange?.(next.recurrencePattern, next.timeOfDay) }}
+          />
+          <button
+            disabled={savingSchedule}
+            onClick={() => { void saveSchedule() }}
+            className="mt-3 text-xs font-medium text-neutral-500 hover:text-neutral-700"
+          >
+            {savingSchedule ? 'Saving…' : 'Save repeating schedule'}
+          </button>
+          {scheduleError && <p role="alert" className="mt-2 text-sm text-red-600">Could not save the schedule. Your changes are still here; try again.</p>}
+        </div>
+      )}
+      </div>
       }
       act={
       <section className="flex flex-col gap-3">
+        {props.onAssistMutate && (
+          <PanelActions
+            actions={[{
+              id: 'discussion',
+              label: discussionLabel,
+              icon: 'discussion',
+              dot: discussionUnread,
+              onClick: () => setAssistOpen(true),
+            }]}
+          />
+        )}
+
         {/* Where it shows, and why — Today, the week, the kiosk. Live while
             the schedule is being edited, so a change says what it will do. */}
         <WhereItShows explanation={explanation} live={editingSchedule || !!props.unsaved} />
-
-        {/* Who does it + context + streak */}
-        <div className="flex flex-wrap items-center gap-2">
-          {familyMembers.length > 0 && props.onAssignChange && (
-            <MultiAssigneeDropdown
-              members={familyMembers}
-              selectedIds={assigneeIds}
-              onSelect={props.onAssignChange}
-              size="sm"
-            />
-          )}
-          <ContextPicker value={routine.context ?? undefined} onChange={props.onContextChange} />
-          {props.onAssistMutate && (
-            <button
-              type="button"
-              onClick={() => setAssistOpen(true)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[15px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-            >
-              <ConceptIcon name="discussion" size={14} decorative /> {discussionLabel}
-              {discussionUnread && <span className="h-1.5 w-1.5 rounded-full bg-primary-500" aria-label="Unread" />}
-            </button>
-          )}
-        </div>
 
         {/* One occurrence only — the every-week fields below stay as they are. */}
         {occurrenceDay && onTimeline && !props.unsaved && (
@@ -435,44 +490,12 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           )}
         </section>
 
-        {/* Schedule (recurrence + time) — collapsed summary, expands to edit */}
-        {props.onScheduleChange && (
-          <div>
-            {editingSchedule ? (
-              <div className="rounded-xl border border-neutral-200 p-3">
-                <p className="mb-3 text-xs text-neutral-500">Repeating schedule. To change just one day, use Set time in that day’s Shelves.</p>
-                <RoutineScheduleEditor
-                  size="sm"
-                  recurrencePattern={scheduleDraft.recurrencePattern}
-                  timeOfDay={scheduleDraft.timeOfDay}
-                  onChange={next => { setScheduleDraft(next); if (props.unsaved) void props.onScheduleChange?.(next.recurrencePattern, next.timeOfDay) }}
-                />
-                <button
-                  disabled={savingSchedule}
-                  onClick={() => { void saveSchedule() }}
-                  className="mt-3 text-xs font-medium text-neutral-500 hover:text-neutral-700"
-                >
-                  {savingSchedule ? 'Saving…' : 'Save repeating schedule'}
-                </button>
-                {scheduleError && <p role="alert" className="mt-2 text-sm text-red-600">Could not save the schedule. Your changes are still here; try again.</p>}
-              </div>
-            ) : (
-              <button
-                onClick={() => { setScheduleDraft({ recurrencePattern: routine.recurrence_pattern, timeOfDay: (routine.time_of_day ?? '').slice(0, 5) }); setScheduleError(false); setEditingSchedule(true) }}
-                className="flex items-center justify-between gap-3 w-full px-3 py-2 rounded-lg bg-neutral-100 text-left text-[15px] text-neutral-700 hover:bg-neutral-200 transition-colors"
-              >
-                <span>{recurrenceSummary(routine)}</span>
-                <span className="shrink-0 text-xs text-neutral-500">Edit schedule</span>
-              </button>
-            )}
-          </div>
-        )}
-
         {/* A zero-step routine IS the atom — even RhythmPage's always-visible
             "add first step" Steps section counts as zero steps. Once real steps
             exist the target hides; a target belongs on the atom, never a parent. */}
         {props.onTargetChange && (props.steps?.length ?? 0) === 0 && (
           <TargetSection
+            bare
             amount={routine.target_amount ?? null}
             unit={routine.target_unit ?? null}
             onChange={props.onTargetChange}

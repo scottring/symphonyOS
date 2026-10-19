@@ -15,7 +15,7 @@ import { removeOutcomeToast, type LinkOutcome } from '@/lib/planning/existingAct
 import { showToast } from '@/hooks/useToast'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 
-export function PartOfGoalControl({ task, tasks, choiceTasks, seasons, setGoalLink, onOpenGoal }: {
+export function PartOfGoalControl({ task, tasks, choiceTasks, seasons, setGoalLink, onOpenGoal, compact = false }: {
   task: Task
   /** Every task the reader may see — names the goal the task is part of. */
   tasks: readonly Task[]
@@ -24,6 +24,10 @@ export function PartOfGoalControl({ task, tasks, choiceTasks, seasons, setGoalLi
   seasons: Seasons
   setGoalLink: (taskId: string, goalId: string | null, expected: string | null) => Promise<LinkOutcome>
   onOpenGoal: (id: string) => void
+  /** Drawn as the value of a labeled Goal row (detail pane standard): the
+   *  goal's name without "Part of", and "Not part of a goal" when there is
+   *  none — the row's label already says what the line is about. */
+  compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -73,11 +77,11 @@ export function PartOfGoalControl({ task, tasks, choiceTasks, seasons, setGoalLi
 
   const itemClass = 'flex w-full items-start gap-2 rounded-md px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-700'
   return (
-    <div ref={wrapRef} className="relative mt-1 inline-flex flex-wrap items-baseline gap-x-1.5 text-[13px]">
+    <div ref={wrapRef} className={compact ? 'relative inline-flex flex-wrap items-baseline gap-x-1.5 text-[14px]' : 'relative mt-1 inline-flex flex-wrap items-baseline gap-x-1.5 text-[13px]'}>
       {current ? (
         <>
-          <span className="text-neutral-400">Part of</span>
-          <button type="button" onClick={() => onOpenGoal(current.id)} className="text-left text-neutral-700 hover:underline">“{current.title}”</button>
+          {!compact && <span className="text-neutral-400">Part of</span>}
+          <button type="button" onClick={() => onOpenGoal(current.id)} className="text-left text-neutral-700 hover:underline">{compact ? current.title : `“${current.title}”`}</button>
           {current.period && <span className="text-neutral-400">· {current.period}</span>}
         </>
       ) : null}
@@ -88,9 +92,13 @@ export function PartOfGoalControl({ task, tasks, choiceTasks, seasons, setGoalLi
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         aria-label={current ? `Change which goal ${task.title} is part of` : undefined}
-        className={current ? 'text-neutral-500 hover:text-primary-700 hover:underline' : 'inline-flex items-center gap-1 rounded text-primary-700 hover:underline'}
+        className={current
+          ? `text-neutral-500 hover:text-primary-700 hover:underline${compact ? ' text-[13px]' : ''}`
+          : compact
+            ? '-ml-1.5 rounded-md px-1.5 py-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
+            : 'inline-flex items-center gap-1 rounded text-primary-700 hover:underline'}
       >
-        {current ? 'Change' : <><CornerUpRight className="h-3.5 w-3.5" aria-hidden="true" />Part of a goal…</>}
+        {current ? 'Change' : compact ? 'Not part of a goal' : <><CornerUpRight className="h-3.5 w-3.5" aria-hidden="true" />Part of a goal…</>}
       </button>}
       {open && (
         <div ref={menuRef} role="menu" aria-label="Part of which goal" className="absolute left-0 top-full z-50 mt-1 max-h-80 w-72 overflow-y-auto rounded-xl border border-neutral-200 bg-bg-elevated py-1 shadow-lg">

@@ -50,7 +50,7 @@ export function TapStepPanel(props: TapStepPanelProps) {
 
   return (
     <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
-      <PanelHeader title={step.name} onTitleChange={props.onRename} onClose={props.onClose} />
+      <PanelHeader kind="Step" title={step.name} onTitleChange={props.onRename} onClose={props.onClose} />
 
       <p className="text-xs text-neutral-500 mb-4">
         Context and people are <span className="font-medium">inherited from {parentName}</span>.

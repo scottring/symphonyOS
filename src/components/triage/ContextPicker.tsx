@@ -11,6 +11,9 @@ interface ContextPickerProps {
    * so shrinking the rail can't quietly shrink them too.
    */
   size?: 'sm' | 'md'
+  /** Name the life area beside a dot instead of the bare tag icon — for a
+   *  detail pane's labeled Area row, where an icon alone said nothing. */
+  showLabel?: boolean
 }
 
 const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
@@ -19,7 +22,7 @@ const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
   { value: 'personal', label: 'Personal', color: 'rgb(147 51 234)' }, // Purple-600 (matches domain switcher)
 ]
 
-export function ContextPicker({ value, onChange, size = 'md' }: ContextPickerProps) {
+export function ContextPicker({ value, onChange, size = 'md', showLabel = false }: ContextPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 0 })
   const triggerRef = useRef<HTMLDivElement>(null)
@@ -129,26 +132,44 @@ export function ContextPicker({ value, onChange, size = 'md' }: ContextPickerPro
       {/* type="button": inside an add row's form, a default (submit) button
           is the one Enter "clicks" — the year's add row opened this menu
           on every Enter (walkthrough 2026-10-02, #4). */}
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
-        className={`${padClass} rounded-lg transition-colors hover:bg-neutral-100 ${hasValue ? '' : 'tag-needs-context'}`}
-        aria-label="Set context"
-        // The tag names its life area on hover (walkthrough 2026-10-02: an
-        // unlabeled mark in task details).
-        title={selectedContext ? `Life area: ${selectedContext.label}` : hasValue ? undefined : 'Untagged — tap to set Work / Family / Personal'}
-      >
-        <svg
-          className={`${iconClass} transition-colors`}
-          fill={selectedContext ? 'currentColor' : 'none'}
-          stroke={selectedContext ? undefined : 'currentColor'}
-          strokeWidth={selectedContext ? undefined : 2}
-          viewBox="0 0 24 24"
-          style={selectedContext ? contextStyles[selectedContext.value as keyof typeof contextStyles] : { color: 'rgb(163 163 163)' }}
+      {showLabel ? (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+          aria-label={selectedContext ? `Life area: ${selectedContext.label}. Change` : 'Set life area'}
+          className={`-ml-1.5 inline-flex min-h-[30px] items-center gap-2 rounded-md px-1.5 text-[14px] transition-colors hover:bg-neutral-100 ${selectedContext ? 'text-neutral-800' : 'text-neutral-500 tag-needs-context'}`}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-        </svg>
-      </button>
+          <span
+            aria-hidden
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={selectedContext ? { backgroundColor: selectedContext.color } : { boxShadow: 'inset 0 0 0 1.5px rgb(163 163 163)' }}
+          />
+          {selectedContext ? selectedContext.label : 'Not set'}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
+          className={`${padClass} rounded-lg transition-colors hover:bg-neutral-100 ${hasValue ? '' : 'tag-needs-context'}`}
+          aria-label="Set context"
+          // The tag names its life area on hover (walkthrough 2026-10-02: an
+          // unlabeled mark in task details).
+          title={selectedContext ? `Life area: ${selectedContext.label}` : hasValue ? undefined : 'Untagged — tap to set Work / Family / Personal'}
+        >
+          <svg
+            className={`${iconClass} transition-colors`}
+            fill={selectedContext ? 'currentColor' : 'none'}
+            stroke={selectedContext ? undefined : 'currentColor'}
+            strokeWidth={selectedContext ? undefined : 2}
+            viewBox="0 0 24 24"
+            style={selectedContext ? contextStyles[selectedContext.value as keyof typeof contextStyles] : { color: 'rgb(163 163 163)' }}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        </button>
+      )}
       {menuContent && createPortal(menuContent, document.body)}
     </div>
   )

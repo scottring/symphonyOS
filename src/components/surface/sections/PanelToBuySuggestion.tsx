@@ -22,28 +22,33 @@ interface Props {
 export function PanelToBuySuggestion({ taskId, title, completed, knownPeople, onSend }: Props) {
   const [, bump] = useReducer((x: number) => x + 1, 0)
   if (completed || !isBuyish(title, knownPeople) || isToBuyNudgeDismissed(taskId)) return null
+  // Drawn as the pane's one suggestion card (detail pane standard,
+  // 2026-10-19): a proposal to accept or dismiss, tinted apart from the facts
+  // and actions so it can't be mistaken for either.
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] text-neutral-600">
-      <ShoppingBag className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden />
-      <span className="min-w-0 flex-1 basis-40">Looks like a purchase. Move it to the To buy list?</span>
-      <span className="flex items-center gap-2 pl-7 sm:pl-0">
-        <button
-          type="button"
-          onClick={onSend}
-          aria-label="Send to To buy list"
-          className="rounded-md border border-neutral-200 px-2 py-0.5 font-medium text-neutral-800 hover:bg-neutral-50"
-        >
-          Move
-        </button>
-        <button
-          type="button"
-          onClick={() => { dismissToBuyNudge(taskId); bump() }}
-          aria-label="Not now"
-          className="px-1 text-neutral-500 hover:text-neutral-800"
-        >
-          Not now
-        </button>
-      </span>
+    <div className="panel-proposal flex items-start gap-3 rounded-xl bg-primary-50 px-3.5 py-3 text-[14px] text-neutral-800">
+      <ShoppingBag className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" aria-hidden />
+      <div className="min-w-0 flex-1">
+        <p className="m-0 leading-snug">Looks like a purchase. Move it to the To buy list?</p>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onSend}
+            aria-label="Send to To buy list"
+            className="h-8 rounded-lg border border-primary-600 bg-white px-3 text-[13px] font-medium text-primary-700 hover:bg-primary-100"
+          >
+            Move to To buy
+          </button>
+          <button
+            type="button"
+            onClick={() => { dismissToBuyNudge(taskId); bump() }}
+            aria-label="Not now"
+            className="h-8 rounded-lg px-2 text-[13px] text-neutral-600 hover:text-neutral-900"
+          >
+            Not now
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

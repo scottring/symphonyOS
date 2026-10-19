@@ -176,7 +176,7 @@ describe('TapContextPanel', () => {
       onAssigneesChange={vi.fn()}
     />)
     // Open the ContextPicker trigger, then click the 'Personal' option
-    fireEvent.click(screen.getByRole('button', { name: /set context/i }))
+    fireEvent.click(screen.getByRole('button', { name: /life area/i }))
     fireEvent.click(screen.getByRole('button', { name: /personal/i }))
     expect(onContextChange).toHaveBeenCalledWith('personal')
   })
@@ -206,16 +206,16 @@ describe('TapContextPanel', () => {
     )
     const article = container.querySelector('article')
     expect(article).not.toBeNull()
-    // Check for divide-y hairline dividers between sections
-    expect(article!.className).toMatch(/divide-y/)
-    expect(article!.className).toMatch(/divide-neutral-200/)
+    // Hairline rules between the sections that show
+    expect(article!.className).toMatch(/:border-t/)
+    expect(article!.className).toMatch(/border-neutral-200/)
     // Mobile padding tighter than desktop
     expect(article!.className).toMatch(/px-4/)
     // Py-4 rhythm applied to direct children
-    expect(article!.className).toMatch(/\[&>\*\]:py-4/)
+    expect(article!.className).toMatch(/:py-4/)
     // First child has collapsed top padding, last child has collapsed bottom padding
-    expect(article!.className).toMatch(/\[&>\*:first-child\]:pt-0/)
-    expect(article!.className).toMatch(/\[&>\*:last-child\]:pb-0/)
+    expect(article!.className).toMatch(/:pt-0/)
+    expect(article!.className).toMatch(/:pb-0/)
   })
 
   // ── Empty fields collapse into one Add row ────────────────────────────────
@@ -280,8 +280,8 @@ describe('TapContextPanel', () => {
       contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
       {...baseHandlers}
     />)
-    expect(screen.getByRole('button', { name: 'Phone' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Email' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Phone' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Email' })).toBeInTheDocument()
   })
 
   it('shows a stored number in the Phone section without a second call link', () => {
@@ -321,7 +321,7 @@ describe('TapContextPanel', () => {
       {...baseHandlers}
       onPhoneChange={onPhoneChange}
     />)
-    await user.click(screen.getByRole('button', { name: 'Phone' }))
+    await user.click(screen.getByRole('button', { name: '+ Phone' }))
     await user.type(screen.getByLabelText('Phone'), '413-555-0142')
     await user.tab()
     expect(onPhoneChange).toHaveBeenCalledWith('413-555-0142')

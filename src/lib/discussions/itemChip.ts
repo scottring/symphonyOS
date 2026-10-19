@@ -15,7 +15,7 @@ export function discussionFor(rows: readonly InboxRow[], entityType: InboxEntity
   return mine.find((r) => r.state.kind !== 'settled') ?? mine[0]
 }
 
-/** The household's other logins, by name: who "Talk to … about this" means. */
+/** The household's other logins, by name: who "Talk to …" means. */
 export function otherLoginNames(members: readonly WaitingMember[], selfAuthId: string | null): string[] {
   return loginIds(members)
     .filter((id) => id !== selfAuthId)
@@ -25,7 +25,9 @@ export function otherLoginNames(members: readonly WaitingMember[], selfAuthId: s
 
 export function discussionChipLabel(row: InboxRow | undefined, otherNames: readonly string[]): string {
   if (!row || row.state.kind === 'empty') {
-    return otherNames.length ? `Talk to ${namesLabel(otherNames)} about this` : 'Discussion'
+    // "about this" is the panel it sits in; at full length it took a third of
+    // the action row (detail pane standard, 2026-10-19).
+    return otherNames.length ? `Talk to ${namesLabel(otherNames)}` : 'Discussion'
   }
   if (row.others.length === 0) return 'Discussion · just you'
   const withWhom = `With ${namesLabel(row.others)}`

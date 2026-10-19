@@ -1,6 +1,10 @@
 import { useState, useCallback, useMemo } from 'react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { MoreHorizontal } from 'lucide-react'
 import { PanelShell } from './PanelShell'
+import { PanelHeader } from './sections/PanelHeader'
+import { PanelFacts } from './sections/PanelFacts'
+import { PanelActions } from './sections/PanelActions'
 import { PanelNotes } from './sections/PanelNotes'
 import { PanelWhatToBring } from './sections/PanelWhatToBring'
 import { PanelIngredients } from './sections/PanelIngredients'
@@ -70,67 +74,44 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
   return (
     <PanelShell
       identity={
-        <>
-      {/* Header: title + close */}
-      <div className="flex items-start justify-between gap-3 mb-1">
-        <h2 className="font-display text-2xl text-neutral-900 leading-snug flex-1">{event.title}</h2>
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="panel-close text-neutral-400 hover:text-neutral-700 text-xl leading-none mt-1 shrink-0"
-        >
-          ×
-        </button>
+      <div>
+        <PanelHeader
+          kind="Meal"
+          title={event.title}
+          // The title is the slot and the dish, derived from the plan entry.
+          onTitleChange={() => { /* meal title is read-only */ }}
+          onClose={onClose}
+        />
+        <PanelFacts
+          facts={[
+            { id: 'when', label: 'When', value: timeDisplay ? <span className="text-neutral-800">{timeDisplay}</span> : null },
+            { id: 'recipe', label: 'Recipe', value: recipe?.title ? <span className="text-neutral-800">{recipe.title}</span> : null },
+          ]}
+        />
       </div>
-      {/* Date + time meta */}
-      {timeDisplay && (
-        <p className="text-[13px] text-neutral-500 mb-2">{timeDisplay}</p>
-      )}
-      {/* Meal chip */}
-      <span className="inline-block text-[11px] px-2 py-0.5 rounded bg-neutral-100 text-neutral-500 mb-4">
-        Meal
-      </span>
-
-      {/* Action row */}
-      <div className="flex items-center justify-around">
-        <button
-          onClick={() => { /* meals: inert */ }}
-          className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-700"
-        >
-          <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-          Complete
-        </button>
-        <button
-          onClick={() => setPickerOpen(true)}
-          className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-700"
-        >
-          <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-          </svg>
-          Edit
-        </button>
-        <button
-          onClick={() => { /* meal reschedule: inert */ }}
-          className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-700"
-        >
-          <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-          </svg>
-          Move
-        </button>
+      }
+      act={
+      // The shared action row (detail pane standard, 2026-10-19). The old row
+      // of icon-over-label buttons carried a Complete and a Move that did
+      // nothing when pressed; they are gone rather than restyled.
+      <PanelActions
+        actions={[
+          ...(recipe?.sourceUrl
+            ? [{ id: 'recipe', label: 'Open recipe', kind: 'primary' as const, href: recipe.sourceUrl }]
+            : []),
+          { id: 'edit', label: 'Change meal', onClick: () => setPickerOpen(true) },
+        ]}
+        overflow={
         <div className="relative">
           <button
+            type="button"
             onClick={() => setMoreOpen(o => !o)}
             aria-haspopup="menu"
             aria-expanded={moreOpen}
-            className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-700"
+            aria-label="More"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-neutral-300 bg-white text-neutral-700 transition-colors hover:bg-neutral-50"
           >
-            <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-            </svg>
-            More
+            <MoreHorizontal className="h-4 w-4" aria-hidden />
           </button>
           {moreOpen && (
             <>
@@ -142,7 +123,7 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
               />
               <div
                 role="menu"
-                className="absolute right-0 bottom-full mb-2 z-20 min-w-[180px] rounded-xl border border-neutral-200 bg-bg-elevated shadow-lg py-1"
+                className="absolute right-0 top-full mt-1 z-20 min-w-[180px] rounded-xl border border-neutral-200 bg-bg-elevated shadow-lg py-1"
               >
                 <button
                   role="menuitem"
@@ -158,9 +139,8 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
             </>
           )}
         </div>
-      </div>
-
-        </>
+        }
+      />
       }
       details={
         <>

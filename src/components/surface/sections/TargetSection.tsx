@@ -6,6 +6,9 @@ interface TargetSectionProps {
   amount: number | null
   unit: TargetUnit | null
   onChange: (t: { amount: number; unit: TargetUnit } | null) => void
+  /** Inside a PanelShell zone, whose rhythm already rules between sections:
+   *  no border or spacing of its own (a second rule under it otherwise). */
+  bare?: boolean
 }
 
 const UNITS: { value: TargetUnit; label: string }[] = [
@@ -13,7 +16,7 @@ const UNITS: { value: TargetUnit; label: string }[] = [
   { value: 'count', label: 'Count' },
 ]
 
-export function TargetSection({ amount, unit, onChange }: TargetSectionProps) {
+export function TargetSection({ amount, unit, onChange, bare = false }: TargetSectionProps) {
   const [open, setOpen] = useState(amount != null)
   const [draftAmount, setDraftAmount] = useState(amount != null ? String(amount) : '')
   const [draftUnit, setDraftUnit] = useState<TargetUnit>(unit ?? 'minutes')
@@ -44,7 +47,7 @@ export function TargetSection({ amount, unit, onChange }: TargetSectionProps) {
   }
 
   return (
-    <section className="pb-4 mb-4 border-b border-neutral-200">
+    <section className={bare ? undefined : 'pb-4 mb-4 border-b border-neutral-200'}>
       <h3 className="text-[15px] font-medium text-neutral-700 mb-2">Daily target</h3>
       {!open ? (
         <button

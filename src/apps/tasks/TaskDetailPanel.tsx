@@ -37,7 +37,8 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu';
-import { MakeGoalControl } from '@/components/plan/MakeGoalControl';
+import { makeTaskAGoal } from '@/components/plan/MakeGoalControl';
+import { goalConversion } from '@/lib/planning/goalConversion';
 import { PartOfGoalControl } from '@/components/plan/PartOfGoalControl';
 import { useDomain } from '@/hooks/useDomain';
 import { filterTasksForLayers } from '@/lib/today/domainFilter';
@@ -308,25 +309,30 @@ function TaskPanelBody({ id }: { id: string }) {
       onEmailChange={(v) => updateTask(task.id, { email: v })}
       // onSaveNoteToVault intentionally omitted (vault integration removed)
       onToggleComplete={() => toggleTask(task.id)}
-      // What the task is FOR, first — the connected-planning contract: details
-      // lead with the goal it serves, then its when. "Part of…" says which
-      // goal and changes it (walkthrough 2026-10-02, #26); "Make it a goal"
-      // beside it changes the same row into a goal, and says why when it
-      // cannot (Scott, 2026-09-25).
+      // What the task is FOR — the connected-planning contract: details lead
+      // with the goal it serves, then its when. "Part of…" says which goal
+      // and changes it (walkthrough 2026-10-02, #26); it is the Goal row's
+      // value now (detail pane standard, 2026-10-19).
       purpose={task.isGoal ? undefined : (
-        <div className="flex flex-wrap items-start gap-x-4">
-          {horizon.forLine}
-          <PartOfGoalControl
-            task={task}
-            tasks={tasks}
-            choiceTasks={goalCandidates}
-            seasons={seasons}
-            setGoalLink={setGoalLink}
-            onOpenGoal={(gid) => navigate(`/task/${gid}`)}
-          />
-          <MakeGoalControl task={task} tasks={tasks} setGoal={setGoal} />
-        </div>
+        <PartOfGoalControl
+          compact
+          task={task}
+          tasks={tasks}
+          choiceTasks={goalCandidates}
+          seasons={seasons}
+          setGoalLink={setGoalLink}
+          onOpenGoal={(gid) => navigate(`/task/${gid}`)}
+        />
       )}
+      horizonLine={horizon.forLine}
+      // "Make it a goal" changes the same row into a goal, and says why when
+      // it cannot (Scott, 2026-09-25) — offered in the ⋯ rather than as a
+      // link beside the goal it would stop being part of.
+      onMakeGoal={task.isGoal || task.completed ? undefined : () => {
+        const check = goalConversion(task, tasks);
+        if (check.ok) void makeTaskAGoal(task, setGoal);
+        else showToast(check.reason, 'info', 6000);
+      }}
       // A goal is not scheduled, so it gets no timing control.
       timingControl={task.isGoal ? undefined : (
         <TaskTimingMenu

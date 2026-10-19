@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { Check, MoreHorizontal } from 'lucide-react'
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 export interface PanelAction {
   id: string
   label: string
   icon?: ConceptName
   /**
-   * primary   — the outlined Complete pill
+   * primary   — the filled Complete button, the one the panel leads with
    * completed — the greyed, checked "already done" state (click to reopen)
    * flagged   — the amber "To discuss" state
    */
@@ -39,18 +40,45 @@ export interface PanelActionsProps {
 }
 
 const BASE =
-  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[15px] font-medium transition-colors'
-export const ACTION_CHIP = `${BASE} bg-neutral-100 text-neutral-700 hover:bg-neutral-200`
-const PRIMARY_CHIP = `${BASE} border border-primary-600 text-primary-700 hover:bg-primary-50`
-const COMPLETED_CHIP = `${BASE} border border-neutral-200 bg-neutral-100 text-neutral-400 hover:bg-neutral-200`
-const FLAGGED_CHIP = `${BASE} bg-amber-100 text-amber-800 hover:bg-amber-200`
+  'inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-[10px] border px-2.5 text-[14px] font-medium transition-colors sm:px-3'
+export const ACTION_CHIP = `${BASE} border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50`
+const PRIMARY_CHIP = `${BASE} border-primary-600 bg-primary-600 text-white hover:bg-primary-700`
+const COMPLETED_CHIP = `${BASE} border-neutral-200 bg-neutral-100 text-neutral-500 hover:bg-neutral-200`
+const FLAGGED_CHIP = `${BASE} border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-200`
 
 /**
  * Actions past this point fold into the overflow menu rather than wrapping onto
- * a second row. Six chips breaking mid-row is a large part of what made the
- * panel read as a scatter of unrelated buttons.
+ * a second row: one filled primary and two more, then the ⋯ (detail pane
+ * standard, 2026-10-19). At five the row still broke onto three lines in a
+ * 420px column — "Talk to Iris about this" alone is a third of it.
  */
-export const MAX_VISIBLE_ACTIONS = 5
+export const MAX_VISIBLE_ACTIONS = 3
+/** A phone's touch-size buttons fit one fewer before the ⋯. */
+export const MAX_VISIBLE_ACTIONS_NARROW = 2
+
+/**
+ * Splits the row at the cap. An action that renders its own popover (a
+ * scheduler, a duration menu) cannot become a menu line, so it never folds.
+ */
+export function splitActions(actions: PanelAction[], cap = MAX_VISIBLE_ACTIONS): { visible: PanelAction[]; folded: PanelAction[] } {
+  const visible: PanelAction[] = []
+  const folded: PanelAction[] = []
+  for (const a of actions) {
+    if (a.render || visible.length < cap) visible.push(a)
+    else folded.push(a)
+  }
+  return { visible, folded }
+}
+
+/** A folded action as a menu line: a link action follows its href. */
+export function foldedClick(a: PanelAction): (() => void) | undefined {
+  if (a.onClick) return a.onClick
+  if (a.href) {
+    const href = a.href
+    return () => { window.location.assign(href) }
+  }
+  return undefined
+}
 
 function chipClass(kind: PanelAction['kind']): string {
   if (kind === 'primary') return PRIMARY_CHIP
@@ -73,7 +101,7 @@ function Chip({ action }: { action: PanelAction }) {
 
   if (action.href) {
     return (
-      <a href={action.href} className={chipClass(action.kind)}>
+      <a href={action.href} title={action.title} className={chipClass(action.kind)}>
         {body}
       </a>
     )
@@ -101,8 +129,8 @@ function Chip({ action }: { action: PanelAction }) {
  * look and where they stop.
  */
 export function PanelActions({ actions, overflow, renderOverflow }: PanelActionsProps) {
-  const visible = actions.slice(0, MAX_VISIBLE_ACTIONS)
-  const folded = actions.slice(MAX_VISIBLE_ACTIONS)
+  const narrow = useMediaQuery('(max-width: 639px)')
+  const { visible, folded } = splitActions(actions, narrow ? MAX_VISIBLE_ACTIONS_NARROW : MAX_VISIBLE_ACTIONS)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -116,7 +144,9 @@ export function PanelActions({ actions, overflow, renderOverflow }: PanelActions
   }, [open])
 
   return (
-    <div className="flex flex-wrap gap-2">
+    // Tighter on a phone, where the touch-size buttons would otherwise push
+    // the ⋯ onto a line of its own.
+    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
       {visible.map((a) => (
         <Chip key={a.id} action={a} />
       ))}
@@ -128,7 +158,7 @@ export function PanelActions({ actions, overflow, renderOverflow }: PanelActions
             aria-label="More actions"
             aria-expanded={open}
             onClick={() => setOpen((o) => !o)}
-            className={ACTION_CHIP}
+            className={`${ACTION_CHIP} w-9 justify-center px-0`}
           >
             <MoreHorizontal className="w-4 h-4" aria-hidden />
           </button>
@@ -140,7 +170,7 @@ export function PanelActions({ actions, overflow, renderOverflow }: PanelActions
                   type="button"
                   onClick={() => {
                     setOpen(false)
-                    a.onClick?.()
+                    foldedClick(a)?.()
                   }}
                   className="flex w-full items-center gap-2 px-4 py-2 text-left text-[15px] text-neutral-700 hover:bg-neutral-50"
                 >

@@ -17,7 +17,7 @@ const members = [
 describe('discussion chip', () => {
   it('before anything is said, names the household\'s other login', () => {
     expect(otherLoginNames(members, 'a-scott')).toEqual(['Iris'])
-    expect(discussionChipLabel(undefined, ['Iris'])).toBe('Talk to Iris about this')
+    expect(discussionChipLabel(undefined, ['Iris'])).toBe('Talk to Iris')
   })
   it('says whose turn it is once a discussion exists', () => {
     expect(discussionChipLabel(row({}), ['Iris'])).toBe('With Iris · waiting on you')

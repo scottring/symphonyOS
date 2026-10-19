@@ -4,9 +4,17 @@ import type { ReactNode, Ref } from 'react'
  * Hairline rules with even vertical padding, and no padding at the ends. Applied
  * to the article AND to each zone, so a zone holding several sections spaces
  * them exactly the way the zones themselves are spaced.
+ *
+ * Counted over the children that show. Sections hide themselves with
+ * `empty:hidden`, and `divide-y` / `:last-child` still counted a hidden one —
+ * a Photos wrapper with nothing in it left the section above it a rule and a
+ * gap of its own, so the pane drew two rules with nothing between them
+ * (detail pane standard, 2026-10-19). A rule goes above every shown child
+ * that has a shown child before it; padding stops at the first and last shown.
  */
 const RHYTHM =
-  'divide-y divide-neutral-200 [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0'
+  '[&>:not(:empty)~:not(:empty)]:border-t [&>*]:border-neutral-200 [&>:not(:empty)]:py-4 ' +
+  '[&>:not(:empty):not(:not(:empty)~*)]:pt-0 [&>:not(:empty):not(:has(~:not(:empty)))]:pb-0'
 
 export interface PanelShellProps {
   identity: ReactNode
@@ -64,7 +72,11 @@ export function PanelShell({
           // `relative` stays: it keeps each zone at the default z-index rather
           // than making it a stacking context, which would trap a popover
           // opened from inside a zone.
-          <div key={i} className={`relative ${RHYTHM} empty:hidden`}>
+          // Identity is one statement — kind, title, the facts under it — so it
+          // carries no inner rules (detail pane standard, 2026-10-19: a rule
+          // under the title, another under the goal line and a third under the
+          // date read as three unrelated blocks).
+          <div key={i} className={`relative ${i === 0 ? '' : RHYTHM} empty:hidden`}>
             {zone}
           </div>
         ),
