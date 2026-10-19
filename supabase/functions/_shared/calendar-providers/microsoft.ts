@@ -1,5 +1,6 @@
 /**
- * Outlook / Microsoft 365 calendar, read-only, via Microsoft Graph.
+ * Outlook / Microsoft 365 calendar reads via Microsoft Graph (writes are in
+ * microsoftWrite.ts).
  *
  * Everything here normalizes into the SAME event and calendar shapes the
  * Google path already returns, so the 50-odd consumers of useGoogleCalendar
@@ -9,14 +10,16 @@
  *   - the cache key column stays `google_event_id` — Graph ids are globally
  *     unique, so the column name is merely historical.
  *
- * Reads only. Every Outlook calendar reports accessRole 'reader', which is
- * the signal the event panel already uses to hide move / delete / edit.
+ * A calendar's accessRole is what the panel uses to offer or hide edit and
+ * delete: Graph's `canEdit` says whether the mailbox may write it, and a
+ * connection that never granted write access (one made before 2026-10-19,
+ * read-only) is downgraded to 'reader' in index.ts.
  */
 import { extractMeetingUrlFromText, type NormalizedCalendar, type NormalizedEvent } from './types.ts'
 
 export const MICROSOFT_AUTHORITY = 'https://login.microsoftonline.com/common/oauth2/v2.0'
 export const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
-export const MICROSOFT_SCOPES = ['offline_access', 'User.Read', 'Calendars.Read']
+export const MICROSOFT_SCOPES = ['offline_access', 'User.Read', 'Calendars.ReadWrite']
 
 export function buildMicrosoftAuthUrl(params: { clientId: string; redirectUri: string; state: string }): string {
   const url = new URL(`${MICROSOFT_AUTHORITY}/authorize`)
@@ -52,6 +55,7 @@ export interface GraphCalendar {
   name?: string
   hexColor?: string
   isDefaultCalendar?: boolean
+  canEdit?: boolean
 }
 
 export interface GraphEvent {
@@ -74,7 +78,7 @@ export function normalizeGraphCalendar(cal: GraphCalendar): NormalizedCalendar {
     id: cal.id,
     summary: cal.name || cal.id,
     email: cal.id,
-    accessRole: 'reader',
+    accessRole: cal.canEdit !== true ? 'reader' : cal.isDefaultCalendar ? 'owner' : 'writer',
     primary: cal.isDefaultCalendar === true,
     backgroundColor: cal.hexColor ? cal.hexColor : undefined,
     provider: 'microsoft',

@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { loadGoogleConnection } from '../_shared/calendar-providers/googleConnection.ts'
+import { loadWriteConnection } from '../_shared/calendar-providers/writeConnection.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -104,10 +104,21 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { connection, error: connError } = await loadGoogleConnection(supabaseAdmin, user.id, { calendarId: sourceCalendarId })
+    const { target, error: connError } = await loadWriteConnection(supabaseAdmin, user.id, { calendarId: sourceCalendarId, eventId })
 
-    if (connError || !connection) {
+    if (connError || !target) {
       return new Response(JSON.stringify({ error: 'No calendar connection found', needsReconnect: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const connection = target.connection
+
+    // Microsoft Graph has no "move to another calendar" for an event.
+    if (connection.provider !== 'google') {
+      return new Response(JSON.stringify({
+        error: 'Outlook events cannot be moved to another calendar from Symphony.',
+      }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

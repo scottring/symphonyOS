@@ -72,6 +72,20 @@ describe('openConnections', () => {
     expect(opened.calendars.find((c) => c.provider === 'microsoft')!.accessRole).toBe('reader')
   })
 
+  it('an editable Outlook calendar is writable only under a write grant', async () => {
+    const editable = vi.fn(async (input: string) => {
+      if (String(input) === 'https://graph.microsoft.com/v1.0/me/calendars') {
+        return new Response(JSON.stringify({ value: [{ id: 'mcal', name: 'Work', isDefaultCalendar: true, canEdit: true }] }))
+      }
+      throw new Error(`unexpected fetch ${input}`)
+    })
+    const granted = { ...row('microsoft'), granted_scopes: 'User.Read Calendars.ReadWrite offline_access' }
+    const readOnlyGrant = { ...row('microsoft'), granted_scopes: 'User.Read Calendars.Read offline_access' }
+    expect((await openConnections(admin, [granted], env, editable as never)).calendars[0].accessRole).toBe('owner')
+    expect((await openConnections(admin, [readOnlyGrant], env, editable as never)).calendars[0].accessRole).toBe('reader')
+    expect((await openConnections(admin, [row('microsoft')], env, editable as never)).calendars[0].accessRole).toBe('reader')
+  })
+
   it('a provider whose grant was revoked is reported, and the other provider still answers', async () => {
     const fetchImpl = routedFetch({ googleRefresh: { error: 'invalid_grant', error_description: 'Token has been expired or revoked' } })
     const opened = await openConnections(admin, [row('google', past), row('microsoft')], env, fetchImpl as never)

@@ -730,9 +730,15 @@ function EventPanelBody({ id }: { id: string }) {
         readOnly: eventCalendar ? eventCalendar.accessRole === 'reader' : false,
       }
     : undefined;
-  const writableCalendars = calendarList
-    .filter((c) => c.accessRole === 'owner' || c.accessRole === 'writer')
-    .map((c) => ({ id: c.id, summary: c.summary }));
+  // Move targets: Google moves an event only between calendars of one
+  // account, and Outlook (Graph) cannot move one at all.
+  const writableCalendars = (eventCalendar?.provider ?? 'google') !== 'google'
+    ? []
+    : calendarList
+      .filter((c) => c.accessRole === 'owner' || c.accessRole === 'writer')
+      .filter((c) => (c.provider ?? 'google') === 'google')
+      .filter((c) => !eventCalendar?.connectionId || !c.connectionId || c.connectionId === eventCalendar.connectionId)
+      .map((c) => ({ id: c.id, summary: c.summary }));
 
   return (
     <TapEventPanel

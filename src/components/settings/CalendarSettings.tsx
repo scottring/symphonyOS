@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useGoogleCalendar, type CalendarAccount, type CalendarProvider, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
+import { homeAccount } from '@/lib/calendar/homeAccount'
 import { CalendarSetupWizard } from '@/components/calendar/CalendarSetupWizard'
 import { SectionHeading } from '@/components/layout/SectionHeading'
 
@@ -125,11 +126,19 @@ export function CalendarSettings() {
   const nameOf = (account: CalendarAccount) =>
     account.accountEmail ?? pickAccountEmail(calendarsOf(account)) ?? (account.provider === 'microsoft' ? 'Outlook account' : 'Google account')
 
-  // New events go to the primary Google account; only calendars it can write to.
+  const isWritable = (c: GoogleCalendarInfo) => c.accessRole === 'owner' || c.accessRole === 'writer'
+  // New events go to the home account (primary Google, else primary Outlook)
+  // unless "Create events on" names a calendar — of any account (2026-10-19).
+  const home = homeAccount(accounts)
   const primaryGoogle = googleAccounts.find((a) => a.isPrimary) ?? googleAccounts[0]
-  const writableCalendars = primaryGoogle
-    ? calendarsOf(primaryGoogle).filter((c) => c.accessRole === 'owner' || c.accessRole === 'writer')
-    : []
+  const createOnGroups = (home ? [home, ...accounts.filter((a) => a.id !== home.id)] : [])
+    .filter((a) => !accountNeedsReconnect(a))
+    .map((a) => ({
+      account: a,
+      // The home account's own calendar is the "Primary" option above the groups.
+      calendars: calendarsOf(a).filter((c) => isWritable(c) && !(a.id === home?.id && c.primary)),
+    }))
+    .filter((g) => g.calendars.length > 0)
 
   const handleDefaultChange = async (value: string) => {
     setDefaultSaveState('saving')
@@ -222,9 +231,9 @@ export function CalendarSettings() {
             <p className="text-sm text-neutral-500">
               {broken
                 ? 'Connection expired. Reconnect this account.'
-                : isOutlook
+                : isOutlook && own.length > 0 && !own.some(isWritable)
                   ? 'View only'
-                  : count > 1 && account.isPrimary
+                  : count > 1 && account.isPrimary && (!isOutlook || googleAccounts.length === 0)
                     ? 'Primary: new events go here'
                     : 'Connected'}
             </p>
@@ -256,7 +265,9 @@ export function CalendarSettings() {
               Reconnect
             </button>
           )}
-          {!isOutlook && count > 1 && !account.isPrimary && !broken && (
+          {/* Outlook's primary matters only with no Google account: it is then
+              where new events go. */}
+          {count > 1 && !account.isPrimary && !broken && (!isOutlook || googleAccounts.length === 0) && (
             <button
               type="button"
               data-action="make-primary"
@@ -280,6 +291,37 @@ export function CalendarSettings() {
       </div>
     )
   }
+
+  // Default write calendar — where Symphony-created events land. Read-only
+  // calendars are excluded: the provider refuses writes to them regardless.
+  const createOn = home && (createOnGroups.length > 0 || calendarsOf(home).some(isWritable)) ? (
+    <div>
+      <label htmlFor="default-calendar" className="block text-sm font-medium text-neutral-700 mb-1">
+        Create events on
+      </label>
+      <select
+        id="default-calendar"
+        value={defaultCalendarId ?? ''}
+        onChange={(e) => handleDefaultChange(e.target.value)}
+        disabled={defaultSaveState === 'saving'}
+        className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
+      >
+        <option value="">Primary ({nameOf(home)})</option>
+        {accounts.length > 1
+          ? createOnGroups.map((g) => (
+              <optgroup key={g.account.id} label={nameOf(g.account)}>
+                {g.calendars.map((c) => <option key={c.id} value={c.id}>{c.summary}</option>)}
+              </optgroup>
+            ))
+          : createOnGroups.flatMap((g) => g.calendars).map((c) => <option key={c.id} value={c.id}>{c.summary}</option>)}
+      </select>
+      <p className="mt-1 text-xs text-neutral-400">
+        {defaultSaveState === 'error'
+          ? 'Could not save — try again.'
+          : 'New events from Symphony go here. Calendars you can only view are not listed.'}
+      </p>
+    </div>
+  ) : null
 
   const addButton = (provider: CalendarProvider, label: string) => (
     <button
@@ -313,35 +355,7 @@ export function CalendarSettings() {
 
             {primaryGoogle && !accountNeedsReconnect(primaryGoogle) && (
               <div className="p-4 bg-white rounded-lg border border-neutral-100 space-y-4">
-                {/* Default write calendar — where Symphony-created events land,
-                    on the primary account. Read-only calendars are excluded:
-                    Google refuses writes to them no matter what. */}
-                {writableCalendars.length > 0 && (
-                  <div>
-                    <label htmlFor="default-calendar" className="block text-sm font-medium text-neutral-700 mb-1">
-                      Create events on
-                    </label>
-                    <select
-                      id="default-calendar"
-                      value={defaultCalendarId ?? ''}
-                      onChange={(e) => handleDefaultChange(e.target.value)}
-                      disabled={defaultSaveState === 'saving'}
-                      className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
-                    >
-                      <option value="">Primary ({nameOf(primaryGoogle)})</option>
-                      {writableCalendars.filter((c) => !c.primary).map((c) => (
-                        <option key={c.id} value={c.id}>{c.summary}</option>
-                      ))}
-                    </select>
-                    <p className="mt-1 text-xs text-neutral-400">
-                      {defaultSaveState === 'error'
-                        ? 'Could not save — try again.'
-                        : googleAccounts.length > 1
-                          ? 'New events from Symphony go here, on your primary account. Calendars you can only view are not listed.'
-                          : 'New events from Symphony go here. Calendars you can only view are not listed.'}
-                    </p>
-                  </div>
-                )}
+                {createOn}
 
                 {/* Mail is optional and consented to separately (beta plan B05):
                     school email and drafts need it; the calendar does not. */}
@@ -409,11 +423,15 @@ export function CalendarSettings() {
         <section data-testid="outlook-card">
           <SectionHeading>Outlook Calendar</SectionHeading>
           <p className="text-sm text-neutral-500 mb-6">
-            Connect one or more Outlook or Microsoft 365 accounts. Their events show alongside everything else; editing stays in Outlook.
+            Connect one or more Outlook or Microsoft 365 accounts. Their events show alongside everything else, and you can add and edit them from Symphony.
           </p>
 
           <div className="space-y-3">
             {outlookAccounts.map((a) => accountCard(a, outlookAccounts.length))}
+            {/* With no Google account, "Create events on" lives here. */}
+            {googleAccounts.length === 0 && createOn && (
+              <div className="p-4 bg-white rounded-lg border border-neutral-100">{createOn}</div>
+            )}
             {outlookAccounts.length === 0 && (
               <div className="p-4 bg-white rounded-lg border border-neutral-100 flex items-center gap-3">
                 <DisconnectedBadge />
@@ -438,13 +456,13 @@ export function CalendarSettings() {
           </li>
           <li className="flex items-start gap-2">
             <CheckIcon />
-            <span>Create calendar events from Symphony (Google only)</span>
+            <span>Create and edit calendar events from Symphony</span>
           </li>
           <li className="flex items-start gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
-            <span className="text-neutral-400">Edits only touch events on calendars you can write to — view-only calendars and Outlook stay untouched</span>
+            <span className="text-neutral-400">Edits only touch events on calendars you can write to — view-only calendars stay untouched</span>
           </li>
         </ul>
       </div>

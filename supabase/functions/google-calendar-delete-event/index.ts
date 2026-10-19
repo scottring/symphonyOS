@@ -1,6 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { loadGoogleConnection } from '../_shared/calendar-providers/googleConnection.ts'
+import { loadWriteConnection } from '../_shared/calendar-providers/writeConnection.ts'
+import { readProviderEnv } from '../_shared/calendar-providers/index.ts'
+import { ensureFreshAccessToken, TokenRefreshError as ProviderTokenError, type AdminLike } from '../_shared/calendar-providers/tokens.ts'
+import { graphDeleteEvent, GraphWriteError } from '../_shared/calendar-providers/microsoftWrite.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,6 +58,35 @@ async function refreshAccessToken(
   return tokenData.access_token
 }
 
+// Best-effort cache cleanup. If the row doesn't exist or RLS blocks,
+// we don't want to fail the user-visible delete.
+async function clearCache(
+  // deno-lint-ignore no-explicit-any
+  supabaseAdmin: { from(table: string): any },
+  userId: string,
+  eventId: string,
+  targetEventId: string,
+  deleteSeries: boolean,
+): Promise<void> {
+  try {
+    if (deleteSeries) {
+      await supabaseAdmin
+        .from('calendar_events')
+        .delete()
+        .eq('user_id', userId)
+        .or(`google_event_id.eq.${targetEventId},recurring_event_id.eq.${targetEventId}`)
+    } else {
+      await supabaseAdmin
+        .from('calendar_events')
+        .delete()
+        .eq('user_id', userId)
+        .eq('google_event_id', eventId)
+    }
+  } catch (cacheErr) {
+    console.warn('Cache cleanup after delete failed (non-fatal):', cacheErr)
+  }
+}
+
 interface DeleteEventRequest {
   eventId: string
   calendarId?: string
@@ -84,7 +116,6 @@ serve(async (req) => {
 
     const body: DeleteEventRequest = await req.json()
     const { eventId, deleteSeries } = body
-    const calendarId = body.calendarId || 'primary'
 
     if (!eventId) {
       return new Response(JSON.stringify({ error: 'Missing required field: eventId' }), {
@@ -98,16 +129,40 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { connection, error: connError } = await loadGoogleConnection(supabaseAdmin, user.id, { calendarId })
+    // The account that owns the event's calendar — Google or Outlook.
+    const { target, error: connError } = await loadWriteConnection(supabaseAdmin, user.id, { calendarId: body.calendarId, eventId })
 
-    if (connError || !connection) {
+    if (connError || !target) {
       return new Response(JSON.stringify({ error: 'No calendar connection found', needsReconnect: true }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+    const connection = target.connection
+    const calendarId = target.calendarId
 
     let accessToken = connection.access_token
+    let targetEventId = eventId
+
+    if (connection.provider === 'microsoft') {
+      try {
+        accessToken = await ensureFreshAccessToken(supabaseAdmin as unknown as AdminLike, connection, readProviderEnv((n) => Deno.env.get(n)))
+        targetEventId = await graphDeleteEvent(accessToken, eventId, deleteSeries === true)
+      } catch (err) {
+        const json = (b: unknown) => new Response(JSON.stringify(b), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        if (err instanceof ProviderTokenError) return json({ error: err.message, errorCode: 'invalid_grant', needsReconnect: err.shouldDisconnect })
+        if (err instanceof GraphWriteError) {
+          console.error('Microsoft Graph delete error:', err.status, err.message)
+          return json({ error: err.message, statusCode: err.status })
+        }
+        throw err
+      }
+      await clearCache(supabaseAdmin, user.id, eventId, targetEventId, deleteSeries === true)
+      return new Response(JSON.stringify({ ok: true, eventId: targetEventId, deletedSeries: !!deleteSeries }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const expiresAt = new Date(connection.token_expires_at)
     const now = new Date()
     const fiveMinutes = 5 * 60 * 1000
@@ -132,7 +187,6 @@ serve(async (req) => {
 
     // For series deletes, look up the recurring parent and target that ID.
     // Google's instance-level DELETE only removes the single occurrence.
-    let targetEventId = eventId
     if (deleteSeries) {
       const getUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
       const getResponse = await fetch(getUrl, {
@@ -188,25 +242,7 @@ serve(async (req) => {
       })
     }
 
-    // Best-effort cache cleanup. If the row doesn't exist or RLS blocks,
-    // we don't want to fail the user-visible delete.
-    try {
-      if (deleteSeries) {
-        await supabaseAdmin
-          .from('calendar_events')
-          .delete()
-          .eq('user_id', user.id)
-          .or(`google_event_id.eq.${targetEventId},recurring_event_id.eq.${targetEventId}`)
-      } else {
-        await supabaseAdmin
-          .from('calendar_events')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('google_event_id', eventId)
-      }
-    } catch (cacheErr) {
-      console.warn('Cache cleanup after delete failed (non-fatal):', cacheErr)
-    }
+    await clearCache(supabaseAdmin, user.id, eventId, targetEventId, !!deleteSeries)
 
     return new Response(JSON.stringify({
       ok: true,

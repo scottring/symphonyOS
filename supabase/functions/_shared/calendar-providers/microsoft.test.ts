@@ -12,7 +12,7 @@ import {
 const calendar = { id: 'cal-1', name: 'Work', hexColor: '#0078d4', isDefaultCalendar: true }
 
 describe('Microsoft auth URL', () => {
-  it('sends the user to the common tenant with offline access and a read-only calendar scope', () => {
+  it('sends the user to the common tenant with offline access and calendar write access', () => {
     const url = new URL(
       buildMicrosoftAuthUrl({ clientId: 'abc', redirectUri: 'https://x/calendar-callback', state: 's1' }),
     )
@@ -24,8 +24,9 @@ describe('Microsoft auth URL', () => {
     expect(url.searchParams.get('prompt')).toBe('select_account')
     const scope = url.searchParams.get('scope')!.split(' ')
     expect(scope).toContain('offline_access')
-    expect(scope).toContain('Calendars.Read')
-    expect(scope).not.toContain('Calendars.ReadWrite')
+    expect(scope).toContain('Calendars.ReadWrite')
+    // Shared calendars wait on a test against a personal account (2026-10-19).
+    expect(scope).not.toContain('Calendars.ReadWrite.Shared')
   })
 
   it('a refresh re-sends the scope — Microsoft rejects a scopeless refresh', () => {
@@ -37,7 +38,7 @@ describe('Microsoft auth URL', () => {
 })
 
 describe('normalizeGraphCalendar', () => {
-  it('reports every Outlook calendar as read-only so the event panel hides edits', () => {
+  it('a calendar Graph will not let this mailbox edit is read-only, so the event panel hides edits', () => {
     const cal = normalizeGraphCalendar(calendar)
     expect(cal).toMatchObject({
       id: 'cal-1',
@@ -47,6 +48,11 @@ describe('normalizeGraphCalendar', () => {
       backgroundColor: '#0078d4',
       provider: 'microsoft',
     })
+  })
+
+  it('an editable calendar is writable; the default one is owned', () => {
+    expect(normalizeGraphCalendar({ ...calendar, canEdit: true }).accessRole).toBe('owner')
+    expect(normalizeGraphCalendar({ ...calendar, canEdit: true, isDefaultCalendar: false }).accessRole).toBe('writer')
   })
 
   it('an "auto" colour (empty hexColor) becomes no colour, not an empty string', () => {

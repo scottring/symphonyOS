@@ -4,6 +4,7 @@ import { shareInFlight } from '@/lib/sharedRequest'
 import { getCurrentAccount } from '@/lib/currentAccount'
 import { recentEventsFor, rememberEvents, RECENT_EVENTS_MS } from './recentCalendarEvents'
 import { setCalendarConnected } from '@/lib/calendarConnection'
+import { homeAccount } from '@/lib/calendar/homeAccount'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { afterPageData } from '@/lib/loadPriority'
 import { logger } from '@/lib/logger'
@@ -116,7 +117,7 @@ export interface GoogleCalendarInfo {
   accessRole: 'owner' | 'writer' | 'reader'
   primary: boolean
   backgroundColor?: string
-  /** Absent = Google (older mocks / callers). Outlook calendars are always 'reader'. */
+  /** Absent = Google (older mocks / callers). */
   provider?: CalendarProvider
   /** The connected account this calendar belongs to. */
   connectionId?: string
@@ -197,9 +198,9 @@ interface GoogleCalendarContextValue {
   removeEventLocal: (eventId: string) => void
   /** Restore a previously-removed event into the local cache (used by undo). */
   restoreEventLocal: (event: CalendarEvent) => void
-  /** Default calendar for Symphony-created events (null = Google primary). */
+  /** Default calendar for Symphony-created events (null = the home account's own calendar). */
   defaultCalendarId: string | null
-  /** Persist a new default write calendar (null = Google primary). */
+  /** Persist a new default write calendar (null = the home account's own calendar). */
   setDefaultCalendarId: (calendarId: string | null) => Promise<void>
 }
 
@@ -222,7 +223,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [error, setError] = useState<string | null>(null)
   // Where Symphony-created events land when no calendar is specified.
-  // null = Google primary. Stored in calendar_connections.calendar_id.
+  // null = the home account's own calendar. Stored on that account's calendar_connections.calendar_id.
   const [defaultCalendarId, setDefaultCalendarIdState] = useState<string | null>(null)
 
   // Check connection status and validate token.
@@ -318,11 +319,11 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         }
 
         setAccounts(found)
-        // The default write calendar lives on the primary Google account's row
-        // — writes are Google-only, and new events go to the primary account.
-        const primaryGoogle = found.find((a) => a.provider === 'google' && a.isPrimary)
-        const googleRow = (connections ?? []).find((c) => c.id === primaryGoogle?.id)
-        setDefaultCalendarIdState(googleRow?.calendar_id ?? null)
+        // The default write calendar lives on the home account's row; it may
+        // name a calendar of any account, which then receives new events.
+        const home = homeAccount(found)
+        const homeRow = (connections ?? []).find((c) => c.id === home?.id)
+        setDefaultCalendarIdState(homeRow?.calendar_id ?? null)
 
         // A connection row is enough to start reading (2026-10-18). Pages
         // used to wait for the test call below — a full trip to Google, ~3–5s
@@ -487,8 +488,8 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
           .eq('user_id', user.id) as unknown as PromiseLike<{ data: ConnectionRow[] | null; error: unknown }>)
         if (!readError && rows) {
           remaining = toCalendarAccounts(rows)
-          const primaryGoogle = remaining.find((a) => a.provider === 'google' && a.isPrimary)
-          setDefaultCalendarIdState(rows.find((r) => r.id === primaryGoogle?.id)?.calendar_id ?? null)
+          const home = homeAccount(remaining)
+          setDefaultCalendarIdState(rows.find((r) => r.id === home?.id)?.calendar_id ?? null)
         }
       }
       setAccounts(remaining)
@@ -523,8 +524,9 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       is_primary: a.provider === target?.provider ? a.id === connectionId : a.isPrimary,
       granted_scopes: a.grantsMail ? GMAIL_READ_SCOPE : null,
     }))))
-    // The default write calendar is the new primary's own.
-    if (target?.provider === 'google') {
+    // The default write calendar is the new home account's own.
+    const nextAccounts = accounts.map((a) => ({ ...a, isPrimary: a.provider === target?.provider ? a.id === connectionId : a.isPrimary }))
+    if (target && homeAccount(nextAccounts)?.id === connectionId) {
       const { data: row } = await supabase.from('calendar_connections').select('calendar_id').eq('id', connectionId).maybeSingle()
       setDefaultCalendarIdState(row?.calendar_id ?? null)
     }
@@ -887,14 +889,14 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     }
   }, [isConnected])
 
-  /** Persist the default write calendar (null = Google primary). It belongs
-   *  to the primary Google account, where new events go. */
+  /** Persist the default write calendar (null = the home account's own). It
+   *  is stored on the home account's row and may name any account's calendar. */
   const setDefaultCalendarId = useCallback(async (calendarId: string | null) => {
     const previous = defaultCalendarId
     setDefaultCalendarIdState(calendarId)
     const { data: { user } } = await getAuthUser()
     if (!user) return
-    const primary = accounts.find((a) => a.provider === 'google' && a.isPrimary)
+    const primary = homeAccount(accounts)
     const query = supabase
       .from('calendar_connections')
       .update({ calendar_id: calendarId, updated_at: new Date().toISOString() })

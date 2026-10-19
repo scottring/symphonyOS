@@ -1,8 +1,8 @@
-# Outlook / Microsoft 365 calendar (reads only), and several accounts
+# Outlook / Microsoft 365 calendar, and several accounts
 
-Symphony can show events from an Outlook or Microsoft 365 calendar next to
-Google's. It is view-only: the event panel hides move, delete, and edit for
-Outlook events, and "Create events on" stays Google.
+Symphony shows events from Outlook or Microsoft 365 calendars next to
+Google's, and (since 2026-10-19) creates, edits and deletes them too. Moving
+an Outlook event to another calendar is not offered: Graph has no move.
 
 ## How it works
 
@@ -16,10 +16,22 @@ Outlook events, and "Create events on" stays Google.
   and event carries the account it came from (`connectionId` /
   `connection_id`); a calendar two accounts can both see is read once, through
   the one with the most access.
-- One Google account per person is `is_primary`: new events (and the "Create
-  events on" choice) go there. Edits to an existing event go through the
-  account that can write its calendar (`writable_calendar_ids`, refreshed on
-  every read; `_shared/calendar-providers/googleConnection.ts`). Mail goes
+- One account per provider is `is_primary`. The **home account** is the
+  primary Google account, or the primary Outlook account for someone with no
+  Google account; its `calendar_id` is "Create events on", which may name a
+  calendar of any account. Every write goes through the account whose
+  `writable_calendar_ids` (refreshed on every read) holds the target calendar,
+  Google or Outlook alike; an edit that names no calendar is matched through
+  the event's cached copy (`_shared/calendar-providers/writeConnection.ts`).
+- Outlook writes: `_shared/calendar-providers/microsoftWrite.ts`, called from
+  the same `google-calendar-create-event` / `-delete-event` functions. Times go
+  to Graph as wall-clock in the person's zone (a weekly 9am series must not
+  drift at DST). Series: the RRULEs Symphony makes are translated to Graph's
+  pattern; any other rule is refused, not approximated. A create carries the
+  request id as Graph's `transactionId`, so a retry makes no duplicate.
+- An Outlook calendar is writable when Graph's `canEdit` says so AND the
+  connection granted `Calendars.ReadWrite` (`granted_scopes`); a grant without
+  it reads as view-only. Mail goes
   through an account that granted Gmail (or an older row with unrecorded
   scopes), primary first. A revoked account is kept and shown as needing
   reconnection, so reconnecting it restores its row, primary role included. Disconnecting the
@@ -122,14 +134,14 @@ to connect from (a Vercel preview URL, a second dev port) the same way.
 
 - [ ] **API permissions → Add a permission → Microsoft Graph → Delegated
       permissions.**
-- [ ] Tick `Calendars.Read`, `User.Read`, `offline_access`. These are exactly
-      `MICROSOFT_SCOPES` in `microsoft.ts` — if that list ever changes, this
-      list changes with it.
+- [ ] Tick `Calendars.ReadWrite`, `User.Read`, `offline_access`. These are
+      exactly `MICROSOFT_SCOPES` in `microsoft.ts` — if that list ever
+      changes, this list changes with it. `Calendars.ReadWrite.Shared` is
+      registered too but not yet requested: calendars others share with you
+      wait on a test that personal accounts accept it.
 - [ ] Add permissions. No admin consent needed: all three are user-consentable,
-      and a personal account consents on first sign-in.
-
-Read-only by design. Do not add `Calendars.ReadWrite` — Symphony never writes to
-Outlook, and the wider scope buys a scarier consent screen for nothing.
+      and a personal account consents on first sign-in. A work tenant may
+      still require its admin's approval for an unverified publisher.
 
 ### 5. Hand the credentials to the edge functions
 
@@ -186,7 +198,10 @@ in advance is wasted work.
 
 ## Known limits
 
-- Reads only. Writes stay on Google.
+- Outlook events cannot move to another calendar (Graph has no move).
+- An Outlook series can repeat only on the patterns Symphony itself makes
+  (daily, weekly on days, monthly by date or "second Tuesday", yearly); any
+  other rule is refused with a message.
 - An event moves only between calendars of one Google account (Google's own
   rule); moving to another account's calendar is refused with a message.
 - "Hide this event" on a recurring Outlook series hides one occurrence, not

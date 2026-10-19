@@ -87,6 +87,8 @@ Deno.serve(async (req) => {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
       expiresInSeconds: tokenData.expires_in,
+      // What was actually granted: a calendar is written only under Calendars.ReadWrite.
+      grantedScopes: typeof tokenData.scope === 'string' ? tokenData.scope : null,
     }, readProviderEnv((n) => Deno.env.get(n)))
 
     if (saved.error) {

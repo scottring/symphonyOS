@@ -8,6 +8,7 @@
  */
 import { fetchGoogleCalendars, fetchGoogleEvents, googleAccountEmail } from './google.ts'
 import { fetchGraphAccountEmail, fetchGraphCalendars, fetchGraphEvents } from './microsoft.ts'
+import { grantsGraphWrite } from './microsoftWrite.ts'
 import { ensureFreshAccessToken, TokenRefreshError, updateConnection, type ProviderEnv } from './tokens.ts'
 import type { CalendarConnectionRow, CalendarProvider, NormalizedCalendar, NormalizedEvent } from './types.ts'
 
@@ -121,7 +122,12 @@ export async function openConnections(
       }
       try {
         const token = await ensureFreshAccessToken(admin, connection, env, fetchImpl)
-        const listed = await adapter.calendars(token, fetchImpl)
+        let listed = await adapter.calendars(token, fetchImpl)
+        // An Outlook account connected before write access existed holds a
+        // read-only grant: its calendars may be editable in Outlook, not here.
+        if (connection.provider === 'microsoft' && !grantsGraphWrite(connection.granted_scopes)) {
+          listed = listed.map((c) => ({ ...c, accessRole: 'reader' as const }))
+        }
         // Rows made before multi-account learn their email here, once.
         const facts = connection.id ? await accountFacts(connection, token, listed, fetchImpl) : {}
         if (Object.keys(facts).length > 0) {

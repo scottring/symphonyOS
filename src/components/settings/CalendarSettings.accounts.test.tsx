@@ -55,11 +55,13 @@ describe('several Google accounts', () => {
     expect(within(card('me@gmail.com')).queryByRole('button', { name: 'Make primary' })).toBeNull()
   })
 
-  it('Create events on lists only the primary account’s writable calendars', async () => {
+  it('Create events on lists every account’s writable calendars, grouped by account', async () => {
     render(<CalendarSettings />)
     const select = await screen.findByLabelText('Create events on')
     const labels = Array.from((select as HTMLSelectElement).options).map((o) => o.textContent)
-    expect(labels).toEqual(['Primary (me@gmail.com)', 'Family'])
+    expect(labels).toEqual(['Primary (me@gmail.com)', 'Family', 'me@work.com', 'Team'])
+    const groups = Array.from(select.querySelectorAll('optgroup')).map((g) => g.label)
+    expect(groups).toEqual(['me@gmail.com', 'me@work.com'])
   })
 
   it('adds another account through the Google sign-in', async () => {

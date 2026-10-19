@@ -1,6 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { loadGoogleConnection } from '../_shared/calendar-providers/googleConnection.ts'
+import { loadWriteConnection, type StoredWriteConnection } from '../_shared/calendar-providers/writeConnection.ts'
+import { readProviderEnv } from '../_shared/calendar-providers/index.ts'
+import { ensureFreshAccessToken, TokenRefreshError as ProviderTokenError, type AdminLike } from '../_shared/calendar-providers/tokens.ts'
+import { graphCreateEvent, graphUpdateEvent, GraphWriteError } from '../_shared/calendar-providers/microsoftWrite.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,6 +60,34 @@ async function refreshAccessToken(
     }).eq('id', connectionId)
 
   return tokenData.access_token
+}
+
+/**
+ * An Outlook account's write (2026-10-19). Same request, same response shape
+ * as the Google path below: errors ride in a 200 body so the client reads them.
+ */
+async function writeThroughGraph(
+  supabaseAdmin: unknown,
+  connection: StoredWriteConnection,
+  run: (accessToken: string) => Promise<Record<string, unknown>>,
+): Promise<Response> {
+  const json = (body: unknown) => new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+  try {
+    const accessToken = await ensureFreshAccessToken(supabaseAdmin as unknown as AdminLike, connection, readProviderEnv((n) => Deno.env.get(n)))
+    return json(await run(accessToken))
+  } catch (err) {
+    if (err instanceof ProviderTokenError) {
+      return json({ error: err.message, errorCode: 'invalid_grant', needsReconnect: err.shouldDisconnect })
+    }
+    if (err instanceof GraphWriteError) {
+      console.error('Microsoft Graph write error:', err.status, err.message)
+      return json({ error: err.message, statusCode: err.status })
+    }
+    throw err
+  }
 }
 
 interface CreateEventRequest {
@@ -124,14 +155,20 @@ serve(async (req) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       )
 
-      // Get user's calendar connection
-      const { connection, error: connError } = await loadGoogleConnection(supabaseAdmin, user.id, { calendarId })
+      // The account that owns the event's calendar — Google or Outlook.
+      const { target, error: connError } = await loadWriteConnection(supabaseAdmin, user.id, { calendarId, eventId })
 
-      if (connError || !connection) {
+      if (connError || !target) {
         return new Response(JSON.stringify({ error: 'No calendar connection found', needsReconnect: true }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
+      }
+      const connection = target.connection
+
+      if (connection.provider === 'microsoft') {
+        return writeThroughGraph(supabaseAdmin, connection, (token) =>
+          graphUpdateEvent(token, eventId, { title, location, startTime, endTime, timeZone }) as Promise<Record<string, unknown>>)
       }
 
       // Check if token needs refresh
@@ -180,8 +217,8 @@ serve(async (req) => {
         })
       }
 
-      // Use the provided calendarId or default to 'primary'
-      const targetCalendarId = calendarId || 'primary'
+      // The calendar the event lives on, as resolved above ('primary' when unknown).
+      const targetCalendarId = target.calendarId
       const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendarId)}/events/${encodeURIComponent(eventId)}`
 
       console.log('Updating Google Calendar event:', {
@@ -253,19 +290,26 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get user's calendar connection
-    const { connection, error: connError } = await loadGoogleConnection(supabaseAdmin, user.id, { calendarId })
+    // Target calendar: explicit request > the user's default write calendar
+    // ("Create events on", calendar_connections.calendar_id of the home
+    // account) > that account's own. The account is the one that owns it.
+    const { target, error: connError } = await loadWriteConnection(supabaseAdmin, user.id, { calendarId, create: true })
 
-    if (connError || !connection) {
+    if (connError || !target) {
       return new Response(JSON.stringify({ error: 'No calendar connection found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+    const connection = target.connection
+    const targetCreateCalendarId = target.calendarId
 
-    // Target calendar: explicit request > the user's default write calendar
-    // (calendar_connections.calendar_id, set in Settings) > Google primary.
-    const targetCreateCalendarId = calendarId || connection.calendar_id || 'primary'
+    if (connection.provider === 'microsoft') {
+      return writeThroughGraph(supabaseAdmin, connection, (token) =>
+        graphCreateEvent(token, {
+          calendarId: targetCreateCalendarId, title, description, startTime, endTime, location, allDay, timeZone, requestId, recurrence,
+        }) as Promise<Record<string, unknown>>)
+    }
 
     // Check if token needs refresh
     let accessToken = connection.access_token
