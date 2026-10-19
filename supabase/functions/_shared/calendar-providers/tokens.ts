@@ -24,7 +24,7 @@ export interface ProviderEnv {
 }
 
 export function buildRefreshRequest(
-  connection: Pick<CalendarConnectionRow, 'provider' | 'refresh_token'>,
+  connection: Pick<CalendarConnectionRow, 'provider' | 'refresh_token' | 'granted_scopes'>,
   env: ProviderEnv,
 ): { url: string; body: URLSearchParams } {
   if (connection.provider === 'microsoft') {
@@ -34,6 +34,7 @@ export function buildRefreshRequest(
         clientId: env.MICROSOFT_CLIENT_ID ?? '',
         clientSecret: env.MICROSOFT_CLIENT_SECRET ?? '',
         refreshToken: connection.refresh_token,
+        grantedScopes: connection.granted_scopes,
       }),
     }
   }

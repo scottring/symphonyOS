@@ -7,8 +7,7 @@
  * alongside whatever did load. The caller decides how to surface them.
  */
 import { fetchGoogleCalendars, fetchGoogleEvents, googleAccountEmail } from './google.ts'
-import { fetchGraphAccountEmail, fetchGraphCalendars, fetchGraphEvents } from './microsoft.ts'
-import { grantsGraphWrite } from './microsoftWrite.ts'
+import { fetchGraphAccountEmail, fetchGraphCalendars, fetchGraphEvents, grantsGraphWrite } from './microsoft.ts'
 import { ensureFreshAccessToken, TokenRefreshError, updateConnection, type ProviderEnv } from './tokens.ts'
 import type { CalendarConnectionRow, CalendarProvider, NormalizedCalendar, NormalizedEvent } from './types.ts'
 

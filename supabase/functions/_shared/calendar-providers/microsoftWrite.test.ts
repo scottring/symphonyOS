@@ -51,8 +51,10 @@ describe('rruleToGraphRecurrence', () => {
 
   it('weekly on named days, or on the first day when none is named', () => {
     expect(rruleToGraphRecurrence(['RRULE:FREQ=WEEKLY;BYDAY=TU,TH'], start)?.pattern).toEqual({
-      type: 'weekly', interval: 1, daysOfWeek: ['tuesday', 'thursday'], firstDayOfWeek: 'sunday',
+      type: 'weekly', interval: 1, daysOfWeek: ['tuesday', 'thursday'], firstDayOfWeek: 'monday',
     })
+    // "Every other week" counts weeks from WKST, Monday by default, as Google does.
+    expect(rruleToGraphRecurrence(['RRULE:FREQ=WEEKLY;INTERVAL=2;WKST=SU;BYDAY=SU,MO'], start)?.pattern).toMatchObject({ firstDayOfWeek: 'sunday', interval: 2 })
     expect(rruleToGraphRecurrence(['RRULE:FREQ=WEEKLY'], start)?.pattern).toMatchObject({ daysOfWeek: ['tuesday'] })
     expect(rruleToGraphRecurrence(['RRULE:FREQ=WEEKLY;BYDAY=SA,SU'], start)?.pattern).toMatchObject({ daysOfWeek: ['saturday', 'sunday'] })
   })
@@ -78,6 +80,7 @@ describe('rruleToGraphRecurrence', () => {
 
   it('refuses what Graph cannot hold exactly', () => {
     expect(rruleToGraphRecurrence(['RRULE:FREQ=HOURLY'], start)).toBeNull()
+    expect(rruleToGraphRecurrence(['RRULE:FREQ=MONTHLY;BYDAY=5FR'], start)).toBeNull()
     expect(rruleToGraphRecurrence(['RRULE:FREQ=MONTHLY;BYDAY=1MO,3MO'], start)).toBeNull()
     expect(rruleToGraphRecurrence(['RRULE:FREQ=MONTHLY;BYSETPOS=1;BYDAY=MO'], start)).toBeNull()
     expect(rruleToGraphRecurrence(['RRULE:FREQ=WEEKLY', 'EXDATE:20261027'], start)).toBeNull()
@@ -121,7 +124,7 @@ describe('buildGraphEvent', () => {
       timeZone: 'America/New_York', recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=TU'],
     })
     expect('body' in built && built.body.recurrence).toEqual({
-      pattern: { type: 'weekly', interval: 1, daysOfWeek: ['tuesday'], firstDayOfWeek: 'sunday' },
+      pattern: { type: 'weekly', interval: 1, daysOfWeek: ['tuesday'], firstDayOfWeek: 'monday' },
       range: { type: 'noEnd', startDate: '2026-10-20' },
     })
   })

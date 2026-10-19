@@ -30,10 +30,18 @@ describe('Microsoft auth URL', () => {
   })
 
   it('a refresh re-sends the scope — Microsoft rejects a scopeless refresh', () => {
-    const body = buildMicrosoftRefreshBody({ clientId: 'abc', clientSecret: 'sec', refreshToken: 'rt' })
+    const body = buildMicrosoftRefreshBody({ clientId: 'abc', clientSecret: 'sec', refreshToken: 'rt', grantedScopes: 'User.Read Calendars.ReadWrite offline_access' })
     expect(body.get('grant_type')).toBe('refresh_token')
     expect(body.get('refresh_token')).toBe('rt')
     expect(body.get('scope')).toBe(MICROSOFT_SCOPES.join(' '))
+  })
+
+  it('a read-only connection refreshes as read-only — asking for more than was granted fails', () => {
+    const readOnly = buildMicrosoftRefreshBody({ clientId: 'abc', clientSecret: 'sec', refreshToken: 'rt', grantedScopes: 'User.Read Calendars.Read offline_access' })
+    expect(readOnly.get('scope')!.split(' ')).toContain('Calendars.Read')
+    expect(readOnly.get('scope')!.split(' ')).not.toContain('Calendars.ReadWrite')
+    const unrecorded = buildMicrosoftRefreshBody({ clientId: 'abc', clientSecret: 'sec', refreshToken: 'rt' })
+    expect(unrecorded.get('scope')!.split(' ')).not.toContain('Calendars.ReadWrite')
   })
 })
 

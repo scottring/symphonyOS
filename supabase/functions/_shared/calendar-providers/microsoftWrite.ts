@@ -14,6 +14,7 @@
  * Graph has no "move between calendars" for events; that stays Google-only.
  */
 import { GRAPH_BASE } from './microsoft.ts'
+export { grantsGraphWrite } from './microsoft.ts'
 
 /** Graph-side failure, carried back to the caller as `{ error, statusCode }`. */
 export class GraphWriteError extends Error {
@@ -21,13 +22,6 @@ export class GraphWriteError extends Error {
     super(message)
     this.name = 'GraphWriteError'
   }
-}
-
-/** Whether a Microsoft granted-scope string lets Symphony write calendars. */
-export function grantsGraphWrite(granted: string | null | undefined): boolean {
-  if (typeof granted !== 'string') return false
-  // Microsoft returns Graph scopes bare ("Calendars.ReadWrite") or as URLs.
-  return granted.split(/\s+/).some((s) => /(^|\/)Calendars\.ReadWrite(\.Shared)?$/i.test(s))
 }
 
 /** "YYYY-MM-DDTHH:mm:ss" wall-clock time of an instant in an IANA zone. */
@@ -61,7 +55,8 @@ function addDays(date: string, days: number): string {
 const GRAPH_DAYS: Record<string, string> = {
   SU: 'sunday', MO: 'monday', TU: 'tuesday', WE: 'wednesday', TH: 'thursday', FR: 'friday', SA: 'saturday',
 }
-const GRAPH_INDEX: Record<string, string> = { '1': 'first', '2': 'second', '3': 'third', '4': 'fourth', '5': 'last', '-1': 'last' }
+// No 'fifth' in Graph, and a fifth weekday is not the last one: 5 is refused.
+const GRAPH_INDEX: Record<string, string> = { '1': 'first', '2': 'second', '3': 'third', '4': 'fourth', '-1': 'last' }
 const WEEKDAY_OF = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
 export interface GraphRecurrence {
@@ -99,13 +94,17 @@ export function rruleToGraphRecurrence(lines: string[], startDate: string): Grap
       if (rule.BYMONTHDAY) return null
       const days = byDay.length ? byDay.map((d) => GRAPH_DAYS[d]) : [WEEKDAY_OF[start.getUTCDay()]]
       if (days.some((d) => !d)) return null
-      pattern = { type: 'weekly', interval, daysOfWeek: days, firstDayOfWeek: 'sunday' }
+      // RFC 5545 weeks start Monday unless WKST says otherwise; "every other
+      // week" counts weeks from there, so Outlook must count the same way.
+      const weekStart = GRAPH_DAYS[rule.WKST ?? 'MO']
+      if (!weekStart) return null
+      pattern = { type: 'weekly', interval, daysOfWeek: days, firstDayOfWeek: weekStart }
       break
     }
     case 'MONTHLY': {
       if (byDay.length > 1 || (byDay.length && rule.BYMONTHDAY)) return null
       if (byDay.length === 1) {
-        const m = /^(-1|[1-5])([A-Z]{2})$/.exec(byDay[0])
+        const m = /^(-1|[1-4])([A-Z]{2})$/.exec(byDay[0])
         if (!m || !GRAPH_DAYS[m[2]]) return null
         pattern = { type: 'relativeMonthly', interval, daysOfWeek: [GRAPH_DAYS[m[2]]], index: GRAPH_INDEX[m[1]] }
       } else {

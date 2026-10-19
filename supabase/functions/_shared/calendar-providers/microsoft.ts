@@ -20,6 +20,15 @@ import { extractMeetingUrlFromText, type NormalizedCalendar, type NormalizedEven
 export const MICROSOFT_AUTHORITY = 'https://login.microsoftonline.com/common/oauth2/v2.0'
 export const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
 export const MICROSOFT_SCOPES = ['offline_access', 'User.Read', 'Calendars.ReadWrite']
+/** What connections made before 2026-10-19 were granted (read-only). */
+export const MICROSOFT_READ_SCOPES = ['offline_access', 'User.Read', 'Calendars.Read']
+
+/** Whether a Microsoft granted-scope string lets Symphony write calendars. */
+export function grantsGraphWrite(granted: string | null | undefined): boolean {
+  if (typeof granted !== 'string') return false
+  // Microsoft returns Graph scopes bare ("Calendars.ReadWrite") or as URLs.
+  return granted.split(/\s+/).some((s) => /(^|\/)Calendars\.ReadWrite(\.Shared)?$/i.test(s))
+}
 
 export function buildMicrosoftAuthUrl(params: { clientId: string; redirectUri: string; state: string }): string {
   const url = new URL(`${MICROSOFT_AUTHORITY}/authorize`)
@@ -35,18 +44,23 @@ export function buildMicrosoftAuthUrl(params: { clientId: string; redirectUri: s
   return url.toString()
 }
 
-/** Microsoft refuses a refresh that omits scope, unlike Google. */
+/**
+ * Microsoft refuses a refresh that omits scope, unlike Google — and one that
+ * asks for more than was granted, so a read-only connection refreshes as
+ * read-only (it would otherwise fail invalid_grant and look revoked).
+ */
 export function buildMicrosoftRefreshBody(params: {
   clientId: string
   clientSecret: string
   refreshToken: string
+  grantedScopes?: string | null
 }): URLSearchParams {
   return new URLSearchParams({
     client_id: params.clientId,
     client_secret: params.clientSecret,
     refresh_token: params.refreshToken,
     grant_type: 'refresh_token',
-    scope: MICROSOFT_SCOPES.join(' '),
+    scope: (grantsGraphWrite(params.grantedScopes) ? MICROSOFT_SCOPES : MICROSOFT_READ_SCOPES).join(' '),
   })
 }
 
