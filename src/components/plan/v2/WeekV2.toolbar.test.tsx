@@ -166,7 +166,7 @@ describe('WeekV2 header — the fact line', () => {
     expect(screen.getAllByRole('button', { name: /^Review/ })).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
     expect(where().get('review')).toBe('1')
-    expect(screen.getByRole('region', { name: 'The deck' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Plan this week' })).toBeTruthy()
   })
 
   it('once last week is reviewed it says the weekday', () => {
@@ -217,8 +217,14 @@ const where = () => new URLSearchParams(screen.getByTestId('where').textContent 
 const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
   mode: null, available: true, cards: [], doneLastWeek: 3, aged: 0, stripDays: [], onSeeAged: vi.fn(), onFinish: vi.fn(async () => true),
   actions: { done: vi.fn(), placeOnDay: vi.fn(), keepThisWeek: vi.fn(), later: vi.fn(), laterOnDate: vi.fn(), letGo: vi.fn(), drain: vi.fn() },
+  choose: { monthWord: 'October', lines: [], doneLines: [], loose: [], onAddLoose: vi.fn(async () => true), onDropIn: vi.fn(async () => false as const), placeItems: [], placedCount: 0 },
   ...over,
 })
+// Plan this week, start to end: Choose, then Give them a day, then Done planning.
+const finishPlanning = () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Give them a day' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Done planning' }))
+}
 // WeekViewV2's part, standing in: the deck's mode is read off the URL, on a
 // week that may open it.
 function WithDeck({ deck, ...props }: Partial<React.ComponentProps<typeof WeekV2>>) {
@@ -245,7 +251,7 @@ describe('WeekV2 — Review opens the deck', () => {
     expect(screen.queryByRole('button', { name: 'Review this week' })).toBeNull()
     expect(document.querySelectorAll('.pv2-btn')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Plan next week' }))
-    expect(screen.getByRole('region', { name: 'The deck' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Plan this week' })).toBeTruthy()
     expect(screen.queryByText('The days')).toBeNull()
     expect(where().get('plan')).toBe('1')
     expect(where().get('date')).toBe('2026-10-04')
@@ -267,7 +273,7 @@ describe('WeekV2 — Review opens the deck', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
     expect(where().get('review')).toBe('1')
     expect(where().get('date')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
+    finishPlanning()
     await vi.waitFor(() => expect(review.finish).toHaveBeenCalledWith({ wentWell: '', didnt: '' }))
     expect(deck.onFinish).toHaveBeenCalledTimes(1)
     expect(await screen.findByText('The days')).toBeTruthy()
@@ -284,7 +290,7 @@ describe('WeekV2 — Review opens the deck', () => {
     session.save.mockImplementationOnce(async () => { order.push('planned'); return true })
     const deck = makeDeck({ onFinish: vi.fn(async () => { order.push('drain'); return true }) })
     renderAt('/week?plan=1', { deck })
-    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
+    finishPlanning()
     await vi.waitFor(() => expect(session.save).toHaveBeenCalledTimes(1))
     expect(session.save).toHaveBeenCalledWith({ wentWell: '', didnt: '', focus: undefined })
     expect(order).toEqual(['drain', 'review', 'planned'])
@@ -298,7 +304,7 @@ describe('WeekV2 — Review opens the deck', () => {
     vi.setSystemTime(new Date(2026, 9, 3, 9)) // Saturday, the last day of Sep 27 – Oct 3
     session.save.mockReset(); review.finish.mockClear()
     renderAt('/week?review=1', { deck: makeDeck() })
-    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
+    finishPlanning()
     await vi.waitFor(() => expect(review.finish).toHaveBeenCalledTimes(1))
     expect(await screen.findByText('The days')).toBeTruthy()
     expect(session.save).not.toHaveBeenCalled()
@@ -307,18 +313,18 @@ describe('WeekV2 — Review opens the deck', () => {
   it('a failed drain or review leaves the week unmarked; Place them never marks it', async () => {
     session.save.mockReset()
     renderAt('/week?plan=1', { deck: makeDeck({ onFinish: vi.fn(async () => false) }) })
-    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
-    await vi.waitFor(() => expect(screen.getByRole('region', { name: 'The deck' })).toBeTruthy())
+    finishPlanning()
+    await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Plan this week' })).toBeTruthy())
     expect(session.save).not.toHaveBeenCalled()
     cleanup()
     review.finish.mockImplementationOnce(async () => false)
     renderAt('/week?review=1', { deck: makeDeck() })
-    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
+    finishPlanning()
     await vi.waitFor(() => expect(review.finish).toHaveBeenCalled())
     expect(session.save).not.toHaveBeenCalled()
     cleanup()
     renderAt('/week?place=1', { deck: makeDeck() })
-    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(await screen.findByText('The days')).toBeTruthy()
     expect(session.save).not.toHaveBeenCalled()
   })
@@ -335,7 +341,7 @@ describe('WeekV2 — Review opens the deck', () => {
 
   it('waits for the tasks before dealing: neither the deck nor the canvas while they load', () => {
     renderAt('/week?review=1', { deck: makeDeck({ loading: true }) })
-    expect(screen.queryByRole('region', { name: 'The deck' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Plan this week' })).toBeNull()
     expect(screen.queryByText('Nothing left without a home')).toBeNull()
     expect(screen.queryByText('The days')).toBeNull()
   })
@@ -352,9 +358,9 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
   it('Plan this week opens the full deck in place of the canvas, with no mark in the bar', () => {
     renderAt('/week', { deck: makeDeck() })
     fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
-    expect(screen.getByRole('region', { name: 'The deck' })).toBeTruthy()
-    // The full deck's intro facts.
-    expect(screen.getByText('done last week')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Plan this week' })).toBeTruthy()
+    // Step 1: from the month.
+    expect(screen.getByText('October goals → this week')).toBeTruthy()
     expect(screen.queryByText('The days')).toBeNull()
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     expect(screen.queryByRole('button', { name: 'I’m happy with this week' })).toBeNull()
@@ -364,7 +370,7 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
 
   it('a week the deck may not open on offers neither Review nor Plan, and ignores the URL', () => {
     renderAt('/week?review=1', { deck: makeDeck({ available: false }) })
-    expect(screen.queryByRole('region', { name: 'The deck' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Plan this week' })).toBeNull()
     expect(screen.getByText('The days')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Plan this week' })).toBeNull()
@@ -384,9 +390,10 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
   it('?place=1 opens the deck in place mode; finishing records no review and returns to the week', async () => {
     const deck = makeDeck()
     renderAt('/week?place=1', { deck })
-    expect(screen.getByRole('region', { name: 'The deck' })).toBeTruthy()
-    expect(screen.queryByText('done last week')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Back to the week' }))
+    expect(screen.getByRole('region', { name: 'Plan this week' })).toBeTruthy()
+    // Place them opens straight on the days.
+    expect(screen.getByRole('heading', { name: 'Give them a day' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(await screen.findByText('The days')).toBeTruthy()
     expect(where().get('place')).toBeNull()
     expect(deck.onFinish).not.toHaveBeenCalled()

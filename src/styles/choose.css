@@ -1,0 +1,105 @@
+/* src/styles/choose.css — planning a period: Choose, then Give them a day
+ * (spec 2026-10-19; card design approved 2026-10-19, mockup choose-v2). On the
+ * deck's scenery shell (.deck) and its card, ghosts, buttons and stamp.
+ */
+
+.choose { width: min(620px, 100%); display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.choose-days, .choose[data-view='all'] { width: min(880px, 100%); }
+.choose-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-height: 32px; }
+.choose-top-right { display: inline-flex; align-items: center; gap: 14px; }
+.choose-leave { min-height: 32px; padding: 0 4px; border: 0; background: none; cursor: pointer; font: inherit; font-size: 13px; color: var(--color-neutral-500); }
+.choose-leave:hover { color: var(--color-neutral-800); }
+.choose-count { margin: 0; font-size: 13px; color: var(--color-neutral-600); }
+.choose-h { margin: 0; font: 400 34px/1.1 var(--font-family-display); color: var(--color-neutral-900); }
+.choose-facts, .choose-was { margin: 0; font-size: 13.5px; color: var(--color-neutral-600); }
+.choose-empty { margin: 0; font-size: 14px; color: var(--color-neutral-500); }
+
+/* The view switch, quiet: One at a time · All at once */
+.choose-switch { display: inline-flex; padding: 2px; gap: 2px; border-radius: 9px; background: color-mix(in oklab, var(--color-neutral-100), transparent 20%); }
+.choose-switch-btn { min-height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: none; cursor: pointer; font: 500 12px var(--font-family-sans); color: var(--color-neutral-500); }
+.choose-switch-btn.is-on { background: var(--color-bg-elevated); color: var(--color-neutral-800); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+
+/* One goal per card, on the deck's stack */
+.choose-stack { width: 100%; margin-top: 4px; }
+.choose-card { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.choose-card-title { margin: 0; padding-right: 120px; font: 400 30px/1.15 var(--font-family-display); color: var(--color-neutral-900); text-wrap: balance; overflow-wrap: anywhere; }
+.choose-fact { margin: 0 0 14px; font-size: 13.5px; color: var(--color-neutral-500); }
+.choose-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.choose-choices.is-one { grid-template-columns: minmax(0, 180px); }
+.choose-more { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 13px; }
+.choose-menu { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.choose-when { min-height: 32px; padding: 0 11px; border-radius: 99px; border: 1px solid var(--color-primary-200); background: var(--color-bg-elevated); cursor: pointer; font: 500 12.5px var(--font-family-sans); color: var(--color-neutral-800); }
+.choose-status { margin: 6px 0 0; font-size: 12.5px; color: var(--color-neutral-500); }
+.choose-status.is-failed { color: var(--color-error-600, #b42318); }
+
+/* The stamp: the deck's, on the card's corner; a small one on a step row or a day */
+.choose-card .choose-stamp { top: -30px; right: -24px; width: 150px; height: 150px; }
+.pv2-stamp.choose-stamp-mini { position: static; flex: none; width: 46px; height: 46px; margin: -10px 0; transform: rotate(-10deg); }
+.pv2-stamp.choose-stamp-day { top: auto; bottom: -16px; right: -16px; width: 78px; height: 78px; }
+.choose-flow .pv2-stamp-carried { color: hsl(212 38% 34%); }
+
+/* A goal's steps, on its card */
+.choose-steps-box { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-neutral-200); display: flex; flex-direction: column; gap: 6px; }
+.choose-steps-h { margin: 0 0 2px; font: 600 10.5px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
+.choose-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.choose-rows.is-sub { margin-top: 6px; padding-left: 14px; border-left: 2px solid var(--color-neutral-200); }
+.choose-row-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 12px; border-radius: 11px; background: var(--color-neutral-50); }
+.choose-row.is-sub .choose-row-main { background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); }
+.choose-row-title { flex: 1 1 200px; min-width: 0; font: 400 17px/1.25 var(--font-family-display); color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.choose-row.is-done .choose-row-title { color: var(--color-neutral-500); text-decoration: line-through; }
+.choose-row-where { font-size: 12px; color: var(--color-neutral-500); white-space: nowrap; }
+.choose-row-where:empty { display: none; }
+.choose-row-acts { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.choose-verb { min-height: 32px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--color-primary-200); background: var(--color-bg-elevated);
+  cursor: pointer; font: 500 12.5px var(--font-family-sans); color: var(--color-neutral-900); }
+.choose-verb:hover:not(:disabled) { background: var(--color-primary-100); }
+.choose-verb.is-quiet { border-color: var(--color-neutral-200); color: var(--color-neutral-600); }
+.choose-verb.is-quiet:hover:not(:disabled) { background: var(--color-neutral-100); }
+.choose-verb:disabled { opacity: .6; cursor: default; }
+.choose-break { font-size: 12.5px; }
+.choose-add { align-self: flex-start; margin-top: 4px; font-size: 14px; }
+
+.choose-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 22px; }
+.choose-pager .deck-btn { min-width: 150px; }
+
+/* All at once: every goal one folded row */
+.choose-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.choose-line { position: relative; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 14px; }
+.choose-line.is-open { box-shadow: 0 14px 30px -20px rgb(20 40 60 / .4); }
+.choose-line-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 10px 16px; border: 0; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.choose-line-title { flex: 1; min-width: 0; font: 400 19px/1.25 var(--font-family-display); color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.choose-counts { flex: none; font-size: 12.5px; color: var(--color-neutral-500); }
+.choose-chev { flex: none; width: 14px; color: var(--color-neutral-400); }
+.choose-line-body { position: relative; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+.choose-line-body > .choose-stamp-mini { position: absolute; top: 4px; right: 16px; width: 56px; height: 56px; margin: 0; }
+.choose-done-fold { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 40px; padding: 6px 16px; border: 0; border-radius: 12px; background: none; cursor: pointer; font: inherit; font-size: 13.5px; color: var(--color-neutral-500); text-align: left; }
+.choose-done-list { list-style: none; margin: 0; padding: 0 16px 8px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--color-neutral-500); }
+
+/* Not under a goal */
+.choose-loose { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 14px; background: color-mix(in oklab, var(--color-bg-elevated), transparent 40%); border: 1px solid var(--color-neutral-200); }
+.choose-card .choose-loose, .choose-card > section { padding: 0; border: 0; background: none; display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.choose-loose-title { margin: 0; font: 600 11px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
+.choose-foot { display: flex; justify-content: flex-end; }
+.choose-foot .deck-btn { min-width: 180px; }
+
+/* Give them a day */
+.choose-strip .deck-day { position: relative; overflow: hidden; min-height: 130px; }
+.choose-place-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.choose-place { display: flex; align-items: baseline; gap: 12px; width: 100%; padding: 10px 14px; border-radius: 11px; border: 1px solid var(--color-neutral-200); background: var(--color-bg-elevated); cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.choose-place.is-on { border-color: var(--color-primary-500); box-shadow: 0 0 0 1.5px var(--color-primary-500) inset; }
+.choose-place-title { flex: 1; min-width: 0; font: 400 18px/1.25 var(--font-family-display); color: var(--color-neutral-900); }
+.choose-place-from { flex: none; max-width: 45%; font-size: 12px; color: var(--color-neutral-500); text-align: right; overflow-wrap: anywhere; }
+
+:is(.choose-verb, .choose-when, .choose-switch-btn, .choose-line-row, .choose-place, .choose-leave):focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .choose-h { font-size: 28px; }
+  .choose-card-title { font-size: 25px; padding-right: 64px; }
+  .choose-card .choose-stamp { width: 100px; height: 100px; top: -18px; right: -8px; }
+  .choose-choices { grid-template-columns: minmax(0, 1fr); }
+  .choose-line-row { flex-wrap: wrap; }
+  .choose-counts { width: 100%; order: 3; }
+  .choose-place { flex-direction: column; gap: 2px; }
+  .choose-place-from { max-width: none; text-align: left; }
+  .choose-strip .deck-day { min-height: 0; }
+}

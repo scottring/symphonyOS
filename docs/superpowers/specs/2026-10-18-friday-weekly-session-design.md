@@ -1,5 +1,10 @@
 # The Friday session: weekly review and plan, one card at a time
 
+> **2026-10-19:** "Plan this week" no longer opens the deck. Planning a week (and a
+> month, season or year) is Choose from the level above, then Give them a day —
+> see `2026-10-19-plan-from-the-level-above-design.md`, which supersedes the deck
+> and the "look at, not act on" rule for the level above.
+
 **Date:** 2026-10-18
 **Status:** Approved by Scott 2026-10-18 (revision 2 governs where it conflicts with the original sections)
 **Author:** Scott + Claude (brainstorm, 2026-10-18)

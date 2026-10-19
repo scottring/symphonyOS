@@ -158,6 +158,13 @@ describe('one plain list',()=>{
   expect(row('Picnic').querySelector('.plan-item-below')).toHaveTextContent(/^(This week|Week of Oct \d+): Book the shelter$/)
   expect(row('Taxes').querySelector('.plan-item-parent')).toBeNull()
  })
+ // Spec 2026-10-19: a step written as a subtask, once on this week, is named
+ // with the rest (this file's committedTo stub puts a 'week' row on this week).
+ it('Month names a line’s subtask step that is on this week',()=>{
+  api.tasks=[{id:'m',title:'Organize documents',bucket:'month',subtasks:[{id:'st',title:'Inventory everything',parentTaskId:'m',bucket:'week'},{id:'st2',title:'Scan it all',parentTaskId:'m',bucket:'month'}]}]
+  month()
+  expect(row('Organize documents').querySelector('.plan-item-below')).toHaveTextContent(/: Inventory everything$/)
+ })
  it('Year lists the year goals and says how many season goals are under them',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
   open()
@@ -808,7 +815,7 @@ describe('the review by hand (2026-10-17)',()=>{
    fireEvent.click(await screen.findByRole('button',{name:'Plan November →'}))
    expect(screen.getByTestId('where').textContent).toContain('start=2026-11-01')
    expect(screen.getByTestId('where').textContent).not.toContain('review=1')
-   expect(screen.getByRole('heading',{name:'Plan November'})).toBeInTheDocument()
+   expect(screen.getByRole('region',{name:'Plan November'})).toBeInTheDocument()
   }finally{review.reviewed=null}
  })
 })
@@ -862,8 +869,9 @@ describe('I’m happy with October (2026-10-17)',()=>{
 
 describe('planning by hand (2026-10-17)',()=>{
  const SEP=new Date(2026,8,1),OCT=new Date(2026,9,1)
- it('Month: Plan October brings in September’s leftovers, adds for each Fall goal and on its own, then marks it planned',async()=>{
+ it('Month: Plan October lists Fall’s lines with their October steps, takes in September’s leftovers, adds a step under a line, then marks it planned',async()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
+  localStorage.setItem('symphony-choose-view','all')
   try{
   api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},
    {id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP},{id:'gone',title:'Pay taxes',bucket:'month',monthStart:SEP,completed:true},
@@ -874,33 +882,64 @@ describe('planning by hand (2026-10-17)',()=>{
   expect(screen.getByTestId('where').textContent).toContain('plan=1')
   expect(facts()).toBeNull()
   expect(screen.queryByRole('button',{name:'Review October'})).toBeNull()
-  const left=screen.getByRole('list',{name:'Left from September'})
-  expect(within(left).getAllByRole('listitem')).toHaveLength(1)
-  expect(within(left).getAllByRole('button').map(b=>b.textContent)).toEqual(['Bring into October','Done','Someday','Let go'])
-  fireEvent.click(within(left).getByRole('button',{name:'Bring into October: Fix the gate'}))
+  const flow=within(screen.getByRole('region',{name:'Plan October'}))
+  expect(flow.getByText('Fall goals → October')).toBeInTheDocument()
+  // September's open line, with its own four verbs; the done one is not asked about.
+  const loose=within(flow.getByRole('region',{name:'Not under a goal'}))
+  expect(loose.getByText('Fix the gate')).toBeInTheDocument()
+  expect(loose.queryByText('Pay taxes')).toBeNull()
+  expect(within(loose.getByText('Fix the gate').closest('li')!).getAllByRole('button').map(b=>b.textContent)).toEqual(['In October','Done','Someday','Let go'])
+  fireEvent.click(loose.getByRole('button',{name:'In October: Fix the gate'}))
   await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('old',{monthStart:OCT},SEP))
   expect(lastRun().label).toBe('Move “Fix the gate” to October')
-  expect(screen.getByText('In October: Hike Bear Mountain')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Add to October for Get outside'}))
-  const field=screen.getByRole('textbox',{name:'New line in October for Get outside'})
+  // Fall's line, folded with its counts; open, its October step says so.
+  const line=flow.getByRole('button',{name:/Get outside/})
+  expect(line).toHaveTextContent('1 in October')
+  fireEvent.click(line)
+  expect(flow.getByText('Hike Bear Mountain').closest('li')).toHaveTextContent('October')
+  fireEvent.click(flow.getByRole('button',{name:'Add a step in October under Get outside'}))
+  const field=flow.getByRole('textbox',{name:'A step in October under Get outside'})
   fireEvent.change(field,{target:{value:'Rake leaves'}});fireEvent.submit(field.closest('form')!)
   await waitFor(()=>expect(api.addTask).toHaveBeenCalledWith('Rake leaves',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT,sourceId:'s'})))
   expect(lastRun().label).toBe('Add “Rake leaves” for “Get outside”')
   fireEvent.click(screen.getByRole('button',{name:'I’m happy with October'}))
   await waitFor(()=>expect(plan.save).toHaveBeenCalled())
+  // Planned, the way on is the week.
   fireEvent.click(await screen.findByRole('button',{name:'Plan this week →'}))
   expect(screen.getByText('Week page')).toBeInTheDocument()
   expect(screen.getByTestId('where').textContent).toContain('plan=1')
-  }finally{vi.useRealTimers();review.prevReviewed=null}
+  }finally{vi.useRealTimers();review.prevReviewed=null;localStorage.removeItem('symphony-choose-view')}
+ })
+ // (This file stubs taskReviewState, so every row here reads as October; which
+ // label a step wears is chooseFromAbove's own test.)
+ it('Month: Back to Fall ends the October commitment on the same row, under its Fall line',async()=>{
+  at(new Date(2026,9,17,12))
+  try{
+  const FALL=new Date(2026,8,1)
+  api.tasks=[{id:'s',title:'Get the house in order',bucket:'quarter',goalId:'g',commitments:[{level:'season',periodStart:FALL,status:'open'}]},
+   {id:'p',title:'Paint the office',bucket:'quarter',sourceId:'s',commitments:[{level:'season',periodStart:FALL,status:'open'}]},
+   {id:'o',title:'Organize documents',bucket:'month',monthStart:OCT,sourceId:'s',commitments:[{level:'season',periodStart:FALL,status:'open'},{level:'month',periodStart:OCT,status:'open'}]}]
+  api.keepForward.mockResolvedValue('p');api.dropCommitment.mockResolvedValue(true)
+  localStorage.setItem('symphony-choose-view','all')
+  month('&plan=1')
+  const flow=within(screen.getByRole('region',{name:'Plan October'}))
+  fireEvent.click(flow.getByRole('button',{name:/Get the house in order/}))
+  expect(flow.getByRole('list',{name:'Steps of Get the house in order'})).toHaveTextContent('Paint the office')
+  fireEvent.click(flow.getByRole('button',{name:'Not in October: Organize documents'}))
+  await waitFor(()=>expect(api.dropCommitment).toHaveBeenCalledWith('o','month',OCT))
+  // Already on Fall: nothing to put back first.
+  expect(api.keepForward).not.toHaveBeenCalled()
+  expect(lastRun().label).toBe('Back to Fall: “Organize documents”')
+  }finally{vi.useRealTimers();localStorage.removeItem('symphony-choose-view')}
  })
  it('Year: last year’s open goals can be brought in as a copy that remembers them',async()=>{
   api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
   open('/year?view=constellation&start=2026-10-09&plan=1')
-  expect(screen.queryByRole('heading',{name:/For /})).toBeNull()
-  fireEvent.click(screen.getByRole('button',{name:'Bring into 2026: Learn to sail'}))
+  expect(screen.queryByRole('heading',{name:/^From /})).toBeNull()
+  fireEvent.click(screen.getByRole('button',{name:'In 2026: Learn to sail'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old'})))
   expect(lastRun().label).toBe('Bring “Learn to sail” into 2026')
-  fireEvent.click(screen.getByRole('button',{name:'Close planning'}))
+  fireEvent.click(screen.getByRole('button',{name:'Leave'}))
   expect(screen.getByTestId('where').textContent).not.toContain('plan=1')
  })
  it('a period already over has no Plan, even asked for',()=>{
@@ -1082,7 +1121,7 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
   cleanup()
   // Bring into 2026, while planning it.
   open('/year?view=constellation&start=2026-10-09&plan=1')
-  fireEvent.click(screen.getByRole('button',{name:'Bring into 2026: Learn to sail'}))
+  fireEvent.click(screen.getByRole('button',{name:'In 2026: Learn to sail'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenLastCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old',sortOrder:2000})))
  })
  it('privacy: with the area and people filters on, a private line from another area is not listed, counted, marked or reordered',async()=>{
