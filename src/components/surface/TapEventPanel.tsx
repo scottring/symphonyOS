@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { useItemDiscussionLabel } from '@/hooks/useItemDiscussionLabel'
 
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -8,7 +8,6 @@ import { PanelNotes } from './sections/PanelNotes'
 import { PanelLinks } from './sections/PanelLinks'
 import { PanelPhotos } from './sections/PanelPhotos'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
-import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
 import { PanelShell } from './PanelShell'
@@ -113,6 +112,18 @@ interface TapEventPanelProps {
    *  writes the series note, so the pill's title says it applies to every occurrence. */
   freeAppliesToSeries?: boolean
 }
+
+/** The sections an event can carry, each hidden until it has something in it. */
+type EventField = 'location' | 'notes' | 'subtask' | 'photo' | 'link'
+
+/** Same order and wording as the task pane's "+ …" chips, in the event's own words. */
+const ADD_CHIPS: { field: EventField; label: string }[] = [
+  { field: 'location', label: '+ Place' },
+  { field: 'notes', label: '+ What to bring' },
+  { field: 'subtask', label: '+ Prep task' },
+  { field: 'photo', label: '+ File' },
+  { field: 'link', label: '+ Link' },
+]
 
 type AnyEvent = { start_time?: string; startTime?: string; end_time?: string; endTime?: string }
 
@@ -293,6 +304,51 @@ export function TapEventPanel(props: TapEventPanelProps) {
   // The whole panel accepts file drops — same reason as the task panel: the
   // Photos & files section alone is a small target and a miss navigates away.
   const panelRef = useRef<HTMLElement>(null)
+
+  // The task pane's rule (detail pane standard): a section earns its header by
+  // having something in it. An event used to open on five titled, empty
+  // sections — a location box, a whole rich-text editor, three upload tiles —
+  // before it said anything. What it doesn't carry is offered as one quiet
+  // line of "+ …" chips; a chip opens that section with the cursor in it.
+  const [revealed, setRevealed] = useState<Set<EventField>>(() => new Set())
+  // Attachments load inside PanelPhotos; it reports back whether there are any.
+  const [photosHaveContent, setPhotosHaveContent] = useState(false)
+  const [prevEventId, setPrevEventId] = useState(event.id)
+  if (event.id !== prevEventId) {
+    setPrevEventId(event.id)
+    setRevealed(new Set())
+    setPhotosHaveContent(false)
+  }
+  const has: Record<EventField, boolean> = {
+    location: !!event.location,
+    notes: !!(props.notes ?? '').replace(/<[^>]*>/g, '').trim(),
+    subtask: prepTasks.length > 0,
+    photo: photosHaveContent,
+    link: (props.links?.length ?? 0) > 0,
+  }
+  const show = (field: EventField): boolean => has[field] || revealed.has(field)
+  const addChips = ADD_CHIPS.filter((c) => {
+    if (show(c.field)) return false
+    // A virtual meeting's place is its Join link, not an address.
+    if (c.field === 'location') return !isVirtualMeeting && !!props.onUpdateEventLocation
+    // A free event has nothing for a parent to prepare.
+    if (c.field === 'subtask') return !props.free
+    return true
+  })
+  const reveal = useCallback((field: EventField) => {
+    setRevealed((prev) => new Set(prev).add(field))
+    // What to bring's editor is a lazy chunk, so its contenteditable can
+    // arrive a beat after the section does: keep looking for up to a second.
+    let tries = 0
+    const focusWhenReady = () => {
+      const host = panelRef.current?.querySelector<HTMLElement>(`[data-prep-field="${field}"]`)
+      const target = host?.querySelector<HTMLElement>('textarea, input:not([type="hidden"]):not([type="file"]), [contenteditable="true"]')
+      if (host && tries === 0) host.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+      if (target) { target.focus({ preventScroll: true }); return }
+      if (++tries < 20 && field !== 'photo') setTimeout(focusWhenReady, 50)
+    }
+    requestAnimationFrame(focusWhenReady)
+  }, [])
 
   const dayLoads = useDayLoads({ tasks: props.allTasks ?? [], enabled: true })
 
@@ -498,7 +554,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
                         aria-label="Move to calendar"
                         value=""
                         onChange={(e) => { if (e.target.value) props.onMoveToCalendar?.(e.target.value) }}
-                        className="text-[12px] text-neutral-500 bg-transparent border border-neutral-200 rounded-md px-1.5 py-0.5 hover:border-neutral-300 focus:outline-none"
+                        className="appearance-none w-auto max-w-[7rem] self-start text-[13px] text-neutral-400 !bg-transparent border-0 p-0 cursor-pointer hover:text-neutral-700 hover:underline focus:outline-none focus-visible:underline"
                       >
                         <option value="">Move to…</option>
                         {moveTargets.map((c) => (
@@ -541,7 +597,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
         <>
           {/* Location editor: for physical addresses or to add one. A virtual
               meeting is handled by the Join chip above, not a Places field. */}
-          {!isVirtualMeeting && (
+          {!isVirtualMeeting && show('location') && (<div data-prep-field="location">
             <PanelLocation
               location={event.location ?? undefined}
               title={event.title}
@@ -549,15 +605,17 @@ export function TapEventPanel(props: TapEventPanelProps) {
               onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
               onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
             />
-          )}
+          </div>)}
 
-          <PanelNotes
-            key={event.id}
-            notes={props.notes}
-            onChange={props.onNotesChange}
-            label="What to bring"
-            id="what-to-bring"
-          />
+          {show('notes') && (<div data-prep-field="notes">
+            <PanelNotes
+              key={event.id}
+              notes={props.notes}
+              onChange={props.onNotesChange}
+              label="What to bring"
+              id="what-to-bring"
+            />
+          </div>)}
 
           {discussionFlagged && props.onDiscussionNoteChange && (
             <PanelSection
@@ -582,57 +640,61 @@ export function TapEventPanel(props: TapEventPanelProps) {
           )}
 
           {/* Prep tasks are the event's subtasks — real tasks linked to this event. */}
-          <PanelSection
-            id="prep-tasks"
-            label="Prep tasks"
-            preview={prepTasks.length ? `${prepTasks.length} task${prepTasks.length === 1 ? '' : 's'}` : undefined}
-          >
-            <div className="flex flex-col gap-1.5">
-              {prepTasks.map((t) => {
-                const row = (
-                  <PanelRow
-                    key={t.id}
-                    onClick={() => props.onOpenTask(t.id)}
-                    icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>}
-                  >
-                    <span className={`block text-[15px] ${t.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>{t.title}</span>
-                  </PanelRow>
-                )
-                if (!props.onTogglePrepTask) return row
-                // Split row, as subtasks do: the mark completes or reopens,
-                // the title opens the task.
-                return (
-                  <div key={t.id} className="flex items-start gap-2">
-                    <button
-                      type="button"
-                      onClick={() => props.onTogglePrepTask?.(t.id)}
-                      aria-label={`Mark ${t.title} ${t.completed ? 'incomplete' : 'complete'}`}
-                      className="mt-2.5 flex-shrink-0"
+          {show('subtask') && (<div data-prep-field="subtask">
+            <PanelSection
+              id="prep-tasks"
+              label="Prep tasks"
+              preview={prepTasks.length ? `${prepTasks.length} task${prepTasks.length === 1 ? '' : 's'}` : undefined}
+            >
+              <div className="flex flex-col gap-1.5">
+                {prepTasks.map((t) => {
+                  const row = (
+                    <PanelRow
+                      key={t.id}
+                      onClick={() => props.onOpenTask(t.id)}
+                      icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>}
                     >
-                      <Checkmark completed={!!t.completed} />
-                    </button>
-                    <div className="min-w-0 flex-1">{row}</div>
-                  </div>
-                )
-              })}
-              {!props.free && (
-                <input
-                  type="text"
-                  value={prepDraft}
-                  onChange={(e) => setPrepDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') commitPrepTask() }}
-                  onBlur={commitPrepTask}
-                  aria-label="Add a prep task"
-                  placeholder="+ Add a prep task…"
-                  className="text-[15px] px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
-                />
-              )}
-            </div>
-          </PanelSection>
+                      <span className={`block text-[15px] ${t.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>{t.title}</span>
+                    </PanelRow>
+                  )
+                  if (!props.onTogglePrepTask) return row
+                  // Split row, as subtasks do: the mark completes or reopens,
+                  // the title opens the task.
+                  return (
+                    <div key={t.id} className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => props.onTogglePrepTask?.(t.id)}
+                        aria-label={`Mark ${t.title} ${t.completed ? 'incomplete' : 'complete'}`}
+                        className="mt-2.5 flex-shrink-0"
+                      >
+                        <Checkmark completed={!!t.completed} />
+                      </button>
+                      <div className="min-w-0 flex-1">{row}</div>
+                    </div>
+                  )
+                })}
+                {!props.free && (
+                  <input
+                    type="text"
+                    value={prepDraft}
+                    onChange={(e) => setPrepDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') commitPrepTask() }}
+                    onBlur={commitPrepTask}
+                    aria-label="Add a prep task"
+                    placeholder="+ Add a prep task…"
+                    className="text-[15px] px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
+                  />
+                )}
+              </div>
+            </PanelSection>
+          </div>)}
 
           {/* Attachments key on the stable Google event id (the same key event
               notes use), under the 'event_note' entity type the table allows. */}
-          <PanelPhotos
+          <div data-prep-field="photo" className="empty:hidden"><PanelPhotos
+            hideWhenEmpty={!revealed.has('photo')}
+            onContentChange={setPhotosHaveContent}
             entityType="event_note"
             entityId={eventId}
             dropZoneRef={panelRef}
@@ -644,16 +706,22 @@ export function TapEventPanel(props: TapEventPanelProps) {
                 ? (address) => props.onUpdateEventLocation!(eventId, address, calendarId)
                 : undefined,
             }}
-          />
+          /></div>
 
-          <PanelLinks links={props.links} onAddLink={props.onAddLink} />
+          {show('link') && <div data-prep-field="link"><PanelLinks links={props.links} onAddLink={props.onAddLink} /></div>}
+
+          {addChips.length > 0 && (
+            <div className="prep-add" role="group" aria-label="Add to this event">
+              {addChips.map((c) => (
+                <button key={c.field} type="button" className="canvas-chip" onClick={() => reveal(c.field)}>{c.label}</button>
+              ))}
+            </div>
+          )}
         </>
       }
       related={<PanelMightBeRelevant items={[]} onOpen={props.onOpenRelated} />}
-      footer={
-        /* Events carry no created/updated timestamps; show the start time. */
-        startTime ? <PanelFooter createdAt={new Date(startTime)} updatedAt={new Date(startTime)} /> : undefined
-      }
+      // No footer: events carry no created/updated timestamps, and the one
+      // this used to show was the START time labelled "Created".
     >
       {assistOpen && (
         <AssistDrawer
