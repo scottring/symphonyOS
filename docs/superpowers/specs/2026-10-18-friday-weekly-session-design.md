@@ -119,6 +119,26 @@ With each day showing two tasks, **the order is the priority**. Scott drags the 
 - **Today keeps its time sections** for timed tasks.
 - **Every reorder has Undo**, through the canvas activity.
 
+
+## Month, Season and Year, calm pass (Scott approved the mockup 2026-10-18)
+
+The Month, Season and Year pages follow the Week page's language (mockup `horizons-calm.html`).
+- **Header: seven things become two.**
+  - Title "‹ October 2026 ›".
+  - One quiet fact line: Month "{open} open · {done} done · planned {date}"; Season "{range} · {n} goals · {done} done"; Year "{n} goals".
+  - **One primary button that changes with the moment:** "Review {previous}" while that review is due, otherwise "Plan {next}" while planning is open, otherwise nothing.
+  - **⋯ menu:** Review {previous} (when it isn't the button), Show done, Hide/Show the {level above} list, Start with a goal · guided introduction, Talk it through (only without the Chat bar), How this page works, Watch the guide.
+  - **Removed from the header:** "I'm happy with {period}" (the plan flow marks the period planned), the separate "Oct 1 – 31", and the summary sentence.
+- **The list never runs off the page.** It is a compact card. The first 8 lines show, then "+N more", which expands in place. Lines reorder by drag:
+  - month and season lines use the task's `sortOrder` (one order, as on Week)
+  - year goals use `goals.sort_order`
+  - every reorder has Undo
+  - hover quick triage is unchanged
+  - the add box stays at the bottom
+- **The level above sits beside it, quieter and read-only:** a lighter card showing 8 then "+N more". A goal with something under it this period is marked "in {period}".
+- **Year is a single list.** Each goal notes "In {season}: {n} goals" when it has any.
+- **Phones:** the side card stacks below the list.
+
 ## Why
 
 Scott and Iris have a weekly planning ritual on paper

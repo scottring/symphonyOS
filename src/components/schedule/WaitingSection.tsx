@@ -30,22 +30,23 @@ export function WaitingSection({
   if (rows.length === 0) return null
 
   return (
-    <section aria-label="Waiting on" className="card p-4 mb-4">
+    <section aria-label="Waiting on" className="home-card inbox-fold">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="w-full flex items-center gap-2 text-left"
+        className="inbox-fold-head"
       >
-        <ChevronRight className={`w-4 h-4 shrink-0 text-neutral-400 transition-transform ${open ? 'rotate-90' : ''}`} />
-        <span className="shrink-0 whitespace-nowrap text-sm font-medium text-neutral-700">Waiting on · {rows.length}</span>
-        <span className="min-w-0 truncate text-xs text-neutral-400">
+        <span className="inbox-icon" aria-hidden="true"><Hourglass className="w-4 h-4" /></span>
+        <span className="inbox-fold-title">Waiting on · {rows.length}</span>
+        <span className={`inbox-fold-sub ${dueCount > 0 ? 'is-due' : ''}`}>
           {dueCount > 0 ? `${dueCount} to follow up` : 'did your part, waiting to hear'}
         </span>
+        <ChevronRight className={`inbox-fold-chevron ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
       </button>
 
       {open && (
-        <ul className="mt-3 space-y-1.5">
+        <ul className="inbox-fold-list">
           {rows.map(({ task, checkBack, due }) => (
             <li key={task.id} className="rounded-lg px-2.5 py-2 hover:bg-neutral-50">
               {/* Phones stack the actions under the text; three buttons

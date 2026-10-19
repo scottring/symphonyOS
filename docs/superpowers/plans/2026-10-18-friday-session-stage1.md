@@ -403,3 +403,42 @@
   - Dropping on another day still moves the task to that day.
 - **WeekViewV2:** the reorder goes through `activity.run`, and its Undo restores the old orders.
 - **Touch:** with a pointer or touch press held for 250ms, then a move, the drag starts. A quick tap still opens the task.
+
+---
+
+## Month, Season and Year calm pass (spec section of the same name)
+
+### Task 14: Shared ⋯ menu and page prefs
+- Generalise `src/components/plan/v2/WeekMenu.tsx` into a shared `PageMenu({ label, choices, talk? })` (e.g. `src/components/plan/PageMenu.tsx`), where `choices` are `{ id, label, checked?, onSelect }`. Keep the keyboard, outside-click, blur and Escape behaviour. The Week menu becomes a thin use of it with **no visible change**, and its existing tests stay green.
+- Add Month/Season/Year prefs: `done` and `hideAbove`, persisted like `useWeekViewPrefs` (reuse its store pattern, not its Week keys). If the page already persists "Hide {Fall} list", keep that key.
+- Tests: PageMenu keyboard and close behaviour; Week menu unchanged; prefs persistence.
+
+### Task 15: The Month/Season/Year header
+- `src/components/plan/constellation/ConstellationPage.tsx` header (`plan-head`, about L550–576), using `horizonSentence.ts` only if needed, plus the tests in `ConstellationPage.test.tsx`.
+- **Title row:** "‹ {title} ›". Below it, one fact line per the spec (Month, Season and Year variants).
+- **One primary button:** "Review {previous}" if due, else "Plan {next}" if plannable, else none. It opens the same `?review=1` / `?plan=1` flows as today.
+- **⋯ via PageMenu** with the spec's items. The guided-introduction link, ?, ▷ and the walk button (when there's no Chat bar) move into it.
+- **Removed:** "I'm happy with {period}", the "{period} planned {date}" chip (its date moves into the fact line), "Oct 1 – 31", the summary sentence, and the "Back to this {period}" link (the title arrows remain; "Back to this {period}" goes into ⋯ when you're viewing another period).
+- Tests:
+  - Exactly one primary button in each state: review due, plannable, neither.
+  - The menu items appear.
+  - The removed elements are gone.
+  - Year's fact line reads "{n} goals".
+
+### Task 16: The list and the level-above card
+- `ConstellationPage.tsx` list section (about L597–642) and the level-above panel (about L597–616), `PlanItemRow.tsx` (already accepts `onDragStart`/`onDragEnd`), and `src/styles/canvas-plan.css`.
+- **Compact list card.** The first 8 lines show, then "+N more", which expands in place, with "Show less" to fold it again; this uses `foldDay` with `cap = 8` or a sibling helper. Open lines sort by `sortOrder` (nulls last), then the current order (`createdAt`).
+- **Drag to reorder:** desktop and press-and-hold on touch, reusing `src/lib/week/dayReorder.ts` and the Week's dnd-kit sensors.
+  - Month and season lines write `sortOrder` through the container's optimistic `updateTaskOrders`, the way the Week does.
+  - Year goals write `goals.sort_order` through `updateGoal`.
+  - Each reorder runs in `activity.run` with an Undo.
+- **Level-above card:** lighter, read-only, 8 shown then "+N more". It is marked "in {period}" when a line of this period sits under it (via `parentOf` / `planParents`). Hidden when `hideAbove` is set.
+- **Year:** a single list. Each goal shows "In {season}: {n} goals" when `belowOf(goal).length > 0`.
+- **Phones:** the side card stacks under the list.
+- Tests:
+  - 19 lines → 8 shown and "+11 more"; it expands and folds back.
+  - A drop calls the writer with the new index, the order updates before the save resolves, and Undo restores it.
+  - A year-goal drop calls `updateGoal` with `sortOrder`.
+  - Side card: 21 goals → 8 shown and "+13 more", and the "in October" mark.
+  - Year's "In Fall: 3 goals".
+  - Hover triage still works.

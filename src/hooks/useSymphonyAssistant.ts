@@ -8,6 +8,7 @@ import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 import type { ChatMessage, ChatSession } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { afterPageData } from '@/lib/loadPriority'
 
 const SESSIONS_LIMIT = 20
 
@@ -104,6 +105,10 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       setSessionsLoading(true)
       setSessionsError(null)
       try {
+        // Earlier conversations, messages and all, are not first paint: the
+        // page's own data goes first (lib/loadPriority).
+        await afterPageData()
+        if (cancelled) return
         // mode='chat' only: the item's Discuss thread is a chat_sessions row on
         // the same entity_id, and it belongs to the drawer's main pane, not to
         // the "older conversations" dropdown.

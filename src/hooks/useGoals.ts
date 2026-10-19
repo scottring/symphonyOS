@@ -263,7 +263,7 @@ export function useGoals(supabase = defaultSupabase) {
     areaId: string | null,
     name: string,
     context?: 'work' | 'family' | 'personal',
-    extra?: { notes?: string | null; scope?: Scope; id?: string; year?: number; strategy?: string | null; carriedFrom?: string | null; assignedToAll?: string[] },
+    extra?: { notes?: string | null; scope?: Scope; id?: string; year?: number; strategy?: string | null; carriedFrom?: string | null; assignedToAll?: string[]; sortOrder?: number },
   ) => {
     if (!user) return null
 
@@ -278,7 +278,9 @@ export function useGoals(supabase = defaultSupabase) {
       strategy: extra?.strategy ?? undefined,
       context: context ?? undefined,
       status: 'active',
-      sortOrder: goals.filter(g => g.areaId === areaId).length,
+      // A caller that orders its list passes its own place (the year page puts
+      // a new goal last); otherwise the count of goals in that area.
+      sortOrder: extra?.sortOrder ?? goals.filter(g => g.areaId === areaId).length,
       actions: [],
       milestones: [],
       carriedFrom: extra?.carriedFrom ?? undefined,
@@ -339,7 +341,10 @@ export function useGoals(supabase = defaultSupabase) {
     return real
   }, [user, currentYear, goals])
 
-  const updateGoal = useCallback(async (id: string, rawUpdates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year' | 'carriedFrom' | 'assignedToAll'>>) => {
+  // `quiet`: a refused write rolls back and answers false without raising the
+  // hook's error (which a page reads as "could not load") — for writes the
+  // caller reports itself, such as a reorder that rolls its siblings back.
+  const updateGoal = useCallback(async (id: string, rawUpdates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year' | 'carriedFrom' | 'assignedToAll'>>, opts?: { quiet?: boolean }) => {
     const goal = goals.find(g => g.id === id)
     if (!goal) return
     let updates: Partial<Goal> = rawUpdates
@@ -387,7 +392,7 @@ export function useGoals(supabase = defaultSupabase) {
 
     if (updateError) {
       setGoals(prev => prev.map(g => g.id === id ? goal : g))
-      setError(updateError.message)
+      if (!opts?.quiet) setError(updateError.message)
       // Refused writes are reported, so a surface can say why (a partner
       // making the owner's shared goal private is refused by RLS).
       return false

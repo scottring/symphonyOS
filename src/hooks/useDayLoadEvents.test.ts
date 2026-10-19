@@ -23,6 +23,7 @@ describe('useDayLoadEvents', () => {
   beforeEach(() => {
     __resetDayLoadCache()
     __resetCurrentAccount()
+    setCurrentAccount('user-a')
     invoke.mockReset()
   })
 
@@ -98,7 +99,7 @@ describe('useDayLoadEvents', () => {
 // of the tab, and had no key for the account or the day.
 describe('the shared read, with more than one reader', () => {
   beforeEach(() => {
-    __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset()
+    __resetDayLoadCache(); __resetCurrentAccount(); setCurrentAccount('user-a'); invoke.mockReset()
   })
 
   it('reads ONCE for two consumers, and wakes them both', async () => {
@@ -144,7 +145,7 @@ describe('the shared read, with more than one reader', () => {
 
 describe('recovering from a failed read', () => {
   beforeEach(() => {
-    __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset()
+    __resetDayLoadCache(); __resetCurrentAccount(); setCurrentAccount('user-a'); invoke.mockReset()
   })
   afterEach(() => { vi.useRealTimers() })
 
@@ -183,7 +184,7 @@ describe('recovering from a failed read', () => {
 })
 
 describe('a calendar we changed ourselves', () => {
-  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset() })
+  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); setCurrentAccount('user-a'); invoke.mockReset() })
 
   it('re-reads after a write, so the day tiles stop reporting the old count', async () => {
     ok([{ id: 'e1' }])
@@ -203,7 +204,7 @@ describe('a calendar we changed ourselves', () => {
 })
 
 describe('two accounts in one tab', () => {
-  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset() })
+  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); setCurrentAccount('user-a'); invoke.mockReset() })
 
   it('never shows the first account’s calendar to the second', async () => {
     setCurrentAccount('user-a')
@@ -227,7 +228,7 @@ describe('two accounts in one tab', () => {
 })
 
 describe('a tab left open overnight', () => {
-  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset() })
+  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); setCurrentAccount('user-a'); invoke.mockReset() })
   afterEach(() => { vi.useRealTimers() })
 
   it('the window key changes with the day, so yesterday’s read stops matching', () => {
@@ -261,7 +262,7 @@ describe('a tab left open overnight', () => {
 // itself. One write with three pickers open started three reads, and whichever
 // answered last won — which is not the same as whichever was newest.
 describe('one signal, however many consumers', () => {
-  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset() })
+  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); setCurrentAccount('user-a'); invoke.mockReset() })
 
   it('a calendar write starts ONE read, not one per consumer', async () => {
     ok([{ id: 'before' }])
@@ -300,7 +301,7 @@ describe('one signal, however many consumers', () => {
 })
 
 describe('responses arriving out of order', () => {
-  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset() })
+  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); setCurrentAccount('user-a'); invoke.mockReset() })
 
   it('an older response never overwrites a newer one', async () => {
     const pending: Array<(v: unknown) => void> = []
@@ -336,7 +337,7 @@ describe('responses arriving out of order', () => {
 })
 
 describe('a mutation that arrives mid-request', () => {
-  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset() })
+  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); setCurrentAccount('user-a'); invoke.mockReset() })
 
   it('is not discarded: the in-flight read lands, then a fresh one follows', async () => {
     const pending: Array<(v: unknown) => void> = []
@@ -374,7 +375,7 @@ describe('a mutation that arrives mid-request', () => {
 })
 
 describe('the failure cooldown and forced reads', () => {
-  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset() })
+  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); setCurrentAccount('user-a'); invoke.mockReset() })
 
   it('a write retries immediately even inside the cooldown — it is not polling', async () => {
     fails()
@@ -395,5 +396,42 @@ describe('the failure cooldown and forced reads', () => {
     renderHook(() => useDayLoadEvents(true))
     renderHook(() => useDayLoadEvents(true))
     expect(invoke).toHaveBeenCalledOnce()
+  })
+})
+
+describe('a cold load, while the shell learns who is signed in', () => {
+  beforeEach(() => { __resetDayLoadCache(); __resetCurrentAccount(); invoke.mockReset() })
+
+  it('reads once: not before the account is known, and not again when it blinks', async () => {
+    // Prod, 2026-10-18: the page mounted before the shell named the account
+    // (a read for nobody), then the account arrived, went to null as the shell
+    // remounted, and came back — four identical reads on one cold /inbox.
+    const pending: Array<(v: unknown) => void> = []
+    invoke.mockImplementation(() => new Promise((r) => { pending.push(r) }))
+    const a = renderHook(() => useDayLoadEvents(true))
+    const b = renderHook(() => useDayLoadEvents(true))
+    expect(invoke).not.toHaveBeenCalled()
+
+    await act(async () => { setCurrentAccount('user-a') })
+    await act(async () => { setCurrentAccount(null) })
+    await act(async () => { setCurrentAccount('user-a') })
+    expect(invoke).toHaveBeenCalledTimes(1)
+
+    await act(async () => { pending[0]({ data: { events: [{ id: 'e1' }] }, error: null }) })
+    expect(a.result.current.events).toEqual([{ id: 'e1' }])
+    expect(b.result.current.events).toEqual([{ id: 'e1' }])
+  })
+
+  it('a different account still gets its own read, and never the first one’s', async () => {
+    ok([{ id: 'a-only' }])
+    setCurrentAccount('user-a')
+    const { result } = renderHook(() => useDayLoadEvents(true))
+    await waitFor(() => expect(result.current.available).toBe(true))
+    await act(async () => { setCurrentAccount(null) })
+    expect(result.current.events).toEqual([])
+    ok([{ id: 'b-only' }])
+    await act(async () => { setCurrentAccount('user-b') })
+    await waitFor(() => expect(result.current.events).toEqual([{ id: 'b-only' }]))
+    expect(invoke).toHaveBeenCalledTimes(2)
   })
 })

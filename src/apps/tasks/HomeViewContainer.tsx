@@ -17,7 +17,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
 import { showToast } from '@/hooks/useToast';
-import { rangeEventSpan } from '@/lib/weekHelpers';
+import { dayEventSpan, rangeEventSpan } from '@/lib/weekHelpers';
 import { densitySourcesFor, type DensitySources } from '@/lib/planning/dayDensity';
 import { makeEventMover } from '@/lib/calendar/moveEvent';
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
@@ -322,11 +322,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       // Two weeks, not one: the grid may draw any run of up to seven days
       // starting in the viewed week (a weekend, a custom Thu–Wed).
       ? rangeEventSpan(viewedDate)
-      : (() => {
-        const start = new Date(viewedDate); start.setHours(0, 0, 0, 0);
-        const end = new Date(viewedDate); end.setHours(23, 59, 59, 999);
-        return { start, end };
-      })();
+      // The same window Home asks for, so moving between them shares a read.
+      : dayEventSpan(viewedDate);
     setEventsRange(null);
     await fetchEvents(span.start, span.end);
     setEventsRange({ start: span.start.getTime(), end: span.end.getTime() });

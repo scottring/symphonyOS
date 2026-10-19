@@ -22,6 +22,7 @@ import { useDiscussionInbox } from '@/hooks/useDiscussionInbox'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useDateInstances } from '@/hooks/useDateInstances'
+import { dayEventSpan } from '@/lib/weekHelpers'
 import { routinesForViewedDate } from '@/lib/today/routinesForDate'
 import { computeTodayData } from '@/lib/today/computeTodayData'
 import { readHideRoutines } from '@/lib/hideRoutinesSignal'
@@ -121,8 +122,9 @@ export function useHomeBearings(now: Date): HomeBearings {
   useEffect(() => {
     if (!isConnected) return
     let live = true
-    const start = new Date(`${dayKey}T00:00:00`)
-    void fetchEvents(start, new Date(start.getTime() + DAY)).catch(() => undefined).finally(() => { if (live) setEventsDay(dayKey) })
+    // The same window Today asks for, so moving between them shares a read.
+    const { start, end } = dayEventSpan(new Date(`${dayKey}T00:00:00`))
+    void fetchEvents(start, end).catch(() => undefined).finally(() => { if (live) setEventsDay(dayKey) })
     return () => { live = false }
     // fetchEvents is stable per connection; the day key is the real input.
   }, [isConnected, dayKey]) // eslint-disable-line react-hooks/exhaustive-deps

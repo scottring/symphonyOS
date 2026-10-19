@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { shareInFlight } from '@/lib/sharedRequest'
 import { useAuth } from '@/hooks/useAuth'
 import type {
   NoteTopic,
@@ -46,11 +47,12 @@ export function useNoteTopics() {
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
+      // Shared while in flight: the notes surfaces mount several instances.
+      const { data, error: fetchError } = await shareInFlight(`note_topics:${user.id}`, () => supabase
         .from('note_topics')
         .select('*')
         .eq('user_id', user.id)
-        .order('name', { ascending: true })
+        .order('name', { ascending: true }))
 
       if (fetchError) {
         setError(fetchError.message)

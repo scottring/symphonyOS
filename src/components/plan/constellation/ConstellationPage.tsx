@@ -2,9 +2,17 @@
 //
 // Year, Season and Month: one page shape for each (mockup approved
 // 2026-10-13, after the Week redesign). The period's goals are one plain list,
-// drawn one way; the level above folds into one line that opens in place, the
-// way Week's "Still to place" does. The top bar names the horizon (Today ·
-// Week · Month · Season · Year), so the page carries no horizon tabs of its own.
+// drawn one way. The top bar names the horizon (Today · Week · Month · Season
+// · Year), so the page carries no horizon tabs of its own.
+//
+// The list, calm pass (Scott approved the mockup 2026-10-18): it never runs
+// off the page — a compact card of 8, then "+N more" (PlanOrderList). Lines
+// order by drag, and the order is the priority: month and season lines write
+// the task's one sortOrder (the same order as Today and the Week), year goals
+// goals.sort_order, each with Undo. The level above sits beside it, quieter
+// and read-only, 8 then "+N more", a goal marked "in {period}" when this
+// period has a line under it; phones stack it under the list. Year is a
+// single list, each goal noting "In {season}: {n} goals".
 //
 // Levels connect by looking, not linking (Scott, 2026-07-08 and 2026-10-13):
 // a link is made while writing (an optional "For" pick) or from the goal's
@@ -16,18 +24,23 @@
 // {next} · Someday · Remove from {period} on a month or season goal, Done ·
 // Archive on a year goal. Tapping a month or season goal opens its task panel
 // (which holds every verb — horizonPanel.tsx), and a year goal opens in place
-// with Done and Archive. Done goals fold into one line. Under the heading, one sentence
-// from rules (horizonSentence.ts). The bar's walk becomes "Plan November"
-// while that talk is due (planSchedule.ts), and a pending change card is
-// drawn dashed on the list (planPreview.ts).
+// with Done and Archive. Done goals fold into one line. The bar's walk becomes
+// "Plan November" while that talk is due (planSchedule.ts), and a pending
+// change card is drawn dashed on the list (planPreview.ts).
+//
+// The header, calm pass (Scott approved the mockup 2026-10-18, as on Week):
+// "‹ October 2026 ›", one quiet fact line, one primary button that changes
+// with the moment (the review that is due, else planning the period), and a
+// ⋯ menu (PageMenu) for everything else.
 //
 // URL: `horizon` (0 Year, 1 Season, 2 Month; 3 hands over to Week), `start`
 // (any date in the period) and `focus` (an item a conversation just saved).
 // Every manual write goes through the canvas activity, so it reports saving /
 // saved / didn't save, with Undo when the previous fields can be restored.
 
-import { PageHelpButton } from '@/components/explain/PageHelp'
-import { LearnVideoChip } from '@/components/learn/LearnVideoChip'
+import { PageHelpContext, usePageHelp } from '@/components/explain/PageHelp'
+import { PageMenu, type PageMenuChoice } from '@/components/plan/PageMenu'
+import { usePlanPagePrefs } from '@/hooks/usePlanPagePrefs'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
@@ -42,7 +55,6 @@ import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { periodBounds, selectPeriodTasks, isCurrentPeriod } from '@/lib/planning/periodPage'
-import { horizonSentence } from '@/lib/planning/horizonSentence'
 import { talkFor, listIsEmpty, isPutOff, readDismissals } from '@/lib/planning/planSchedule'
 import { committedTo } from '@/lib/placement/model'
 import { localYmd, parseLocalYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
@@ -59,6 +71,9 @@ import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { compareSortOrder, nextTaskSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
+import { FoldToggle, PlanOrderList, type RowOrder } from './PlanOrderList'
+import { useFold } from './useFold'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { periodMoves } from './horizonPanel'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
@@ -77,28 +92,45 @@ const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
 const PERIODS = ['year', 'season', 'month'] as const
 const SESSION_HORIZONS: readonly SessionHorizon[] = ['annual', 'seasonal', 'monthly']
 const ROUTE_LEVEL: Record<string, number> = { '/year': 0, '/season': 1, '/month': 2 }
+/** "1 goal", "3 goals". */
+const goalCount = (n: number) => `${n} goal${n === 1 ? '' : 's'}`
 /** "an October goal", "a Fall goal". */
 const aOrAn = (word: string) => /^[aeiou8]/i.test(word) ? 'an' : 'a'
 
 type Composer = { kind: 'add' } | { kind: 'edit'; key: string }
 
-// Whether the level above is open beside the list: one viewer's preference
-// (the page works the same without it).
-const ABOVE_OPEN_KEY = 'symphony.plan.aboveOpen'
-function readAboveOpen(): boolean {
-  try { return localStorage.getItem(ABOVE_OPEN_KEY) === '1' } catch { return false }
-}
-function writeAboveOpen(open: boolean) {
-  try { localStorage.setItem(ABOVE_OPEN_KEY, open ? '1' : '0') } catch { /* private window */ }
+/** The level above, beside the list: lighter, read-only, 8 then "+N more";
+ *  a goal with a line of this period under it is marked "in {period}". */
+function AboveCard({ title, hideLabel, none, onHide, goals, hereWord }: {
+  title: string; hideLabel: string; none: string; onHide: () => void
+  goals: { key: string; title: string; here: boolean }[]; hereWord: string
+}) {
+  const { shown, toggle } = useFold(goals)
+  return <aside id="plan-above-panel" className="plan-above-panel plan-card plan-side" aria-label={title}>
+    <div className="plan-above-panel-head">
+      <p className="plan-above-panel-title">{title}</p>
+      <button type="button" className="canvas-link plan-above-hide" aria-expanded aria-controls="plan-above-panel" onClick={onHide}>{hideLabel}</button>
+    </div>
+    {goals.length > 0
+      ? <ul className="plan-above-list" aria-label={title}>
+        {shown.map((g) => <li key={g.key}>{g.title}{g.here && <i className="plan-above-here">in {hereWord}</i>}</li>)}
+      </ul>
+      : <p className="plan-above-none">{none}</p>}
+    <FoldToggle toggle={toggle} />
+  </aside>
 }
 
 function Inner() {
   const selection = useSelectionOptional()
   const { goals, loading: goalsLoading, error: goalsError, addGoal, updateGoal, deleteGoal } = useGoalsContext()
-  const { tasks, loading, error, addTask, updateTask, refetch, deleteTask, toggleTask, pushTask, setBucket, updateTasksBulk, keepForward, dropCommitment } = useSupabaseTasks()
+  // `tasks` is what the page draws, so its own `updateTaskOrders` (optimistic)
+  // moves a dropped line at once — never another hook instance's.
+  const { tasks, loading, error, addTask, updateTask, refetch, deleteTask, toggleTask, pushTask, setBucket, updateTasksBulk, keepForward, dropCommitment, updateTaskOrders } = useSupabaseTasks()
   // Someday asks for a domain first on an Unsorted item, as every triage does.
   const gated = useGatedTaskActions({ updateTask, pushTask, setBucket, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const activity = useCanvasActivity()
+  const updateGoalRef = useRef(updateGoal)
+  useEffect(() => { updateGoalRef.current = updateGoal }, [updateGoal])
   const { openAssistant } = useAssistantLauncher()
   const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember, members } = useFamilyMembers(), { seasons } = useHouseholdSeasons()
   const { user } = useAuth()
@@ -106,6 +138,8 @@ function Inner() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const area = useAddArea()
+  // The shell's "How this page works", or the page's own ask where it offers none.
+  const shellHelp = usePageHelp()
 
   // ---- Where we are -------------------------------------------------------
   const raw = params.get('start')
@@ -140,14 +174,14 @@ function Inner() {
   const target = reviewTarget(bounds, now, REVIEW_WINDOW_DAYS[PERIODS[level]])
   // "I'm happy with October" (Scott, 2026-10-17): planned is a thing you
   // say, as on Week — not a list that merely has lines. Home's checklist
-  // reads it.
+  // reads it. The plan flow (PeriodPlan) says it; the header shows when.
   const planSession = usePlanningSession(SESSION_HORIZONS[level], sessionToken)
-  const [marking, setMarking] = useState(false)
+  // The next period's record: "Plan {next}" is offered only while it is unplanned.
+  const nextToken = level === 0 ? yearToken(year + 1) : level === 1 ? seasonToken(bounds.next, seasons) : monthToken(bounds.next)
+  const nextPlanSession = usePlanningSession(SESSION_HORIZONS[level], nextToken)
   const markPlanned = async (): Promise<boolean> => {
-    setMarking(true)
     const mine = planSession.mine
     const ok = await planSession.save({ wentWell: mine?.wentWell ?? '', didnt: mine?.didnt ?? '', ...(mine?.focus ? { focus: mine.focus } : {}) })
-    setMarking(false)
     if (!ok) showToast('Couldn’t save that — try again.', 'error', 5000)
     return ok
   }
@@ -163,13 +197,16 @@ function Inner() {
     visible.filter((t) => committedTo(t, 'week', week, { isCurrent: thisWeek }) !== undefined),
   ])
 
-  const [showDone, setShowDone] = useState(false)
+  // Show done and the level above: this viewer's choices, shared with the
+  // ⋯ menu and remembered on this device (usePlanPagePrefs).
+  const prefs = usePlanPagePrefs()
+  const showDone = prefs.done
   const [expanded, setExpanded] = useState<string | null>(null)
   const [composer, setComposer] = useState<Composer | null>(null)
   // The optional "For" pick while writing a new goal (a node key, or none).
   const [forKey, setForKey] = useState('')
-  const [aboveOpen, setAboveOpen] = useState(readAboveOpen)
-  const toggleAbove = () => setAboveOpen((open) => { writeAboveOpen(!open); return !open })
+  const aboveOpen = !prefs.hideAbove
+  const toggleAbove = () => prefs.set('hideAbove', aboveOpen)
   // A link just made: the goal's "For" line lights up.
   const [linked, setLinked] = useState<string | null>(null)
   const mainRef = useRef<HTMLElement>(null)
@@ -239,9 +276,13 @@ function Inner() {
   const contextFor = (parent: PlanNode | null): TaskContext | undefined =>
     (parent ? (parent.goal ? parent.goal.context : parent.task?.context) : area.area) ?? undefined
 
+  // A goal new to a year goes last there: above that year's highest order, so a
+  // list already ordered by drag doesn't take it in second.
+  const lastInYear = (y: number) => nextTaskSortOrder(goals.filter((g) => g.year === y))
+
   /** The one create path: period and lineage in a single insert. */
   const createItem = async (lvl: number, title: string, parent: PlanNode | null, id: string, context: TaskContext | undefined): Promise<boolean> => {
-    if (lvl === 0) return !!await addGoal(null, title, context, { year, id })
+    if (lvl === 0) return !!await addGoal(null, title, context, { year, id, sortOrder: lastInYear(year) })
     return !!await addTask(title, undefined, undefined, undefined, {
       id,
       bucket: lvl === 1 ? 'quarter' : lvl === 2 ? 'month' : 'week',
@@ -304,7 +345,7 @@ function Inner() {
     const g = node.goal!
     const id = crypto.randomUUID()
     return act(label, () => addGoal(g.areaId || null, g.name, g.context ?? undefined, {
-      id, year: to, carriedFrom: g.id, notes: g.notes ?? null, strategy: g.strategy ?? null,
+      id, year: to, carriedFrom: g.id, notes: g.notes ?? null, strategy: g.strategy ?? null, sortOrder: lastInYear(to),
       ...(g.assignedToAll ? { assignedToAll: g.assignedToAll } : {}),
     }).then((made) => !!made), { ids: [id], undo: async () => { await deleteGoal(id) } })
   }
@@ -373,9 +414,14 @@ function Inner() {
   const goalsById = new Map(allNodes.filter((n) => n.goal).map((n) => [n.id, n.goal!]))
   const prepLookup: ReadinessLookup = { task: (id) => visibleById.get(id), goal: (id) => goalsById.get(id) }
 
-  // ---- The level above, folded into one line ------------------------------
-  const above = level > 0 ? allNodes.filter((n) => n.level === level - 1 && isOpen(n)) : []
-  const aboveTitles = level > 0 ? above.map((n) => n.title) : goalsOf(year - 1).filter((g) => g.status !== 'completed').map((g) => g.name)
+  // ---- The order: by drag, nulls last, then as they came --------------------
+  // A month or season line orders by its task's sortOrder, a year goal by
+  // goals.sort_order; a never-ordered line keeps the list's own order after.
+  const orderOf = (n: PlanNode) => n.goal ? n.goal.sortOrder : n.task?.sortOrder
+  const inOrder = (nodes: PlanNode[]) => [...nodes].sort((a, b) => compareSortOrder(orderOf(a), orderOf(b)))
+
+  // ---- The level above, beside the list -------------------------------------
+  const above = level > 0 ? inOrder(allNodes.filter((n) => n.level === level - 1 && isOpen(n))) : []
   const aboveWord = level === 2 ? seasonWord : String(year)
   // The toggle names the list it opens ("Show Fall list"), and once open it
   // sits on the list itself (Scott, 2026-10-16).
@@ -383,18 +429,17 @@ function Inner() {
   const showAbove = `Show ${aboveListWord} list`, hideAbove = `Hide ${aboveListWord} list`
   const aboveTitle = level === 2 ? `${seasonWord} goals` : level === 1 ? `${year} goals` : `${year - 1} goals`
   const aboveWhat = level === 2 ? `the season ${periodWord} serves` : level === 1 ? `the year ${periodWord} serves` : 'last year, for reference'
-  const aboveNone = level === 2 ? `No ${seasonWord} goals yet.` : level === 1 ? `No ${year} goals yet.` : `Nothing was written for ${year - 1}.`
+  const aboveNone = level === 2 ? `No ${seasonWord} goals yet.` : `No ${year} goals yet.`
+  // Year is a single list: nothing sits beside it (calm pass mockup).
+  const hasAbove = level > 0
+  const aboveShown = hasAbove && aboveOpen
 
   // ---- The period's goals: open first, done folded into one line -----------
   const levelNodes = allNodes.filter((n) => n.level === level)
-  const openNodes = levelNodes.filter(isOpen)
+  const openNodes = inOrder(levelNodes.filter(isOpen))
   const doneNodes = levelNodes.filter(isDone)
   const movedNodes = levelNodes.filter((n) => !isDone(n) && !!movedLabel(n))
   const items = showDone ? [...openNodes, ...movedNodes, ...doneNodes] : openNodes
-  const sentence = horizonSentence({
-    items: levelNodes.map((n) => ({ done: isDone(n), moved: !!movedLabel(n), hasParent: !!n.parent })),
-    parentWord: level === 2 ? seasonWord : level === 1 ? String(year) : null,
-  })
   // "5 done, 1 moved on · Taxes, Picnic…": what is no longer open, in one line.
   const folded = [...doneNodes, ...movedNodes]
   const doneLine = `${[doneNodes.length ? `${doneNodes.length} done` : '', movedNodes.length ? `${movedNodes.length} moved on` : ''].filter(Boolean).join(', ')} · ${folded.slice(0, 2).map((n) => n.title).join(', ')}${folded.length > 2 ? '…' : ''}`
@@ -420,6 +465,13 @@ function Inner() {
   const belowLabel = level === 2 ? (thisWeek ? 'This week' : `Week of ${week.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)
     : level === 1 ? monthWord : seasonWord
   const belowOf = (node: PlanNode) => allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && isOpen(n)).map((n) => n.title)
+  // "In October: Picnic · Leaf pile" on Season; Year names no season goals,
+  // it counts them: "In Fall: 3 goals"; Month keeps "This week: …".
+  const belowFor = (node: PlanNode) => {
+    const titles = belowOf(node)
+    return level === 0 ? { label: `In ${seasonWord}`, titles: titles.length ? [goalCount(titles.length)] : [] }
+      : level === 1 ? { label: `In ${monthWord}`, titles } : { label: belowLabel, titles }
+  }
 
   // ---- The review by hand (Scott, 2026-10-17) ---------------------------------
   const setMode = (mode: 'review' | 'plan' | null, start?: Date) => setParams((prev) => {
@@ -441,7 +493,47 @@ function Inner() {
   })
   const byWhom = (authorId: string) => authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === authorId)?.name ?? 'your household'
 
-  const renderItem = (node: PlanNode) => {
+  // ---- Drag to order (calm pass, 2026-10-18) ---------------------------------
+  // The gap a line was dropped in, as Week's day order does: usually one
+  // write; Undo writes back every order it changed.
+  // Year goals write one at a time, quietly (a refusal never reads as the
+  // page failing to load); one refused rolls back those already written and
+  // says so, as the task path does, so a renumber is never left half-done.
+  // The latest writer, so an Undo pressed later rolls back to the goals as
+  // they are then, not as they were at the drop.
+  const writeGoalOrders = async (writes: readonly { id: string; sortOrder: number }[], was: ReadonlyMap<string, number | null>): Promise<boolean> => {
+    const write = (id: string, sortOrder: number) => updateGoalRef.current(id, { sortOrder }, { quiet: true })
+    const written: string[] = []
+    for (const w of writes) {
+      if ((await write(w.id, w.sortOrder)) === false) {
+        for (const id of written.reverse()) await write(id, was.get(id) ?? 0)
+        showToast('Couldn’t save the new order', 'warning')
+        return false
+      }
+      written.push(w.id)
+    }
+    return true
+  }
+  const reorderLine = (id: string, orderedIds: string[], toIndex: number) => {
+    const node = openNodes.find((n) => n.id === id)
+    if (!node) return
+    const was = new Map(openNodes.map((n) => [n.id, orderOf(n) ?? null]))
+    const writes: OrderWrite[] = reorderTasksToIndex(orderedIds, id, toIndex, was)
+    if (writes.length === 0) return
+    const up = toIndex < orderedIds.indexOf(id)
+    const label = `Move “${node.title}” ${up ? 'up' : 'down'}`
+    const opts = { ids: writes.map((w) => w.id) }
+    if (node.goal) {
+      const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? 0 }))
+      const after = new Map(writes.map((w) => [w.id, w.sortOrder]))
+      void activity.run(label, () => writeGoalOrders(writes, was), { ...opts, undo: async () => writeGoalOrders(before, after) })
+    } else {
+      const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))
+      void activity.run(label, () => updateTaskOrders(writes), { ...opts, undo: async () => updateTaskOrders(before) })
+    }
+  }
+
+  const renderItem = (node: PlanNode, order?: RowOrder) => {
     const scheduled = node.task?.scheduledFor
     const editing = composer?.kind === 'edit' && composer.key === node.key
     const parent = parentOf(node)
@@ -460,7 +552,7 @@ function Inner() {
       : () => selection?.setSelection({ kind: 'task', id: node.id })
     return <PlanItemRow key={node.key} node={node}
       parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
-      below={{ label: belowLabel, titles: belowOf(node) }}
+      below={belowFor(node)}
       linked={linked === node.key}
       done={isDone(node)} movedTo={movedLabel(node) ?? undefined} saved={savedKey === node.key}
       onOpen={onOpen} expanded={expanded === node.key} more={more} quick={quickFor(node)}
@@ -469,7 +561,8 @@ function Inner() {
       onCancelEdit={() => setComposer(null)}
       preview={preview.marks.get(node.id)}
       readiness={node.task ? readinessOf(node.task, prepLookup) : undefined}
-      meta={scheduled ? `Scheduled ${scheduled.toLocaleDateString()}${!node.task?.isAllDay ? ` · ${scheduled.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : null} />
+      meta={scheduled ? `Scheduled ${scheduled.toLocaleDateString()}${!node.task?.isAllDay ? ` · ${scheduled.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : null}
+      {...order} />
   }
 
   // ---- Writing a goal: one quiet line, with an optional "For" -------------
@@ -530,6 +623,8 @@ function Inner() {
         ] }]
       })
     })()
+  // The card beside the list: a goal marked "in October" when this period has
+  // an open line under it (the same children the plan flow reads).
   const planParents: PlanParent[] = above.map((n) => ({
     key: n.key, title: n.title,
     children: levelNodes.filter((c) => c.parent === n.key && isOpen(c)).map((c) => c.title),
@@ -544,35 +639,84 @@ function Inner() {
       ? { label: `Plan ${monthWord} →`, onClick: () => navigate(`/month?view=constellation&horizon=2${keepStart}&plan=1`) }
       : { label: `Plan ${seasonWord} →`, onClick: () => navigate(`/season?view=constellation&horizon=1${keepStart}&plan=1`) }
 
-  const walk = <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>{walkLabel}</button>
+  // ---- The header (calm pass, 2026-10-18) ------------------------------------
+  // One primary button that changes with the moment (fix round 1 rulings):
+  // the review that is due (the period before's while under way, its own in
+  // its last days); else planning — this period until it is planned, then the
+  // next one while that is unplanned; both planned, nothing (final review
+  // ruling, 2026-10-18). Year is reference: its primary is only the review
+  // that is due, or planning inside a planning window (talkFor: next year's
+  // from Dec 25, this year's through Jan 14) while that year is unplanned.
+  // Whatever isn't the button waits in ⋯; neither while a flow is open.
+  type Offer = { label: string; due: boolean; run: () => void }
+  const inFlow = reviewing || planning
+  // Held until the reviews and the plan record have loaded, so the button
+  // doesn't flicker from one offer to another.
+  const settled = !review.loading && !prevReview.loading && !planSession.loading && !nextPlanSession.loading
+  const reviewOffer: Offer | null = inFlow ? null
+    : target === 'this' ? { label: `Review ${periodWord}`, due: !review.loading && !review.error && !review.reviewed, run: () => setReviewing(true) }
+      : target === 'previous' && !prevReview.loading && !prevReview.error && !prevReview.reviewed
+        ? { label: `Review ${prevWord}`, due: true, run: () => setReviewing(true, bounds.prev) }
+        : null
+  const planThis: Offer = { label: `Plan ${periodWord}`, due: level !== 0, run: () => setMode('plan') }
+  const planNextOffer: Offer = { label: `Plan ${nextWord}`, due: level !== 0, run: () => setMode('plan', bounds.next) }
+  // A record that failed to load reads as unplanned, so planning stays offered.
+  const thisPlanned = !planSession.error && !!planSession.saved
+  const nextPlanned = !nextPlanSession.error && !!nextPlanSession.saved
+  const yearTalk = level === 0 && talk
+    ? localYmd(talk.start) === localYmd(bounds.next) ? (nextPlanned ? null : { ...planNextOffer, due: true })
+      : localYmd(talk.start) === localYmd(bounds.start) ? (thisPlanned ? null : { ...planThis, due: true }) : null
+    : null
+  // Both planned, planning this period waits in ⋯, as Year's does.
+  const planOffer: Offer | null = inFlow ? null
+    : yearTalk ?? (!plannable ? null : !thisPlanned ? planThis : !nextPlanned ? planNextOffer : { ...planThis, due: false })
+  const primary = !settled ? null : reviewOffer?.due ? reviewOffer : planOffer?.due ? planOffer : null
+  // One quiet fact line: Month "19 open · 26 done", Season "Sep 22 – Dec 20 ·
+  // 21 goals · 4 done", Year "5 goals"; then when it was planned.
+  const factParts = level === 2 ? [`${openNodes.length} open`, `${doneNodes.length} done`]
+    : level === 1 ? [periodRange(bounds.start, bounds.end), goalCount(openNodes.length), `${doneNodes.length} done`]
+      : [goalCount(openNodes.length)]
+  const plannedOn = !planSession.loading && !planSession.error && planSession.saved
+    ? `planned ${planSession.saved.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
+  const facts = !inFlow && dataReady && !error && !goalsError
+    ? <p className="wk-facts plan-facts" data-explain="period-facts" data-explain-label={`${periodWord} at a glance`}>
+      {factParts.join(' · ')}{plannedOn && <> · <b className="wk-facts-reviewed">{plannedOn}</b></>}
+    </p>
+    : null
+  const menuChoices: PageMenuChoice[] = [
+    ...[reviewOffer, planOffer].filter((o): o is Offer => !!o && o !== primary && dataReady && settled)
+      .map((o) => ({ id: o === planOffer ? 'plan' : 'review', label: o.label, onSelect: o.run })),
+    ...(!current ? [{ id: 'back', label: `Back to this ${PERIODS[level]}`, onSelect: () => setStart(null) }] : []),
+    ...(inFlow ? [] : [
+      { id: 'done', label: 'Show done', checked: showDone, onSelect: () => prefs.set('done', !showDone) },
+      ...(hasAbove ? [{ id: 'above', label: `${aboveOpen ? 'Hide' : 'Show'} the ${aboveListWord} list`, onSelect: toggleAbove }] : []),
+      { id: 'intro', label: 'Start with a goal · guided introduction', onSelect: () => navigate('/getting-started?journey=goals') },
+    ]),
+  ]
+  const help = shellHelp ?? (() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true }))
+  const menuLabel = `${PERIODS[level][0].toUpperCase()}${PERIODS[level].slice(1)} options`
 
   return <main ref={mainRef} className={`plan-canvas plan-horizon ${PAGE_PLANNING}`} data-horizon={level}>
     <header className="plan-head">
-      {/* Without the docked bar (phones) the page offers both itself. */}
-      {(!walkInBar || !(reviewing || planning)) && <div className="plan-head-row">
-        {!walkInBar && walk}
-        {!reviewing && !planning && target === 'this' && <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setReviewing(true)}>Review {periodWord}</button>}
-        {!reviewing && !planning && target === 'previous' && !prevReview.loading && !prevReview.error && !prevReview.reviewed &&
-          <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setReviewing(true, bounds.prev)}>Review {prevWord}</button>}
-        {!reviewing && !planning && plannable && <button type="button" className="plan-walk plan-review-open" disabled={!dataReady} onClick={() => setMode('plan')}>Plan {periodWord}</button>}
-        {!reviewing && !planning && !planSession.loading && !planSession.error && (planSession.saved
-          ? <span className="plan-planned"><span className="pv2-seal" aria-hidden="true" />{periodWord} planned {planSession.saved.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-          // A period already over is reviewed, not planned.
-          : bounds.end > now && <button type="button" className="canvas-link plan-mark" disabled={marking || !dataReady} onClick={() => { void markPlanned() }}>I’m happy with {periodWord}</button>)}
-      </div>}
-      <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
-        <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
-        <h1>{periodTitle}</h1>
-        <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
-        <span className="plan-period-range">{periodRange(bounds.start, bounds.end)}</span>
-        <PageHelpButton onHelp={() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true })} />
-        <LearnVideoChip />
-        {!current && <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>Back to this {PERIODS[level]}</button>}
+      <div className="plan-head-main">
+        <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
+          <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
+          <h1>{periodTitle}</h1>
+          <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
+        </div>
+        {/* The review and the plan say where the period stands in their own
+            words: the fact line steps aside while one is open. */}
+        {facts}
       </div>
-      {/* The review says where the period stands in its own words, and is
-          no place to start a new goal: both step aside while it is open. */}
-      {!reviewing && !planning && dataReady && !error && !goalsError && sentence && <p className="plan-sentence">{sentence}</p>}
-      {!reviewing && !planning && <Link className="canvas-link" to="/getting-started?journey=goals">Start with a goal · guided introduction</Link>}
+      <div className="plan-head-tools">
+        {primary && <button type="button" className="pv2-btn wk-plan plan-primary" disabled={!dataReady} onClick={primary.run}
+          data-explain="plan-primary" data-explain-label={primary.label}>{primary.label}</button>}
+        {/* Without the docked bar (phones), ⋯ offers the talk itself. */}
+        <PageHelpContext.Provider value={help}>
+          <PageMenu label={menuLabel} choices={menuChoices}
+            talk={walkInBar ? undefined : () => openAssistant({ message: walkMessage, autoSend: true })} />
+        </PageHelpContext.Provider>
+      </div>
     </header>
 
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
@@ -592,40 +736,34 @@ function Inner() {
           planned={planSession.saved ? { at: planSession.saved.at, by: byWhom(planSession.saved.authorId) } : null}
           onMark={markPlanned} next={planNext} onClose={() => setMode(null)} />
       : <>
-        {/* Wide screens: open, the panel beside the list carries the title
-            and its own Hide, so this line steps aside (canvas-plan.css). */}
-        <div className={`plan-above${aboveOpen ? ' is-open' : ''}`} data-explain="above" data-explain-label={`${aboveTitle}, ${aboveWhat}`}>
+        {/* Hidden, one line offers the level above back; shown, the card
+            beside the list carries its title and its own Hide. */}
+        {hasAbove && <div className={`plan-above${aboveOpen ? ' is-open' : ''}`} data-explain="above" data-explain-label={`${aboveTitle}, ${aboveWhat}`}>
           <button type="button" className="plan-above-line" aria-expanded={aboveOpen} aria-controls="plan-above-panel" onClick={toggleAbove}>
             <span className="plan-above-title">{aboveTitle}</span>
             <span className="plan-above-what">{aboveWhat}</span>
             <span className="canvas-link plan-above-go">{aboveOpen ? hideAbove : showAbove}</span>
           </button>
-        </div>
+        </div>}
 
-        <div className={`plan-horizon-body${aboveOpen ? ' has-above' : ''}${preview.next.length ? ' has-next' : ''}`}>
-        {/* Open, the level above sits beside the list and stays in view while
-            the list scrolls (Scott, 2026-10-13); narrow screens show it above. */}
-        {aboveOpen && <aside id="plan-above-panel" className="plan-above-panel" aria-label={aboveTitle}>
-          <div className="plan-above-panel-head">
-            <p className="plan-above-panel-title">{aboveTitle}</p>
-            <button type="button" className="canvas-link plan-above-hide" aria-expanded aria-controls="plan-above-panel" onClick={toggleAbove}>{hideAbove}</button>
-          </div>
-          {aboveTitles.length > 0
-            ? <ul className="plan-above-list" aria-label={aboveTitle}>{aboveTitles.map((t, i) => <li key={`${i}:${t}`}>{t}</li>)}</ul>
-            : <p className="plan-above-none">{aboveNone}</p>}
-        </aside>}
-        <section className="plan-list" data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
-          <ul className="plan-items plan-goal-list" aria-label={`${periodWord} goals`}>
-            {items.map(renderItem)}
-            {preview.here.map(previewRow)}
-            {proposals.map((p) => {
-              const parent = level > 0 ? allNodes.find((n) => n.level === level - 1 && n.id === p.parentId) : undefined
-              return <ProposalRow key={p.key} proposal={p} parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
-                onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />
-            })}
-          </ul>
+        <div className={`plan-horizon-body${aboveShown ? ' has-above' : ''}${preview.next.length ? ' has-next' : ''}`}>
+        <section className="plan-list plan-card" data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
+          <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items}
+            keyOf={(n) => n.key} titleOf={(n) => n.title}
+            // Only an open line orders; done and moved-on lines keep their place.
+            orderIdOf={(n) => isOpen(n) ? n.id : null}
+            pinnedOf={(n) => n.key === savedKey || preview.marks.has(n.id)}
+            renderRow={renderItem} onReorder={reorderLine}
+            tail={<>
+              {preview.here.map(previewRow)}
+              {proposals.map((p) => {
+                const parent = level > 0 ? allNodes.find((n) => n.level === level - 1 && n.id === p.parentId) : undefined
+                return <ProposalRow key={p.key} proposal={p} parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
+                  onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />
+              })}
+            </>} />
           {openNodes.length === 0 && preview.here.length === 0 && proposals.length === 0 && !adding && <p className="plan-empty">Nothing{folded.length ? ' open' : ''} for {periodWord} yet.</p>}
-          {folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>
+          {folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => prefs.set('done', !showDone)}>
             <span className="plan-done-fold-text">{doneLine}</span>
             <span className="canvas-link plan-done-fold-go">{showDone ? 'Hide' : 'Show'}</span>
           </button>}
@@ -647,6 +785,10 @@ function Inner() {
             {preview.next.map(previewRow)}
           </ul>
         </section>}
+        {/* The level above, beside the list on wide screens and under it on
+            narrow ones: lighter, read-only, 8 then "+N more". */}
+        {aboveShown && <AboveCard key={`${level}:${localYmd(bounds.start)}`} title={aboveTitle} hideLabel={hideAbove} none={aboveNone}
+          onHide={toggleAbove} goals={planParents.map((p) => ({ key: p.key, title: p.title, here: p.children.length > 0 }))} hereWord={periodWord} />}
         </div>
       </>}
   </main>

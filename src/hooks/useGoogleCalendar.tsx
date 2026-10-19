@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { emitCalendarChanged } from '@/lib/calendarChangedSignal'
+import { shareInFlight } from '@/lib/sharedRequest'
+import { getCurrentAccount } from '@/lib/currentAccount'
+import { recentEventsFor, rememberEvents, RECENT_EVENTS_MS } from './recentCalendarEvents'
 import { setCalendarConnected } from '@/lib/calendarConnection'
 import { supabase, getAuthUser } from '@/lib/supabase'
+import { afterPageData } from '@/lib/loadPriority'
 import { logger } from '@/lib/logger'
 import { getRecurringBaseId } from './useHiddenCalendarEvents'
 import { filterOutEvent } from './calendarEventCache'
@@ -182,17 +186,41 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | null = null
     let attempts = 0
+    // One check at a time, and none again soon after a good one (2026-10-18).
+    // supabase-js announces SIGNED_IN on every session restore — on page load,
+    // right beside the mount check, and on every return to the tab — so each
+    // load validated twice and every tab switch called the calendar again,
+    // each one a full trip to Google.
+    let running: Promise<void> | null = null
+    let checkingFor: string | null = null
+    let validatedFor: { userId: string; at: number } | null = null
+
+    const runCheck = (opts: { sessionUserId?: string } = {}): Promise<void> => {
+      if (running) {
+        // A session for someone else than the check in flight: look again after it.
+        if (opts.sessionUserId && checkingFor !== opts.sessionUserId) return running.then(() => runCheck(opts))
+        return running
+      }
+      // Fresh for this session's user; a different user always rechecks.
+      if (
+        opts.sessionUserId && validatedFor && validatedFor.userId === opts.sessionUserId &&
+        Date.now() - validatedFor.at < CONNECTION_RECHECK_AFTER_MS
+      ) return Promise.resolve()
+      running = checkAndValidateConnection().finally(() => { running = null })
+      return running
+    }
 
     const scheduleRetry = () => {
       if (cancelled || attempts >= CONNECTION_CHECK_MAX_ATTEMPTS) return
       attempts += 1
-      retryTimer = setTimeout(() => { void checkAndValidateConnection() }, CONNECTION_CHECK_RETRY_MS)
+      retryTimer = setTimeout(() => { void runCheck() }, CONNECTION_CHECK_RETRY_MS)
     }
 
     async function checkAndValidateConnection() {
       if (cancelled) return
       try {
         const { data: { user } } = await getAuthUser()
+        checkingFor = user?.id ?? null
         if (!user) {
           setIsConnected(false)
           setNeedsReconnect(false)
@@ -235,6 +263,18 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         const googleRow = (connections ?? []).find((c) => c.provider === 'google')
         setDefaultCalendarIdState(googleRow?.calendar_id ?? null)
 
+        // A connection row is enough to start reading (2026-10-18). Pages
+        // used to wait for the test call below — a full trip to Google, ~3–5s
+        // on prod — before their own events read could even begin. A token
+        // that turns out to be broken still reads as "reconnect": the test
+        // call below says so, and so does the page's own read (fetchEvents).
+        setIsConnected(true)
+        setIsLoading(false)
+
+        // The test call is not first paint: the page's own data goes first.
+        await afterPageData()
+        if (cancelled) return
+
         // Connection exists - validate by making a test API call
         // Retry once before declaring connection broken (handles transient failures)
         let validated = false
@@ -268,6 +308,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         }
 
         if (validated) {
+          validatedFor = { userId: user.id, at: Date.now() }
           setIsConnected(true)
           setNeedsReconnect(false)
           setError(null)
@@ -297,14 +338,15 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    void checkAndValidateConnection()
+    void runCheck()
 
     // A session arriving after mount (the wall coming online, a sign-in) is
-    // the moment to look again — with a fresh attempt budget.
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    // the moment to look again — with a fresh attempt budget. A restore of
+    // the session we just validated is not (see runCheck).
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         attempts = 0
-        void checkAndValidateConnection()
+        void runCheck({ sessionUserId: session?.user?.id })
       }
     })
 
@@ -392,13 +434,17 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     setIsFetching(true)
 
     try {
-      const { data, error: fetchError } = await supabase.functions.invoke('google-calendar-events', {
-        body: {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          domain: domainOverride ?? 'universal', // Always fetch all calendars — domain filtering applies to tasks only
-        },
-      })
+      const domain = domainOverride ?? 'universal' // Always fetch all calendars — domain filtering applies to tasks only
+      const key = `${getCurrentAccount() ?? 'anon'}|${startDate.toISOString()}|${endDate.toISOString()}|${domain}`
+      const recent = recentEventsFor(key)
+      if (recent && Date.now() - recent.at < RECENT_EVENTS_MS) {
+        if (typeof recent.data.calendarListMissing === 'boolean') setCalendarListMissing(recent.data.calendarListMissing)
+        setEvents(recent.data.events || [])
+        return recent.data.events || []
+      }
+      const { data, error: fetchError } = await shareInFlight(`google-calendar-events|${key}`, () => supabase.functions.invoke('google-calendar-events', {
+        body: { startDate: startDate.toISOString(), endDate: endDate.toISOString(), domain },
+      }))
 
       // A non-2xx carries the function's reason in its body; without reading
       // it the banner could only say "Edge Function returned a non-2xx status
@@ -425,6 +471,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
 
       // Domain-filtered answers can return early without the flag; keep the last known.
       if (typeof data?.calendarListMissing === 'boolean') setCalendarListMissing(data.calendarListMissing)
+      rememberEvents(key, data)
       setEvents(data.events || [])
       return data.events || []
     } catch (err) {
@@ -787,6 +834,8 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
 const CONNECTION_CHECK_RETRY_MS = 30_000
 /** ~10 minutes of trying — a kiosk booting before its Wi-Fi is well inside that. */
 const CONNECTION_CHECK_MAX_ATTEMPTS = 20
+/** A good check stands this long against session-restore events. */
+const CONNECTION_RECHECK_AFTER_MS = 10 * 60_000
 
 export function useGoogleCalendar() {
   const context = useContext(GoogleCalendarContext)

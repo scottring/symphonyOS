@@ -332,10 +332,19 @@ describe('InboxView send to calendar', () => {
 })
 
 describe('InboxView masthead', () => {
-  it('wears the shared masthead card with the count on the quiet line and the page controls along the foot', () => {
+  it('wears the shared masthead card with the count on the quiet line', () => {
     renderInbox()
     const card = screen.getByTestId('masthead-card')
     expect(within(card).getByRole('heading', { level: 1, name: 'Inbox' })).toBeInTheDocument()
     expect(within(card).getByText(/1 item to triage/)).toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: 'Select' })).toBeNull()
+  })
+
+  it('puts Select and List / Focus on "To sort", the list they act on', () => {
+    renderInbox()
+    const sort = screen.getByRole('region', { name: 'To sort' })
+    expect(within(sort).getByRole('heading', { level: 2, name: 'To sort' })).toBeInTheDocument()
+    expect(within(sort).getByRole('button', { name: 'Select' })).toBeInTheDocument()
+    expect(within(sort).getByRole('button', { name: /Focus/ })).toBeInTheDocument()
   })
 })

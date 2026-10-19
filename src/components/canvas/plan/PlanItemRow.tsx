@@ -12,8 +12,11 @@
 //
 // A pending change card marks the row dashed (planPreview.ts): teal when it
 // would change here, grey when it would leave, struck when done or gone.
+//
+// An open line orders by drag (calm pass, 2026-10-18): the desk drags it
+// natively; touch holds it, through `liProps` (PlanOrderList).
 
-import type { DragEvent } from 'react'
+import type { DragEvent, HTMLAttributes, Ref } from 'react'
 import { useArrived } from '@/contexts/CanvasActivityContext'
 import type { PlanNode } from '@/components/plan/constellation/model'
 import type { PlanMark } from '@/components/plan/constellation/planPreview'
@@ -56,6 +59,11 @@ export interface PlanItemRowProps {
   disabled?: boolean
   onDragStart?: (e: DragEvent) => void
   onDragEnd?: () => void
+  /** The list item's own attributes: a held press's ref and listeners on
+   *  touch, the order id the gap reads, and the gap and lifted marks. */
+  liProps?: HTMLAttributes<HTMLLIElement> & { ref?: Ref<HTMLLIElement>; 'data-order-id'?: string }
+  /** It orders by drag: a grip shows on hover. */
+  orderable?: boolean
 }
 
 export function PlanItemRow(p: PlanItemRowProps) {
@@ -65,9 +73,11 @@ export function PlanItemRow(p: PlanItemRowProps) {
   const state = [arrived ? 'is-arrived' : '', p.saved ? 'is-selected' : '', p.done ? 'is-done' : '', p.movedTo && !p.done ? 'is-moved' : ''].filter(Boolean).join(' ')
   const preview = p.preview ? ` is-preview is-${p.preview.tone}${p.preview.struck ? ' is-struck' : ''}` : ''
   const open = opensInPlace && !!p.expanded && !p.editing
-  return <li className={`plan-item${open ? ' is-open' : ''}${p.linked ? ' is-linked' : ''}${preview}`} data-plan-key={node.key}
+  const { className: liClass, ...li } = p.liProps ?? {}
+  return <li {...li} className={`plan-item${open ? ' is-open' : ''}${p.linked ? ' is-linked' : ''}${preview}${liClass ? ` ${liClass}` : ''}`} data-plan-key={node.key}
     draggable={!!p.onDragStart && !p.editing} onDragStart={p.onDragStart} onDragEnd={p.onDragEnd}>
     <div className={`canvas-item ${state}`}>
+      {p.orderable && !p.editing && <span className="plan-grip" aria-hidden="true">⋮⋮</span>}
       {p.editing && p.onSaveEdit && p.onCancelEdit
         ? <InlineComposer label={`Wording for ${node.title}`} initial={node.title} onSave={p.onSaveEdit} onCancel={p.onCancelEdit} />
         : <button type="button" className="canvas-item-title plan-item-title" aria-expanded={opensInPlace ? !!p.expanded : undefined}
