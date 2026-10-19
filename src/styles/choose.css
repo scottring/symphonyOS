@@ -96,6 +96,7 @@
   .choose-card { padding: 18px 16px; }
   .choose-place { flex-direction: column; gap: 2px; }
   .choose-place-from { width: auto; }
+  .choose-strip .deck-day { min-height: 0; }
 }
 
 /* Lines already done on the level above: the record, folded */

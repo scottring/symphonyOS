@@ -11,6 +11,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import type { Planned } from '@/lib/planning/chooseFromAbove'
+import type { ChooseViewMode } from '@/lib/planning/chooseView'
 
 export interface ChooseVerb {
   label: string
@@ -44,7 +45,6 @@ export interface ChooseLineView {
   onAddStep?: (title: string) => Promise<boolean>
 }
 
-export type ChooseViewMode = 'all' | 'one'
 
 export interface ChoosePlanProps {
   /** "this week", "October" */
@@ -89,8 +89,9 @@ export function ChoosePlan(p: ChoosePlanProps) {
   const [showDone, setShowDone] = useState(false)
   const doneLines = p.doneLines ?? []
 
-  const cap = p.hereWord[0].toUpperCase() + p.hereWord.slice(1)
-  const looseTitle = p.aboveWord ? 'Not under a line' : `${cap}, anything else`
+  // "this week" reads on its own; "October" needs its "in".
+  const inHere = /^(this|next|last) /.test(p.hereWord) ? p.hereWord : `in ${p.hereWord}`
+  const looseTitle = p.aboveWord ? 'Not under a line' : `On ${p.hereWord}`
   const runVerb = async (key: string, v: ChooseVerb) => {
     setPending(key); setFailed(null); setMenuOpen(null)
     const ok = await v.run()
@@ -140,8 +141,8 @@ export function ChoosePlan(p: ChoosePlanProps) {
   )
 
   const stepAdder = (line: ChooseLineView) => line.onAddStep && (adding === `step:${line.key}`
-    ? <InlineComposer key={added} label={`A step ${p.hereWord} under ${line.title}`} saveLabel="Add" onSave={add(`step:${line.key}`, line.onAddStep)} onCancel={() => setAdding(null)} />
-    : <button type="button" className="canvas-link choose-add" aria-label={`Add a step ${p.hereWord} under ${line.title}`} onClick={() => setAdding(`step:${line.key}`)}>+ A step {p.hereWord}</button>)
+    ? <InlineComposer key={added} label={`A step ${inHere} under ${line.title}`} saveLabel="Add" onSave={add(`step:${line.key}`, line.onAddStep)} onCancel={() => setAdding(null)} />
+    : <button type="button" className="canvas-link choose-add" aria-label={`Add a step ${inHere} under ${line.title}`} onClick={() => setAdding(`step:${line.key}`)}>+ A step {inHere}</button>)
 
   const lineBody = (line: ChooseLineView) => <>
     {line.verbs.length > 0 && <div className="choose-line-verbs">

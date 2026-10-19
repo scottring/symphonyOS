@@ -3,19 +3,10 @@
 // days. Leave keeps everything already saved — each choice saved as it was made.
 
 import { useState } from 'react'
-import { ChoosePlan, type ChooseViewMode, type ChooseItemView, type ChooseLineView } from './ChoosePlan'
+import { ChoosePlan, type ChooseItemView, type ChooseLineView } from './ChoosePlan'
+import { readChooseView, writeChooseView, type ChooseViewMode } from '@/lib/planning/chooseView'
 import { GiveThemADay, type PlaceItem } from './GiveThemADay'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
-
-const VIEW_KEY = 'symphony-choose-view'
-
-/** The Choose view this viewer used last (All at once by default). */
-export function readChooseView(): ChooseViewMode {
-  try { return localStorage.getItem(VIEW_KEY) === 'one' ? 'one' : 'all' } catch { return 'all' }
-}
-export function writeChooseView(v: ChooseViewMode) {
-  try { localStorage.setItem(VIEW_KEY, v) } catch { /* a convenience only */ }
-}
 
 export interface WeekChoose {
   monthWord: string

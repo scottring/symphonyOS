@@ -89,3 +89,22 @@ line has come down.
    pages, Break it down, Drop something in. "Plan this week" opens it.
 2. Month, Season, Year: step 1 on the same component; labels on their pages.
 3. One at a time.
+
+All three built 2026-10-19 (branch `claude/plan-everywhere`):
+
+- `src/lib/planning/chooseFromAbove.ts` — the tree, the "planned for" labels,
+  and Drop something in's matcher (shared words with a line or its steps; a tie
+  files under nothing). Not the change card: no model call.
+- `src/components/plan/choose/` — `ChoosePlan` (both views), `GiveThemADay`,
+  `PlanWeekFlow`. `useChooseWeek` binds the week's verbs; `ConstellationPage`
+  binds Month, Season and Year's.
+- The deck (`Deck`, `DeckCardView`) and the one-page `PeriodPlan` are removed.
+  The deck's writers (`useDeckActions`), its opening sweep of stale items and
+  its week strip stay. Finishing sends last week's unanswered leftovers that
+  are on October back to October; the rest go to Later as before.
+- `withPlacedSubtasks` draws a subtask with its own week or day on the Week page.
+- Year goals stand in as lines on Season; their steps are the season items made
+  for them (`goalId`, no `sourceId`). "Back to 2026" ends the season commitment,
+  so a step with nothing else holding it shows in the Inbox as well.
+- Month, Season pages name a line's subtask steps that are on the period below
+  alongside its linked lines ("This week: …", "In October: …").

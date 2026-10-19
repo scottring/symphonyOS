@@ -71,6 +71,9 @@ const DAY_MS = 86_400_000
 /** Deep enough for a line › step › broken-down step › its step. */
 const MAX_DEPTH = 4
 
+/** When a row was made; a row read without its stamp sorts first. */
+const age = (t: Task): number => t.createdAt?.getTime?.() ?? 0
+
 const linkIds = (t: Task): string[] => [t.parentTaskId, t.sourceId, t.goalTaskId].filter((x): x is string => !!x)
 
 export function plannedFor(t: Task, inp: Pick<ChooseInput, 'level' | 'periodStart' | 'prevStart' | 'isCurrent' | 'hereWord' | 'lastWord' | 'aboveWord'>): Planned {
@@ -105,7 +108,7 @@ export function buildChooseTree(inp: ChooseInput): ChooseTree {
     .filter((t) => !linkIds(t).some((id) => id !== t.id && lineIds.has(id)))
     .filter((t) => !aboveLevel || !inp.aboveStart || !movedOn(t, aboveLevel, inp.aboveStart, { isCurrent: inp.isCurrent }))
     // The level above's own order (the Month page's drag order), then age.
-    .sort((a, b) => compareSortOrder(a.sortOrder, b.sortOrder) || a.createdAt.getTime() - b.createdAt.getTime())
+    .sort((a, b) => compareSortOrder(a.sortOrder, b.sortOrder) || age(a) - age(b))
   const childrenOf = new Map<string, Task[]>()
   for (const t of inp.pool) {
     for (const id of new Set([t.sourceId, t.goalTaskId].filter((x): x is string => !!x))) {
@@ -128,7 +131,7 @@ export function buildChooseTree(inp: ChooseInput): ChooseTree {
     for (const s of t.subtasks ?? []) out.set(s.id, s)
     for (const s of childrenOf.get(t.id) ?? []) out.set(s.id, s)
     // Open work first, done at the end, each in the order it was made.
-    return [...out.values()].sort((a, b) => Number(!!a.completed) - Number(!!b.completed) || a.createdAt.getTime() - b.createdAt.getTime())
+    return [...out.values()].sort((a, b) => Number(!!a.completed) - Number(!!b.completed) || age(a) - age(b))
   }
 
   const builtLines: ChooseLine[] = lines.map((t) => {
@@ -160,7 +163,7 @@ export function buildChooseTree(inp: ChooseInput): ChooseTree {
   }
   const order: Record<LooseSource, number> = { last: 0, here: 1, inbox: 2 }
   loose.sort((a, b) => order[a.source] - order[b.source]
-    || (a.source === 'inbox' ? b.task.createdAt.getTime() - a.task.createdAt.getTime() : a.task.createdAt.getTime() - b.task.createdAt.getTime()))
+    || (a.source === 'inbox' ? age(b.task) - age(a.task) : age(a.task) - age(b.task)))
   return {
     lines: builtLines.filter((l) => l.planned.kind !== 'done'),
     doneLines: builtLines.filter((l) => l.planned.kind === 'done'),

@@ -15,10 +15,10 @@
 //
 // It is chrome AROUND the existing week: the canvas, drag and drop and
 // add-to-day are WeekViewV2's, unchanged. Review (?review=1) and Plan
-// (?plan=1) swap the canvas for the deck (Friday session, Stage 1): everything
-// without a home this week, one card at a time. "Place them" (?place=1) opens
-// the same deck with only this week's cards. Month, Season and Year keep
-// PeriodReview and PeriodPlan (ConstellationPage).
+// (?plan=1) swap the canvas for Plan this week (spec 2026-10-19): Choose from
+// the month, then Give them a day. "Place them" (?place=1) opens straight on
+// the days. Month, Season and Year plan with the same Choose step
+// (ConstellationPage).
 
 import { useContext, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
