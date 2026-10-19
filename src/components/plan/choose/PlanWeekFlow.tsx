@@ -6,6 +6,8 @@ import { useState } from 'react'
 import { ChoosePlan, type ChooseItemView, type ChooseLineView } from './ChoosePlan'
 import { readChooseView, writeChooseView, type ChooseViewMode } from '@/lib/planning/chooseView'
 import { GiveThemADay, type PlaceItem } from './GiveThemADay'
+import { LookingBack } from './LookingBack'
+import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 
 export interface WeekChoose {
@@ -16,9 +18,11 @@ export interface WeekChoose {
   onAddLoose: (title: string) => Promise<boolean>
   placeItems: PlaceItem[]
   placedCount: number
+  /** Last week's still open (Looking back's count). */
+  notDoneLastWeek: number
 }
 
-export function PlanWeekFlow({ mode, choose, stripDays, loading, aged = 0, onSeeAged, onFinish, onLeave }: {
+export function PlanWeekFlow({ mode, choose, stripDays, loading, aged = 0, onSeeAged, onFinish, onLeave, look }: {
   mode: 'full' | 'place'
   choose: WeekChoose
   stripDays: StripDay[]
@@ -29,8 +33,10 @@ export function PlanWeekFlow({ mode, choose, stripDays, loading, aged = 0, onSee
   /** Done planning: the closing writes and records. Resolves when finished. */
   onFinish: () => Promise<void>
   onLeave: () => void
+  /** Looking back at last week first (its review): its count, what was said, and the save. */
+  look?: { done: number; initial?: ReviewNotes | null; reviewed?: string | null; onContinue: (notes: ReviewNotes) => Promise<boolean> }
 }) {
-  const [step, setStep] = useState<'choose' | 'days'>(mode === 'place' ? 'days' : 'choose')
+  const [step, setStep] = useState<'look' | 'choose' | 'days'>(mode === 'place' ? 'days' : look ? 'look' : 'choose')
   const [view, setView] = useState<ChooseViewMode>(readChooseView)
   const [finishing, setFinishing] = useState(false)
   const finish = async () => {
@@ -39,7 +45,11 @@ export function PlanWeekFlow({ mode, choose, stripDays, loading, aged = 0, onSee
   }
 
   return <section className="deck choose-flow" aria-label="Plan this week">
-    {step === 'choose'
+    {step === 'look' && look
+      ? <LookingBack kicker="Review last week · then plan this week" periodWord="Last week" done={look.done} notDone={choose.notDoneLastWeek}
+          initial={look.initial} reviewed={look.reviewed} nextLabel={`On to ${choose.monthWord} goals → this week`} onLeave={onLeave}
+          onContinue={async (notes) => { const ok = await look.onContinue(notes); if (ok) setStep('choose'); return ok }} />
+      : step === 'choose'
       ? <ChoosePlan hereWord="this week" aboveWord={choose.monthWord} lines={choose.lines} doneLines={choose.doneLines} loose={choose.loose}
           kicker={`${choose.monthWord} goals → this week`} onLeave={onLeave}
           onAddLoose={choose.onAddLoose} loading={loading}

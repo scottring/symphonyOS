@@ -153,6 +153,11 @@ export function useChooseWeek(d: ChooseWeekDeps) {
     const end = new Date(d.weekAnchor.getFullYear(), d.weekAnchor.getMonth(), d.weekAnchor.getDate() + 7)
     const placedCount = d.pool.filter((t) => !t.completed && t.scheduledFor && t.scheduledFor >= d.weekAnchor && t.scheduledFor < end).length
 
+    const unanswered = tree.lines.flatMap(function all(l: ChooseLine | ChooseNode): Task[] {
+      const kids = 'steps' in l ? l.steps : l.children
+      return [...(l.planned.kind === 'last' ? [l.task] : []), ...kids.flatMap(all)]
+    }).concat(tree.loose.filter((x) => x.source === 'last').map((x) => x.task))
+
     return {
       tree,
       monthWord,
@@ -163,10 +168,9 @@ export function useChooseWeek(d: ChooseWeekDeps) {
       placeItems,
       placedCount,
       /** Last week's leftovers nobody answered (the drain at the end). */
-      unanswered: tree.lines.flatMap(function all(l: ChooseLine | ChooseNode): Task[] {
-        const kids = 'steps' in l ? l.steps : l.children
-        return [...(l.planned.kind === 'last' ? [l.task] : []), ...kids.flatMap(all)]
-      }).concat(tree.loose.filter((x) => x.source === 'last').map((x) => x.task)),
+      unanswered,
+      /** How many of last week's are still open (Looking back's count). */
+      notDoneLastWeek: unanswered.length,
     }
   }, [d, activity, monthWord])
 }

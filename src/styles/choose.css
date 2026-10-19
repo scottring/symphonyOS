@@ -108,3 +108,32 @@
 .choose-settled-line { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; padding: 8px 12px; border: 0; border-radius: 10px; background: var(--color-neutral-50); cursor: pointer; text-align: left; font: inherit; font-size: 13.5px; color: var(--color-neutral-600); }
 .choose-settled-line b { font-weight: 600; color: var(--color-neutral-700); }
 .choose-settled > .choose-rows { margin-top: 6px; }
+
+/* Looking back: the period in one number, two labeled places */
+.choose-big { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 10px; font-size: 14px; color: var(--color-neutral-600); }
+.choose-big b { font: 500 44px/1 var(--font-family-display); color: var(--color-primary-500); }
+.choose-place-label { display: block; margin: 12px 0 6px; font: 600 10.5px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
+.choose-textarea { width: 100%; min-height: 60px; padding: 10px 12px; border: 1px solid var(--color-neutral-200); border-radius: 11px; background: var(--color-bg-elevated); font: 400 17px/1.35 var(--font-family-display); color: var(--color-neutral-900); resize: vertical; }
+.choose-textarea:focus { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
+.choose-look-next { margin-top: 12px; }
+.choose-settled-line.is-static { cursor: default; margin-top: 10px; }
+
+/* Today: the list and the day side by side */
+.choose.choose-today { width: min(1040px, 100%); }
+.choose-today-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.choose-today-h { margin-top: 16px; }
+.choose-today-group + .choose-today-group { margin-top: 10px; }
+.choose-today-goal { margin: 8px 0 6px; font: 500 12px var(--font-family-sans); color: var(--color-primary-500); }
+.choose-daypic { position: sticky; top: 76px; }
+.choose-daypic-h { margin: 0; font: 400 24px var(--font-family-display); color: var(--color-neutral-900); }
+.choose-daypic-slot { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: start; margin-bottom: 6px; }
+.choose-daypic-time { padding-top: 6px; font-size: 11.5px; color: var(--color-neutral-500); text-align: right; font-variant-numeric: tabular-nums; }
+.choose-daypic-ev { padding: 6px 9px; border-left: 3px solid hsl(207 30% 70%); border-radius: 6px; background: var(--color-neutral-50); font-size: 13px; color: var(--color-neutral-700); }
+.choose-daypic-ev.is-task { border-left-color: var(--color-primary-500); }
+.choose-daypic-untimed { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--color-neutral-200); display: flex; flex-direction: column; gap: 5px; }
+.choose-daypic-task { padding: 6px 9px; border: 1px solid var(--color-neutral-200); border-radius: 8px; background: var(--color-bg-elevated); font: 400 16px/1.25 var(--font-family-display); color: var(--color-neutral-900); }
+.choose-daypic-task.is-new { border-color: var(--color-primary-500); box-shadow: 0 0 0 1px var(--color-primary-500) inset; }
+@media (max-width: 760px) {
+  .choose-today-grid { grid-template-columns: minmax(0, 1fr); }
+  .choose-daypic { position: static; }
+}

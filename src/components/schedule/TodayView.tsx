@@ -51,7 +51,14 @@ import { planDropHandlers } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { TodayFlow, type DayPictureItem } from '@/components/plan/choose/TodayFlow'
+import { buildTodayChoice, buildTodayReview, goalOf } from '@/lib/planning/chooseToday'
+import { usePeriodReview } from '@/hooks/usePeriodReview'
+import { dayToken } from '@/hooks/usePlanningSession'
+import { openCommitment as openCommitmentOf } from '@/lib/placement/model'
+import { bootstrapCommitments as bootstrapOf } from '@/lib/placement/intentions'
+import { SECTIONS_ORDER } from '@/lib/today/types'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox'
@@ -597,6 +604,60 @@ export function TodayView({
   const planTalk = data.isToday ? <PlanTalkChip tasks={tasks} meId={meId} today={nowForDisplay} /> : null
   const headerLine = headerSentence || planTalk ? <>{headerSentence}{headerSentence && planTalk && ' '}{planTalk}</> : null
 
+  // ── Plan today / Review today (spec 2026-10-19, Today mockup approved):
+  // the same choosing as every horizon, one level down. ?plan=1 opens "This
+  // week → today", ?review=1 "Today → tomorrow". Today's date only. The chat
+  // walk (Plan my day / Review my day) stays beside it in the bar.
+  const [dayParams, setDayParams] = useSearchParams()
+  const dayFlow: 'plan' | 'review' | null = !data.isToday ? null
+    : dayParams.get('plan') === '1' ? 'plan' : dayParams.get('review') === '1' ? 'review' : null
+  const setDayFlow = (f: 'plan' | 'review' | null) => setDayParams((prev) => {
+    const p = new URLSearchParams(prev)
+    p.delete('plan'); p.delete('review')
+    if (f) p.set(f, '1')
+    return p
+  })
+  const dayReview = usePeriodReview('daily', data.isToday ? dayToken(viewedDate) : '')
+  const monthWordToday = viewedDate.toLocaleDateString('en-US', { month: 'long' })
+  const tasksById = useMemo(() => {
+    const m = new Map<string, Task>()
+    for (const t of tasks) { m.set(t.id, t); for (const st of t.subtasks ?? []) if (!m.has(st.id)) m.set(st.id, st) }
+    return m
+  }, [tasks])
+  const todayChoice = useMemo(() => buildTodayChoice({
+    week: data.dayPlan.chooserTasks.flatMap((e) => (e.kind === 'task' && e.task ? [e.task] : [])),
+    carried: data.dayPlan.carried.flatMap((e) => (e.kind === 'task' && e.task ? [e.task] : [])),
+    allTasks: tasks, today: viewedDate, userId, monthWord: monthWordToday,
+  }), [data.dayPlan, tasks, viewedDate, userId, monthWordToday])
+  const todayReview = useMemo(() => buildTodayReview({ allTasks: tasks, today: viewedDate, userId }), [tasks, viewedDate, userId])
+  const dayPicture = useMemo<DayPictureItem[]>(() => SECTIONS_ORDER.flatMap((sec) => data.grouped[sec] ?? [])
+    .filter((i) => !i.skipped)
+    .map((i) => ({
+      key: i.id, title: i.title,
+      kind: (i.type === 'event' ? 'event' : i.type === 'task' ? 'task' : 'routine') as DayPictureItem['kind'],
+      time: i.startTime && !i.allDay ? i.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(':00', '').replace(' ', '').toLowerCase() : undefined,
+    })), [data.grouped])
+  const tomorrowOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
+  const todayActions = {
+    today: (t: Task) => planActions.chooseTaskDay(t.id, viewedDate),
+    undoToday: async (t: Task) => { await planActions.unchooseTask(t.id, viewedDate); return true },
+    done: async (t: Task) => { await onToggleTask(t.id); return true },
+    undone: async (t: Task) => { await onToggleTask(t.id); return true },
+    tomorrow: (t: Task) => planActions.chooseTaskDay(t.id, tomorrowOf(viewedDate), { focus: false }),
+    // Off today, onto the week with no day: a row the week never held is put on it.
+    backToWeek: async (t: Task) => {
+      await planActions.unchooseTask(t.id, viewedDate)
+      if (!openCommitmentOf({ commitments: bootstrapOf(t) }, 'week')) await planActions.commitTask(t.id, 'week')
+      return true
+    },
+  }
+  const dayFlowOffer = data.isToday && !dayFlow
+    ? (nowForDisplay.getHours() < 16 ? { label: 'Plan today', flow: 'plan' as const } : { label: 'Review today', flow: 'review' as const })
+    : null
+  const dayFlowButton = dayFlowOffer
+    ? <button type="button" className="pv2-btn today-flow-btn" data-explain="day-flow" data-explain-label={dayFlowOffer.label} onClick={() => setDayFlow(dayFlowOffer.flow)}>{dayFlowOffer.label}</button>
+    : null
+
   // ── Plan my day / Review my day: the bar's walk into a conversation that
   // ends in one change card. Today's date only; phones offer it in the page.
   const walk = data.isToday ? (nowForDisplay.getHours() < 16 ? PLAN_WALK : REVIEW_WALK) : null
@@ -1134,7 +1195,7 @@ export function TodayView({
         // every horizon (Scott, 2026-09-30). The masthead keeps them only where
         // there is no control row to hold them.
         controls={foldedControls
-          ? <div className="flex items-center gap-1">{desktopToolbar}{!alongsideWorkspace && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}</div>
+          ? <div className="flex items-center gap-1">{dayFlowButton}{desktopToolbar}{!alongsideWorkspace && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}</div>
           : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
@@ -1150,12 +1211,26 @@ export function TodayView({
 
       />
       {/* Phones have no conversation bar: the page offers the same walk. */}
-      {pageWalk && (
+      {(pageWalk || (dayFlowButton && !foldedControls)) && (
         <div className="today-walk px-4 md:px-0">
-          <button type="button" className="pv2-btn" data-explain="plan-walk" data-explain-label={pageWalk.label}
-            onClick={() => openAssistant({ message: pageWalk.message, autoSend: true })}>{pageWalk.label}</button>
+          {dayFlowButton && !foldedControls && dayFlowButton}
+          {pageWalk && <button type="button" className="pv2-btn" data-explain="plan-walk" data-explain-label={pageWalk.label}
+            onClick={() => openAssistant({ message: pageWalk.message, autoSend: true })}>{pageWalk.label}</button>}
         </div>
       )}
+      {dayFlow && <div className="deck choose-flow today-flow px-4 md:px-0">
+        <TodayFlow mode={dayFlow} choice={todayChoice} review={todayReview} dayItems={dayPicture} actions={todayActions}
+          dayLabel={viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}
+          goalLabel={(t) => (goalOf(t, tasksById) ? `${monthWordToday} goal` : undefined)}
+          onLeave={() => setDayFlow(null)}
+          onFinish={async (win) => {
+            // The review is kept as the day's planning_sessions note, as every
+            // horizon keeps its own; planning the day records nothing more.
+            if (dayFlow === 'review' && !(await dayReview.finish({ wentWell: win, didnt: '' }))) return false
+            setDayFlow(null)
+            return true
+          }} />
+      </div>}
       {/* Notices sit under the heading on every destination (one page shape). */}
       <div className="px-4 md:px-0 empty:hidden"><CalendarReconnectBanner /></div>
 
@@ -1174,7 +1249,7 @@ export function TodayView({
       {/* With the week beside it, the day and the week each scroll on their
           own (Scott, 2026-10-05), as Week and Month do: useColumnsFitWindow
           sizes them to the window, layout-system.css scrolls them. */}
-      <div ref={splitRef} className={`px-4 md:px-0 ${showWeek ? 'today-split is-colscroll @[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
+      <div ref={splitRef} style={dayFlow ? { display: 'none' } : undefined} className={`px-4 md:px-0 ${showWeek ? 'today-split is-colscroll @[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
         <main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,

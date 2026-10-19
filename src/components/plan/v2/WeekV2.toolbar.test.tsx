@@ -221,8 +221,11 @@ const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
   ...over,
 })
 // Plan this week, start to end: Choose, then Give them a day, then Done planning.
-const finishPlanning = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Give them a day' }))
+const finishPlanning = async () => {
+  // Looking back at last week first, on the full flow.
+  const on = screen.queryByRole('button', { name: 'On to October goals → this week' })
+  if (on) fireEvent.click(on)
+  fireEvent.click(await screen.findByRole('button', { name: 'Give them a day' }))
   fireEvent.click(screen.getByRole('button', { name: 'Done planning' }))
 }
 // WeekViewV2's part, standing in: the deck's mode is read off the URL, on a
@@ -273,7 +276,7 @@ describe('WeekV2 — Review opens the deck', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
     expect(where().get('review')).toBe('1')
     expect(where().get('date')).toBeNull()
-    finishPlanning()
+    await finishPlanning()
     await vi.waitFor(() => expect(review.finish).toHaveBeenCalledWith({ wentWell: '', didnt: '' }))
     expect(deck.onFinish).toHaveBeenCalledTimes(1)
     expect(await screen.findByText('The days')).toBeTruthy()
@@ -286,14 +289,16 @@ describe('WeekV2 — Review opens the deck', () => {
   it('finishing the full deck marks the week planned, after the drain and the review', async () => {
     session.save.mockReset(); session.save.mockResolvedValue(true)
     const order: string[] = []
-    review.finish.mockImplementationOnce(async () => { order.push('review'); return true })
+    review.finish.mockImplementation(async () => { order.push('review'); return true })
     session.save.mockImplementationOnce(async () => { order.push('planned'); return true })
     const deck = makeDeck({ onFinish: vi.fn(async () => { order.push('drain'); return true }) })
     renderAt('/week?plan=1', { deck })
-    finishPlanning()
+    await finishPlanning()
     await vi.waitFor(() => expect(session.save).toHaveBeenCalledTimes(1))
     expect(session.save).toHaveBeenCalledWith({ wentWell: '', didnt: '', focus: undefined })
-    expect(order).toEqual(['drain', 'review', 'planned'])
+    // Looking back saves the review first; the close records it again, after the drain.
+    expect(order).toEqual(['review', 'drain', 'review', 'planned'])
+    review.finish.mockImplementation(async () => true)
     expect(await screen.findByText('The days')).toBeTruthy()
   })
 
@@ -304,8 +309,8 @@ describe('WeekV2 — Review opens the deck', () => {
     vi.setSystemTime(new Date(2026, 9, 3, 9)) // Saturday, the last day of Sep 27 – Oct 3
     session.save.mockReset(); review.finish.mockClear()
     renderAt('/week?review=1', { deck: makeDeck() })
-    finishPlanning()
-    await vi.waitFor(() => expect(review.finish).toHaveBeenCalledTimes(1))
+    await finishPlanning()
+    await vi.waitFor(() => expect(review.finish).toHaveBeenCalledTimes(2))
     expect(await screen.findByText('The days')).toBeTruthy()
     expect(session.save).not.toHaveBeenCalled()
   })
@@ -313,14 +318,15 @@ describe('WeekV2 — Review opens the deck', () => {
   it('a failed drain or review leaves the week unmarked; Place them never marks it', async () => {
     session.save.mockReset()
     renderAt('/week?plan=1', { deck: makeDeck({ onFinish: vi.fn(async () => false) }) })
-    finishPlanning()
+    await finishPlanning()
     await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Plan this week' })).toBeTruthy())
     expect(session.save).not.toHaveBeenCalled()
     cleanup()
+    // Looking back's save fails: it says so and goes no further.
     review.finish.mockImplementationOnce(async () => false)
     renderAt('/week?review=1', { deck: makeDeck() })
-    finishPlanning()
-    await vi.waitFor(() => expect(review.finish).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: 'On to October goals → this week' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Didn’t save')
     expect(session.save).not.toHaveBeenCalled()
     cleanup()
     renderAt('/week?place=1', { deck: makeDeck() })
@@ -359,8 +365,8 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
     renderAt('/week', { deck: makeDeck() })
     fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
     expect(screen.getByRole('region', { name: 'Plan this week' })).toBeTruthy()
-    // Step 1: from the month.
-    expect(screen.getByText('October goals → this week')).toBeTruthy()
+    // First, Looking back at last week; then the month's goals.
+    expect(screen.getByText('Review last week · then plan this week')).toBeTruthy()
     expect(screen.queryByText('The days')).toBeNull()
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     expect(screen.queryByRole('button', { name: 'I’m happy with this week' })).toBeNull()
