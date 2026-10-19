@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { shareInFlight } from '@/lib/sharedRequest'
 import { useAuth } from '@/hooks/useAuth'
 import { weatherCondition } from '@/lib/weatherIcon'
 import { WEATHER_COORDS_KEY } from '@/components/place/sceneryLighting'
@@ -129,8 +130,11 @@ async function fetchOpenMeteo(lat: number, lng: number) {
   return direct.json()
 }
 
+// Shared while in flight: Home, the week and the weather chip each mount this
+// hook, and each read again once the user arrived (prod, 2026-10-19: four
+// identical calls per load).
 async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData> {
-  const data = await fetchOpenMeteo(lat, lng)
+  const data = await shareInFlight(`weather:${lat},${lng}`, () => fetchOpenMeteo(lat, lng))
   const currentHour = new Date().getHours()
   const hourlyForecast = (data.hourly?.time || [])
     .map((t: string, i: number) => ({
