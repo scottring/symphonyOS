@@ -2,7 +2,7 @@
 // (lib/wall/activity/kioskActivity), today's kitchen + departure persisted in
 // localStorage (a reload or a build auto-reload restores cooking exactly),
 // a clock that ticks while anything time-based is on screen, the idle rule,
-// and a chime when a timer finishes.
+// and the alarm when a timer finishes (rings until stopped; see kioskAlarm).
 
 import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from 'react'
 import {
@@ -11,6 +11,7 @@ import {
   type KioskEvent, type KioskState, type HoldContext,
 } from '@/lib/wall/activity/kioskActivity'
 import { isTimerDone } from '@/lib/wall/activity/kioskTimers'
+import { finishedLive, ringDue, ringingTimers } from '@/lib/wall/activity/kioskAlarm'
 
 const safeStorage = (): Storage | null => {
   try { return typeof localStorage !== 'undefined' ? localStorage : null } catch { return null }
@@ -42,26 +43,39 @@ function init(dateKey: string): KioskState {
   })
 }
 
-/** A short two-note chime through Web Audio — no asset to load. Silent when
- *  the browser blocks audio. */
-function chime() {
+/** One AudioContext for the page, resumed on every touch, so a ring that
+ *  comes minutes after the last tap isn't blocked by the autoplay rule. */
+let audio: AudioContext | null = null
+function audioContext(): AudioContext | null {
   try {
-    const Ctx = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
-      ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!Ctx) return
-    const ctx = new Ctx()
-    ;[0, 0.35, 0.7].forEach((t, i) => {
+    if (!audio) {
+      const Ctx = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
+        ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!Ctx) return null
+      audio = new Ctx()
+    }
+    if (audio.state === 'suspended') void audio.resume()
+    return audio
+  } catch { return null }
+}
+
+/** A kitchen-timer ring: four quick beeps through Web Audio, no asset to
+ *  load. Silent when the browser blocks audio. */
+function ring() {
+  const ctx = audioContext()
+  if (!ctx) return
+  try {
+    ;[0, 0.18, 0.36, 0.54].forEach((t) => {
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
-      osc.frequency.value = i % 2 ? 660 : 880
+      osc.frequency.value = 1046
       gain.gain.setValueAtTime(0.0001, ctx.currentTime + t)
-      gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.3)
+      gain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + t + 0.01)
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.12)
       osc.connect(gain).connect(ctx.destination)
       osc.start(ctx.currentTime + t)
-      osc.stop(ctx.currentTime + t + 0.32)
+      osc.stop(ctx.currentTime + t + 0.14)
     })
-    setTimeout(() => { void ctx.close() }, 1500)
   } catch { /* no audio on this device */ }
 }
 
@@ -114,28 +128,34 @@ export function useKioskActivity(dateKey: string, opts: KioskActivityOptions = {
   // the stale tick (a new 5-minute timer shows 5:00, never 5:01).
   const shownNow = opts.fixedNow ?? state.timers.reduce((n, t) => Math.max(n, t.endsAt - t.totalMs), nowMs)
 
-  // A chime once per timer, the moment it finishes.
-  const rung = useRef<Set<string>>(new Set())
+  // The alarm: a timer that finishes while the wall is watching rings until
+  // it's stopped or given +1 min (which re-arms it), and goes quiet after
+  // five minutes. One that finished while the page was closed only shows Done.
+  const judged = useRef<Set<string>>(new Set())
+  const live = useRef<Set<string>>(new Set())
+  const lastRang = useRef(0)
   useEffect(() => {
-    let ring = false
+    if (opts.fixedNow !== undefined) return
+    const ids = new Set(state.timers.map((t) => t.id))
+    for (const set of [judged.current, live.current]) for (const id of [...set]) if (!ids.has(id)) set.delete(id)
     for (const t of state.timers) {
-      if (isTimerDone(t, shownNow) && !rung.current.has(t.id)) {
-        // A timer that finished while the page was closed doesn't chime on
-        // load; it simply shows Done.
-        if (shownNow - t.endsAt < 5_000) ring = true
-        rung.current.add(t.id)
-      }
-      if (!isTimerDone(t, shownNow)) rung.current.delete(t.id)
+      if (!isTimerDone(t, shownNow)) { judged.current.delete(t.id); live.current.delete(t.id); continue }
+      if (judged.current.has(t.id)) continue
+      judged.current.add(t.id)
+      if (finishedLive(t, shownNow)) live.current.add(t.id)
     }
-    if (ring) chime()
-  }, [state.timers, shownNow])
+    if (ringDue(ringingTimers(state.timers, live.current, shownNow), lastRang.current, shownNow)) {
+      lastRang.current = shownNow
+      ring()
+    }
+  }, [state.timers, shownNow, opts.fixedNow])
 
   // Idle: only an untouched browsing screen goes home (the reducer decides
   // what counts — activities in progress never time out).
   const holdRef = useRef<HoldContext>({ bedtimeInProgress: false })
   const setHold = useCallback((ctx: HoldContext) => { holdRef.current = ctx }, [])
   const [touchVersion, setTouchVersion] = useState(0)
-  const touched = useCallback(() => setTouchVersion((v) => v + 1), [])
+  const touched = useCallback(() => { setTouchVersion((v) => v + 1); if (opts.fixedNow === undefined) audioContext() }, [opts.fixedNow])
   const away = state.stack.length > 1
   useEffect(() => {
     if (!away) return
