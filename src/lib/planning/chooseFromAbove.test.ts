@@ -73,6 +73,16 @@ describe('buildChooseTree', () => {
   })
 })
 
+describe('a day this week that has passed', () => {
+  it('reads "Was {day}, not done" and still counts as this week', () => {
+    const line = task({ id: 'L', title: 'Organize documents', commitments: [month()] })
+    const missed = task({ id: 'm', title: 'Scan', sourceId: 'L', scheduledFor: new Date(2026, 9, 18), bucket: 'timed' })
+    const tree = buildChooseTree(base([line], [line, missed], { now: new Date(2026, 9, 19, 9) }))
+    expect(tree.lines[0].steps[0].planned).toEqual({ kind: 'missed', label: 'Was Sunday, not done' })
+    expect(tree.lines[0].counts.here).toBe(1)
+  })
+})
+
 describe('lineFor', () => {
   it('files a dropped line under the one line it plainly belongs to, else nowhere', async () => {
     const { lineFor } = await import('./chooseFromAbove')

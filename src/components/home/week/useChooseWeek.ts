@@ -81,6 +81,7 @@ export function useChooseWeek(d: ChooseWeekDeps) {
     // Done toggles: on a finished row the same write reopens it (the card's Undo).
     const done = (t: Task): ChooseVerb => ({ label: 'Done', quiet: true, role: 'done', run: () => d.actions.done(card(t, 'this-week')) })
     const reopen = (t: Task): ChooseVerb => ({ label: 'Reopen', quiet: true, role: 'reopen', run: () => d.actions.done(card(t, 'this-week')) })
+    const keepWeek = (t: Task): ChooseVerb => ({ label: 'This week', role: 'here', run: () => d.actions.keepThisWeek(card(t, 'this-week')) })
     const later = (t: Task, source: DeckSource): ChooseVerb => ({
       label: 'Later', quiet: true, run: async () => true,
       menu: LATER.map((l) => ({ label: l.label, run: () => d.actions.later(card(t, source), l.when) })),
@@ -105,6 +106,8 @@ export function useChooseWeek(d: ChooseWeekDeps) {
         case 'done': return [reopen(t)]
         case 'above': return [thisWeek(t, false), done(t), reopen(t)]
         case 'last': return [thisWeek(t, true), backUp(t, true), done(t), reopen(t)]
+        // A day that passed undone is spent: keep it on the week with no day, or send it back.
+        case 'missed': return [keepWeek(t), backUp(t, false), done(t), reopen(t)]
         default: return [backUp(t, false), done(t), reopen(t)]
       }
     }
@@ -128,8 +131,10 @@ export function useChooseWeek(d: ChooseWeekDeps) {
         ? [thisWeek(t, true), done(t), reopen(t), later(t, 'last-week'), letGo(t, 'last-week')]
         : it.source === 'inbox'
           ? [thisWeek(t, false), later(t, 'inbox'), letGo(t, 'inbox')]
-          : [done(t), reopen(t), later(t, 'this-week')]
-      return { key: t.id, title: t.title, planned: it.planned, note: it.source === 'last' ? 'From last week, not done' : it.source === 'inbox' ? 'In your Inbox' : undefined, verbs, children: [] }
+          : it.planned.kind === 'missed'
+            ? [keepWeek(t), done(t), reopen(t), later(t, 'this-week')]
+            : [done(t), reopen(t), later(t, 'this-week')]
+      return { key: t.id, title: t.title, planned: it.planned, note: it.source === 'last' ? 'From last week, not done' : it.source === 'inbox' ? 'In your Inbox' : it.planned.kind === 'missed' ? it.planned.label : undefined, verbs, children: [] }
     }
 
     // What each week item serves, for step 2: the line it sits under.
@@ -142,7 +147,7 @@ export function useChooseWeek(d: ChooseWeekDeps) {
     const placeCards = buildDeck({ tasks: d.pool, weekStart: d.weekAnchor, lastWeekStart: d.lastWeekStart, isCurrent: d.isCurrent, only: 'this-week' })
     const placeItems: PlaceItem[] = placeCards.map((c) => ({
       key: c.key, title: c.task.title,
-      from: lineOf.has(c.task.id) ? `${monthWord} goal · ${lineOf.get(c.task.id)}` : 'Not under a goal',
+      from: lineOf.has(c.task.id) ? `${monthWord} goal · ${lineOf.get(c.task.id)}` : 'Also this week',
       onPlace: (day: Date) => d.actions.placeOnDay(c, day),
     }))
     const end = new Date(d.weekAnchor.getFullYear(), d.weekAnchor.getMonth(), d.weekAnchor.getDate() + 7)

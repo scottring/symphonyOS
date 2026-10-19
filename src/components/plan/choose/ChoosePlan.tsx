@@ -108,7 +108,10 @@ export function ChoosePlan(p: ChoosePlanProps) {
   const inHere = /^(this|next|last) /.test(here) ? here : `in ${here}`
   const above = p.aboveWord
   const doneLines = p.doneLines ?? []
-  const looseTitle = above ? 'Not under a goal' : `On ${here}`
+  // What is on this period but not under a goal of the level above.
+  const looseTitle = above ? `Also ${inHere}` : `On ${here}`
+  const looseNote = above ? `${cap(here === inHere ? `on ${here}` : inHere)}, not part of ${/^[aeiou]/i.test(above) ? 'an' : 'a'} ${above} goal.` : null
+  const [showSettled, setShowSettled] = useState(false)
 
   const run = async (key: string, v: ChooseVerb, then?: Decision | null) => {
     setPending(key); setFailed(null); setMenuOpen(null)
@@ -134,18 +137,20 @@ export function ChoosePlan(p: ChoosePlanProps) {
     if (d === 'stay') return `Stays on ${above}`
     if (d === 'done' || pl.kind === 'done') return 'Done'
     if (d === 'here' && pl.kind !== 'day') return `On ${here}`
+    if (pl.kind === 'missed') return pl.label
     if (pl.kind === 'day') return `On ${pl.label[0].toLowerCase()}${pl.label.slice(1)}`
     if (pl.kind === 'here') return `On ${here}`
     if (pl.kind === 'last') return `From ${pl.label.toLowerCase()}, not done`
     return above ? `On ${above}` : `On ${here}`
   }
-  const stampFor = (key: string, pl: Planned, small = false): ReactNode => {
+  // A stamp marks a choice made here, this sitting — never a state found on
+  // arrival (Scott, 2026-10-19: a stamp on every row meant nothing).
+  const stampFor = (key: string, _pl: Planned, small = false): ReactNode => {
     const d = decided[key]
-    const fresh = !!d
     const cls = small ? 'choose-stamp-mini' : 'choose-stamp'
     if (d === 'stay') return <Stamp kind="someday" word={`On ${above}`} context={`Not ${inHere}`} fresh className={cls} />
-    if (d === 'done' || pl.kind === 'done') return <Stamp kind="done" context="Done" fresh={fresh} className={cls} />
-    if (d === 'here' || pl.kind === 'here' || pl.kind === 'day') return <Stamp kind="carried" word={here} context={above ? `${above} goal` : here} fresh={fresh} className={cls} />
+    if (d === 'done') return <Stamp kind="done" context="Done" fresh className={cls} />
+    if (d === 'here') return <Stamp kind="carried" word={here} context={above ? `${above} goal` : here} fresh className={cls} />
     return null
   }
   const menuRow = (key: string, title: string, verbs: ChooseVerb[]) => menuOpen === key && <div className="choose-menu" role="group" aria-label={`Later: ${title}`}>
@@ -212,6 +217,7 @@ export function ChoosePlan(p: ChoosePlanProps) {
             </>
             : <>
               {doIt && <button type="button" className="choose-verb" disabled={pending !== null} aria-label={`${cap(inHere)}: ${it.title}`} onClick={() => { void run(it.key, doIt, 'here') }}>{cap(inHere)}</button>}
+              {back && (it.planned.kind === 'missed' || it.planned.kind === 'last') && <button type="button" className="choose-verb is-quiet" disabled={pending !== null} aria-label={`Not ${inHere}: ${it.title}`} onClick={() => { void run(it.key, back, 'stay') }}>Not {inHere}</button>}
               {done && <button type="button" className="choose-verb is-quiet" disabled={pending !== null} aria-label={`Done: ${it.title}`} onClick={() => { void run(it.key, done, 'done') }}>Done</button>}
               {others.map((v) => v.menu
                 ? <button key={v.label} type="button" className="choose-verb is-quiet" aria-expanded={menuOpen === it.key} aria-label={`${v.label}: ${it.title}`} onClick={() => setMenuOpen(menuOpen === it.key ? null : it.key)}>{v.label} ▸</button>
@@ -244,8 +250,21 @@ export function ChoosePlan(p: ChoosePlanProps) {
     </div>}
   </>
 
+  // Only what needs a choice gets buttons; what already has its place folds
+  // to one line ("2 already this week: Reschedule dentist (Thu) · …").
+  const settled = p.loose.filter((it) => (it.planned.kind === 'here' || it.planned.kind === 'day') && !decided[it.key])
+  const needs = p.loose.filter((it) => !settled.includes(it))
+  const dayOf = (it: ChooseItemView) => it.planned.kind === 'day' ? ` (${it.planned.label.replace(/^.*· /, '')})` : ''
   const looseBody = <>
-    {p.loose.length > 0 && <ul className="choose-rows">{p.loose.map((it) => step(it, 0))}</ul>}
+    {looseNote && <p className="choose-fact">{looseNote}</p>}
+    {needs.length > 0 && <ul className="choose-rows">{needs.map((it) => step(it, 0))}</ul>}
+    {settled.length > 0 && <div className="choose-settled">
+      <button type="button" className="choose-settled-line" aria-expanded={showSettled} onClick={() => setShowSettled(!showSettled)}>
+        <span><b>{settled.length} already {inHere}:</b> {settled.slice(0, 4).map((it) => `${it.title}${dayOf(it)}`).join(' · ')}{settled.length > 4 ? ' · …' : ''}</span>
+        <span className="canvas-link">{showSettled ? 'Hide' : 'Show'}</span>
+      </button>
+      {showSettled && <ul className="choose-rows">{settled.map((it) => step(it, 0))}</ul>}
+    </div>}
     {p.loose.length === 0 && adding !== 'loose' && <p className="choose-empty">Nothing else {inHere} yet.</p>}
     {adding === 'loose'
       ? <InlineComposer key={added} label={`Something ${inHere}`} saveLabel="Add" onSave={add('loose', p.onAddLoose)} onCancel={() => setAdding(null)} />
@@ -272,7 +291,7 @@ export function ChoosePlan(p: ChoosePlanProps) {
     {p.planned && <p className="choose-was">{p.planned}</p>}
 
     {p.loading ? <p className="plan-status" role="status">Loading…</p> : p.view === 'one' ? <>
-      <p className="choose-count">{current ? `${at + 1} of ${p.lines.length}` : looseTitle}</p>
+      <p className="choose-count">{current ? `${at + 1} of ${p.lines.length}` : p.lines.length ? `After the ${p.lines.length} ${above} goals` : ''}</p>
       <div className="deck-stack choose-stack" ref={cardRef}>
         <div className="deck-ghost is-far" /><div className="deck-ghost" />
         {current
