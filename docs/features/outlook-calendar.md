@@ -38,6 +38,12 @@ Outlook events, and "Create events on" stays Google.
 - Microsoft rotates refresh tokens on every refresh; `tokens.ts` writes the
   new one back. A refresh without `scope` is rejected by Microsoft, so the
   refresh body always carries the scopes.
+- Release order for the multi-account change (and any later change to these
+  columns): migration `20261018150000`, then every calendar edge function in
+  one go, then main. Functions first fail every read (they select the new
+  columns); a gap after the migration fails connecting (the old callbacks
+  upsert on the dropped `(user_id, provider)` constraint). The web app copes
+  with either.
 
 ## One-time setup — Azure checklist
 

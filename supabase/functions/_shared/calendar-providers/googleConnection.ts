@@ -28,7 +28,10 @@ export interface PickOptions {
 export function pickGoogleConnection<T extends CalendarConnectionRow>(rows: T[], opts: PickOptions = {}): T | null {
   const google = rows.filter((r) => r.provider === 'google')
   if (google.length === 0) return null
-  const ordered = [...google].sort((a, b) => Number(b.is_primary === true) - Number(a.is_primary === true))
+  // Primary first, then a fixed order (the query has none), so mail read
+  // from one account is fetched again from that same account.
+  const ordered = [...google].sort((a, b) =>
+    Number(b.is_primary === true) - Number(a.is_primary === true) || String(a.id ?? '').localeCompare(String(b.id ?? '')))
 
   if (opts.connectionId) {
     const named = ordered.find((r) => r.id === opts.connectionId)
