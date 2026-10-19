@@ -64,11 +64,41 @@ describe('TapEventPanel', () => {
     expect(screen.getByText('Annual physical')).toBeInTheDocument()
   })
 
-  it('renders a Photos & files section keyed to the event', () => {
-    render(<TapEventPanel
+  it('opens Photos & files from its + chip', async () => {
+    const { user } = render(<TapEventPanel
       event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
     />)
-    expect(screen.getByText('Photos & files')).toBeInTheDocument()
+    expect(screen.queryByText('Photos & files')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '+ File' }))
+    expect(await screen.findByText('Photos & files')).toBeInTheDocument()
+  })
+
+  // An event used to open on five titled, empty sections and a "Created" line
+  // that was really its start time. Empty fields are one line of + chips.
+  it('offers every empty field as a + chip instead of an empty section', () => {
+    const noLocation = { ...mockEvent, location: undefined }
+    render(<TapEventPanel
+      event={noLocation} notes={undefined} allTasks={[]} {...baseHandlers} onUpdateEventLocation={vi.fn()}
+    />)
+    for (const label of ['+ Place', '+ What to bring', '+ Prep task', '+ File', '+ Link']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    }
+    expect(screen.queryByPlaceholderText(/add a location/i)).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/add a prep task/i)).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/paste a url/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Created /)).not.toBeInTheDocument()
+  })
+
+  it('shows filled sections and does not offer them again', () => {
+    const prep = createMockTask({ id: 't1', linkedEventId: 'e1', title: 'Bring vaccine card' })
+    render(<TapEventPanel
+      event={mockEvent} notes="Insurance card" allTasks={[prep]} {...baseHandlers} onUpdateEventLocation={vi.fn()}
+      links={[{ url: 'https://example.com/agenda', title: 'Agenda' }]}
+    />)
+    for (const label of ['+ Place', '+ What to bring', '+ Prep task', '+ Link']) {
+      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
+    }
+    expect(screen.getByRole('button', { name: '+ File' })).toBeInTheDocument()
   })
 
   it('renders prep tasks linked to the event', () => {
@@ -86,11 +116,12 @@ describe('TapEventPanel', () => {
     expect(screen.getByText(/what to bring/i)).toBeInTheDocument()
   })
 
-  it('shows the add-location input and no Directions toggle when the event has no location', () => {
+  it('shows the add-location input and no Directions toggle when the event has no location', async () => {
     const noLocation = { ...mockEvent, location: undefined }
-    render(<TapEventPanel
+    const { user } = render(<TapEventPanel
       event={noLocation} notes={undefined} allTasks={[]} {...baseHandlers} onUpdateEventLocation={vi.fn()}
     />)
+    await user.click(screen.getByRole('button', { name: '+ Place' }))
     expect(screen.getByPlaceholderText(/add a location/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /directions/i })).not.toBeInTheDocument()
   })
@@ -109,6 +140,7 @@ describe('TapEventPanel', () => {
     const { user } = render(<TapEventPanel
       event={event} notes={undefined} allTasks={[]} {...baseHandlers} onUpdateEventLocation={onUpdateEventLocation}
     />)
+    await user.click(screen.getByRole('button', { name: '+ Place' }))
     await user.type(screen.getByPlaceholderText(/add a location/i), 'Main St')
     const result = await screen.findByText('1 Main St')
     await user.click(result)
@@ -164,6 +196,7 @@ describe('TapEventPanel', () => {
     const { user } = render(<TapEventPanel
       event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
     />)
+    await user.click(screen.getByRole('button', { name: '+ Prep task' }))
     const input = screen.getByPlaceholderText(/add a prep task/i)
     await user.type(input, 'Print the financial plan{Enter}')
     expect(baseHandlers.onAddPrepTask).toHaveBeenCalledWith('Print the financial plan')
