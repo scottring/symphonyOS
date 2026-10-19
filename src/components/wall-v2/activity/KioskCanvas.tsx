@@ -39,7 +39,9 @@ import {
 import { kioskComposition, nextCommitment } from '@/lib/wall/activity/kioskCompose'
 import { buildDeparture, type BedtimeGrid } from '@/lib/wall/activity/kioskRoutines'
 import { proposeGroceries, linesToAdd, linesToRetry, type GroceryLine, type GroceryLineResult } from '@/lib/wall/activity/groceryProposal'
-import { soonestTimer } from '@/lib/wall/activity/kioskTimers'
+import { soonestTimer, isTimerDone } from '@/lib/wall/activity/kioskTimers'
+import { doneAnnouncement, finishedLive } from '@/lib/wall/activity/kioskAlarm'
+import { speechFor } from '@/lib/wall/voice/wallVoiceActions'
 import { isIngredientLine, scaledLine, cookingSteps } from '@/lib/wall/activity/cookingModel'
 import type { KioskCommand } from '@/lib/wall/activity/kioskCommands'
 import type { KioskActivity } from './useKioskActivity'
@@ -278,6 +280,20 @@ export function KioskCanvas(p: KioskCanvasProps) {
 
   // One path for every sentence: speech, typing and the dock's chip.
   const tell = useTellSymphony(runCommand, p.voice, p.listenerPreview)
+
+  // Say which timer finished, through the wall's speaker, just after the ring.
+  const announced = useRef<Set<string>>(new Set())
+  const { listener, live: listenerLive } = tell
+  useEffect(() => {
+    for (const t of state.timers) {
+      if (!isTimerDone(t, nowMs)) { announced.current.delete(t.id); continue }
+      if (announced.current.has(t.id)) continue
+      announced.current.add(t.id)
+      if (!finishedLive(t, nowMs) || !listenerLive) continue
+      const text = doneAnnouncement(t)
+      setTimeout(() => { void speechFor(text).then((wav) => (wav ? listener.play(wav) : listener.say(text))) }, 1200)
+    }
+  }, [state.timers, nowMs, listener, listenerLive])
   const [typing, setTyping] = useState(false)
   useWallFonts(!!p.v1)
 
