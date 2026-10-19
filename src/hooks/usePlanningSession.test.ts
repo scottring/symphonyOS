@@ -149,4 +149,18 @@ describe('usePlanningSession', () => {
     await act(async () => { await h.result.current.save({ wentWell: '', didnt: '', focus: 'Yard and laundry reset' }) })
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ notes: expect.objectContaining({ focus: 'Yard and laundry reset' }) }), expect.anything())
   })
+  // Prod, 2026-10-19: Home read this week, month and season four times each per load.
+  it('the same period, mounted several times at once, is read once', async () => {
+    let reads = 0
+    orderImpl = async () => { reads++; return { data: rows, error: null } }
+    rows.push({ author_id: 'u1', updated_at: '2026-10-18', notes: { wentWell: 'w', didnt: '', savedAt: '2026-10-18T10:00:00Z' } })
+    const hooks = [1, 2, 3, 4].map(() => renderHook(() => usePlanningSession('weekly', '2026-10-17')))
+    for (const h of hooks) await waitFor(() => expect(h.result.current.loading).toBe(false))
+    expect(reads).toBe(1)
+    for (const h of hooks) expect(h.result.current.saved?.notes.wentWell).toBe('w')
+    // A different period is its own read.
+    const other = renderHook(() => usePlanningSession('monthly', '2026-10'))
+    await waitFor(() => expect(other.result.current.loading).toBe(false))
+    expect(reads).toBe(2)
+  })
 })

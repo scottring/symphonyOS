@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { shareInFlight } from '@/lib/sharedRequest'
 import { useAuth } from '@/hooks/useAuth'
 
 export function monthToken(start: Date): string { return `${start.getFullYear()}-${start.getMonth() + 1}` }
@@ -43,9 +44,14 @@ export function usePlanningSession(horizon: SessionHorizon, token: string) {
     setLoading(true)
     setLoadedToken(null)
     setError(null)
-    const { data, error: readError } = await supabase.from('planning_sessions')
-      .select('author_id, updated_at, notes').eq('horizon', horizon).eq('period_token', token)
-      .order('updated_at', { ascending: false })
+    // Shared while in flight: Home mounts this week, month and season more
+    // than once in a render pass (prod, 2026-10-19: each read four times).
+    const { data, error: readError } = await shareInFlight(
+      `planning_sessions:${user?.id ?? 'anon'}|${horizon}|${token}`,
+      async () => await supabase.from('planning_sessions')
+        .select('author_id, updated_at, notes').eq('horizon', horizon).eq('period_token', token)
+        .order('updated_at', { ascending: false }),
+    )
     if (req !== latest.current) return
     if (readError) {
       // Unknown is not empty: opening now would seed blank notes and a save
