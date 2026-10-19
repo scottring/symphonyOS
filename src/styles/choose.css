@@ -103,3 +103,8 @@
   .choose-place-from { max-width: none; text-align: left; }
   .choose-strip .deck-day { min-height: 0; }
 }
+
+/* Also this week: what already has its place, folded to one line */
+.choose-settled-line { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; padding: 8px 12px; border: 0; border-radius: 10px; background: var(--color-neutral-50); cursor: pointer; text-align: left; font: inherit; font-size: 13.5px; color: var(--color-neutral-600); }
+.choose-settled-line b { font-weight: 600; color: var(--color-neutral-700); }
+.choose-settled > .choose-rows { margin-top: 6px; }

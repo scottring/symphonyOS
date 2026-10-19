@@ -885,7 +885,7 @@ describe('planning by hand (2026-10-17)',()=>{
   const flow=within(screen.getByRole('region',{name:'Plan October'}))
   expect(flow.getByText('Fall goals → October')).toBeInTheDocument()
   // September's open line, with its own four verbs; the done one is not asked about.
-  const loose=within(flow.getByRole('region',{name:'Not under a goal'}))
+  const loose=within(flow.getByRole('region',{name:'Also in October'}))
   expect(loose.getByText('Fix the gate')).toBeInTheDocument()
   expect(loose.queryByText('Pay taxes')).toBeNull()
   expect(within(loose.getByText('Fix the gate').closest('li')!).getAllByRole('button').map(b=>b.textContent)).toEqual(['In October','Done','Someday','Let go'])

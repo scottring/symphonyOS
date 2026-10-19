@@ -90,10 +90,31 @@ describe('ChoosePlan — one October goal per card', () => {
     const { props } = renderChoose()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    const loose = within(screen.getByRole('region', { name: 'Not under a goal' }))
+    const loose = within(screen.getByRole('region', { name: 'Also this week' }))
+    expect(loose.getByText('On this week, not part of an October goal.')).toBeTruthy()
     expect(loose.getByText('Return library books').closest('li')).toHaveTextContent('From last week, not done')
     fireEvent.click(screen.getByRole('button', { name: 'Give them a day' }))
     expect(props.primary.run).toHaveBeenCalled()
+  })
+})
+
+describe('ChoosePlan — Also this week', () => {
+  // Scott, 2026-10-19: a stamp on every row meant nothing, a passed Sunday
+  // still read "On this week · Sun", and settled rows asked for a choice.
+  it('only what needs a choice has buttons; what has its place folds to one line; no stamps on arrival', () => {
+    const v = verbs()
+    renderChoose({ lines: [], loose: [
+      { key: 'm', title: 'Buy Ella a helmet', planned: { kind: 'missed', label: 'Was Sunday, not done' }, note: 'Was Sunday, not done', verbs: [v.here, v.done], children: [] },
+      { key: 'd', title: 'Reschedule dentist', planned: { kind: 'day', label: 'This week · Thu' }, verbs: [verbs().done], children: [] },
+      { key: 'k', title: 'Ask Kaleb about costume', planned: { kind: 'day', label: 'This week · Mon' }, verbs: [verbs().done], children: [] },
+    ] })
+    const loose = within(screen.getByRole('region', { name: 'Also this week' }))
+    expect(loose.getByText('Buy Ella a helmet').closest('li')).toHaveTextContent('Was Sunday, not done')
+    expect(loose.getByRole('button', { name: 'This week: Buy Ella a helmet' })).toBeTruthy()
+    const fold = loose.getByRole('button', { name: /2 already this week/ })
+    expect(fold).toHaveTextContent('Reschedule dentist (Thu) · Ask Kaleb about costume (Mon)')
+    expect(loose.queryByRole('button', { name: 'Done: Reschedule dentist' })).toBeNull()
+    expect(screen.queryByRole('img')).toBeNull()
   })
 })
 

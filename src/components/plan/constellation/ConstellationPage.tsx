@@ -493,7 +493,7 @@ function Inner() {
       : { level: 'month' as const, periodStart: monthB.start, prevStart: monthB.prev, isCurrent: isCurrentPeriod(monthB, now) }
     const steps = node.task.subtasks.filter((st) => {
       const k = plannedFor(st, { ...below, hereWord: '', lastWord: '', aboveWord: '' }).kind
-      return k === 'here' || k === 'day'
+      return k === 'here' || k === 'day' || k === 'missed'
     }).map((st) => st.title)
     return [...linked, ...steps.filter((t) => !linked.includes(t))]
   }

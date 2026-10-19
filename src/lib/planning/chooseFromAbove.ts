@@ -15,8 +15,10 @@ import type { Task } from '@/types/task'
 import type { PlacementLevel } from '@/lib/placement/model'
 import { movedOn, taskReviewState, weekReviewState } from './periodReview'
 import { compareSortOrder } from '@/lib/today/taskOrdering'
+import { isMissedPlacement } from '@/lib/week/missedPlacement'
 
-export type PlannedKind = 'done' | 'day' | 'here' | 'last' | 'above'
+/** `missed`: given a day this week that has passed, not done — the day is spent. */
+export type PlannedKind = 'done' | 'day' | 'missed' | 'here' | 'last' | 'above'
 export interface Planned { kind: PlannedKind; label: string }
 
 export interface ChooseNode {
@@ -65,6 +67,8 @@ export interface ChooseInput {
   includeInbox?: boolean
   /** The level above's period ("October" when planning a week): a line moved on from it is left out. */
   aboveStart?: Date
+  /** Today, for a day this week that has already passed. */
+  now?: Date
 }
 
 const DAY_MS = 86_400_000
@@ -76,7 +80,7 @@ const age = (t: Task): number => t.createdAt?.getTime?.() ?? 0
 
 const linkIds = (t: Task): string[] => [t.parentTaskId, t.sourceId, t.goalTaskId].filter((x): x is string => !!x)
 
-export function plannedFor(t: Task, inp: Pick<ChooseInput, 'level' | 'periodStart' | 'prevStart' | 'isCurrent' | 'hereWord' | 'lastWord' | 'aboveWord'>): Planned {
+export function plannedFor(t: Task, inp: Pick<ChooseInput, 'level' | 'periodStart' | 'prevStart' | 'isCurrent' | 'hereWord' | 'lastWord' | 'aboveWord' | 'now'>): Planned {
   if (t.completed) return { kind: 'done', label: 'Done' }
   const here = inp.level === 'week'
     ? weekReviewState(t, inp.periodStart, { isCurrent: inp.isCurrent })
@@ -85,6 +89,8 @@ export function plannedFor(t: Task, inp: Pick<ChooseInput, 'level' | 'periodStar
   if (here === 'open') {
     const end = new Date(inp.periodStart.getTime() + 7 * DAY_MS)
     if (inp.level === 'week' && t.scheduledFor && t.scheduledFor >= inp.periodStart && t.scheduledFor < end) {
+      const day = t.scheduledFor.toLocaleDateString('en-US', { weekday: 'long' })
+      if (isMissedPlacement(t.scheduledFor, !!t.completed, inp.now ?? new Date())) return { kind: 'missed', label: `Was ${day}, not done` }
       return { kind: 'day', label: `${cap(inp.hereWord)} · ${t.scheduledFor.toLocaleDateString('en-US', { weekday: 'short' })}` }
     }
     return { kind: 'here', label: cap(inp.hereWord) }
@@ -142,7 +148,7 @@ export function buildChooseTree(inp: ChooseInput): ChooseTree {
       for (const n of ns) {
         const k = n.planned.kind
         if (k === 'done') counts.done++
-        else if (k === 'here' || k === 'day') counts.here++
+        else if (k === 'here' || k === 'day' || k === 'missed') counts.here++
         else if (k === 'last') counts.last++
         else counts.above++
         walk(n.children)
@@ -158,7 +164,7 @@ export function buildChooseTree(inp: ChooseInput): ChooseTree {
     if (placed.has(t.id) || t.completed || t.isGoal) continue
     const planned = plannedFor(t, inp)
     if (planned.kind === 'last') loose.push({ task: t, source: 'last', planned })
-    else if (planned.kind === 'here' || planned.kind === 'day') loose.push({ task: t, source: 'here', planned })
+    else if (planned.kind === 'here' || planned.kind === 'day' || planned.kind === 'missed') loose.push({ task: t, source: 'here', planned })
     else if (inp.includeInbox && t.bucket === 'inbox') loose.push({ task: t, source: 'inbox', planned: { kind: 'above', label: 'Inbox' } })
   }
   const order: Record<LooseSource, number> = { last: 0, here: 1, inbox: 2 }
