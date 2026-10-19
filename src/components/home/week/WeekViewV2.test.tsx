@@ -972,7 +972,7 @@ describe('WeekViewV2 — the deck', () => {
     expect(line.title).toBe('Get the house ready for winter')
     expect(line.steps.map((x) => [x.key, x.planned.label])).toEqual([['s', 'This week']])
     expect(props().choose.loose).toEqual([])
-    expect(props().choose.placeItems).toEqual([expect.objectContaining({ key: 's', from: 'October · Get the house ready for winter' })])
+    expect(props().choose.placeItems).toEqual([expect.objectContaining({ key: 's', from: 'October goal · Get the house ready for winter' })])
   })
 
   // Spec 2026-10-19: a step of an October line, still a subtask, put on this

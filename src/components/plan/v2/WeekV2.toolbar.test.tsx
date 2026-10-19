@@ -360,7 +360,7 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
     expect(screen.getByRole('region', { name: 'Plan this week' })).toBeTruthy()
     // Step 1: from the month.
-    expect(screen.getByRole('heading', { name: 'From October' })).toBeTruthy()
+    expect(screen.getByText('October goals → this week')).toBeTruthy()
     expect(screen.queryByText('The days')).toBeNull()
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     expect(screen.queryByRole('button', { name: 'I’m happy with this week' })).toBeNull()

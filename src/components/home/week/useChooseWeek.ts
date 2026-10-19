@@ -11,7 +11,7 @@ import type { Task } from '@/types/task'
 import type { DeckCard, DeckSource } from '@/lib/planning/deck'
 import { buildDeck } from '@/lib/planning/deck'
 import type { DeckActions, LaterWhen } from './useDeckActions'
-import { buildChooseTree, countsLine, lineFor, type ChooseNode, type ChooseLine, type LooseItem } from '@/lib/planning/chooseFromAbove'
+import { buildChooseTree, countsLine, type ChooseNode, type ChooseLine, type LooseItem } from '@/lib/planning/chooseFromAbove'
 import type { ChooseItemView, ChooseLineView, ChooseVerb } from '@/components/plan/choose/ChoosePlan'
 import type { PlaceItem } from '@/components/plan/choose/GiveThemADay'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
@@ -65,20 +65,22 @@ export function useChooseWeek(d: ChooseWeekDeps) {
       return async () => ok(await d.updateTask(t.id, { ...offDay.previous, commitments: before }))
     }
     const thisWeek = (t: Task, fromLast: boolean): ChooseVerb => ({
-      label: 'This week',
+      label: 'This week', role: 'here',
       run: () => fromLast ? d.actions.keepThisWeek(card(t, 'last-week')) : d.actions.keepThisWeek(card(t, 'inbox')),
     })
     // Back up to October: the week (this one, or last week's leftover) ends;
     // a row October never held is put on it first, so it lands under its line.
     const backUp = (t: Task, fromLast: boolean): ChooseVerb => ({
-      label: `Back to ${monthWord}`, quiet: true,
+      label: `Back to ${monthWord}`, quiet: true, role: 'back',
       run: () => activity.run(`Back to ${monthWord}: “${t.title}”`, async () => {
         if (t.scheduledFor && !ok(await d.updateTask(t.id, timingRemoval(t, 'day').updates))) return false
         if (!openCommitment({ commitments: bootstrapCommitments(t) }, 'month') && !(await d.keepForward(t.id, { monthStart: d.monthStart }))) return false
         return d.dropCommitment(t.id, 'week', fromLast ? d.lastWeekStart : d.weekAnchor)
       }, { ids: [t.id], undo: restoreOf(t) }),
     })
-    const done = (t: Task): ChooseVerb => ({ label: 'Done', quiet: true, run: () => d.actions.done(card(t, 'this-week')) })
+    // Done toggles: on a finished row the same write reopens it (the card's Undo).
+    const done = (t: Task): ChooseVerb => ({ label: 'Done', quiet: true, role: 'done', run: () => d.actions.done(card(t, 'this-week')) })
+    const reopen = (t: Task): ChooseVerb => ({ label: 'Reopen', quiet: true, role: 'reopen', run: () => d.actions.done(card(t, 'this-week')) })
     const later = (t: Task, source: DeckSource): ChooseVerb => ({
       label: 'Later', quiet: true, run: async () => true,
       menu: LATER.map((l) => ({ label: l.label, run: () => d.actions.later(card(t, source), l.when) })),
@@ -100,15 +102,15 @@ export function useChooseWeek(d: ChooseWeekDeps) {
     const stepVerbs = (n: { task: Task; planned: ChooseNode['planned'] }): ChooseVerb[] => {
       const t = n.task
       switch (n.planned.kind) {
-        case 'done': return []
-        case 'above': return [thisWeek(t, false), done(t)]
-        case 'last': return [thisWeek(t, true), backUp(t, true), done(t)]
-        default: return [backUp(t, false), done(t)]
+        case 'done': return [reopen(t)]
+        case 'above': return [thisWeek(t, false), done(t), reopen(t)]
+        case 'last': return [thisWeek(t, true), backUp(t, true), done(t), reopen(t)]
+        default: return [backUp(t, false), done(t), reopen(t)]
       }
     }
     const node = (n: ChooseNode): ChooseItemView => ({
       key: n.task.id, title: n.task.title, planned: n.planned,
-      note: n.fromLast ? 'from last week' : undefined,
+      note: n.fromLast ? 'From last week, not done' : undefined,
       verbs: stepVerbs(n), children: n.children.map(node),
       onBreakDown: n.planned.kind === 'above' || n.planned.kind === 'last'
         ? addUnder(n.task, `Add a step under “${n.task.title}”`) : undefined,
@@ -123,11 +125,11 @@ export function useChooseWeek(d: ChooseWeekDeps) {
     const looseView = (it: LooseItem): ChooseItemView => {
       const t = it.task
       const verbs: ChooseVerb[] = it.source === 'last'
-        ? [thisWeek(t, true), later(t, 'last-week'), done(t), letGo(t, 'last-week')]
+        ? [thisWeek(t, true), done(t), reopen(t), later(t, 'last-week'), letGo(t, 'last-week')]
         : it.source === 'inbox'
           ? [thisWeek(t, false), later(t, 'inbox'), letGo(t, 'inbox')]
-          : [later(t, 'this-week'), done(t)]
-      return { key: t.id, title: t.title, planned: it.planned, note: it.source === 'last' ? 'from last week' : it.source === 'inbox' ? 'in your Inbox' : undefined, verbs, children: [] }
+          : [done(t), reopen(t), later(t, 'this-week')]
+      return { key: t.id, title: t.title, planned: it.planned, note: it.source === 'last' ? 'From last week, not done' : it.source === 'inbox' ? 'In your Inbox' : undefined, verbs, children: [] }
     }
 
     // What each week item serves, for step 2: the line it sits under.
@@ -140,7 +142,7 @@ export function useChooseWeek(d: ChooseWeekDeps) {
     const placeCards = buildDeck({ tasks: d.pool, weekStart: d.weekAnchor, lastWeekStart: d.lastWeekStart, isCurrent: d.isCurrent, only: 'this-week' })
     const placeItems: PlaceItem[] = placeCards.map((c) => ({
       key: c.key, title: c.task.title,
-      from: lineOf.has(c.task.id) ? `${monthWord} · ${lineOf.get(c.task.id)}` : 'Not under a line',
+      from: lineOf.has(c.task.id) ? `${monthWord} goal · ${lineOf.get(c.task.id)}` : 'Not under a goal',
       onPlace: (day: Date) => d.actions.placeOnDay(c, day),
     }))
     const end = new Date(d.weekAnchor.getFullYear(), d.weekAnchor.getMonth(), d.weekAnchor.getDate() + 7)
@@ -153,11 +155,6 @@ export function useChooseWeek(d: ChooseWeekDeps) {
       doneLines: tree.doneLines.map(lineView),
       loose: tree.loose.map(looseView),
       onAddLoose: addUnder(null, 'Add to this week'),
-      onDropIn: async (title: string): Promise<string | false> => {
-        const line = lineFor(title, tree.lines)
-        const saved = await addUnder(line?.task ?? null, line ? `Add “${title}” under “${line.task.title}”` : `Add “${title}” to this week`)(title)
-        return saved ? (line ? `under “${line.task.title}”` : 'to Not under a line') : false
-      },
       placeItems,
       placedCount,
       /** Last week's leftovers nobody answered (the drain at the end). */

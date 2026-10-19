@@ -17,13 +17,18 @@ const ICON: Record<StampKind, ReactElement> = {
   dropped: <path d="M60 60l40 40M100 60l-40 40" strokeWidth={7} />,
 }
 
-export function Stamp({ kind, context, on, fresh }: { kind: StampKind; context: string; on?: Date | null; fresh?: boolean }) {
+export function Stamp({ kind, context, on, fresh, word: wordOver, className }: {
+  kind: StampKind; context: string; on?: Date | null; fresh?: boolean
+  /** The stamp's own word, where the kind's default doesn't say it ("THIS WEEK", "ON OCTOBER"). */
+  word?: string
+  className?: string
+}) {
   const id = useId().replace(/:/g, '')
-  const word = WORD[kind]
+  const word = (wordOver ?? WORD[kind]).toUpperCase()
   const rim = `${word} · ${context} · SYMPHONY · ${word} · ${context} · `.toUpperCase()
   const date = (on ?? new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()
   return (
-    <svg className={`pv2-stamp pv2-stamp-${kind}${fresh ? ' is-fresh' : ''}`} viewBox="0 0 160 160" role="img" aria-label={`${word.toLowerCase()} — ${context}`}>
+    <svg className={`pv2-stamp pv2-stamp-${kind}${fresh ? ' is-fresh' : ''}${className ? ` ${className}` : ''}`} viewBox="0 0 160 160" role="img" aria-label={`${word.toLowerCase()} — ${context}`}>
       <defs>
         <path id={`rim${id}`} d="M80,80 m-61,0 a61,61 0 1,1 122,0 a61,61 0 1,1 -122,0" />
         <filter id={`ink${id}`} x="-10%" y="-10%" width="120%" height="120%">

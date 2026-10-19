@@ -14,7 +14,6 @@ export interface WeekChoose {
   doneLines: ChooseLineView[]
   loose: ChooseItemView[]
   onAddLoose: (title: string) => Promise<boolean>
-  onDropIn: (title: string) => Promise<string | false>
   placeItems: PlaceItem[]
   placedCount: number
 }
@@ -40,17 +39,14 @@ export function PlanWeekFlow({ mode, choose, stripDays, loading, aged = 0, onSee
   }
 
   return <section className="deck choose-flow" aria-label="Plan this week">
-    <div className="deck-top">
-      <span className="deck-kicker">{mode === 'place' ? 'Give them a day' : step === 'choose' ? 'Plan this week · 1 of 2' : 'Plan this week · 2 of 2'}</span>
-      <button type="button" className="deck-leave" onClick={onLeave}>Leave</button>
-    </div>
     {step === 'choose'
       ? <ChoosePlan hereWord="this week" aboveWord={choose.monthWord} lines={choose.lines} doneLines={choose.doneLines} loose={choose.loose}
-          onAddLoose={choose.onAddLoose} onDropIn={choose.onDropIn} loading={loading}
+          kicker={`${choose.monthWord} goals → this week`} onLeave={onLeave}
+          onAddLoose={choose.onAddLoose} loading={loading}
           planned={aged > 0 ? <>Moved {aged} untouched {aged === 1 ? 'thing' : 'things'} to Later · <button type="button" className="deck-link" onClick={onSeeAged}>See them</button></> : undefined}
           view={view} onViewChange={(v) => { setView(v); writeChooseView(v) }}
           primary={{ label: 'Give them a day', run: () => setStep('days') }} />
-      : <GiveThemADay days={stripDays} items={choose.placeItems} placedCount={choose.placedCount}
+      : <GiveThemADay days={stripDays} items={choose.placeItems} placedCount={choose.placedCount} onLeave={onLeave}
           onBack={mode === 'full' ? () => setStep('choose') : undefined}
           primary={mode === 'full'
             ? { label: 'Done planning', run: finish, busy: finishing }

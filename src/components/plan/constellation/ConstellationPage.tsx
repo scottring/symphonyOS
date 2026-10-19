@@ -677,13 +677,14 @@ function Inner() {
       return async () => (await updateTask(t.id, { commitments: before })) !== false
     }
     const toggleOf = (t: Task) => async () => (await toggleTask(t.id)) !== false
-    const done = (t: Task): ChooseVerb => ({ label: 'Done', quiet: true, run: () => act(`Complete “${t.title}”`, toggleOf(t), { ids: [t.id], undo: toggleOf(t) }) })
+    const done = (t: Task): ChooseVerb => ({ label: 'Done', quiet: true, role: 'done', run: () => act(`Complete “${t.title}”`, toggleOf(t), { ids: [t.id], undo: toggleOf(t) }) })
+    const reopen = (t: Task): ChooseVerb => ({ label: 'Reopen', quiet: true, role: 'reopen', run: () => act(`Reopen “${t.title}”`, toggleOf(t), { ids: [t.id], undo: toggleOf(t) }) })
     const bringHere = (t: Task, from?: Date): ChooseVerb => ({
-      label: periodWord[0].toUpperCase() + periodWord.slice(1),
+      label: periodWord[0].toUpperCase() + periodWord.slice(1), role: 'here',
       run: () => act(`${periodWord}: “${t.title}”`, async () => !!(await keepForward(t.id, { [startKey]: bounds.start }, from)), { ids: [t.id], undo: restoreOf(t) }),
     })
     const backUp = (t: Task, from: Date): ChooseVerb => ({
-      label: `Back to ${aboveWord}`, quiet: true,
+      label: `Back to ${aboveWord}`, quiet: true, role: 'back',
       run: () => act(`Back to ${aboveWord}: “${t.title}”`, async () => {
         // A row the season never held is put on it first, so it lands under its line.
         if (lvl === 'month' && !openCommitment({ commitments: bootstrapCommitments(t) }, 'season') && !(await keepForward(t.id, { seasonStart: seasonB.start }))) return false
@@ -700,14 +701,14 @@ function Inner() {
     }
     const stepVerbs = (n: { task: Task; planned: ChooseNode['planned'] }): ChooseVerb[] => {
       switch (n.planned.kind) {
-        case 'done': return []
-        case 'above': return [bringHere(n.task), done(n.task)]
-        case 'last': return [bringHere(n.task, prevB.start), backUp(n.task, prevB.start), done(n.task)]
-        default: return [backUp(n.task, bounds.start), done(n.task)]
+        case 'done': return [reopen(n.task)]
+        case 'above': return [bringHere(n.task), done(n.task), reopen(n.task)]
+        case 'last': return [bringHere(n.task, prevB.start), backUp(n.task, prevB.start), done(n.task), reopen(n.task)]
+        default: return [backUp(n.task, bounds.start), done(n.task), reopen(n.task)]
       }
     }
     const node = (n: ChooseNode): ChooseItemView => ({
-      key: n.task.id, title: n.task.title, planned: n.planned, note: n.fromLast ? `from ${prevWord}` : undefined,
+      key: n.task.id, title: n.task.title, planned: n.planned, note: n.fromLast ? `From ${prevWord}, not done` : undefined,
       verbs: stepVerbs(n), children: n.children.map(node),
       onBreakDown: n.planned.kind === 'above' || n.planned.kind === 'last' ? addUnder(n.task) : undefined,
     })
@@ -736,7 +737,7 @@ function Inner() {
     }
     const looseView = (it: LooseItem): ChooseItemView => {
       const n = nodeOf(it.task.id)
-      const verbs: ChooseVerb[] = n ? verbsFor(n).map((v) => ({ label: v.label, run: v.run, quiet: v.label !== 'Done' })) : [done(it.task)]
+      const verbs: ChooseVerb[] = n ? verbsFor(n).map((v) => ({ label: v.label, run: v.run, role: v.label === 'Done' ? 'done' as const : 'other' as const })) : [done(it.task)]
       return { key: it.task.id, title: it.task.title, planned: it.planned, verbs, children: [] }
     }
     // What the period before left open and the tree did not already hold.
@@ -747,13 +748,13 @@ function Inner() {
       walk(l.steps)
     }
     const carried: ChooseItemView[] = carryLines.filter((c) => !placed.has(c.key) && !placed.has(c.key.replace(/^0:/, ''))).map((c) => ({
-      key: c.key, title: c.title, planned: { kind: 'last', label: prevWord }, note: `from ${prevWord}`,
-      verbs: c.verbs.map((v, i) => ({ label: v.label, run: v.run, quiet: i > 0 })), children: [],
+      key: c.key, title: c.title, planned: { kind: 'last', label: prevWord }, note: `From ${prevWord}, not done`,
+      verbs: c.verbs.map((v, i) => ({ label: v.label, run: v.run, role: i === 0 ? 'here' as const : v.label === 'Done' ? 'done' as const : 'other' as const })), children: [],
     }))
     const carriedIds = new Set(carried.map((c) => c.key))
     const hereLoose: ChooseItemView[] = tree
       ? tree.loose.filter((x) => x.source === 'here' && !carriedIds.has(x.task.id)).map(looseView)
-      : openNodes.map((n) => ({ key: n.key, title: n.title, planned: { kind: 'here' as const, label: periodWord }, verbs: verbsFor(n).map((v) => ({ label: v.label, run: v.run, quiet: v.label !== 'Done' })), children: [] }))
+      : openNodes.map((n) => ({ key: n.key, title: n.title, planned: { kind: 'here' as const, label: periodWord }, verbs: verbsFor(n).map((v) => ({ label: v.label, run: v.run, role: v.label === 'Done' ? 'done' as const : 'other' as const })), children: [] }))
     return {
       lines: (tree?.lines ?? []).map(lineView),
       doneLines: (tree?.doneLines ?? []).map(lineView),
@@ -865,11 +866,8 @@ function Inner() {
           next={{ label: `Plan ${nextWord} →`, onClick: () => setMode('plan', bounds.next) }}
           onClose={() => setReviewing(false)} />
       : planning && choose ? <section className="deck choose-flow plan-choose" aria-label={`Plan ${periodWord}`} key={`${level}:${localYmd(bounds.start)}`}>
-          <div className="deck-top">
-            <span className="deck-kicker">Plan {periodWord}</span>
-            <button type="button" className="deck-leave" onClick={() => setMode(null)}>Leave</button>
-          </div>
           <ChoosePlan hereWord={periodWord} aboveWord={level > 0 ? aboveWord : undefined}
+            kicker={level > 0 ? `${aboveWord} goals → ${periodWord}` : `Plan ${periodWord}`} onLeave={() => setMode(null)}
             lines={choose.lines} doneLines={choose.doneLines} loose={choose.loose}
             onAddLoose={(title) => runCreate(level, title, null, `Add “${title}”`)}
             loading={planSession.loading}
