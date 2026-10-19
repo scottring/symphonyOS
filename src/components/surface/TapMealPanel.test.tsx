@@ -56,10 +56,10 @@ describe('TapMealPanel', () => {
     expect(screen.queryByText('What to bring')).not.toBeInTheDocument()
   })
 
-  it('opens the recipe picker when "Edit" is clicked', () => {
-    // Action bar was redesigned: the old "Change recipe" button is now "Edit".
+  it('opens the recipe picker when "Change meal" is clicked', () => {
+    // The shared action row (detail pane standard): "Change meal", not "Edit".
     render(<TapMealPanel event={mealEvent} onClose={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^change meal$/i }))
     // RecipePickerModal renders a Cancel button when open
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
   })

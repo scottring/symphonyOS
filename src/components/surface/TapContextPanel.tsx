@@ -21,10 +21,13 @@ import { PanelLinks } from './sections/PanelLinks'
 import { PanelPhotos } from './sections/PanelPhotos'
 import { PanelConversations } from './sections/PanelConversations'
 import { PanelLocation } from './sections/PanelLocation'
-import { PanelAddRow, type AddableField } from './sections/PanelAddRow'
+import type { PrepField } from '@/components/canvas/prep/ReadinessSection'
+import { PanelFacts } from './sections/PanelFacts'
+import { foldedClick } from './sections/PanelActions'
+import { ContextPicker } from '@/components/triage/ContextPicker'
+import { MultiAssigneeDropdown } from '@/components/family'
 import { PanelReach } from './sections/PanelReach'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
-import { PanelClassify } from './sections/PanelClassify'
 import { PanelFooter } from './sections/PanelFooter'
 import { PanelToBuySuggestion } from './sections/PanelToBuySuggestion'
 import { PanelSection } from './sections/PanelSection'
@@ -39,7 +42,11 @@ import { scopeForDomain } from '@/lib/scope'
 import type { MightBeRelevantItem } from './types'
 import type { Goal } from '@/types/goal'
 import type { Attachment } from '@/lib/taskAttachments'
-import { ReadinessSection, type PrepField } from '@/components/canvas/prep/ReadinessSection'
+import { ReadinessSection } from '@/components/canvas/prep/ReadinessSection'
+
+/** The fields a task can carry that aren't set yet — each opened from a
+ *  "What you'll need" chip. */
+type AddableField = PrepField
 
 interface TapContextPanelProps {
   /**
@@ -49,8 +56,12 @@ interface TapContextPanelProps {
    * the writer; omitted, the pane is as it was.
    */
   timingControl?: ReactNode
-  /** The goal this task serves, drawn first under the title. */
+  /** The goal this task serves — the value of the Goal row under the title. */
   purpose?: ReactNode
+  /** Opened over a Month or Season page: what it is for there, under the facts. */
+  horizonLine?: ReactNode
+  /** "Make it a goal", offered in the ⋯. Omitted where it can't apply. */
+  onMakeGoal?: () => void
   task: Task
   // Reference data (Plan 1: passed in by caller — Plan 2 may push into context)
   contacts: Contact[]
@@ -218,9 +229,6 @@ export function TapContextPanel(props: TapContextPanelProps) {
     photo: photosHaveContent,
   }
   const show = (field: AddableField): boolean => has[field] || revealed.has(field)
-  // "What you'll need" offers the rest of the fields at the top; this row
-  // keeps only how to reach whoever the task needs.
-  const addable = (['phone', 'email'] as const).filter((f) => !show(f))
 
   // The whole panel accepts file drops, not just the Photos & files section
   // — that section was 16% of the panel, and a miss navigated the tab to
@@ -245,8 +253,9 @@ export function TapContextPanel(props: TapContextPanelProps) {
   const phone = task.phoneNumber || linked.contact?.phone || linked.project?.phoneNumber
   const hasGroup = (task.subtasks?.length ?? 0) > 0
 
-  // Fixed order — complete, then how to reach it, then when, then help. The
-  // renderer folds anything past the fifth into its overflow menu.
+  // Fixed order — complete, then how to reach it, then help. The renderer
+  // folds anything past the third into the ⋯. Schedule is not here: it sits
+  // in the When row beside the date it changes.
   const actions: PanelAction[] = [
     {
       id: 'complete',
@@ -254,7 +263,9 @@ export function TapContextPanel(props: TapContextPanelProps) {
       kind: task.completed ? 'completed' : 'primary',
       onClick: props.onToggleComplete,
     },
-    ...(phone ? [{ id: 'call', label: phone, icon: 'call' as const, href: `tel:${phone}` }] : []),
+    // "Call", not the number: the number is listed in What you'll need, and
+    // as the label it pushed the row onto a second line.
+    ...(phone ? [{ id: 'call', label: 'Call', title: phone, icon: 'call' as const, href: `tel:${phone}` }] : []),
     ...(task.location
       ? [{
           id: 'directions',
@@ -263,21 +274,6 @@ export function TapContextPanel(props: TapContextPanelProps) {
           onClick: () => setShowDirections((v) => !v),
         }]
       : []),
-    {
-      id: 'schedule',
-      label: 'Schedule',
-      render: () => (
-        <SchedulePicker
-          flexibleWeekend
-          label={task.weekendStart && !task.scheduledFor ? weekendLabel(task.weekendStart) : undefined}
-          scheduledFor={task.scheduledFor || undefined}
-          onSchedule={props.onSchedule}
-          onReschedule={props.onReschedule}
-          onClearSchedule={props.onClearSchedule}
-          loads={dayLoads}
-        />
-      ),
-    },
     ...(props.onAssistMutate
       ? [{
           id: 'assist',
@@ -287,8 +283,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
           onClick: () => setAssistOpen(true),
         }]
       : []),
-    // After the five that were always here, so they fold into the ⋯ first
-    // rather than pushing Schedule or Discussion out of sight.
+    // After the ones that were always here, so they fold into the ⋯ first
+    // rather than pushing Discussion out of sight.
     ...(props.onSaveWaiting
       ? [{
           id: 'waiting',
@@ -317,7 +313,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
   // The ⋯ holds what the row had no room for, then removing the day — the row
   // menu's quiet way out — before Pin and Delete.
   const moreItems = (folded: PanelAction[]) => [
-    ...folded.map((a) => ({ id: a.id, label: a.label, onClick: a.onClick })),
+    ...folded.map((a) => ({ id: a.id, label: a.label, onClick: foldedClick(a) })),
+    ...(props.onMakeGoal ? [{ id: 'make-goal', label: 'Make it a goal', onClick: props.onMakeGoal }] : []),
     ...(props.onRemoveFromDay
       ? [{ id: 'remove-day', label: props.removeFromDayLabel ?? 'Remove from this day', onClick: () => { void props.onRemoveFromDay?.() } }]
       : []),
@@ -330,15 +327,70 @@ export function TapContextPanel(props: TapContextPanelProps) {
       identity={
         <>
           <PanelHeader
+            kind={task.isGoal ? 'Goal' : 'Task'}
             title={task.title}
             onTitleChange={props.onTitleChange}
             onClose={props.onClose}
           />
-          {/* The read-only "FAMILY · timed · for Iris" meta row was removed — it
-              duplicated (in jargon) the interactive context chooser + who-picker
-              below. The why-chain stays. */}
-          {props.purpose && <div className="mt-1">{props.purpose}</div>}
-          {props.timingControl && <div className="mt-1.5">{props.timingControl}</div>}
+          {/* What the task IS, as labeled rows (detail pane standard,
+              2026-10-19). The life area and the people used to sit lower down
+              as a bare tag icon and a pair of initials; the date and the goal
+              links each had a line of their own. */}
+          <PanelFacts
+            facts={[
+              // The goal it serves first, then its when — the connected-
+              // planning contract (what it is FOR leads).
+              { id: 'goal', label: 'Goal', value: props.purpose ?? null },
+              {
+                id: 'when',
+                label: 'When',
+                // The saved when, then the one scheduler beside it — it is
+                // the same fact, so it is no longer a chip in the action row.
+                value: (
+                  <>
+                    {props.timingControl}
+                    <SchedulePicker
+                      trigger="quiet"
+                      // The timing control already names a weekend ("either
+                      // day"); without one, the trigger says it instead.
+                      label={props.timingControl
+                        ? 'Pick a date'
+                        : task.weekendStart && !task.scheduledFor ? weekendLabel(task.weekendStart) : 'Schedule'}
+                      flexibleWeekend
+                      scheduledFor={task.scheduledFor || undefined}
+                      onSchedule={props.onSchedule}
+                      onReschedule={props.onReschedule}
+                      onClearSchedule={props.onClearSchedule}
+                      loads={dayLoads}
+                    />
+                  </>
+                ),
+              },
+              {
+                id: 'who',
+                label: 'Who',
+                value: props.familyMembers.length > 0 ? (
+                  <MultiAssigneeDropdown
+                    members={props.familyMembers}
+                    selectedIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
+                    onSelect={props.onAssigneesChange}
+                    size="sm"
+                    showNames
+                  />
+                ) : null,
+              },
+              {
+                // There is deliberately NO scope control. Scope (who can SEE
+                // the task) is DERIVED from this and Who by scopeForDomain
+                // (src/lib/scope.ts); a picker beside them could only disagree
+                // with them, which is the state the August leak lived in.
+                id: 'area',
+                label: 'Area',
+                value: <ContextPicker value={task.context ?? undefined} onChange={props.onContextChange} showLabel />,
+              },
+            ]}
+          />
+          {props.horizonLine && <div className="mt-2">{props.horizonLine}</div>}
           {props.whyChain}
         </>
       }
@@ -376,6 +428,26 @@ export function TapContextPanel(props: TapContextPanelProps) {
               />
             </div>
           )}
+          {/* Wrapped, so the zone's rule sits above the card rather than on
+              its rounded edge; empty when there is nothing to suggest. */}
+          {props.onSendToBuy && (
+            <div className="empty:hidden">
+              <PanelToBuySuggestion
+                taskId={task.id}
+                title={task.title}
+                completed={!!task.completed}
+                knownPeople={[...props.familyMembers.map((m) => m.name), ...props.contacts.map((c) => c.name)]}
+                onSend={props.onSendToBuy}
+              />
+            </div>
+          )}
+          <PanelAssistant taskId={task.id} />
+        </>
+      }
+      details={
+        <>
+          {/* What you'll need leads the details: every resource the task
+              carries, then one quiet line of what it could carry. */}
           <ReadinessSection
             task={task}
             allTasks={allTasks}
@@ -388,30 +460,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
             onAdd={addPrep}
             opened={revealed}
           />
-          <PanelAssistant taskId={task.id} />
-          {props.onSendToBuy && (
-            <PanelToBuySuggestion
-              taskId={task.id}
-              title={task.title}
-              completed={!!task.completed}
-              knownPeople={[...props.familyMembers.map((m) => m.name), ...props.contacts.map((c) => c.name)]}
-              onSend={props.onSendToBuy}
-            />
-          )}
-        </>
-      }
-      classify={
-        <PanelClassify
-          context={task.context}
-          onContextChange={props.onContextChange}
-          members={props.familyMembers}
-          selectedAssigneeIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
-          onAssigneesChange={props.onAssigneesChange}
-        />
-      }
-      details={
-        <>
-          {show('phone') && (
+          {show('phone') && (<div data-prep-field="phone" className="empty:hidden">
             <PanelReach
               kind="phone"
               value={task.phoneNumber}
@@ -419,15 +468,15 @@ export function TapContextPanel(props: TapContextPanelProps) {
               autoFocus={revealed.has('phone')}
               asLink={false}
             />
-          )}
-          {show('email') && (
+          </div>)}
+          {show('email') && (<div data-prep-field="email" className="empty:hidden">
             <PanelReach
               kind="email"
               value={task.email}
               onChange={props.onEmailChange}
               autoFocus={revealed.has('email')}
             />
-          )}
+          </div>)}
           {show('location') && (<div data-prep-field="location" className="empty:hidden">
             <PanelLocation
               location={task.location}
@@ -512,9 +561,6 @@ export function TapContextPanel(props: TapContextPanelProps) {
             />
           </div>)}
           {show('link') && <div data-prep-field="link" className="empty:hidden"><PanelLinks links={task.links} onAddLink={props.onAddLink} /></div>}
-          {/* The tail of the details list, not a zone of its own: every field
-              the task doesn't carry yet, as one quiet row. */}
-          <PanelAddRow fields={addable} onReveal={reveal} />
         </>
       }
       related={

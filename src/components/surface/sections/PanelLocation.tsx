@@ -41,6 +41,7 @@ export function PanelLocation({
         onGetDetails={getPlaceDetails}
         error={placesError}
         placeholder="Add a location…"
+        focusOnMount={false}
       />
       {location && showDirections && (
         <div className="mt-3 -mx-1 bg-white rounded-2xl border border-neutral-100 overflow-hidden">

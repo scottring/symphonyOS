@@ -19,7 +19,7 @@ import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import { readinessOf, notesExcerpt, type InheritedResources, type ReadinessKind } from '@/lib/prep/readiness'
 
 /** The panel's existing editors a chip can open. */
-export type PrepField = 'person' | 'link' | 'location' | 'notes' | 'subtask' | 'photo'
+export type PrepField = 'person' | 'link' | 'location' | 'notes' | 'subtask' | 'photo' | 'phone' | 'email'
 
 const ADD_CHIPS: { kind: ReadinessKind; field: PrepField; label: string }[] = [
   { kind: 'contact', field: 'person', label: '+ Contact' },
@@ -28,6 +28,11 @@ const ADD_CHIPS: { kind: ReadinessKind; field: PrepField; label: string }[] = [
   { kind: 'notes', field: 'notes', label: '+ Note' },
   { kind: 'steps', field: 'subtask', label: '+ Supplies or steps' },
   { kind: 'file', field: 'photo', label: '+ File' },
+  // How to reach whoever the task needs — once a row of its own further down
+  // the pane, now offered with everything else it might carry (detail pane
+  // standard, 2026-10-19).
+  { kind: 'phone', field: 'phone', label: '+ Phone' },
+  { kind: 'email', field: 'email', label: '+ Email' },
 ]
 
 export const ASK_WHAT_I_NEED = 'What will I need when I come to do this?'

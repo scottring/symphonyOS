@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { PanelActions, MAX_VISIBLE_ACTIONS, type PanelAction } from './PanelActions'
+import { PanelActions, MAX_VISIBLE_ACTIONS, foldedClick, splitActions, type PanelAction } from './PanelActions'
 
 const act = (id: string, over: Partial<PanelAction> = {}): PanelAction => ({
   id,
@@ -39,8 +39,8 @@ describe('PanelActions', () => {
     const many = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id) => act(id))
     render(<PanelActions actions={many} />)
 
-    expect(screen.getByRole('button', { name: 'e' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'f' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'c' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'd' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
     expect(screen.getByRole('button', { name: 'f' })).toBeInTheDocument()
@@ -50,7 +50,7 @@ describe('PanelActions', () => {
   it('fires a folded action from the overflow menu', async () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
-    const many = ['a', 'b', 'c', 'd', 'e'].map((id) => act(id))
+    const many = ['a', 'b', 'c'].map((id) => act(id))
     render(<PanelActions actions={[...many, act('f', { onClick })]} />)
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
@@ -74,5 +74,25 @@ describe('PanelActions', () => {
       <PanelActions actions={[act('Completed', { kind: 'completed' })]} />,
     )
     expect(container.querySelector('svg')).toBeInTheDocument()
+  })
+
+  it('never folds an action that draws its own popover', () => {
+    const many = ['a', 'b', 'c', 'd'].map((id) => act(id))
+    const picker = act('Schedule', { render: () => <button>Schedule</button> })
+    const { visible, folded } = splitActions([...many, picker])
+    expect(visible.map((a) => a.id)).toEqual(['a', 'b', 'c', 'Schedule'])
+    expect(folded.map((a) => a.id)).toEqual(['d'])
+  })
+
+  it('gives a folded link action a click that follows its href', () => {
+    const assign = vi.fn()
+    const original = window.location
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, assign } })
+    try {
+      foldedClick(act('Join', { onClick: undefined, href: 'https://meet.test/x' }))?.()
+      expect(assign).toHaveBeenCalledWith('https://meet.test/x')
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: original })
+    }
   })
 })

@@ -209,8 +209,11 @@
 .prep-steps label { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; font-size: 13.5px; color: var(--color-neutral-800); cursor: pointer; }
 .prep-steps label input { margin-top: 3px; accent-color: var(--color-primary-600); }
 .prep-steps label.is-done span { color: var(--color-neutral-500); text-decoration: line-through; }
-.prep-add { display: flex; flex-wrap: wrap; gap: 6px; }
-.prep-add .canvas-chip { color: var(--color-neutral-600); }
+.prep-add { display: flex; flex-wrap: wrap; gap: 2px; margin-left: -8px; }
+/* Quiet "+ Contact" lines, not outlined pills: what the task doesn't carry
+   yet is an offer you can ignore (detail pane standard, 2026-10-19). */
+.prep-add .canvas-chip { border: 0; background: none; border-radius: 8px; padding: 5px 8px; font-size: 13.5px; color: var(--color-neutral-600); }
+.prep-add .canvas-chip:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 .prep-from { margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); }
 .prep-from-head { margin: 0 0 2px; font-size: 12px; color: var(--color-neutral-500); }
 .prep-from-head .canvas-link { font-size: 12px; padding: 0 2px; }

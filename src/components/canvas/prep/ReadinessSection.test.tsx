@@ -22,7 +22,7 @@ describe('What you’ll need',()=>{
   const h=show(t('bare'))
   expect(screen.queryByRole('list')).not.toBeInTheDocument()
   const chips=within(screen.getByRole('group',{name:'Add what you’ll need'})).getAllByRole('button').map(b=>b.textContent)
-  expect(chips).toEqual(['+ Contact','+ Link','+ Place','+ Note','+ Supplies or steps','+ File'])
+  expect(chips).toEqual(['+ Contact','+ Link','+ Place','+ Note','+ Supplies or steps','+ File','+ Phone','+ Email'])
   fireEvent.click(screen.getByRole('button',{name:'+ Supplies or steps'}))
   expect(h.onAdd).toHaveBeenCalledWith('subtask')
  })

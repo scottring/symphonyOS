@@ -24,6 +24,10 @@ interface PlacesAutocompleteProps {
   placeholder?: string
   /** When Places fails (key rejected, script blocked, …), show this instead of "No places found". */
   error?: string | null
+  /** Focus the empty field as it first appears. Off in a detail pane, where
+   *  an empty Location sits among other sections: taking focus there scrolled
+   *  the pane past its own title on open. */
+  focusOnMount?: boolean
 }
 
 /**
@@ -39,6 +43,7 @@ export function PlacesAutocomplete({
   initialQuery = '',
   placeholder = 'Search for a place...',
   error = null,
+  focusOnMount = true,
 }: PlacesAutocompleteProps) {
   const [isEditing, setIsEditing] = useState(!value)
   const [query, setQuery] = useState(initialQuery)
@@ -56,9 +61,14 @@ export function PlacesAutocomplete({
     }
   }, [activeIndex])
 
-  // Focus input when editing starts
+  // Focus input when editing starts — and on mount, unless the host says not
+  // to. Tracked as a change of `isEditing` rather than a first-run flag, which
+  // StrictMode's second effect run would defeat.
+  const wasEditing = useRef(focusOnMount ? false : isEditing)
   useEffect(() => {
-    if (isEditing && inputRef.current) {
+    const started = isEditing && !wasEditing.current
+    wasEditing.current = isEditing
+    if (started && inputRef.current) {
       inputRef.current.focus()
     }
   }, [isEditing])

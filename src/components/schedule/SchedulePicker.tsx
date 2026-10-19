@@ -48,11 +48,17 @@ export interface SchedulePickerProps {
   loads: Map<string, DayLoad>
   /** Trigger text. Defaults to "Schedule"; the event panel says "Reschedule". */
   label?: string
+  /** 'quiet' draws the trigger as a plain text button, for a detail pane's
+   *  When row, where it sits beside the date it changes. */
+  trigger?: 'chip' | 'quiet'
 }
 
 const TRIGGER =
   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ' +
   'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors'
+const QUIET_TRIGGER =
+  'inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[13px] text-neutral-500 ' +
+  'hover:bg-neutral-100 hover:text-neutral-800 transition-colors'
 
 /** Matches `w-80`. Kept as a number because the position math needs it. */
 const POPOVER_WIDTH = 320
@@ -78,6 +84,7 @@ export function SchedulePicker({
   onClearSchedule,
   loads,
   label = 'Schedule',
+  trigger = 'chip',
 }: SchedulePickerProps) {
   const [open, setOpen] = useState(false)
   const [peek, setPeek] = useState<DayLoad | null>(null)
@@ -144,8 +151,13 @@ export function SchedulePicker({
 
   return (
     <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen((o) => !o)} className={TRIGGER}>
-        <ConceptIcon name="when" decorative /> {label}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className={trigger === 'quiet' ? QUIET_TRIGGER : TRIGGER}
+      >
+        {trigger === 'chip' && <ConceptIcon name="when" decorative />} {label}
       </button>
 
       {open && pos && createPortal(

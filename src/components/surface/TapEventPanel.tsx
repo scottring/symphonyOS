@@ -13,7 +13,8 @@ import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
 import { PanelShell } from './PanelShell'
 import { EventWhenLine } from './sections/EventWhenLine'
-import { PanelActions, type PanelAction } from './sections/PanelActions'
+import { PanelFacts } from './sections/PanelFacts'
+import { PanelActions, foldedClick, type PanelAction } from './sections/PanelActions'
 import { PanelSection } from './sections/PanelSection'
 import { PanelRow } from './sections/PanelRow'
 import { PanelMoreMenu } from './sections/PanelMoreMenu'
@@ -303,9 +304,9 @@ export function TapEventPanel(props: TapEventPanelProps) {
                 onClick={() => setShowDurationMenu((v) => !v)}
                 aria-expanded={showDurationMenu}
                 aria-label="Change duration"
-                className="px-3 py-1.5 rounded-lg text-[15px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[13px] text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 transition-colors"
               >
-                <ConceptIcon name="time" decorative /> {formatDuration(durationMinutes)} {showDurationMenu ? '▾' : '▸'}
+                {formatDuration(durationMinutes)} {showDurationMenu ? '▾' : '▸'}
               </button>
               {showDurationMenu && (
                 <div className="absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-neutral-100 py-1 min-w-[7rem]">
@@ -324,6 +325,30 @@ export function TapEventPanel(props: TapEventPanelProps) {
               )}
             </div>
   )
+
+  // Reschedule and the duration are the same fact as the when-line, so they sit
+  // in the When row beside it rather than in the action row (detail pane
+  // standard, 2026-10-19).
+  const reschedulePicker = canEdit && props.onReschedule ? (
+    <SchedulePicker
+      trigger="quiet"
+      label="Reschedule"
+      scheduledFor={startTime ? new Date(startTime) : undefined}
+      onSchedule={(date) => handleReschedule(date)}
+      onReschedule={handleRelativeReschedule}
+      // The days an event can be MOVED to, keeping its time. "Tonight"
+      // and the pool tiles are left out on purpose: an event cannot go
+      // to Someday, and "Tonight" would mean inventing an hour. A new
+      // time is a job for "Pick date & time…", which was already the
+      // only tile that worked.
+      whens={EVENT_WHENS}
+      // An event ends at a particular time, so "either day" is not an
+      // answer it can take: the weekend offers Saturday AND Sunday.
+      weekendDays
+      loads={dayLoads}
+    />
+  ) : null
+  const showDuration = canEdit && !!props.onReschedule && durationMinutes !== null && durationMinutes > 0
 
   const actions: PanelAction[] = [
     ...(props.onToggleComplete && !props.free
@@ -344,33 +369,6 @@ export function TapEventPanel(props: TapEventPanelProps) {
           icon: 'location' as const,
           onClick: () => setShowDirections((v) => !v),
         }]
-      : []),
-    ...(canEdit && props.onReschedule
-      ? [{
-          id: 'reschedule',
-          label: 'Reschedule',
-          render: () => (
-            <SchedulePicker
-              label="Reschedule"
-              scheduledFor={startTime ? new Date(startTime) : undefined}
-              onSchedule={(date) => handleReschedule(date)}
-              onReschedule={handleRelativeReschedule}
-              // The days an event can be MOVED to, keeping its time. "Tonight"
-              // and the pool tiles are left out on purpose: an event cannot go
-              // to Someday, and "Tonight" would mean inventing an hour. A new
-              // time is a job for "Pick date & time…", which was already the
-              // only tile that worked.
-              whens={EVENT_WHENS}
-              // An event ends at a particular time, so "either day" is not an
-              // answer it can take: the weekend offers Saturday AND Sunday.
-              weekendDays
-              loads={dayLoads}
-            />
-          ),
-        }]
-      : []),
-    ...(canEdit && props.onReschedule && durationMinutes !== null && durationMinutes > 0
-      ? [{ id: 'duration', label: formatDuration(durationMinutes), render: () => durationMenu }]
       : []),
     {
       id: 'discussion',
@@ -425,6 +423,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
         // shell's rhythm would rule between them and read as three facts.
         <div>
         <PanelHeader
+          kind="Event"
           title={event.title}
           // Renames write through to Google, so they're only offered where
           // Google will accept the write; on a view-only calendar (or a host
@@ -437,71 +436,89 @@ export function TapEventPanel(props: TapEventPanelProps) {
           onClose={props.onClose}
         />
 
-        {/* When — the one fact that defines an event, stated plainly, and
-            editable in place where Google will take the write (Scott's
-            walkthrough: "click the date/time under the title to edit it"). */}
-        {startTime && (
-          <EventWhenLine
-            event={event}
-            startTime={new Date(startTime)}
-            endTime={endTime ? new Date(endTime) : null}
-            spansDays={!!endTime && spansDays(startTime, endTime)}
-            onSave={canEdit && props.onReschedule ? props.onReschedule : undefined}
-          >
-          <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
-            <span className="text-[15px] font-medium text-neutral-800">{formatDayLabel(startTime)}</span>
-            {/* A multi-day event must name the day it ends on. Without it a
-                five-day boarding stay read "8:00 AM – 8:00 AM", which looks
-                like a bug rather than a fact about the event. */}
-            <span className="text-[15px] text-neutral-600 tabular-nums">
-              {formatClock(startTime)}
-              {endTime
-                ? spansDays(startTime, endTime)
-                  ? ` – ${formatDayShort(endTime)}, ${formatClock(endTime)}`
-                  : ` – ${formatClock(endTime)}`
-                : ''}
-            </span>
-            {durationMinutes !== null && durationMinutes > 0 && (
-              <span className="text-[13px] text-neutral-400">· {formatDuration(durationMinutes)}</span>
-            )}
-          </div>
-          </EventWhenLine>
-        )}
-
-        {/* Which calendar this event lives on + move / view-only affordance */}
-        {props.calendarAccess && (
-          <div className="mt-2 flex items-center gap-2 flex-wrap text-[13px]">
-            <span className="text-neutral-500">
-              {props.calendarAccess.name ?? 'Primary calendar'}
-            </span>
-            {readOnlyCalendar ? (
-              <span
-                className="px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 text-[11px] font-medium"
-                title="This calendar is shared with you view-only — Google doesn't allow Symphony (or you) to change its events"
-              >
-                view-only
-              </span>
-            ) : (
-              props.onMoveToCalendar && moveTargets.length > 0 && (
-                <select
-                  aria-label="Move to calendar"
-                  value=""
-                  onChange={(e) => { if (e.target.value) props.onMoveToCalendar?.(e.target.value) }}
-                  className="text-[12px] text-neutral-500 bg-transparent border border-neutral-200 rounded-md px-1.5 py-0.5 hover:border-neutral-300 focus:outline-none"
-                >
-                  <option value="">Move to…</option>
-                  {moveTargets.map((c) => (
-                    <option key={c.id} value={c.id}>{c.summary}</option>
-                  ))}
-                </select>
-              )
-            )}
-          </div>
-        )}
-
-          {event.location && isVirtualMeeting && !joinUrl && (
-            <div className="mt-2 text-[13px] text-neutral-500">{event.location}</div>
-          )}
+        <PanelFacts
+          facts={[
+            {
+              // When — the one fact that defines an event, stated plainly, and
+              // editable in place where Google will take the write (Scott's
+              // walkthrough: "click the date/time under the title to edit it").
+              id: 'when',
+              label: 'When',
+              value: startTime ? (
+                <>
+                  <EventWhenLine
+                    event={event}
+                    startTime={new Date(startTime)}
+                    endTime={endTime ? new Date(endTime) : null}
+                    spansDays={!!endTime && spansDays(startTime, endTime)}
+                    onSave={canEdit && props.onReschedule ? props.onReschedule : undefined}
+                  >
+                    <span className="flex flex-wrap items-baseline gap-x-1.5">
+                      <span className="font-medium text-neutral-800">{formatDayLabel(startTime)}</span>
+                      {/* A multi-day event must name the day it ends on. Without it a
+                          five-day boarding stay read "8:00 AM – 8:00 AM", which looks
+                          like a bug rather than a fact about the event. */}
+                      <span className="text-neutral-600 tabular-nums">
+                        {formatClock(startTime)}
+                        {endTime
+                          ? spansDays(startTime, endTime)
+                            ? ` – ${formatDayShort(endTime)}, ${formatClock(endTime)}`
+                            : ` – ${formatClock(endTime)}`
+                          : ''}
+                      </span>
+                      {!showDuration && durationMinutes !== null && durationMinutes > 0 && (
+                        <span className="text-[13px] text-neutral-500">· {formatDuration(durationMinutes)}</span>
+                      )}
+                    </span>
+                  </EventWhenLine>
+                  {showDuration && durationMenu}
+                  {reschedulePicker}
+                </>
+              ) : null,
+            },
+            {
+              // Which calendar this event lives on + move / view-only affordance
+              id: 'calendar',
+              label: 'Calendar',
+              value: props.calendarAccess ? (
+                <>
+                  <span className="text-neutral-800">
+                    {props.calendarAccess.name ?? 'Primary calendar'}
+                  </span>
+                  {readOnlyCalendar ? (
+                    <span
+                      className="px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 text-[11px] font-medium"
+                      title="This calendar is shared with you view-only — Google doesn't allow Symphony (or you) to change its events"
+                    >
+                      view-only
+                    </span>
+                  ) : (
+                    props.onMoveToCalendar && moveTargets.length > 0 && (
+                      <select
+                        aria-label="Move to calendar"
+                        value=""
+                        onChange={(e) => { if (e.target.value) props.onMoveToCalendar?.(e.target.value) }}
+                        className="text-[12px] text-neutral-500 bg-transparent border border-neutral-200 rounded-md px-1.5 py-0.5 hover:border-neutral-300 focus:outline-none"
+                      >
+                        <option value="">Move to…</option>
+                        {moveTargets.map((c) => (
+                          <option key={c.id} value={c.id}>{c.summary}</option>
+                        ))}
+                      </select>
+                    )
+                  )}
+                </>
+              ) : null,
+            },
+            {
+              id: 'where',
+              label: 'Where',
+              value: event.location && isVirtualMeeting && !joinUrl
+                ? <span className="text-neutral-700">{event.location}</span>
+                : null,
+            },
+          ]}
+        />
         </div>
       }
       act={
@@ -512,7 +529,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
             // host that didn't wire it) gets no Delete at all. With Delete,
             // the folded actions ride in the same ⋯ rather than a second one.
             renderOverflow={canEdit && props.onDeleteEvent
-              ? (folded) => <PanelMoreMenu items={folded} onDelete={() => { void handleDelete() }} />
+              ? (folded) => <PanelMoreMenu items={folded.map((a) => ({ id: a.id, label: a.label, icon: a.icon, onClick: foldedClick(a) }))} onDelete={() => { void handleDelete() }} />
               : undefined}
           />
           {deleteError && (

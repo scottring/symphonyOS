@@ -70,9 +70,10 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
         aria-label="More actions"
         aria-haspopup="true"
         aria-expanded={open}
-        className="px-3 py-1.5 rounded-lg text-[15px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+        type="button"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-neutral-300 bg-white text-neutral-700 transition-colors hover:bg-neutral-50"
       >
-        <MoreHorizontal className="w-4 h-4" />
+        <MoreHorizontal className="w-4 h-4" aria-hidden />
       </button>
 
       {open && createPortal(
