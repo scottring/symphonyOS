@@ -9,6 +9,7 @@
 // rendered; `now` is the wall clock, which only the evening "needed
 // tomorrow" rule reads).
 
+import { wallAppFor, type WallApp } from './activity/wallApps'
 import type { Routine, ActionableInstance, TargetUnit } from '@/types/actionable'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
@@ -40,6 +41,9 @@ export interface KidRow {
   done: boolean
   timeOfDay: string | null // 'HH:MM' or null
   target: KidRowTarget | null // null = plain checkbox row
+  /** A web app the row opens on the wall (its link is in the routine's
+   *  description; see wallApps). */
+  app?: WallApp
   /** Who the step is for, when it names people: a kid's morning holds
    *  "Wake the kids" (a parent) beside "Get dressed" (the kid). Absent = the
    *  routine's own people. */
@@ -205,6 +209,7 @@ function buildRow(
     }
   }
   const by = routine.assigned_to_all?.length ? routine.assigned_to_all : routine.assigned_to ? [routine.assigned_to] : []
+  const app = wallAppFor(routine.description)
   return {
     entityType: 'routine',
     id: routine.id,
@@ -213,6 +218,7 @@ function buildRow(
     timeOfDay: effectiveTimeOfDay(routine, byId),
     target,
     ...(by.length ? { by } : {}),
+    ...(app ? { app } : {}),
   }
 }
 

@@ -62,6 +62,7 @@ import { WallV2PhoneScreen, type PhoneFixture } from '../WallV2PhoneScreen'
 import { MathStage } from './MathStage'
 import type { KidMath } from '@/hooks/useKidMath'
 import { EnergyStage } from './EnergyStage'
+import { WebAppStage } from './WebAppStage'
 import { AgendaStage, AgendaViews } from './AgendaStage'
 import { StickySheet, StickyStrip } from './KioskStickies'
 import type { AgendaDay, AgendaRow, AgendaView } from '@/lib/wall/wallAgenda'
@@ -173,6 +174,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const comp = useMemo(() => kioskComposition(p.moment, p.now), [p.moment, p.now])
   const hold = useMemo(() => ({ bedtimeInProgress: p.bedtime.inProgress }), [p.bedtime.inProgress])
   const { setHold } = p.activity
+  const goBack = useCallback(() => dispatch({ type: 'BACK' }), [dispatch])
   useEffect(() => { setHold(hold) }, [hold, setHold])
   const memberById = useCallback((id: string) => p.members.find((m) => m.id === id) ?? null, [p.members])
 
@@ -466,6 +468,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
       content = math
         ? <MathStage math={math} now={p.now} flash={p.flash} />
         : <div className="kc-card kc-fill"><p className="kc-quiet-line">Math of the day isn’t ready.</p></div>
+      break
+    case 'webapp':
+      content = <WebAppStage url={stage.url} title={stage.title} origin={stage.origin} routineId={stage.routineId} onClose={goBack} />
       break
     case 'energy':
       content = <EnergyStage live={energy} now={p.now} loadPeriod={p.loadEnergyPeriod} />
