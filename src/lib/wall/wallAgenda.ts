@@ -31,6 +31,9 @@ export interface AgendaRow {
 
 export interface AgendaDay {
   key: string
+  date: Date
+  /** "Saturday, Oct 24", or "Today, Oct 24": the date is written, so no one
+   *  has to work out which weekend "this weekend" is. */
   label: string
   isToday: boolean
   /** All-day events: titles only. */
@@ -41,14 +44,30 @@ export interface AgendaDay {
 
 const ymd = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
 
-/** Today; or the weekend: the coming Saturday and Sunday, or what's left of
- *  it when today is one of them. */
-export function agendaDays(days: WallDayData[], view: AgendaView, now: Date): WallDayData[] {
-  if (view === 'today') return days.filter((d) => d.isToday)
+/** The weekend the wall means by "this weekend": the coming Saturday and
+ *  Sunday, or what's left of it when today is one of them. Always the next
+ *  one, whatever day the household's week starts on. */
+export function weekendDates(now: Date): Date[] {
   const dow = now.getDay()
   const toSat = dow === 0 ? -1 : 6 - dow
-  const want = [toSat, toSat + 1].filter((n) => n >= 0)
-    .map((n) => ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + n)))
+  return [toSat, toSat + 1].filter((n) => n >= 0)
+    .map((n) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + n))
+}
+
+const monthDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+/** "Oct 24–25", "Oct 31 – Nov 1", or "Oct 25" when only Sunday is left. */
+export function datesLabel(dates: Date[]): string {
+  if (!dates.length) return ''
+  const a = dates[0], b = dates[dates.length - 1]
+  if (dates.length === 1 || ymd(a) === ymd(b)) return monthDay(a)
+  return a.getMonth() === b.getMonth() ? `${monthDay(a)}–${b.getDate()}` : `${monthDay(a)} – ${monthDay(b)}`
+}
+
+/** Today; or the weekend (weekendDates). */
+export function agendaDays(days: WallDayData[], view: AgendaView, now: Date): WallDayData[] {
+  if (view === 'today') return days.filter((d) => d.isToday)
+  const want = weekendDates(now).map(ymd)
   return days.filter((d) => want.includes(ymd(d.date)))
 }
 
@@ -96,7 +115,8 @@ export function agendaDay(day: WallDayData, members: FamilyMember[], now: Date):
   }
   return {
     key: ymd(day.date),
-    label: day.isToday ? 'Today' : day.date.toLocaleDateString('en-US', { weekday: 'long' }),
+    date: day.date,
+    label: `${day.isToday ? 'Today' : day.date.toLocaleDateString('en-US', { weekday: 'long' })}, ${monthDay(day.date)}`,
     isToday: day.isToday,
     allDay,
     timed: timed.sort((a, b) => a.at - b.at).map(({ at: _at, ...r }) => r),

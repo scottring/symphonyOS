@@ -8,12 +8,12 @@ const members = [{ id: 'sk', name: 'Scott' }] as unknown as FamilyMember[]
 const row = (id: string, kind: AgendaRow['kind'], title: string, o: Partial<AgendaRow> = {}): AgendaRow =>
   ({ id, kind, time: '9a', title, sub: null, owners: [], done: false, past: false, checkable: kind !== 'event', on: new Date(2026, 9, 14), ...o })
 const today: AgendaDay = {
-  key: 't', label: 'Today', isToday: true, allDay: ['Grandma visiting'],
+  key: 't', date: new Date(2026, 9, 14), label: 'Today, Oct 14', isToday: true, allDay: ['Grandma visiting'],
   timed: [row('event-swim', 'event', 'Swim'), row('task-mow', 'task', 'Mow', { owners: ['sk'] })],
   anytime: [row('routine-plants', 'routine', 'Water the plants', { time: null }), row('task-bat', 'task', 'Buy batteries', { time: null, done: true })],
 }
 const sat: AgendaDay = {
-  key: 's', label: 'Saturday', isToday: false, allDay: [], timed: [row('routine-pizza', 'routine', 'Pizza night')],
+  key: 's', date: new Date(2026, 9, 17), label: 'Saturday, Oct 17', isToday: false, allDay: [], timed: [row('routine-pizza', 'routine', 'Pizza night')],
   anytime: [row('task-gift', 'task', 'Wrap the present', { time: null }), row('task-old', 'task', 'Already wrapped', { time: null, done: true })],
 }
 
@@ -67,7 +67,7 @@ describe('AgendaStage', () => {
 
   it('weekend view: a routine on Saturday has its check', () => {
     setup('weekend')
-    expect(screen.getByRole('region', { name: 'Saturday' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Saturday, Oct 17' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Mark Pizza night done' })).toBeInTheDocument()
   })
 })

@@ -15,7 +15,7 @@
 import { useState, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
-import type { AgendaDay, AgendaRow, AgendaView } from '@/lib/wall/wallAgenda'
+import { datesLabel, type AgendaDay, type AgendaRow, type AgendaView } from '@/lib/wall/wallAgenda'
 
 export interface AgendaStageProps {
   view: AgendaView
@@ -113,7 +113,7 @@ export function AgendaStage(p: AgendaStageProps) {
     // 2026-10-18): "see unfinished anytime this weekend items on the today view".
     const later = p.days.weekend.filter((w) => !w.isToday)
     const soon = later.flatMap((w) => w.anytime.filter((r) => !r.done))
-    const soonLab = later.length === 1 ? later[0].label : 'This weekend'
+    const soonLab = later.length === 1 ? later[0].label : `This weekend, ${datesLabel(later.map((w) => w.date))}`
     cols = d ? [
       col('On the clock', <><AllDay titles={d.allDay} />{d.timed.length ? <Rows rows={d.timed} p={p} flipped={flipped} flip={flip} /> : empty('Nothing on the clock today.')}</>, 'timed'),
       col('Anytime today', (

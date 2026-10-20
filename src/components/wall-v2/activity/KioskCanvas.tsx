@@ -66,7 +66,7 @@ import { EnergyStage } from './EnergyStage'
 import { WebAppStage } from './WebAppStage'
 import { AgendaStage, AgendaViews } from './AgendaStage'
 import { StickySheet, StickyStrip } from './KioskStickies'
-import type { AgendaDay, AgendaRow, AgendaView } from '@/lib/wall/wallAgenda'
+import { datesLabel, weekendDates, type AgendaDay, type AgendaRow, type AgendaView } from '@/lib/wall/wallAgenda'
 import { formatWatts, hasReading, type EnergyLive, type EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
 import { planWeek } from '@/lib/wall/wallDates'
 
@@ -205,6 +205,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
     recipeTitle: p.recipeTitle,
     departureLabel: departure.label,
     memberName: (id) => memberById(id)?.name ?? null,
+    weekendDates: datesLabel(weekendDates(p.now)),
   })
   const chips = heldChips(state, nowMs, hold)
   const next = nextCommitment(p.rows, p.now)

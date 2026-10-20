@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { agendaDays, agendaDay } from './wallAgenda'
+import { agendaDays, agendaDay, datesLabel, weekendDates } from './wallAgenda'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { WallDayData } from '@/hooks/useWallData'
@@ -26,6 +26,26 @@ describe('agendaDays', () => {
     const days = [17, 18, 19].map((d) => day(d, []))
     expect(agendaDays(days, 'weekend', new Date(2026, 9, 17, 9)).map((d) => d.date.getDate())).toEqual([17, 18])
     expect(agendaDays(days, 'weekend', new Date(2026, 9, 18, 9)).map((d) => d.date.getDate())).toEqual([18])
+  })
+})
+
+// Scott, 2026-10-20: "we need to be clearer about what 'this weekend' means on
+// the kiosk". The household's week starts on Saturday, so on a Tuesday the
+// Week page's weekend is the one just gone; the wall's is the coming one, and
+// it now says so in dates.
+describe('weekend dates', () => {
+  it('is always the coming Saturday and Sunday, written out', () => {
+    const tue = new Date(2026, 9, 20, 9)
+    expect(weekendDates(tue).map((d) => d.getDate())).toEqual([24, 25])
+    expect(datesLabel(weekendDates(tue))).toBe('Oct 24–25')
+  })
+  it('spans a month; on a Sunday is just Sunday', () => {
+    expect(datesLabel(weekendDates(new Date(2026, 9, 28)))).toBe('Oct 31 – Nov 1')
+    expect(datesLabel(weekendDates(new Date(2026, 9, 25, 9)))).toBe('Oct 25')
+  })
+  it('labels each day with its date, today as Today', () => {
+    expect(agendaDay(day(24, []), members, new Date(2026, 9, 20)).label).toBe('Saturday, Oct 24')
+    expect(agendaDay(day(24, [], true), members, new Date(2026, 9, 24)).label).toBe('Today, Oct 24')
   })
 })
 
@@ -58,7 +78,7 @@ describe('agendaDay', () => {
       item({ id: 'event-party', title: 'Party', startTime: new Date(2026, 9, 17, 14) }),
     ])
     const d = agendaDay(sat, members, at(12))
-    expect(d.label).toBe('Saturday')
+    expect(d.label).toBe('Saturday, Oct 17')
     expect(d.timed.map((r) => [r.id, r.checkable])).toEqual([['task-mow', true], ['event-party', false], ['routine-pizza', true]])
     expect(d.timed[2].on).toEqual(new Date(2026, 9, 17))
   })
