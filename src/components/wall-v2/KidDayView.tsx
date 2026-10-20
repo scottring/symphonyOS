@@ -23,7 +23,8 @@ import { AppointmentsWidget } from './member/AppointmentsWidget'
 import { KidsWidget } from './member/KidsWidget'
 import { ComingUpWidget } from './member/ComingUpWidget'
 import { DinnerWidget } from './member/DinnerWidget'
-import type { KidRow, KidNeededRow, KidHomeworkRow, KidNoticeRow, KidBandKey, MemberDayModel } from '@/lib/wall/kidDayModel'
+import type { KidRow, KidNeededRow, KidHomeworkRow, KidPaperRow, KidNoticeRow, KidBandKey, MemberDayModel } from '@/lib/wall/kidDayModel'
+import { FaceButton } from './WallV2WhoSheet'
 import {
   READING_REASON, readingEarns, readingTimerKey, readReadingTimer, writeReadingTimer,
   startReadingTimer, pauseReadingTimer, resumeReadingTimer, isTimerRunning,
@@ -77,6 +78,13 @@ interface KidDayViewProps {
   homeworkTasks: Task[]
   /** Standing info from school, last 14 days. */
   notices: WallNotice[]
+  /** School papers (spec 2026-10-20), from useWallData's own query. */
+  paperTasks?: Task[]
+  /** The parents, whose faces answer "I have it". */
+  adults?: FamilyMember[]
+  onClaimPaper?: (taskId: string, memberId: string) => void
+  onPaperInBackpack?: (taskId: string) => void
+  onPaperNotOurs?: (taskId: string) => void
   /** Today's screen-time ledger for this member, from useWallData. */
   screenTime?: ChildScreenTimeSummary | null
   weather?: WeatherData | null
@@ -133,6 +141,7 @@ const storage = (): Storage | null => {
 export function KidDayView({
   member, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, notices, screenTime, weather, onToggleTask, onClose,
   days, tonight, onOpenDinner, onOpenMember, onOpenApp, now,
+  paperTasks, adults = [], onClaimPaper, onPaperInBackpack, onPaperNotOurs,
 }: KidDayViewProps) {
   const { markDone, undoDone, addProgress, setProgress } = useActionableInstances()
   const { history } = useMemberInstanceHistory()
@@ -162,9 +171,9 @@ export function KidDayView({
     // the kiosk, and `now` is what the evening "needed tomorrow" rule reads.
     const clock = now ?? new Date()
     return buildMemberDayModel({
-      member, date: clock, now: clock, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, notices, history,
+      member, date: clock, now: clock, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, paperTasks, notices, history,
     })
-  }, [member, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, notices, history, now])
+  }, [member, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, paperTasks, notices, history, now])
 
   // ── Which shape, and the adult model ──────────────────────────────
   // A kid's page is the checklist model above. An adult's page is what a
@@ -513,16 +522,73 @@ export function KidDayView({
     )
   }
 
+  // A school paper (spec 2026-10-20). Not found yet → "I have it" → the
+  // parents' faces; held → "In backpack"; done → struck through until
+  // tomorrow. "Not ours" sits in the expanded detail, out of a stray tap's way.
+  const [claiming, setClaiming] = useState<string | null>(null)
+  const nameOf = (id: string) => (members ?? []).find((m) => m.id === id)?.name ?? adults.find((m) => m.id === id)?.name ?? 'A parent'
+  function renderPaperRow(row: KidPaperRow) {
+    const open = expanded.has(`paper:${row.id}`)
+    const state = row.done ? 'In backpack' : row.heldBy ? `${nameOf(row.heldBy)} has it` : 'Not found yet'
+    return (
+      <div key={row.id} className={`${WALL.cardInset} flex flex-col`}>
+        <div className="flex items-center gap-2 pr-2">
+          <button
+            type="button"
+            aria-label={row.title}
+            onClick={() => toggleExpand(`paper:${row.id}`)}
+            className="flex-1 min-w-0 min-h-[56px] py-3 pl-4 text-left"
+          >
+            <div className={`text-[1.05rem] font-semibold ${row.done ? WALL.muted + ' line-through' : WALL.inkStrong}`}>{row.title}</div>
+            <div className={`text-[0.9rem] font-semibold ${WALL.muted}`}>
+              {row.due && <span className={row.late ? WALL.warn : ''}>{row.due}</span>}{row.due && ' · '}{state}
+            </div>
+          </button>
+          {!row.done && !row.heldBy && onClaimPaper && (
+            <button type="button" onClick={() => setClaiming(claiming === row.id ? null : row.id)}
+              className={`${WALL.card} shrink-0 min-h-[56px] px-4 text-[0.95rem] font-bold border-dashed ${WALL.ink}`}>I have it</button>
+          )}
+          {!row.done && row.heldBy && onPaperInBackpack && (
+            <button type="button" onClick={() => onPaperInBackpack(row.id)}
+              className="shrink-0 min-h-[56px] px-4 rounded-2xl text-[0.95rem] font-bold bg-[#2E4638] text-[#F7F1E4] dark:bg-[#4E7261]">In backpack</button>
+          )}
+        </div>
+        {claiming === row.id && onClaimPaper && (
+          <div className="flex flex-wrap gap-3 px-4 pb-4" role="group" aria-label={`Who has ${row.title}?`}>
+            {adults.map((a, i) => (
+              <FaceButton key={a.id} member={a} index={i} onTap={() => { setClaiming(null); onClaimPaper(row.id, a.id) }} />
+            ))}
+          </div>
+        )}
+        {open && (
+          <div className={`px-4 pb-4 text-[0.95rem] ${WALL.muted}`}>
+            {row.notes && <div className="whitespace-pre-line">{row.notes}</div>}
+            {!row.done && onPaperNotOurs && (
+              <button type="button" onClick={() => onPaperNotOurs(row.id)} className={`mt-2 min-h-[44px] underline ${WALL.muted}`}>Not ours</button>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── Widgets ──────────────────────────────────────────────────────
   // One grid, no page scroll: 1024x768 is the whole screen and a kiosk that
   // scrolls is a kiosk nobody reads. The list column (My day / Appointments)
   // scrolls inside itself; every other widget is capped by its adapter.
   const empty = (text: string) => <p className={`text-[1.05rem] ${WALL.muted}`}>{text}</p>
 
+  // Papers sit at the top of the Homework card: both are school things that
+  // go back in the backpack, and the page's grid has no free slot.
   const homeworkWidget = (
-    <Widget title="Homework" icon={BookOpen}>
-      {model.homework.length === 0 && empty('Nothing due')}
-      <div className="flex flex-col gap-2 min-h-0 overflow-y-auto">{model.homework.map(renderHomeworkRow)}</div>
+    <Widget title={model.papers.length ? 'Homework & papers' : 'Homework'} icon={BookOpen}>
+      <div className="flex flex-col gap-2 min-h-0 overflow-y-auto">
+        {model.papers.length > 0 && <div className={WALL.label}>Papers</div>}
+        {model.papers.map(renderPaperRow)}
+        {model.papers.length > 0 && model.homework.length > 0 && <div className={WALL.label}>Homework</div>}
+        {model.homework.length === 0 && model.papers.length === 0 && empty('Nothing due')}
+        {model.homework.map(renderHomeworkRow)}
+      </div>
     </Widget>
   )
 

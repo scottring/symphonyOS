@@ -113,6 +113,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { PairDisplayScreen } from '@/components/auth/PairDisplayScreen';
 import { supabase } from '@/lib/supabase';
+import { claimPaper, paperInBackpack, paperNotOurs } from '@/lib/wall/paperActions';
 import type { WallV2TimelineEvent } from './types';
 import { useWallTheme } from './wallThemeOverride';
 import type { Task } from '@/types/task';
@@ -692,6 +693,13 @@ export function WallV2Shell() {
     if (!q) return null;
     return { lead: `${q.when === 'today' ? 'Today' : 'Tomorrow'} · ${q.time}`, prompt: q.prompt, more: handoffQuestions.length - 1 };
   }, [handoffQuestions]);
+  // School papers (spec 2026-10-20): one write, then the wall reloads.
+  const handlePaper = useCallback((write: Promise<boolean>) => {
+    void (async () => {
+      if (!(await write)) showFlash('Couldn’t save — try again');
+      await wallData.refetch();
+    })();
+  }, [showFlash, wallData]);
 
   const handlePickWho = useCallback((q: HandoffQuestion, member: FamilyMember) => {
     if (!user) return;
@@ -1236,6 +1244,11 @@ export function WallV2Shell() {
               neededTasks={wallData.neededTasks}
               homeworkTasks={wallData.homeworkTasks}
               notices={wallData.notices}
+              paperTasks={wallData.paperTasks}
+              adults={adults}
+              onClaimPaper={(id, memberId) => handlePaper(claimPaper(supabase, id, memberId))}
+              onPaperInBackpack={(id) => handlePaper(paperInBackpack(supabase, id, new Date()))}
+              onPaperNotOurs={(id) => handlePaper(paperNotOurs(supabase, id, new Date()))}
               onToggleTask={handleToggleComplete}
               onClose={handleCloseKidView}
               days={wallData.days}
