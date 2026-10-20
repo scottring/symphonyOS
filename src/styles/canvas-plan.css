@@ -122,7 +122,7 @@
   all: unset; cursor: pointer; flex: 1; min-width: 0; overflow-wrap: anywhere;
   font-size: 15px; line-height: 1.35; color: var(--color-neutral-900);
 }
-.plan-item > .canvas-item { border-radius: var(--radius-md); transition: background-color .12s; }
+.plan-item > .canvas-item { position: relative; border-radius: var(--radius-md); transition: background-color .12s; }
 .plan-item > .canvas-item:hover { background: var(--color-neutral-50); }
 .canvas-item.is-selected { border-color: var(--color-primary-400); background: var(--color-primary-50); }
 .canvas-item.is-done .plan-item-title { color: var(--color-neutral-500); text-decoration: line-through; }
@@ -410,9 +410,10 @@
 .plan-goal-list > .plan-item { padding: 5px 0 6px; border-bottom: 1px solid var(--color-neutral-100); }
 .plan-goal-list > .plan-item:last-child { border-bottom: 0; }
 .plan-goal-list .plan-item-title { font-family: var(--font-family-display); font-size: 17px; line-height: 1.25; }
-/* Drag to order: a grip on hover; the gap it would land in is a line; on
+/* Drag to order: a grip on hover, out in the left gutter so the title stays
+   flush with the lines under it; the gap it would land in is a line; on
    touch the held line stays put, dimmed, and a chip follows the finger. */
-.plan-grip { flex: none; width: 10px; margin-right: -4px; font-size: 12px; letter-spacing: -2px; color: var(--color-neutral-400); opacity: 0; cursor: grab; user-select: none; }
+.plan-grip { position: absolute; left: -8px; top: 8px; width: 10px; font-size: 12px; letter-spacing: -2px; color: var(--color-neutral-400); opacity: 0; cursor: grab; user-select: none; }
 .plan-item:hover > .canvas-item > .plan-grip { opacity: 1; }
 .plan-goal-list > .plan-item.is-gap-above { box-shadow: inset 0 2px 0 var(--color-primary-500); }
 .plan-goal-list > .plan-item.is-gap-below { box-shadow: inset 0 -2px 0 var(--color-primary-500); }
@@ -422,9 +423,9 @@
   .plan-goal-list > .plan-item[data-order-id] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 }
 /* "+11 more" / "Show less": the rest of a list, opened in place. */
-.plan-more { display: block; margin: 0; padding: 8px 6px 2px; font-size: 12.5px; font-weight: 500; color: var(--color-primary-700); }
+.plan-more { display: block; margin: 0; padding: 8px 6px 2px 1.5px; font-size: 12.5px; font-weight: 500; color: var(--color-primary-700); }
 @media (max-width: 767px) { .plan-more { min-height: 44px; } }
-.plan-goal-list > .plan-item > .plan-item-parent, .plan-item-below { margin: 0; padding: 0 6px 0; font-size: 12.5px; line-height: 1.4; color: var(--color-neutral-600); overflow-wrap: anywhere; }
+.plan-goal-list > .plan-item > .plan-item-parent, .plan-item-below { margin: 0; padding: 0 6px 0 1.5px; font-size: 12.5px; line-height: 1.4; color: var(--color-neutral-600); overflow-wrap: anywhere; }
 .plan-item-below { color: var(--color-primary-700); }
 .plan-item-below-kind { font-weight: 600; }
 .plan-goal-list > .plan-item > .plan-item-parent .plan-item-parent-kind { font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--color-neutral-600); }
