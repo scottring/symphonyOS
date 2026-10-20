@@ -4480,6 +4480,12 @@ button.domain-switcher-trigger[data-filtered="true"] { color: var(--color-primar
 .wk-facts { margin: 0; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
 .wk-facts .wc-quiet-link { font-size: 13px; }
 .wk-facts-reviewed { font-weight: 500; color: var(--color-sage-400); }
+/* "28 of 46 done" and its bar: one count on every horizon, out of everything
+   that was on the period (reviewed design, 2026-10-20), as Looking back. */
+.wk-facts-count b { font-weight: 600; color: var(--color-neutral-900); }
+.wk-facts-bar { display: inline-block; width: 120px; height: 6px; margin: 0 2px 0 8px; vertical-align: middle; border-radius: 999px; background: var(--color-neutral-100); overflow: hidden; }
+.wk-facts-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary-500); }
+@media (max-width: 767px) { .wk-facts-bar { width: 72px; } }
 .wk-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 12px; flex-wrap: wrap; margin: 0 0 12px; }
 .wk-head > .wk-facts { flex: 1 1 14rem; min-width: 0; }
 .wk-head > .wk-head-actions { margin-left: auto; }

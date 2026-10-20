@@ -20,18 +20,21 @@
 // horizon down; an unlinked goal says nothing.
 //
 // Talk-first (spec 2026-10-14, "The pages"): a list to look at, with a few
-// quick triage verbs on each open row (Scott, 2026-10-16): Done · Move to
-// {next} · Someday · Remove from {period} on a month or season goal, Done ·
-// Archive on a year goal. Tapping a month or season goal opens its task panel
+// quick triage verbs on each open row (Scott, 2026-10-16), one word per move
+// as in planning (reviewed design, 2026-10-20): This week (October on Season)
+// · Done · Later ▾ (Next month · Someday) · Back to Fall (Off October when
+// nothing above holds it) on a month or season goal, Done · Let go on a year
+// goal. Each row tags where it stands one horizon down ("This week · 2",
+// "Thu", "October"); nothing there, no tag. Tapping a month or season goal opens its task panel
 // (which holds every verb — horizonPanel.tsx), and a year goal opens in place
-// with Done and Archive. Done goals fold into one line. The bar's walk becomes
+// with Done and Let go. Done goals fold into one line. The bar's walk becomes
 // "Plan November" while that talk is due (planSchedule.ts), and a pending
 // change card is drawn dashed on the list (planPreview.ts).
 //
 // The header, calm pass (Scott approved the mockup 2026-10-18, as on Week):
-// "‹ October 2026 ›", one quiet fact line, one primary button that changes
-// with the moment (the review that is due, else planning the period), and a
-// ⋯ menu (PageMenu) for everything else.
+// "‹ October 2026 ›", one quiet fact line ("28 of 46 done", a bar, "planned
+// Oct 2"), at most one button — only the one that's due (reviewed design,
+// 2026-10-20) — and a ⋯ menu (PageMenu) for everything else.
 //
 // URL: `horizon` (0 Year, 1 Season, 2 Month; 3 hands over to Week), `start`
 // (any date in the period) and `focus` (an item a conversation just saved).
@@ -64,7 +67,7 @@ import { planNodes, type PlanNode } from './model'
 import { moveUnderPatch } from './connections'
 import { planPreview, type PeriodSpan } from './planPreview'
 import { isDone, periodRange } from '@/components/canvas/plan/planGroups'
-import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
+import { PlanItemRow, type RowVerb } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
@@ -75,7 +78,7 @@ import { compareSortOrder, nextTaskSortOrder, reorderTasksToIndex, type OrderWri
 import { FoldToggle, PlanOrderList, type RowOrder } from './PlanOrderList'
 import { useFold } from './useFold'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
-import { periodMoves } from './horizonPanel'
+import { aboveOf, periodMoves } from './horizonPanel'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 import { useAuth } from '@/hooks/useAuth'
@@ -98,8 +101,6 @@ const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
 const PERIODS = ['year', 'season', 'month'] as const
 const SESSION_HORIZONS: readonly SessionHorizon[] = ['annual', 'seasonal', 'monthly']
 const ROUTE_LEVEL: Record<string, number> = { '/year': 0, '/season': 1, '/month': 2 }
-/** "1 goal", "3 goals". */
-const goalCount = (n: number) => `${n} goal${n === 1 ? '' : 's'}`
 /** "an October goal", "a Fall goal". */
 const aOrAn = (word: string) => /^[aeiou8]/i.test(word) ? 'an' : 'a'
 
@@ -127,7 +128,13 @@ function AboveCard({ title, hideLabel, none, onHide, goals, hereWord }: {
 }
 
 /** One line the period before left, with the verbs that answer it. */
-interface ReviewVerb { label: string; run: () => Promise<boolean> }
+interface ReviewVerb { label: string; run: () => Promise<boolean>; menu?: ReviewVerb[]; confirm?: string }
+/** Later ▾'s first choice: the next period of the row's own kind. */
+const LATER_WORD = { season: 'Next season', month: 'Next month' } as const
+const toRowVerb = (v: ReviewVerb): RowVerb => ({
+  label: v.label, onSelect: () => { void v.run() },
+  ...(v.menu ? { menu: v.menu.map(toRowVerb) } : {}), ...(v.confirm ? { confirm: v.confirm } : {}),
+})
 interface ReviewLine { key: string; title: string; state: ReviewState; note?: string; verbs: ReviewVerb[] }
 
 /** A goal of the level above, with what this period already holds under it (the card beside the list). */
@@ -169,8 +176,11 @@ function Inner() {
   const weekStartsOn = readCadenceConfig().weekStartsOn
   const yearB = periodBounds('year', anchor, seasons), seasonB = periodBounds('season', anchor, seasons), monthB = periodBounds('month', anchor, seasons)
   const bounds = [yearB, seasonB, monthB][level]
-  const week = weekStartAnchor(anchor, weekStartsOn)
   const now = new Date()
+  // The week a Month page looks down into: this week while the month is
+  // current, whatever day `start` names (it was the week of Oct 1 when the
+  // URL said start=2026-10-01); another month's first week.
+  const week = weekStartAnchor(isCurrentPeriod(monthB, now) ? now : monthB.start, weekStartsOn)
   const thisWeek = localYmd(week) === localYmd(weekStartAnchor(now, weekStartsOn))
   const periodTitle = bounds.label
   const current = isCurrentPeriod(bounds, now)
@@ -376,32 +386,49 @@ function Inner() {
     }).then((made) => !!made), { ids: [id], undo: async () => { await deleteGoal(id) } })
   }
 
-  // Quick triage on an open row (Scott, 2026-10-13, again 2026-10-16). A year
-  // goal is a goals row: Done or Archive (Archive is its let-go; nothing is
-  // deleted). A month or season goal is a task committed to this period: Done,
-  // Move to the next period, Someday, or Remove from this one. The row is on
-  // this page's list by construction, so Move and Remove need no other check.
-  // The same verbs answer each open line in the review by hand (PeriodReview),
-  // where a year goal can also move on to next year.
-  const verbsFor = (node: PlanNode, opts: { carryYear?: boolean } = {}): ReviewVerb[] => {
+  // The row as it was, for Undo: its list of periods (planPlacement's stated list).
+  const restoreOf = (t: Task) => {
+    const before = liveCommitments({ commitments: bootstrapCommitments(t) })
+    return async () => (await updateTask(t.id, { commitments: before })) !== false
+  }
+  const somedayOf = (t: Task): ReviewVerb => ({ label: 'Someday', run: () => act(`${describeTriageWhen('someday')}: “${t.title}”`, () => applyTriageWhen('someday', t.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }), { ids: [t.id] }) })
+
+  // Quick triage on an open row (Scott, 2026-10-13, again 2026-10-16), one
+  // word per move as in planning (reviewed design, 2026-10-20). A year goal
+  // is a goals row: Done or Let go (it archives; nothing is deleted), which
+  // asks once. A month or season goal is a task committed to this period:
+  // This week (October, on Season) where it isn't yet, Done, Later ▾ (the
+  // next period, or Someday), and Back to Fall — or Off October when nothing
+  // above holds it. The row is on this page's list by construction, so the
+  // moves need no other check. Planning's cards use the same verbs, less the
+  // step down (`onPage`).
+  const verbsFor = (node: PlanNode, opts: { onPage?: boolean } = {}): ReviewVerb[] => {
     if (isDone(node) || movedLabel(node)) return []
     if (!node.task) return [
       { label: 'Done', run: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
-      ...(opts.carryYear ? [{ label: `Move to ${year + 1}`, run: () => carryGoal(node) }] : []),
-      { label: 'Archive', run: () => setGoalStatus(node, 'archived', `Archive “${node.title}”`) },
+      { label: 'Let go', confirm: 'Off every list?', run: () => setGoalStatus(node, 'archived', `Let go of “${node.title}”`) },
     ]
     const task = node.task
+    const lvl = PERIODS[level] as 'season' | 'month'
     const toggle = async () => (await toggleTask(task.id)) !== false
-    const [carry, remove] = periodMoves(task, PERIODS[level] as 'season' | 'month', bounds, seasons, { updateTask, keepForward, dropCommitment }, activity.run)
+    const above = aboveOf(task, lvl, !!node.parent, lvl === 'month' ? seasonWord : String(year), seasonB.start)
+    const [carry, off] = periodMoves(task, lvl, bounds, seasons, { updateTask, keepForward, dropCommitment }, activity.run, above)
+    // One horizon down, while it is under way: this week from Month, this month from Season.
+    const down: ReviewVerb | null = !opts.onPage ? null
+      : lvl === 'month' ? (thisWeek && committedTo(task, 'week', week, { isCurrent: true }) === undefined
+        ? { label: 'This week', run: () => act(`This week: “${task.title}”`, async () => !!(await keepForward(task.id, { weekStart: week })), { ids: [task.id], undo: restoreOf(task) }) }
+        : null)
+        : isCurrentPeriod(monthB, now) && committedTo(task, 'month', monthB.start, { isCurrent: true, seasons }) === undefined
+          ? { label: monthWord, run: () => act(`${monthWord}: “${task.title}”`, async () => !!(await keepForward(task.id, { monthStart: monthB.start })), { ids: [task.id], undo: restoreOf(task) }) }
+          : null
     return [
+      ...(down ? [down] : []),
       { label: 'Done', run: () => act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) },
-      { label: carry.label, run: carry.onClick },
-      { label: 'Someday', run: () => act(`${describeTriageWhen('someday')}: “${node.title}”`, () => applyTriageWhen('someday', task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }), { ids: [node.id] }) },
-      { label: remove.label, run: remove.onClick },
+      { label: 'Later', run: async () => true, menu: [{ label: LATER_WORD[lvl], run: carry.onClick }, somedayOf(task)] },
+      { label: off.label, run: off.onClick },
     ]
   }
-  const quickFor = (node: PlanNode): { label: string; onSelect: () => void }[] =>
-    verbsFor(node).map((v) => ({ label: v.label, onSelect: () => { void v.run() } }))
+  const quickFor = (node: PlanNode): RowVerb[] => verbsFor(node, { onPage: true }).map(toRowVerb)
 
   // ---- Proposals for this horizon -----------------------------------------
   const inPeriod = (ymd?: string) => {
@@ -433,7 +460,7 @@ function Inner() {
   // The walk rides in the docked bar where there is one (desktop).
   const walkInBar = useConversationWalk(requested === 3 ? null : { label: walkLabel, message: walkMessage })
 
-  if (requested === 3) return <Navigate replace to={`/week?view=alongside&date=${localYmd(anchor)}&start=${localYmd(week)}`} />
+  if (requested === 3) return <Navigate replace to={`/week?view=alongside&date=${localYmd(anchor)}&start=${localYmd(weekStartAnchor(anchor, weekStartsOn))}`} />
 
   // Readiness reads only rows this reader already has, under the same filters.
   const visibleById = new Map(visible.map((t) => [t.id, t]))
@@ -487,29 +514,39 @@ function Inner() {
     </li>
 
   const parentOf = (node: PlanNode) => node.parent ? allNodes.find((n) => n.key === node.parent) : undefined
-  // What is already under a goal one horizon down, by name — never a count.
-  const belowLabel = level === 2 ? (thisWeek ? 'This week' : `Week of ${week.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)
-    : level === 1 ? monthWord : seasonWord
-  const belowOf = (node: PlanNode) => {
-    const linked = allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && isOpen(n)).map((n) => n.title)
+  // What is already under a goal one horizon down: its open lines there, and
+  // its own steps put on that period.
+  const belowOf = (node: PlanNode): Task[] => {
+    const linked = allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && isOpen(n)).flatMap((n) => (n.task ? [n.task] : []))
+    if (level === 0) return linked
     // A line's own steps written as subtasks never become plan nodes; one put
-    // on the period below is named here too (spec 2026-10-19).
-    if (level === 0 || !node.task?.subtasks?.length) return linked
+    // on the period below counts here too (spec 2026-10-19).
+    if (!node.task?.subtasks?.length) return linked
     const below = level === 2
       ? { level: 'week' as const, periodStart: week, prevStart: new Date(week.getFullYear(), week.getMonth(), week.getDate() - 7), isCurrent: thisWeek }
       : { level: 'month' as const, periodStart: monthB.start, prevStart: monthB.prev, isCurrent: isCurrentPeriod(monthB, now) }
+    const ids = new Set(linked.map((t) => t.id))
     const steps = node.task.subtasks.filter((st) => {
+      if (ids.has(st.id)) return false
       const k = plannedFor(st, { ...below, hereWord: '', lastWord: '', aboveWord: '' }).kind
       return k === 'here' || k === 'day' || k === 'missed'
-    }).map((st) => st.title)
-    return [...linked, ...steps.filter((t) => !linked.includes(t))]
+    })
+    return [...linked, ...steps]
   }
-  // "In October: Picnic · Leaf pile" on Season; Year names no season goals,
-  // it counts them: "In Fall: 3 goals"; Month keeps "This week: …".
+  // Where a goal stands one horizon down, as one tag (reviewed design,
+  // 2026-10-20): Month "This week", "This week · 2", or the day when its one
+  // thing has one ("Thu"); Season "October", "October · 2"; Year "Fall · 3".
+  // Nothing there, no tag.
+  const weekEnd = new Date(week.getFullYear(), week.getMonth(), week.getDate() + 7)
   const belowFor = (node: PlanNode) => {
-    const titles = belowOf(node)
-    return level === 0 ? { label: `In ${seasonWord}`, titles: titles.length ? [goalCount(titles.length)] : [] }
-      : level === 1 ? { label: `In ${monthWord}`, titles } : { label: belowLabel, titles }
+    const below = belowOf(node)
+    if (!below.length) return undefined
+    const word = level === 2 ? (thisWeek ? 'This week' : `Week of ${week.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)
+      : level === 1 ? monthWord : seasonWord
+    const day = level === 2 && below.length === 1 ? below[0].scheduledFor : undefined
+    const tag = day && day >= week && day < weekEnd ? day.toLocaleDateString('en-US', { weekday: 'short' })
+      : below.length > 1 ? `${word} · ${below.length}` : word
+    return { tag, titles: below.map((t) => t.title) }
   }
 
   // ---- The review by hand (Scott, 2026-10-17) ---------------------------------
@@ -569,12 +606,12 @@ function Inner() {
     const editing = composer?.kind === 'edit' && composer.key === node.key
     const parent = parentOf(node)
     const status = node.goal?.status ?? 'active'
-    // A year goal opens in place with Done (or Reopen), Archive and its wording.
+    // A year goal opens in place with Done (or Reopen), Let go and its wording.
     const more = node.goal ? [
       status === 'completed'
         ? { label: 'Reopen', onSelect: () => setGoalStatus(node, 'active', `Reopen “${node.title}”`) }
         : { label: 'Done', onSelect: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
-      { label: 'Archive', onSelect: () => setGoalStatus(node, 'archived', `Archive “${node.title}”`) },
+      { label: 'Let go', onSelect: () => setGoalStatus(node, 'archived', `Let go of “${node.title}”`) },
       { label: 'Edit wording', onSelect: () => setComposer({ kind: 'edit', key: node.key }) },
     ] : undefined
     // A month or season goal is a task: its panel holds every verb.
@@ -618,7 +655,7 @@ function Inner() {
   // One onward step: the next horizon down, for the period on screen.
   const keepStart = current ? '' : `&start=${localYmd(anchor)}`
   const onward = level === 2
-    ? { to: `/week?view=alongside&date=${localYmd(anchor)}`, label: thisWeek ? 'Go to this week →' : 'Go to that week →' }
+    ? { to: `/week?view=alongside&date=${localYmd(thisWeek ? now : week)}`, label: thisWeek ? 'Go to this week →' : 'Go to that week →' }
     : level === 1
       ? { to: `/month?view=constellation&horizon=2${keepStart}`, label: `Go to ${monthWord} →` }
       : { to: `/season?view=constellation&horizon=1${keepStart}`, label: `Go to ${seasonWord} →` }
@@ -633,9 +670,9 @@ function Inner() {
     ? goalsOf(year - 1).filter((g) => yearGoalReviewState(g, thisYearGoals) === 'open').map((g) => {
       const node: PlanNode = { key: `0:${g.id}`, id: g.id, title: g.name, level: 0, parent: null, goal: g }
       return { key: node.key, title: g.name, state: 'open' as const, verbs: [
-        { label: `Bring into ${year}`, run: () => carryGoal(node, year, `Bring “${g.name}” into ${year}`) },
+        { label: String(year), run: () => carryGoal(node, year, `Bring “${g.name}” into ${year}`) },
         { label: 'Done', run: () => setGoalStatus(node, 'completed', `Complete “${g.name}”`) },
-        { label: 'Let go', run: () => setGoalStatus(node, 'archived', `Archive “${g.name}”`) },
+        { label: 'Let go', run: () => setGoalStatus(node, 'archived', `Let go of “${g.name}”`) },
       ] }
     })
     : (() => {
@@ -643,14 +680,18 @@ function Inner() {
       const prevCurrent = isCurrentPeriod(prevB, now)
       return selectPeriodTasks(visible, lvl, prevB.start, prevCurrent, lens.scopeId, seasons).flatMap((t): ReviewLine[] => {
         if (taskReviewState(t, lvl, prevB.start, { isCurrent: prevCurrent, seasons }) !== 'open') return []
-        // The period's own moves, aimed from the one before: carry it here, or drop it there.
-        const [carry, remove] = periodMoves(t, lvl, prevB, seasons, { updateTask, keepForward, dropCommitment }, activity.run)
+        // The period's own moves, aimed from the one before: carry it here,
+        // later, or off that period — Back to Fall, or Off September when
+        // nothing above holds it (it was mislabeled "Let go").
+        const above = aboveOf(t, lvl, lvl === 'month' ? !!t.sourceId : !!t.goalId, lvl === 'month' ? seasonWord : String(year), seasonB.start)
+        const [carry, off] = periodMoves(t, lvl, prevB, seasons, { updateTask, keepForward, dropCommitment }, activity.run, above)
         const toggle = async () => (await toggleTask(t.id)) !== false
+        const later = () => act(`Move “${t.title}” to ${nextWord}`, async () => !!(await keepForward(t.id, lvl === 'month' ? { monthStart: bounds.next } : { seasonStart: bounds.next }, prevB.start)), { ids: [t.id], undo: restoreOf(t) })
         return [{ key: t.id, title: t.title, state: 'open', verbs: [
-          { label: `Bring into ${periodWord}`, run: carry.onClick },
+          { label: periodWord, run: carry.onClick },
           { label: 'Done', run: () => act(`Complete “${t.title}”`, toggle, { ids: [t.id], undo: toggle }) },
-          { label: 'Someday', run: () => act(`${describeTriageWhen('someday')}: “${t.title}”`, () => applyTriageWhen('someday', t.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }), { ids: [t.id] }) },
-          { label: 'Let go', run: remove.onClick },
+          { label: 'Later', run: async () => true, menu: [{ label: LATER_WORD[lvl], run: later }, somedayOf(t)] },
+          { label: off.label, run: off.onClick },
         ] }]
       })
     })()
@@ -671,10 +712,6 @@ function Inner() {
     if (!planning) return null
     const lvl = PERIODS[level] as 'year' | 'season' | 'month'
     const startKey = lvl === 'month' ? 'monthStart' : 'seasonStart'
-    const restoreOf = (t: Task) => {
-      const before = liveCommitments({ commitments: bootstrapCommitments(t) })
-      return async () => (await updateTask(t.id, { commitments: before })) !== false
-    }
     const toggleOf = (t: Task) => async () => (await toggleTask(t.id)) !== false
     const done = (t: Task): ChooseVerb => ({ label: 'Done', quiet: true, role: 'done', run: () => act(`Complete “${t.title}”`, toggleOf(t), { ids: [t.id], undo: toggleOf(t) }) })
     const reopen = (t: Task): ChooseVerb => ({ label: 'Reopen', quiet: true, role: 'reopen', run: () => act(`Reopen “${t.title}”`, toggleOf(t), { ids: [t.id], undo: toggleOf(t) }) })
@@ -736,7 +773,7 @@ function Inner() {
     }
     const looseView = (it: LooseItem): ChooseItemView => {
       const n = nodeOf(it.task.id)
-      const verbs: ChooseVerb[] = n ? verbsFor(n).map((v) => ({ label: v.label, run: v.run, role: v.label === 'Done' ? 'done' as const : 'other' as const })) : [done(it.task)]
+      const verbs: ChooseVerb[] = n ? verbsFor(n).map((v) => ({ label: v.label, run: v.run, menu: v.menu, role: v.label === 'Done' ? 'done' as const : 'other' as const })) : [done(it.task)]
       return { key: it.task.id, title: it.task.title, planned: it.planned, verbs, children: [] }
     }
     // What the period before left open and the tree did not already hold.
@@ -748,12 +785,12 @@ function Inner() {
     }
     const carried: ChooseItemView[] = carryLines.filter((c) => !placed.has(c.key) && !placed.has(c.key.replace(/^0:/, ''))).map((c) => ({
       key: c.key, title: c.title, planned: { kind: 'last', label: prevWord }, note: `From ${prevWord}, not done`,
-      verbs: c.verbs.map((v, i) => ({ label: v.label, run: v.run, role: i === 0 ? 'here' as const : v.label === 'Done' ? 'done' as const : 'other' as const })), children: [],
+      verbs: c.verbs.map((v, i) => ({ label: v.label, run: v.run, menu: v.menu, role: i === 0 ? 'here' as const : v.label === 'Done' ? 'done' as const : 'other' as const })), children: [],
     }))
     const carriedIds = new Set(carried.map((c) => c.key))
     const hereLoose: ChooseItemView[] = tree
       ? tree.loose.filter((x) => x.source === 'here' && !carriedIds.has(x.task.id)).map(looseView)
-      : openNodes.map((n) => ({ key: n.key, title: n.title, planned: { kind: 'here' as const, label: periodWord }, verbs: verbsFor(n).map((v) => ({ label: v.label, run: v.run, role: v.label === 'Done' ? 'done' as const : 'other' as const })), children: [] }))
+      : openNodes.map((n) => ({ key: n.key, title: n.title, planned: { kind: 'here' as const, label: periodWord }, verbs: verbsFor(n).map((v) => ({ label: v.label, run: v.run, menu: v.menu, role: v.label === 'Done' ? 'done' as const : 'other' as const })), children: [] }))
     return {
       lines: (tree?.lines ?? []).map(lineView),
       doneLines: (tree?.doneLines ?? []).map(lineView),
@@ -793,52 +830,58 @@ function Inner() {
   }
 
   // ---- The header (calm pass, 2026-10-18) ------------------------------------
-  // One primary button that changes with the moment (fix round 1 rulings):
-  // the review that is due (the period before's while under way, its own in
-  // its last days); else planning — this period until it is planned, then the
-  // next one while that is unplanned; both planned, nothing (final review
-  // ruling, 2026-10-18). Year is reference: its primary is only the review
-  // that is due, or planning inside a planning window (talkFor: next year's
-  // from Dec 25, this year's through Jan 14) while that year is unplanned.
-  // Whatever isn't the button waits in ⋯; neither while a flow is open.
-  type Offer = { label: string; due: boolean; run: () => void }
+  // One button at most, and only the one that's due (reviewed design,
+  // 2026-10-20), the same rule on every horizon. Not planned yet: "Plan
+  // October", which opens on Looking back at September — so a review missed
+  // in September's last days is never lost. Planned, under way: no button.
+  // The last days (REVIEW_WINDOW_DAYS: a month's last 3, a season's or year's
+  // last 7) and after, until reviewed: "Review October", the same walk —
+  // Looking back at October, then plan November. Reviewed: no button. Year is
+  // reference: "Plan 2027" is due only in its planning window (talkFor, Jan
+  // 1–14). Everything not due waits in ⋯ — planning again, planning the next
+  // period early, a review never done; nothing while a flow is open.
+  type Offer = { id: string; label: string; due: boolean; run: () => void }
   const inFlow = reviewing || planning
-  // Held until the reviews and the plan record have loaded, so the button
+  // Held until the reviews and the plan records have loaded, so the button
   // doesn't flicker from one offer to another.
   const settled = !review.loading && !prevReview.loading && !planSession.loading && !nextPlanSession.loading
-  const reviewOffer: Offer | null = inFlow ? null
-    : target === 'this' ? { label: `Review ${periodWord}`, due: !review.loading && !review.error && !review.reviewed, run: () => setReviewing(true) }
-      : target === 'previous' && !prevReview.loading && !prevReview.error && !prevReview.reviewed
-        ? { label: `Review ${prevWord}`, due: true, run: () => setReviewing(true, bounds.prev) }
-        : null
-  const planThis: Offer = { label: `Plan ${periodWord}`, due: level !== 0, run: () => setMode('plan') }
-  const planNextOffer: Offer = { label: `Plan ${nextWord}`, due: level !== 0, run: () => setMode('plan', bounds.next) }
   // A record that failed to load reads as unplanned, so planning stays offered.
   const thisPlanned = !planSession.error && !!planSession.saved
   const nextPlanned = !nextPlanSession.error && !!nextPlanSession.saved
-  const yearTalk = level === 0 && talk
-    ? localYmd(talk.start) === localYmd(bounds.next) ? (nextPlanned ? null : { ...planNextOffer, due: true })
-      : localYmd(talk.start) === localYmd(bounds.start) ? (thisPlanned ? null : { ...planThis, due: true }) : null
-    : null
-  // Both planned, planning this period waits in ⋯, as Year's does.
-  const planOffer: Offer | null = inFlow ? null
-    : yearTalk ?? (!plannable ? null : !thisPlanned ? planThis : !nextPlanned ? planNextOffer : { ...planThis, due: false })
-  const primary = !settled ? null : reviewOffer?.due ? reviewOffer : planOffer?.due ? planOffer : null
-  // One quiet fact line: Month "19 open · 26 done", Season "Sep 22 – Dec 20 ·
-  // 21 goals · 4 done", Year "5 goals"; then when it was planned.
-  const factParts = level === 2 ? [`${openNodes.length} open`, `${doneNodes.length} done`]
-    : level === 1 ? [periodRange(bounds.start, bounds.end), goalCount(openNodes.length), `${doneNodes.length} done`]
-      : [goalCount(openNodes.length)]
+  const yearWindow = level === 0 && !!talk && localYmd(talk.start) === localYmd(bounds.start)
+  const offers: Offer[] = inFlow || !settled ? [] : [
+    ...(target === 'this' && !review.error && !review.reviewed
+      ? [{ id: 'review', label: `Review ${periodWord}`, due: true, run: () => setReviewing(true) }] : []),
+    ...(target === 'previous' && !prevReview.error && !prevReview.reviewed
+      ? [{ id: 'review', label: `Review ${prevWord}`, due: false, run: () => setReviewing(true, bounds.prev) }] : []),
+    ...(plannable ? [{
+      id: 'plan', label: thisPlanned ? `Plan ${periodWord} again` : `Plan ${periodWord}`,
+      due: !thisPlanned && target !== 'this' && (level !== 0 || yearWindow), run: () => setMode('plan'),
+    }] : []),
+    ...(!nextPlanned ? [{ id: 'plan-next', label: target === 'this' ? `Plan ${nextWord}` : `Plan ${nextWord} early`, due: false, run: () => setMode('plan', bounds.next) }] : []),
+  ]
+  const primary = offers.find((o) => o.due) ?? null
+  // One quiet fact line, one count on every horizon (reviewed design): done
+  // out of everything that was on the period — done, moved on or still open —
+  // as Looking back counts it: Month "28 of 46 done", Season "Sep 22 – Dec 20
+  // · 4 of 21 done", Year "1 of 5 goals done"; a bar; then when it was planned.
+  const onPeriod = levelNodes.length
+  const doneWord = level === 0 ? `${onPeriod === 1 ? 'goal' : 'goals'} done` : 'done'
+  const countText = `${doneNodes.length} of ${onPeriod} ${doneWord}`
   const plannedOn = !planSession.loading && !planSession.error && planSession.saved
     ? `planned ${planSession.saved.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
   const facts = !inFlow && dataReady && !error && !goalsError
     ? <p className="wk-facts plan-facts" data-explain="period-facts" data-explain-label={`${periodWord} at a glance`}>
-      {factParts.join(' · ')}{plannedOn && <> · <b className="wk-facts-reviewed">{plannedOn}</b></>}
+      {level === 1 && <>{periodRange(bounds.start, bounds.end)}{(onPeriod > 0 || plannedOn) && ' · '}</>}
+      {onPeriod > 0 && <>
+        <span className="wk-facts-count"><b>{doneNodes.length}</b> of {onPeriod} {doneWord}</span>
+        <span className="wk-facts-bar" role="img" aria-label={countText}><span style={{ width: `${Math.round(doneNodes.length / onPeriod * 1000) / 10}%` }} /></span>
+      </>}
+      {plannedOn && <>{onPeriod > 0 && ' · '}<b className="wk-facts-reviewed">{plannedOn}</b></>}
     </p>
     : null
   const menuChoices: PageMenuChoice[] = [
-    ...[reviewOffer, planOffer].filter((o): o is Offer => !!o && o !== primary && dataReady && settled)
-      .map((o) => ({ id: o === planOffer ? 'plan' : 'review', label: o.label, onSelect: o.run })),
+    ...(dataReady ? offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run })) : []),
     ...(!current ? [{ id: 'back', label: `Back to this ${PERIODS[level]}`, onSelect: () => setStart(null) }] : []),
     ...(inFlow ? [] : [
       { id: 'done', label: 'Show done', checked: showDone, onSelect: () => prefs.set('done', !showDone) },

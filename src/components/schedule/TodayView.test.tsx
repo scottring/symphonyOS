@@ -16,6 +16,11 @@ vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mockUseMobile() }))
 const noWeather = { weather: null, loading: false, error: 'x', requestLocation: vi.fn() }
 const mockUseWeather = vi.fn((): Record<string, unknown> => noWeather)
 vi.mock('@/hooks/useWeather', () => ({ useWeather: () => mockUseWeather() }))
+// The day's plan and review records (planning_sessions): planned, reviewed, or neither.
+const daySession = vi.hoisted(() => ({ saved: null as null | { at: Date; authorId: string; notes: object }, reviewed: null as null | object, save: vi.fn(async () => true), finish: vi.fn(async () => true) }))
+vi.mock('@/hooks/usePlanningSession', async (importOriginal) => ({ ...await importOriginal<object>(),
+  usePlanningSession: () => ({ saved: daySession.saved, mine: null, loading: false, loadedToken: '', error: null, reload: vi.fn(), save: daySession.save }) }))
+vi.mock('@/hooks/usePeriodReview', () => ({ usePeriodReview: () => ({ reviewed: daySession.reviewed, mine: null, loading: false, error: null, reload: vi.fn(), finish: daySession.finish }) }))
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
 vi.mock('@/hooks/useRoutineStats', () => ({ useRoutineStats: () => ({ getStats: () => undefined }) }))
 vi.mock('@/hooks/useRecurringEventDetection', () => ({ useRecurringEventDetection: () => ({ isPromotionSuggested: () => false }) }))
@@ -593,7 +598,7 @@ describe('TodayView — the day card carries the date nav', () => {
 // same choosing as every horizon, one level down — "This week → today" until
 // 4 pm, "Today → tomorrow" after. The ⋯ menu still has no review of its own.
 describe('TodayView — Plan today / Review today', () => {
-  afterEach(() => { mockUseMobile.mockReturnValue(true); vi.useRealTimers(); window.history.replaceState({}, '', '/') })
+  afterEach(() => { mockUseMobile.mockReturnValue(true); vi.useRealTimers(); window.history.replaceState({}, '', '/'); daySession.saved = null; daySession.reviewed = null })
   const renderAt = (hour: number) => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), hour, 0))
@@ -619,6 +624,9 @@ describe('TodayView — Plan today / Review today', () => {
     expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Plan today' }))
     expect(screen.getByText('This week → today')).toBeInTheDocument()
+    // Finishing records the day planned, so the button can step aside.
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await vi.waitFor(() => expect(daySession.save).toHaveBeenCalledWith({ wentWell: '', didnt: '' }))
     host.remove()
   })
   it('from 4 pm it offers Review today, which opens Today → tomorrow; ⋯ has no end-of-day review', async () => {
@@ -628,6 +636,23 @@ describe('TodayView — Plan today / Review today', () => {
     await user.keyboard('{Escape}')
     await user.click(screen.getByRole('button', { name: 'Review today' }))
     expect(screen.getByText('Today → tomorrow')).toBeInTheDocument()
+    host.remove()
+  })
+  // One button at most, only the one that's due (reviewed design, 2026-10-20).
+  it('once the day is planned, Plan today steps aside for a quiet "Plan today again"', async () => {
+    daySession.saved = { at: new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), 8), authorId: 'me', notes: {} }
+    const { user, host } = renderAt(10)
+    expect(screen.queryByRole('button', { name: 'Plan today' })).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.today-flow-btn')).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Plan today again' }))
+    expect(screen.getByText('This week → today')).toBeInTheDocument()
+    host.remove()
+  })
+  it('once the day is reviewed, Review today steps aside', () => {
+    daySession.reviewed = { at: new Date(), authorId: 'me', wentWell: '', didnt: '' }
+    const { host } = renderAt(17)
+    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review today again' })).toBeInTheDocument()
     host.remove()
   })
 })

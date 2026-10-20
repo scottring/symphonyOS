@@ -55,7 +55,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { TodayFlow, type DayPictureItem } from '@/components/plan/choose/TodayFlow'
 import { buildTodayChoice, buildTodayReview, goalOf } from '@/lib/planning/chooseToday'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
-import { dayToken } from '@/hooks/usePlanningSession'
+import { dayToken, usePlanningSession } from '@/hooks/usePlanningSession'
 import { openCommitment as openCommitmentOf } from '@/lib/placement/model'
 import { bootstrapCommitments as bootstrapOf } from '@/lib/placement/intentions'
 import { SECTIONS_ORDER } from '@/lib/today/types'
@@ -618,6 +618,9 @@ export function TodayView({
     return p
   })
   const dayReview = usePeriodReview('daily', data.isToday ? dayToken(viewedDate) : '')
+  // "Plan today" is recorded, as every horizon's planning is, so its button
+  // can step aside once the day is planned (reviewed design, 2026-10-20).
+  const dayPlan = usePlanningSession('daily', data.isToday ? dayToken(viewedDate) : '')
   const monthWordToday = viewedDate.toLocaleDateString('en-US', { month: 'long' })
   const tasksById = useMemo(() => {
     const m = new Map<string, Task>()
@@ -651,11 +654,17 @@ export function TodayView({
       return true
     },
   }
-  const dayFlowOffer = data.isToday && !dayFlow
-    ? (nowForDisplay.getHours() < 16 ? { label: 'Plan today', flow: 'plan' as const } : { label: 'Review today', flow: 'review' as const })
+  // One button at most, only the one that's due, as on every horizon: "Plan
+  // today" before 4 pm until the day is planned, "Review today" from 4 pm
+  // until it is reviewed. Done, a quiet link offers it again.
+  const planHours = nowForDisplay.getHours() < 16
+  const dayFlowOffer = data.isToday && !dayFlow && !dayPlan.loading && !dayReview.loading
+    ? (planHours ? { label: 'Plan today', flow: 'plan' as const, due: !dayPlan.saved } : { label: 'Review today', flow: 'review' as const, due: !dayReview.reviewed })
     : null
   const dayFlowButton = dayFlowOffer
-    ? <button type="button" className="pv2-btn today-flow-btn" data-explain="day-flow" data-explain-label={dayFlowOffer.label} onClick={() => setDayFlow(dayFlowOffer.flow)}>{dayFlowOffer.label}</button>
+    ? dayFlowOffer.due
+      ? <button type="button" className="pv2-btn today-flow-btn" data-explain="day-flow" data-explain-label={dayFlowOffer.label} onClick={() => setDayFlow(dayFlowOffer.flow)}>{dayFlowOffer.label}</button>
+      : <button type="button" className="canvas-link wc-quiet-link today-flow-again" onClick={() => setDayFlow(dayFlowOffer.flow)}>{planHours ? 'Plan today again' : 'Review today again'}</button>
     : null
 
   // ── Plan my day / Review my day: the bar's walk into a conversation that
@@ -1225,8 +1234,9 @@ export function TodayView({
           onLeave={() => setDayFlow(null)}
           onFinish={async (win) => {
             // The review is kept as the day's planning_sessions note, as every
-            // horizon keeps its own; planning the day records nothing more.
+            // horizon keeps its own; planning the day marks it planned.
             if (dayFlow === 'review' && !(await dayReview.finish({ wentWell: win, didnt: '' }))) return false
+            if (dayFlow === 'plan' && !(await dayPlan.save({ wentWell: '', didnt: '' }))) showToast('Couldn’t mark today planned — try again.', 'error', 5000)
             setDayFlow(null)
             return true
           }} />

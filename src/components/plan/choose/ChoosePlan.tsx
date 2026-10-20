@@ -1,8 +1,9 @@
 // Step 1 of planning a period: Choose (spec 2026-10-19, plan from the level
 // above; card design approved 2026-10-19, mockup choose-v2). One goal of the
 // level above per card — "October goals → this week" — with where it stands
-// in one quiet line and three plain choices: Do this week, Not this week,
-// Done. A decided card wears its stamp (the deck's, back) with Undo beside it.
+// in one quiet line and three plain choices: This week, Not this week,
+// Done — "This week" (or "October") is the word the pages use for the same
+// move (reviewed design, 2026-10-20). A decided card wears its stamp (the deck's, back) with Undo beside it.
 // A goal's steps are listed on its card, each with its own choices. After the
 // last goal, what isn't under a goal. All at once lays the same goals out as
 // one list instead; the switch is remembered by the page.
@@ -172,7 +173,7 @@ export function ChoosePlan(p: ChoosePlanProps) {
     if (pl.kind === 'done' || verbs.length === 0) return null
     const onHere = pl.kind === 'here' || pl.kind === 'day'
     const list: { label: string; v: ChooseVerb; then: Decision | null; primary?: boolean }[] = [
-      ...(!onHere && doIt ? [{ label: `Do ${inHere}`, v: doIt, then: 'here' as Decision, primary: true }] : []),
+      ...(!onHere && doIt ? [{ label: cap(here), v: doIt, then: 'here' as Decision, primary: true }] : []),
       ...(onHere && back ? [{ label: `Not ${inHere}`, v: back, then: null }] : []),
       // Not this week on a goal still on October changes nothing: it stays, stamped.
       ...(!onHere && above ? [{ label: `Not ${inHere}`, v: pl.kind === 'last' && back ? back : NOOP, then: 'stay' as Decision }] : []),
@@ -216,7 +217,7 @@ export function ChoosePlan(p: ChoosePlanProps) {
                 : null)}
             </>
             : <>
-              {doIt && <button type="button" className="choose-verb" disabled={pending !== null} aria-label={`${cap(inHere)}: ${it.title}`} onClick={() => { void run(it.key, doIt, 'here') }}>{cap(inHere)}</button>}
+              {doIt && <button type="button" className="choose-verb" disabled={pending !== null} aria-label={`${cap(here)}: ${it.title}`} onClick={() => { void run(it.key, doIt, 'here') }}>{cap(here)}</button>}
               {back && (it.planned.kind === 'missed' || it.planned.kind === 'last') && <button type="button" className="choose-verb is-quiet" disabled={pending !== null} aria-label={`Not ${inHere}: ${it.title}`} onClick={() => { void run(it.key, back, 'stay') }}>Not {inHere}</button>}
               {done && <button type="button" className="choose-verb is-quiet" disabled={pending !== null} aria-label={`Done: ${it.title}`} onClick={() => { void run(it.key, done, 'done') }}>Done</button>}
               {others.map((v) => v.menu

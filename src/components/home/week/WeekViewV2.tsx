@@ -1015,6 +1015,15 @@ export function WeekViewV2(props: WeekViewV2Props) {
     () => deckTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) !== undefined).length,
     [deckTasks, lastWeekStart],
   )
+  // This week's count for the header, the same way: done, out of everything on it.
+  const doneThisWeek = useMemo(
+    () => deckTasks.filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) === 'done').length,
+    [deckTasks, weekAnchor, weekIsCurrent],
+  )
+  const onThisWeek = useMemo(
+    () => deckTasks.filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) !== undefined).length,
+    [deckTasks, weekAnchor, weekIsCurrent],
+  )
   const alsoDoneLastWeek = useMemo(
     () => alsoDoneIn(deckTasks, lastWeekStart, weekAnchor, (t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) !== undefined),
     [deckTasks, lastWeekStart, weekAnchor],
@@ -1093,7 +1102,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   })
   const deck: WeekDeck = {
     mode: deckMode, available: deckAvailable,
-    cards: deckCards, doneLastWeek, plannedLastWeek, alsoDoneLastWeek, aged, actions: deckActions, stripDays,
+    cards: deckCards, doneLastWeek, plannedLastWeek, alsoDoneLastWeek, doneThisWeek, onThisWeek, aged, actions: deckActions, stripDays,
     loading: !tasksLoaded, lastReview,
     // Last week's leftovers nobody answered: one on October goes back to
     // October (its week ends, its line keeps it); any other goes to Later,
