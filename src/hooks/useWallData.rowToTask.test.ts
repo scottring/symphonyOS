@@ -39,4 +39,21 @@ describe('rowToTask', () => {
   it('asks the database for sort_order', () => {
     expect(TASK_COLUMNS.split(',').map((c) => c.trim())).toContain('sort_order')
   })
+
+  // School papers (2026-10-20): who has it, "Not ours", and when it went in the backpack.
+  it('maps a paper\'s holder, dismissal and completion time', () => {
+    const t = rowToTask({ ...raw, category: 'paper', held_by: 'iris', dismissed_at: '2026-10-20T15:00:00Z', completed_at: '2026-10-20T16:00:00Z' })
+    expect(t.category).toBe('paper')
+    expect(t.heldBy).toBe('iris')
+    expect(t.dismissedAt).toEqual(new Date('2026-10-20T15:00:00Z'))
+    expect(t.completedAt).toEqual(new Date('2026-10-20T16:00:00Z'))
+    const open = rowToTask({ ...raw, held_by: null, dismissed_at: null, completed_at: null })
+    expect(open.heldBy).toBeUndefined()
+    expect(open.dismissedAt).toBeUndefined()
+    expect(open.completedAt).toBeUndefined()
+  })
+
+  it('selects the paper columns', () => {
+    for (const c of ['held_by', 'dismissed_at', 'completed_at']) expect(TASK_COLUMNS).toContain(c)
+  })
 })

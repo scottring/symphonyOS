@@ -42,7 +42,7 @@ export type TaskContext = 'work' | 'family' | 'personal'
 
 // Category represents what KIND of family item this is
 // Defaults to 'task' for backwards compatibility
-export type TaskCategory = 'task' | 'chore' | 'errand' | 'event' | 'activity' | 'homework'
+export type TaskCategory = 'task' | 'chore' | 'errand' | 'event' | 'activity' | 'homework' | 'paper'
 
 // Prep/Follow-up task linking
 export type LinkType = 'prep' | 'followup'
@@ -117,6 +117,10 @@ export interface Task {
   contactId?: string // Linked contact (who task is ABOUT)
   assignedTo?: string // Who should DO this task (family member id) - legacy single assignment
   assignedToAll?: string[] // Multi-member assignment
+  /** A school paper's holder: the parent who has it (null/undefined = not found yet). */
+  heldBy?: string
+  /** A school paper marked "Not ours": kept, never shown. */
+  dismissedAt?: Date
   projectId?: string // Linked project
   parentTaskId?: string // If set, this is a subtask
   subtasks?: Task[] // Populated on fetch, not stored in DB
