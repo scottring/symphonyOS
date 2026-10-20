@@ -10,7 +10,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildWallPrompt, parseAskBody, replyFromResponse } from './prompt.ts'
 import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
-const MODEL = Deno.env.get('WALL_ASK_MODEL') || 'claude-haiku-5-5'
+const MODEL = Deno.env.get('WALL_ASK_MODEL') || 'claude-haiku-4-5'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

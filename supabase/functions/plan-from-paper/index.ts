@@ -29,8 +29,8 @@ import { AiUsageError, reserveAiProviderCall } from '../_shared/aiUsage.ts'
 // ~$0.38 a spread (Sonnet at high effort ran out of room). Revising is text
 // only: Sonnet.
 // Env overrides switch either without a code change.
-const READ = { model: Deno.env.get('PLAN_FROM_PAPER_READ_MODEL') || 'claude-opus-5', effort: Deno.env.get('PLAN_FROM_PAPER_READ_EFFORT') || 'high' }
-const REVISE = { model: Deno.env.get('PLAN_FROM_PAPER_REVISE_MODEL') || 'claude-sonnet-5', effort: Deno.env.get('PLAN_FROM_PAPER_REVISE_EFFORT') || 'medium' }
+const READ = { model: Deno.env.get('PLAN_FROM_PAPER_READ_MODEL') || 'claude-opus-5-5', effort: Deno.env.get('PLAN_FROM_PAPER_READ_EFFORT') || 'high' }
+const REVISE = { model: Deno.env.get('PLAN_FROM_PAPER_REVISE_MODEL') || 'claude-sonnet-4-6', effort: Deno.env.get('PLAN_FROM_PAPER_REVISE_EFFORT') || 'medium' }
 type ModelChoice = typeof READ
 
 const corsHeaders = {

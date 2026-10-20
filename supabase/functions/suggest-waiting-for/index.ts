@@ -19,7 +19,7 @@ import { assembleContext } from '../_shared/context-graph/assemble.ts'
 import { renderBundleForPrompt } from '../_shared/context-graph/build.ts'
 import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
-const MODEL = 'claude-haiku-4-5-20251001'
+const MODEL = 'claude-haiku-4-5'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

@@ -611,7 +611,7 @@ Return ONLY a JSON array (no markdown, no explanation):
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-haiku-4-5',
         max_tokens: 2048,
         messages: [{ role: 'user', content: prompt }],
       }),
