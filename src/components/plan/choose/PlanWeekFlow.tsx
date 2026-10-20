@@ -34,7 +34,7 @@ export function PlanWeekFlow({ mode, choose, stripDays, loading, aged = 0, onSee
   onFinish: () => Promise<void>
   onLeave: () => void
   /** Looking back at last week first (its review): its count, what was said, and the save. */
-  look?: { done: number; outOf?: number; initial?: ReviewNotes | null; reviewed?: string | null; onContinue: (notes: ReviewNotes) => Promise<boolean> }
+  look?: { done: number; outOf?: number; alsoDone?: readonly { id: string; title: string }[]; initial?: ReviewNotes | null; reviewed?: string | null; onContinue: (notes: ReviewNotes) => Promise<boolean> }
 }) {
   const [step, setStep] = useState<'look' | 'choose' | 'days'>(mode === 'place' ? 'days' : look ? 'look' : 'choose')
   const [view, setView] = useState<ChooseViewMode>(readChooseView)
@@ -46,7 +46,7 @@ export function PlanWeekFlow({ mode, choose, stripDays, loading, aged = 0, onSee
 
   return <section className="deck choose-flow" aria-label="Plan this week">
     {step === 'look' && look
-      ? <LookingBack kicker="Review last week · then plan this week" periodWord="Last week" done={look.done} outOf={look.outOf} notDone={choose.notDoneLastWeek}
+      ? <LookingBack kicker="Review last week · then plan this week" periodWord="Last week" done={look.done} outOf={look.outOf} alsoDone={look.alsoDone} notDone={choose.notDoneLastWeek}
           initial={look.initial} reviewed={look.reviewed} nextLabel={`On to ${choose.monthWord} goals → this week`} onLeave={onLeave}
           onContinue={async (notes) => { const ok = await look.onContinue(notes); if (ok) setStep('choose'); return ok }} />
       : step === 'choose'

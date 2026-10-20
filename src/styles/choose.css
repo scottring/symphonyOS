@@ -118,6 +118,8 @@
 .choose-textarea { width: 100%; min-height: 60px; padding: 10px 12px; border: 1px solid var(--color-neutral-200); border-radius: 11px; background: var(--color-bg-elevated); font: 400 17px/1.35 var(--font-family-display); color: var(--color-neutral-900); resize: vertical; }
 .choose-textarea:focus { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
 .choose-look-next { margin-top: 12px; }
+.choose-look-also { margin: 0 0 10px; }
+.choose-look-also-list { margin: 6px 0 0; padding: 0 12px 0 28px; max-height: 220px; overflow-y: auto; font-size: 13.5px; line-height: 1.6; color: var(--color-neutral-700); }
 .choose-settled-line.is-static { cursor: default; margin-top: 10px; }
 
 /* Today: the list and the day side by side */

@@ -107,6 +107,17 @@ export function committedTo(
     return undefined
   }
   if (task.bucket !== bucketForLevel(level)) return undefined
+  // An unstamped row that was finished belongs to the period it was finished
+  // in. The NULL rule alone kept it on whichever period is current, so the
+  // month it was done in never counted it (September's "0 done", 2026-10-19).
+  const stamp = level === 'week' ? task.weekStart : level === 'month' ? task.monthStart : task.seasonStart
+  if (!stamp && task.completed && task.completedAt) {
+    const end = level === 'week'
+      ? new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate() + 7)
+      : level === 'month' ? new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 1)
+        : seasonEndFor(periodStart, seasons)
+    return task.completedAt >= periodStart && task.completedAt < end ? 'legacy' : undefined
+  }
   const isCurrent = opts.isCurrent ?? true
   let on = false
   if (level === 'week') on = isCurrent ? belongsToWeek(task, periodStart) : isPlacedOnWeek(task, periodStart)
