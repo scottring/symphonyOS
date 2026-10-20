@@ -67,6 +67,7 @@ import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
 import { PhonePaneSwitch } from './PhonePaneSwitch';
 import { NoteViewer } from '@/components/chat/NoteViewer';
 import { useSceneryPreferences } from '@/hooks/useSceneryPreferences';
+import { useApplyLook } from '@/hooks/useApplyLook';
 import { PlaceScenery } from '@/components/place/PlaceScenery';
 import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
@@ -192,6 +193,7 @@ function ShellLayoutInner({ children }: Props) {
   // phone alike. Focused controls must clear the scenery foreground.
   const [pageScroller, setPageScroller] = useState<HTMLDivElement | null>(null);
   const { showScenery, sceneryLighting } = useSceneryPreferences();
+  useApplyLook();
   // Today, Week, Plan and Routines on desktop have one conversation: the bar
   // docked at the window's foot (approved boards, 2026-10-10). The side pane
   // is for Details there.

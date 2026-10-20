@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import { usePlaceOrDefault } from '@/hooks/usePlace'
 import { sceneryArt } from './panoramas'
+import { landscapeArt } from './landscapeArt'
 import { useSceneryPreferences } from '@/hooks/useSceneryPreferences'
 import { keepFocusAboveScenery } from './sceneryFocus'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -38,8 +39,8 @@ export function PlaceScenery({ scroller, right = 0, floor, vivid = false }: {
   vivid?: boolean
 }) {
   const place = usePlaceOrDefault()
-  const { showScenery, sceneryLighting, sceneryStyle, sceneryScene } = useSceneryPreferences()
-  const art = sceneryArt(sceneryStyle, place, sceneryLighting)
+  const { showScenery, sceneryLighting, sceneryStyle, sceneryScene, look, palette } = useSceneryPreferences()
+  const art = look === 'landscape' ? landscapeArt(palette) : sceneryArt(sceneryStyle, place, sceneryLighting)
   const box = useRef<HTMLDivElement>(null)
   const catcher = useRef<HTMLDivElement>(null)
   // How much of the window's bottom the scene conceals (over the text

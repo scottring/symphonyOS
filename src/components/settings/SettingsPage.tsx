@@ -10,6 +10,7 @@ import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
 import { PlacePicker } from './PlacePicker'
+import { LookPicker } from './LookPicker'
 import { useTextSize } from '@/hooks/useTextSize'
 import { HomeAddressSettings } from './HomeAddressSettings'
 import { PlanningRhythmSettings } from './PlanningRhythmSettings'
@@ -336,6 +337,7 @@ export function SettingsPage({
           <div className="space-y-8">
             {/* Your place IS the theme: artwork + accent colours (the separate
                 Appearance chooser was retired, 2026-09-23). */}
+            <LookPicker />
             <PlacePicker />
 
             {/* Text Size */}

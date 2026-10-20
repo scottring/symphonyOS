@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { lightingAt, readCachedCoords } from '@/components/place/sceneryLighting'
+import { DEFAULT_PALETTE, isPaletteId, paletteById, type Look, type PaletteId } from '@/config/landscape'
 
 export type SceneryLighting = 'daytime' | 'dusk-dawn' | 'nighttime'
 /** What the person chose: one lighting, or 'auto' to follow the sun. */
@@ -16,6 +17,8 @@ const SHOW_KEY = 'symphony-show-scenery'
 const LIGHTING_KEY = 'symphony-scenery-lighting'
 const STYLE_KEY = 'symphony-scenery-style'
 const SCENE_KEY = 'symphony-scenery-scene'
+const LOOK_KEY = 'symphony-look'
+const PALETTE_KEY = 'symphony-palette'
 /** Automatic lighting is re-read this often (and when the tab returns). */
 const CLOCK_MS = 60_000
 const fallback = new Map<string, string>()
@@ -58,7 +61,12 @@ const getChoice = (): SceneryLightingChoice => {
   const value = read(LIGHTING_KEY)
   return value === 'dusk-dawn' || value === 'nighttime' || value === 'auto' ? value : 'daytime'
 }
+const getLook = (): Look => read(LOOK_KEY) === 'landscape' ? 'landscape' : 'classic'
+const getPalette = (): PaletteId => { const v = read(PALETTE_KEY); return isPaletteId(v) ? v : DEFAULT_PALETTE }
 const getLighting = (): SceneryLighting => {
+  // The Landscape look's palette is its light: Night reads as nighttime (the
+  // page turns dark), Dusk and Dawn as dusk, the rest as daytime.
+  if (getLook() === 'landscape') return paletteById(getPalette()).lighting
   const choice = getChoice()
   return choice === 'auto' ? lightingAt(Date.now(), readCachedCoords()).lighting : choice
 }
@@ -68,8 +76,11 @@ const setSceneryScene = (scene: SceneryScene) => write(SCENE_KEY, scene)
 const setShowScenery = (show: boolean) => write(SHOW_KEY, String(show))
 const setSceneryStyle = (style: SceneryStyle) => write(STYLE_KEY, style)
 const setSceneryLighting = (choice: SceneryLightingChoice) => write(LIGHTING_KEY, choice)
+const setLook = (look: Look) => write(LOOK_KEY, look)
+const setPalette = (palette: PaletteId) => write(PALETTE_KEY, palette)
 
-/** Device-local display choices (show, scene, lighting, style). The selected place still uses profile sync.
+/** Device-local display choices (show, scene, lighting, style, and the look:
+ *  Classic or Landscape with its palette). The selected place still uses profile sync.
  *  `sceneryLighting` is what to show now — with Automatic, it follows sunrise
  *  and sunset; `lightingChoice` is what was picked. */
 export function useSceneryPreferences() {
@@ -78,7 +89,9 @@ export function useSceneryPreferences() {
   const sceneryLighting = useSyncExternalStore(subscribe, getLighting, () => 'daytime' as const)
   const sceneryStyle = useSyncExternalStore(subscribe, getStyle, () => 'painted' as const)
   const sceneryScene = useSyncExternalStore(subscribe, getScene, () => 'faint' as const)
-  return { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene }
+  const look = useSyncExternalStore(subscribe, getLook, () => 'classic' as const)
+  const palette = useSyncExternalStore(subscribe, getPalette, () => DEFAULT_PALETTE)
+  return { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene, look, setLook, palette, setPalette }
 }
 
 /** When Automatic lighting next changes, for the chooser's hint. */

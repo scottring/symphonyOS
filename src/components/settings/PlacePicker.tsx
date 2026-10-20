@@ -12,16 +12,19 @@ const LIGHTING_LABEL = { 'daytime': 'Daytime', 'dusk-dawn': 'Dusk / Dawn', 'nigh
 
 export function PlacePicker() {
   const { place, setPlace } = usePlace()
-  const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene } = useSceneryPreferences()
+  const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene, look } = useSceneryPreferences()
+  // The Landscape look draws its own hills in its palette: style, lighting
+  // and the places do not apply there, so only Show scenery and Scene stay.
+  const landscape = look === 'landscape'
   const next = lightingChoice === 'auto' ? nextAutomaticChange() : null
 
   return (
     <section>
-      <SectionHeading>Your place</SectionHeading>
+      <SectionHeading>{landscape ? 'Scenery' : 'Your place'}</SectionHeading>
       <p className="text-sm text-neutral-500 mb-6">
-        Your place is Symphony's theme: its scenery and sky, and the accent colour on
-        selected tabs, buttons and links. It applies instantly and follows you
-        across devices.
+        {landscape
+          ? 'The hills along the foot of the window, in your palette.'
+          : 'Your place is Symphony\'s theme: its scenery and sky, and the accent colour on selected tabs, buttons and links. It applies instantly and follows you across devices.'}
       </p>
 
       <div className="place-display-options">
@@ -39,6 +42,7 @@ export function PlacePicker() {
           </select>
         </label>
         {/* Painted landscapes or woodblock prints, under the same sky. */}
+        {!landscape && <>
         <label className="place-art-setting">Style
           <select value={sceneryStyle} onChange={e => setSceneryStyle(e.target.value as SceneryStyle)}>
             <option value="painted">Painted</option>
@@ -53,16 +57,17 @@ export function PlacePicker() {
             <option value="nighttime">Nighttime</option>
           </select>
         </label>
+        </>}
         </div>
       </div>
-      <p className="text-xs text-neutral-500 mb-4">
+      {!landscape && <p className="text-xs text-neutral-500 mb-4">
         {lightingChoice === 'auto' && (
           <>Automatic follows sunrise and sunset: now {LIGHTING_LABEL[sceneryLighting]}
             {next ? `, changing at ${new Date(next).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. </>
         )}
         Scenery visibility, scene, style and lighting are saved on this device. Short windows always get the faint scene.
-      </p>
-      <div className="place-theme-grid">
+      </p>}
+      {!landscape && <div className="place-theme-grid">
         {PLACES.map((p) => {
           const active = p.id === place
           return (
@@ -92,7 +97,7 @@ export function PlacePicker() {
             </button>
           )
         })}
-      </div>
+      </div>}
     </section>
   )
 }

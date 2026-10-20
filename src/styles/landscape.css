@@ -1,0 +1,119 @@
+/* =============================================================================
+   THE LANDSCAPE LOOK (stage 2, design approved 2026-10-20; src/config/landscape.ts)
+   One style — a soft sky over rounded hills, Fraunces titles, rounder pieces,
+   pill buttons — with a colour palette as the theme. It applies only under
+   <html data-look="landscape" data-palette="…"> (Settings → The look), set by
+   useApplyLook; the Classic look and its place themes are untouched. Its
+   rules out-rank the places' (:root[data-place]) by one attribute, so a
+   saved place never shows through.
+   ============================================================================= */
+
+/* The palettes: each sets its accent pair, its ground and its sky. Accent:
+   the main action (Symphony's primary); action: the warm due / This week
+   colour. --sky-h/--sky-s keep the night flip and previews in its hue. */
+:root[data-look='landscape'][data-palette='dusk'] {
+  --lk-primary: #4b4d78; --lk-action: #b9533f; --lk-ground: #f8efe9;
+  --lk-sky-1: #5b6aa6; --lk-sky-2: #d99ab0; --lk-sky-3: #f8cfae;
+  --sky-h: 250; --sky-s: 26%;
+}
+:root[data-look='landscape'][data-palette='dawn'] {
+  --lk-primary: #6b4f5c; --lk-action: #b45a42; --lk-ground: #fbf2ea;
+  --lk-sky-1: #86a9c8; --lk-sky-2: #f0c3b6; --lk-sky-3: #fde6c6;
+  --sky-h: 18; --sky-s: 36%;
+}
+:root[data-look='landscape'][data-palette='clear'] {
+  --lk-primary: #2a5d86; --lk-action: #a95a1c; --lk-ground: #f3f7f2;
+  --lk-sky-1: #3d86c6; --lk-sky-2: #8cc2e8; --lk-sky-3: #e2f1f7;
+  --sky-h: 205; --sky-s: 48%;
+}
+:root[data-look='landscape'][data-palette='forest'] {
+  --lk-primary: #2f4a3e; --lk-action: #985626; --lk-ground: #f2f2e8;
+  --lk-sky-1: #4b7666; --lk-sky-2: #a7c3a0; --lk-sky-3: #ebefd9;
+  --sky-h: 140; --sky-s: 20%;
+}
+:root[data-look='landscape'][data-palette='coast'] {
+  --lk-primary: #1f4f66; --lk-action: #b5513b; --lk-ground: #f1f6f4;
+  --lk-sky-1: #2c6d8d; --lk-sky-2: #7cbfc8; --lk-sky-3: #e6f4ef;
+  --sky-h: 192; --sky-s: 40%;
+}
+:root[data-look='landscape'][data-palette='night'] {
+  --lk-primary: #5a5f9e; --lk-action: #a65f4c; --lk-ground: #23253d;
+  --lk-sky-1: #1e2446; --lk-sky-2: #3b4479; --lk-sky-3: #76699a;
+  --sky-h: 235; --sky-s: 30%;
+}
+
+/* The page's tokens, drawn from the palette. Cards and menus stay white on
+   the ground; the night palette's lighting flips them dark (index.css). */
+:root[data-look='landscape'] {
+  --font-family-display: 'Fraunces', 'Crimson Pro', Georgia, serif;
+  --font-display: 'Fraunces', 'Crimson Pro', Georgia, serif;
+  font-variation-settings: 'SOFT' 100;
+
+  --color-bg-base: var(--lk-ground);
+  --color-primary-50: color-mix(in oklab, var(--lk-primary) 6%, #fff);
+  --color-primary-100: color-mix(in oklab, var(--lk-primary) 12%, #fff);
+  --color-primary-200: color-mix(in oklab, var(--lk-primary) 24%, #fff);
+  --color-primary-300: color-mix(in oklab, var(--lk-primary) 42%, #fff);
+  --color-primary-400: color-mix(in oklab, var(--lk-primary) 70%, #fff);
+  --color-primary-500: var(--lk-primary);
+  --color-primary-600: color-mix(in oklab, var(--lk-primary) 86%, #000);
+  --color-primary-700: color-mix(in oklab, var(--lk-primary) 74%, #000);
+  --color-primary-800: color-mix(in oklab, var(--lk-primary) 60%, #000);
+  --color-primary-900: color-mix(in oklab, var(--lk-primary) 46%, #000);
+  --color-primary-950: color-mix(in oklab, var(--lk-primary) 30%, #000);
+  --color-accent-50: color-mix(in oklab, var(--lk-action) 6%, #fff);
+  --color-accent-100: color-mix(in oklab, var(--lk-action) 12%, #fff);
+  --color-accent-200: color-mix(in oklab, var(--lk-action) 24%, #fff);
+  --color-accent-300: color-mix(in oklab, var(--lk-action) 42%, #fff);
+  --color-accent-400: color-mix(in oklab, var(--lk-action) 70%, #fff);
+  --color-accent-500: var(--lk-action);
+  --color-accent-600: color-mix(in oklab, var(--lk-action) 86%, #000);
+  --color-accent-700: color-mix(in oklab, var(--lk-action) 74%, #000);
+  --shadow-primary: 0 8px 24px -8px color-mix(in srgb, var(--lk-primary) 35%, transparent);
+  --shadow-accent: 0 8px 24px -8px color-mix(in srgb, var(--lk-action) 30%, transparent);
+  --shadow-card: 0 0 0 1px color-mix(in srgb, var(--lk-primary) 7%, transparent), 0 8px 20px -14px rgb(60 50 90 / 0.4);
+  --shadow-elevated: 0 0 0 1px color-mix(in srgb, var(--lk-primary) 8%, transparent), 0 14px 32px -14px rgb(60 50 90 / 0.4);
+
+  /* Rounder pieces: cards ~22px, panels ~26px. */
+  --radius-md: 0.75rem;
+  --radius-lg: 1.125rem;
+  --radius-xl: 1.375rem;
+  --radius-2xl: 1.625rem;
+  --radius-3xl: 2rem;
+}
+
+/* The sky is the palette's own three colours, whatever the lighting. */
+:root[data-look='landscape'] [data-scenery-lighting] {
+  --sky-top: var(--lk-sky-1);
+  --sky-mid: var(--lk-sky-2);
+  --sky-low: var(--lk-sky-3);
+}
+
+/* Titles in Fraunces sit a touch heavier than Crimson did. */
+:root[data-look='landscape'] .font-display { font-weight: 600; letter-spacing: -0.005em; }
+
+/* Pill buttons. */
+:root[data-look='landscape'] :is(.btn-primary, .btn-secondary, .pv2-btn, .pv2-qbtn, .deck-btn, .choose-verb) { border-radius: 999px; }
+:root[data-look='landscape'] .btn-primary { box-shadow: none; }
+:root[data-look='landscape'] .btn-primary:hover { transform: none; }
+
+/* Settings → The look (LookPicker). Shown in both looks, so it carries its
+   own colours rather than the palette's tokens. */
+.look-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 520px; }
+.look-option { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 20px; background: var(--color-bg-elevated); text-align: left; box-shadow: 0 0 0 1px var(--color-neutral-200); transition: box-shadow var(--transition-base); }
+.look-option[aria-checked='true'] { box-shadow: 0 0 0 2.5px var(--color-primary-500); }
+.look-option-preview { display: block; height: 76px; border-radius: 14px; }
+.look-option-preview.is-classic { background: linear-gradient(hsl(150 22% 86%), hsl(150 14% 93%)); box-shadow: inset 0 -22px 0 hsl(150 18% 78%); }
+.look-option-preview.is-landscape { background: linear-gradient(#5b6aa6, #d99ab0 58%, #f8cfae); box-shadow: inset 0 -20px 0 #8f7aa3; }
+.look-option-name { font-size: 15px; font-weight: 700; color: var(--color-neutral-900); padding: 0 4px; }
+.look-option-note { font-size: 12.5px; color: var(--color-neutral-500); padding: 0 4px 4px; }
+.look-palettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; max-width: 640px; }
+.look-palette { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 6px 12px; border-radius: 18px; background: var(--color-bg-elevated); box-shadow: 0 0 0 1px var(--color-neutral-200); }
+.look-palette[aria-checked='true'] { box-shadow: 0 0 0 2.5px var(--color-primary-500); }
+.look-palette-swatch { display: block; width: 52px; height: 52px; border-radius: 50%; }
+.look-palette-name { font-size: 13px; font-weight: 600; color: var(--color-neutral-800); }
+.look-option:focus-visible, .look-palette:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+
+/* Night: the flip lightens primary-700 for text, so the current horizon
+   tab (white text on primary-700) keeps the palette's own accent instead. */
+:root[data-look='landscape'][data-palette='night'] .page-navigation-center .horizon-rail a.is-current { background: var(--lk-primary); }
