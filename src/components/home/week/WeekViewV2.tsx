@@ -78,7 +78,7 @@ import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters 
 import { todayItem } from '@/components/canvas/week/weekSentence'
 import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
-import { weekReviewState } from '@/lib/planning/periodReview'
+import { alsoDoneIn, weekReviewState } from '@/lib/planning/periodReview'
 import type { WeekDeck } from '@/components/plan/v2/WeekV2'
 import { buildDeck, deckModeOf, deckWeekAllowed } from '@/lib/planning/deck'
 import { staleForDrain } from '@/lib/planning/drain'
@@ -1015,6 +1015,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
     () => deckTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) !== undefined).length,
     [deckTasks, lastWeekStart],
   )
+  const alsoDoneLastWeek = useMemo(
+    () => alsoDoneIn(deckTasks, lastWeekStart, weekAnchor, (t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) !== undefined),
+    [deckTasks, lastWeekStart, weekAnchor],
+  )
   // The page's own way into the deck ("Place them"), the same URLs WeekV2's
   // buttons set, on the week being viewed. The deck on a week reviews the
   // week before it, which is the week the header's fact line counts. The one
@@ -1089,7 +1093,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   })
   const deck: WeekDeck = {
     mode: deckMode, available: deckAvailable,
-    cards: deckCards, doneLastWeek, plannedLastWeek, aged, actions: deckActions, stripDays,
+    cards: deckCards, doneLastWeek, plannedLastWeek, alsoDoneLastWeek, aged, actions: deckActions, stripDays,
     loading: !tasksLoaded, lastReview,
     // Last week's leftovers nobody answered: one on October goes back to
     // October (its week ends, its line keeps it); any other goes to Later,

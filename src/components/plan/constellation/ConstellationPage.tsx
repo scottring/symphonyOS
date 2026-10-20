@@ -83,7 +83,7 @@ import { monthToken, usePlanningSession, yearToken, type SessionHorizon } from '
 import { showToast } from '@/hooks/useToast'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { seasonToken } from '@/lib/cadence/seasons'
-import { REVIEW_WINDOW_DAYS, movedOn, reviewTarget, taskReviewState, weekPhrase, yearGoalReviewState } from '@/lib/planning/periodReview'
+import { REVIEW_WINDOW_DAYS, alsoDoneIn, movedOn, reviewTarget, taskReviewState, weekPhrase, yearGoalReviewState } from '@/lib/planning/periodReview'
 import type { ReviewState } from '@/lib/planning/periodReview'
 import { LookingBack } from '@/components/plan/choose/LookingBack'
 import { ChoosePlan, type ChooseItemView, type ChooseLineView, type ChooseVerb } from '@/components/plan/choose/ChoosePlan'
@@ -780,6 +780,8 @@ function Inner() {
     ? selectPeriodTasks(visible, PERIODS[level] as 'season' | 'month', prevB.start, isCurrentPeriod(prevB, now), lens.scopeId, seasons)
     : []
   const prevAll = prevGoals.length + prevTasks.length
+  const prevListed = new Set(prevTasks.map((t) => t.id))
+  const prevAlso = planning && level > 0 ? alsoDoneIn(visible, prevB.start, prevB.end, (t) => prevListed.has(t.id)) : []
   const prevDone = prevGoals.filter((g) => g.status === 'completed').length
     + prevTasks.filter((t) => taskReviewState(t, PERIODS[level] as 'season' | 'month', prevB.start, { isCurrent: isCurrentPeriod(prevB, now), seasons }) === 'done').length
   const prevWordCap = prevWord[0].toUpperCase() + prevWord.slice(1)
@@ -878,7 +880,7 @@ function Inner() {
       // (spec 2026-10-19): Review October opens Plan November on Looking back.
       : reviewing ? <Navigate replace to={`${pathname}?${(() => { const q = new URLSearchParams(params); q.delete('review'); q.delete('focus'); q.set('plan', '1'); q.set('start', localYmd(bounds.next)); return q.toString() })()}`} />
       : planning && choose && !looked ? <section className="deck choose-flow plan-choose" aria-label={`Plan ${periodWord}`} key={`look:${periodKey}`}>
-          <LookingBack kicker={`Review ${prevWord} · then plan ${periodWord}`} periodWord={prevWordCap} done={prevDone} outOf={prevAll} notDone={choose.carriedCount}
+          <LookingBack kicker={`Review ${prevWord} · then plan ${periodWord}`} periodWord={prevWordCap} done={prevDone} outOf={prevAll} alsoDone={prevAlso} notDone={choose.carriedCount}
             initial={prevReview.mine}
             reviewed={prevReview.reviewed ? `Reviewed ${prevReview.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} by ${byWhom(prevReview.reviewed.authorId)}` : null}
             nextLabel={level > 0 ? `On to ${aboveWord} goals → ${periodWord}` : `On to ${periodWord}`}

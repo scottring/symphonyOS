@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 
-export function LookingBack({ kicker, periodWord, done, outOf, notDone, initial, nextLabel, onContinue, onLeave, reviewed }: {
+export function LookingBack({ kicker, periodWord, done, outOf, notDone, alsoDone = [], initial, nextLabel, onContinue, onLeave, reviewed }: {
   /** "Review last week · then plan this week" */
   kicker: string
   /** "Last week", "September" */
@@ -17,6 +17,8 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, initial,
   /** Everything that was on the period — done, moved on or still open ("8 of 12 done"). */
   outOf?: number
   notDone: number
+  /** Finished during the period but not on its list (dated things, the week's tasks, the Inbox). */
+  alsoDone?: readonly { id: string; title: string }[]
   initial?: ReviewNotes | null
   /** "On to October goals → this week" */
   nextLabel: string
@@ -29,6 +31,7 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, initial,
   const hasTotal = outOf !== undefined && outOf >= done && outOf > 0
   const [wentWell, setWentWell] = useState(initial?.wentWell ?? '')
   const [didnt, setDidnt] = useState(initial?.didnt ?? '')
+  const [showAlso, setShowAlso] = useState(false)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -52,6 +55,13 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, initial,
         <p className="choose-big"><b>{done}</b> {hasTotal ? `of ${outOf} ` : ''}done{notDone ? ` · ${notDone} not done` : ''}</p>
         {hasTotal && <div className="choose-progress" role="img" aria-label={`${done} of ${outOf} done`}>
           <span style={{ width: `${(done / outOf) * 100}%` }} />
+        </div>}
+        {alsoDone.length > 0 && <div className="choose-settled choose-look-also">
+          <button type="button" className="choose-settled-line" aria-expanded={showAlso} onClick={() => setShowAlso(!showAlso)}>
+            <span><b>Also done, not on the list: {alsoDone.length}</b>{showAlso ? '' : ` · ${alsoDone.slice(0, 3).map((t) => t.title).join(' · ')}${alsoDone.length > 3 ? ' · …' : ''}`}</span>
+            <span aria-hidden="true">{showAlso ? '▴' : '▾'}</span>
+          </button>
+          {showAlso && <ul className="choose-look-also-list">{alsoDone.map((t) => <li key={t.id}>{t.title}</li>)}</ul>}
         </div>}
         {reviewed && <p className="choose-fact">{reviewed}</p>}
         <label className="choose-place-label" htmlFor="look-well">What went well</label>

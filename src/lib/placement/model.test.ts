@@ -149,3 +149,17 @@ describe('helpers', () => {
     expect(periodStartFor('week', new Date(2026, 8, 23)).getDay()).toBeLessThanOrEqual(1)
   })
 })
+
+describe('committedTo — an unstamped row that was finished', () => {
+  const SEP = new Date(2026, 8, 1), OCT = new Date(2026, 9, 1)
+  it('belongs to the month it was finished in, not whichever month is current', () => {
+    const t = task({ bucket: 'month', completed: true, completedAt: new Date(2026, 8, 20) })
+    expect(committedTo(t, 'month', SEP, { isCurrent: false })).toBe('legacy')
+    expect(committedTo(t, 'month', OCT, { isCurrent: true })).toBeUndefined()
+  })
+  it('an unstamped open row still answers to the current month', () => {
+    const t = task({ bucket: 'month' })
+    expect(committedTo(t, 'month', OCT, { isCurrent: true })).toBe('legacy')
+    expect(committedTo(t, 'month', SEP, { isCurrent: false })).toBeUndefined()
+  })
+})

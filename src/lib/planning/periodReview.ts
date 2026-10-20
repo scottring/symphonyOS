@@ -32,6 +32,24 @@ export function taskReviewState(
   return 'open'
 }
 
+/**
+ * Looking back's "Also done": what was finished in [start, end) that was not
+ * on the period's list — dated things, the week's tasks, the Inbox, steps.
+ * Oldest first. `listed` says what the list already counts.
+ */
+export function alsoDoneIn(tasks: readonly Task[], start: Date, end: Date, listed: (t: Task) => boolean): Task[] {
+  const seen = new Set<string>()
+  const out: Task[] = []
+  const visit = (t: Task) => {
+    if (seen.has(t.id)) return
+    seen.add(t.id)
+    if (!t.isGoal && t.completed && t.completedAt && t.completedAt >= start && t.completedAt < end && !listed(t)) out.push(t)
+    for (const s of t.subtasks ?? []) visit(s)
+  }
+  for (const t of tasks) visit(t)
+  return out.sort((a, b) => a.completedAt!.getTime() - b.completedAt!.getTime())
+}
+
 const monthDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
 /** A week named by its dates, never its number (Scott, 2026-10-17: "not
