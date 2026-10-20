@@ -361,6 +361,14 @@
 /* ---- Home from school ---------------------------------------------------- */
 .is-v1 .kw-kids { display: grid; grid-template-columns: repeat(var(--kids, 2), minmax(0, 1fr)); column-gap: calc(48 * var(--p)); margin-top: calc(22 * var(--p)); min-height: 0; }
 .is-v1 .kw-kid { display: flex; flex-direction: column; gap: calc(8 * var(--p)); min-width: 0; min-height: 0; overflow: hidden; }
+/* School papers (2026-10-20): read-only chips; dashed until a parent has it. */
+.is-v1 .kw-papers { display: flex; flex-wrap: wrap; gap: calc(8 * var(--p)); margin: 0; padding: 0; list-style: none; }
+.is-v1 .kw-paper { display: inline-flex; align-items: baseline; gap: calc(8 * var(--p)); min-height: calc(60 * var(--p)); padding: 0 calc(20 * var(--p)); border: 2px solid var(--kw-line); border-radius: calc(16 * var(--p)); background: color-mix(in srgb, var(--kw-line) 35%, transparent); color: var(--kw-ink); font: 500 calc(28 * var(--p)) var(--kw-sans); }
+.is-v1 .kw-paper.is-unfound { border-style: dashed; background: transparent; }
+.is-v1 .kw-paper small { font-size: calc(23 * var(--p)); color: var(--kw-muted); }
+.is-v1 .kw-paper.is-late small:first-of-type { color: #A8600F; }
+.is-dark .kw-paper.is-late small:first-of-type { color: #E0A959; }
+.is-v1 .kw-paper .kw-paper-who { font-weight: 600; color: var(--kw-ink); }
 .is-v1 .kw-side-title { margin: calc(12 * var(--p)) 0 calc(6 * var(--p)); }
 
 /* ---- Dinner ----------------------------------------------------------- */

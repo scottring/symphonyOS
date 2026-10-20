@@ -102,7 +102,7 @@ import { saveGroceryLines, type GroceryLine } from '@/lib/wall/activity/groceryP
 import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines';
 import { isIngredientLine } from '@/lib/wall/activity/cookingModel';
 import { wallMoment } from '@/lib/wall/wallMoment';
-import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, type WallTodayRow } from '@/lib/wall/wallMomentsModel';
+import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, type WallTodayRow, bagWithPapers } from '@/lib/wall/wallMomentsModel';
 import { agendaDays, agendaDay, type AgendaRow } from '@/lib/wall/wallAgenda';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
 import { memberShape } from '@/lib/wall/memberPageModel';
@@ -895,7 +895,9 @@ export function WallV2Shell() {
       member,
       special: model.school?.special ?? null,
       tomorrowSpecial: model.school?.tomorrowSpecial ?? null,
-      bag: model.needed.filter((n) => !n.tomorrow).map((n) => n.title),
+      // A paper a parent has, due today, rides in the bag line (spec 2026-10-20).
+      bag: bagWithPapers(model.needed.filter((n) => !n.tomorrow).map((n) => n.title), model.papers),
+      papers: model.papers.map((pp) => ({ id: pp.id, title: pp.title, due: pp.due, late: pp.late, heldByName: pp.heldBy ? memberName(pp.heldBy) ?? null : null, done: pp.done })),
       morning: model.collections.find((c) => (minutesOf(c.timeOfDay) ?? 24 * 60) < 11 * 60)?.rows ?? [],
       // After school is the home-from-school routine itself (its steps for
       // the day: folder, then math or reading), plus homework due. Not the
