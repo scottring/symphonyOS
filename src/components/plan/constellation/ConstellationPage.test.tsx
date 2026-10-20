@@ -397,9 +397,30 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
    expect(lastRun().label).toBe('October: “Autumn outings”')
   }finally{vi.useRealTimers()}
  })
- it('a year goal triages from its row with Done and Let go, which asks once, never Delete',async()=>{
+ it('a year goal triages from its row: Fall, Done, Later ▾ (Next year), Let go',async()=>{
+  at(new Date(2026,9,20,12))
+  try{
+   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'other'}]
+   open()
+   // Fall only while it has no Fall goal: Health has one already.
+   expect(within(screen.getByRole('group',{name:'Triage Together'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Fall','Done','Later ▾','Let go'])
+   expect(within(screen.getByRole('group',{name:'Triage Health'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Done','Later ▾','Let go'])
+   // Fall: a Fall goal for it, in one write, with Undo.
+   fireEvent.click(screen.getByRole('button',{name:'Fall: Together'}))
+   await waitFor(()=>expect(api.addTask).toHaveBeenCalledWith('Together',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',seasonStart:new Date(2026,8,1),goalId:'g'})))
+   expect(lastRun().label).toBe('Fall: “Together”')
+   expect(lastRun().opts.undo).toBeTypeOf('function')
+   // Later ▾ Next year: a copy in 2027 that remembers it; goals have no Someday.
+   fireEvent.click(screen.getByRole('button',{name:'Later: Together'}))
+   expect(within(screen.getByRole('group',{name:'Later: Together'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Next year','Cancel'])
+   fireEvent.click(screen.getByRole('button',{name:'Next year: Together'}))
+   await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g'})))
+   expect(lastRun().label).toBe('Move “Together” to 2027')
+  }finally{vi.useRealTimers()}
+ })
+ it('a year goal’s Let go asks once, and never deletes',async()=>{
   open()
-  expect(within(screen.getByRole('group',{name:'Triage Together'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Done','Let go'])
+  expect(within(screen.getByRole('group',{name:'Triage Together'})).getAllByRole('button').map(b=>b.textContent).filter(l=>l!=='Fall')).toEqual(['Done','Later ▾','Let go'])
   fireEvent.click(screen.getByRole('button',{name:'Let go: Together'}))
   const ask=screen.getByRole('group',{name:'Let go? Together'})
   expect(ask).toHaveTextContent('Off every list?')

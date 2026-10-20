@@ -23,8 +23,8 @@
 // quick triage verbs on each open row (Scott, 2026-10-16), one word per move
 // as in planning (reviewed design, 2026-10-20): This week (October on Season)
 // · Done · Later ▾ (Next month · Someday) · Back to Fall (Off October when
-// nothing above holds it) on a month or season goal, Done · Let go on a year
-// goal. Each row tags where it stands one horizon down ("This week · 2",
+// nothing above holds it) on a month or season goal, Fall · Done · Later ▾
+// (Next year) · Let go on a year goal. Each row tags where it stands one horizon down ("This week · 2",
 // "Thu", "October"); nothing there, no tag. Tapping a month or season goal opens its task panel
 // (which holds every verb — horizonPanel.tsx), and a year goal opens in place
 // with Done and Let go. Done goals fold into one line. The bar's walk becomes
@@ -395,8 +395,10 @@ function Inner() {
 
   // Quick triage on an open row (Scott, 2026-10-13, again 2026-10-16), one
   // word per move as in planning (reviewed design, 2026-10-20). A year goal
-  // is a goals row: Done or Let go (it archives; nothing is deleted), which
-  // asks once. A month or season goal is a task committed to this period:
+  // is a goals row: Fall (a Fall goal for it, the step down, while it has
+  // none), Done, Later ▾ (Next year: a copy there that remembers it; goals
+  // have no Someday), and Let go (it archives; nothing is deleted), which
+  // asks once — nothing sits above a year to go back to. A month or season goal is a task committed to this period:
   // This week (October, on Season) where it isn't yet, Done, Later ▾ (the
   // next period, or Someday), and Back to Fall — or Off October when nothing
   // above holds it. The row is on this page's list by construction, so the
@@ -404,10 +406,18 @@ function Inner() {
   // step down (`onPage`).
   const verbsFor = (node: PlanNode, opts: { onPage?: boolean } = {}): ReviewVerb[] => {
     if (isDone(node) || movedLabel(node)) return []
-    if (!node.task) return [
-      { label: 'Done', run: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
-      { label: 'Let go', confirm: 'Off every list?', run: () => setGoalStatus(node, 'archived', `Let go of “${node.title}”`) },
-    ]
+    if (!node.task) {
+      const hasSeason = allNodes.some((n) => n.level === 1 && n.parent === node.key && isOpen(n))
+      const down: ReviewVerb | null = opts.onPage && isCurrentPeriod(seasonB, now) && !hasSeason
+        ? { label: seasonWord, run: () => runCreate(1, node.title, node, `${seasonWord}: “${node.title}”`) }
+        : null
+      return [
+        ...(down ? [down] : []),
+        { label: 'Done', run: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
+        { label: 'Later', run: async () => true, menu: [{ label: 'Next year', run: () => carryGoal(node) }] },
+        { label: 'Let go', confirm: 'Off every list?', run: () => setGoalStatus(node, 'archived', `Let go of “${node.title}”`) },
+      ]
+    }
     const task = node.task
     const lvl = PERIODS[level] as 'season' | 'month'
     const toggle = async () => (await toggleTask(task.id)) !== false

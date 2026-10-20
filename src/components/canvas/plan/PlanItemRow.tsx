@@ -8,7 +8,8 @@
 // Triage on the row (Scott, 2026-10-16, bringing back 2026-10-13's): an open
 // goal shows its quick verbs, one word per move as in planning (reviewed
 // design, 2026-10-20): This week (or October) · Done · Later ▾ · Back to Fall
-// (or Off October) for a month or season goal; Done · Let go for a year goal.
+// (or Off October) for a month or season goal; Fall · Done · Later ▾ (Next
+// year) · Let go for a year goal.
 // Later opens its choices in place; Let go asks once. With a mouse they show
 // on hover or focus; on touch, where there is no hover, always.
 //
