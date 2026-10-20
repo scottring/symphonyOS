@@ -56,6 +56,7 @@ describe('LookingBack', () => {
     render(<LookingBack kicker="Review September · then plan October" periodWord="September" done={11} outOf={16} notDone={3}
       nextLabel="On to Fall goals → October" onContinue={onContinue} onLeave={vi.fn()} />)
     expect(screen.getByText(/of 16 done · 3 not done/)).toBeTruthy()
+    expect(screen.getByRole('img', { name: '11 of 16 done' }).querySelector('span')?.style.width).toBe('68.75%')
     expect(screen.getByText(/The 3 not done come next/)).toBeTruthy()
     fireEvent.change(screen.getByRole('textbox', { name: 'What went well' }), { target: { value: 'Rooms finished' } })
     fireEvent.click(screen.getByRole('button', { name: 'On to Fall goals → October' }))
