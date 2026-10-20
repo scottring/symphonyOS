@@ -320,6 +320,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
     tomorrow: { label: 'Thursday', outTheDoor: v1Screen === 'night' ? '7:20' : null, specials: KIDS.map((k, i) => ({ member: k, text: i ? 'Library' : 'Music' })) },
     weekend: { rows, anytime: [{ title: 'Kids’ laundry', owners: ['sk', 'ir'] }, { title: 'Food planning', owners: ['ir'] }, { title: 'Paper mail', owners: [] }], tomorrow: [row('soccer', 16, 0, 'Soccer', ['mi']), row('math', 18, 30, 'Math night', ['li'])], tomorrowLabel: 'Thursday' },
     onNotes: noop, next: V1_NEXT[v1Screen],
+    scenes: { choices: ['out-the-door', 'home', 'dinner', 'bedtime'], clock: v1Screen, held: false, onPick: noop },
   }
   return (
     <div className={`${(v1 ? v1.pick.dark : isDark) ? 'dark ' : ''}h-screen w-screen overflow-hidden`} data-kiosk-scene={scene}>

@@ -28,6 +28,7 @@ import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
 import type { WallTodayRow, WallChecklist } from '@/lib/wall/wallMomentsModel'
 import type { KidRow } from '@/lib/wall/kidDayModel'
+import { sceneTitle, type KioskScreen } from '@/lib/wall/activity/kioskScreen'
 import type { ComingUpRow } from '../wallStrip'
 import type { MomentKid, MomentHandoff } from '../moments/WallMoments'
 import { usePlaceOrDefault } from '@/hooks/usePlace'
@@ -162,6 +163,9 @@ function useWallFonts(on: boolean) {
 /** What the Shell hands the v1 Home; the canvas adds the handlers. */
 export type KioskV1Data = Pick<KioskHomeV1Props, 'pick' | 'anchors' | 'kids' | 'restLine' | 'restSub' | 'notes' | 'talks' | 'question' | 'tomorrow' | 'weekend' | 'onAnotherQuestion'> & {
   onNotes: () => void
+  /** The day's scenes, for picking one by hand (Scott, 2026-10-20). `clock`
+   *  is the scene the clock would show; `held` when a pick is leading. */
+  scenes?: { choices: KioskScreen[]; clock: KioskScreen; held: boolean; onPick: (screen: KioskScreen) => void }
   /** Local preview of another time of day (localhost ?at=6:58). */
   at?: Date
   /** The bar's NEXT: the day's next landmark (from the routines) or event. */
@@ -205,6 +209,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const next = nextCommitment(p.rows, p.now)
   const showHeld = showsHeldColumn(state)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [scenesOpen, setScenesOpen] = useState(false)
   const [stickyOpen, setStickyOpen] = useState(false)
 
   // ─── Commands: buttons, typing and speech all land here ───
@@ -528,6 +533,8 @@ export function KioskCanvas(p: KioskCanvasProps) {
     // Home only away from Home: an activity, an answer, More, the week.
     const away = stage.kind !== 'home' || moreOpen || takeover || talk.active || !!tell.answer
     const ampm = /PM$/i.test(p.clock) ? 'pm' : /AM$/i.test(p.clock) ? 'am' : ''
+    // Scenes are picked from Home only; an activity keeps its own title.
+    const scenes = stage.kind === 'home' && !moreOpen ? v1.scenes ?? null : null
     return (
       <div className={`kiosk-canvas is-v1 ${dark ? 'is-dark dark' : ''} sky-${stage.kind === 'home' ? v1.pick.screen : 'activity'} ${moreOpen ? 'is-more' : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
         {wash && <div className={`kv-wash ${quietScreen && !moreOpen ? '' : 'is-faint'}`} aria-hidden="true"><img src={wash} alt="" /></div>}
@@ -543,8 +550,20 @@ export function KioskCanvas(p: KioskCanvasProps) {
               ? <span className="kw-grow kw-band-stickies"><StickyStrip notes={v1.notes} onOpen={v1.onNotes} /></span>
               : <span className="kw-grow" />}
           {W && <span className="kw-wx" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
-          <h1 className="kw-moment" ref={placeRef} tabIndex={-1} aria-live="polite">{title}</h1>
+          <h1 className="kw-moment" ref={placeRef} tabIndex={-1} aria-live="polite">
+            {scenes
+              ? <button type="button" className="kw-scene-name" aria-expanded={scenesOpen} onClick={() => setScenesOpen((o) => !o)}>{title}{scenes.held && <small> · held</small>}</button>
+              : title}
+          </h1>
         </header>
+        {scenes && scenesOpen && (
+          <div className="kw-scenes" role="group" aria-label="Scenes">
+            {scenes.choices.map((s) => (
+              <button key={s} type="button" aria-pressed={s === v1.pick.screen} onClick={() => { scenes.onPick(s); setScenesOpen(false) }}>{sceneTitle(s, p.now)}</button>
+            ))}
+            {scenes.held && <button type="button" className="is-quiet" onClick={() => { scenes.onPick(scenes.clock); setScenesOpen(false) }}>Back to the clock</button>}
+          </div>
+        )}
 
         <div className={`kc-stage ${showHeld ? 'is-held' : ''}`}>
           {showHeld && <HeldColumn session={state.cooking} recipe={recipe} timers={state.timers} nowMs={nowMs} dispatch={dispatch} />}

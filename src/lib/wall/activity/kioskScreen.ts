@@ -94,3 +94,54 @@ export function kioskScreen(now: Date, a: DayAnchors): KioskScreenPick {
   if (a.home && t >= a.home.start) return { screen: 'home', title: 'Home from school', dark: false }
   return { screen: 'rest', title: t < 12 * 60 ? 'A quiet morning' : 'A quiet afternoon', dark: false }
 }
+
+// ─── A scene held by hand (Scott, 2026-10-20) ───
+// "If we're eating dinner late … we need a way to manually go back to the
+// previous scene." Anyone at the wall can pick one of the day's scenes; it
+// holds until the clock's own scene changes or 30 minutes pass, whichever
+// comes first, and then the clock leads again.
+
+export const SCENE_HOLD_MS = 30 * 60_000
+
+export interface SceneHold {
+  screen: KioskScreen
+  /** When it was picked (ms). */
+  at: number
+  /** The scene the clock showed then; when the clock moves on, the hold ends. */
+  clockScreen: KioskScreen
+}
+
+/** The scenes a person can pick today, in the day's order. The quiet ones
+ *  (rest, night) are what the wall falls back to, not places to go. */
+export function sceneChoices(a: DayAnchors): KioskScreen[] {
+  return a.morning
+    ? ['out-the-door', ...(a.home ? ['home' as const] : []), 'dinner', 'bedtime']
+    : ['weekend', 'dinner', 'bedtime']
+}
+
+const HELD: Record<KioskScreen, (now: Date) => Omit<KioskScreenPick, 'screen'>> = {
+  'out-the-door': () => ({ title: 'Out the door', dark: false }),
+  home: () => ({ title: 'Home from school', dark: false }),
+  dinner: () => ({ title: 'Dinner', dark: false }),
+  bedtime: () => ({ title: 'Bedtime', dark: true }),
+  weekend: (now) => ({ title: WEEKDAY[now.getDay()], dark: false }),
+  rest: () => ({ title: 'This evening', dark: true }),
+  night: () => ({ title: 'Goodnight', dark: true }),
+}
+
+/** A scene's plain name, as the picker and a held scene show it. */
+export function sceneTitle(screen: KioskScreen, now: Date): string {
+  return HELD[screen](now).title
+}
+
+/** What leads given the clock's pick and any scene held by hand. */
+export function heldScreen(
+  clock: KioskScreenPick, hold: SceneHold | null, now: Date,
+): { pick: KioskScreenPick; held: boolean } {
+  const live = hold
+    && hold.screen !== clock.screen
+    && hold.clockScreen === clock.screen
+    && now.getTime() - hold.at < SCENE_HOLD_MS
+  if (!live) return { pick: clock, held: false }
+  return { pick: { screen: hold.screen, ...HELD[hold.screen](now) }, held: true }
+}

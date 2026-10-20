@@ -90,7 +90,7 @@ import { useKioskActivity } from './activity/useKioskActivity';
 import { supabaseGroceryIO } from './activity/groceryIO';
 import type { WallVoice } from './activity/KioskTellSymphony';
 import type { KioskV1Data } from './activity/KioskCanvas';
-import { dayAnchors, kioskScreen, minutesOf } from '@/lib/wall/activity/kioskScreen';
+import { dayAnchors, heldScreen, kioskScreen, minutesOf, sceneChoices, type SceneHold } from '@/lib/wall/activity/kioskScreen';
 import { nextCommitment } from '@/lib/wall/activity/kioskCompose';
 import { boardOwnersOf } from './wallGantt';
 import { HOUSEHOLD_ID } from './wallEventAttribution';
@@ -865,12 +865,23 @@ export function WallV2Shell() {
     const d = new Date(now); d.setHours(Number(m[1]), Number(m[2]), 0, 0);
     return d;
   }, [now]);
+  // A scene picked by hand at the wall (Scott, 2026-10-20: a late dinner
+  // needs the dinner scene back). It leads until the clock's own scene
+  // changes or 30 minutes pass; heldScreen decides, this only remembers.
+  const [sceneHold, setSceneHold] = useState<SceneHold | null>(null);
   const kioskV1: KioskV1Data = useMemo(() => {
     const found = dayAnchors(kidModels.flatMap(({ model }) => model.collections), dinnerStartDate);
     // Local preview: ?weekend=1 draws today as a day with no school morning.
     const previewWeekend = previewAt != null && new URLSearchParams(window.location.search).get('weekend') === '1';
     const anchors = previewWeekend ? { ...found, morning: null, home: null } : found;
-    const pick = kioskScreen(previewAt ?? now, anchors);
+    const clockPick = kioskScreen(previewAt ?? now, anchors);
+    const { pick, held } = heldScreen(clockPick, sceneHold, previewAt ?? now);
+    const scenes = {
+      choices: sceneChoices(anchors), clock: clockPick.screen, held,
+      onPick: (screen: typeof clockPick.screen) => setSceneHold(
+        screen === clockPick.screen ? null : { screen, at: (previewAt ?? new Date()).getTime(), clockScreen: clockPick.screen },
+      ),
+    };
     const hhmm = (min: number) => `${Math.floor(min / 60) % 12 || 12}:${String(min % 60).padStart(2, '0')}`;
     const kids = kidModels.map(({ member, model }) => ({
       member,
@@ -914,7 +925,7 @@ export function WallV2Shell() {
       .reduce<{ title: string; owners: string[] }[]>((acc, it) => (acc.some((a) => a.title === it.title) ? acc : [...acc, { title: it.title, owners: boardOwnersOf(it, wallData.familyMembers).filter((id) => id !== HOUSEHOLD_ID) }]), [])
       .slice(0, 8);
     return {
-      pick, anchors, kids, restLine, restSub, next,
+      pick, scenes, anchors, kids, restLine, restSub, next,
       notes: scratchRows.filter((r) => r.kind === 'note').map((r) => ({ id: r.key, text: r.text, by: r.authorMemberId ? memberName(r.authorMemberId) ?? null : null })),
       talks: scratchRows.filter((r) => r.kind === 'talk').map((r) => {
         const turn = r.source === 'task' ? turnOf.get(r.id) : undefined;
@@ -935,7 +946,7 @@ export function WallV2Shell() {
       onNotes: () => { setScratchpadFocus(null); setShowScratchpad(true); },
       at: previewAt ?? undefined,
     };
-  }, [kidModels, dinnerStartDate, now, previewAt, todayRows, dinnerEvent, dinner, tomorrowData, todayItems, wallData.familyMembers, scratchRows, memberName, discussionPrompt, turnOf]);
+  }, [kidModels, dinnerStartDate, now, previewAt, sceneHold, todayRows, dinnerEvent, dinner, tomorrowData, todayItems, wallData.familyMembers, scratchRows, memberName, discussionPrompt, turnOf]);
 
   // ─── Talking with Symphony (Kitchen wall v2, stage 3) ───
   // The app's own task store (shared cache; the discussion items already

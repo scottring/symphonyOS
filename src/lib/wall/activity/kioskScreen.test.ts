@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayAnchors, kioskScreen } from './kioskScreen'
+import { SCENE_HOLD_MS, dayAnchors, heldScreen, kioskScreen, sceneChoices, type KioskScreen } from './kioskScreen'
 
 // The household's routines as rebuilt 2026-10-13: School morning 6:45–7:20,
 // Home from school 5:45 (pickup leaves 5:15), bedtime 7:30 → lights out 8:30.
@@ -40,5 +40,52 @@ describe('which screen leads the wall', () => {
     const none = dayAnchors([], null)
     expect(none.bedtime).toEqual({ start: 1170, end: 1230 })
     expect(kioskScreen(at(5, 30), none).screen).toBe('night')
+  })
+})
+
+// Scott, 2026-10-20: "if we're eating dinner late … we need a way to manually
+// go back to the previous scene". A tapped scene holds until the clock's own
+// scene changes or 30 minutes pass, whichever comes first.
+describe('a scene held by hand', () => {
+  const tuesday = dayAnchors([schoolMorning, homeFromSchool, bedtime], dinnerAt)
+  const clock = (h: number, m: number) => kioskScreen(at(h, m), tuesday)
+  const holdAt = (screen: KioskScreen, h: number, m: number) =>
+    ({ screen, at: at(h, m).getTime(), clockScreen: clock(h, m).screen })
+
+  it('offers the day’s scenes in order: a school day, then a weekend day', () => {
+    expect(sceneChoices(tuesday)).toEqual(['out-the-door', 'home', 'dinner', 'bedtime'])
+    expect(sceneChoices(dayAnchors([bedtime], null))).toEqual(['weekend', 'dinner', 'bedtime'])
+  })
+
+  it('shows dinner again after the clock has moved on', () => {
+    const hold = holdAt('dinner', 19, 5)
+    expect(heldScreen(clock(19, 10), hold, at(19, 10))).toEqual({ pick: { screen: 'dinner', title: 'Dinner', dark: false }, held: true })
+  })
+
+  it('lets go when the clock’s own scene changes', () => {
+    const hold = holdAt('dinner', 19, 5)
+    expect(heldScreen(clock(19, 30), hold, at(19, 30))).toEqual({ pick: clock(19, 30), held: false })
+  })
+
+  it('lets go after 30 minutes even if the clock’s scene has not changed', () => {
+    const hold = holdAt('out-the-door', 10, 0)
+    const later = new Date(hold.at + SCENE_HOLD_MS)
+    expect(heldScreen(clock(10, 29), hold, at(10, 29)).held).toBe(true)
+    expect(heldScreen(clock(10, 30), hold, later)).toEqual({ pick: clock(10, 30), held: false })
+  })
+
+  it('holding the scene the clock already shows is no hold at all', () => {
+    const hold = holdAt('dinner', 18, 10)
+    expect(heldScreen(clock(18, 15), hold, at(18, 15))).toEqual({ pick: clock(18, 15), held: false })
+  })
+
+  it('names a held scene plainly, without the clock’s countdowns', () => {
+    expect(heldScreen(clock(10, 0), holdAt('out-the-door', 10, 0), at(10, 0)).pick).toEqual({ screen: 'out-the-door', title: 'Out the door', dark: false })
+    expect(heldScreen(clock(10, 0), holdAt('home', 10, 0), at(10, 0)).pick).toEqual({ screen: 'home', title: 'Home from school', dark: false })
+    expect(heldScreen(clock(10, 0), holdAt('bedtime', 10, 0), at(10, 0)).pick).toEqual({ screen: 'bedtime', title: 'Bedtime', dark: true })
+    const saturday = dayAnchors([bedtime], null)
+    const sat = kioskScreen(at(19, 10, 17), saturday)
+    expect(heldScreen(sat, { screen: 'weekend', at: at(19, 10, 17).getTime(), clockScreen: sat.screen }, at(19, 10, 17)).pick)
+      .toEqual({ screen: 'weekend', title: 'Saturday', dark: false })
   })
 })
