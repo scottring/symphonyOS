@@ -31,14 +31,17 @@ const corsHeaders = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'content-type': 'application/json' } })
 
-async function callClaude(prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
+async function callClaude(
+  prompt: string, apiKey: string, transport: typeof fetch = fetch, model = 'claude-opus-5-5',
+): Promise<string> {
   const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
-      model: 'claude-opus-5-5',
+      model,
       max_tokens: 8000,
-      output_config: { effort: 'medium' },
+      // Effort is an Opus control; other models are called without it.
+      ...(model.includes('opus') ? { output_config: { effort: 'medium' } } : {}),
       messages: [{ role: 'user', content: prompt }],
     }),
   })
@@ -247,6 +250,26 @@ Deno.serve(async (req: Request) => {
       text: renderDigestText(digest, dateLabel),
       html: renderDigestHtml(digest, dateLabel),
     }))
+    // Trial (2026-10-20): with DIGEST_SHADOW_MODEL set, the same transcripts
+    // are digested by that model too and mailed to the sending account only
+    // (not DIGEST_TO, which can include the household inbound address),
+    // subject-tagged, so the two can be compared on real days. Never writes,
+    // never fails the run.
+    const shadowModel = Deno.env.get('DIGEST_SHADOW_MODEL')
+    if (shadowModel) {
+      try {
+        const shadow = parseDigestResponse(await callClaude(buildDigestPrompt(sources, dateLabel), Deno.env.get('ANTHROPIC_API_KEY')!, paidFetch, shadowModel))
+        const shadowToDo = shadow.sections.reduce((n, s) => n + s.toDo.length, 0)
+        await sendGmail(accessToken, buildMime({
+          from, to: [from],
+          subject: `[${shadowModel}] School digest · ${dateLabel}${shadowToDo ? ` · ${shadowToDo} to do` : ''}`,
+          text: renderDigestText(shadow, dateLabel),
+          html: renderDigestHtml(shadow, dateLabel),
+        }))
+      } catch (e) {
+        console.error('school-digest: shadow digest failed:', e)
+      }
+    }
     // The kids' work onto the wall — after the email, and never at its cost.
     let kidsWork: { written: number; skipped?: string; retry_at?: string } | { error: string }
     try {
