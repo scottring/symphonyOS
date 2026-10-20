@@ -34,7 +34,7 @@ async function callAnthropic(prompt: string, apiKey: string, transport: typeof f
   const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
   })
   if (!res.ok) throw new Error(`Anthropic returned ${res.status}`)
   const data = await res.json()

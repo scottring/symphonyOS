@@ -187,4 +187,4 @@ export function messagesBody(r: GuideRequest, model: string) {
   }
 }
 
-export const DEFAULT_MODEL = 'claude-sonnet-5-5'
+export const DEFAULT_MODEL = 'claude-sonnet-4-6'
