@@ -150,7 +150,7 @@ function todayIn(tz: string): { ymd: string; weekday: string } {
 
 /**
  * Pull the children's work out of today's transcripts and write it as
- * homework, once per child, skipping what is already open. Runs after the
+ * homework and papers, per child, skipping what is already there. Runs after the
  * email has gone, and never fails the digest: a bad extraction costs the
  * wall a day, not the family their 5pm email.
  */
@@ -188,10 +188,15 @@ async function postKidsWork(
   const items = parseHomework(await callClaude(buildHomeworkPrompt(sources, members, today.ymd, today.weekday), apiKey, transport))
   if (items.length === 0) return { written: 0 }
 
-  // Open homework anyone in the household already has, for the dedupe.
+  // For the dedupe: open homework, and papers open or finished (in the
+  // backpack, or "Not ours") in the last 30 days — a paper done Monday must
+  // not come back when Tuesday's posts mention it again.
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
   const { data: open, error: openError } = await supabase
-    .from('tasks').select('title, assigned_to, assigned_to_all')
-    .in('user_id', userIds).eq('category', 'homework').eq('completed', false).limit(500)
+    .from('tasks').select('title, assigned_to, assigned_to_all, category, completed')
+    .in('user_id', userIds).in('category', ['homework', 'paper'])
+    .or(`completed.eq.false,completed_at.gte.${since},dismissed_at.gte.${since}`)
+    .limit(500)
   if (openError) throw new Error(`homework read failed: ${openError.message}`)
   const rows = planHomework({ items, members, userId, todayYmd: today.ymd, existing: (open ?? []) as ExistingHomework[] })
   if (rows.length === 0) return { written: 0 }

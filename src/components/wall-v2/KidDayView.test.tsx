@@ -506,3 +506,61 @@ describe('idle auto-close never interrupts something under way', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 })
+
+// School papers (spec 2026-10-20): the kid's page is where a paper is claimed
+// ("I have it" → a parent's face), finished ("In backpack") or removed ("Not ours").
+describe('KidDayView — papers', () => {
+  const SCOTT_ADULT = { id: 'scott', name: 'Scott' } as FamilyMember
+  const IRIS = { id: 'iris', name: 'Iris' } as FamilyMember
+  const paper = (over: Partial<Task> = {}) => neededTask({ id: 'p1', title: 'Pink health form', category: 'paper', ...over })
+  function renderPapers(paperTasks: Task[]) {
+    const handlers = { onClaimPaper: vi.fn(), onPaperInBackpack: vi.fn(), onPaperNotOurs: vi.fn() }
+    render(
+      <KidDayView
+        member={KID} routines={[]} todayItems={emptySections<TimelineItem>()} neededTasks={[]} homeworkTasks={[]}
+        notices={[]} onToggleTask={vi.fn()} onClose={vi.fn()} days={[]} tonight={null}
+        paperTasks={paperTasks} adults={[SCOTT_ADULT, IRIS]} members={[KID, SCOTT_ADULT, IRIS]} {...handlers}
+      />,
+    )
+    return handlers
+  }
+
+  it('a paper nobody has found offers "I have it", then the parents\' faces', () => {
+    const h = renderPapers([paper()])
+    expect(screen.getByText('Not found yet', { exact: false })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'I have it' }))
+    expect(screen.getByRole('button', { name: 'Scott' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Iris' }))
+    expect(h.onClaimPaper).toHaveBeenCalledWith('p1', 'iris')
+  })
+
+  it('a held paper shows who has it and "In backpack"', () => {
+    const h = renderPapers([paper({ heldBy: 'iris' })])
+    expect(screen.getByText('Iris has it', { exact: false })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'In backpack' }))
+    expect(h.onPaperInBackpack).toHaveBeenCalledWith('p1')
+  })
+
+  it('a done paper is struck through with no buttons', () => {
+    renderPapers([paper({ heldBy: 'iris', completed: true, completedAt: new Date() })])
+    expect(screen.getByText('Pink health form')).toHaveClass('line-through')
+    expect(screen.queryByRole('button', { name: 'In backpack' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'I have it' })).toBeNull()
+  })
+
+  it('"Not ours" is behind a secondary control', () => {
+    const h = renderPapers([paper()])
+    expect(screen.queryByRole('button', { name: 'Not ours' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Pink health form' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Not ours' }))
+    expect(h.onPaperNotOurs).toHaveBeenCalledWith('p1')
+  })
+
+  it('late papers use the warm warning colour, not red', () => {
+    const lastWeek = new Date(); lastWeek.setDate(lastWeek.getDate() - 7)
+    renderPapers([paper({ neededOn: lastWeek })])
+    const late = screen.getByText('Late', { exact: false })
+    expect(late.className).toMatch(/A8600F/)
+    expect(late.className).not.toMatch(/red/)
+  })
+})

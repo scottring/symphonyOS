@@ -14,7 +14,7 @@ import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { isQuietHours } from '@/lib/quietHours'
 import { graceFloor } from '@/lib/today/taskPools'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
-import { addDays } from '@/lib/dateUtils'
+import { addDays, startOfDay } from '@/lib/dateUtils'
 import { resolveFetchOutcome } from '@/hooks/wallDataCommit'
 import { instanceKey, seriesKey } from '@/lib/today/eventFree'
 import { computeScreenTimeSummaries, type ChildScreenTimeSummary } from '@/hooks/useScreenTime'
@@ -35,7 +35,7 @@ const FAMILY_LAYER: ReadonlySet<Layer> = new Set(['family'])
 // sort_order: the day's order dragged on Today or the Week page, which the
 // untimed list follows (Task 13). Exported for its test only.
 export const TASK_COLUMNS =
-  'id, title, completed, created_at, updated_at, scheduled_for, needed_on, is_all_day, is_waiting, context, category, notes, phone_number, contact_id, assigned_to, assigned_to_all, project_id, parent_task_id, location, location_place_id, sort_order'
+  'id, title, completed, created_at, updated_at, scheduled_for, needed_on, is_all_day, is_waiting, context, category, notes, phone_number, contact_id, assigned_to, assigned_to_all, project_id, parent_task_id, location, location_place_id, sort_order, held_by, dismissed_at, completed_at'
 
 /** One snake_case → Task mapper for every task query on the wall, so a column
  *  added to TASK_COLUMNS can't reach one list and silently miss another.
@@ -69,6 +69,9 @@ export function rowToTask(t: any): Task {
     location: t.location ?? undefined,
     locationPlaceId: t.location_place_id ?? undefined,
     sortOrder: t.sort_order ?? null,
+    heldBy: t.held_by ?? undefined,
+    dismissedAt: t.dismissed_at ? new Date(t.dismissed_at) : undefined,
+    completedAt: t.completed_at ? new Date(t.completed_at) : undefined,
   }
 }
 
@@ -128,6 +131,8 @@ export interface UseWallDataReturn {
   homeworkTasks: Task[]
   /** Standing info from school, last 14 days, for the kid page's "From school" card. */
   notices: WallNotice[]
+  /** School papers: open ones, and today's done ones (spec 2026-10-20). */
+  paperTasks: Task[]
   /**
    * Raw fetched routine rows — BEFORE the wall's effectiveTimeOfDay remap
    * (a Step's time_of_day stays null here, not filled from its collection
@@ -185,6 +190,7 @@ export function useWallData(): UseWallDataReturn {
   const [neededTasks, setNeededTasks] = useState<Task[]>([])
   const [homeworkTasks, setHomeworkTasks] = useState<Task[]>([])
   const [notices, setNotices] = useState<WallNotice[]>([])
+  const [paperTasks, setPaperTasks] = useState<Task[]>([])
   const [rawRoutines, setRawRoutines] = useState<Routine[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -229,6 +235,7 @@ export function useWallData(): UseWallDataReturn {
         freeEventNotesRes,
         homeworkRes,
         noticesRes,
+        papersRes,
       ] = await Promise.all([
         // 1. Family members
         supabase.from('family_members').select('*').order('display_order'),
@@ -239,7 +246,10 @@ export function useWallData(): UseWallDataReturn {
           .select(TASK_COLUMNS)
           .gte('scheduled_for', startDate.toISOString())
           .lte('scheduled_for', endDate.toISOString())
-          .eq('context', 'family'),
+          .eq('context', 'family')
+          // School papers live on their own (query 17): read-only chips and
+          // the kid's page, never a tickable row in the day's lists.
+          .or('category.is.null,category.neq.paper'),
 
         // 3. Routines. Deliberately NOT filtered to visibility 'active' in
         // SQL: a routine collection is 'reference' (it never renders itself)
@@ -291,7 +301,8 @@ export function useWallData(): UseWallDataReturn {
           .lt('scheduled_for', startDate.toISOString())
           .gte('scheduled_for', overdueFloor.toISOString())
           .eq('completed', false)
-          .eq('context', 'family'),
+          .eq('context', 'family')
+          .or('category.is.null,category.neq.paper'),
 
         // (An inbox-count query used to sit here. It filtered on `is_someday`,
         //  a column that no longer exists — someday is `bucket = 'someday'`
@@ -321,7 +332,8 @@ export function useWallData(): UseWallDataReturn {
           .select(TASK_COLUMNS)
           .eq('completed', false)
           .eq('context', 'family')
-          .in('needed_on', [todayStr, localYmd(addDays(new Date(), 1))]),
+          .in('needed_on', [todayStr, localYmd(addDays(new Date(), 1))])
+          .or('category.is.null,category.neq.paper'),
 
         // 14. "Free" events (informational-only — no prep/handoff). event_notes
         // is shared within the household, so this reads every member's flags,
@@ -352,6 +364,17 @@ export function useWallData(): UseWallDataReturn {
           .select('id, family_member_id, text, sender_label, received_on')
           .gte('received_on', localYmd(addDays(new Date(), -14)))
           .order('received_on', { ascending: false }),
+
+        // 17. School papers (spec 2026-10-20): open ones, any date, and the
+        // ones put in the backpack today — they stay struck through until
+        // tomorrow. "Not ours" (dismissed_at) never comes back.
+        supabase
+          .from('tasks')
+          .select(TASK_COLUMNS)
+          .eq('context', 'family')
+          .eq('category', 'paper')
+          .is('dismissed_at', null)
+          .or(`completed.eq.false,completed_at.gte.${startOfDay(new Date()).toISOString()}`),
       ])
 
       if (!mountedRef.current) return
@@ -364,7 +387,7 @@ export function useWallData(): UseWallDataReturn {
       const dataError = [
         membersRes, tasksRes, routinesRes, instancesRes, contactsRes,
         milestonesRes, stBudgetsRes, stEntriesRes, stAdjustmentsRes,
-        overdueRes, routineCompletionsRes, neededRes, freeEventNotesRes, homeworkRes, noticesRes,
+        overdueRes, routineCompletionsRes, neededRes, freeEventNotesRes, homeworkRes, noticesRes, papersRes,
       ].find((r) => r.error)?.error?.message ?? null
 
       const members = (membersRes.data || []) as FamilyMember[]
@@ -374,6 +397,7 @@ export function useWallData(): UseWallDataReturn {
       const tasks: Task[] = (tasksRes.data || []).map(rowToTask)
       const needed: Task[] = (neededRes.data || []).map(rowToTask)
       const homework: Task[] = (homeworkRes.data || []).map(rowToTask)
+      const papers: Task[] = (papersRes.data || []).map(rowToTask)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const noticeRows: WallNotice[] = (noticesRes.data || []).map((n: any) => ({
         id: n.id, familyMemberId: n.family_member_id ?? null, text: n.text,
@@ -574,6 +598,7 @@ export function useWallData(): UseWallDataReturn {
           setAllTasks(tasks)
           setNeededTasks(needed)
           setHomeworkTasks(homework)
+          setPaperTasks(papers)
           setNotices(noticeRows)
           setRawRoutines(allRoutines)
         }
@@ -619,5 +644,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, neededTasks, homeworkTasks, notices, routines: rawRoutines, loading, error, lastRefresh, refetch: fetchAllData }
+  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, neededTasks, homeworkTasks, notices, paperTasks, routines: rawRoutines, loading, error, lastRefresh, refetch: fetchAllData }
 }

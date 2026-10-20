@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { wallTodayRows, stillOnToday, specialsWeek, checklistFor, afterSchoolRows } from './wallMomentsModel'
+import { wallTodayRows, stillOnToday, specialsWeek, checklistFor, afterSchoolRows, bagWithPapers } from './wallMomentsModel'
 import { taskToTimelineItem, type TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { MemberDayModel } from './kidDayModel'
@@ -142,5 +142,18 @@ describe('wallTodayRows — the family’s screen', () => {
       scheduledFor: at(10), isAllDay: false, assignedTo: 'sk', assignedToAll: ['sk', 'el'] } as never)
     const rows = wallTodayRows({ morning: [shared] }, members, at(7))
     expect(rows.map((r) => [r.id, r.owners])).toEqual([['task-poop', ['sk', 'el']]])
+  })
+})
+
+// Out the door (spec 2026-10-20): a paper a parent has, due today and not yet
+// in the backpack, rides in that kid's bag line.
+describe('bagWithPapers', () => {
+  const p = (over: Partial<Parameters<typeof bagWithPapers>[1][number]>) =>
+    ({ id: 'p', title: 'Pink health form', due: 'Today', late: false, heldBy: 'iris', done: false, ...over })
+  it('a held paper due today rides in the bag line', () => {
+    expect(bagWithPapers(['Library book'], [p({})])).toEqual(['Library book', 'Pink health form'])
+  })
+  it('not when nobody has it, it is done, or it is not due today', () => {
+    expect(bagWithPapers([], [p({ heldBy: null }), p({ done: true }), p({ due: 'Thu' })])).toEqual([])
   })
 })

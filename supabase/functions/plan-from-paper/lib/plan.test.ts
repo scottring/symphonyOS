@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   ANALYSIS_SCHEMA, REVISION_SCHEMA, buildAnalysisPrompt, buildRevisionPrompt, normalizeAnalysis,
   classifyModelHttpError, isOwnPagePath, boundContext, LIMITS, applyRevision, type PlanContext,
+  normalizePaper, buildPaperPrompt, PAPER_SCHEMA,
 } from './plan'
 
 const ctx: PlanContext = {
@@ -175,5 +176,42 @@ describe('access checks', () => {
     expect(out.openTasks[0].title).toHaveLength(LIMITS.contextTitleChars)
     expect(out.members[0].role).toBeNull()
     expect(out.year).toBe(2026)
+  })
+})
+
+// A photographed school paper (spec 2026-10-20): one paper, its kid, due
+// date and money — read from a printed form, so Sonnet, not the Opus reader.
+describe('school paper reading', () => {
+  const ctx = { today: '2026-10-20', year: 2026, seasons: [], members: [
+    { id: 'e', name: 'Ella', role: 'child' }, { id: 'k', name: 'Kaleb', role: 'child' }, { id: 's', name: 'Scott', role: 'parent' },
+  ], yearGoals: [], periodGoals: [], openTasks: [], routines: [] }
+
+  it('normalizePaper keeps a confident read', () => {
+    expect(normalizePaper({ title: ' Pink health form ', for: ['Kaleb'], everyone: false, due: '2026-10-22', money: '$12', detail: 'Sign both sides', confidence: 0.9 }))
+      .toEqual({ title: 'Pink health form', for: ['Kaleb'], due: '2026-10-22', money: '$12', detail: 'Sign both sides', confidence: 0.9 })
+  })
+
+  it('normalizePaper reads "everyone" and drops bad dates', () => {
+    expect(normalizePaper({ title: 'Field trip slip', for: [], everyone: true, due: 'next Thursday', money: null, detail: null, confidence: 0.8 }))
+      .toEqual({ title: 'Field trip slip', for: 'everyone', confidence: 0.8 })
+  })
+
+  it('normalizePaper drops a guess or an untitled read', () => {
+    expect(normalizePaper({ title: 'Form', for: [], everyone: true, due: null, money: null, detail: null, confidence: 0.4 })).toBeNull()
+    expect(normalizePaper({ title: '  ', for: [], everyone: true, due: null, money: null, detail: null, confidence: 0.9 })).toBeNull()
+    expect(normalizePaper(null)).toBeNull()
+  })
+
+  it('the prompt names the kids and today, and says they share papers', () => {
+    const p = buildPaperPrompt(ctx)
+    expect(p).toContain('Ella')
+    expect(p).toContain('Kaleb')
+    expect(p).not.toContain('Scott')
+    expect(p).toContain('2026-10-20')
+    expect(p).toMatch(/everyone/)
+  })
+
+  it('PAPER_SCHEMA asks for every field', () => {
+    expect(PAPER_SCHEMA.required).toEqual(['title', 'for', 'everyone', 'due', 'money', 'detail', 'confidence'])
   })
 })

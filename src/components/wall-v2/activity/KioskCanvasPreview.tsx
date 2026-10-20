@@ -309,6 +309,8 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         { entityType: 'routine' as const, id: `folder-${i}`, title: 'Take-home folder', done: i === 0, timeOfDay: '17:45', target: null },
         { entityType: 'routine' as const, id: `math-${i}`, title: i ? 'Reading, 20 minutes' : 'Math sheet', done: false, timeOfDay: '17:45', target: null },
       ],
+      papers: i ? [{ id: 'pp-k', title: 'Pink health form', due: 'Thu', late: false, heldByName: null, done: false }]
+        : [{ id: 'pp-e', title: 'Field trip slip + $12', due: 'Today', late: false, heldByName: 'Iris', done: false }],
       morning: v1Screen === 'out-the-door' ? otdMorning(i, k.id) : [
         { entityType: 'routine' as const, id: `wake-${i}`, title: 'Wake the kids', done: false, timeOfDay: '06:45', target: null, by: [MEMBERS[0].id] },
         { entityType: 'routine' as const, id: `out-${i}`, title: 'Out the door', done: false, timeOfDay: '07:20', target: null },

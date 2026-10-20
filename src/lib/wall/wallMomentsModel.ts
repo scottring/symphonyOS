@@ -8,7 +8,7 @@ import type { WallDayData } from '@/hooks/useWallData'
 import { routineEarnsTheWall } from '@/lib/routineUtils'
 import { boardOwnersOf } from '@/components/wall-v2/wallGantt'
 import { titleForMember, HOUSEHOLD_ID } from '@/components/wall-v2/wallEventAttribution'
-import { bandForTime, type MemberDayModel, type KidRow } from './kidDayModel'
+import { bandForTime, type MemberDayModel, type KidRow, type KidPaperRow } from './kidDayModel'
 import type { WallMoment } from './wallMoment'
 
 /** "7:30a", "2:10p", "12p". */
@@ -174,4 +174,11 @@ export function afterSchoolRows(model: MemberDayModel): KidRow[] {
   const routineRows = [...Object.values(model.bands).flat(), ...model.collections.flatMap((c) => c.rows)]
   for (const r of routineRows) if (PRACTICE.test(r.title)) add(r)
   return out
+}
+
+/** Out the door (spec 2026-10-20): a paper a parent has, due today and not
+ *  yet in the backpack, joins that kid's bag line — a plain fact, the last
+ *  chance before school. */
+export function bagWithPapers(needed: string[], papers: KidPaperRow[], todayLabel = 'Today'): string[] {
+  return [...needed, ...papers.filter((p) => p.heldBy && !p.done && p.due === todayLabel).map((p) => p.title)]
 }

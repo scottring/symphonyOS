@@ -47,6 +47,32 @@ export interface V1Kid {
   bag: string[]
   morning: KidRow[]
   after: KidRow[]
+  /** School papers (spec 2026-10-20): read-only here; the kid's page acts on them. */
+  papers?: V1Paper[]
+}
+
+export interface V1Paper { id: string; title: string; due: string | null; late: boolean; heldByName: string | null; done: boolean }
+
+/** A kid's open papers as chips. Never ticked from the board: a tap opens
+ *  the kid's page. Dashed = not found yet; a name = that parent has it. */
+function PaperChips({ kid, papers, onOpen }: { kid: FamilyMember; papers?: V1Paper[]; onOpen: () => void }) {
+  const open = (papers ?? []).filter((p) => !p.done)
+  if (open.length === 0) return null
+  return (
+    <ul className="kw-papers" aria-label={`${kid.name}’s papers`}>
+      {open.map((p) => (
+        <li key={p.id}>
+          <button type="button" onClick={onOpen}
+            className={`kw-paper ${p.heldByName ? '' : 'is-unfound'} ${p.late ? 'is-late' : ''}`}
+            aria-label={`${p.title}${p.due ? `, due ${p.due}` : ''}${p.heldByName ? `, ${p.heldByName} has it` : ', not found yet'}`}>
+            <span className="kw-paper-title">{p.title}</span>
+            {p.due && <small>{p.due}</small>}
+            {p.heldByName && <small className="kw-paper-who">{p.heldByName}</small>}
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 export interface V1Note { id: string; text: string; by: string | null }
@@ -563,6 +589,7 @@ function HomeFromSchool(p: KioskHomeV1Props) {
             <section key={k.member.id} className="kw-kid" aria-label={`${k.member.name} after school`}>
               <KidHead kid={k.member} count={`${done} of ${rows.length}`} onOpen={() => p.onOpenKid(k.member)} />
               <KidChecklist kid={k.member} steps={rows} max={p.math ? 4 : 5} onTick={(r) => p.onTick(k.member, r)} />
+              <PaperChips kid={k.member} papers={k.papers} onOpen={() => p.onOpenKid(k.member)} />
               <MathButton p={p} member={k.member} />
             </section>
           )

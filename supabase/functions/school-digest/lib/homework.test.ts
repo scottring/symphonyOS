@@ -12,7 +12,7 @@ const TODAY = '2026-10-07' // a Wednesday
 
 const item = (over: Partial<HomeworkItem>): HomeworkItem => ({
   title: 'Reading log', for: ['Ella'], due: '2026-10-09', source: 'HEMs Third Graders',
-  source_quote: 'Reading logs are due Friday.', confidence: 0.9, ...over,
+  source_quote: 'Reading logs are due Friday.', confidence: 0.9, kind: 'homework', ...over,
 })
 
 describe('parseHomework', () => {
@@ -84,5 +84,55 @@ describe('buildHomeworkPrompt', () => {
     expect(p).toContain('CHILDREN: Ella, Kaleb')
     expect(p).toContain('Wednesday 2026-10-07')
     expect(p).toContain('### ClassDojo · Ms. R\nSpelling test Friday!')
+  })
+})
+
+// School papers (spec 2026-10-20): something a parent signs, fills in or pays
+// that goes back to school. One row per kid — each brings home their own copy.
+describe('papers', () => {
+  const plan = (items: HomeworkItem[], existing: Parameters<typeof planHomework>[0]['existing'] = []) =>
+    planHomework({ items, members, userId: 'scott', todayYmd: TODAY, existing })
+  const paper = (over: Partial<HomeworkItem>) => item({ kind: 'paper', title: 'Pink health form', for: 'everyone', ...over })
+
+  it('parses kind, defaulting to homework', () => {
+    const raw = (kind?: string) => JSON.stringify({ homework: [{ title: 'X', for: 'everyone', source: 's', source_quote: 'q', confidence: 0.9, ...(kind ? { kind } : {}) }] })
+    expect(parseHomework(raw('paper'))[0].kind).toBe('paper')
+    expect(parseHomework(raw())[0].kind).toBe('homework')
+    expect(parseHomework(raw('other'))[0].kind).toBe('homework')
+  })
+
+  it('the prompt asks for papers a parent signs, fills in or pays and the kid returns', () => {
+    const prompt = buildHomeworkPrompt([{ label: '3-01', text: 'Return the pink form' }], members, TODAY, 'Wednesday')
+    expect(prompt).toContain('"kind"')
+    expect(prompt).toMatch(/paper/)
+    expect(prompt).toMatch(/sign/)
+    expect(prompt).toMatch(/volunteer|sign up for/i)
+  })
+
+  it('one paper per kid when both classes post the same form', () => {
+    const rows = plan([paper({ source: '3-01 Mr. Gorby / Ms. Rozanc' }), paper({ source: '3-02 Ms. Rozanc / Mr. Gorby' })])
+    expect(rows).toHaveLength(2)
+    expect(rows.map((r) => r.assigned_to).sort()).toEqual(['ella', 'kaleb'])
+    for (const r of rows) expect(r).toMatchObject({ category: 'paper', assigned_to_all: null, context: 'family' })
+  })
+
+  it('a paper naming one child is that child\'s only', () => {
+    const rows = plan([paper({ for: ['Kaleb'] })])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].assigned_to).toBe('kaleb')
+  })
+
+  it('does not re-add a paper done or dismissed in the last 30 days', () => {
+    const rows = plan([paper({})], [{ title: 'Pink health form', assigned_to: 'ella', assigned_to_all: null, category: 'paper', completed: true }])
+    expect(rows.map((r) => r.assigned_to)).toEqual(['kaleb'])
+  })
+
+  it('a paper and homework with the same name do not swallow each other', () => {
+    expect(plan([paper({ for: ['Ella'] })], [{ title: 'Pink health form', assigned_to: 'ella', category: 'homework' }])).toHaveLength(1)
+    expect(plan([item({ title: 'Reading log' })], [{ title: 'Reading log', assigned_to: 'ella', category: 'paper', completed: false }])).toHaveLength(1)
+  })
+
+  it('homework never dedupes against finished homework', () => {
+    expect(plan([item({})], [{ title: 'Reading log', assigned_to: 'ella', category: 'homework', completed: true }])).toHaveLength(1)
   })
 })

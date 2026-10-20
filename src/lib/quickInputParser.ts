@@ -19,7 +19,7 @@ export interface ParsedQuickInput {
   durationMinutes?: number           // Parsed duration ("45m", "1h30m", "for 45 minutes", or a chrono range)
   durationMatch?: string             // What text matched (e.g., "45m")
   priority?: 'high' | 'medium' | 'low'
-  category?: 'task' | 'chore' | 'errand' | 'event' | 'activity' | 'homework'
+  category?: 'task' | 'chore' | 'errand' | 'event' | 'activity' | 'homework' | 'paper'
   categoryMatch?: string             // What text matched (e.g., "errand:")
   context?: TaskContext              // Domain stamped by an explicit #work/#family/#personal token
   contextMatch?: string              // What text matched (e.g., "#work")

@@ -18,7 +18,7 @@ interface Props {
   onClose: () => void;
 }
 
-function FaceButton({ member, index, onTap }: { member: FamilyMember; index: number; onTap: () => void }) {
+export function FaceButton({ member, index, onTap }: { member: FamilyMember; index: number; onTap: () => void }) {
   const [failed, setFailed] = useState(false);
   return (
     <button

@@ -237,3 +237,31 @@ describe('Math of the day on Home', () => {
     expect(screen.getByRole('button', { name: 'Ella: Math of the day, solved, 4 days in a row' })).toBeInTheDocument()
   })
 })
+
+// School papers (spec 2026-10-20): read-only chips on Home from school.
+describe('papers on the board', () => {
+  it("Home from school shows each kid's papers as read-only chips", () => {
+    const onOpenKid = vi.fn()
+    render(<KioskHomeV1 {...props({
+      pick: { screen: 'home', title: 'Home from school', dark: false },
+      onOpenKid,
+      kids: [
+        { member: ella, special: null, tomorrowSpecial: null, bag: [], morning: [], after: [], papers: [
+          { id: 'p1', title: 'Pink health form', due: 'Thu', late: false, heldByName: null, done: false },
+          { id: 'p2', title: 'Field trip slip', due: 'Late', late: true, heldByName: 'Iris', done: false },
+          { id: 'p3', title: 'Book fair order', due: null, late: false, heldByName: 'Scott', done: true },
+        ] },
+        { member: kaleb, special: null, tomorrowSpecial: null, bag: [], morning: [], after: [] },
+      ],
+    })} />)
+    const papers = screen.getByRole('list', { name: 'Ella’s papers' })
+    const unfound = within(papers).getByRole('button', { name: /Pink health form/ })
+    expect(unfound).toHaveClass('is-unfound')
+    expect(unfound).not.toHaveAttribute('aria-pressed')
+    expect(within(papers).getByRole('button', { name: /Field trip slip/ })).toHaveTextContent('Iris')
+    expect(within(papers).getByRole('button', { name: /Field trip slip/ })).toHaveClass('is-late')
+    expect(within(papers).queryByText('Book fair order')).toBeNull()
+    fireEvent.click(unfound)
+    expect(onOpenKid).toHaveBeenCalledWith(ella)
+  })
+})

@@ -1,7 +1,7 @@
 // Calls to the plan-from-paper edge function. Every failure becomes a
 // PaperPlanError carrying a stable code (errors.ts), never a raw message.
 import { supabase } from '@/lib/supabase'
-import type { Analysis, PlanContext } from '../../../supabase/functions/plan-from-paper/lib/plan'
+import type { Analysis, PlanContext, SchoolPaperRead } from '../../../supabase/functions/plan-from-paper/lib/plan'
 import { PaperPlanError, codeFromBody } from './errors'
 import type { ChatTurn } from './importState'
 
@@ -40,4 +40,10 @@ export function revisePlan(analysis: Analysis, conversation: ChatTurn[], message
     message,
     conversation: conversation.map((t) => ({ role: t.role, text: t.text })),
   })
+}
+
+/** Read one photographed school paper (spec 2026-10-20). `paper` is null when
+ *  the photo isn't readable as a school paper. */
+export function readSchoolPaper(storagePaths: string[], context: PlanContext) {
+  return call<{ ok: true; paper: SchoolPaperRead | null }>({ action: 'read-paper', storagePaths, context })
 }

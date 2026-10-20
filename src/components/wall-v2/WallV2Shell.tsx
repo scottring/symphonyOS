@@ -102,7 +102,7 @@ import { saveGroceryLines, type GroceryLine } from '@/lib/wall/activity/groceryP
 import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines';
 import { isIngredientLine } from '@/lib/wall/activity/cookingModel';
 import { wallMoment } from '@/lib/wall/wallMoment';
-import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, type WallTodayRow } from '@/lib/wall/wallMomentsModel';
+import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, type WallTodayRow, bagWithPapers } from '@/lib/wall/wallMomentsModel';
 import { agendaDays, agendaDay, type AgendaRow } from '@/lib/wall/wallAgenda';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
 import { memberShape } from '@/lib/wall/memberPageModel';
@@ -113,6 +113,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { PairDisplayScreen } from '@/components/auth/PairDisplayScreen';
 import { supabase } from '@/lib/supabase';
+import { claimPaper, paperInBackpack, paperNotOurs } from '@/lib/wall/paperActions';
 import type { WallV2TimelineEvent } from './types';
 import { useWallTheme } from './wallThemeOverride';
 import type { Task } from '@/types/task';
@@ -692,6 +693,13 @@ export function WallV2Shell() {
     if (!q) return null;
     return { lead: `${q.when === 'today' ? 'Today' : 'Tomorrow'} · ${q.time}`, prompt: q.prompt, more: handoffQuestions.length - 1 };
   }, [handoffQuestions]);
+  // School papers (spec 2026-10-20): one write, then the wall reloads.
+  const handlePaper = useCallback((write: Promise<boolean>) => {
+    void (async () => {
+      if (!(await write)) showFlash('Couldn’t save — try again');
+      await wallData.refetch();
+    })();
+  }, [showFlash, wallData]);
 
   const handlePickWho = useCallback((q: HandoffQuestion, member: FamilyMember) => {
     if (!user) return;
@@ -755,10 +763,10 @@ export function WallV2Shell() {
     member,
     model: buildMemberDayModel({
       member, date: now, now, routines: wallData.routines, todayItems, tomorrowItems: tomorrowData?.items,
-      members: wallData.familyMembers, neededTasks: wallData.neededTasks, homeworkTasks: wallData.homeworkTasks,
+      members: wallData.familyMembers, neededTasks: wallData.neededTasks, homeworkTasks: wallData.homeworkTasks, paperTasks: wallData.paperTasks,
       notices: wallData.notices, history: instanceHistory,
     }),
-  })), [kids, now, wallData.routines, todayItems, tomorrowData, wallData.familyMembers, wallData.neededTasks, wallData.homeworkTasks, wallData.notices, instanceHistory]);
+  })), [kids, now, wallData.routines, todayItems, tomorrowData, wallData.familyMembers, wallData.neededTasks, wallData.homeworkTasks, wallData.paperTasks, wallData.notices, instanceHistory]);
   const kidsNow: MomentKid[] = useMemo(() => kidModels.map(({ member, model }) => {
     const evening = moment === 'evening';
     return {
@@ -887,7 +895,9 @@ export function WallV2Shell() {
       member,
       special: model.school?.special ?? null,
       tomorrowSpecial: model.school?.tomorrowSpecial ?? null,
-      bag: model.needed.filter((n) => !n.tomorrow).map((n) => n.title),
+      // A paper a parent has, due today, rides in the bag line (spec 2026-10-20).
+      bag: bagWithPapers(model.needed.filter((n) => !n.tomorrow).map((n) => n.title), model.papers),
+      papers: model.papers.map((pp) => ({ id: pp.id, title: pp.title, due: pp.due, late: pp.late, heldByName: pp.heldBy ? memberName(pp.heldBy) ?? null : null, done: pp.done })),
       morning: model.collections.find((c) => (minutesOf(c.timeOfDay) ?? 24 * 60) < 11 * 60)?.rows ?? [],
       // After school is the home-from-school routine itself (its steps for
       // the day: folder, then math or reading), plus homework due. Not the
@@ -1236,6 +1246,11 @@ export function WallV2Shell() {
               neededTasks={wallData.neededTasks}
               homeworkTasks={wallData.homeworkTasks}
               notices={wallData.notices}
+              paperTasks={wallData.paperTasks}
+              adults={adults}
+              onClaimPaper={(id, memberId) => handlePaper(claimPaper(supabase, id, memberId))}
+              onPaperInBackpack={(id) => handlePaper(paperInBackpack(supabase, id, new Date()))}
+              onPaperNotOurs={(id) => handlePaper(paperNotOurs(supabase, id, new Date()))}
               onToggleTask={handleToggleComplete}
               onClose={handleCloseKidView}
               days={wallData.days}
