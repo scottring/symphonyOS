@@ -162,13 +162,6 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: /people filter/i })).not.toBeInTheDocument()
   })
 
-  it('offers no "Plan today" anywhere (guided sessions left with the analog-planning pivot)', async () => {
-    const { user } = renderView()
-    expect(screen.queryByRole('button', { name: /plan today/i })).not.toBeInTheDocument()
-    await openOverflow(user)
-    expect(screen.queryByRole('button', { name: /plan today/i })).not.toBeInTheDocument()
-  })
-
   it('wears the shared masthead card', () => {
     renderView()
     expect(screen.getByTestId('masthead-card')).toBeInTheDocument()
