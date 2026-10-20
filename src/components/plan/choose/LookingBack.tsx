@@ -8,12 +8,14 @@
 import { useState } from 'react'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 
-export function LookingBack({ kicker, periodWord, done, notDone, initial, nextLabel, onContinue, onLeave, reviewed }: {
+export function LookingBack({ kicker, periodWord, done, outOf, notDone, initial, nextLabel, onContinue, onLeave, reviewed }: {
   /** "Review last week · then plan this week" */
   kicker: string
   /** "Last week", "September" */
   periodWord: string
   done: number
+  /** Everything that was on the period — done, moved on or still open ("8 of 12 done"). */
+  outOf?: number
   notDone: number
   initial?: ReviewNotes | null
   /** "On to October goals → this week" */
@@ -46,7 +48,7 @@ export function LookingBack({ kicker, periodWord, done, notDone, initial, nextLa
       <div className="deck-ghost is-far" /><div className="deck-ghost" />
       <article className="deck-card choose-card" aria-label={`Looking back at ${periodWord}`}>
         <h3 className="choose-card-title">{periodWord}</h3>
-        <p className="choose-big"><b>{done}</b> done{notDone ? ` · ${notDone} not done` : ''}</p>
+        <p className="choose-big"><b>{done}</b> {outOf !== undefined && outOf >= done && outOf > 0 ? `of ${outOf} ` : ''}done{notDone ? ` · ${notDone} not done` : ''}</p>
         {reviewed && <p className="choose-fact">{reviewed}</p>}
         <label className="choose-place-label" htmlFor="look-well">What went well</label>
         <textarea id="look-well" className="choose-textarea" rows={2} value={wentWell} onChange={(e) => setWentWell(e.target.value)} />
