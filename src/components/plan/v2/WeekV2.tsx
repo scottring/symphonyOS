@@ -49,6 +49,8 @@ export interface WeekDeck {
   available: boolean
   cards: DeckCard[]
   doneLastWeek: number
+  /** Everything that was on last week, done or not (Looking back's "of"). */
+  plannedLastWeek?: number
   aged: number
   actions: DeckActions
   stripDays: StripDay[]
@@ -206,7 +208,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
         ? (deck.loading ? null : <PlanWeekFlow key={`${localYmd(weekStart)}-${deckMode}`} mode={deckMode} choose={deck.choose}
             stripDays={deck.stripDays} aged={deck.aged} onSeeAged={deck.onSeeAged} onFinish={() => finishDeck(new Set())} onLeave={() => setMode(null)}
             look={deckMode === 'full' ? {
-              done: deck.doneLastWeek, initial: lastReview.mine,
+              done: deck.doneLastWeek, outOf: deck.plannedLastWeek, initial: lastReview.mine,
               reviewed: lastReview.reviewed ? `Reviewed ${lastReview.reviewed.at.toLocaleDateString('en-US', { weekday: 'long' })}` : null,
               onContinue: async (notes) => { setLookNotes(notes); return lastReview.finish(notes) },
             } : undefined} />)

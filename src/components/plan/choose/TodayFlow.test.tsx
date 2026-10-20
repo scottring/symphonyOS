@@ -53,9 +53,9 @@ describe('TodayFlow — Today → tomorrow', () => {
 describe('LookingBack', () => {
   it('shows the count and two places; moving on saves them, and a failed save says so', async () => {
     const onContinue = vi.fn(async () => false)
-    render(<LookingBack kicker="Review September · then plan October" periodWord="September" done={11} notDone={3}
+    render(<LookingBack kicker="Review September · then plan October" periodWord="September" done={11} outOf={16} notDone={3}
       nextLabel="On to Fall goals → October" onContinue={onContinue} onLeave={vi.fn()} />)
-    expect(screen.getByText(/done · 3 not done/)).toBeTruthy()
+    expect(screen.getByText(/of 16 done · 3 not done/)).toBeTruthy()
     expect(screen.getByText(/The 3 not done come next/)).toBeTruthy()
     fireEvent.change(screen.getByRole('textbox', { name: 'What went well' }), { target: { value: 'Rooms finished' } })
     fireEvent.click(screen.getByRole('button', { name: 'On to Fall goals → October' }))

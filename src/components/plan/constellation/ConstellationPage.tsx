@@ -774,10 +774,14 @@ function Inner() {
   // its count, what was said, and the save.
   const periodKey = `${level}:${localYmd(bounds.start)}`
   const looked = lookedKey === periodKey
-  const prevDone = !planning ? 0 : level === 0
-    ? goalsOf(year - 1).filter((g) => g.status === 'completed').length
-    : selectPeriodTasks(visible, PERIODS[level] as 'season' | 'month', prevB.start, isCurrentPeriod(prevB, now), lens.scopeId, seasons)
-      .filter((t) => taskReviewState(t, PERIODS[level] as 'season' | 'month', prevB.start, { isCurrent: isCurrentPeriod(prevB, now), seasons }) === 'done').length
+  // Everything that was on the period before (done, moved on or open), for "8 of 12 done".
+  const prevGoals = planning && level === 0 ? goalsOf(year - 1) : []
+  const prevTasks = planning && level > 0
+    ? selectPeriodTasks(visible, PERIODS[level] as 'season' | 'month', prevB.start, isCurrentPeriod(prevB, now), lens.scopeId, seasons)
+    : []
+  const prevAll = prevGoals.length + prevTasks.length
+  const prevDone = prevGoals.filter((g) => g.status === 'completed').length
+    + prevTasks.filter((t) => taskReviewState(t, PERIODS[level] as 'season' | 'month', prevB.start, { isCurrent: isCurrentPeriod(prevB, now), seasons }) === 'done').length
   const prevWordCap = prevWord[0].toUpperCase() + prevWord.slice(1)
   const markPlannedHere = async () => {
     setMarking(true)
@@ -874,7 +878,7 @@ function Inner() {
       // (spec 2026-10-19): Review October opens Plan November on Looking back.
       : reviewing ? <Navigate replace to={`${pathname}?${(() => { const q = new URLSearchParams(params); q.delete('review'); q.delete('focus'); q.set('plan', '1'); q.set('start', localYmd(bounds.next)); return q.toString() })()}`} />
       : planning && choose && !looked ? <section className="deck choose-flow plan-choose" aria-label={`Plan ${periodWord}`} key={`look:${periodKey}`}>
-          <LookingBack kicker={`Review ${prevWord} · then plan ${periodWord}`} periodWord={prevWordCap} done={prevDone} notDone={choose.carriedCount}
+          <LookingBack kicker={`Review ${prevWord} · then plan ${periodWord}`} periodWord={prevWordCap} done={prevDone} outOf={prevAll} notDone={choose.carriedCount}
             initial={prevReview.mine}
             reviewed={prevReview.reviewed ? `Reviewed ${prevReview.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} by ${byWhom(prevReview.reviewed.authorId)}` : null}
             nextLabel={level > 0 ? `On to ${aboveWord} goals → ${periodWord}` : `On to ${periodWord}`}

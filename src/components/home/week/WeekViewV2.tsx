@@ -1011,6 +1011,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
     () => deckTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) === 'done').length,
     [deckTasks, lastWeekStart],
   )
+  const plannedLastWeek = useMemo(
+    () => deckTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) !== undefined).length,
+    [deckTasks, lastWeekStart],
+  )
   // The page's own way into the deck ("Place them"), the same URLs WeekV2's
   // buttons set, on the week being viewed. The deck on a week reviews the
   // week before it, which is the week the header's fact line counts. The one
@@ -1085,7 +1089,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   })
   const deck: WeekDeck = {
     mode: deckMode, available: deckAvailable,
-    cards: deckCards, doneLastWeek, aged, actions: deckActions, stripDays,
+    cards: deckCards, doneLastWeek, plannedLastWeek, aged, actions: deckActions, stripDays,
     loading: !tasksLoaded, lastReview,
     // Last week's leftovers nobody answered: one on October goes back to
     // October (its week ends, its line keeps it); any other goes to Later,
