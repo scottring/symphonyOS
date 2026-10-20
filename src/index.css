@@ -2424,14 +2424,15 @@ html.desktop-shell a {
 .horizon-rail-l { font-size: 13.5px; }
 .horizon-rail a.is-current { color: var(--color-neutral-900); }
 .horizon-rail a.is-current .horizon-rail-l { font-weight: 600; }
-/* In the top bar the three destinations read as tabs, the one you are on
-   filled — where you are, at a glance (approved boards, 2026-10-10). */
+/* In the top bar the horizons read as tabs, the one you are on underlined
+   in bold — where you are, without looking like a button (Scott, 2026-10-20). */
 .page-navigation-center .horizon-rail { gap: 2px; }
 .page-navigation-center .horizon-rail-join { display: none; }
-.page-navigation-center .horizon-rail a { padding: 7px 14px; color: var(--color-neutral-600); }
+.page-navigation-center .horizon-rail a { --rail-pad: 14px; position: relative; padding: 7px var(--rail-pad); color: var(--color-neutral-600); }
 .page-navigation-center .horizon-rail a:hover { background: var(--color-neutral-100); }
-.page-navigation-center .horizon-rail a.is-current { background: var(--color-primary-700); color: #fff; }
-.page-navigation-center .horizon-rail a.is-current:hover { background: var(--color-primary-800); }
+.page-navigation-center .horizon-rail a.is-current { color: var(--color-primary-700); }
+.page-navigation-center .horizon-rail a.is-current:hover { background: none; }
+.page-navigation-center .horizon-rail a.is-current::after { content: ""; position: absolute; left: var(--rail-pad); right: var(--rail-pad); bottom: 0; height: 2px; border-radius: 2px; background: currentColor; }
 /* Today and Week are for doing; Month, Season and Year hold goals. A hairline
    between them, in the one line of horizons (2026-10-13). */
 .page-navigation-center .horizon-rail-step.is-goals-start::before { content: ""; align-self: center; width: 1px; height: 16px; margin: 0 6px; background: var(--color-neutral-300); }
@@ -3790,7 +3791,7 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
 /* Narrower windows: the rail tightens (its words are short) and the weather
    keeps its icon and temperature. */
 @media (max-width: 1180px) {
-  .page-navigation-center .horizon-rail a { padding-inline: 10px; }
+  .page-navigation-center .horizon-rail a { --rail-pad: 10px; }
   .page-navigation-lead .daybook-weather-line > span:not(.daybook-weather-temp) { display: none; }
 }
 
@@ -4480,6 +4481,12 @@ button.domain-switcher-trigger[data-filtered="true"] { color: var(--color-primar
 .wk-facts { margin: 0; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
 .wk-facts .wc-quiet-link { font-size: 13px; }
 .wk-facts-reviewed { font-weight: 500; color: var(--color-sage-400); }
+/* "28 of 46 done" and its bar: one count on every horizon, out of everything
+   that was on the period (reviewed design, 2026-10-20), as Looking back. */
+.wk-facts-count b { font-weight: 600; color: var(--color-neutral-900); }
+.wk-facts-bar { display: inline-block; width: 120px; height: 6px; margin: 0 2px 0 8px; vertical-align: middle; border-radius: 999px; background: var(--color-neutral-100); overflow: hidden; }
+.wk-facts-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary-500); }
+@media (max-width: 767px) { .wk-facts-bar { width: 72px; } }
 .wk-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 12px; flex-wrap: wrap; margin: 0 0 12px; }
 .wk-head > .wk-facts { flex: 1 1 14rem; min-width: 0; }
 .wk-head > .wk-head-actions { margin-left: auto; }

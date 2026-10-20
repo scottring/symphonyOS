@@ -69,22 +69,24 @@ describe('the task panel over a horizon page', () => {
     await last().opts.undo!()
     expect(deps.updateTask).toHaveBeenLastCalledWith('m', { sourceId: 's1', goalId: 'g' })
   })
-  it('Move to November carries it on; Remove from October drops only that month; both undo to the periods it was on', async () => {
+  // The page's and planning's words (reviewed design, 2026-10-20).
+  it('Later: November carries it on; Back to Fall puts it on Fall, then off October; both undo to the periods it was on', async () => {
     show('/month?view=constellation&horizon=2&start=2026-10-09')
-    expect(verbs()).toEqual(['Move to November', 'Remove from October'])
-    fireEvent.click(screen.getByRole('button', { name: 'Move to November' }))
+    expect(verbs()).toEqual(['Later: November', 'Back to Fall'])
+    fireEvent.click(screen.getByRole('button', { name: 'Later: November' }))
     await waitFor(() => expect(deps.keepForward).toHaveBeenCalledWith('m', { monthStart: NOV }, OCT))
     expect(last()).toMatchObject({ label: 'Move “Picnic” to November', ok: true })
     await last().opts.undo!()
     expect(deps.updateTask).toHaveBeenLastCalledWith('m', { commitments: [{ level: 'month', periodStart: OCT, status: 'open' }] })
-    fireEvent.click(screen.getByRole('button', { name: 'Remove from October' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Fall' }))
     await waitFor(() => expect(deps.dropCommitment).toHaveBeenCalledWith('m', 'month', OCT))
-    expect(last().label).toBe('Remove “Picnic” from October')
+    expect(deps.keepForward).toHaveBeenLastCalledWith('m', { seasonStart: expect.any(Date) })
+    expect(last().label).toBe('Back to Fall: “Picnic”')
   })
-  it('a season goal: For a year goal, and Move to Winter', () => {
+  it('a season goal: For a year goal, Later: Winter, and Back to 2026', () => {
     show('/season?view=constellation&horizon=1&start=2026-10-09', 's1')
     expect(screen.getByText('Together')).toBeInTheDocument()
-    expect(verbs()).toEqual(['Move to Winter', 'Remove from Fall'])
+    expect(verbs()).toEqual(['Later: Winter', 'Back to 2026'])
   })
   it('offers nothing off a horizon page, for a task not on its list, or once done', () => {
     show('/today?detail=task:m')

@@ -48,20 +48,20 @@ describe('ChoosePlan — one October goal per card', () => {
     expect(screen.getByText('1 of 2')).toBeTruthy()
     const card = within(screen.getByRole('article', { name: 'Plan a winter vacation' }))
     expect(card.getByText('On October · no steps yet')).toBeTruthy()
-    expect(card.getAllByRole('button').map((b) => b.textContent)).toEqual(['Do this week', 'Not this week', 'Done', '+ Add a step'])
+    expect(card.getAllByRole('button').map((b) => b.textContent)).toEqual(['This week', 'Not this week', 'Done', '+ Add a step'])
   })
 
-  it('Do this week saves, stamps the card and offers Undo, which sends it back', async () => {
+  it('This week saves, stamps the card and offers Undo, which sends it back', async () => {
     const g = goal()
     const back = { label: 'Back to October', role: 'back' as const, run: vi.fn(async () => true) }
     g.verbs.push(back)
     renderChoose({ lines: [g] })
-    fireEvent.click(screen.getByRole('button', { name: 'Do this week: Plan a winter vacation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'This week: Plan a winter vacation' }))
     await waitFor(() => expect(screen.getByRole('img', { name: /this week/i })).toBeTruthy())
     expect(g.verbs[0].run).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'Undo: Plan a winter vacation' }))
     await waitFor(() => expect(back.run).toHaveBeenCalledTimes(1))
-    expect(screen.getByRole('button', { name: 'Do this week: Plan a winter vacation' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'This week: Plan a winter vacation' })).toBeTruthy()
   })
 
   it('Not this week changes nothing but stamps it as staying on October', async () => {
@@ -124,7 +124,7 @@ describe('ChoosePlan — All at once', () => {
     const row = screen.getByRole('button', { name: /Organize important family documents/ })
     expect(row).toHaveTextContent('1 done · 1 this week · 1 on October')
     fireEvent.click(row)
-    expect(screen.getByRole('button', { name: 'Do this week: Organize important family documents' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'This week: Organize important family documents' })).toBeTruthy()
     fireEvent.click(screen.getByRole('radio', { name: 'One at a time' }))
     expect(props.onViewChange).toHaveBeenCalledWith('one')
   })

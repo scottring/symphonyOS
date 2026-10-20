@@ -5,9 +5,10 @@
 // this file once ran is retired (2026-10-14).
 //
 // The header (calm pass 2, mockup approved 2026-10-18): one quiet fact line
-// ("{n} done last week · reviewed {Weekday} · Today: {first item}"), one
-// primary button, "Plan this week", where the deck may open, and a ⋯ menu
-// (WeekMenu). On the desk they fold into HomeHeader's masthead; on a phone
+// ("4 of 16 done", a bar, "planned Sunday · Today: {first item}" — this week's
+// count, as Month counts October; last week's lives in Looking back), at most
+// one button, only the one that's due (reviewed design, 2026-10-20), and a ⋯
+// menu (WeekMenu). On the desk they fold into HomeHeader's masthead; on a phone
 // they are the page's own row. "Help me plan the rest of my week" lives in the
 // Chat bar (WeekViewV2 still hands it the walk); a phone, which has no bar,
 // gets "Talk it through" in the ⋯ menu instead. There is no "I’m happy with
@@ -49,6 +50,9 @@ export interface WeekDeck {
   available: boolean
   cards: DeckCard[]
   doneLastWeek: number
+  /** This week's count for the fact line: done, out of everything on it. */
+  doneThisWeek?: number
+  onThisWeek?: number
   /** Everything that was on last week, done or not (Looking back's "of"). */
   plannedLastWeek?: number
   /** Finished last week but not on it (Looking back's "Also done"). */
@@ -92,6 +96,8 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   // nothing), so finishing the deck updates the page's line too.
   const ownReview = usePeriodReview('weekly', deck?.lastReview ? '' : weekToken(lastWeek))
   const lastReview = deck?.lastReview ?? ownReview
+  // This week's own review (due on its last day) and next week's plan record.
+  const thisReview = usePeriodReview('weekly', weekToken(weekStart))
   const [, setParams] = useSearchParams()
   const deckMode = deck?.mode ?? null
   const setMode = (mode: 'review' | 'plan' | 'place' | null, week?: Date) => setParams((prev) => {
@@ -103,6 +109,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   })
   const reviewWord = weekPhrase(weekStart)
   const nextWeek = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
+  const nextSession = usePlanningSession('weekly', weekToken(nextWeek))
 
   // The week's planned mark — the record "I’m happy with this week" wrote,
   // which Home's checklist reads. Written now by finishing the full deck.
@@ -123,9 +130,6 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   // cards) and records that week's review. So reviewing this week opens the
   // deck on the week after it, and last week's review opens it here.
   const target = reviewTarget({ start: weekStart, end: nextWeek }, new Date(), REVIEW_WINDOW_DAYS.week)
-  // On the week's own last day there is nothing left of it to plan: the one
-  // button plans the next week, opening the deck on it (fix round 1 ruling).
-  const lastDayPlan = target === 'this' && isCurrent && !!deck
   // Full deck: the undealt last-week cards go to Later (WeekViewV2's drain),
   // then last week is recorded reviewed, then this week is marked planned —
   // unless this week ends today: a week on its last day is not marked planned
@@ -147,19 +151,37 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   }
 
   // ── The header ─────────────────────────────────────────────────────────
-  // One primary button, where the deck may open; none while it is open.
-  const primary = deckMode ? null
-    : plannable ? { label: `Plan ${reviewWord}`, onClick: () => setMode('plan') }
-      : lastDayPlan ? { label: 'Plan next week', onClick: () => setMode('plan', nextWeek) }
-        : null
-  // The fact line: last week's progress where the deck may open (the deck on
-  // this week reviews it), and today's first item.
-  const reviewKnown = !lastReview.loading && !lastReview.error
-  const progress = deck?.available ? (
-    <>{deck.doneLastWeek} done last week{reviewKnown && <> · {lastReview.reviewed
-      ? <b className="wk-facts-reviewed">reviewed {lastReview.reviewed.at.toLocaleDateString('en-US', { weekday: 'long' })}</b>
-      : <button type="button" className="canvas-link wc-quiet-link" onClick={() => setMode('review')}>Review</button>}</>}</>
-  ) : null
+  // One button at most, and only the one that's due — the rule every horizon
+  // follows (reviewed design, 2026-10-20). Not planned yet: "Plan this week",
+  // which opens on Looking back at last week. Planned: no button. Its last
+  // day, until reviewed: "Review this week" — the deck on next week, which
+  // looks back at this one and records its review. Reviewed: no button. The
+  // rest waits in ⋯; nothing while the deck is open.
+  type Offer = { id: string; label: string; due: boolean; run: () => void }
+  const settled = !session.loading && !nextSession.loading && !thisReview.loading && !lastReview.loading
+  const planned = !session.error && !!session.saved
+  const nextPlanned = !nextSession.error && !!nextSession.saved
+  const nextWord = isCurrent ? 'next week' : weekPhrase(nextWeek)
+  const offers: Offer[] = deckMode || !deck || !settled ? [] : [
+    ...(target === 'this' && isCurrent && !thisReview.error && !thisReview.reviewed
+      ? [{ id: 'review', label: `Review ${reviewWord}`, due: true, run: () => setMode('plan', nextWeek) }] : []),
+    ...(target === 'previous' && deck.available && !lastReview.error && !lastReview.reviewed
+      ? [{ id: 'review-last', label: 'Review last week', due: false, run: () => setMode('review') }] : []),
+    ...(plannable ? [{ id: 'plan', label: planned ? `Plan ${reviewWord} again` : `Plan ${reviewWord}`, due: !planned, run: () => setMode('plan') }] : []),
+    ...(!nextPlanned && isCurrent ? [{ id: 'plan-next', label: target === 'this' ? `Plan ${nextWord}` : `Plan ${nextWord} early`, due: false, run: () => setMode('plan', nextWeek) }] : []),
+  ]
+  const primary = offers.find((o) => o.due) ?? null
+  // The fact line: this week's count and bar, when it was planned, and
+  // today's first item.
+  const on = deck?.onThisWeek ?? 0, doneHere = deck?.doneThisWeek ?? 0
+  const countText = `${doneHere} of ${on} done`
+  const plannedOn = !session.loading && !session.error && session.saved
+    ? `planned ${session.saved.at.toLocaleDateString('en-US', { weekday: 'long' })}` : null
+  const progress = on > 0 || plannedOn ? <>
+    {on > 0 && <><span className="wk-facts-count"><b>{doneHere}</b> of {on} done</span>
+      <span className="wk-facts-bar" role="img" aria-label={countText}><span style={{ width: `${Math.round(doneHere / on * 1000) / 10}%` }} /></span></>}
+    {plannedOn && <>{on > 0 && ' · '}<b className="wk-facts-reviewed">{plannedOn}</b></>}
+  </> : null
   const facts = !deckMode && (progress || today) ? (
     <p className="wk-facts" data-explain="week-facts" data-explain-label="This week’s facts">
       {progress}{progress && today && ' · '}{today && <>Today: {today}</>}
@@ -167,8 +189,8 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   ) : null
   const controls = (
     <>
-      {primary && <button type="button" className="pv2-btn wk-plan" onClick={primary.onClick} data-explain="plan-deck" data-explain-label={primary.label}>{primary.label}</button>}
-      <WeekMenu talk={phoneTalk} />
+      {primary && <button type="button" className="pv2-btn wk-plan" onClick={primary.run} data-explain="plan-deck" data-explain-label={primary.label}>{primary.label}</button>}
+      <WeekMenu talk={phoneTalk} offers={offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run }))} />
     </>
   )
   // HomeHeader's masthead, when it offers a place for the header (desktop
@@ -196,7 +218,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
         // What the week is for, as agreed when it was planned.
         <p className="wk-focus-line"><span>This week is for</span> <em>{session.saved.notes?.focus}</em></p>
       )}
-      {endsToday && (
+      {endsToday && !primary && (
         // The week's last day: nothing left in it to plan, so say so and
         // point at planning the next one by talking.
         <div className="pv2-saved pv2-endsweek" role="note">
