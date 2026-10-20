@@ -353,6 +353,35 @@ function ThemedWall({ auto }: { auto: boolean }) {
   return <Harness isDark={dark} tools={themed} v1={{ ...v1Rest, pick: { ...v1Rest.pick, dark } }} />
 }
 
+// Scott, 2026-10-20: a late dinner needs the dinner scene back. The scene's
+// name in the top band opens the day's scenes; a pick holds for a while.
+describe('Kitchen wall v2: picking a scene by hand', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  it('the scene name opens the day’s scenes, and a pick goes to the Shell', () => {
+    const onPick = vi.fn()
+    render(<Harness v1={{ ...v1Rest, pick: { screen: 'rest', title: 'This evening', dark: true }, scenes: { choices: ['out-the-door', 'home', 'dinner', 'bedtime'], clock: 'rest', held: false, onPick } }} />)
+    fireEvent.click(topBand().getByRole('button', { name: /This evening/ }))
+    const picker = screen.getByRole('group', { name: 'Scenes' })
+    expect(within(picker).getAllByRole('button').map((b) => b.textContent)).toEqual(['Out the door', 'Home from school', 'Dinner', 'Bedtime'])
+    fireEvent.click(within(picker).getByRole('button', { name: 'Dinner' }))
+    expect(onPick).toHaveBeenCalledWith('dinner')
+    expect(screen.queryByRole('group', { name: 'Scenes' })).toBeNull()
+  })
+
+  it('a held scene says so, and offers the clock’s scene back', () => {
+    const onPick = vi.fn()
+    render(<Harness v1={{ ...v1Rest, pick: { screen: 'dinner', title: 'Dinner', dark: false }, scenes: { choices: ['out-the-door', 'home', 'dinner', 'bedtime'], clock: 'rest', held: true, onPick } }} />)
+    const title = topBand().getByRole('button', { name: /Dinner/ })
+    expect(title).toHaveTextContent('Dinner · held')
+    fireEvent.click(title)
+    const picker = screen.getByRole('group', { name: 'Scenes' })
+    expect(within(picker).getByRole('button', { name: 'Dinner' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(picker).getByRole('button', { name: 'Back to the clock' }))
+    expect(onPick).toHaveBeenCalledWith('rest')
+  })
+})
+
 describe('More: Dark view / Light view on the v1 wall', () => {
   beforeEach(() => { localStorage.clear() })
 
