@@ -112,6 +112,8 @@
 /* Looking back: the period in one number, two labeled places */
 .choose-big { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 10px; font-size: 14px; color: var(--color-neutral-600); }
 .choose-big b { font: 500 44px/1 var(--font-family-display); color: var(--color-primary-500); }
+.choose-progress { height: 8px; margin: -2px 0 12px; border-radius: 999px; background: var(--color-neutral-100); overflow: hidden; }
+.choose-progress span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary-500); transition: width .4s ease; }
 .choose-place-label { display: block; margin: 12px 0 6px; font: 600 10.5px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
 .choose-textarea { width: 100%; min-height: 60px; padding: 10px 12px; border: 1px solid var(--color-neutral-200); border-radius: 11px; background: var(--color-bg-elevated); font: 400 17px/1.35 var(--font-family-display); color: var(--color-neutral-900); resize: vertical; }
 .choose-textarea:focus { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }

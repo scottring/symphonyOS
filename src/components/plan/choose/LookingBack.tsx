@@ -26,6 +26,7 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, initial,
   /** Already reviewed: when, and by whom ("Reviewed Oct 17 by you"). */
   reviewed?: string | null
 }) {
+  const hasTotal = outOf !== undefined && outOf >= done && outOf > 0
   const [wentWell, setWentWell] = useState(initial?.wentWell ?? '')
   const [didnt, setDidnt] = useState(initial?.didnt ?? '')
   const [saving, setSaving] = useState(false)
@@ -48,7 +49,10 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, initial,
       <div className="deck-ghost is-far" /><div className="deck-ghost" />
       <article className="deck-card choose-card" aria-label={`Looking back at ${periodWord}`}>
         <h3 className="choose-card-title">{periodWord}</h3>
-        <p className="choose-big"><b>{done}</b> {outOf !== undefined && outOf >= done && outOf > 0 ? `of ${outOf} ` : ''}done{notDone ? ` · ${notDone} not done` : ''}</p>
+        <p className="choose-big"><b>{done}</b> {hasTotal ? `of ${outOf} ` : ''}done{notDone ? ` · ${notDone} not done` : ''}</p>
+        {hasTotal && <div className="choose-progress" role="img" aria-label={`${done} of ${outOf} done`}>
+          <span style={{ width: `${(done / outOf) * 100}%` }} />
+        </div>}
         {reviewed && <p className="choose-fact">{reviewed}</p>}
         <label className="choose-place-label" htmlFor="look-well">What went well</label>
         <textarea id="look-well" className="choose-textarea" rows={2} value={wentWell} onChange={(e) => setWentWell(e.target.value)} />
