@@ -66,6 +66,19 @@ export interface KidNeededRow {
   tomorrow: boolean
 }
 
+/** A school paper on the kid's page (spec 2026-10-20). Not found yet while
+ *  `heldBy` is null; done once it is in the backpack (shown until tomorrow). */
+export interface KidPaperRow {
+  id: string
+  title: string
+  due: string | null
+  late: boolean
+  notes?: string
+  /** The parent who has it (family_members.id), or null: not found yet. */
+  heldBy: string | null
+  done: boolean
+}
+
 /** A row of the "Homework" card — open homework assigned to this member,
  *  until it is checked off. Due label and order come from homeworkLabel,
  *  shared with the board, so the two can never disagree about "Fri". */
@@ -110,6 +123,8 @@ export interface MemberDayModel {
   /** Today at school — null on a day with no school on the calendar. */
   school: KidSchoolDay | null
   homework: KidHomeworkRow[]
+  /** School papers (spec 2026-10-20): open, then today's done ones. */
+  papers: KidPaperRow[]
   notices: KidNoticeRow[]
   collections: KidCollection[]
   bands: Record<KidBandKey, KidRow[]>
@@ -255,6 +270,8 @@ export function buildMemberDayModel(input: {
   /** Open homework, any date (useWallData.homeworkTasks). Optional so
    *  callers that predate the card keep working. */
   homeworkTasks?: Task[]
+  /** School papers (useWallData.paperTasks). */
+  paperTasks?: Task[]
   /** Standing info from school (useWallData.notices). */
   notices?: WallNotice[]
   /** Tomorrow's items, for the evening "tomorrow's special" line. */
@@ -325,7 +342,7 @@ export function buildMemberDayModel(input: {
       if (item.type !== 'task') continue
       if (item.assignedTo !== member.id) continue
       // The Homework card owns homework rows — one row per item on the page.
-      if (item.category === 'homework') continue
+      if (item.category === 'homework' || item.category === 'paper') continue
       const row: KidRow = {
         entityType: 'task',
         // taskToTimelineItem prefixes the timeline id (`task-${task.id}`) —
@@ -353,7 +370,7 @@ export function buildMemberDayModel(input: {
   const neededOnDay = (t: Task, day: Date) => !!t.neededOn && isSameDay(t.neededOn, day)
   // Homework is excluded here too: a form due today is still the Homework
   // card's row, not a second one under "Needed today".
-  const forMember = neededTasks.filter((t) => !t.completed && t.assignedTo === member.id && t.category !== 'homework')
+  const forMember = neededTasks.filter((t) => !t.completed && t.assignedTo === member.id && t.category !== 'homework' && t.category !== 'paper')
   const needed: KidNeededRow[] = [
     ...forMember.filter((t) => neededOnDay(t, window.today)).map((t) => ({ id: t.id, title: t.title, tomorrow: false })),
     ...(window.tomorrow
@@ -367,10 +384,23 @@ export function buildMemberDayModel(input: {
   // homeworkLabel so the page and the board never disagree about whose it is
   // or about "Fri". A class-wide sheet is one row naming every child.
   const rosterIds = new Set(members.map((m) => m.id))
-  const mine = homeworkTasks.filter((t) => !t.completed && homeworkOwners(t, rosterIds).includes(member.id))
+  const mine = homeworkTasks.filter((t) => !t.completed && t.category !== 'paper' && homeworkOwners(t, rosterIds).includes(member.id))
   const homework: KidHomeworkRow[] = sortHomework(mine, now).map((t) => {
     const due = homeworkDue(t.neededOn, now)
     return { id: t.id, title: t.title, due: due.label, late: due.late, notes: t.notes?.trim() || null }
+  })
+
+  // Papers: this kid's, open or done today (then gone); "Not ours" never.
+  // They never make the page non-empty on their own, like notices.
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const myPapers = (input.paperTasks ?? []).filter((t) => t.category === 'paper' && t.assignedTo === member.id && !t.dismissedAt
+    && (!t.completed || (t.completedAt != null && t.completedAt >= todayStart)))
+  const papers: KidPaperRow[] = [
+    ...sortHomework(myPapers.filter((t) => !t.completed), now),
+    ...sortHomework(myPapers.filter((t) => t.completed), now),
+  ].map((t) => {
+    const due = homeworkDue(t.neededOn, now)
+    return { id: t.id, title: t.title, due: due.label, late: !t.completed && due.late, notes: t.notes?.trim() || undefined, heldBy: t.heldBy ?? null, done: !!t.completed }
   })
 
   // Notices: addressed to this member or to everyone. Newest first. They are
@@ -391,7 +421,7 @@ export function buildMemberDayModel(input: {
     collections.length === 0 &&
     Object.values(bands).every((rows) => rows.length === 0)
 
-  return { needed, reading, school, homework, notices, collections, bands, isEmpty }
+  return { needed, reading, school, homework, papers, notices, collections, bands, isEmpty }
 }
 
 /** A minutes target whose name is about reading: "Read", "Read 20 min", "Reading". */

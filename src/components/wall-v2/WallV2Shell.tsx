@@ -755,10 +755,10 @@ export function WallV2Shell() {
     member,
     model: buildMemberDayModel({
       member, date: now, now, routines: wallData.routines, todayItems, tomorrowItems: tomorrowData?.items,
-      members: wallData.familyMembers, neededTasks: wallData.neededTasks, homeworkTasks: wallData.homeworkTasks,
+      members: wallData.familyMembers, neededTasks: wallData.neededTasks, homeworkTasks: wallData.homeworkTasks, paperTasks: wallData.paperTasks,
       notices: wallData.notices, history: instanceHistory,
     }),
-  })), [kids, now, wallData.routines, todayItems, tomorrowData, wallData.familyMembers, wallData.neededTasks, wallData.homeworkTasks, wallData.notices, instanceHistory]);
+  })), [kids, now, wallData.routines, todayItems, tomorrowData, wallData.familyMembers, wallData.neededTasks, wallData.homeworkTasks, wallData.paperTasks, wallData.notices, instanceHistory]);
   const kidsNow: MomentKid[] = useMemo(() => kidModels.map(({ member, model }) => {
     const evening = moment === 'evening';
     return {

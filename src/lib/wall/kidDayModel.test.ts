@@ -382,3 +382,45 @@ describe('homework + notices', () => {
     expect(model.isEmpty).toBe(true)
   })
 })
+
+// School papers (spec 2026-10-20): per kid, from mention until the backpack;
+// a paper done today stays struck through until tomorrow; "Not ours" never shows.
+describe('papers', () => {
+  const papers = (paperTasks: Task[], neededTasks: Task[] = [], homeworkTasks: Task[] = []) => buildMemberDayModel({
+    member: KID, date: TODAY, now: TODAY, routines: [], history: [],
+    todayItems: emptySections<TimelineItem>(), neededTasks, homeworkTasks, paperTasks,
+  })
+  const paper = (over: Partial<Task>) => task({ category: 'paper', title: 'Pink health form', ...over })
+  const at = (daysAgo: number, h = 9) => { const d = new Date(TODAY); d.setDate(d.getDate() - daysAgo); d.setHours(h, 0, 0, 0); return d }
+
+  it("a kid's open papers, held or not", () => {
+    const model = papers([
+      paper({ id: 'p-held', heldBy: 'iris' }),
+      paper({ id: 'p-unfound', title: 'Field trip slip' }),
+      paper({ id: 'p-other', assignedTo: 'kid-2' }),
+    ])
+    expect(model.papers.map((p) => [p.id, p.heldBy, p.done])).toEqual(expect.arrayContaining([['p-held', 'iris', false], ['p-unfound', null, false]]))
+    expect(model.papers).toHaveLength(2)
+  })
+
+  it('a paper done today stays, struck through', () => {
+    const model = papers([paper({ id: 'p-done', completed: true, completedAt: at(0) })])
+    expect(model.papers).toEqual([expect.objectContaining({ id: 'p-done', done: true })])
+  })
+
+  it('a paper done yesterday is gone today', () => {
+    expect(papers([paper({ completed: true, completedAt: at(1, 20) })]).papers).toEqual([])
+  })
+
+  it('a dismissed paper never shows', () => {
+    expect(papers([paper({ dismissedAt: at(0) })]).papers).toEqual([])
+  })
+
+  it('papers stay out of Homework and Needed', () => {
+    const p = paper({ id: 'p-today', neededOn: TODAY })
+    const model = papers([p], [p], [p])
+    expect(model.homework).toEqual([])
+    expect(model.needed).toEqual([])
+    expect(model.papers.map((x) => x.id)).toEqual(['p-today'])
+  })
+})
