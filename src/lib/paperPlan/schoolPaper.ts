@@ -5,18 +5,26 @@
 import { attachFile } from '@/lib/taskAttachments'
 import { supabase } from '@/lib/supabase'
 import { rowToTask, TASK_COLUMNS } from '@/hooks/useWallData'
-import { itemsMatch, scopeFor } from '../../../supabase/functions/extract-email/lib/plan.ts'
+import { itemsMatch, normaliseTitle, scopeFor } from '../../../supabase/functions/extract-email/lib/plan.ts'
 import { nextSchoolDay } from '../../../supabase/functions/school-digest/lib/homework.ts'
 import type { Task } from '@/types/task'
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
+/** Words every school paper shares; a match on these alone is no match. */
+const GENERIC = new Set(['form', 'forms', 'slip', 'slips', 'paper', 'sheet', 'return', 'the', 'a', 'an', 'of', 'for', 'and', 'to'])
+const sharesAWord = (a: string, b: string) => {
+  const A = new Set(normaliseTitle(a).split(' ').filter((w) => w && !GENERIC.has(w)))
+  return normaliseTitle(b).split(' ').some((w) => A.has(w))
+}
+
 /** The kid's open, not-yet-found paper this photo most likely is: the same
- *  name, or the same due date. Null when none fits — then it is a new paper. */
+ *  name, or the same due date with at least one shared word (many papers are
+ *  due Friday). Null when none fits — then it is a new paper. */
 export function matchOpenPaper(read: { title: string; due?: string }, open: Task[], kidId: string): Task | null {
   const candidates = open.filter((t) => t.category === 'paper' && t.assignedTo === kidId && !t.completed && !t.heldBy && !t.dismissedAt)
   return candidates.find((t) => itemsMatch(t.title, read.title))
-    ?? (read.due ? candidates.find((t) => t.neededOn && ymd(t.neededOn) === read.due) : undefined)
+    ?? (read.due ? candidates.find((t) => t.neededOn && ymd(t.neededOn) === read.due && sharesAWord(t.title, read.title)) : undefined)
     ?? null
 }
 
@@ -42,13 +50,16 @@ export interface SchoolPaperSave {
   today: string
 }
 
-/** True when everything saved. */
-export async function saveSchoolPaper(db: PaperWriteDb, s: SchoolPaperSave): Promise<boolean> {
+/** `saved` once the paper is on the wall — even if the photo then failed to
+ *  attach, so the card never offers a Save that would add it a second time. */
+export interface SchoolPaperSaved { saved: boolean; photoAttached: boolean }
+
+export async function saveSchoolPaper(db: PaperWriteDb, s: SchoolPaperSave): Promise<SchoolPaperSaved> {
   const name = `paper-${s.today}.jpg`
   if (s.existing) {
     const { error } = await db.from('tasks').update({ held_by: s.holderId }).eq('id', s.existing.id)
-    if (error) return false
-    return !!(await attachFile('task', s.existing.id, s.photo, name))
+    if (error) return { saved: false, photoAttached: false }
+    return { saved: true, photoAttached: !!(await attachFile('task', s.existing.id, s.photo, name)) }
   }
   const due = s.due && s.due >= s.today ? s.due : nextSchoolDay(s.today)
   const rows = s.kidIds.map((kid) => ({
@@ -69,9 +80,9 @@ export async function saveSchoolPaper(db: PaperWriteDb, s: SchoolPaperSave): Pro
     held_by: s.holderId,
   }))
   const { data, error } = await db.from('tasks').insert(rows).select('id')
-  if (error || !data) return false
+  if (error || !data) return { saved: false, photoAttached: false }
   const attached = await Promise.all(data.map((r) => attachFile('task', r.id, s.photo, name)))
-  return attached.every(Boolean)
+  return { saved: true, photoAttached: attached.every(Boolean) }
 }
 
 /** The household's open, unclaimed papers, to match a photo against. */

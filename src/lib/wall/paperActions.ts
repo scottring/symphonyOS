@@ -22,5 +22,7 @@ export const claimPaper = (db: PaperDb, taskId: string, memberId: string) => pat
 export const paperInBackpack = (db: PaperDb, taskId: string, now: Date) =>
   patch(db, taskId, { completed: true, completed_at: now.toISOString() })
 
-/** "Not ours": kept, never shown, and the digest won't add it back. */
-export const paperNotOurs = (db: PaperDb, taskId: string, now: Date) => patch(db, taskId, { dismissed_at: now.toISOString() })
+/** "Not ours": kept, never shown, and the digest won't add it back. Closed
+ *  too, so the phone app (which reads every open task) drops it. */
+export const paperNotOurs = (db: PaperDb, taskId: string, now: Date) =>
+  patch(db, taskId, { dismissed_at: now.toISOString(), completed: true, completed_at: now.toISOString() })

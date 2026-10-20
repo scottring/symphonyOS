@@ -31,7 +31,8 @@ describe('paper actions', () => {
   it('Not ours dismisses it, kept for the dedupe', async () => {
     const { db, calls } = client()
     expect(await paperNotOurs(db, 'p1', NOW)).toBe(true)
-    expect(calls).toEqual([{ table: 'tasks', patch: { dismissed_at: NOW.toISOString() }, id: 'p1' }])
+    // Closed too, so the phone app (which reads every open task) drops it.
+    expect(calls).toEqual([{ table: 'tasks', patch: { dismissed_at: NOW.toISOString(), completed: true, completed_at: NOW.toISOString() }, id: 'p1' }])
   })
 
   it('says so when the write fails', async () => {

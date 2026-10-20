@@ -5,7 +5,7 @@ import type { Task } from '@/types/task'
 
 const m = vi.hoisted(() => ({
   readSchoolPaper: vi.fn(),
-  saveSchoolPaper: vi.fn(async () => true),
+  saveSchoolPaper: vi.fn(async () => ({ saved: true, photoAttached: true })),
   loadOpenPapers: vi.fn(async () => [] as Task[]),
   uploadPaperPhoto: vi.fn(async () => 'u/paper-plan/x/photo-1.jpg'),
   prepareImages: vi.fn(async (b: Blob) => [{ blob: b, part: 'whole' }]),
@@ -56,7 +56,7 @@ describe('SchoolPaperCapture', () => {
 
   it('a paper already on the wall is pre-selected and claimed', async () => {
     await photograph({ title: 'Pink Health Information Form', for: ['Kaleb'], confidence: 0.9 }, [openPink])
-    expect(screen.getByText('This is: Pink health form', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Kaleb’s: Pink health form', { exact: false })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(m.saveSchoolPaper).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ kidIds: ['k'], existing: openPink })))
   })
@@ -73,6 +73,24 @@ describe('SchoolPaperCapture', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Kaleb' }))
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('two kids with their own matches each get a line', async () => {
+    const ellaPink = { ...openPink, id: 'p2', assignedTo: 'e' } as Task
+    await photograph({ title: 'Pink health form', for: 'everyone', confidence: 0.9 }, [openPink, ellaPink])
+    fireEvent.click(screen.getByRole('button', { name: 'Ella' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Kaleb' }))
+    expect(screen.getByText('Ella’s: Pink health form', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Kaleb’s: Pink health form', { exact: false })).toBeInTheDocument()
+  })
+
+  it('a saved paper whose photo did not attach is not saved again', async () => {
+    m.saveSchoolPaper.mockResolvedValueOnce({ saved: true, photoAttached: false })
+    await photograph({ title: 'Field trip slip', for: ['Ella'], confidence: 0.9 })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText(/photo didn’t attach/i)).toBeInTheDocument()
+    expect(screen.getByText('On the wall.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
   })
 
   it('says so when the photo is not a readable paper', async () => {

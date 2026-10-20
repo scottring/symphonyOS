@@ -27,7 +27,7 @@ type Step =
   | { kind: 'photo' }
   | { kind: 'reading' }
   | { kind: 'confirm'; photo: Blob; read: SchoolPaperRead; open: Task[] }
-  | { kind: 'saved' }
+  | { kind: 'saved'; photoAttached: boolean }
 
 export function SchoolPaperCapture({ userId, holderId, kids, onClose, today }: Props) {
   const [step, setStep] = useState<Step>({ kind: 'photo' })
@@ -86,15 +86,17 @@ export function SchoolPaperCapture({ userId, holderId, kids, onClose, today }: P
       existing: matches.find((m) => m.id === kid)?.task ?? undefined,
     })))
     setSaving(false)
-    if (results.every(Boolean)) setStep({ kind: 'saved' })
-    else setError('Couldn’t save — try again.')
+    // A paper that saved is never saved again: the card closes even if its
+    // photo didn't attach, rather than offering a Save that would duplicate it.
+    if (results.some((r) => r.saved)) setStep({ kind: 'saved', photoAttached: results.every((r) => r.saved && r.photoAttached) })
+    if (results.some((r) => !r.saved)) setError('Couldn’t save — try again.')
   }
 
   useEffect(() => {
     if (step.kind !== 'saved') return
-    const t = setTimeout(onClose, 1200)
+    const t = setTimeout(onClose, step.photoAttached ? 1200 : 3500)
     return () => clearTimeout(t)
-  }, [step.kind, onClose])
+  }, [step, onClose])
 
   const toggleKid = (id: string) => setKidIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
 
@@ -123,8 +125,13 @@ export function SchoolPaperCapture({ userId, holderId, kids, onClose, today }: P
           <div className="flex flex-col gap-3">
             {matches.length > 0 && (
               <div className="rounded-xl bg-primary-50 px-3 py-2 text-sm text-neutral-800">
-                This is: {matches[0].task!.title}{matches[0].task!.neededOn ? `, due ${matches[0].task!.neededOn.toLocaleDateString('en-US', { weekday: 'short' })}` : ''} — already on the wall.
-                <button type="button" onClick={() => setDifferent(true)} className="ml-1 font-semibold text-primary-700 underline">It’s a different paper</button>
+                <div className="font-semibold">Already on the wall:</div>
+                {matches.map((m) => (
+                  <div key={m.id}>
+                    {kids.find((k) => k.id === m.id)?.name}’s: {m.task!.title}{m.task!.neededOn ? `, due ${m.task!.neededOn.toLocaleDateString('en-US', { weekday: 'short' })}` : ''}
+                  </div>
+                ))}
+                <button type="button" onClick={() => setDifferent(true)} className="mt-1 font-semibold text-primary-700 underline">It’s a different paper</button>
               </div>
             )}
             <div>
@@ -157,7 +164,12 @@ export function SchoolPaperCapture({ userId, holderId, kids, onClose, today }: P
           </div>
         )}
 
-        {step.kind === 'saved' && <p className="py-10 text-center text-sm font-semibold text-neutral-800">On the wall.</p>}
+        {step.kind === 'saved' && (
+          <div className="py-10 text-center text-sm">
+            <p className="font-semibold text-neutral-800">On the wall.</p>
+            {!step.photoAttached && <p className="mt-1 text-neutral-600">The photo didn’t attach — the paper is saved without it.</p>}
+          </div>
+        )}
       </div>
     </div>
   )

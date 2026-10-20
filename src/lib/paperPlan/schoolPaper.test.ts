@@ -23,6 +23,10 @@ describe('matchOpenPaper', () => {
     const d = new Date(2026, 9, 22)
     expect(matchOpenPaper({ title: 'Zoo trip form', due: '2026-10-22' }, [open({ title: 'Field trip permission slip', neededOn: d })], 'k')?.id).toBe('p1')
   })
+  it('the same due date alone does not match — the titles must share a word', () => {
+    const d = new Date(2026, 9, 23)
+    expect(matchOpenPaper({ title: 'Book fair order', due: '2026-10-23' }, [open({ title: 'Pink health form', neededOn: d })], 'k')).toBeNull()
+  })
   it('a held or other kid\'s paper never matches', () => {
     expect(matchOpenPaper({ title: 'Pink health form' }, [open({ heldBy: 'iris' })], 'k')).toBeNull()
     expect(matchOpenPaper({ title: 'Pink health form' }, [open({ assignedTo: 'e' })], 'k')).toBeNull()
@@ -49,7 +53,7 @@ const photo = new Blob(['x'], { type: 'image/jpeg' })
 describe('saveSchoolPaper', () => {
   it('with an existing paper only claims it and attaches the photo', async () => {
     const d = db()
-    expect(await saveSchoolPaper(d, { userId: 'u', kidIds: ['k'], title: 'Pink health form', notes: '', holderId: 'scott', photo, existing: open({}), today: '2026-10-20' })).toBe(true)
+    expect(await saveSchoolPaper(d, { userId: 'u', kidIds: ['k'], title: 'Pink health form', notes: '', holderId: 'scott', photo, existing: open({}), today: '2026-10-20' })).toEqual({ saved: true, photoAttached: true })
     expect(d.updates).toEqual([{ patch: { held_by: 'scott' }, id: 'p1' }])
     expect(d.inserts).toEqual([])
     expect(attach.attachFile).toHaveBeenCalledWith('task', 'p1', photo, expect.any(String))
@@ -66,6 +70,13 @@ describe('saveSchoolPaper', () => {
       expect(r).toMatchObject({ category: 'paper', context: 'family', completed: false, held_by: 'iris', needed_on: '2026-10-22', assigned_to_all: null, user_id: 'u' })
     }
     expect(attach.attachFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('a photo that will not attach still counts the paper as saved — Save again must not add it twice', async () => {
+    const d = db()
+    attach.attachFile.mockResolvedValueOnce(null as never)
+    expect(await saveSchoolPaper(d, { userId: 'u', kidIds: ['k'], title: 'Form', notes: '', holderId: 'iris', photo, today: '2026-10-20' }))
+      .toEqual({ saved: true, photoAttached: false })
   })
 
   it('an undated paper is due the next school day, like the digest\'s', async () => {
