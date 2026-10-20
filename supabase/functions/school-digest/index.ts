@@ -36,7 +36,7 @@ async function callClaude(prompt: string, apiKey: string, transport: typeof fetc
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
-      model: 'claude-opus-5',
+      model: 'claude-opus-5-5',
       max_tokens: 8000,
       output_config: { effort: 'medium' },
       messages: [{ role: 'user', content: prompt }],
