@@ -19,6 +19,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   ANALYSIS_SCHEMA, REVISION_SCHEMA, buildAnalysisPrompt, buildRevisionPrompt, normalizeAnalysis,
   PlanError, classifyModelHttpError, isOwnPagePath, boundContext, LIMITS, applyRevision,
+  PAPER_SCHEMA, buildPaperPrompt, normalizePaper,
   type Analysis, type RevisionPatch,
 } from './lib/plan.ts'
 import { AiUsageError, reserveAiProviderCall } from '../_shared/aiUsage.ts'
@@ -31,6 +32,9 @@ import { AiUsageError, reserveAiProviderCall } from '../_shared/aiUsage.ts'
 // Env overrides switch either without a code change.
 const READ = { model: Deno.env.get('PLAN_FROM_PAPER_READ_MODEL') || 'claude-opus-5-5', effort: Deno.env.get('PLAN_FROM_PAPER_READ_EFFORT') || 'high' }
 const REVISE = { model: Deno.env.get('PLAN_FROM_PAPER_REVISE_MODEL') || 'claude-sonnet-4-6', effort: Deno.env.get('PLAN_FROM_PAPER_REVISE_EFFORT') || 'medium' }
+// A school paper is printed, one page, a handful of fields (spec 2026-10-20):
+// Sonnet reads it; the Opus page reader costs ~50¢ a spread.
+const PAPER = { model: Deno.env.get('PLAN_FROM_PAPER_PAPER_MODEL') || 'claude-sonnet-4-6', effort: 'medium' }
 type ModelChoice = typeof READ
 
 const corsHeaders = {
@@ -183,7 +187,7 @@ Deno.serve(async (req) => {
     const declared = Number(req.headers.get('content-length') ?? '0')
     if (declared > 400_000) throw new PlanError('bad_request', 'Request too large', 413)
     let body: {
-      action?: 'analyze' | 'revise'
+      action?: 'analyze' | 'revise' | 'read-paper'
       storagePaths?: string[]
       instructions?: string | null
       context?: unknown
@@ -255,7 +259,26 @@ ${history ? `Conversation so far:\n${history}\n\n` : ''}User: ${message}`,
       })
     }
 
-    throw new PlanError('bad_request', 'action must be analyze or revise', 400)
+    if (body.action === 'read-paper') {
+      const paths = Array.isArray(body.storagePaths) ? body.storagePaths : []
+      if (!paths.length || paths.length > LIMITS.images) throw new PlanError('bad_request', `Send 1 to ${LIMITS.images} images`, 400)
+      if (!paths.every((p) => isOwnPagePath(p, user.id))) throw new PlanError('forbidden', 'Images must be your own uploaded pages', 403)
+      const images: Block[] = []
+      for (const [i, p] of paths.entries()) {
+        const { data: signed, error } = await service.storage.from('attachments').createSignedUrl(p, 900)
+        if (error || !signed?.signedUrl) throw new PlanError('image_unavailable', `Image ${i + 1} could not be opened`, 404)
+        images.push({ type: 'image', source: { type: 'url', url: signed.signedUrl } })
+      }
+      await reserveAiProviderCall(db, 'plan-from-paper')
+      return streamed(async () => {
+        const { text, usage } = await callModel([...images, { type: 'text', text: buildPaperPrompt(ctx) }], PAPER_SCHEMA, apiKey, PAPER)
+        const paper = normalizePaper(parseReply(text))
+        console.log('read-paper ok', JSON.stringify({ ms: Date.now() - started, found: !!paper, usage }))
+        return { ok: true, paper }
+      })
+    }
+
+    throw new PlanError('bad_request', 'action must be analyze, revise or read-paper', 400)
   } catch (e) {
     if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     const err = e instanceof PlanError ? e : new PlanError('unknown', e instanceof Error ? e.message : String(e), 500)

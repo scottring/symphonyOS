@@ -385,3 +385,71 @@ export function boundContext(raw: unknown): PlanContext | null {
     routines: rows(c.routines, (r) => ({ id: clip(r.id, 64), title: clip(r.title, t) })),
   }
 }
+
+// ─── A photographed school paper (spec 2026-10-20) ───
+// One paper a parent must sign, fill in or pay that goes back to school: its
+// name, which kid, when it is due, any money. The phone confirms it on one
+// card before anything is saved; this only reads.
+
+export interface SchoolPaperRead {
+  title: string
+  /** Kids' first names, or 'everyone' (Ella and Kaleb share take-home papers). */
+  for: string[] | 'everyone'
+  /** YYYY-MM-DD. */
+  due?: string
+  money?: string
+  detail?: string
+  confidence: number
+}
+
+/** Below this the read is a guess; the wall would show a guess as fact. */
+const PAPER_MIN_CONFIDENCE = 0.6
+
+export const PAPER_SCHEMA = obj({
+  title: str,
+  for: { type: 'array', items: str },
+  everyone: { type: 'boolean' },
+  due: nullable(str),
+  money: nullable(str),
+  detail: nullable(str),
+  confidence: { type: 'number' },
+})
+
+export function buildPaperPrompt(ctx: PlanContext): string {
+  const kids = ctx.members.filter((m) => m.role === 'child').map((m) => m.name.split(' ')[0])
+  return `This is a photo of ONE paper a child brought home from school (today is ${ctx.today}): a permission slip, a form to fill in, a money envelope, a report to sign and return.
+
+CHILDREN: ${kids.join(', ') || '(none listed)'}
+
+Read it and return:
+- "title": the paper's short name as a parent would say it ("Pink health form", "Field trip permission slip"). No child's name.
+- "for": the children's first names from CHILDREN it is for, when the paper names a child; otherwise [].
+- "everyone": true when it names no child — the children share the same class papers.
+- "due": YYYY-MM-DD when it must be returned, resolving weekday names against today; null if not stated.
+- "money": an amount to send ("$12"), or null.
+- "detail": one sentence a parent needs (what to sign or fill in), or null.
+- "confidence": 0–1 that this is a school paper and the fields are right.
+
+Read only what is on the paper. Do not invent a due date.`
+}
+
+export function normalizePaper(raw: unknown): SchoolPaperRead | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+  const title = text(r.title)
+  const confidence = typeof r.confidence === 'number' ? r.confidence : 0
+  if (!title || confidence < PAPER_MIN_CONFIDENCE) return null
+  const named = Array.isArray(r.for) ? r.for.map(text).filter(Boolean) : []
+  const due = text(r.due)
+  const money = text(r.money)
+  const detail = text(r.detail)
+  return {
+    title,
+    for: r.everyone === true || named.length === 0 ? 'everyone' : named,
+    ...(/^\d{4}-\d{2}-\d{2}$/.test(due) ? { due } : {}),
+    ...(money ? { money } : {}),
+    ...(detail ? { detail } : {}),
+    confidence,
+  }
+}

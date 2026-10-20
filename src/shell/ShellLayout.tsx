@@ -61,6 +61,8 @@ import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 import { useShellChrome } from './useShellChrome';
 import { addScratchpadNote, ownMemberId } from '@/lib/wall/addScratchpadNote';
+import { SchoolPaperCapture } from '@/components/capture/SchoolPaperCapture';
+import { localYmd } from '@/lib/cadence/config';
 import { useSelection } from './providers/SelectionProvider';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
@@ -248,6 +250,8 @@ function ShellLayoutInner({ children }: Props) {
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  // A school paper photographed onto the wall (spec 2026-10-20): who took it.
+  const [schoolPaperHolder, setSchoolPaperHolder] = useState<string | null>(null);
   // Following a capture's "Go to inbox" (or any link) left Quick Add open
   // over the page it had just sent you to. Going somewhere closes it.
   const [quickAddPath, setQuickAddPath] = useState(location.pathname);
@@ -628,6 +632,7 @@ function ShellLayoutInner({ children }: Props) {
           onAddNote={tracked(chrome.onQuickAddNote)}
           eventCalendarName={chrome.eventCalendarName}
           onPlanFromPaper={() => { stayInSymphony(); if (!requestPlanFromPaper()) navigate('/today') }}
+          onSchoolPaper={user ? () => { void ownMemberId(user.id).then((id) => setSchoolPaperHolder(id ?? '')) } : undefined}
           projects={chrome.quickAddProjects}
           contacts={chrome.quickAddContacts}
           familyMembers={chrome.quickAddFamilyMembers}
@@ -780,6 +785,15 @@ function ShellLayoutInner({ children }: Props) {
         <ConfirmationToast
           toast={chrome.confirmationToast}
           onDismiss={chrome.dismissConfirmationToast}
+        />
+      )}
+      {schoolPaperHolder !== null && user && (
+        <SchoolPaperCapture
+          userId={user.id}
+          holderId={schoolPaperHolder}
+          kids={chrome.familyKids}
+          today={localYmd(new Date())}
+          onClose={() => setSchoolPaperHolder(null)}
         />
       )}
     </div>

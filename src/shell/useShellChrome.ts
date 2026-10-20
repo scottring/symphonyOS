@@ -283,6 +283,11 @@ export function useShellChrome() {
     () => familyMembers.map((m) => ({ id: m.id, name: m.name })),
     [familyMembers],
   );
+  // The household's kids, for a school paper photographed onto the wall.
+  const familyKids = useMemo(
+    () => familyMembers.filter((m) => m.role_label === 'child' || (m.role_label !== 'parent' && !m.is_full_user)),
+    [familyMembers],
+  );
 
   // ── Pins ──
   // Pin navigation: tasks open the global DetailPanel via selection; other
@@ -331,6 +336,7 @@ export function useShellChrome() {
     quickAddProjects,
     quickAddContacts,
     quickAddFamilyMembers,
+    familyKids,
     // Pins
     pins: pinnedItems.pins,
     pinnedEntities,

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
-import { Sparkles, Camera, NotebookPen, StickyNote, Mic } from 'lucide-react'
+import { Sparkles, Camera, NotebookPen, StickyNote, Mic, FileText } from 'lucide-react'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields, allDayFromParse } from '@/lib/quickInputParser'
@@ -64,6 +64,8 @@ interface QuickCaptureProps {
   /** Photograph a written plan and place its items. Lives in Add so the phone
    *  Today header stays light (Scott, 2026-09-22). */
   onPlanFromPaper?: () => void
+  /** Photograph a school paper onto the kitchen wall (spec 2026-10-20). */
+  onSchoolPaper?: () => void
   /**
    * The host confirms each capture itself, AFTER its write settles. Then this
    * component's own toast — shown before the write, so a failed save read
@@ -93,6 +95,7 @@ export function QuickCapture({
   onAskSymphony,
   eventCalendarName,
   onPlanFromPaper,
+  onSchoolPaper,
   confirmsAfterWrite = false,
   onAddToScratchpad,
 }: QuickCaptureProps) {
@@ -556,6 +559,16 @@ export function QuickCapture({
                     >
                       <NotebookPen className="w-4 h-4 shrink-0 text-primary-600" />
                       <span className="flex-1 text-left">Plan from paper — photograph your written plan</span>
+                    </button>
+                  )}
+                  {onSchoolPaper && (
+                    <button
+                      type="button"
+                      onClick={() => { handleClose(); onSchoolPaper() }}
+                      className="mt-2 w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600 hover:bg-neutral-100 transition-colors"
+                    >
+                      <FileText className="w-4 h-4 shrink-0 text-primary-600" />
+                      <span className="flex-1 text-left">School paper — a slip or form for the kitchen wall</span>
                     </button>
                   )}
                 </div>
