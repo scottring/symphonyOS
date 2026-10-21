@@ -69,7 +69,7 @@ function setup(ask: Ask, over: Partial<KioskCanvasProps> = {}) {
   const undo = vi.fn(async () => true)
   const applyChanges = vi.fn(async (): Promise<WallApplyResult> => ({ ok: true, ids: ['swim', 'new'], undo }))
   const save = vi.fn(async () => ({ said: 'Added milk to Groceries.' }))
-  const agent: WallTalkDeps = { ask: vi.fn(ask) as never, applyChanges, weekStartsOn: 1 }
+  const agent: WallTalkDeps = { ask: vi.fn(ask) as never, applyChanges, weekStartsOn: 6 }
   const voice = { save, snapshot: () => 'Today: nothing', agent }
   function Harness() {
     const activity = useKioskActivity('2026-10-10')
@@ -195,11 +195,13 @@ describe('talking to the wall: the change card', () => {
     await type("Move swim to Friday and add 'Call the plumber' Saturday at 10")
     const card = screen.getByRole('region', { name: 'Proposed changes' })
     expect(within(card).getByText('Swim on Friday, plumber Saturday')).toBeInTheDocument()
-    expect(within(card).getByText('Sun 10:00 → Fri 10:00 · Ella')).toBeInTheDocument()
-    expect(within(card).getByText('Sat 10:00')).toBeInTheDocument()
+    // Every day on the card carries its date: Oct 17 and Oct 24 are both "Sat".
+    expect(within(card).getByText('Tomorrow at 10:00 → Fri, Oct 16 at 10:00 · Ella')).toBeInTheDocument()
+    expect(within(card).getByText('Sat, Oct 17 at 10:00')).toBeInTheDocument()
     expect(within(card).getByRole('button', { name: /Approve/ })).toBeInTheDocument()
     expect(screen.getByText('Only family plans can change from the wall.')).toBeInTheDocument()
-    // The lead: the days the card touches.
+    // The lead: the days the card touches, each named with its date.
+    expect(screen.getByText('Showing · tomorrow · Friday, Oct 16 · Saturday, Oct 17')).toBeInTheDocument()
     const sun = screen.getByRole('group', { name: 'Sunday, October 11' })
     expect(within(sun).getByText('Swim lesson').closest('[data-kind]')).toHaveAttribute('data-kind', 'trace')
     expect(within(sun).getByText('Birthday party').closest('[data-kind]')).toHaveAttribute('data-kind', 'plain')
@@ -209,6 +211,21 @@ describe('talking to the wall: the change card', () => {
     expect(within(sat).getByText('Call the plumber').closest('[data-kind]')).toHaveAttribute('data-kind', 'prop')
     // Never applied by itself.
     expect(applyChanges).not.toHaveBeenCalled()
+  })
+
+  it('an add with no day says which week it lands in', async () => {
+    const undated: ChangeSet = { key: 'set-u', title: 'Gate', ops: [{ key: 'u1', op: 'add', title: 'Fix the gate' }] }
+    setup(async (t, h) => reply(t, h, 'Add it?', { changeSet: undated }))
+    await type('add fix the gate')
+    const card = screen.getByRole('region', { name: 'Proposed changes' })
+    expect(within(card).getByText('No day yet · week of Sat, Oct 10 – Fri, Oct 16')).toBeInTheDocument()
+  })
+
+  it('a one-day card header names the day with its date', async () => {
+    const one: ChangeSet = { key: 'set-o', title: 'Plumber', ops: [{ key: 'o2', op: 'add', title: 'Call the plumber', date: '2026-10-17', time: '10:00' }] }
+    setup(async (t, h) => reply(t, h, 'Saturday?', { changeSet: one }))
+    await type('plumber saturday')
+    expect(screen.getByText('Symphony · 1 change to Saturday, Oct 17')).toBeInTheDocument()
   })
 
   it('while the card waits the strip stays open and says how to answer', async () => {
@@ -296,22 +313,24 @@ describe('talking to the wall: plan the week', () => {
   beforeEach(() => { localStorage.clear(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW) })
   afterEach(() => { vi.useRealTimers() })
 
-  it('More → Plan the week starts the session with the desktop’s opening phrase and shows the family week', async () => {
+  it('More → Plan the week names the week it plans, by its dates, and shows that week', async () => {
     const { ask } = setup(async (t, h) => reply(t, h, 'Let’s plan the rest of the week. Sunday has swim and a party; Friday is open.'))
     fireEvent.click(dock().getByRole('button', { name: 'More' }))
+    // Saturday Oct 10 starts the household's week: the tile says which one.
+    expect(screen.getByText('Sat, Oct 10 – Fri, Oct 16')).toBeInTheDocument()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Plan the week/ })) })
-    expect(ask).toHaveBeenCalledWith('Help me plan the rest of my week.', [], expect.anything())
-    expect(screen.getByText('Family only · October 10 – 16')).toBeInTheDocument()
+    expect(ask).toHaveBeenCalledWith('Help me plan the week of Sat, Oct 10 – Fri, Oct 16.', [], expect.anything())
+    expect(screen.getByText('Family only · Sat, Oct 10 – Fri, Oct 16')).toBeInTheDocument()
     const pic = screen.getByLabelText('The family’s week')
     expect(within(pic).getAllByRole('group')).toHaveLength(7)
-    expect(side().getByText('Plan the week')).toBeInTheDocument()
+    expect(side().getByText('Plan the week · Sat, Oct 10 – Fri, Oct 16')).toBeInTheDocument()
     expect(side().getByText(/Let’s plan the rest of the week/)).toBeInTheDocument()
   })
 
   it('saying "plan the week" starts it too; proposals land dashed in their days and the card waits behind Review', async () => {
     const { ask, applyChanges } = setup(async (t, h) => reply(t, h, 'Swim to Friday?', h.length ? { changeSet: SET } : {}))
     await type('plan the week')
-    expect(ask).toHaveBeenCalledWith('Help me plan the rest of my week.', [], expect.anything())
+    expect(ask).toHaveBeenCalledWith('Help me plan the week of Sat, Oct 10 – Fri, Oct 16.', [], expect.anything())
     await type('move swim to Friday')
     const fri = screen.getByRole('group', { name: 'Friday, October 16' })
     expect(within(fri).getByText('Swim lesson').closest('[data-kind]')).toHaveAttribute('data-kind', 'prop')

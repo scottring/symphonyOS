@@ -68,6 +68,7 @@ import { AgendaStage, AgendaViews } from './AgendaStage'
 import { StickySheet, StickyStrip } from './KioskStickies'
 import type { AgendaDay, AgendaRow, AgendaView } from '@/lib/wall/wallAgenda'
 import { formatWatts, hasReading, type EnergyLive, type EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
+import { planWeek } from '@/lib/wall/wallDates'
 
 /** The household tools in the bottom bar. Call is the canvas's own (it opens
  *  the Calling activity); the rest are the Shell's sheets. */
@@ -361,7 +362,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const energy = p.energy ?? null
   const energyNow = energy && hasReading(energy.now) ? energy.now : null
   const moreTiles = [
-    talk.enabled ? { id: 'plan', label: 'Plan the week', sub: 'Together, with Symphony', icon: CalendarDays, onSelect: () => { setMoreOpen(false); void tell.handle('Plan the week', false) } } : null,
+    talk.enabled ? { id: 'plan', label: 'Plan the week', sub: planWeek(p.now, talk.weekStartsOn).label, icon: CalendarDays, onSelect: () => { setMoreOpen(false); void tell.handle('Plan the week', false) } } : null,
     math && math.kids.length > 0
       ? { id: 'math', label: 'Math of the day', sub: mathLeft ? `${mathLeft} still to solve` : 'All done today', icon: Calculator, onSelect: () => { setMoreOpen(false); openMath() } }
       : null,

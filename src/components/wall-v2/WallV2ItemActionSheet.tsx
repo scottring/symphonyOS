@@ -1,14 +1,14 @@
 import { Redo2, Check, X, Phone, MapPin, FileText, Video, Link as LinkIcon } from 'lucide-react'
 import { useDragScroll } from '@/hooks/useDragScroll'
-import { getNextWeekend, getWeekendAfterNext, formatShortDate } from '@/lib/dateHelpers'
+import { pushTargets as targetsFor, type PushTarget } from '@/lib/wall/wallDates'
+import { readCadenceConfig } from '@/lib/cadence/config'
 import { WALL } from './wallTheme'
 import type { WallV2TimelineEvent } from './types'
 
 /**
- * Push reschedules a task from the wall. Most presets target a fuzzy time
- * bucket without a specific date; the two weekend presets mirror the main
- * page's SchedulePopover and schedule the task all-day on the upcoming (or
- * following) Saturday. Finer scheduling still lives on mobile / desktop.
+ * Push reschedules a task from the wall: into a named week or month, onto a
+ * weekend's Saturday (all day), or to Someday. Each button shows the dates it
+ * means (wallDates.pushTargets). Finer scheduling lives on mobile / desktop.
  */
 export type PushPreset =
   | 'this-week'
@@ -28,6 +28,9 @@ interface Props {
   /** Task variant only — emits a fuzzy push preset; the Shell maps it to a
    *  bucket mutation. Routines / events never fire this. */
   onPushTask: (id: string, preset: PushPreset) => void
+  /** Where each preset lands, for the date line under its button. Defaults to
+   *  now and this browser's week start. */
+  pushTargets?: Record<PushPreset, PushTarget>
   onClose: () => void
 }
 
@@ -40,14 +43,6 @@ const PUSH_PRESETS: ReadonlyArray<{ preset: PushPreset; label: string }> = [
   { preset: 'next-month',   label: 'Next month'   },
   { preset: 'someday',      label: 'Someday'      },
 ]
-
-// The two weekend presets land on a concrete Saturday; surface that date under
-// the label so "next weekend" is unambiguous at tap time (which Saturday?).
-// The fuzzy bucket presets have no specific date and show label only.
-const PRESET_DATE: Partial<Record<PushPreset, () => Date>> = {
-  'this-weekend': getNextWeekend,
-  'next-weekend': getWeekendAfterNext,
-}
 
 // Destination-only Maps link — the wall is stationary, so we surface "where is
 // this" rather than a turn-by-turn route. Rendered into an <a> (never
@@ -62,7 +57,8 @@ const ctxRow =
   `flex items-center gap-3 w-full min-h-[60px] px-4 ${WALL.cardInset} ` +
   `${WALL.inkStrong} active:scale-[0.98] transition-transform`
 
-export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, onClose }: Props) {
+export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, pushTargets, onClose }: Props) {
+  const targets = pushTargets ?? targetsFor(new Date(), readCadenceConfig().weekStartsOn)
   const kind: 'routine' | 'event' | 'task' = event.kind ?? 'event'
 
   // The Pi delivers touch as mouse events, so the touch-action CSS below never
@@ -169,8 +165,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
               {/* Push presets — 2×2 grid of inset buttons */}
               <div className="grid grid-cols-2 gap-3">
                 {PUSH_PRESETS.map(({ preset, label }) => {
-                  const dateFn = PRESET_DATE[preset]
-                  const sub = dateFn ? formatShortDate(dateFn()) : null
+                  const sub = targets[preset].sub
                   return (
                     <button
                       key={preset}
@@ -179,9 +174,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
                       className={`flex flex-col items-center justify-center w-full min-h-[64px] text-lg font-bold leading-tight active:scale-[0.98] transition-transform ${WALL.cardInset} ${WALL.inkStrong}`}
                     >
                       <span>{label}</span>
-                      {sub && (
-                        <span className={`text-sm font-semibold mt-0.5 ${WALL.muted}`}>{sub}</span>
-                      )}
+                      <span className={`text-sm font-semibold mt-0.5 ${WALL.muted}`}>{sub}</span>
                     </button>
                   )
                 })}

@@ -8,7 +8,8 @@
 
 import type { ChangeOp, ChangeSet } from '@/lib/canvas/changeCard'
 import { opRow, opWhen } from '@/lib/canvas/changeCard'
-import { localYmd, weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
+import { localYmd } from '@/lib/cadence/config'
+import { dayLabel, weekSpan } from './wallDates'
 import type { WallTodayRow } from './wallMomentsModel'
 
 /** A conversation ends after this long with nothing said. */
@@ -40,21 +41,6 @@ export function talkIntent(text: string, cardUp: boolean): TalkIntent | null {
   if (cardUp && APPROVE.test(t)) return 'approve'
   if (cardUp && DISMISS.test(t)) return 'dismiss'
   return null
-}
-
-/** What the wall says to start planning: the desktop Week page's own opening
- *  (weekWalk in src/components/home/week/WeekViewV2.tsx) for the week we are
- *  in — "Help me plan the week." on its first day, the next week by its start on its
- *  last day, "Help me plan the rest of my week." between. */
-export function wallPlanOpening(now: Date, weekStartsOn: WeekStart): string {
-  const anchor = weekStartAnchor(now, weekStartsOn)
-  if (localYmd(now) === localYmd(anchor)) return 'Help me plan the week.'
-  const lastDay = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 6)
-  if (localYmd(now) === localYmd(lastDay)) {
-    const next = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 7)
-    return `Help me plan the week of ${next.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
-  }
-  return 'Help me plan the rest of my week.'
 }
 
 /** Rejects with 'timeout' when the promise takes longer than `ms`; `onTimeout`
@@ -93,7 +79,8 @@ export interface DayEntry {
 
 const clock = (d: Date) => `${d.getHours() % 12 === 0 ? 12 : d.getHours() % 12}:${String(d.getMinutes()).padStart(2, '0')}`
 const hm = (time: string) => { const [h, m] = time.split(':').map(Number); return h * 60 + m }
-const shortDay = (d: Date, today: Date) => (localYmd(d) === localYmd(today) ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short' }))
+/** "Tomorrow at 5:30", "Sat, Oct 17": a day always with its date. */
+const dayAt = (d: Date, today: Date, timed: boolean) => (timed ? `${dayLabel(d, today)} at ${clock(d)}` : dayLabel(d, today))
 
 /** The days a card touches, in order: where things go and where moved things
  *  were. 'none' collects what lands on no day. */
@@ -140,7 +127,7 @@ export function dayEntries(day: string, rows: readonly WallTodayRow[], ops: read
     const wasTime = was ? `${String(was.getHours()).padStart(2, '0')}:${String(was.getMinutes()).padStart(2, '0')}` : null
     const stays = op.op === 'place' && op.date === wasDay && (op.time ?? null) === wasTime
     if ((op.op === 'place' || op.op === 'unplace' || op.op === 'someday') && wasDay === day && !stays) {
-      const to = op.op === 'place' ? (op.date === day ? `moving to ${op.time ? clock(opWhen(op)!) : 'no time'}` : `moving to ${shortDay(opWhen(op)!, today)}`) : op.op === 'someday' ? 'moving to Someday' : 'moving to no day yet'
+      const to = op.op === 'place' ? (op.date === day ? `moving to ${op.time ? clock(opWhen(op)!) : 'no time'}` : `moving to ${dayLabel(opWhen(op)!, today)}`) : op.op === 'someday' ? 'moving to Someday' : 'moving to no day yet'
       out.push({ key: `t-${op.key}`, kind: 'trace', time: was ? clock(was) : null, title: op.title, by: to, min: was ? was.getHours() * 60 + was.getMinutes() : 24 * 60 })
     }
   }
@@ -162,13 +149,19 @@ export function fitEntries(entries: readonly DayEntry[], max: number): { rows: D
 }
 
 /** One line of the wall's change card: what changes, and the detail line
- *  ("Thu 5:30 → Fri 7:00 · Ella, Kaleb"). */
-export function cardLine(op: ChangeOp, info: TalkTaskInfo | null, today: Date): { kind: ReturnType<typeof opRow>['kind']; title: string; detail: string } {
+ *  ("Tomorrow at 5:30 → Fri, Oct 16 at 7:00 · Ella, Kaleb"). Every day is named
+ *  with its date; an add with no day names the week it lands in (`weekStart`). */
+export function cardLine(op: ChangeOp, info: TalkTaskInfo | null, today: Date, weekStart?: Date): { kind: ReturnType<typeof opRow>['kind']; title: string; detail: string } {
   const row = opRow(op, today)
-  const was = info?.at ? `${shortDay(info.at, today)}${info.allDay ? '' : ` ${clock(info.at)}`}` : null
+  const was = info?.at ? dayAt(info.at, today, !info.allDay) : null
+  const to = opWhen(op)
   const who = op.op === 'assign' ? null : op.assigneeName ?? (info?.who.length ? info.who.join(', ') : null)
   let where: string
-  if (op.op === 'add') where = row.where
+  if (op.op === 'add') where = to ? dayAt(to, today, !!op.time) : weekStart ? `No day yet · week of ${weekSpan(weekStart)}` : 'No day yet'
+  else if (op.op === 'place' && to) {
+    const sameDay = !!info?.at && localYmd(info.at) === op.date && !!op.time
+    where = `${was ? `${was} ` : ''}→ ${sameDay ? clock(to) : dayAt(to, today, !!op.time)}`
+  }
   else if (op.op === 'assign') where = `${info?.who.length ? `${info.who.join(', ')} ` : ''}${row.where}`
   else where = was ? `${was} ${row.where}` : row.where
   return { kind: row.kind, title: op.title, detail: [where, who].filter(Boolean).join(' · ') }
@@ -190,5 +183,5 @@ export function dayWord(day: string, today: Date): string {
   const diff = Math.round((date.getTime() - t.getTime()) / 86_400_000)
   if (diff === 0) return 'today'
   if (diff === 1) return 'tomorrow'
-  return date.toLocaleDateString('en-US', { weekday: 'long' })
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
 }

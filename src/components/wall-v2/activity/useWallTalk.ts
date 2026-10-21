@@ -14,7 +14,8 @@ import { askWallAgent, type WallAgentReply, type WallTurn } from '@/lib/wall/wal
 import { changeCardNote, type ChangeCardNote, type ChangeSet } from '@/lib/canvas/changeCard'
 import type { ApplyResult } from '@/lib/canvas/applyChangeSet'
 import type { WeekStart } from '@/lib/cadence/config'
-import { AGENT_TIMEOUT_MS, TALK_IDLE_MS, TALK_UNDO_MS, wallPlanOpening, withTimeout } from '@/lib/wall/wallTalk'
+import { AGENT_TIMEOUT_MS, TALK_IDLE_MS, TALK_UNDO_MS, withTimeout } from '@/lib/wall/wallTalk'
+import { planWeek, type PlanWeek } from '@/lib/wall/wallDates'
 
 /** Approve's outcome on the wall: the shared apply, or refused because a task
  *  is not a family one (only family plans change from the wall). */
@@ -44,7 +45,9 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
   const [turns, setTurns] = useState<TalkTurn[]>([])
   const [card, setCardState] = useState<TalkCard | null>(null)
   const [saved, setSaved] = useState<TalkSaved | null>(null)
-  const [planning, setPlanning] = useState(false)
+  /** The week being planned, by its dates; null when not planning. */
+  const [plan, setPlan] = useState<PlanWeek | null>(null)
+  const planning = !!plan
   const [review, setReview] = useState(false)
   const [pointed, setPointed] = useState<string[]>([])
   const [lastAt, setLastAt] = useState(0)
@@ -72,7 +75,7 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
     epoch.current++
     history.current = []
     noteRef.current = null
-    setTurns([]); setCard(null); setPlanning(false); setReview(false); setPointed([]); setAsking(false)
+    setTurns([]); setCard(null); setPlan(null); setReview(false); setPointed([]); setAsking(false)
   }, [setCard])
 
   /** Turns go one at a time: a sentence said while Symphony is still
@@ -129,8 +132,10 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
 
   const startPlanning = useCallback((now = new Date()) => {
     if (!deps) throw new Error('Symphony is not set up on this screen')
-    setPlanning(true)
-    return ask(wallPlanOpening(now, deps.weekStartsOn), 'Plan the week')
+    // Said with the week's dates, and shown so: which week is never a guess.
+    const week = planWeek(now, deps.weekStartsOn)
+    setPlan(week)
+    return ask(week.opening, `Plan the week · ${week.label}`)
   }, [deps, ask])
 
   /** The card the wall last read out. A spoken approve means that one (plan
@@ -204,9 +209,10 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
   }, [saved])
 
   return useMemo(() => ({
-    enabled: !!deps, active, asking, turns, card, saved, planning, review, pointed,
+    enabled: !!deps, active, asking, turns, card, saved, planning, plan, review, pointed,
+    weekStartsOn: deps?.weekStartsOn ?? 0,
     ask, addReply, startPlanning, approve, dismiss, undoSaved, end, setReview,
-  }), [deps, active, asking, turns, card, saved, planning, review, pointed, ask, addReply, startPlanning, approve, dismiss, undoSaved, end])
+  }), [deps, active, asking, turns, card, saved, planning, plan, review, pointed, ask, addReply, startPlanning, approve, dismiss, undoSaved, end])
 }
 
 export type WallTalk = ReturnType<typeof useWallTalk>

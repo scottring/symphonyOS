@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ChangeSet } from '@/lib/canvas/changeCard'
 import type { WallTodayRow } from './wallMomentsModel'
-import { cardDays, cardLine, dayEntries, fitEntries, talkIntent, talkUsesBand, wallPlanOpening, withTimeout, type TalkTaskInfo } from './wallTalk'
+import { cardDays, cardLine, dayEntries, dayWord, fitEntries, talkIntent, talkUsesBand, withTimeout, type TalkTaskInfo } from './wallTalk'
 
 const today = new Date(2026, 9, 14, 16, 40) // Wed Oct 14
 
@@ -22,14 +22,6 @@ describe('talkIntent: words that act on the wall itself', () => {
   it('"plan the week" starts planning, card or not', () => {
     for (const s of ['Help me plan the week', "Let's plan the week", 'plan the rest of the week', 'Hey Symphony, plan our week.']) expect(talkIntent(s, false)).toBe('plan-week')
     expect(talkIntent('plan dinner on Tuesday', false)).toBeNull()
-  })
-})
-
-describe('wallPlanOpening: the desktop Week page’s opening phrase', () => {
-  it('first day, middle and last day of the week', () => {
-    expect(wallPlanOpening(new Date(2026, 9, 12, 9), 1)).toBe('Help me plan the week.') // Monday
-    expect(wallPlanOpening(today, 1)).toBe('Help me plan the rest of my week.')
-    expect(wallPlanOpening(new Date(2026, 9, 18, 9), 1)).toBe('Help me plan the week of Oct 19.') // Sunday
   })
 })
 
@@ -79,13 +71,29 @@ describe('drawing a change card', () => {
 
   it('a move to another day leaves a trace naming the day', () => {
     const moved = dayEntries('2026-10-15', [], [{ key: 'm', op: 'place', taskId: 'read', title: 'Reading', date: '2026-10-16' }], info, today)
-    expect(moved).toEqual([expect.objectContaining({ kind: 'trace', by: 'moving to Fri' })])
+    expect(moved).toEqual([expect.objectContaining({ kind: 'trace', by: 'moving to Fri, Oct 16' })])
   })
 
   it('card lines say what changes and for whom', () => {
     expect(cardLine(set.ops[0], info('pick'), today)).toEqual({ kind: 'WHO', title: 'Pick up the kids', detail: 'Scott → Iris' })
-    expect(cardLine(set.ops[1], info('read'), today)).toEqual({ kind: 'MOVE', title: 'Reading', detail: 'Thu 5:30 → Thu 7:00 · Ella, Kaleb' })
-    expect(cardLine(set.ops[2], null, today)).toEqual({ kind: 'ADD', title: 'Call the plumber', detail: 'Sat 10:00' })
+    expect(cardLine(set.ops[1], info('read'), today)).toEqual({ kind: 'MOVE', title: 'Reading', detail: 'Tomorrow at 5:30 → 7:00 · Ella, Kaleb' })
+    expect(cardLine(set.ops[2], null, today)).toEqual({ kind: 'ADD', title: 'Call the plumber', detail: 'Sat, Oct 17 at 10:00' })
+  })
+
+  it('card lines name every day with its date, never a bare weekday', () => {
+    const move = { key: 'm', op: 'place' as const, taskId: 'read', title: 'Reading', date: '2026-10-21', time: '17:00' }
+    expect(cardLine(move, info('read'), today).detail).toBe('Tomorrow at 5:30 → Wed, Oct 21 at 5:00 · Ella, Kaleb')
+  })
+
+  it('an add with no day says which week it lands in', () => {
+    const add = { key: 'a', op: 'add' as const, title: 'Fix the gate' }
+    expect(cardLine(add, null, today, new Date(2026, 9, 17)).detail).toBe('No day yet · week of Sat, Oct 17 – Fri, Oct 23')
+  })
+
+  it('dayWord names a day past tomorrow with its date', () => {
+    expect(dayWord('2026-10-14', today)).toBe('today')
+    expect(dayWord('2026-10-15', today)).toBe('tomorrow')
+    expect(dayWord('2026-10-17', today)).toBe('Saturday, Oct 17')
   })
 
   it('fitting a day keeps every proposal and the plain rows nearest them', () => {

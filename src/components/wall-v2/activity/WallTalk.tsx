@@ -17,7 +17,8 @@
 import { AudioLines, Archive, ArrowRight, Check, Plus, Undo2, UserRound, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { WallTodayRow } from '@/lib/wall/wallMomentsModel'
-import { localYmd } from '@/lib/cadence/config'
+import { localYmd, type WeekStart } from '@/lib/cadence/config'
+import { plannedWeekStart } from '@/lib/canvas/applyChangeSet'
 import { cardDays, cardLine, dayEntries, dayTitle, dayWord, fitEntries, type DayEntry, type TalkTaskInfo } from '@/lib/wall/wallTalk'
 import type { WallTalk, TalkCard, TalkTurn } from './useWallTalk'
 
@@ -60,9 +61,11 @@ function Turn({ turn, big }: { turn: TalkTurn; big?: boolean }) {
 }
 
 /** The wall-size change card (Change.dc.html). */
-export function WallChangeCard({ card, info, today, onApprove, onDismiss }: {
-  card: TalkCard; info: (id: string) => TalkTaskInfo | null; today: Date; onApprove: () => void; onDismiss: () => void
+export function WallChangeCard({ card, info, today, weekStartsOn, onApprove, onDismiss }: {
+  card: TalkCard; info: (id: string) => TalkTaskInfo | null; today: Date; weekStartsOn: WeekStart; onApprove: () => void; onDismiss: () => void
 }) {
+  // Where an add with no day lands (applyChangeSet does the same).
+  const weekStart = plannedWeekStart(card.set, today, weekStartsOn)
   const n = card.set.ops.length
   const saving = card.state === 'saving'
   const MAX = 4
@@ -75,7 +78,7 @@ export function WallChangeCard({ card, info, today, onApprove, onDismiss }: {
       <h2 className="kw-card-title">{card.set.title}</h2>
       <ul className="kw-ops">
         {shown.map((op) => {
-          const line = cardLine(op, op.taskId ? info(op.taskId) : null, today)
+          const line = cardLine(op, op.taskId ? info(op.taskId) : null, today, weekStart)
           const Icon = KIND_ICON[line.kind] ?? ArrowRight
           return (
             <li key={op.key} className="kw-op">
@@ -118,7 +121,7 @@ export function WallConversation({ talk, info, today, onApprove, onUndo, onBack 
       </div>
       {showCard && (
         <>
-          <WallChangeCard card={card} info={info} today={today} onApprove={onApprove} onDismiss={talk.dismiss} />
+          <WallChangeCard card={card} info={info} today={today} weekStartsOn={talk.weekStartsOn} onApprove={onApprove} onDismiss={talk.dismiss} />
           <p className="kw-meta kw-family-only">Only family plans can change from the wall.</p>
         </>
       )}
@@ -154,14 +157,14 @@ function EntryRow({ e, size }: { e: DayEntry; size: 'lg' | 'sm' }) {
   )
 }
 
-function DayColumn({ day, label, num, entries, max, size, today }: { day: string; label: string; num?: string; entries: DayEntry[]; max: number; size: 'lg' | 'sm'; today?: boolean }) {
+function DayColumn({ day, label, num, entries, max, size, today, unknown }: { day: string; label: string; num?: string; entries: DayEntry[]; max: number; size: 'lg' | 'sm'; today?: boolean; unknown?: boolean }) {
   const { rows, hidden } = fitEntries(entries, max)
   return (
     <div className={`kw-day ${today ? 'is-today' : ''}`} role="group" aria-label={dayTitle(day)}>
       <span className="kw-day-h">{label}</span>
       {num && <span className="kw-day-n">{num}</span>}
       {rows.map((e) => <EntryRow key={e.key} e={e} size={size} />)}
-      {rows.length === 0 && <span className="kw-de-none">Nothing on the clock</span>}
+      {rows.length === 0 && <span className="kw-de-none">{unknown ? 'Not on the wall yet' : 'Nothing on the clock'}</span>}
       {hidden > 0 && <span className="kw-de-more">+{hidden} more</span>}
     </div>
   )
@@ -179,18 +182,21 @@ export function WallTalkLead({ talk, week, today, onBack }: { talk: WallTalk; we
     </div>
   )
 
-  if (talk.planning) {
-    const first = week.days[0]?.date, last = week.days.at(-1)?.date
-    const range = first && last ? `${first.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${last.toLocaleDateString('en-US', first.getMonth() === last.getMonth() ? { day: 'numeric' } : { month: 'long', day: 'numeric' })}` : ''
+  if (talk.plan) {
+    // The week being planned — the rest of this one, or next week on its last
+    // day — named by its dates, not the wall's rolling next seven days.
+    const plan = talk.plan
     return (
       <>
-        {head(`Family only · ${range}`)}
+        {head(`Family only · ${plan.label}`)}
         <div className="kw-week" aria-label="The family’s week">
-          {week.days.map((d) => {
-            const day = localYmd(d.date)
+          {plan.days.map((date) => {
+            const day = localYmd(date)
+            const known = week.days.find((d) => localYmd(d.date) === day)
             return (
-              <DayColumn key={day} day={day} label={d.date.toLocaleDateString('en-US', { weekday: 'short' })} num={String(d.date.getDate())}
-                entries={dayEntries(day, d.rows, ops, week.task, today)} max={5} size="sm" today={day === localYmd(today)} />
+              <DayColumn key={day} day={day} label={date.toLocaleDateString('en-US', { weekday: 'short' })} num={String(date.getDate())}
+                entries={dayEntries(day, known?.rows ?? [], ops, week.task, today)} max={5} size="sm" today={day === localYmd(today)}
+                unknown={!known} />
             )
           })}
         </div>
@@ -200,7 +206,7 @@ export function WallTalkLead({ talk, week, today, onBack }: { talk: WallTalk; we
 
   const days = talk.card ? cardDays(talk.card.set, week.task) : talk.pointed.filter((d) => week.days.some((w) => localYmd(w.date) === d))
   if (!days.length) return null
-  const eyebrow = `Showing · ${days.map((d) => dayWord(d, today)).join(', ')}`
+  const eyebrow = `Showing · ${days.map((d) => dayWord(d, today)).join(' · ')}`
   if (days.length === 1) {
     const day = days[0]
     const { rows, hidden } = fitEntries(dayEntries(day, day === 'none' ? [] : rowsFor(day), ops, week.task, today), 5)

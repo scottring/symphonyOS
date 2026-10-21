@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { WallV2ItemActionSheet } from './WallV2ItemActionSheet'
 import { Calendar } from 'lucide-react'
 import type { WallV2TimelineEvent } from './types'
+import { pushTargets } from '@/lib/wall/wallDates'
 
 const routine: WallV2TimelineEvent = { id: 'routine-1', icon: Calendar, tint: 'sage', title: 'Trash', kind: 'routine' }
 const event: WallV2TimelineEvent = { id: 'event-9', icon: Calendar, tint: 'sky', title: 'Dentist', kind: 'event' }
@@ -155,5 +156,15 @@ describe('WallV2ItemActionSheet', () => {
     fireEvent.click(screen.getByText('Mark done'))
     expect(onPushTask).not.toHaveBeenCalled()
     expect(screen.queryByText('This week')).toBeNull()
+  })
+
+  it('task: every push button says the dates it moves the task to', () => {
+    const task: WallV2TimelineEvent = { id: 'task-od-1', icon: Calendar, tint: 'honey', title: 'Pay water bill', kind: 'task' }
+    // Wed Oct 21 2026, weeks starting Saturday.
+    const targets = pushTargets(new Date(2026, 9, 21, 15), 6)
+    render(<WallV2ItemActionSheet event={task} onSkip={vi.fn()} onMarkDone={vi.fn()} onPushTask={vi.fn()} pushTargets={targets} onClose={vi.fn()} />)
+    for (const sub of ['Sat, Oct 17 – Fri, Oct 23', 'Sat, Oct 24 – Fri, Oct 30', 'Sat, Oct 24', 'Sat, Oct 31', 'November', 'No date']) {
+      expect(screen.getByText(sub)).toBeInTheDocument()
+    }
   })
 })

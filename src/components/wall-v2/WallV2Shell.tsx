@@ -33,7 +33,10 @@ import { WallV2QuestionSheet } from './WallV2QuestionSheet';
 import { openHandoffQuestions, type HandoffQuestion } from './wallQuestions';
 import { assignWallEvent } from '@/lib/wall/eventAssign';
 import { readReadingTimer, readingTimerKey, elapsedMinutes, isTimerRunning } from '@/lib/wall/readingScreenTime';
-import { localYmd, readCadenceConfig } from '@/lib/cadence/config';
+import { localYmd, useCadenceConfig } from '@/lib/cadence/config';
+import { useHouseholdWeekStart } from '@/hooks/useHouseholdWeekStart';
+import { pushTargets } from '@/lib/wall/wallDates';
+import { wallQuickAdd, type WallQuickAddData } from '@/lib/wall/wallQuickAdd';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { plannedWeekStart } from '@/lib/canvas/applyChangeSet';
 import { useDisplayHeartbeat } from '@/lib/display/useDisplayHeartbeat';
@@ -71,7 +74,6 @@ import type { MealSlot } from '@/types/meal-planner';
 import { findDinnerEvent, findBreakfastEvent, getMealIcon } from '@/components/wall/WallDinnerWidget';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
-import { getNextWeekend, getWeekendAfterNext, formatShortDate } from '@/lib/dateHelpers';
 import { WallRecipeViewer } from '@/components/wall/WallRecipeViewer';
 import { WallV2RecipeSheet } from './WallV2RecipeSheet';
 import { useWallRecipeIndex } from '@/hooks/useWallRecipeIndex';
@@ -116,52 +118,6 @@ import { supabase } from '@/lib/supabase';
 import { claimPaper, paperInBackpack, paperNotOurs } from '@/lib/wall/paperActions';
 import type { WallV2TimelineEvent } from './types';
 import { useWallTheme } from './wallThemeOverride';
-import type { Task } from '@/types/task';
-
-/**
- * Map one of the wall's four push presets to the exact Partial<Task>
- * mutation the existing updateTask hook expects. Exported so it can be
- * unit-tested without spinning up the Shell.
- *
- * - this-week    → drop into the "week" bucket
- * - next-week    → drop into "week" + set weekDeferredAt=now (existing
- *                  convention: "sink to the bottom of This Week so it
- *                  surfaces during next week's planning")
- * - this-weekend → schedule all-day on the upcoming Saturday (getNextWeekend)
- * - next-weekend → schedule all-day on the Saturday after next
- *                  (getWeekendAfterNext) — mirrors the main page picker
- * - next-month   → drop into "month"
- * - someday      → drop into "quarter" (longest review horizon; the
- *                  family-readable "Someday" label is UI-only)
- *
- * Bucket presets clear scheduledFor (no specific date). The weekend presets
- * are the exception: they set a real all-day date (bucket "timed"), matching
- * how SchedulePopover's "This/Next Weekend → All day" path schedules a task.
- */
-export function pushPresetToUpdates(preset: PushPreset): Partial<Task> {
-  const common = { scheduledFor: undefined, isSomeday: false } as const
-  const weekend = (date: Date): Partial<Task> => ({
-    scheduledFor: date,
-    isAllDay: true,
-    bucket: 'timed',
-    isSomeday: false,
-    weekDeferredAt: undefined,
-  })
-  switch (preset) {
-    case 'this-week':
-      return { ...common, bucket: 'week', weekDeferredAt: undefined }
-    case 'next-week':
-      return { ...common, bucket: 'week', weekDeferredAt: new Date() }
-    case 'this-weekend':
-      return weekend(getNextWeekend())
-    case 'next-weekend':
-      return weekend(getWeekendAfterNext())
-    case 'next-month':
-      return { ...common, bucket: 'month', weekDeferredAt: undefined }
-    case 'someday':
-      return { ...common, bucket: 'quarter', weekDeferredAt: undefined }
-  }
-}
 
 function formatDate(d: Date): { weekday: string; fullDate: string } {
   const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
@@ -209,6 +165,11 @@ function useMealCardData(event: CalendarEvent | null, fallbackName: string) {
 
 export function WallV2Shell() {
   const { user, loading: authLoading } = useAuth();
+  // The household's week start (Saturday for us). The kiosk opens only the
+  // wall, never the app shell that copies it into this browser, so the wall
+  // reads it itself; without this every week here counted from Sunday.
+  useHouseholdWeekStart();
+  const { config: { weekStartsOn } } = useCadenceConfig();
 
   // The chromeless Pi kiosk can't reload itself to pick up a new deploy, so a
   // shipped fix can stay invisible on the wall until a power-cycle. Poll for a
@@ -976,15 +937,25 @@ export function WallV2Shell() {
       updateTask: storeUpdate,
       deleteTask: storeDelete,
       addTask: (title, when, options) => storeAdd(title, undefined, undefined, when, { ...options, context: 'family' }),
-      weekStart: plannedWeekStart(set, new Date(), readCadenceConfig().weekStartsOn),
+      weekStart: plannedWeekStart(set, new Date(), weekStartsOn),
     }, reviewedWriter);
     if (!r.ok) return r;
     void wallData.refetch();
     return { ...r, undo: async () => { const ok = await r.undo(); void wallData.refetch(); return ok; } };
-  }, [reviewedWriter, storeTasks, storeUpdate, storeDelete, storeAdd, wallData]);
+  }, [reviewedWriter, storeTasks, storeUpdate, storeDelete, storeAdd, wallData, weekStartsOn]);
+  // A capture with a parsed day, time or person keeps them — the sheet showed
+  // the day ("→ Sat, Oct 24") before Add, so the task must land there.
+  const handleQuickCaptureAddRich = useCallback(async (data: WallQuickAddData) => {
+    const add = wallQuickAdd(data, new Date());
+    const id = await storeAdd(add.title, undefined, undefined, add.when, add.options);
+    if (!id) { showFlash('Save failed — try again'); return; }
+    showFlash(add.flash);
+    wallData.refetch();
+  }, [storeAdd, showFlash, wallData]);
+
   const wallAgent: WallTalkDeps = useMemo(
-    () => ({ applyChanges: applyWallChanges, weekStartsOn: readCadenceConfig().weekStartsOn }),
-    [applyWallChanges],
+    () => ({ applyChanges: applyWallChanges, weekStartsOn }),
+    [applyWallChanges, weekStartsOn],
   );
   // The family's next seven days (useWallData's own, family-only) for the
   // conversation's pictures, and what the wall knows of a task a card names.
@@ -1121,21 +1092,13 @@ export function WallV2Shell() {
 
   const handleWallPushTask = useCallback(async (id: string, preset: PushPreset) => {
     const taskId = id.replace(/^task-/, '');
-    await updateTask(taskId, pushPresetToUpdates(preset));
+    // Every preset lands on named dates — a week by its two ends, a weekend by
+    // its Saturday — and the flash says them, so nobody guesses where it went.
+    const target = pushTargets(new Date(), weekStartsOn)[preset];
+    await updateTask(taskId, target.updates);
     wallData.refetch();
-    // Weekend presets resolve to a concrete Saturday — show it so "next
-    // weekend" is never ambiguous (which Saturday did it land on?). The fuzzy
-    // bucket presets have no specific date, so they stay label-only.
-    const flash: Record<PushPreset, string> = {
-      'this-week':    'Moved to this week',
-      'this-weekend': `Moved to this weekend · ${formatShortDate(getNextWeekend())}`,
-      'next-week':    'Moved to next week',
-      'next-weekend': `Moved to next weekend · ${formatShortDate(getWeekendAfterNext())}`,
-      'next-month':   'Moved to next month',
-      'someday':      'Moved to Someday',
-    };
-    showFlash(flash[preset]);
-  }, [updateTask, wallData, showFlash]);
+    showFlash(target.flash);
+  }, [updateTask, wallData, showFlash, weekStartsOn]);
 
   // Derive the discussion-overlay visibility so it auto-hides when the queue
   // drains (without an effect that lint flags for cascading renders).
@@ -1325,6 +1288,7 @@ export function WallV2Shell() {
           onSkip={handleWallSkip}
           onMarkDone={handleWallMarkDone}
           onPushTask={handleWallPushTask}
+          pushTargets={pushTargets(now, weekStartsOn)}
           onClose={() => setActionSheetItem(null)}
         />
       )}
@@ -1385,6 +1349,7 @@ export function WallV2Shell() {
          entry point. Parser is given a slim family list for @mentions. */}
       <QuickCapture
         onAdd={handleQuickCaptureAdd}
+        onAddRich={(data) => void handleQuickCaptureAddRich(data)}
         projects={captureProjects}
         contacts={captureContacts}
         familyMembers={captureFamilyMembers}
