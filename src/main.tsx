@@ -87,6 +87,8 @@ await import('./styles/kiosk-math.css')
 await import('./styles/kiosk-energy.css')
 // All of today · This weekend on the wall.
 await import('./styles/kiosk-agenda.css')
+// A kid's tablet (/kid).
+await import('./styles/kid-kiosk.css')
 await import('./styles/canvas-routines.css')
 // Discussions with someone: the top-bar count, the phone's Waiting on you.
 await import('./styles/discussions.css')
@@ -142,6 +144,8 @@ const PhonePaperPage = lazy(() => import('./components/capture/PhonePaperPage').
 // can be opened on the Pi without a session; carries no live data.
 const WallV2LanePreview = lazy(() => import('./components/wall-v2/WallV2LanePreview').then((m) => ({ default: m.WallV2LanePreview })))
 const KioskScenePreview = lazy(() => import('./components/wall-v2/activity/KioskScenePreviewRoute'))
+const KidKiosk = lazy(() => import('./components/kids/KidKioskRoute'))
+const KidKioskPreview = lazy(() => import('./components/kids/KidKioskPreviewRoute'))
 
 // P5 cutover (gated). /, /today, /inbox, /task/:id route to the new Shell-mounted
 // TasksApp when the flag is enabled, otherwise to legacy App.tsx. Both paths now
@@ -217,6 +221,11 @@ createRoot(document.getElementById('root')!).render(
               {/* Dev only: every approved kiosk board with fixed data — no reads,
                   writes or calls — for design review screenshots. */}
               {import.meta.env.DEV && <Route path="/kiosk-preview" element={<Suspense fallback={null}><KioskScenePreview /></Suspense>} />}
+              {/* A kid's tablet: paired for one kid in Settings → Displays. A
+                  grown-up can open /kid/<member id>?layout=trail|list. */}
+              <Route path="/kid" element={<Suspense fallback={null}><KidKiosk /></Suspense>} />
+              <Route path="/kid/:memberId" element={<Suspense fallback={null}><KidKiosk /></Suspense>} />
+              {import.meta.env.DEV && <Route path="/kid-preview" element={<Suspense fallback={null}><KidKioskPreview /></Suspense>} />}
               {/* /jobs and /us retired (pare-down 2026-09-01): the job pipeline
                   moved out of Symphony (the vault owns job search) and the Us
                   surface was axed. Redirect, don't 404 — stale bookmarks and

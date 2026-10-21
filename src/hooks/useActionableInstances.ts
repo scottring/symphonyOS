@@ -3,6 +3,7 @@ import { supabase as defaultSupabase, getAuthUser } from '@/lib/supabase'
 import { emitInstancesChanged } from '@/lib/instancesChangedSignal'
 import { applyProgressDelta, applyProgressExact } from '@/lib/wall/targetProgress'
 import { chainPerKey } from '@/lib/wall/chainPerKey'
+import { isDisplayUser, displaySetRoutineDone } from '@/lib/display/displayWrites'
 import type {
   ActionableInstance,
   InstanceNote,
@@ -266,6 +267,14 @@ export function useActionableInstances(supabase = defaultSupabase) {
     setError(null)
 
     try {
+      // A paired display may not write instances itself; the server checks
+      // a routine off for it (displayWrites.ts).
+      if (entityType === 'routine' && isDisplayUser((await getAuthUser()).data.user)) {
+        const ok = await displaySetRoutineDone(entityId, date, true, null, supabase)
+        if (!ok) throw new Error('Failed to mark done')
+        emitInstancesChanged()
+        return true
+      }
       // Find existing instance (including deferred-to instances)
       let instance = await findInstanceForDate(entityType, entityId, date)
       // Fall back to creating a new instance if none exists
@@ -313,6 +322,14 @@ export function useActionableInstances(supabase = defaultSupabase) {
       setIsLoading(true)
       setError(null)
       try {
+        if (entityType === 'routine' && isDisplayUser((await getAuthUser()).data.user)) {
+          const current = await findInstanceForDate(entityType, entityId, date)
+          const p = compute(current?.progress ?? null)
+          const ok = await displaySetRoutineDone(entityId, date, p.status === 'completed', p.progress ?? 0, supabase)
+          if (!ok) throw new Error('Failed to log progress')
+          emitInstancesChanged()
+          return true
+        }
         let instance = await findInstanceForDate(entityType, entityId, date)
         if (!instance) instance = await getOrCreateInstance(entityType, entityId, date)
         if (!instance) throw new Error('Failed to get instance')
@@ -358,6 +375,12 @@ export function useActionableInstances(supabase = defaultSupabase) {
     setError(null)
 
     try {
+      if (entityType === 'routine' && isDisplayUser((await getAuthUser()).data.user)) {
+        const ok = await displaySetRoutineDone(entityId, date, false, null, supabase)
+        if (!ok) throw new Error('Failed to undo')
+        emitInstancesChanged()
+        return true
+      }
       const instance = await findInstanceForDate(entityType, entityId, date)
       if (!instance) return true // No instance means it's already not done
 

@@ -20,8 +20,9 @@ export function PairDisplayScreen({ onSignInInstead }: { onSignInInstead: () => 
     const r = await claimPairingCode(code)
     setBusy(false)
     if (!r.ok) { setError(r.error); return }
-    // The session is now a display: reload so the auth gate opens on the wall.
-    window.location.replace('/wall-v2')
+    // The session is now a display: reload so the auth gate opens on the
+    // wall, or on the kid's own screen for a kid's tablet.
+    window.location.replace(r.familyMemberId ? '/kid' : '/wall-v2')
   }
 
   return (

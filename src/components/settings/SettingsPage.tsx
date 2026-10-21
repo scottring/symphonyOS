@@ -680,7 +680,7 @@ export function SettingsPage({
             </section>
 
             {/* Displays — a kitchen wall's own restricted sign-in */}
-            <DisplaysSection />
+            <DisplaysSection members={members} />
 
             {/* School mail — the household's forwarding address */}
             <SchoolMailCard />

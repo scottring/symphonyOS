@@ -14,7 +14,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
-import { claimPairingCode, createPairingCode, isDisplaySession, listDisplays, revokeDisplay } from './pairing'
+import { claimPairingCode, createPairingCode, isDisplaySession, listDisplays, myDisplay, revokeDisplay } from './pairing'
 
 beforeEach(() => { vi.clearAllMocks() })
 
@@ -28,6 +28,30 @@ describe('createPairingCode', () => {
   it('passes the server’s refusal through (a member, not an owner)', async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'Only a household owner or admin can pair a display' } })
     expect(await createPairingCode()).toEqual({ ok: false, error: 'Only a household owner or admin can pair a display' })
+  })
+})
+
+describe('a kid’s tablet', () => {
+  it('pairs for one family member, with how it lays out the day', async () => {
+    mocks.rpc.mockResolvedValue({ data: { code: 'KAL234', expires_at: '2026-10-21T10:10:00Z' }, error: null })
+    await createPairingCode('Kaleb’s tablet', { familyMemberId: 'kaleb', layout: 'trail' })
+    expect(mocks.rpc).toHaveBeenCalledWith('create_display_pairing_code', { p_name: 'Kaleb’s tablet', p_family_member_id: 'kaleb', p_layout: 'trail' })
+  })
+  it('claims and says which kid it is for', async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: { user: { is_anonymous: true } } } })
+    mocks.rpc.mockResolvedValue({ data: { household_id: 'h1', name: 'Ella’s tablet', family_member_id: 'ella' }, error: null })
+    expect(await claimPairingCode('ELL234')).toEqual({ ok: true, householdId: 'h1', name: 'Ella’s tablet', familyMemberId: 'ella' })
+  })
+  it('reads its own display: the kid and the layout', async () => {
+    mocks.rpc.mockResolvedValue({ data: { id: 'd1', name: 'Kaleb’s tablet', household_id: 'h1', family_member_id: 'kaleb', layout: 'trail' }, error: null })
+    expect(await myDisplay()).toEqual({ id: 'd1', name: 'Kaleb’s tablet', householdId: 'h1', familyMemberId: 'kaleb', layout: 'trail' })
+    expect(mocks.rpc).toHaveBeenCalledWith('my_display')
+  })
+  it('is null for a person, or a server without the function', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: null })
+    expect(await myDisplay()).toBeNull()
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'function my_display() does not exist' } })
+    expect(await myDisplay()).toBeNull()
   })
 })
 
@@ -47,7 +71,7 @@ describe('claimPairingCode', () => {
     mocks.getSession.mockResolvedValue({ data: { session: null } })
     mocks.signInAnonymously.mockResolvedValue({ error: null })
     mocks.rpc.mockResolvedValue({ data: { household_id: 'h1', name: 'Kitchen wall' }, error: null })
-    expect(await claimPairingCode(' abc234 ')).toEqual({ ok: true, householdId: 'h1', name: 'Kitchen wall' })
+    expect(await claimPairingCode(' abc234 ')).toEqual({ ok: true, householdId: 'h1', name: 'Kitchen wall', familyMemberId: null })
     expect(mocks.signInAnonymously).toHaveBeenCalledTimes(1)
     expect(mocks.rpc).toHaveBeenCalledWith('claim_display_pairing', { p_code: 'ABC234' })
   })
@@ -80,7 +104,7 @@ describe('displays', () => {
     mocks.from.mockReturnValue({ select: () => ({ order }) })
     const rows = await listDisplays()
     expect(order).toHaveBeenCalledWith('paired_at', { ascending: false })
-    expect(rows).toEqual([{ id: 'd1', name: 'Kitchen wall', pairedAt: new Date('2026-10-15T10:00:00Z'), lastSeenAt: null, revokedAt: null }])
+    expect(rows).toEqual([{ id: 'd1', name: 'Kitchen wall', pairedAt: new Date('2026-10-15T10:00:00Z'), lastSeenAt: null, revokedAt: null, familyMemberId: null, layout: null }])
   })
   it('revokeDisplay calls the RPC and reports a refusal', async () => {
     mocks.rpc.mockResolvedValueOnce({ data: { revoked: true }, error: null })
