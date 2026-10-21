@@ -519,7 +519,7 @@ server.tool(
       const planId = await ensureWeekPlan(params.week_start)
       const { data, error } = await supabase
         .from('meal_plan_entries')
-        .select('id, day_of_week, slot, recipe_id, ad_hoc_title, notes, leftover_from, family_member_id, prepared_by_family_member_id, recipes(title)')
+        .select('id, day_of_week, slot, recipe_id, ad_hoc_title, notes, leftover_from, for_member_id, recipes(title)')
         .eq('meal_plan_id', planId)
         .order('day_of_week')
         .order('slot')
@@ -533,15 +533,16 @@ server.tool(
 
 server.tool(
   'symphony_add_meal_entry',
-  'Add an entry to a week plan. Provide recipe_id OR ad_hoc_title. day_of_week: 0=Sunday .. 6=Saturday. Use leftover_from to mark a reheat of an earlier entry.',
+  'Add an entry to a week plan. Provide recipe_id OR ad_hoc_title. day_of_week: 0=Sunday .. 6=Saturday. Use leftover_from to mark a reheat of an earlier entry, and for_member_id for a meal that belongs to one person (e.g. their lunch).',
   {
     week_start: z.string().describe('Sunday of the week, YYYY-MM-DD'),
     day_of_week: z.number().min(0).max(6),
-    slot: z.enum(['breakfast', 'lunch', 'snack', 'dinner', 'prep']),
+    slot: z.enum(['breakfast', 'lunch', 'dinner']),
     recipe_id: z.string().optional().describe('Recipe UUID'),
     ad_hoc_title: z.string().optional().describe('Free-text meal when there is no recipe'),
     notes: z.string().optional(),
     leftover_from: z.string().optional().describe('Entry UUID this reheats leftovers from'),
+    for_member_id: z.string().optional().describe('Household member UUID this meal is for (from symphony_list_household_members); omit for the whole family'),
   },
   async (params) => {
     try {
@@ -550,7 +551,7 @@ server.tool(
       const { data, error } = await supabase
         .from('meal_plan_entries')
         .insert({ ...entry, meal_plan_id: planId })
-        .select('id, day_of_week, slot, recipe_id, ad_hoc_title')
+        .select('id, day_of_week, slot, recipe_id, ad_hoc_title, for_member_id')
         .single()
       if (error) return fail(error)
       return ok(data)

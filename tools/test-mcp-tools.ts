@@ -47,12 +47,24 @@ const weekStart = sunday.toISOString().split('T')[0]
 
 const added = await client.callTool({
   name: 'symphony_add_meal_entry',
-  arguments: { week_start: weekStart, day_of_week: 6, slot: 'snack', ad_hoc_title: 'MCP smoke test' },
+  arguments: { week_start: weekStart, day_of_week: 6, slot: 'dinner', ad_hoc_title: 'MCP smoke test' },
 })
 const addedText = text(added)
 if (addedText.startsWith('Error:')) { console.error('add_meal_entry failed: ' + addedText); process.exit(1) }
 const entryId = JSON.parse(addedText).id as string
 console.log(`symphony_add_meal_entry: OK (${entryId})`)
+
+// Reading the week back catches selects of dropped columns (family_member_id broke this in July).
+const week = await client.callTool({ name: 'symphony_get_week_plan', arguments: { week_start: weekStart } })
+const weekText = text(week)
+const readBack = !weekText.startsWith('Error:') &&
+  (JSON.parse(weekText).entries as Array<{ id: string }>).some(e => e.id === entryId)
+if (!readBack) {
+  console.error('get_week_plan failed: ' + weekText)
+  await client.callTool({ name: 'symphony_remove_meal_entry', arguments: { id: entryId } })
+  process.exit(1)
+}
+console.log('symphony_get_week_plan: OK')
 
 const removed = await client.callTool({ name: 'symphony_remove_meal_entry', arguments: { id: entryId } })
 if (text(removed).startsWith('Error:')) { console.error('remove_meal_entry failed: ' + text(removed)); process.exit(1) }
