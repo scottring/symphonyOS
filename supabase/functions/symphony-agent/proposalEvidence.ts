@@ -25,8 +25,11 @@ export function proposalRepairToolAllowed(name: string): boolean {
 
 /** Chat already displays the verified draft and its Not saved status. Avoid
  * repeating a receipt in every reply; the spoken wall still needs one. */
-export function proposalReply(reply: string, surface: 'wall' | 'onboarding' | 'onboarding_activity' | null = null): string {
+export function proposalReply(reply: string, surface: 'wall' | 'onboarding' | 'onboarding_activity' | null = null, planning = false): string {
   if (surface !== 'wall') return reply.trim() || 'The draft is ready. Choose Save when you’re ready.'
+  // Planning the week, the card is folded away and grows with every answer:
+  // the next question, not a receipt read out each turn.
+  if (planning) return reply.trim() || 'Noted. Nothing is saved until you approve.'
   const receipt = 'The updated plan is ready to review. Nothing is saved until you approve.'
   if (!reply.trim()) return receipt
   if (/\b(?:nothing is saved|not (?:yet )?saved)\b/i.test(reply) && /\bapprov(?:e|al)\b/i.test(reply)) return reply

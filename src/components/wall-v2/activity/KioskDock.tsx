@@ -125,8 +125,8 @@ export function KioskDock(p: KioskDockProps) {
   let hint: string, line: string
   if (t.isThinking) { hint = t.heard ? `Heard “${t.heard}”` : 'One moment'; line = 'Thinking…' }
   else if (t.isSpeaking) { hint = 'Symphony is speaking · tap to talk'; line = lastSaid.length > 60 ? `“${lastSaid.slice(0, 58).trimEnd()}…”` : lastSaid ? `“${lastSaid}”` : 'Speaking…' }
-  else if (conv.card && !off) { hint = t.live ? `Say “${wake}”, or tap` : 'Tap to talk or type'; line = 'Say “approve”, or say what to change' }
-  else if (conv.planning && !off) { hint = t.live ? `Say “${wake}”, or tap · either of you can answer` : 'Tap to talk or type'; line = 'Answer, or say “approve” when ready' }
+  else if (conv.card && (!conv.planning || conv.review) && !off) { hint = t.live ? `Say “${wake}”, or tap` : 'Tap to talk or type'; line = 'Say “approve”, or say what to change' }
+  else if (conv.planning && !off) { hint = t.live ? `Say “${wake}”, or tap · either of you can answer` : 'Tap to talk or type'; line = 'Answer, or say “that’s it” when you’re done' }
   else if (quiet) { hint = `Not listening for “${wake}”`; line = 'Quiet hours · tap to talk' }
   else if (muted) { hint = 'The microphone is off'; line = 'Tap to type, or turn it on in More' }
   else if (t.live) { hint = `Say “${wake}”, or tap${p.copy.tapWhat}`; line = p.copy.line }

@@ -30,6 +30,8 @@ export interface WallAgentOptions {
   functionName?: string
   /** Abort the turn (the wall gave up waiting); the agent stops at its next tool. */
   signal?: AbortSignal
+  /** The days the family is planning ("Help me plan the week"), YYYY-MM-DD. */
+  plan?: { from: string; to: string }
 }
 
 export interface WallAgentReply {
@@ -100,6 +102,7 @@ export async function askWallAgent(text: string, history: readonly WallTurn[] = 
     ...(opts.currentMemberId ? { currentMemberId: opts.currentMemberId } : {}),
     ...(opts.turnId ? { turnId: opts.turnId } : {}),
     ...(opts.signal ? { signal: opts.signal } : {}),
+    ...(opts.plan ? { wallPlan: opts.plan } : {}),
     onText: (t) => { got.streamed += t; got.afterTool += t; opts.onText?.(t) },
     onTool: () => { got.afterTool = '' },
     onChangeSet: (set) => { got.changeSet = set },

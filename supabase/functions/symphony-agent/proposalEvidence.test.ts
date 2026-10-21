@@ -22,6 +22,10 @@ it('adds a verified spoken wall proposal receipt without removing a natural foll
  expect(proposalReply('Which day for the test drive?', 'wall')).toBe('The updated plan is ready to review. Nothing is saved until you approve. Which day for the test drive?')
  expect(proposalReply(proposalReply('Which day?', 'wall'), 'wall')).toBe(proposalReply('Which day?', 'wall'))
 })
+it('while the family plans the week, asks the next question without reading out a receipt every turn',()=>{
+ expect(proposalReply('Noted. Anything else on Thursday?', 'wall', true)).toBe('Noted. Anything else on Thursday?')
+ expect(proposalReply('  ', 'wall', true)).toBe('Noted. Nothing is saved until you approve.')
+})
 it('repair tools cannot create or change persisted data',()=>{
  for(const name of ['symphony_create_task','symphony_update_task','symphony_draft_email','symphony_attach_source','symphony_add_to_scratchpad'])expect(proposalRepairToolAllowed(name)).toBe(false)
  expect(proposalRepairToolAllowed('symphony_read_week')).toBe(true)

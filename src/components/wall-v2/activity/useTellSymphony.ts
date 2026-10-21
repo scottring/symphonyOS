@@ -143,7 +143,7 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
     setOpen(false)
     let said: string | null
     let speak: string | null = null
-    const intent = talk.enabled ? talkIntent(text, !!talk.card) : null
+    const intent = talk.enabled ? talkIntent(text, !!talk.card, talk.planning) : null
     const agentTakes = talk.enabled && (u.kind === 'question' || (u.kind === 'unknown' && !!u.text.trim()))
     if (intent === 'approve') {
       setBusy(true)
@@ -151,6 +151,8 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
     } else if (intent === 'dismiss') {
       talk.dismiss()
       said = 'Okay, not now. Nothing was changed.'
+    } else if (intent === 'plan-done') {
+      said = talk.finishPlanning()
     } else if (intent === 'plan-week') {
       said = await converse(() => talk.startPlanning(), text)
     } else if (agentTakes) {

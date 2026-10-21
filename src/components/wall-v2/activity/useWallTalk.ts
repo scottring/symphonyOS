@@ -16,6 +16,7 @@ import type { ApplyResult } from '@/lib/canvas/applyChangeSet'
 import type { WeekStart } from '@/lib/cadence/config'
 import { AGENT_TIMEOUT_MS, TALK_IDLE_MS, TALK_UNDO_MS, withTimeout } from '@/lib/wall/wallTalk'
 import { planWeek, type PlanWeek } from '@/lib/wall/wallDates'
+import { localYmd } from '@/lib/cadence/config'
 
 /** Approve's outcome on the wall: the shared apply, or refused because a task
  *  is not a family one (only family plans change from the wall). */
@@ -46,8 +47,11 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
   const [card, setCardState] = useState<TalkCard | null>(null)
   const [saved, setSaved] = useState<TalkSaved | null>(null)
   /** The week being planned, by its dates; null when not planning. */
-  const [plan, setPlan] = useState<PlanWeek | null>(null)
+  const [plan, setPlanState] = useState<PlanWeek | null>(null)
   const planning = !!plan
+  /** The same, for the turn being asked right after planning starts. */
+  const planRef = useRef<PlanWeek | null>(null)
+  const setPlan = useCallback((p: PlanWeek | null) => { planRef.current = p; setPlanState(p) }, [])
   const [review, setReview] = useState(false)
   const [pointed, setPointed] = useState<string[]>([])
   const [lastAt, setLastAt] = useState(0)
@@ -76,7 +80,7 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
     history.current = []
     noteRef.current = null
     setTurns([]); setCard(null); setPlan(null); setReview(false); setPointed([]); setAsking(false)
-  }, [setCard])
+  }, [setCard, setPlan])
 
   /** Turns go one at a time: a sentence said while Symphony is still
    *  answering waits for that answer, so each turn carries the last. */
@@ -94,10 +98,14 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
       if (mine !== epoch.current) return null
       const cur = cardRef.current
       const changeCard = cur ? changeCardNote(cur.set, 'pending') : noteRef.current ?? undefined
+      // Every turn of "Help me plan the week" says which days, so Symphony
+      // keeps asking about them (wallPlanLine on the server).
+      const p = planRef.current
+      const plan = p ? { from: localYmd(p.from), to: localYmd(p.days[p.days.length - 1]) } : undefined
       try {
         // Past the timeout the agent is aborted, not left to finish unseen.
         const abort = new AbortController()
-        const r = await withTimeout((deps.ask ?? askWallAgent)(text, history.current, { changeCard, turnId: newId(), signal: abort.signal }), AGENT_TIMEOUT_MS, () => abort.abort())
+        const r = await withTimeout((deps.ask ?? askWallAgent)(text, history.current, { changeCard, turnId: newId(), signal: abort.signal, ...(plan ? { plan } : {}) }), AGENT_TIMEOUT_MS, () => abort.abort())
         if (mine !== epoch.current) return null
         noteRef.current = null
         history.current = r.history
@@ -135,8 +143,25 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
     // Said with the week's dates, and shown so: which week is never a guess.
     const week = planWeek(now, deps.weekStartsOn)
     setPlan(week)
-    return ask(week.opening, `Plan the week · ${week.label}`)
-  }, [deps, ask])
+    return ask(week.opening, `Help me plan the week · ${week.label}`)
+  }, [deps, ask, setPlan])
+
+  /** "That's it": planning is over. The whole card comes up to approve; with
+   *  nothing on it, planning simply ends. Returns what to say. */
+  const finishPlanning = useCallback((): string => {
+    const c = cardRef.current
+    if (!c) {
+      end()
+      return 'Nothing to change this week. Nothing was saved.'
+    }
+    const n = c.set.ops.length
+    const said = `That’s the week: ${n} ${n === 1 ? 'change' : 'changes'}. Say approve, or what to change.`
+    announced.current = c.set.key
+    setReview(true)
+    setTurns((t) => [...t, { id: newId(), who: 'symphony', text: said }])
+    touch()
+    return said
+  }, [end, touch])
 
   /** The card the wall last read out. A spoken approve means that one (plan
    *  §6): a card that arrived since is read first and approved on the next
@@ -211,8 +236,8 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
   return useMemo(() => ({
     enabled: !!deps, active, asking, turns, card, saved, planning, plan, review, pointed,
     weekStartsOn: deps?.weekStartsOn ?? 0,
-    ask, addReply, startPlanning, approve, dismiss, undoSaved, end, setReview,
-  }), [deps, active, asking, turns, card, saved, planning, plan, review, pointed, ask, addReply, startPlanning, approve, dismiss, undoSaved, end])
+    ask, addReply, startPlanning, finishPlanning, approve, dismiss, undoSaved, end, setReview,
+  }), [deps, active, asking, turns, card, saved, planning, plan, review, pointed, ask, addReply, startPlanning, finishPlanning, approve, dismiss, undoSaved, end])
 }
 
 export type WallTalk = ReturnType<typeof useWallTalk>

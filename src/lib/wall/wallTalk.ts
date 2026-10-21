@@ -24,20 +24,23 @@ export function talkUsesBand(screen: string): boolean {
   return screen === 'out-the-door' || screen === 'bedtime'
 }
 
-export type TalkIntent = 'approve' | 'dismiss' | 'plan-week'
+export type TalkIntent = 'approve' | 'dismiss' | 'plan-week' | 'plan-done'
 
 const tidyWords = (s: string) => s.toLowerCase().replace(/[’']/g, '').replace(/^\s*(?:(?:hey|ok|okay|hi)[\s,]+)?symphony\b[\s,.!:-]*/, '').replace(/[.,!?]+/g, ' ').replace(/\s+/g, ' ').trim()
 
 const APPROVE = /^(?:(?:ok(?:ay)?|yes|yeah|yep|great|good|perfect|sure|thanks)\s+)*(?:please\s+)?(?:approve(?:\s+(?:it|that|this|them|all|all of (?:it|them)|the changes|the card|everything))?|(?:yes\s+)?(?:please\s+)?do it|(?:yes\s+)?(?:please\s+)?save (?:it|that|them|the changes))(?:\s+please)?$/
 const DISMISS = /^(?:not now|never ?mind|cancel(?: that| it| the changes)?|forget it|dismiss(?: it| that)?)$/
 const PLAN_WEEK = /^(?:(?:can we|lets|let us|i want to|we should|help (?:us|me))\s+)?plan (?:the|our|this) (?:rest of (?:the|our|this) )?week(?: together)?(?: please)?$/
+const PLAN_DONE = /^(?:(?:ok(?:ay)?|yes|yeah|so|and)\s+)*(?:thats (?:it|all|everything)|(?:were|we are|im|i am|all) (?:done|finished))(?:\s+(?:for now|thanks|thank you))?$/
 
 /** Words that act on the wall itself rather than go to Symphony. Approve and
- *  Not now only mean something while a card is up. */
-export function talkIntent(text: string, cardUp: boolean): TalkIntent | null {
+ *  Not now only mean something while a card is up; "that's it" only while
+ *  planning the week. */
+export function talkIntent(text: string, cardUp: boolean, planning = false): TalkIntent | null {
   const t = tidyWords(text)
   if (!t) return null
   if (PLAN_WEEK.test(t)) return 'plan-week'
+  if (planning && PLAN_DONE.test(t)) return 'plan-done'
   if (cardUp && APPROVE.test(t)) return 'approve'
   if (cardUp && DISMISS.test(t)) return 'dismiss'
   return null

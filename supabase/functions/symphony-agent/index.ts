@@ -28,7 +28,7 @@ import { normalizeSchedule, etOffsetMinutes, APP_TZ } from './schedule.ts'
 import { MEAL_SLOTS, type MealSlot, getMeals, resolveDate, setMeal } from './meals.ts'
 import { summarizeTurn, type TurnWrite } from './outcome.ts'
 import { fenceRetrieved } from './untrusted.ts'
-import { type Surface, SCRATCHPAD_TOOL, WALL_WRITE_TOOLS, addToScratchpad, callerSurface, fenceDb, loadWallFence, parseSurface, systemForSurface, toolAllowed, toolsForSurface, wallClockLine } from './wallMode.ts'
+import { type Surface, SCRATCHPAD_TOOL, WALL_WRITE_TOOLS, addToScratchpad, callerSurface, fenceDb, loadWallFence, parseSurface, systemForSurface, toolAllowed, toolsForSurface, wallClockLine, wallPlanLine } from './wallMode.ts'
 
 /** What the wall's Approve can apply today (WallV2Shell passes task writers only). */
 const WALL_CARD_OPS = new Set(['place', 'unplace', 'add', 'someday', 'assign'])
@@ -1464,6 +1464,9 @@ Deno.serve(async (req) => {
   const today = `${part('year')}-${part('month')}-${part('day')}`
   let datePrefix = `(Today is ${today}, ${part('hour')}:${part('minute')} local time, ${tz}.)${familyLine}`
   if (wall) datePrefix += wallClockLine(new Date(), tz)
+  // "Help me plan the week": the days, and how to help plan them (wallMode.ts).
+  const planLine = wall ? wallPlanLine(body.wallPlan) : ''
+  datePrefix += planLine
   if (taskContext) {
     const isRoutine = taskContext.kind === 'routine'
     if (isRoutine) {
@@ -1708,7 +1711,7 @@ Deno.serve(async (req) => {
         const seen = new Set<string>()
         const sources = sourceNotes.filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)))
         const outcome = summarizeTurn(writes, shown, trace.truncated ? 'error' : 'ok')
-        if (outcome.state === 'proposed') finalText = proposalReply(finalText, surface)
+        if (outcome.state === 'proposed') finalText = proposalReply(finalText, surface, !!planLine)
         else if (!finalText.trim()) finalText = outcome.say
         send({ type: 'text', text: finalText })
         send({ type: 'done', reply: finalText, sessionId: null, sources, outcome, requestId })

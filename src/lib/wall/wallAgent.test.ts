@@ -104,6 +104,12 @@ describe('askWallAgent', () => {
     expect(body.turnId).toBe('t2')
   })
 
+  it('says which days the family is planning, on every turn of it', async () => {
+    const fetch = mockFetch(streamed(sse({ type: 'done', reply: 'What else is on Wednesday?', sessionId: null })))
+    await askWallAgent('Help me plan the rest of this week, Wed, Oct 21 – Fri, Oct 23.', [], { plan: { from: '2026-10-21', to: '2026-10-23' } })
+    expect(sentBody(fetch, 0).wallPlan).toEqual({ from: '2026-10-21', to: '2026-10-23' })
+  })
+
   it('uses the preview build’s wall test copy when one is named', async () => {
     vi.stubEnv('VITE_WALL_AGENT_FUNCTION', 'symphony-agent-wall-test')
     expect(wallAgentFunctionName()).toBe('symphony-agent-wall-test')

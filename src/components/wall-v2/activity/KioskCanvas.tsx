@@ -362,7 +362,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const energy = p.energy ?? null
   const energyNow = energy && hasReading(energy.now) ? energy.now : null
   const moreTiles = [
-    talk.enabled ? { id: 'plan', label: 'Plan the week', sub: planWeek(p.now, talk.weekStartsOn).label, icon: CalendarDays, onSelect: () => { setMoreOpen(false); void tell.handle('Plan the week', false) } } : null,
+    talk.enabled ? { id: 'plan', label: 'Help me plan the week', sub: planWeek(p.now, talk.weekStartsOn).label, icon: CalendarDays, onSelect: () => { setMoreOpen(false); void tell.handle('Help me plan the week', false) } } : null,
     math && math.kids.length > 0
       ? { id: 'math', label: 'Math of the day', sub: mathLeft ? `${mathLeft} still to solve` : 'All done today', icon: Calculator, onSelect: () => { setMoreOpen(false); openMath() } }
       : null,

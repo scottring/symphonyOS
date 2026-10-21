@@ -128,6 +128,8 @@ export interface StreamHandlers {
   /** 'wall': the kitchen wall — the agent reads only the family layer and
    *  proposes every change (supabase/functions/symphony-agent/wallMode.ts). */
   surface?: 'wall' | 'onboarding' | 'onboarding_activity'
+  /** The wall's "Help me plan the week": the days being planned (YYYY-MM-DD). */
+  wallPlan?: { from: string; to: string }
   /** Another deployed copy of the agent function (e.g. a test copy). */
   functionName?: string
   /** Abort the request (the wall's timeout): the server's stream closes and
@@ -206,6 +208,7 @@ export async function streamSymphonyAgent(
         ...(handlers.sessionContext ? { sessionContext: handlers.sessionContext } : {}),
         ...(handlers.turnId ? { turnId: handlers.turnId } : {}),
         ...(handlers.surface ? { surface: handlers.surface } : {}),
+        ...(handlers.wallPlan ? { wallPlan: handlers.wallPlan } : {}),
       }),
       ...(handlers.signal ? { signal: handlers.signal } : {}),
     },

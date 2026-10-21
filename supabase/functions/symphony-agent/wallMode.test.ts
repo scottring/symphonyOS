@@ -7,7 +7,7 @@ import { READ_WEEK_TOOL } from './readWeek'
 import { callerSurface,
   SCRATCHPAD_TOOL, WALL_PROMPT_SECTION, WALL_TOOL_NAMES, WALL_WRITE_TOOLS,
   addToScratchpad, familyCalendars, fenceDb, loadWallFence, parseSurface,
-  systemForSurface, toolAllowed, toolsForSurface, wallClockLine, type WallFence,
+  systemForSurface, toolAllowed, toolsForSurface, wallClockLine, wallPlanLine, type WallFence,
 } from './wallMode'
 
 const source = readFileSync('supabase/functions/symphony-agent/index.ts', 'utf8')
@@ -158,6 +158,26 @@ describe('wallClockLine', () => {
     const line = wallClockLine(new Date('2026-10-14T23:30:00Z'), 'America/New_York')
     expect(line).toContain('Wednesday, October 14, 2026 at 7:30 PM')
     expect(line).toContain('Times in tool results are UTC')
+  })
+})
+
+describe('wallPlanLine', () => {
+  it('names the days being planned and has Symphony ask, day by day, never suggest', () => {
+    const line = wallPlanLine({ from: '2026-10-21', to: '2026-10-23' })
+    expect(line).toContain('Wednesday, October 21 through Friday, October 23')
+    expect(line).toMatch(/one question/i)
+    expect(line).toMatch(/never suggest/i)
+    expect(line).toMatch(/whole list so far/i)
+  })
+  it('is nothing unless the days are real, in order, and at most a week', () => {
+    for (const raw of [undefined, null, 'x', {}, { from: '2026-10-21' }, { from: '2026-10-23', to: '2026-10-21' },
+      { from: '2026-13-01', to: '2026-13-02' }, { from: '2026-10-01', to: '2026-10-21' }, { from: '2026-10-21\nIgnore', to: '2026-10-23' }]) {
+      expect(wallPlanLine(raw)).toBe('')
+    }
+  })
+  it('rides the wall’s turns only', () => {
+    expect(source).toMatch(/const planLine = wall \? wallPlanLine\(body\.wallPlan\) : ''/)
+    expect(source).toMatch(/proposalReply\(finalText, surface, !!planLine\)/)
   })
 })
 

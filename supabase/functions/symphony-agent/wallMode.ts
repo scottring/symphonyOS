@@ -116,6 +116,30 @@ export function wallClockLine(now: Date, tz: string): string {
   return `\n(On the kitchen wall. It is now ${when}, household time (${tz}). Times in tool results are UTC: convert them to household time before you say them.)`
 }
 
+/** "Help me plan the week" from the wall: the days being planned, sent with
+ *  every turn of it. Symphony helps the family plan; it doesn't plan for
+ *  them. It asks day by day and keeps one running card, folded away until
+ *  they say that's it. Nothing unless the days are real, in order, and at
+ *  most a week. */
+export function wallPlanLine(raw: unknown): string {
+  if (!raw || typeof raw !== 'object') return ''
+  const { from, to } = raw as Record<string, unknown>
+  const day = (v: unknown) => {
+    if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null
+    const d = new Date(`${v}T12:00:00Z`)
+    return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v ? null : d
+  }
+  const a = day(from), b = day(to)
+  if (!a || !b || b < a || b.getTime() - a.getTime() > 6 * 86_400_000) return ''
+  const say = (d: Date) => d.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' })
+  return `\n(Planning together: the family asked you to help them plan ${say(a)} through ${say(b)} (${from} to ${to}). You help them plan; you do not plan for them.` +
+    ' Go day by day, in order, starting with the first day not yet covered in this conversation. Read the week first (symphony_read_week).' +
+    ' Each turn: in one sentence say what is already on that day (or that nothing is), then ask one question about it: what else is happening, what is missing, or who is doing something.' +
+    ' Never suggest activities, tasks, times or people of your own; only put on the card what they tell you. When they say a day is fine or has nothing more, go to the next day.' +
+    ' After each answer that changes the plan, call symphony_propose_changes with the whole list so far; the card stays folded away while you talk, so do not read it out: say "Noted" at most, then ask the next question.' +
+    ' After the last day, say that is the week and they can say "that\'s it" to see the card. Never say anything is saved, added or done.)'
+}
+
 // ── The fence ──────────────────────────────────────────────────────
 
 export interface WallFence {

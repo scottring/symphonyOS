@@ -23,6 +23,15 @@ describe('talkIntent: words that act on the wall itself', () => {
     for (const s of ['Help me plan the week', "Let's plan the week", 'plan the rest of the week', 'Hey Symphony, plan our week.']) expect(talkIntent(s, false)).toBe('plan-week')
     expect(talkIntent('plan dinner on Tuesday', false)).toBeNull()
   })
+  it('"that\'s it" ends planning, and only while planning', () => {
+    for (const s of ["That's it", 'thats all', 'Okay, that’s everything', "We're done", 'all done', 'Hey Symphony, we are finished.']) {
+      expect(talkIntent(s, true, true)).toBe('plan-done')
+      expect(talkIntent(s, false, true)).toBe('plan-done')
+      expect(talkIntent(s, true, false)).toBeNull()
+    }
+    // An answer about the day is not the end of planning.
+    for (const s of ['done by 5', 'that’s it for Thursday', 'Soccer is done']) expect(talkIntent(s, true, true)).toBeNull()
+  })
 })
 
 it('full-stage moments use the reply band', () => {

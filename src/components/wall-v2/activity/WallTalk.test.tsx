@@ -313,17 +313,17 @@ describe('talking to the wall: plan the week', () => {
   beforeEach(() => { localStorage.clear(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW) })
   afterEach(() => { vi.useRealTimers() })
 
-  it('More → Plan the week names the week it plans, by its dates, and shows that week', async () => {
+  it('More → Help me plan the week names the week it plans, by its dates, and shows that week', async () => {
     const { ask } = setup(async (t, h) => reply(t, h, 'Let’s plan the rest of the week. Sunday has swim and a party; Friday is open.'))
     fireEvent.click(dock().getByRole('button', { name: 'More' }))
     // Saturday Oct 10 starts the household's week: the tile says which one.
     expect(screen.getByText('Sat, Oct 10 – Fri, Oct 16')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Plan the week/ })) })
-    expect(ask).toHaveBeenCalledWith('Help me plan the week of Sat, Oct 10 – Fri, Oct 16.', [], expect.anything())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Help me plan the week/ })) })
+    expect(ask).toHaveBeenCalledWith('Help me plan the week of Sat, Oct 10 – Fri, Oct 16.', [], expect.objectContaining({ plan: { from: '2026-10-10', to: '2026-10-16' } }))
     expect(screen.getByText('Family only · Sat, Oct 10 – Fri, Oct 16')).toBeInTheDocument()
     const pic = screen.getByLabelText('The family’s week')
     expect(within(pic).getAllByRole('group')).toHaveLength(7)
-    expect(side().getByText('Plan the week · Sat, Oct 10 – Fri, Oct 16')).toBeInTheDocument()
+    expect(side().getByText('Help me plan the week · Sat, Oct 10 – Fri, Oct 16')).toBeInTheDocument()
     expect(side().getByText(/Let’s plan the rest of the week/)).toBeInTheDocument()
   })
 
@@ -339,6 +339,36 @@ describe('talking to the wall: plan the week', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
     expect(screen.getByRole('region', { name: 'Proposed changes' })).toBeInTheDocument()
     expect(applyChanges).not.toHaveBeenCalled()
+  })
+
+  it('every answer goes back with the days being planned, and the dock asks for "that’s it", not approve', async () => {
+    const { ask } = setup(async (t, h) => reply(t, h, 'Anything else on Saturday?', h.length ? { changeSet: SET } : {}))
+    await type('help me plan the week')
+    await type('Ella has a sleepover Saturday')
+    expect(ask).toHaveBeenLastCalledWith('Ella has a sleepover Saturday', expect.anything(), expect.objectContaining({ plan: { from: '2026-10-10', to: '2026-10-16' } }))
+    expect(dock().getByText('Answer, or say “that’s it” when you’re done')).toBeInTheDocument()
+  })
+
+  it('"that’s it" brings up the whole card to approve, without asking Symphony again', async () => {
+    const { ask, applyChanges } = setup(async (t, h) => reply(t, h, 'Anything else on Saturday?', h.length ? { changeSet: SET } : {}))
+    await type('help me plan the week')
+    await type('move swim to Friday')
+    ask.mockClear()
+    await type('that’s it')
+    expect(ask).not.toHaveBeenCalled()
+    expect(screen.getByRole('region', { name: 'Proposed changes' })).toBeInTheDocument()
+    expect(dock().getByText('Say “approve”, or say what to change')).toBeInTheDocument()
+    expect(applyChanges).not.toHaveBeenCalled()
+  })
+
+  it('"that’s it" with nothing said yet ends planning with nothing changed', async () => {
+    const { ask } = setup(async (t, h) => reply(t, h, 'Saturday has swim. Anything else?'))
+    await type('help me plan the week')
+    ask.mockClear()
+    await type('that’s it')
+    expect(ask).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('The family’s week')).toBeNull()
+    expect(screen.getByText('Nothing to change this week. Nothing was saved.')).toBeInTheDocument()
   })
 })
 
