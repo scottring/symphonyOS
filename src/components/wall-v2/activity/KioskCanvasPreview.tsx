@@ -207,6 +207,11 @@ const AGENDA: Record<'today' | 'weekend', AgendaDay[]> = {
       anytime: [ar('task-bags', 'task', null, 'Pack school bags', ['li', 'mi'])] },
   ],
 }
+// Sometime this weekend: a Weekend-rule chore and a task planned for the weekend with no day.
+const AGENDA_SOMETIME: AgendaRow[] = [
+  ar('routine-weed', 'routine', null, 'Weed the backyard', ['sk']),
+  ar('task-donate', 'task', null, 'Drop off the donation bags', ['ir']),
+]
 
 // The Energy scene: an evening with the car charging, the sun nearly down.
 function energyFixture(now: Date): EnergyLive {
@@ -355,7 +360,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         math={math}
         energy={energyFixture(now)}
         loadEnergyPeriod={energyPeriodFixture}
-        agenda={AGENDA}
+        agenda={{ ...AGENDA, sometime: AGENDA_SOMETIME }}
         onSetDone={noop}
         onAddSticky={async () => true}
         listenerPreview={v1Screen ? dock ?? (v1Screen === 'night' ? 'quiet' : 'idle') : undefined}

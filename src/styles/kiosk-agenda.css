@@ -25,6 +25,8 @@
 .kiosk-canvas .ka-allday { list-style: none; margin: 0 0 calc(12 * var(--p)); padding: 0; display: flex; flex-wrap: wrap; gap: calc(10 * var(--p)); }
 .kiosk-canvas .ka-allday li { padding: calc(10 * var(--p)) calc(20 * var(--p)); border-radius: 999px; background: var(--kw-surface); border: 1px solid var(--kw-line); font-size: calc(24 * var(--p)); font-weight: 600; color: var(--kw-ink); }
 .kiosk-canvas .ka-empty { margin-top: 0; }
+.kiosk-canvas .ka-soon { display: contents; }
+.kiosk-canvas .ka-hint { flex: none; margin: calc(-4 * var(--p)) 0 calc(12 * var(--p)); }
 
 /* Less scrolling (Scott, 2026-10-18: "as little as possible"): one line a
    row, who beside the title; the row is still a full touch target. */

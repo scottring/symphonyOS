@@ -72,6 +72,8 @@ export function rowToTask(t: any): Task {
     heldBy: t.held_by ?? undefined,
     dismissedAt: t.dismissed_at ? new Date(t.dismissed_at) : undefined,
     completedAt: t.completed_at ? new Date(t.completed_at) : undefined,
+    // A DATE column, like needed_on. Only the weekend query (18) selects it.
+    weekendStart: t.weekend_start ? parseLocalYmd(t.weekend_start) : undefined,
   }
 }
 
@@ -134,6 +136,15 @@ export interface UseWallDataReturn {
   /** School papers: open ones, and today's done ones (spec 2026-10-20). */
   paperTasks: Task[]
   /**
+   * Tasks planned for a weekend with no day of their own (`weekend_start`,
+   * no `scheduled_for`): the Week page's "Sometime this weekend". Done ones
+   * too, so a check on the wall can be taken back.
+   */
+  weekendTasks: Task[]
+  /** The week's routine instances: which day a Weekend-rule routine was
+   *  given (planned_on), for "Sometime this weekend". */
+  routineInstances: ActionableInstance[]
+  /**
    * Raw fetched routine rows — BEFORE the wall's effectiveTimeOfDay remap
    * (a Step's time_of_day stays null here, not filled from its collection
    * parent) and before the two shallow overrides applied at the dayRoutines
@@ -191,6 +202,8 @@ export function useWallData(): UseWallDataReturn {
   const [homeworkTasks, setHomeworkTasks] = useState<Task[]>([])
   const [notices, setNotices] = useState<WallNotice[]>([])
   const [paperTasks, setPaperTasks] = useState<Task[]>([])
+  const [weekendTasks, setWeekendTasks] = useState<Task[]>([])
+  const [routineInstances, setRoutineInstances] = useState<ActionableInstance[]>([])
   const [rawRoutines, setRawRoutines] = useState<Routine[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -236,6 +249,7 @@ export function useWallData(): UseWallDataReturn {
         homeworkRes,
         noticesRes,
         papersRes,
+        weekendRes,
       ] = await Promise.all([
         // 1. Family members
         supabase.from('family_members').select('*').order('display_order'),
@@ -375,6 +389,18 @@ export function useWallData(): UseWallDataReturn {
           .eq('category', 'paper')
           .is('dismissed_at', null)
           .or(`completed.eq.false,completed_at.gte.${startOfDay(new Date()).toISOString()}`),
+
+        // 18. Planned for a weekend with no day — the Week page's "Sometime
+        // this weekend". No `scheduled_for`, so query 2 can't see them. From
+        // yesterday, so on a Sunday the weekend's Saturday is still in hand.
+        supabase
+          .from('tasks')
+          .select(`${TASK_COLUMNS}, weekend_start`)
+          .eq('context', 'family')
+          .is('scheduled_for', null)
+          .gte('weekend_start', localYmd(addDays(startDate, -1)))
+          .lte('weekend_start', endStr)
+          .or('category.is.null,category.neq.paper'),
       ])
 
       if (!mountedRef.current) return
@@ -387,7 +413,7 @@ export function useWallData(): UseWallDataReturn {
       const dataError = [
         membersRes, tasksRes, routinesRes, instancesRes, contactsRes,
         milestonesRes, stBudgetsRes, stEntriesRes, stAdjustmentsRes,
-        overdueRes, routineCompletionsRes, neededRes, freeEventNotesRes, homeworkRes, noticesRes, papersRes,
+        overdueRes, routineCompletionsRes, neededRes, freeEventNotesRes, homeworkRes, noticesRes, papersRes, weekendRes,
       ].find((r) => r.error)?.error?.message ?? null
 
       const members = (membersRes.data || []) as FamilyMember[]
@@ -398,6 +424,7 @@ export function useWallData(): UseWallDataReturn {
       const needed: Task[] = (neededRes.data || []).map(rowToTask)
       const homework: Task[] = (homeworkRes.data || []).map(rowToTask)
       const papers: Task[] = (papersRes.data || []).map(rowToTask)
+      const weekend: Task[] = (weekendRes.data || []).map(rowToTask)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const noticeRows: WallNotice[] = (noticesRes.data || []).map((n: any) => ({
         id: n.id, familyMemberId: n.family_member_id ?? null, text: n.text,
@@ -599,6 +626,8 @@ export function useWallData(): UseWallDataReturn {
           setNeededTasks(needed)
           setHomeworkTasks(homework)
           setPaperTasks(papers)
+          setWeekendTasks(weekend)
+          setRoutineInstances(instances.filter((i) => i.entity_type === 'routine'))
           setNotices(noticeRows)
           setRawRoutines(allRoutines)
         }
@@ -644,5 +673,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, neededTasks, homeworkTasks, notices, paperTasks, routines: rawRoutines, loading, error, lastRefresh, refetch: fetchAllData }
+  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, neededTasks, homeworkTasks, notices, paperTasks, weekendTasks, routineInstances, routines: rawRoutines, loading, error, lastRefresh, refetch: fetchAllData }
 }
