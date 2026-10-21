@@ -15,11 +15,14 @@
 import { useState, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
-import type { AgendaDay, AgendaRow, AgendaView } from '@/lib/wall/wallAgenda'
+import { datesLabel, type AgendaDay, type AgendaRow, type AgendaView } from '@/lib/wall/wallAgenda'
 
 export interface AgendaStageProps {
   view: AgendaView
   days: Record<AgendaView, AgendaDay[]>
+  /** "Sometime this weekend": the weekend's work with no day, once for both
+   *  days, as the Week page has it. */
+  sometime?: AgendaRow[]
   members: FamilyMember[]
   onSetDone: (row: AgendaRow, done: boolean) => void
   onTapRow: (id: string) => void
@@ -112,20 +115,36 @@ export function AgendaStage(p: AgendaStageProps) {
     // The weekend's anytime things still to do wait under today's (Scott,
     // 2026-10-18): "see unfinished anytime this weekend items on the today view".
     const later = p.days.weekend.filter((w) => !w.isToday)
-    const soon = later.flatMap((w) => w.anytime.filter((r) => !r.done))
-    const soonLab = later.length === 1 ? later[0].label : 'This weekend'
+    const sometime = (p.sometime ?? []).filter((r) => !r.done)
+    const weekendDays = p.days.weekend.map((w) => w.date)
     cols = d ? [
       col('On the clock', <><AllDay titles={d.allDay} />{d.timed.length ? <Rows rows={d.timed} p={p} flipped={flipped} flip={flip} /> : empty('Nothing on the clock today.')}</>, 'timed'),
       col('Anytime today', (
         <>
           {d.anytime.length ? <Rows rows={d.anytime} p={p} flipped={flipped} flip={flip} anytime /> : empty('Nothing else today.')}
-          {soon.length > 0 && <p className="kw-eyebrow ka-lab is-gap">Anytime · {soonLab}</p>}
-          <Rows rows={soon} p={p} flipped={flipped} flip={flip} anytime />
+          {sometime.length > 0 && <p className="kw-eyebrow ka-lab is-gap">Sometime this weekend · {datesLabel(weekendDays)}</p>}
+          <Rows rows={sometime} p={p} flipped={flipped} flip={flip} anytime />
+          {later.map((w) => {
+            const soon = w.anytime.filter((r) => !r.done)
+            return soon.length > 0 && (
+              <div key={w.key} className="ka-soon">
+                <p className="kw-eyebrow ka-lab is-gap">Anytime · {w.label}</p>
+                <Rows rows={soon} p={p} flipped={flipped} flip={flip} anytime />
+              </div>
+            )
+          })}
         </>
       ), 'anytime'),
     ] : [col('Today', empty('Nothing on today.'), 'none')]
   } else {
-    cols = days.length ? days.map((d) => col(d.label, (
+    const sometime = p.sometime ?? []
+    const sometimeCol = col('Sometime this weekend', (
+      <>
+        <p className="kw-quiet ka-hint">{days.length > 1 ? 'once for both days' : 'once for the weekend'}</p>
+        {sometime.length ? <Rows rows={sometime} p={p} flipped={flipped} flip={flip} anytime /> : empty('Nothing waiting for the weekend.')}
+      </>
+    ), 'sometime')
+    cols = days.length ? [...days.map((d) => col(d.label, (
       <>
         <AllDay titles={d.allDay} />
         <Rows rows={d.timed} p={p} flipped={flipped} flip={flip} />
@@ -133,7 +152,7 @@ export function AgendaStage(p: AgendaStageProps) {
         <Rows rows={d.anytime} p={p} flipped={flipped} flip={flip} anytime />
         {!d.allDay.length && !d.timed.length && !d.anytime.length && empty('Nothing planned yet.')}
       </>
-    ), d.key)) : [col('This weekend', empty('Nothing planned yet.'), 'none')]
+    ), d.key)), sometimeCol] : [col('This weekend', empty('Nothing planned yet.'), 'none'), sometimeCol]
   }
 
   return (

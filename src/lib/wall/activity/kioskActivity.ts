@@ -317,6 +317,8 @@ export interface PlaceContext {
   recipeTitle: string | null
   departureLabel: string | null
   memberName: (id: string) => string | null
+  /** "Oct 24–25": the dates "This weekend" means. */
+  weekendDates?: string
 }
 
 /** The frame's centre: where the household is right now. */
@@ -350,7 +352,7 @@ export function kioskPlace(s: KioskState, ctx: PlaceContext): string {
     case 'energy':
       return 'Energy'
     case 'agenda':
-      return stage.view === 'today' ? 'All of today' : 'This weekend'
+      return stage.view === 'today' ? 'All of today' : ctx.weekendDates ? `This weekend · ${ctx.weekendDates}` : 'This weekend'
     case 'webapp':
       return stage.title
   }

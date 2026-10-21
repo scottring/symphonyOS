@@ -173,7 +173,7 @@ const ar = (id: string, kind: AgendaRow['kind'], time: string | null, title: str
   ({ id, kind, time, title, sub: null, owners, done: false, past: false, checkable: kind !== 'event', on: new Date(), ...o })
 const AGENDA: Record<'today' | 'weekend', AgendaDay[]> = {
   today: [{
-    key: 'today', label: 'Today', isToday: true, allDay: ['Specials — Liam: Library · Mia: Art', 'Grandma visiting'],
+    key: 'today', date: new Date(2026, 9, 13), label: 'Today, Oct 13', isToday: true, allDay: ['Specials — Liam: Library · Mia: Art', 'Grandma visiting'],
     timed: [
       ar('event-school', 'event', '7:30a', 'School — Liam & Mia', [], { sub: 'Hampden Elementary', past: true }),
       ar('task-vet', 'task', '9a', 'Call the vet about Biscuit', ['sk'], { done: true, past: true }),
@@ -191,7 +191,7 @@ const AGENDA: Record<'today' | 'weekend', AgendaDay[]> = {
     ],
   }],
   weekend: [
-    { key: 'sat', label: 'Saturday', isToday: false, allDay: ['Grandma visiting'],
+    { key: 'sat', date: new Date(2026, 9, 17), label: 'Saturday, Oct 17', isToday: false, allDay: ['Grandma visiting'],
       timed: [
         ar('event-soccer', 'event', '9a', 'Soccer — Liam', ['li'], { sub: 'Field 3' }),
         ar('task-mow', 'task', '11a', 'Mow the lawn', ['sk']),
@@ -199,7 +199,7 @@ const AGENDA: Record<'today' | 'weekend', AgendaDay[]> = {
         ar('routine-pizza', 'routine', '6p', 'Pizza night', []),
       ],
       anytime: [ar('task-gift', 'task', null, 'Wrap Ava’s present', ['mi']), ar('task-garage', 'task', null, 'Clean out the garage', ['sk', 'ir'])] },
-    { key: 'sun', label: 'Sunday', isToday: false, allDay: [],
+    { key: 'sun', date: new Date(2026, 9, 18), label: 'Sunday, Oct 18', isToday: false, allDay: [],
       timed: [
         ar('event-brunch', 'event', '10a', 'Brunch with the Parks', []),
         ar('routine-plan', 'routine', '4p', 'Plan the week', ['sk', 'ir']),
@@ -207,6 +207,11 @@ const AGENDA: Record<'today' | 'weekend', AgendaDay[]> = {
       anytime: [ar('task-bags', 'task', null, 'Pack school bags', ['li', 'mi'])] },
   ],
 }
+// Sometime this weekend: a Weekend-rule chore and a task planned for the weekend with no day.
+const AGENDA_SOMETIME: AgendaRow[] = [
+  ar('routine-weed', 'routine', null, 'Weed the backyard', ['sk']),
+  ar('task-donate', 'task', null, 'Drop off the donation bags', ['ir']),
+]
 
 // The Energy scene: an evening with the car charging, the sun nearly down.
 function energyFixture(now: Date): EnergyLive {
@@ -355,7 +360,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         math={math}
         energy={energyFixture(now)}
         loadEnergyPeriod={energyPeriodFixture}
-        agenda={AGENDA}
+        agenda={{ ...AGENDA, sometime: AGENDA_SOMETIME }}
         onSetDone={noop}
         onAddSticky={async () => true}
         listenerPreview={v1Screen ? dock ?? (v1Screen === 'night' ? 'quiet' : 'idle') : undefined}

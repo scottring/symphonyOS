@@ -66,7 +66,7 @@ import { EnergyStage } from './EnergyStage'
 import { WebAppStage } from './WebAppStage'
 import { AgendaStage, AgendaViews } from './AgendaStage'
 import { StickySheet, StickyStrip } from './KioskStickies'
-import type { AgendaDay, AgendaRow, AgendaView } from '@/lib/wall/wallAgenda'
+import { datesLabel, weekendDates, type AgendaDay, type AgendaRow, type AgendaView } from '@/lib/wall/wallAgenda'
 import { formatWatts, hasReading, type EnergyLive, type EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
 import { planWeek } from '@/lib/wall/wallDates'
 
@@ -120,7 +120,7 @@ export interface KioskCanvasProps {
   /** Ticks a task or routine on the day's lists off. */
   onCompleteRow?: (id: string) => void
   /** All of today · This weekend (the dock's Today), and its checks both ways. */
-  agenda?: Record<AgendaView, AgendaDay[]>
+  agenda?: Record<AgendaView, AgendaDay[]> & { sometime?: AgendaRow[] }
   onSetDone?: (row: AgendaRow, done: boolean) => void
   /** Saves a sticky for Home: its words and who it's from (a member id). */
   onAddSticky?: (text: string, by: string | null) => Promise<boolean>
@@ -205,6 +205,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
     recipeTitle: p.recipeTitle,
     departureLabel: departure.label,
     memberName: (id) => memberById(id)?.name ?? null,
+    weekendDates: datesLabel(weekendDates(p.now)),
   })
   const chips = heldChips(state, nowMs, hold)
   const next = nextCommitment(p.rows, p.now)
@@ -483,7 +484,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
       break
     case 'agenda':
       content = p.agenda && p.onSetDone
-        ? <AgendaStage view={stage.view} days={p.agenda} members={p.members} onSetDone={p.onSetDone} onTapRow={p.onTapRow} />
+        ? <AgendaStage view={stage.view} days={p.agenda} sometime={p.agenda.sometime} members={p.members} onSetDone={p.onSetDone} onTapRow={p.onTapRow} />
         : <div className="kc-card kc-fill"><p className="kc-quiet-line">Nothing to show.</p></div>
       break
   }

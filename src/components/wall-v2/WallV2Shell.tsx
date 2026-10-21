@@ -105,7 +105,7 @@ import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines';
 import { isIngredientLine } from '@/lib/wall/activity/cookingModel';
 import { wallMoment } from '@/lib/wall/wallMoment';
 import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, type WallTodayRow, bagWithPapers } from '@/lib/wall/wallMomentsModel';
-import { agendaDays, agendaDay, type AgendaRow } from '@/lib/wall/wallAgenda';
+import { agendaDays, agendaDay, agendaWeekend, type AgendaRow } from '@/lib/wall/wallAgenda';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
 import { memberShape } from '@/lib/wall/memberPageModel';
 import { useMemberInstanceHistory } from './useMemberInstanceHistory';
@@ -1052,9 +1052,16 @@ export function WallV2Shell() {
   // All of today · This weekend (Scott, 2026-10-18): every item the wall
   // holds for those days, and a check that goes both ways.
   const agenda = useMemo(() => {
-    const of = (view: 'today' | 'weekend') => agendaDays(wallData.days, view, now).map((d) => agendaDay(d, wallData.familyMembers, now));
-    return { today: of('today'), weekend: of('weekend') };
-  }, [wallData.days, wallData.familyMembers, now]);
+    // The weekend as the Week page draws it (Scott, 2026-10-21: "make it
+    // match the main app"): Saturday, Sunday, and Sometime this weekend.
+    const planned = (routineId: string, dayKey: string) => wallData.routineInstances.some((i) => i.entity_id === routineId && i.planned_on === dayKey);
+    const weekend = agendaWeekend(wallData.days, wallData.familyMembers, now, { tasks: wallData.weekendTasks, planned });
+    return {
+      today: agendaDays(wallData.days, 'today', now).map((d) => agendaDay(d, wallData.familyMembers, now)),
+      weekend: weekend.days,
+      sometime: weekend.sometime,
+    };
+  }, [wallData.days, wallData.familyMembers, wallData.weekendTasks, wallData.routineInstances, now]);
   // A sticky written on the wall (Scott, 2026-10-18): a scratchpad note, so
   // it's on Home, in Notes and in the app's scratchpad alike.
   const handleAddSticky = useCallback(async (text: string, by: string | null) => {

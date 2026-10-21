@@ -24,7 +24,7 @@ const PLACE: Record<string, RegExp> = {
   bedtime: /^Bedtime$/,
   call: /^Calling$/,
   agenda: /^All of today$/,
-  'agenda-weekend': /^This weekend$/,
+  'agenda-weekend': /^This weekend · [A-Z][a-z]{2} \d/,
 }
 
 describe('KioskCanvasPreview (dev fixture)', () => {
@@ -41,7 +41,7 @@ describe('KioskCanvasPreview (dev fixture)', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wall' })).getByRole('button', { name: 'All of today and this weekend' }))
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('All of today')
     fireEvent.click(screen.getByRole('button', { name: 'This weekend' }))
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('This weekend')
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^This weekend · [A-Z][a-z]{2} \d/)
   })
 
   it('stickies sit in the band on Home, and the dock’s Sticky opens one to write', () => {

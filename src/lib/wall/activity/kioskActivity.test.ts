@@ -206,6 +206,8 @@ describe('kiosk activity: place labels', () => {
     expect(kioskPlace(run([{ type: 'OPEN', stage: { kind: 'calling' } }]), ctx)).toBe('Calling')
     expect(kioskPlace(run([{ type: 'OPEN', stage: { kind: 'person', memberId: 'el' } }]), ctx)).toBe('Ella')
     expect(kioskPlace(run([{ type: 'GROCERY_PROPOSE', proposal: proposeGroceries(['A'], 'dinner') }]), ctx)).toBe('Dinner · Groceries')
+    const weekend = run([{ type: 'OPEN', stage: { kind: 'agenda', view: 'weekend' } }])
+    expect(kioskPlace(weekend, { ...ctx, weekendDates: 'Oct 24–25' })).toBe('This weekend · Oct 24–25')
   })
 
   it('names a held cooking session beside any other activity, but not on Home', () => {

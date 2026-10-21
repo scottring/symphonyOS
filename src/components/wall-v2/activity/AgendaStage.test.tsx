@@ -8,18 +8,18 @@ const members = [{ id: 'sk', name: 'Scott' }] as unknown as FamilyMember[]
 const row = (id: string, kind: AgendaRow['kind'], title: string, o: Partial<AgendaRow> = {}): AgendaRow =>
   ({ id, kind, time: '9a', title, sub: null, owners: [], done: false, past: false, checkable: kind !== 'event', on: new Date(2026, 9, 14), ...o })
 const today: AgendaDay = {
-  key: 't', label: 'Today', isToday: true, allDay: ['Grandma visiting'],
+  key: 't', date: new Date(2026, 9, 14), label: 'Today, Oct 14', isToday: true, allDay: ['Grandma visiting'],
   timed: [row('event-swim', 'event', 'Swim'), row('task-mow', 'task', 'Mow', { owners: ['sk'] })],
   anytime: [row('routine-plants', 'routine', 'Water the plants', { time: null }), row('task-bat', 'task', 'Buy batteries', { time: null, done: true })],
 }
 const sat: AgendaDay = {
-  key: 's', label: 'Saturday', isToday: false, allDay: [], timed: [row('routine-pizza', 'routine', 'Pizza night')],
+  key: 's', date: new Date(2026, 9, 17), label: 'Saturday, Oct 17', isToday: false, allDay: [], timed: [row('routine-pizza', 'routine', 'Pizza night')],
   anytime: [row('task-gift', 'task', 'Wrap the present', { time: null }), row('task-old', 'task', 'Already wrapped', { time: null, done: true })],
 }
 
-function setup(view: 'today' | 'weekend' = 'today') {
+function setup(view: 'today' | 'weekend' = 'today', sometime: AgendaRow[] = []) {
   const onSetDone = vi.fn()
-  render(<AgendaStage view={view} days={{ today: [today], weekend: [sat] }} members={members} onSetDone={onSetDone} onTapRow={vi.fn()} />)
+  render(<AgendaStage view={view} days={{ today: [today], weekend: [sat] }} sometime={sometime} members={members} onSetDone={onSetDone} onTapRow={vi.fn()} />)
   return { onSetDone }
 }
 
@@ -43,7 +43,7 @@ describe('AgendaStage', () => {
     setup()
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['On the clock', 'Anytime today'])
     const soon = screen.getByRole('region', { name: 'Anytime today' })
-    expect(soon).toHaveTextContent('Anytime · Saturday')
+    expect(soon).toHaveTextContent('Anytime · Saturday, Oct 17')
     expect(soon).toHaveTextContent('Wrap the present')
     expect(soon).not.toHaveTextContent('Already wrapped')
     expect(screen.queryByText('Pizza night')).toBeNull()
@@ -67,7 +67,30 @@ describe('AgendaStage', () => {
 
   it('weekend view: a routine on Saturday has its check', () => {
     setup('weekend')
-    expect(screen.getByRole('region', { name: 'Saturday' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Saturday, Oct 17' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Mark Pizza night done' })).toBeInTheDocument()
+  })
+
+  // Scott, 2026-10-21: "make it match the main app" — Saturday, Sunday and
+  // Sometime this weekend, as the Week page has them.
+  it('weekend view: Sometime this weekend is its own column after the days, ticked like any row', () => {
+    const { onSetDone } = setup('weekend', [row('task-garage', 'task', 'Clean out the garage', { time: null })])
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['Saturday, Oct 17', 'Sometime this weekend'])
+    expect(screen.getByRole('region', { name: 'Sometime this weekend' })).toHaveTextContent('once for the weekend')
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Clean out the garage done' }))
+    expect(onSetDone).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'task-garage' }), true)
+  })
+
+  it('weekend view with nothing waiting says so', () => {
+    setup('weekend')
+    expect(screen.getByRole('region', { name: 'Sometime this weekend' })).toHaveTextContent('Nothing waiting for the weekend.')
+  })
+
+  it('today view: what is still waiting for the weekend sits under today’s, with its dates', () => {
+    setup('today', [row('task-garage', 'task', 'Clean out the garage', { time: null }), row('task-old2', 'task', 'Done already', { time: null, done: true })])
+    const anytime = screen.getByRole('region', { name: 'Anytime today' })
+    expect(anytime).toHaveTextContent('Sometime this weekend · Oct 17')
+    expect(anytime).toHaveTextContent('Clean out the garage')
+    expect(anytime).not.toHaveTextContent('Done already')
   })
 })
