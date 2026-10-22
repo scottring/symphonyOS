@@ -238,6 +238,8 @@ describe('loadChoice', () => {
     expect(d?.contacts.get('k1')).toEqual({ name: 'Acme Co', phone: '555' })
     const t = calls.filter((c) => c.table === 'tasks')[1]
     expect(op(t, 'in')).toEqual(['choice_option_id', ['o1']])
+    // A planned event (a task with log_kind) is not a follow-up.
+    expect(op(t, 'is')).toEqual(['log_kind', null])
   })
   const crow = {
     id: 'c1', user_id: 'u1', goal_task_id: 'g1', goal_id: null, title: 'T', status: 'open', chosen_option_id: null,

@@ -42,8 +42,10 @@ const MAX_TEXT = 1000
 const MAX_CHOICES = 50
 /** goal_log_entries.summary's check. */
 const MAX_SUMMARY = 500
-/** Done log lines a read gives per goal (all upcoming ones are given). */
+/** Done log lines a read gives per goal (all planned ones are given): fewer
+ *  on the plain read of every open choice, which can span many goals. */
 const MAX_DONE = 20
+const MAX_DONE_ALL = 5
 const MAX_AMOUNT = 1_000_000_000
 /** Optional fields where an explicit null means "not given". */
 const NULL_IS_ABSENT = ['status', 'date', 'amount', 'phone', 'note', 'description', 'contact_id', 'time', 'log_kind'] as const
@@ -192,9 +194,10 @@ async function goalTitles(db: Db, taskIds: string[], goalIds: string[]): Promise
 
 /** Each goal's log as the page's Log section merges it (src/lib/choices/log.ts
  *  mergeLog): entries and done planned events newest first, the latest
- *  MAX_DONE of them, and every planned event still open, soonest first.
+ *  `maxDone` of them, and every planned event still open, soonest first. One
+ *  still open after its day is set apart, so it is not read as upcoming.
  *  `names` holds the option names already read; others are read here. */
-async function goalLogs(db: Db, goals: Goal[], names: Map<string, string>) {
+async function goalLogs(db: Db, goals: Goal[], names: Map<string, string>, today: string, maxDone: number) {
   const taskIds = goals.filter((g) => g.kind === 'task').map((g) => g.id)
   const yearIds = goals.filter((g) => g.kind === 'goal').map((g) => g.id)
   const ENTRY = 'id, goal_task_id, goal_id, choice_option_id, kind, happened_on, happened_at_time, summary, created_at'
@@ -219,9 +222,11 @@ async function goalLogs(db: Db, goals: Goal[], names: Map<string, string>) {
 
   return goals.map((g) => {
     const mine = (r: { goal_task_id: string | null; goal_id: string | null }) => (g.kind === 'task' ? r.goal_task_id : r.goal_id) === g.id
-    const upcoming = planned.filter((p) => mine(p) && !p.completed)
+    const open = planned.filter((p) => mine(p) && !p.completed)
       .sort((a, b) => Date.parse(a.scheduled_for!) - Date.parse(b.scheduled_for!))
       .map((p) => { const w = at(p.scheduled_for!, p.is_all_day); return line(w.on, w.time, p.log_kind, p.choice_option_id, p.title) })
+    const upcoming = open.filter((l) => l.on >= today)
+    const passed = open.filter((l) => l.on < today)
     const done = [
       ...entries.filter(mine).map((e) => ({ sort: `${e.happened_on} ${e.happened_at_time?.slice(0, 5) ?? '00:00'}`, made: e.created_at, l: line(e.happened_on, e.happened_at_time?.slice(0, 5), e.kind, e.choice_option_id, e.summary) })),
       ...planned.filter((p) => mine(p) && p.completed).map((p) => {
@@ -232,15 +237,18 @@ async function goalLogs(db: Db, goals: Goal[], names: Map<string, string>) {
     return {
       goal: { title: g.title, id: g.id },
       upcoming,
-      done: done.slice(0, MAX_DONE),
-      ...(done.length > MAX_DONE ? { older_not_shown: done.length - MAX_DONE } : {}),
+      ...(passed.length ? { planned_date_passed_not_ticked_done: passed } : {}),
+      done: done.slice(0, maxDone),
+      ...(done.length > maxDone ? { older_not_shown: done.length - maxDone } : {}),
     }
   })
 }
 
 /** symphony_read_choices, through the person's RLS client: a choice they
- *  cannot see is simply absent. JSON text. */
-export async function readChoices(db: Db, input: { goal_id?: unknown; choice_id?: unknown }): Promise<string> {
+ *  cannot see is simply absent. JSON text. `today` (YYYY-MM-DD) sets planned
+ *  events apart once their day has passed; the app's day by default. */
+export async function readChoices(db: Db, input: { goal_id?: unknown; choice_id?: unknown }, today = local(new Date().toISOString()).date): Promise<string> {
+  const named = (input.choice_id !== undefined && input.choice_id !== null) || (input.goal_id !== undefined && input.goal_id !== null)
   let found: ChoiceRow[]
   if (input.choice_id !== undefined && input.choice_id !== null) {
     if (!isId(input.choice_id)) throw new Error('choice_id must be a choice id from symphony_read_choices')
@@ -258,7 +266,7 @@ export async function readChoices(db: Db, input: { goal_id?: unknown; choice_id?
   if (!found.length) {
     // A goal's log is read even when it has no choices yet.
     const goal = input.goal_id !== undefined && input.goal_id !== null ? await goalTitles(db, [input.goal_id as string], [input.goal_id as string]) : []
-    const log = goal.length ? await goalLogs(db, goal.slice(0, 1), new Map()) : []
+    const log = goal.length ? await goalLogs(db, goal.slice(0, 1), new Map(), today, MAX_DONE) : []
     return JSON.stringify({ choices: [], note: 'No choices here that this person can see.', ...(log.length ? { log } : {}) })
   }
 
@@ -269,7 +277,8 @@ export async function readChoices(db: Db, input: { goal_id?: unknown; choice_id?
   const contactIds = [...new Set(options.map((o) => o.contact_id).filter((c): c is string => !!c))]
   const [linesRead, followRead, contactsRead, goals] = await Promise.all([
     optionIds.length ? db.from('choice_price_lines').select('id, option_id, work_ids, amount_cents, note, sort_order').in('option_id', optionIds).order('sort_order', { ascending: true }) : { data: [], error: null },
-    optionIds.length ? db.from('tasks').select('id, choice_option_id, scheduled_for, completed, waiting_since').in('choice_option_id', optionIds).order('created_at', { ascending: false }) : { data: [], error: null },
+    // A planned call or visit (log_kind set) is the log's, not a follow-up.
+    optionIds.length ? db.from('tasks').select('id, choice_option_id, scheduled_for, completed, waiting_since').in('choice_option_id', optionIds).is('log_kind', null).order('created_at', { ascending: false }) : { data: [], error: null },
     contactIds.length ? db.from('contacts').select('id, name, phone').in('id', contactIds) : { data: [], error: null },
     goalTitles(db, [...new Set(found.flatMap((c) => (c.goal_task_id ? [c.goal_task_id] : [])))], [...new Set(found.flatMap((c) => (c.goal_id ? [c.goal_id] : [])))]),
   ])
@@ -347,7 +356,7 @@ export async function readChoices(db: Db, input: { goal_id?: unknown; choice_id?
     seenGoals.add(id)
     return [{ id, title: goalTitle.get(id) ?? '', kind: c.goal_task_id ? 'task' as const : 'goal' as const }]
   })
-  const log = await goalLogs(db, readGoals, new Map(options.map((o) => [o.id, o.name])))
+  const log = await goalLogs(db, readGoals, new Map(options.map((o) => [o.id, o.name])), today, named ? MAX_DONE : MAX_DONE_ALL)
   return JSON.stringify({ choices, log })
 }
 

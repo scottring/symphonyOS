@@ -53,7 +53,8 @@ async function fetchFollowUps(db: Db, optionIds: string[]): Promise<FollowUp[] |
   if (optionIds.length === 0) return []
   const { data, error } = await db.from('tasks')
     .select('id, choice_option_id, title, scheduled_for, completed, waiting_since')
-    .in('choice_option_id', optionIds).order('created_at', { ascending: false })
+    // A planned call or visit (log_kind set) is the log's, not a follow-up.
+    .in('choice_option_id', optionIds).is('log_kind', null).order('created_at', { ascending: false })
   if (error || !data) return null
   return (data as DbFollowUpTask[]).map(mapFollowUp)
 }

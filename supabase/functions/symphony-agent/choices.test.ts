@@ -281,6 +281,7 @@ function fakeDb(tables: Record<string, Row[]>) {
         in: (c: string, vs: unknown[]) => { rows = rows.filter((r) => vs.includes(r[c])); return q },
         order: () => q,
         limit: (k: number) => { rows = rows.slice(0, k); return q },
+        is: (c: string, v: unknown) => { rows = rows.filter((r) => (r[c] ?? null) === v); return q },
         not: (c: string, op: string, v: unknown) => { if (op === 'is' && v === null) rows = rows.filter((r) => r[c] != null); return q },
         then: (ok: (v: { data: Row[]; error: null }) => unknown, bad?: (e: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(ok, bad),
       }
@@ -652,7 +653,7 @@ describe('log events', () => {
         scheduled_for: '2026-10-30T14:00:00+00:00', is_all_day: false, completed: false, completed_at: null, waiting_since: null, created_at: SEEN,
       }],
     })
-    const out = JSON.parse(await readChoices(db, { goal_id: G }))
+    const out = JSON.parse(await readChoices(db, { goal_id: G }, '2026-10-22'))
     expect(out.log).toHaveLength(1)
     const [log] = out.log
     expect(log.goal).toEqual({ title: 'Redo the bathrooms', id: G })
@@ -666,8 +667,14 @@ describe('log events', () => {
     const bare = JSON.parse(await readChoices(fakeDb({ ...MOCKUP, choices: [], goal_log_entries: [entry('e3', { kind: 'visit', happened_on: '2026-10-01', summary: 'Looked at tile' })] }), { goal_id: G }))
     expect(bare.choices).toEqual([])
     expect(bare.log[0].done).toEqual([{ on: '2026-10-01', kind: 'Home visit', about: 'the project', text: 'Looked at tile' }])
-    const all = JSON.parse(await readChoices(db, {}))
+    const all = JSON.parse(await readChoices(db, {}, '2026-10-22'))
     expect(all.log.map((l: { goal: { id: string } }) => l.goal.id)).toEqual([G])
+    // The plain read (every open choice) keeps each goal's log short.
+    expect(all.log[0].done).toHaveLength(5)
+    expect(all.log[0].older_not_shown).toBe(22)
+    expect(all.log[0].upcoming).toHaveLength(1)
+    // Naming the choice reads its goal's log in full.
+    expect(JSON.parse(await readChoices(db, { choice_id: C }, '2026-10-22')).log[0].done).toHaveLength(20)
     expect(JSON.stringify(out)).not.toMatch(/best|recommend|cheapest|rank/i)
   })
 
@@ -681,5 +688,32 @@ describe('log events', () => {
     const src = readFileSync('supabase/functions/symphony-agent/index.ts', 'utf8')
     expect(src).toContain('Log calls, visits, messages, meetings and notes with event_log (past) and plan future ones with event_plan. When logging a contact with an option that is Considering, also propose option_status → contacted in the same card. Never set a status backward.')
     expect(src).toMatch(/choiceSetFromInput\(block\.input \?\? \{\}, .*, today\)/)
+  })
+})
+
+describe('review fixes: log reads', () => {
+  const visit = (x: Row) => ({
+    id: 'v1', goal_task_id: G, goal_id: null, choice_option_id: RB, log_kind: 'visit', title: "Home visit: Look at the hall bath (Rob (Dave's cousin))",
+    scheduled_for: '2026-10-30T14:00:00+00:00', is_all_day: false, completed: false, completed_at: null, waiting_since: '2026-10-01T15:00:00+00:00', created_at: '2026-10-21T00:00:00+00:00', ...x,
+  })
+
+  it('a planned event is not an option\'s follow-up', async () => {
+    // Rob is Contacted with only a planned visit: no follow-up, and his wait is his status's.
+    const db = fakeDb({ ...MOCKUP, tasks: [MOCKUP.tasks[0], visit({})] })
+    const [c] = JSON.parse(await readChoices(db, {}, '2026-10-22')).choices
+    const rob = c.options.find((o: { name: string }) => o.name === "Rob (Dave's cousin)")
+    expect(rob).toMatchObject({ status: 'contacted', follow_up: null, waiting_since: '2026-10-16' })
+    expect(db.reads).toContain('tasks:id, choice_option_id, scheduled_for, completed, waiting_since')
+  })
+
+  it('an open planned event whose day has passed is not called upcoming', async () => {
+    const db = fakeDb({ ...MOCKUP, tasks: [MOCKUP.tasks[0], visit({ id: 'v0', scheduled_for: '2026-10-20T14:00:00+00:00' }), visit({})] })
+    const [log] = JSON.parse(await readChoices(db, { goal_id: G }, '2026-10-22')).log
+    expect(log.upcoming.map((l: { on: string }) => l.on)).toEqual(['2026-10-30'])
+    expect(log.planned_date_passed_not_ticked_done.map((l: { on: string }) => l.on)).toEqual(['2026-10-20'])
+    // A visit planned for today is still ahead.
+    const today = JSON.parse(await readChoices(fakeDb({ ...MOCKUP, tasks: [MOCKUP.tasks[0], visit({ scheduled_for: '2026-10-22T14:00:00+00:00' })] }), { goal_id: G }, '2026-10-22')).log[0]
+    expect(today.upcoming).toHaveLength(1)
+    expect(today.planned_date_passed_not_ticked_done).toBeUndefined()
   })
 })
