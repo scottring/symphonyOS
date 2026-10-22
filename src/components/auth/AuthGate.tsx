@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthForm } from '@/components/lazy'
 import { PairDisplayScreen } from './PairDisplayScreen'
+import { usePairing } from '@/lib/display/pairing'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import type { User } from '@supabase/supabase-js'
 
@@ -99,6 +100,9 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
   // instead" is one tap away for setup.
   const [wantsPersonSignIn, setWantsPersonSignIn] = useState(false)
   const onWall = (() => { try { return window.location.pathname.startsWith('/wall') } catch { return false } })()
+  // Mid-pairing the wall is signed in but not yet a display: keep the
+  // pairing screen up until the code is through or refused.
+  const pairing = usePairing()
 
   useEffect(() => {
     try {
@@ -147,7 +151,7 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
     )
   }
 
-  if (!user) {
+  if (!user || (pairing && onWall)) {
     if (onWall && !wantsPersonSignIn) return <PairDisplayScreen onSignInInstead={() => setWantsPersonSignIn(true)} />
     return (
       <Suspense fallback={<LoadingFallback />}>

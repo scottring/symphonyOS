@@ -6,6 +6,7 @@
 // as the wall whatever it asks for, and the database refuses the writes a
 // wall never makes. Revoking fails the device closed at once.
 
+import { useSyncExternalStore } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export interface PairingCode { code: string; expiresAt: Date }
@@ -39,29 +40,51 @@ export async function cancelPairingCode(code: string): Promise<{ ok: true } | { 
   return error ? { ok: false, error: message(error, 'Could not cancel that code') } : { ok: true }
 }
 
+// Pairing in progress. Between the anonymous sign-in and the claim's answer
+// the session is anonymous but not yet a display; the heartbeat would sign
+// it out (as revoked) and the screen would drop back to pairing, so it waits,
+// and the pairing screen stays up, until this is false again.
+let pairing = false
+const pairingListeners = new Set<() => void>()
+const setPairing = (v: boolean) => { pairing = v; pairingListeners.forEach((l) => l()) }
+export const isPairing = (): boolean => pairing
+export function subscribePairing(l: () => void): () => void { pairingListeners.add(l); return () => { pairingListeners.delete(l) } }
+export function usePairing(): boolean { return useSyncExternalStore(subscribePairing, isPairing, isPairing) }
+
 /** The display: sign in anonymously (if not already) and claim the code.
- *  Refused for a person's account: a display must never be an adult's login. */
+ *  Refused for a person's account: a display must never be an adult's login.
+ *  A refused code signs out the sign-in this call made, so the screen stays
+ *  on pairing with the reason. */
 export async function claimPairingCode(code: string): Promise<{ ok: true; householdId: string; name: string; familyMemberId: string | null } | { ok: false; error: string }> {
   const trimmed = code.trim().toUpperCase()
   if (!/^[A-Z0-9]{6}$/.test(trimmed)) return { ok: false, error: 'A code is six letters and digits.' }
   const { data: { session } } = await supabase.auth.getSession()
   if (session && !session.user.is_anonymous) return { ok: false, error: 'Sign out first: a display uses its own sign-in, not a person’s account.' }
-  if (!session) {
-    const { error } = await supabase.auth.signInAnonymously()
-    if (error) return { ok: false, error: /anonymous sign-ins are disabled/i.test(error.message) ? 'Display sign-in is not enabled for this Symphony yet.' : message(error, 'Could not start the display’s sign-in') }
+  setPairing(true)
+  try {
+    if (!session) {
+      const { error } = await supabase.auth.signInAnonymously()
+      if (error) return { ok: false, error: /anonymous sign-ins are disabled/i.test(error.message) ? 'Display sign-in is not enabled for this Symphony yet.' : message(error, 'Could not start the display’s sign-in') }
+    }
+    const refused = async (error: string) => {
+      if (!session) await supabase.auth.signOut().catch(() => undefined)
+      return { ok: false as const, error }
+    }
+    const { data, error } = await supabase.rpc('claim_display_pairing', { p_code: trimmed })
+    if (error) return refused(message(error, 'That code did not work'))
+    const row = data as { household_id?: unknown; name?: unknown; family_member_id?: unknown } | null
+    if (!row || typeof row.household_id !== 'string') return refused('That code did not work')
+    return { ok: true, householdId: row.household_id, name: typeof row.name === 'string' ? row.name : 'Kitchen wall', familyMemberId: typeof row.family_member_id === 'string' ? row.family_member_id : null }
+  } finally {
+    setPairing(false)
   }
-  const { data, error } = await supabase.rpc('claim_display_pairing', { p_code: trimmed })
-  if (error) return { ok: false, error: message(error, 'That code did not work') }
-  const row = data as { household_id?: unknown; name?: unknown; family_member_id?: unknown } | null
-  if (!row || typeof row.household_id !== 'string') return { ok: false, error: 'That code did not work' }
-  return { ok: true, householdId: row.household_id, name: typeof row.name === 'string' ? row.name : 'Kitchen wall', familyMemberId: typeof row.family_member_id === 'string' ? row.family_member_id : null }
 }
 
-/** Is this session a paired display? Asks the server; false when it cannot
- *  say (an unpaired or pre-migration session is treated as a member). */
-export async function isDisplaySession(): Promise<boolean> {
+/** Is this session a paired display? Asks the server: null when it cannot
+ *  say (offline, a server error), which is no reason to sign a tablet out. */
+export async function isDisplaySession(): Promise<boolean | null> {
   const { data, error } = await supabase.rpc('my_surface')
-  return !error && data === 'display'
+  return error ? null : data === 'display'
 }
 
 /** This session's display, or null for a person (or a pre-migration server). */

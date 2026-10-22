@@ -17,7 +17,7 @@ import { useMemberInstanceHistory } from '@/components/wall-v2/useMemberInstance
 import { PairDisplayScreen } from '@/components/auth/PairDisplayScreen'
 import { AuthForm } from '@/components/AuthForm'
 import { useDisplayHeartbeat } from '@/lib/display/useDisplayHeartbeat'
-import { myDisplay, type KidLayout, type MyDisplay } from '@/lib/display/pairing'
+import { myDisplay, usePairing, type KidLayout, type MyDisplay } from '@/lib/display/pairing'
 import { displaySetTaskDone, isDisplayUser } from '@/lib/display/displayWrites'
 import { buildMemberDayModel, type MemberDayModel } from '@/lib/wall/kidDayModel'
 import { buildKidPanel, type KidStop } from '@/lib/kids/kidPanelModel'
@@ -78,18 +78,21 @@ export default function KidKioskRoute() {
   const [display, setDisplay] = useState<MyDisplay | null | undefined>(undefined)
   const [wantsPersonSignIn, setWantsPersonSignIn] = useState(false)
   const isDisplay = isDisplayUser(user)
+  const pairing = usePairing()
   useDisplayHeartbeat(isDisplay)
 
   useEffect(() => {
     let live = true
-    if (!user) { setDisplay(undefined); return }
+    if (!user || pairing) { setDisplay(undefined); return }
     if (!isDisplay) { setDisplay(null); return }
     void myDisplay().then((d) => { if (live) setDisplay(d) })
     return () => { live = false }
-  }, [user, isDisplay])
+  }, [user, isDisplay, pairing])
 
   if (loading) return <div className="kid-kiosk" />
-  if (!user) return wantsPersonSignIn ? <AuthForm /> : <PairDisplayScreen onSignInInstead={() => setWantsPersonSignIn(true)} />
+  // Mid-pairing the session is signed in but not yet a tablet: the pairing
+  // screen stays up until the code is through (or refused, with the reason).
+  if (!user || pairing) return wantsPersonSignIn ? <AuthForm /> : <PairDisplayScreen onSignInInstead={() => setWantsPersonSignIn(true)} />
   if (display === undefined) return <div className="kid-kiosk" />
 
   // A tablet is for its kid, whatever the address says.

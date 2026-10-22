@@ -4,17 +4,18 @@ const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
   getSession: vi.fn(),
   signInAnonymously: vi.fn(),
+  signOut: vi.fn(),
   from: vi.fn(),
 }))
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     rpc: mocks.rpc,
-    auth: { getSession: mocks.getSession, signInAnonymously: mocks.signInAnonymously },
+    auth: { getSession: mocks.getSession, signInAnonymously: mocks.signInAnonymously, signOut: mocks.signOut },
     from: mocks.from,
   },
 }))
 
-import { claimPairingCode, createPairingCode, isDisplaySession, listDisplays, myDisplay, revokeDisplay } from './pairing'
+import { claimPairingCode, createPairingCode, isDisplaySession, isPairing, listDisplays, myDisplay, revokeDisplay } from './pairing'
 
 beforeEach(() => { vi.clearAllMocks() })
 
@@ -87,17 +88,38 @@ describe('claimPairingCode', () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'That code is not valid or has expired' } })
     expect(await claimPairingCode('abc234')).toEqual({ ok: false, error: 'That code is not valid or has expired' })
     expect(mocks.signInAnonymously).not.toHaveBeenCalled()
+    expect(mocks.signOut).not.toHaveBeenCalled()
+  })
+  it('is pairing from the sign-in until the claim answers, so nothing signs the new session out meanwhile', async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null } })
+    const seen: boolean[] = []
+    mocks.signInAnonymously.mockImplementation(async () => { seen.push(isPairing()); return { error: null } })
+    mocks.rpc.mockImplementation(async () => { seen.push(isPairing()); return { data: { household_id: 'h1', name: 'Kaleb’s tablet', family_member_id: 'kaleb' }, error: null } })
+    expect(isPairing()).toBe(false)
+    expect((await claimPairingCode('KAL234')).ok).toBe(true)
+    expect(seen).toEqual([true, true])
+    expect(isPairing()).toBe(false)
+  })
+  it('a refused code signs out the sign-in it just made, so the pairing screen stays with the reason', async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null } })
+    mocks.signInAnonymously.mockResolvedValue({ error: null })
+    mocks.signOut.mockImplementation(async () => { expect(isPairing()).toBe(true); return { error: null } })
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'That code is not valid or has expired' } })
+    expect(await claimPairingCode('abc234')).toEqual({ ok: false, error: 'That code is not valid or has expired' })
+    expect(mocks.signOut).toHaveBeenCalledTimes(1)
+    expect(isPairing()).toBe(false)
   })
 })
 
 describe('displays', () => {
-  it('isDisplaySession is true only when the server says display', async () => {
+  it('isDisplaySession is true or false only when the server says so', async () => {
     mocks.rpc.mockResolvedValueOnce({ data: 'display', error: null })
     expect(await isDisplaySession()).toBe(true)
     mocks.rpc.mockResolvedValueOnce({ data: 'member', error: null })
     expect(await isDisplaySession()).toBe(false)
+    // It cannot say (offline, a server error): not a reason to sign a tablet out.
     mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: 'PGRST202' } })
-    expect(await isDisplaySession()).toBe(false)
+    expect(await isDisplaySession()).toBeNull()
   })
   it('lists displays newest first and parses dates', async () => {
     const order = vi.fn().mockResolvedValue({ data: [{ id: 'd1', name: 'Kitchen wall', paired_at: '2026-10-15T10:00:00Z', last_seen_at: null, revoked_at: null }], error: null })

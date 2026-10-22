@@ -31,6 +31,13 @@ vi.mock('@/components/lazy', () => ({
   ),
 }))
 
+// Pairing in progress (src/lib/display/pairing.ts), set per test.
+const pairingState = vi.hoisted(() => ({ now: false }))
+vi.mock('@/lib/display/pairing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/display/pairing')>()),
+  usePairing: () => pairingState.now,
+}))
+
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>()
@@ -44,6 +51,7 @@ beforeEach(() => {
   authState.loading = false
   authState.isPasswordRecovery = false
   authState.sessionLost = false
+  pairingState.now = false
   mockNavigate.mockClear()
   sessionStorage.clear()
   window.history.replaceState({}, '', '/')
@@ -225,6 +233,14 @@ describe('AuthGate on the wall', () => {
     expect(screen.queryByText('AUTH_FORM')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /sign in instead/i }))
     expect(screen.getByText('AUTH_FORM')).toBeInTheDocument()
+  })
+  it('keeps pairing up while the wall, just signed in, is still claiming its code', () => {
+    window.history.replaceState({}, '', '/wall-v2')
+    authState.user = { id: 'anon-display', email: '' }
+    pairingState.now = true
+    render(<AuthGate>{() => <div>APP</div>}</AuthGate>)
+    expect(screen.getByRole('button', { name: /pair this display/i })).toBeInTheDocument()
+    expect(screen.queryByText('APP')).toBeNull()
   })
   it('keeps the ordinary sign-in everywhere else', () => {
     window.history.replaceState({}, '', '/today')
