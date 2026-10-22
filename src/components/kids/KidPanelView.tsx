@@ -12,11 +12,21 @@
 // thought catcher: say or type a thought so it stops pulling at you, and go
 // over it with a grown-up at bedtime.
 //
+// While one of the kid's routines is on (the door panel, 2026-10-22), either
+// layout shows that routine as one checklist instead: a picture, the step and
+// a big check per row, tap again to undo.
+//
 // Presentational: the route passes the day, the clock and the handlers; the
 // preview passes fixed ones.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { clockLabel, type KidPanel, type KidStop } from '@/lib/kids/kidPanelModel'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  ArrowUp, Backpack, Bed, BookOpen, Calculator, Droplets, Footprints, GlassWater, Hand, HandPlatter, Moon, Music, PawPrint, Pencil, Pill,
+  Puzzle, Shirt, ShoppingBasket, ShowerHead, Smile, Sparkles, Toilet, ToyBrick, Trash2, Utensils, Wind,
+  type LucideIcon,
+} from 'lucide-react'
+import { clockLabel, headTitle, type KidPanel, type KidRoutineNow, type KidStop } from '@/lib/kids/kidPanelModel'
+import { stepIcon, type StepIcon } from '@/lib/kids/stepIcon'
 import {
   fractionLeft, hasRung, isRunning, leftLabel, pauseTimer, readTimer, resumeTimer, soundKey, startTimer, timerKey, writeTimer, type KidTimer,
 } from '@/lib/kids/kidTimer'
@@ -57,6 +67,20 @@ const storage = (): Storage | null => {
 function restOf(stop: KidStop): string | null {
   const rest = stop.title.slice(stop.short.replace(/…$/, '').length).replace(/^[\s,:—–-]+/, '').trim()
   return rest && !stop.short.endsWith('…') ? rest : null
+}
+
+const STEP_ICONS: Record<StepIcon, LucideIcon> = {
+  trash: Trash2, pullup: ArrowUp, hamper: ShoppingBasket, towel: Wind, floor: Droplets, shower: ShowerHead, teeth: Smile,
+  toilet: Toilet, wash: Hand, dressed: Shirt, shoes: Footprints, bag: Backpack, bed: Bed, breakfast: Utensils,
+  dishes: HandPlatter, read: BookOpen, music: Music, lights: Moon, pet: PawPrint, math: Calculator, homework: Pencil,
+  medicine: Pill, tidy: ToyBrick, puzzle: Puzzle, water: GlassWater, step: Sparkles,
+}
+
+/** "Tuesday night", "Wednesday morning". */
+function partOfDay(now: Date): string {
+  const h = now.getHours()
+  const part = h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 19 ? 'evening' : 'night'
+  return `${now.toLocaleDateString('en-US', { weekday: 'long' })} ${part}`
 }
 
 function Check({ done }: { done: boolean }) {
@@ -116,8 +140,9 @@ export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, o
   }
 
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long' })
-  const title = layout === 'trail' ? `${member.name}’s trail` : panel.isWeekend ? `${member.name}’s ${weekday}` : `${member.name}’s afternoon`
-  const sub = panel.isWeekend
+  const routine = panel.routine
+  const title = routine ? member.name : layout === 'trail' ? `${member.name}’s trail` : panel.isWeekend ? `${member.name}’s ${weekday}` : `${member.name}’s afternoon`
+  const sub = routine ? partOfDay(now) : panel.isWeekend
     ? `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · the whole day`
     : panel.dayNote ? `${weekday} · ${panel.dayNote}` : weekday
   const clock = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '')
@@ -140,7 +165,7 @@ export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, o
   }
 
   return (
-    <div className={`kid-kiosk is-${layout}`} style={{ ['--kid' as string]: color }}>
+    <div className={`kid-kiosk ${routine ? 'is-routine' : `is-${layout}`}`} style={{ ['--kid' as string]: color }}>
       <header className="kk-head">
         <span className="kk-face" aria-hidden="true">{member.name.slice(0, 1).toUpperCase()}</span>
         <div className="kk-head-words">
@@ -151,7 +176,9 @@ export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, o
       </header>
 
       <main className="kk-main">
-        {layout === 'trail' ? (
+        {routine ? (
+          <RoutineChecklist routine={routine} onToggle={(s) => (s.done ? onToggle(s, false) : done(s))} timerControls={timerControls} />
+        ) : layout === 'trail' ? (
           <>
             {panel.stops.length > 0 && (
               <section className="kk-trail" aria-label="Today’s trail">
@@ -304,6 +331,53 @@ export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, o
         />
       )}
     </div>
+  )
+}
+
+/** The routine that is on now: every step in order, one tap each way. */
+function RoutineChecklist({ routine, onToggle, timerControls }: {
+  routine: KidRoutineNow
+  onToggle: (stop: KidStop) => void
+  timerControls: (stop: KidStop, big: boolean) => ReactNode
+}) {
+  const allDone = routine.doneCount === routine.steps.length
+  return (
+    <section className="kk-routine" aria-label={routine.title}>
+      <div className="kk-routine-head">
+        <h2>{routine.title}</h2>
+        <span className="kk-count">{routine.doneCount} of {routine.steps.length}</span>
+      </div>
+      <div className="kk-routine-dots" aria-hidden="true">
+        {routine.steps.map((s) => <i key={s.key} className={s.done ? 'is-done' : ''} />)}
+      </div>
+      <ul className="kk-steps">
+        {routine.steps.map((s) => {
+          const Icon = STEP_ICONS[stepIcon(s.title)]
+          // The whole step, wrapped: the checklist has room the trail doesn't.
+          const head = headTitle(s.title)
+          const rest = s.title.slice(head.length).replace(/^[\s,:—–(-]+/, '').replace(/\)$/, '').trim() || null
+          return (
+            <li key={s.key} className={`kk-step${s.done ? ' is-done' : ''}`}>
+              <button type="button" aria-pressed={s.done} aria-label={s.done ? `Mark ${head} not done` : `Mark ${head} done`} onClick={() => onToggle(s)}>
+                <span className="kk-step-icon"><Icon aria-hidden="true" /></span>
+                <span className="kk-step-words">
+                  <span className="kk-step-title">{head}</span>
+                  {rest && <span className="kk-step-sub">{rest}</span>}
+                </span>
+                <span className="kk-step-check"><Check done={s.done} /></span>
+              </button>
+              {!s.done && timerControls(s, false)}
+            </li>
+          )
+        })}
+      </ul>
+      {allDone && (
+        <p className="kk-routine-done" role="status"><Check done />All done</p>
+      )}
+      {routine.next && (
+        <p className="kk-routine-next">Next: <b>{routine.next.title}</b> · {clockLabel(routine.next.time)}</p>
+      )}
+    </section>
   )
 }
 

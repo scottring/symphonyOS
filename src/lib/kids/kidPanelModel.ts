@@ -10,6 +10,11 @@
 //     NOW (the one thing to do), NEXT, and the rest as one line.
 //   * list ("any order", Ella): everything for now as a checklist, and the
 //     rest of the day below it with times.
+//
+// The door panel (2026-10-22): while one of the kid's routines is on (School
+// morning, Kids Bedtime routine), the screen is that routine's checklist
+// instead, in either layout, mornings included. Scott: "if they start it up
+// at 7:30pm on Tuesday, it has their Tuesday night shower routine".
 
 import type { KidRow, MemberDayModel } from '@/lib/wall/kidDayModel'
 
@@ -32,7 +37,21 @@ export interface KidStop {
   missed: boolean
 }
 
+/** The routine that is on right now, as one checklist in its own step order. */
+export interface KidRoutineNow {
+  id: string
+  title: string
+  /** 'HH:MM' it starts. */
+  time: string
+  steps: KidStop[]
+  doneCount: number
+  /** The kid's next routine today, for the line at the bottom. */
+  next: { title: string; time: string } | null
+}
+
 export interface KidPanel {
+  /** The routine that is on now; the screen shows it instead of the trail or list. */
+  routine: KidRoutineNow | null
   /** Every stop in order: timed by time, then anytime. */
   stops: KidStop[]
   now: KidStop | null
@@ -53,6 +72,10 @@ export interface KidPanel {
 const SOON_MIN = 60
 /** A stop not done this long after its time is missed. */
 const MISSED_MIN = 180
+/** A routine is on from this long before it starts… */
+const ROUTINE_LEAD_MIN = 30
+/** …until this long after its last step's time (or its start, when no step has one). */
+const ROUTINE_TAIL_MIN = 90
 
 export function isWeekendDay(d: Date): boolean {
   return d.getDay() === 0 || d.getDay() === 6
@@ -66,9 +89,14 @@ export function minutesFromTitle(title: string): number | null {
   return n > 0 && n <= 180 ? n : null
 }
 
-/** The few words before the first comma, colon, dash or bracket. */
+/** The words before the first comma, colon, dash or bracket: "Bag packed". */
+export function headTitle(title: string): string {
+  return title.split(/\s*[,(—–]\s*|:\s+|\s+-\s+/)[0]?.trim() || title.trim()
+}
+
+/** The head, cut to fit the trail strip. */
 export function shortTitle(title: string): string {
-  const cut = title.split(/\s*[,(—–]\s*|:\s+|\s+-\s+/)[0]?.trim() || title.trim()
+  const cut = headTitle(title)
   return cut.length > 24 ? `${cut.slice(0, 22).trimEnd()}…` : cut
 }
 
@@ -81,13 +109,11 @@ export function buildKidPanel(model: MemberDayModel, memberId: string, now: Date
   const raw: Omit<KidStop, 'missed'>[] = []
 
   const add = (row: KidRow, time: string | null, group: string | null) => {
-    // A step that names other people (a parent's "Wake the kids") is theirs.
-    if (row.by && row.by.length && !row.by.includes(memberId)) return
+    if (!isMine(row, memberId)) return
     const key = `${row.entityType}:${row.id}`
     if (seen.has(key)) return
     seen.add(key)
-    const minutes = row.target?.unit === 'minutes' ? row.target.amount : minutesFromTitle(row.title)
-    raw.push({ key, row, title: row.title, short: shortTitle(row.title), time, group, minutes, done: row.done })
+    raw.push(stopFor(row, time, group))
   }
 
   for (const c of model.collections) for (const r of c.rows) add(r, r.timeOfDay ?? c.timeOfDay, c.title)
@@ -124,7 +150,53 @@ export function buildKidPanel(model: MemberDayModel, memberId: string, now: Date
   const titles = stops.map((s) => s.title)
   const dayNote = titles.some((t) => /^math\b/i.test(t)) ? 'Math day' : titles.some((t) => /^reading\b/i.test(t)) ? 'Reading day' : null
 
-  return { stops, now: now_, next, later, listNow, listLater, doneCount: stops.filter((s) => s.done).length, dayNote, isWeekend }
+  return { routine: routineNow(model, memberId, now), stops, now: now_, next, later, listNow, listLater, doneCount: stops.filter((s) => s.done).length, dayNote, isWeekend }
+}
+
+/** A step that names other people (a parent's "Wake the kids") is theirs. */
+function isMine(row: KidRow, memberId: string): boolean {
+  return !row.by || row.by.length === 0 || row.by.includes(memberId)
+}
+
+function stopFor(row: KidRow, time: string | null, group: string | null): Omit<KidStop, 'missed'> {
+  const minutes = row.target?.unit === 'minutes' ? row.target.amount : minutesFromTitle(row.title)
+  return { key: `${row.entityType}:${row.id}`, row, title: row.title, short: shortTitle(row.title), time, group, minutes, done: row.done }
+}
+
+/**
+ * The routine on now. Each timed routine (a collection with steps for this
+ * kid) is on from ROUTINE_LEAD_MIN before it starts until ROUTINE_TAIL_MIN
+ * after its last step's time. When two overlap, the one that has started
+ * most recently wins; before either has started, the sooner one does. A
+ * finished routine stays up (all checked) until its time is over.
+ */
+export function routineNow(model: MemberDayModel, memberId: string, now: Date): KidRoutineNow | null {
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const routines = model.collections
+    .filter((c) => c.timeOfDay != null)
+    .map((c) => {
+      const time = c.timeOfDay!.slice(0, 5)
+      const steps = c.rows.filter((r) => isMine(r, memberId)).map((r) => ({ ...stopFor(r, r.timeOfDay ?? time, c.title), missed: false }))
+      const start = toMin(time)
+      const last = Math.max(start, ...steps.map((s) => (s.time ? toMin(s.time) : start)))
+      return { id: c.id, title: c.title, time, steps, start, from: start - ROUTINE_LEAD_MIN, until: last + ROUTINE_TAIL_MIN }
+    })
+    .filter((c) => c.steps.length > 0)
+    .sort((a, b) => a.start - b.start)
+
+  const on = routines.filter((c) => c.from <= nowMin && nowMin < c.until)
+  const started = on.filter((c) => c.start <= nowMin)
+  const pick = started[started.length - 1] ?? on[0]
+  if (!pick) return null
+  const next = routines.find((c) => c.start > nowMin && c !== pick && c.start > pick.start)
+  return {
+    id: pick.id,
+    title: pick.title,
+    time: pick.time,
+    steps: pick.steps,
+    doneCount: pick.steps.filter((s) => s.done).length,
+    next: next ? { title: next.title, time: next.time } : null,
+  }
 }
 
 /** "6:00" from "18:00" — am/pm is obvious on a kid's afternoon. */

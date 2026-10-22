@@ -12,7 +12,9 @@ import type { KidRow, MemberDayModel } from '@/lib/wall/kidDayModel'
 const r = (id: string, title: string, time: string | null, done = false): KidRow => ({ entityType: 'routine', id, title, done, timeOfDay: time, target: null })
 const model: MemberDayModel = {
   needed: [], reading: null, school: null, homework: [], papers: [], notices: [], isEmpty: false,
-  collections: [{ id: 'home', title: 'Home from school', timeOfDay: '17:45', rows: [r('folder', 'Empty take-home folder', null, true), r('read', 'Reading, 20 minutes — a real book', null)] }],
+  // The collection is untimed (its steps carry the time), so it is never "the
+  // routine on now": these tests are the trail and the list.
+  collections: [{ id: 'home', title: 'Home from school', timeOfDay: null, rows: [r('folder', 'Empty take-home folder', '17:45', true), r('read', 'Reading, 20 minutes — a real book', '17:45')] }],
   bands: { morning: [], afternoon: [], evening: [r('jax', 'Feed Jax dinner', '18:00')], anytime: [] },
 }
 const NOW = new Date(2026, 9, 20, 17, 52)
@@ -69,6 +71,36 @@ describe('KidPanelView', () => {
   it('no thought catcher where there is nowhere to save one', () => {
     render(<KidPanelView member={member} layout="trail" panel={buildKidPanel(model, 'kaleb', NOW)} now={NOW} onToggle={vi.fn()} thoughts={[]} />)
     expect(screen.queryByRole('button', { name: /Got a thought/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('the routine on now', () => {
+  const bedtime: MemberDayModel = {
+    ...model,
+    collections: [{ id: 'bed', title: 'Kids Bedtime routine', timeOfDay: '19:30', rows: [
+      r('shower', 'Shower', null, true), r('towel', 'Hang up your wet towel', null), r('read', 'Wait quietly for Mommy to read', null),
+    ] }],
+  }
+  const TUE_NIGHT = new Date(2026, 9, 20, 19, 32)
+
+  it('replaces the trail with the routine’s checklist, a tap each way', () => {
+    const onToggle = vi.fn()
+    render(<KidPanelView member={member} layout="trail" panel={buildKidPanel(bedtime, 'kaleb', TUE_NIGHT)} now={TUE_NIGHT} onToggle={onToggle} thoughts={[]} />)
+    expect(screen.getByRole('heading', { name: 'Kaleb' })).toBeInTheDocument()
+    expect(screen.getByText('Tuesday night')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Kids Bedtime routine' })).toBeInTheDocument()
+    expect(screen.getByText('1 of 3')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'I did it' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Hang up your wet towel done' }))
+    expect(onToggle).toHaveBeenLastCalledWith(expect.objectContaining({ key: 'routine:towel' }), true)
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Shower not done' }))
+    expect(onToggle).toHaveBeenLastCalledWith(expect.objectContaining({ key: 'routine:shower' }), false)
+  })
+
+  it('says when it is all done', () => {
+    const done = withTicks(bedtime, new Map([['routine:towel', true], ['routine:read', true]]))
+    render(<KidPanelView member={member} layout="list" panel={buildKidPanel(done, 'kaleb', TUE_NIGHT)} now={TUE_NIGHT} onToggle={vi.fn()} thoughts={[]} />)
+    expect(screen.getByRole('status')).toHaveTextContent('All done')
   })
 })
 

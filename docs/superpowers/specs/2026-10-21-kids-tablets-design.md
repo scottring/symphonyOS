@@ -23,6 +23,24 @@ thought catcher: type (or, where the browser can listen, say) a thought and
 pick what kind it is; it is kept for a grown-up to go over at bedtime and
 marked gone over in Settings → Displays.
 
+## The door panel (2026-10-22)
+
+The tablet lives in a charging mount outside the kid's bedroom door. While
+one of the kid's routines is on, either layout shows that routine as one
+checklist instead (Scott: "if they start it up at 7:30pm on Tuesday, it has
+their Tuesday night shower routine"). Mornings included: the noon start
+holds only for the trail and list.
+
+- A routine is a collection with a time. It is on from 30 minutes before it
+  starts until 90 minutes after its last step's time. When two overlap, the
+  one that has started most recently wins.
+- Steps keep their own order and their day rules (shower-night steps are
+  Tuesday, Thursday and Saturday steps of Kids Bedtime routine). A step for
+  one kid (Kaleb's pull-up) is only on that kid's list.
+- Every step has a picture, read from its name (`stepIcon.ts`), so a kid who
+  can't read yet can follow it. Tap to check, tap again to undo.
+- Between routines the screen is the trail or list, as before.
+
 ## Data and safety
 
 Migration `20261021180000_kid_displays.sql`:

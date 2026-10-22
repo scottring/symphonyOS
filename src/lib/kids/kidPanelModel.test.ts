@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildKidPanel, clockLabel, minutesFromTitle, shortTitle } from './kidPanelModel'
+import { buildKidPanel, clockLabel, minutesFromTitle, routineNow, shortTitle } from './kidPanelModel'
 import type { KidRow, MemberDayModel } from '@/lib/wall/kidDayModel'
 
 const KALEB = 'kaleb'
@@ -85,6 +85,72 @@ describe('buildKidPanel', () => {
   it('homework is a stop', () => {
     const p = buildKidPanel(model({ homework: [{ id: 'hw', title: 'Spelling sheet', due: 'Fri', late: false, notes: null }] }), KALEB, tue(16))
     expect(p.now).toMatchObject({ key: 'task:hw', group: 'Homework' })
+  })
+})
+
+describe('the routine on now (the door panel)', () => {
+  // Tuesday: School morning, Home from school, bedtime with shower-night steps.
+  const day = model({
+    collections: [
+      { id: 'm', title: 'School morning', timeOfDay: '06:45:00', rows: [
+        row('off', 'Pull-up off, underwear on', null, false, [KALEB]),
+        row('dress', 'Get dressed', null),
+        row('trash', 'Pull-up in the downstairs trash', null, false, [KALEB]),
+        row('eat', 'Eat breakfast', '07:00'),
+        row('shoes', 'Shoes and jacket on', '07:18'),
+      ] },
+      { id: 'home', title: 'Home from school', timeOfDay: '17:45', rows: [row('folder', 'Empty take-home folder', null)] },
+      { id: 'bed', title: 'Kids Bedtime routine', timeOfDay: '19:30', rows: [
+        row('shower', 'Shower', null, true), row('floor', 'Dry off the bathroom floor', null), row('on', 'Pull-up on', null, false, [KALEB]),
+        row('out', 'Lights out', '20:30'),
+      ] },
+      { id: 'later', title: 'Untimed chores', timeOfDay: null, rows: [row('x', 'Tidy bedrooms', null)] },
+    ],
+  })
+
+  it('7:30 on a Tuesday night is the bedtime routine, every step in its own order', () => {
+    const r = routineNow(day, KALEB, tue(19, 30))!
+    expect(r.title).toBe('Kids Bedtime routine')
+    expect(r.steps.map((s) => s.title)).toEqual(['Shower', 'Dry off the bathroom floor', 'Pull-up on', 'Lights out'])
+    expect(r.doneCount).toBe(1)
+    expect(r.next).toBeNull()
+  })
+
+  it('a morning is the morning routine, on a weekday too', () => {
+    const r = buildKidPanel(day, KALEB, tue(7, 5)).routine!
+    expect(r.title).toBe('School morning')
+    expect(r.steps[0].title).toBe('Pull-up off, underwear on')
+    expect(r.next).toEqual({ title: 'Home from school', time: '17:45' })
+  })
+
+  it('a step for one kid is only on that kid’s list', () => {
+    const r = routineNow(day, 'ella', tue(7, 5))!
+    expect(r.steps.map((s) => s.title)).toEqual(['Get dressed', 'Eat breakfast', 'Shoes and jacket on'])
+  })
+
+  it('on from half an hour before it starts until an hour and a half after its last step', () => {
+    expect(routineNow(day, KALEB, tue(6, 14))).toBeNull()
+    expect(routineNow(day, KALEB, tue(6, 15))?.title).toBe('School morning')
+    expect(routineNow(day, KALEB, tue(8, 47))?.title).toBe('School morning')
+    expect(routineNow(day, KALEB, tue(8, 48))).toBeNull()
+    expect(routineNow(day, KALEB, tue(21, 59))?.title).toBe('Kids Bedtime routine')
+    expect(routineNow(day, KALEB, tue(22, 0))).toBeNull()
+  })
+
+  it('between routines there is none: the trail or list is the screen', () => {
+    expect(buildKidPanel(day, KALEB, tue(14, 0)).routine).toBeNull()
+  })
+
+  it('when two overlap, the one that has started wins; before either, the sooner one', () => {
+    // Home from school runs until 19:15; bedtime opens at 19:00.
+    expect(routineNow(day, KALEB, tue(19, 5))?.title).toBe('Home from school')
+    expect(routineNow(day, KALEB, tue(19, 16))?.title).toBe('Kids Bedtime routine')
+    expect(routineNow(day, KALEB, tue(19, 30))?.title).toBe('Kids Bedtime routine')
+  })
+
+  it('a routine with nothing for this kid is not theirs', () => {
+    const onlyKaleb = model({ collections: [{ id: 'j', title: 'Jax', timeOfDay: '18:00', rows: [row('jax', 'Feed Jax dinner', null, false, [KALEB])] }] })
+    expect(routineNow(onlyKaleb, 'ella', tue(18, 0))).toBeNull()
   })
 })
 

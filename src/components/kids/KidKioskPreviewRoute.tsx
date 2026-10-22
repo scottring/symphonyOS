@@ -1,6 +1,7 @@
 // Dev only: /kid-preview?scene=… — a kid's tablet with fixed days and a fixed
 // clock, no reads or writes, for design review screenshots. Scenes:
-// kaleb-tue, kaleb-sat, ella-mon, thoughts, timer, ring, done.
+// kaleb-tue, kaleb-sat, ella-mon, thoughts, timer, ring, done, and the door
+// panel's routines: kaleb-shower (Tuesday 7:32pm), kaleb-morning, ella-shower.
 
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -12,7 +13,7 @@ import { KidPanelView } from './KidPanelView'
 
 const KALEB = { id: 'preview-kaleb', name: 'Kaleb', color: 'orange' }
 const ELLA = { id: 'preview-ella', name: 'Ella', color: 'blue' }
-const r = (id: string, title: string, time: string | null, done = false): KidRow => ({ entityType: 'routine', id, title, done, timeOfDay: time, target: null })
+const r = (id: string, title: string, time: string | null, done = false, by?: string[]): KidRow => ({ entityType: 'routine', id, title, done, timeOfDay: time, target: null, ...(by ? { by } : {}) })
 const empty: MemberDayModel = { needed: [], reading: null, school: null, homework: [], papers: [], notices: [], collections: [], bands: { morning: [], afternoon: [], evening: [], anytime: [] }, isEmpty: false }
 
 function weekday(kind: 'reading' | 'math', allDone = false): MemberDayModel {
@@ -41,6 +42,26 @@ const saturday: MemberDayModel = {
     anytime: [r('tidy', 'Tidy bedrooms, 15 minutes', null), r('family', 'Family reading time every weekend', null)],
   },
 }
+// The door panel: Tuesday's shower night and a school morning, Kaleb's
+// pull-up steps his alone.
+const k = [KALEB.id]
+const routines: MemberDayModel = {
+  ...empty,
+  collections: [
+    { id: 'morning', title: 'School morning', timeOfDay: '06:45', rows: [
+      r('off', 'Pull-up off and underwear on', null, true, k), r('dress', 'Get dressed', null, true), r('hamper', 'Dirty clothes in the hamper', null),
+      r('bed', 'Make bed and straighten room', null), r('teeth', 'Brush teeth', null), r('trash', 'Pull-up in the downstairs trash', null, false, k),
+      r('eat', 'Eat breakfast', '07:00'), r('place', 'Clean up your place, dishes away', '07:10'),
+      r('bag', 'Bag packed: homework folder, take-home folder, stocked pencil pouch', '07:15'), r('shoes', 'Shoes and jacket on', '07:18'),
+    ] },
+    { id: 'home', title: 'Home from school', timeOfDay: '17:45', rows: [r('folder', 'Empty take-home folder', null)] },
+    { id: 'bedtime', title: 'Kids Bedtime routine', timeOfDay: '19:30', rows: [
+      r('shower', 'Shower', null, true), r('floor', 'Dry off the bathroom floor', null, true), r('clothes', 'Dirty clothes in the hamper', null, true),
+      r('towel', 'Hang up your wet towel', null), r('pullup', 'Pull-up on', null, false, k), r('dressed', 'Get dressed', null),
+      r('wait', 'Wait quietly for Mommy to read', null),
+    ] },
+  ],
+}
 const thoughts: KidThought[] = [
   { id: 't1', familyMemberId: KALEB.id, text: 'Can we go to the library on Saturday?', kind: 'ask', createdAt: new Date(2026, 9, 20, 16, 58), reviewedAt: null },
   { id: 't2', familyMemberId: KALEB.id, text: 'Build the Lego crane', kind: 'later', createdAt: new Date(2026, 9, 20, 17, 40), reviewedAt: null },
@@ -53,6 +74,9 @@ export default function KidKioskPreviewRoute() {
     const tue = new Date(2026, 9, 20, 17, 52)
     if (scene === 'kaleb-sat') return { member: KALEB, layout: 'trail' as const, model: saturday, now: new Date(2026, 9, 24, 10, 5) }
     if (scene === 'ella-mon') return { member: ELLA, layout: 'list' as const, model: weekday('math'), now: new Date(2026, 9, 19, 17, 50) }
+    if (scene === 'kaleb-shower') return { member: KALEB, layout: 'trail' as const, model: routines, now: new Date(2026, 9, 20, 19, 32) }
+    if (scene === 'ella-shower') return { member: { ...ELLA, id: 'preview-ella' }, layout: 'list' as const, model: routines, now: new Date(2026, 9, 20, 19, 32) }
+    if (scene === 'kaleb-morning') return { member: KALEB, layout: 'trail' as const, model: routines, now: new Date(2026, 9, 21, 7, 5) }
     if (scene === 'done') return { member: KALEB, layout: 'trail' as const, model: weekday('reading', true), now: new Date(2026, 9, 20, 20, 40) }
     return { member: KALEB, layout: 'trail' as const, model: weekday('reading'), now: tue }
   }, [scene])
