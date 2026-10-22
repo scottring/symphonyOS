@@ -56,6 +56,35 @@ create trigger update_choices_updated_at before update on public.choices for eac
 create trigger update_choice_options_updated_at before update on public.choice_options for each row execute function update_updated_at_column();
 create trigger update_choice_price_lines_updated_at before update on public.choice_price_lines for each row execute function update_updated_at_column();
 
+-- Visibility follows the parent pointer, so a signed-in writer may not move a
+-- row: a member could otherwise re-point an owner's Family choice at their own
+-- private goal and it would vanish from the owner (the gap
+-- 2026-09-21_owner_immutable.sql closed for user_id). Same boundary as that
+-- guard: the request role, not auth.uid(). The service role and direct
+-- sessions (migrations, SQL editor) can still re-parent. Owners are pinned
+-- with the existing guard_owner_immutable().
+create function public.guard_parent_immutable() returns trigger language plpgsql set search_path = '' as $$
+declare c text;
+begin
+  if coalesce(auth.role(), 'service_role') <> 'service_role' then
+    foreach c in array tg_argv loop
+      if to_jsonb(new) -> c is distinct from to_jsonb(old) -> c then
+        raise exception '% is immutable', c using errcode = '42501', hint = 'Add it again where it belongs instead of moving it.';
+      end if;
+    end loop;
+  end if;
+  return new;
+end $$;
+create trigger choices_guard_parent before update of goal_task_id, goal_id on public.choices
+  for each row execute function public.guard_parent_immutable('goal_task_id', 'goal_id');
+create trigger choice_options_guard_parent before update of choice_id on public.choice_options
+  for each row execute function public.guard_parent_immutable('choice_id');
+create trigger choice_price_lines_guard_parent before update of option_id on public.choice_price_lines
+  for each row execute function public.guard_parent_immutable('option_id');
+create trigger choices_guard_owner before update of user_id on public.choices for each row execute function public.guard_owner_immutable();
+create trigger choice_options_guard_owner before update of user_id on public.choice_options for each row execute function public.guard_owner_immutable();
+create trigger choice_price_lines_guard_owner before update of user_id on public.choice_price_lines for each row execute function public.guard_owner_immutable();
+
 -- Visibility: these subqueries run under the caller's RLS on tasks/goals/choices.
 create function public.choice_goal_visible(p_goal_task_id uuid, p_goal_id uuid) returns boolean
 language sql stable security invoker set search_path = public as $$

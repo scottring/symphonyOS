@@ -47,7 +47,7 @@ const O_PRIVATE = '50000000-0000-0000-0000-000000000003'
 const O_YEAR = '50000000-0000-0000-0000-000000000004'
 const FOLLOW_UP = '60000000-0000-0000-0000-000000000001'
 
-const prefix = (user) => `set role authenticated; set request.jwt.claim.sub = '${user}'; set request.jwt.claims = '${JSON.stringify({ sub: user })}'; `
+const prefix = (user) => `set role authenticated; set request.jwt.claim.sub = '${user}'; set request.jwt.claims = '${JSON.stringify({ sub: user, role: 'authenticated' })}'; `
 /** Run `text` as this signed-in user, under RLS. */
 const as = (user, text) => sql(prefix(user) + text)
 const failsAs = (user, text, pattern) => fails(prefix(user) + text, pattern)
@@ -74,6 +74,7 @@ try {
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+    create function auth.role() returns text language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role'))::text $$;
     grant usage on schema public to anon, authenticated;
     create table public.households(id uuid primary key);
     create table public.household_members(id uuid primary key default gen_random_uuid(), household_id uuid references public.households(id) on delete cascade not null, user_id uuid references auth.users(id) on delete cascade not null, role text not null default 'member', status text not null default 'pending', unique(household_id,user_id));
@@ -93,6 +94,17 @@ try {
       select user_a = user_b or exists (select 1 from household_members hm_a join household_members hm_b on hm_a.household_id = hm_b.household_id
         where hm_a.user_id = user_a and hm_b.user_id = user_b and hm_a.status = 'active' and hm_b.status = 'active') $$;
     create function public.update_updated_at_column() returns trigger language plpgsql as $$ begin new.updated_at = now(); return new; end $$;
+    -- 2026-09-21_owner_immutable.sql
+    create function public.guard_owner_immutable() returns trigger language plpgsql set search_path = '' as $$
+    begin
+      if new.user_id is distinct from old.user_id
+         and coalesce(auth.role(), 'service_role') <> 'service_role' then
+        raise exception 'user_id is immutable'
+          using errcode = '42501',
+                hint = 'Assign the item instead of changing its owner.';
+      end if;
+      return new;
+    end $$;
     create function public.journal_reviewed_change() returns trigger language plpgsql as $$ begin return coalesce(new, old); end $$;
 
     create table public.tasks(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id), title text, is_goal boolean not null default false, scope text default 'individual');
@@ -192,7 +204,8 @@ try {
   })
   check('choice on ordinary task is refused', () => {
     failsAs(OWNER, `insert into public.choices (user_id,goal_task_id,title) values ('${OWNER}','${TASK_PLAIN}','Milk brand')`, /A choice belongs to a goal/)
-    failsAs(OWNER, `update public.choices set goal_task_id = '${TASK_PLAIN}' where id = '${C_FAMILY}'`, /A choice belongs to a goal/)
+    // Only a direct session can re-point a choice now; it still has to be a goal.
+    fails(`update public.choices set goal_task_id = '${TASK_PLAIN}' where id = '${C_FAMILY}'`, /A choice belongs to a goal/)
   })
   check('choice needs exactly one goal', () => {
     // As superuser, so the row reaches the check constraint (signed in, RLS refuses a goalless row first).
@@ -212,6 +225,28 @@ try {
     assert.deepEqual(counts(OWNER, yearTree), { choices: '1', options: '1', lines: '0' })
     as(OWNER, `update public.goals set scope = 'compound' where id = '${YEAR_GOAL}'`)
     assert.deepEqual(counts(MEMBER, yearTree), { choices: '1', options: '1', lines: '0' })
+  })
+  const MEMBER_PRIVATE_GOAL = '20000000-0000-0000-0000-000000000004'
+  check('member cannot move a choice to another goal', () => {
+    as(MEMBER, `insert into public.tasks (id,user_id,title,is_goal,scope) values ('${MEMBER_PRIVATE_GOAL}','${MEMBER}','Member private',true,'individual')`)
+    failsAs(MEMBER, `update public.choices set goal_task_id = '${MEMBER_PRIVATE_GOAL}' where id = '${C_FAMILY}'`, /goal_task_id is immutable/)
+    failsAs(MEMBER, `update public.choices set goal_task_id = null, goal_id = '${YEAR_GOAL}' where id = '${C_FAMILY}'`, /goal_task_id is immutable/)
+    failsAs(OWNER, `update public.choices set goal_id = null, goal_task_id = '${GOAL_FAMILY}' where id = '${C_YEAR}'`, /goal_(task_)?id is immutable/)
+    failsAs(MEMBER, `update public.choices set user_id = '${MEMBER}' where id = '${C_FAMILY}'`, /user_id is immutable/)
+    assert.equal(as(OWNER, `select count(*) from public.choices where id = '${C_FAMILY}' and goal_task_id = '${GOAL_FAMILY}' and user_id = '${OWNER}'`), '1')
+    // Other edits on the same row still work, and a direct session can still re-parent.
+    assert.equal(as(MEMBER, `update public.choices set title = 'Roofer (2026)', goal_task_id = '${GOAL_FAMILY}' where id = '${C_FAMILY}' returning title`), 'Roofer (2026)')
+    assert.equal(sql(`update public.choices set goal_task_id = '${GOAL_FAMILY}', goal_id = null where id = '${C_YEAR}' returning 1`), '1')
+    assert.equal(sql(`update public.choices set goal_task_id = null, goal_id = '${YEAR_GOAL}' where id = '${C_YEAR}' returning 1`), '1')
+  })
+  check('member cannot move an option to another choice', () => {
+    failsAs(MEMBER, `update public.choice_options set choice_id = '${C_YEAR}' where id = '${O_MEMBER}'`, /choice_id is immutable/)
+    failsAs(MEMBER, `update public.choice_options set user_id = '${OWNER}' where id = '${O_MEMBER}'`, /user_id is immutable/)
+    const line = as(MEMBER, `select id from public.choice_price_lines where option_id = '${O_OWNER}'`)
+    failsAs(MEMBER, `update public.choice_price_lines set option_id = '${O_MEMBER}' where id = '${line}'`, /option_id is immutable/)
+    failsAs(MEMBER, `update public.choice_price_lines set user_id = '${OWNER}' where id = '${line}'`, /user_id is immutable/)
+    assert.equal(as(MEMBER, `update public.choice_price_lines set amount_cents = 1850050 where id = '${line}' returning amount_cents`), '1850050')
+    assert.equal(as(OWNER, `select count(*) from public.choice_options where choice_id = '${C_FAMILY}'`), '2')
   })
   check('member sees attachment on shared option', () => {
     assert.equal(as(MEMBER, `insert into public.attachments (user_id,entity_type,entity_id) values ('${MEMBER}','choice_option','${O_OWNER}') returning 1`), '1')
