@@ -144,6 +144,7 @@ const PhonePaperPage = lazy(() => import('./components/capture/PhonePaperPage').
 // can be opened on the Pi without a session; carries no live data.
 const WallV2LanePreview = lazy(() => import('./components/wall-v2/WallV2LanePreview').then((m) => ({ default: m.WallV2LanePreview })))
 const KioskScenePreview = lazy(() => import('./components/wall-v2/activity/KioskScenePreviewRoute'))
+const ChoiceFixture = import.meta.env.DEV ? lazy(() => import('./dev/choiceFixture')) : null
 const KidKiosk = lazy(() => import('./components/kids/KidKioskRoute'))
 const KidKioskPreview = lazy(() => import('./components/kids/KidKioskPreviewRoute'))
 
@@ -195,6 +196,8 @@ createRoot(document.getElementById('root')!).render(
                   /* catch-all below (explicit routes here win by specificity). */}
               <Route path="/goals/*" element={cutoverShell} />
               <Route path="/choice/*" element={cutoverShell} />
+              {/* Dev only: the comparison page with fixed data, outside AuthGate. */}
+              {import.meta.env.DEV && <Route path="/dev/choice-fixture" element={<Suspense fallback={null}>{ChoiceFixture && <ChoiceFixture />}</Suspense>} />}
               {/* /projects retired from the UI (2026-09-02): "Projects" read as
                   GTD jargon and muddied the household-OS pitch. HIDE THE NOUN,
                   KEEP THE DATA — the table, useProjects, types/project.ts and
