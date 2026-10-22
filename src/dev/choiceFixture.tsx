@@ -77,7 +77,7 @@ export default function ChoiceFixture() {
   // The log in memory: saves show up at once, as the real page's refetch would.
   const [entries, setEntries] = useState(fixtureEntries)
   const [planned, setPlanned] = useState(fixturePlanned)
-  const goalLog: PageLog = { log: mergeLog(entries, planned), entries, memberName: (id) => fixtureMembers[id] }
+  const goalLog: PageLog = { log: mergeLog(entries, planned, new Date()), entries, memberName: (id) => fixtureMembers[id] }
   const writers: ChoicePageWriters = {
     readChoice: async () => {
       const { choice } = fixtureDetail(current.current)

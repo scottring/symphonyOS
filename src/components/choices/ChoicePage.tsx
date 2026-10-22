@@ -8,7 +8,7 @@ import { useMemberName } from '@/hooks/useMemberName'
 import { useGoalLog } from '@/hooks/useGoalLog'
 import { supabase } from '@/lib/supabase'
 import * as db from '@/lib/choices/db'
-import { rowLine, type LogLine } from '@/lib/choices/log'
+import { rowLine, type LogLine, type MergedLog } from '@/lib/choices/log'
 import type { LogEntry } from '@/types/goalLog'
 import type { ChoiceDetail } from '@/lib/choices/db'
 import { choiceSummary } from '@/lib/choices/facts'
@@ -54,14 +54,14 @@ function useNarrow(): boolean {
 
 /** The goal's log as the page shows it; ChoicePage reads it (useGoalLog). */
 export interface PageLog {
-  log: { upcoming: LogLine[]; done: LogLine[] }
+  log: MergedLog
   entries: readonly LogEntry[]
   /** Option names across the goal's choices, for lines about another choice's option. */
   optionNames?: ReadonlyMap<string, string>
   /** A logger's first name. */
   memberName?: (userId: string) => string | undefined
 }
-const NO_LOG: PageLog = { log: { upcoming: [], done: [] }, entries: [] }
+const NO_LOG: PageLog = { log: { upcoming: [], passed: [], done: [] }, entries: [] }
 
 const sameKey = (a: SortKey | null, b: SortKey) =>
   !!a && a.kind === b.kind && (a.kind !== 'column' || (b.kind === 'column' && a.columnId === b.columnId))
@@ -85,7 +85,7 @@ export function ChoicePageView({ detail, writers, files, goalLog = NO_LOG }: {
 }) {
   const { choice, options, lines, followUps, contacts } = detail
   const navigate = useNavigate()
-  const edit = useChoiceEditing(detail, writers)
+  const edit = useChoiceEditing(detail, writers, goalLog.entries)
   const narrow = useNarrow()
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [showRuledOut, setShowRuledOut] = useState(false)
@@ -106,7 +106,7 @@ export function ChoicePageView({ detail, writers, files, goalLog = NO_LOG }: {
   const shown = showRuledOut ? [...sorted, ...ruledOut] : sorted
   const optionOf = (id: string) => options.find((o) => o.id === id)
   const { log } = goalLog
-  const logged = (o: ChoiceOption) => log.upcoming.some((l) => l.optionId === o.id) || log.done.some((l) => l.optionId === o.id)
+  const logged = (o: ChoiceOption) => [log.upcoming, log.passed, log.done].some((ls) => ls.some((l) => l.optionId === o.id))
 
   // A planned event is edited as a task: open it where tasks open (as the task panel's links do).
   const openTask = (taskId: string) => navigate(`/today?detail=task:${taskId}`)
@@ -227,7 +227,7 @@ function ChoiceHeading({ title, onRename, onDelete }: {
       </div>
       {mode === 'delete' && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-[13px] text-neutral-600">{`Delete ${title}? Its options, prices and values go too. Can't be undone.`}</span>
+          <span className="text-[13px] text-neutral-600">{`Delete ${title}? Its options, prices, values and their log go too. Can't be undone.`}</span>
           <button type="button" onClick={async () => { if (await onDelete()) setMode(null) }}
             className="rounded-lg bg-red-500 px-3 py-1 text-[13px] font-medium text-white hover:bg-red-600">Delete</button>
           <button type="button" onClick={() => setMode(null)}
@@ -309,7 +309,7 @@ function Dialogs({ open, close, detail, edit, files, optionOf, goalLog, onOpen, 
     const entryOf = (entryId: string) => goalLog.entries.find((e) => e.id === entryId)
     return (
       <DialogFrame title={`History · ${o.name}`} onClose={close}>
-        <LogList log={{ upcoming: only(goalLog.log.upcoming), done: only(goalLog.log.done) }}
+        <LogList log={{ upcoming: only(goalLog.log.upcoming), passed: only(goalLog.log.passed), done: only(goalLog.log.done) }}
           optionNames={namesOf(goalLog, detail.options)} memberName={goalLog.memberName ?? noName}
           onEdit={(entryId) => onOpen({ kind: 'editLog', entryId })}
           onDelete={async (entryId) => { const e = entryOf(entryId); return e ? edit.deleteLogEntry(e) : false }}

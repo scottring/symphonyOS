@@ -230,8 +230,10 @@ async function goalLogs(db: Db, goals: Goal[], names: Map<string, string>, today
     const done = [
       ...entries.filter(mine).map((e) => ({ sort: `${e.happened_on} ${e.happened_at_time?.slice(0, 5) ?? '00:00'}`, made: e.created_at, l: line(e.happened_on, e.happened_at_time?.slice(0, 5), e.kind, e.choice_option_id, e.summary) })),
       ...planned.filter((p) => mine(p) && p.completed).map((p) => {
-        const w = at(p.completed_at ?? p.scheduled_for!, p.is_all_day)
-        return { sort: `${w.on} ${w.time ?? '00:00'}`, made: '', l: line(w.on, w.time, p.log_kind, p.choice_option_id, p.title) }
+        // The day it was ticked done, at the time it was planned for (not the tick's).
+        const on = at(p.completed_at ?? p.scheduled_for!, p.is_all_day).on
+        const time = at(p.scheduled_for!, p.is_all_day).time
+        return { sort: `${on} ${time ?? '00:00'}`, made: '', l: line(on, time, p.log_kind, p.choice_option_id, p.title) }
       }),
     ].sort((a, b) => (a.sort === b.sort ? b.made.localeCompare(a.made) : b.sort.localeCompare(a.sort))).map((x) => x.l)
     return {

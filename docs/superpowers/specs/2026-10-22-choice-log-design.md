@@ -65,9 +65,12 @@ contractor)"; preset from where it was opened).
 **The log list** merges, newest first:
 
 - **Coming up:** open tasks with `log_kind` on this goal (soonest first), shown
-  in the primary color with "on your calendar".
+  in the primary color with "on your calendar". One whose local date is
+  before today is not coming up.
+- **Date passed, not ticked done:** those open tasks whose date has passed
+  (newest first); the line still opens its task. A row's "next" ignores them.
 - **Done:** log entries, plus completed tasks with `log_kind` (dated by
-  `completed_at`). Each line: date · kind · option name or "The project" ·
+  `completed_at`, at the task's scheduled time when not all-day). Each line: date · kind · option name or "The project" ·
   summary · who logged it (first name; "You" for the signed-in person is not
   required — first name is fine).
 - Entries can be edited (kind, date, time, summary; to change what it is about, delete and log again) and deleted from

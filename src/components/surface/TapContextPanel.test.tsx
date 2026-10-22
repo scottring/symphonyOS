@@ -11,7 +11,7 @@ vi.mock('@/hooks/useChoices', () => ({
 }))
 
 vi.mock('@/hooks/useGoalLog', () => ({
-  useGoalLog: () => ({ log: { upcoming: [], done: [] }, entries: [], loading: false, refetch: vi.fn() }),
+  useGoalLog: () => ({ log: { upcoming: [], passed: [], done: [] }, entries: [], loading: false, refetch: vi.fn() }),
 }))
 
 describe('TapContextPanel', () => {

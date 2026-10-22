@@ -12,7 +12,7 @@ const NONE: LogEntry[] = []
 const NO_PLANS: PlannedEvent[] = []
 
 /** A goal's log: its entries and its planned events (tasks with log_kind),
- *  merged into Coming up and Done. Reads again on the same signals as Choices. */
+ *  merged into Coming up, Date passed and Done. Reads again on the same signals as Choices. */
 export function useGoalLog(goal: GoalRef | null) {
   const { user } = useAuth()
   const [read, setRead] = useState<Read | null>(null)
@@ -41,6 +41,7 @@ export function useGoalLog(goal: GoalRef | null) {
 
   // Another goal's log (still shown while the new one loads) is not this one's.
   const mine = read && read.key === key ? read : null
-  const log = useMemo(() => mergeLog(mine?.entries ?? NONE, mine?.planned ?? NO_PLANS), [mine])
+  // Today as of each read: a plan whose day has passed is set apart from Coming up.
+  const log = useMemo(() => mergeLog(mine?.entries ?? NONE, mine?.planned ?? NO_PLANS, new Date()), [mine])
   return { log, entries: mine?.entries ?? NONE, loading, refetch }
 }

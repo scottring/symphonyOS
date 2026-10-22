@@ -39,15 +39,24 @@ function parseYmd(on: string, time?: string): Date {
   return new Date(y, m - 1, d, hh, mm)
 }
 
+/** The log's three groups. `passed`: planned events still open after their
+ *  day, neither ahead nor done. */
+export type MergedLog = { upcoming: LogLine[]; passed: LogLine[]; done: LogLine[] }
+
+const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+
 export function mergeLog(
-  entries: readonly LogEntry[], planned: readonly PlannedEvent[],
-): { upcoming: LogLine[]; done: LogLine[] } {
-  const upcoming: LogLine[] = planned.filter((p) => !p.completed).map((p) => ({
+  entries: readonly LogEntry[], planned: readonly PlannedEvent[], now: Date,
+): MergedLog {
+  const today = localYmd(now)
+  const open: LogLine[] = planned.filter((p) => !p.completed).map((p) => ({
     key: `t:${p.taskId}`, when: p.scheduledFor, on: localYmd(p.scheduledFor),
-    time: p.allDay ? undefined : `${pad(p.scheduledFor.getHours())}:${pad(p.scheduledFor.getMinutes())}`,
+    time: p.allDay ? undefined : hhmm(p.scheduledFor),
     kind: p.kind, optionId: p.optionId, text: p.title, upcoming: true, taskId: p.taskId,
   }))
-  upcoming.sort((a, b) => a.when.getTime() - b.when.getTime())
+  const upcoming = open.filter((l) => l.on >= today).sort((a, b) => a.when.getTime() - b.when.getTime())
+  const passed = open.filter((l) => l.on < today).map((l) => ({ ...l, upcoming: false }))
+    .sort((a, b) => b.when.getTime() - a.when.getTime())
 
   const created = new Map<string, number>()
   const done: LogLine[] = entries.map((e) => {
@@ -59,15 +68,16 @@ export function mergeLog(
   })
   for (const p of planned) {
     if (!p.completed) continue
-    const when = p.completedAt ?? p.scheduledFor
+    // The day it was ticked done, at the time it was planned for (not the tick's).
+    const on = localYmd(p.completedAt ?? p.scheduledFor)
+    const time = p.allDay ? undefined : hhmm(p.scheduledFor)
     done.push({
-      key: `t:${p.taskId}`, when, on: localYmd(when),
-      time: p.allDay ? undefined : `${pad(when.getHours())}:${pad(when.getMinutes())}`,
+      key: `t:${p.taskId}`, when: parseYmd(on, time), on, time,
       kind: p.kind, optionId: p.optionId, text: p.title, upcoming: false, taskId: p.taskId,
     })
   }
   done.sort((a, b) => b.when.getTime() - a.when.getTime() || (created.get(b.key) ?? 0) - (created.get(a.key) ?? 0))
-  return { upcoming, done }
+  return { upcoming, passed, done }
 }
 
 const monthDay = (d: Date) => `${MONTHS[d.getMonth()]} ${d.getDate()}`
@@ -78,8 +88,10 @@ export const weekdayLabel = (on: string) => `${WEEKDAYS[parseYmd(on).getDay()]} 
 /** Stored HH:MM with the leading zero dropped, e.g. 09:05 -> 9:05, 14:30 stays. */
 export const shortTime = (t: string) => t.replace(/^0/, '')
 
+/** An option's row: its next planned event (one whose day has passed is not
+ *  next) and its last one done. */
 export function rowLine(
-  log: { upcoming: LogLine[]; done: LogLine[] }, optionId: string,
+  log: Pick<MergedLog, 'upcoming' | 'done'>, optionId: string,
 ): { next?: string; last?: string } | null {
   const nextLine = log.upcoming.find((l) => l.optionId === optionId)
   const lastLine = log.done.find((l) => l.optionId === optionId)

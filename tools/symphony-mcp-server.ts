@@ -397,9 +397,9 @@ Name exactly one of option_id (the entry is about that option), goal_task_id (mo
 on is the day it happened (YYYY-MM-DD, today or earlier; a future visit is planned in Symphony instead). time is optional HH:MM.
 Logging a call, visit, message or meeting about a Considering option moves it to Contacted. Facts only, in the person's words.`,
   {
-    goal_task_id: z.string().optional().describe('Month/season goal task id'),
-    goal_id: z.string().optional().describe('Year goal id'),
-    option_id: z.string().optional().describe('Option UUID (from symphony_list_choices)'),
+    goal_task_id: z.string().min(1).optional().describe('Month/season goal task id'),
+    goal_id: z.string().min(1).optional().describe('Year goal id'),
+    option_id: z.string().min(1).optional().describe('Option UUID (from symphony_list_choices)'),
     kind: z.enum(LOG_KINDS),
     on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('YYYY-MM-DD'),
     time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().describe('HH:MM'),
@@ -1037,8 +1037,10 @@ async function goalLogsLocal(goals: { id: string; title: string; kind: 'task' | 
     const done = [
       ...entries.filter(mine).map((e) => ({ sort: `${e.happened_on} ${e.happened_at_time?.slice(0, 5) ?? '00:00'}`, made: e.created_at, l: line(e.happened_on, e.happened_at_time?.slice(0, 5), e.kind, e.choice_option_id, e.summary) })),
       ...planned.filter((p) => mine(p) && p.completed).map((p) => {
-        const w = at(p.completed_at ?? p.scheduled_for!, p.is_all_day)
-        return { sort: `${w.on} ${w.time ?? '00:00'}`, made: '', l: line(w.on, w.time, p.log_kind, p.choice_option_id, p.title) }
+        // The day it was ticked done, at the time it was planned for (not the tick's).
+        const on = at(p.completed_at ?? p.scheduled_for!, p.is_all_day).on
+        const time = at(p.scheduled_for!, p.is_all_day).time
+        return { sort: `${on} ${time ?? '00:00'}`, made: '', l: line(on, time, p.log_kind, p.choice_option_id, p.title) }
       }),
     ].sort((a, b) => (a.sort === b.sort ? b.made.localeCompare(a.made) : b.sort.localeCompare(a.sort))).map((x) => x.l)
     return {

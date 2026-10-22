@@ -686,8 +686,11 @@ describe('log events', () => {
     expect(PROPOSE_CHOICE_CHANGES_TOOL.description).toMatch(/event_log \(something that already happened/)
     expect(PROPOSE_CHOICE_CHANGES_TOOL.description).toMatch(/event_plan \(a future visit, call or meeting/)
     const src = readFileSync('supabase/functions/symphony-agent/index.ts', 'utf8')
-    expect(src).toContain('Log calls, visits, messages, meetings and notes with event_log (past) and plan future ones with event_plan. When logging a contact with an option that is Considering, also propose option_status → contacted in the same card. Never set a status backward.')
+    expect(src).toContain('Log calls, visits, messages, meetings and notes with event_log (past) and plan future ones with event_plan. When logging or planning a contact with an option that is Considering, also propose option_status → contacted in the same card. Never set a status backward.')
     expect(src).toMatch(/choiceSetFromInput\(block\.input \?\? \{\}, .*, today\)/)
+    // Read and propose agree on the household's day.
+    expect(src).toContain('return await readChoices(db, input, today)')
+    expect(src).toMatch(/await runTool\([^\n]*, turnId, today\)/)
   })
 })
 
@@ -715,5 +718,24 @@ describe('review fixes: log reads', () => {
     const today = JSON.parse(await readChoices(fakeDb({ ...MOCKUP, tasks: [MOCKUP.tasks[0], visit({ scheduled_for: '2026-10-22T14:00:00+00:00' })] }), { goal_id: G }, '2026-10-22')).log[0]
     expect(today.upcoming).toHaveLength(1)
     expect(today.planned_date_passed_not_ticked_done).toBeUndefined()
+  })
+
+  it('the MCP server mirrors it: a ticked plan keeps its planned time, and an empty id names nothing', () => {
+    const mcp = readFileSync('tools/symphony-mcp-server.ts', 'utf8')
+    const logLocal = mcp.slice(mcp.indexOf('async function goalLogsLocal'), mcp.indexOf('async function readChoicesLocal'))
+    expect(logLocal).toContain('const time = at(p.scheduled_for!, p.is_all_day).time')
+    const logEvent = mcp.slice(mcp.indexOf("'symphony_log_event'"), mcp.indexOf('async (params)', mcp.indexOf("'symphony_log_event'")))
+    for (const id of ['goal_task_id', 'goal_id', 'option_id']) expect(logEvent).toContain(`${id}: z.string().min(1).optional()`)
+  })
+
+  it('a planned event ticked done keeps its planned time, on the day it was ticked', async () => {
+    const db = fakeDb({ ...MOCKUP, tasks: [MOCKUP.tasks[0],
+      // Planned for Oct 20 at 10:00, ticked done Oct 21 at 15:37 (New York).
+      visit({ id: 'v1', scheduled_for: '2026-10-20T14:00:00+00:00', completed: true, completed_at: '2026-10-21T19:37:00+00:00' }),
+      // No tick time: its planned day and time.
+      visit({ id: 'v2', scheduled_for: '2026-10-19T13:30:00+00:00', completed: true, completed_at: null }),
+    ] })
+    const [log] = JSON.parse(await readChoices(db, { goal_id: G }, '2026-10-22')).log
+    expect(log.done.map((l: { on: string; time?: string }) => [l.on, l.time])).toEqual([['2026-10-21', '10:00'], ['2026-10-19', '09:30']])
   })
 })

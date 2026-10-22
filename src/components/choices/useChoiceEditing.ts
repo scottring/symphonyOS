@@ -69,8 +69,9 @@ function useSerial() {
 }
 
 /** Every edit on the comparison page, each run as one command with an Undo
- *  built from the values captured before the write. */
-export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
+ *  built from the values captured before the write. `logEntries` is the
+ *  goal's log as the page shows it (deleting an option takes its entries). */
+export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters, logEntries: readonly LogEntry[] = []) {
   const { run } = useCanvasActivity()
   const { choice } = detail
   // The selection the last toggle asked for, so quick taps build on each
@@ -286,9 +287,11 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
 
     deleteOption: (o: ChoiceOption) => {
       const lines = detail.lines.filter((l) => l.optionId === o.id)
+      // Its log entries go with it (the database cascades); Undo logs them again.
+      const entries = logEntries.filter((e) => e.optionId === o.id)
       return run('Delete option', () => w.deleteOption(o.id), {
-        // Puts the option back with its values and priced lines (as a new row;
-        // its files and follow-ups stay with the deleted one).
+        // Puts the option back with its values, priced lines and log entries
+        // (as a new row; its files and follow-ups stay with the deleted one).
         undo: async () => {
           const back = await w.addOption({ name: o.name, contactId: o.contactId, status: o.status })
           if (!back) return false
@@ -299,7 +302,10 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
           for (const l of lines) {
             steps.push(w.addPriceLine(back.id, { workIds: l.workIds, amountCents: l.amountCents, ...(l.note ? { note: l.note } : {}) }).then(Boolean))
           }
-          return all(steps)
+          if (!(await all(steps))) return false
+          return all(entries.map((e) => w.addLogEntry({
+            goal: e.goal, optionId: back.id, kind: e.kind, on: e.on, ...(e.time ? { time: e.time } : {}), summary: e.summary,
+          }).then(Boolean)))
         },
       })
     },

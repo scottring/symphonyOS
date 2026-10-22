@@ -54,8 +54,10 @@ const entries = [
   entry({ id: 'e1', optionId: 'sch' }),
   entry({ id: 'e2', kind: 'note', on: '2026-10-20', summary: 'Iris wants to keep the clawfoot tub', userId: 'iris' }),
 ]
+// Noon on Thu Oct 22, 2026: the fixtures' "today".
+const NOW = new Date(2026, 9, 22, 12, 0)
 const pageLog = (es: LogEntry[] = entries, planned: PlannedEvent[] = [visit]): PageLog => ({
-  log: mergeLog(es, planned),
+  log: mergeLog(es, planned, NOW),
   entries: es,
   memberName: (id) => ({ scott: 'Scott', iris: 'Iris' } as Record<string, string>)[id],
 })
@@ -67,7 +69,8 @@ function makeWriters() {
     setSelectedWork: vi.fn(async () => true),
     updateChoice: vi.fn(async () => true),
     deleteChoice: vi.fn(async () => true),
-    addOption: vi.fn(async () => null),
+    addOption: vi.fn(async (input: { name: string; contactId?: string; status?: ChoiceOption['status'] }) =>
+      opt('back', input.name, 9, { contactId: input.contactId, status: input.status })),
     updateOption: vi.fn(async () => true),
     deleteOption: vi.fn(async () => true),
     addPriceLine: vi.fn(async () => null),
@@ -288,6 +291,46 @@ describe('the log on the comparison page', () => {
     expect(w.updateLogEntry).toHaveBeenCalledWith('e1', { kind: 'call', on: '2026-10-22', time: null, summary: 'Can come Friday' })
     await lastUndo()()
     expect(w.updateLogEntry).toHaveBeenLastCalledWith('e1', { kind: 'call', on: '2026-10-22', time: null, summary: 'Can come Thursday' })
+  })
+
+  it('a plan whose day has passed sits between Coming up and Done, and still opens its task', async () => {
+    const missed: PlannedEvent = { ...visit, taskId: 't0', title: 'Home visit: Measure the hall bath (Scher Remodeling)', scheduledFor: new Date(2026, 9, 20, 9, 0) }
+    render(<ChoicePageView detail={detail} writers={w} goalLog={pageLog(entries, [visit, missed])} />)
+    const section = screen.getByRole('region', { name: 'Log' })
+    const text = section.textContent ?? ''
+    const [up, passed, done] = ['Coming up', 'Date passed, not ticked done', 'Done'].map((h) => text.indexOf(h))
+    expect(up).toBeGreaterThanOrEqual(0)
+    expect(passed).toBeGreaterThan(up)
+    expect(done).toBeGreaterThan(passed)
+    const lines = within(section).getAllByRole('listitem').map((li) => li.textContent)
+    expect(lines[1]).toContain('Oct 20')
+    expect(lines[1]).toContain('Scher Remodeling · 9:00 · Measure the hall bath')
+    expect(lines[1]).not.toContain('on your calendar')
+    // Its row's next is the visit still ahead, not the one that passed.
+    expect(rowOf('Scher Remodeling').textContent).toContain('Home visit Fri Oct 30, 10:00')
+    await userEvent.click(within(section).getByRole('button', { name: /Measure the hall bath/ }))
+    expect(navigate).toHaveBeenCalledWith('/today?detail=task:t0')
+  })
+
+  it('deleting an option says its log goes too; Undo logs its entries again about the new option', async () => {
+    const es = [
+      entry({ id: 'c1', optionId: 'che', kind: 'call', on: '2026-10-19', time: '09:15', summary: 'Quote by Friday' }),
+      entry({ id: 'c2', optionId: 'che', kind: 'visit', on: '2026-10-21', summary: 'Measured the hall bath', userId: 'iris' }),
+      entry({ id: 'e1', optionId: 'sch' }),
+    ]
+    render(<ChoicePageView detail={detail} writers={w} goalLog={pageLog(es, [])} />)
+    await userEvent.click(within(rowOf('Chesapeake Renovations')).getByRole('button', { name: 'More' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete option' }))
+    expect(screen.getByText('Delete Chesapeake Renovations? Its prices, values and log entries go too.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(w.deleteOption).toHaveBeenCalledWith('che')
+    await lastUndo()()
+    expect(w.addOption).toHaveBeenCalledWith({ name: 'Chesapeake Renovations', status: 'heard_back' })
+    expect(w.addLogEntry).toHaveBeenCalledTimes(2)
+    expect(w.addLogEntry).toHaveBeenCalledWith({ goal, optionId: 'back', kind: 'call', on: '2026-10-19', time: '09:15', summary: 'Quote by Friday' })
+    expect(w.addLogEntry).toHaveBeenCalledWith({ goal, optionId: 'back', kind: 'visit', on: '2026-10-21', summary: 'Measured the hall bath' })
+    // After the option is back.
+    expect(w.addLogEntry.mock.invocationCallOrder[0]).toBeGreaterThan(w.addOption.mock.invocationCallOrder[0])
   })
 
   it('a planned line opens its task, where tasks are edited', async () => {

@@ -61,6 +61,6 @@ describe('useGoalLog', () => {
     const { result } = renderHook(() => useGoalLog(null))
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(listGoalLog).not.toHaveBeenCalled()
-    expect(result.current.log).toEqual({ upcoming: [], done: [] })
+    expect(result.current.log).toEqual({ upcoming: [], passed: [], done: [] })
   })
 })

@@ -19,7 +19,7 @@ vi.mock('@/hooks/useLogWriters', () => ({ useLogWriters: () => writers }))
 vi.mock('@/hooks/useMemberName', () => ({ useMemberName: () => () => 'Scott' }))
 vi.mock('@/hooks/useGoalLog', async () => {
   const { mergeLog: merge } = await import('@/lib/choices/log')
-  return { useGoalLog: () => ({ log: merge(state.entries as LogEntry[], []), entries: state.entries, loading: false, refetch: vi.fn() }) }
+  return { useGoalLog: () => ({ log: merge(state.entries as LogEntry[], [], new Date()), entries: state.entries, loading: false, refetch: vi.fn() }) }
 })
 vi.mock('@/hooks/useChoices', () => ({ useGoalChoices: () => ({ rows: state.rows }) }))
 vi.mock('react-router-dom', async (orig) => ({ ...(await orig<typeof import('react-router-dom')>()), useNavigate: () => vi.fn() }))

@@ -536,7 +536,7 @@ describe('the choice itself: Rename and Delete', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choice actions' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Delete choice' }))
     expect(w.deleteChoice).not.toHaveBeenCalled()
-    expect(screen.getByText(/Delete Contractor\? .*Can't be undone\./)).toBeInTheDocument()
+    expect(screen.getByText("Delete Contractor? Its options, prices, values and their log go too. Can't be undone.")).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByText(/Can't be undone/)).not.toBeInTheDocument()
 

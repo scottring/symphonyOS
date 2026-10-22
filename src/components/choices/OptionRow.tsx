@@ -87,7 +87,7 @@ export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete
   if (confirming) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px] text-neutral-600">{`Delete ${option.name}?`}</span>
+        <span className="text-[13px] text-neutral-600">{`Delete ${option.name}? Its prices, values and log entries go too.`}</span>
         <button type="button" onClick={async () => { if (await onDelete(option)) setConfirming(false) }}
           className="rounded-lg bg-red-500 px-3 py-1 text-[13px] font-medium text-white hover:bg-red-600">Delete</button>
         <button type="button" onClick={() => setConfirming(false)}

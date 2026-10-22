@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { LOG_KIND_LABEL } from '@/types/goalLog'
-import { dayLabel, shortTime, weekdayLabel, type LogLine } from '@/lib/choices/log'
+import { dayLabel, shortTime, weekdayLabel, type LogLine, type MergedLog } from '@/lib/choices/log'
 import { PopMenu } from './StatusMenu'
 import { linkButton } from './DialogFrame'
 
@@ -15,12 +15,13 @@ function lineText(l: LogLine, name: string | undefined): string {
   return t
 }
 
-/** The log, as lines: Coming up (soonest first), then Done (newest first).
+/** The log, as lines: Coming up (soonest first), then planned events whose
+ *  date passed without being ticked done (newest first), then Done (newest first).
  *  Each line: date · kind · option or the project · what happened, and who
  *  logged it. Entry lines have ⋯ Edit and Delete; a planned event's line
  *  opens its task (it is edited as a task). */
 export function LogList({ log, optionNames, memberName, limit, onEdit, onDelete, onOpenTask }: {
-  log: { upcoming: LogLine[]; done: LogLine[] }
+  log: MergedLog
   optionNames: ReadonlyMap<string, string>
   memberName: (userId: string) => string | undefined
   /** Shows the newest N done lines, with "All n" (n done lines) for the rest. */
@@ -30,8 +31,8 @@ export function LogList({ log, optionNames, memberName, limit, onEdit, onDelete,
   onOpenTask?: (taskId: string) => void
 }) {
   const [all, setAll] = useState(false)
-  const { upcoming, done } = log
-  if (upcoming.length === 0 && done.length === 0) return null
+  const { upcoming, passed, done } = log
+  if (upcoming.length === 0 && passed.length === 0 && done.length === 0) return null
   const cut = limit !== undefined && !all && done.length > limit
   const shownDone = cut ? done.slice(0, limit) : done
   const group = 'px-3.5 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400'
@@ -44,6 +45,12 @@ export function LogList({ log, optionNames, memberName, limit, onEdit, onDelete,
         <>
           <div className={group}>Coming up</div>
           <ul>{upcoming.map(line)}</ul>
+        </>
+      )}
+      {passed.length > 0 && (
+        <>
+          <div className={group}>Date passed, not ticked done</div>
+          <ul>{passed.map(line)}</ul>
         </>
       )}
       {done.length > 0 && (
