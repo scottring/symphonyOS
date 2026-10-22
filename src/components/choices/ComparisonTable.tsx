@@ -4,6 +4,7 @@ import type { SortKey } from '@/lib/choices/sort'
 import { formatCents } from '@/lib/choices/price'
 import { optionFact } from '@/lib/choices/facts'
 import type { FollowUp } from '@/types/choice'
+import { LOG_KINDS, LOG_KIND_LABEL } from '@/types/goalLog'
 import { StatusChip } from './StatusChip'
 import { contactLine, formatCell, type PriceCell } from './cells'
 
@@ -33,20 +34,32 @@ export interface ComparisonProps {
 export const editableCell = '-mx-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-neutral-100'
 export const addLabel = 'text-primary-600'
 
-/** "Home visit Fri Oct 30, 10:00 · last: Phone call Oct 22"; the planned
- *  part in the primary color. */
+/** "Home visit" + "Fri Oct 30, 10:00": each unit stays whole, but the line
+ *  may break between them, so the Option column stays narrow enough for the
+ *  table to fit without hiding a row's ⋯. */
+function Phrase({ text }: { text: string }) {
+  const kind = LOG_KINDS.map((k) => LOG_KIND_LABEL[k]).find((label) => text.startsWith(`${label} `) || text.startsWith(`last: ${label} `))
+  if (!kind) return <span className="whitespace-nowrap">{text}</span>
+  const head = text.startsWith('last: ') ? `last: ${kind}` : kind
+  return <><span className="whitespace-nowrap">{head}</span>{' '}<span className="whitespace-nowrap">{text.slice(head.length + 1)}</span></>
+}
+
+/** The next planned event (primary) over the last one done; only the quoted
+ *  summary after " · " wraps freely. */
 export function LogLineView({ line }: { line: { next?: string; last?: string } | null | undefined }) {
   if (!line) return null
-  // Each phrase stays whole; only the quoted summary after " · " may wrap.
   const cut = line.last ? line.last.indexOf(' · ') : -1
   const lastHead = line.last && (cut < 0 ? line.last : line.last.slice(0, cut))
   const lastTail = line.last && cut >= 0 ? line.last.slice(cut) : ''
   return (
     <div className="mt-1 break-words text-xs text-neutral-500">
-      {line.next && <span className="whitespace-nowrap text-primary-600">{line.next}</span>}
-      {line.next && line.last && ' · '}
-      {lastHead && <span className="whitespace-nowrap">{line.next ? `last: ${lastHead}` : lastHead}</span>}
-      {lastTail}
+      {line.next && <span className="block text-primary-600"><Phrase text={line.next} /></span>}
+      {lastHead && (
+        <span className="block">
+          <Phrase text={line.next ? `last: ${lastHead}` : lastHead} />
+          {lastTail}
+        </span>
+      )}
     </div>
   )
 }

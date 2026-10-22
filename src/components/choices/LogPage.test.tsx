@@ -214,7 +214,10 @@ describe('the log on the comparison page', () => {
 
   it('the row shows the next planned event and the last one done', () => {
     render(<ChoicePageView detail={detail} writers={w} goalLog={pageLog()} />)
-    expect(rowOf('Scher Remodeling').textContent).toContain('Home visit Fri Oct 30, 10:00 · last: Phone call Oct 22')
+    // Stacked: the next planned event, then the last one done.
+    const line = (text: string) => within(rowOf('Scher Remodeling')).getByText((_, el) => el?.tagName === 'SPAN' && el.classList.contains('block') && el.textContent === text)
+    expect(line('Home visit Fri Oct 30, 10:00')).toHaveClass('text-primary-600')
+    expect(line('last: Phone call Oct 22')).toBeInTheDocument()
     expect(rowOf('Martinez Tile & Bath').textContent).not.toContain('last:')
   })
 
