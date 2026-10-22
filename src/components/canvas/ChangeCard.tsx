@@ -7,7 +7,7 @@
 import { useId } from 'react'
 import { X } from 'lucide-react'
 import { useCanvasActivity, type PendingChangeSet } from '@/contexts/CanvasActivityContext'
-import { choiceHeading, opRow, opScope, planHeading, SCOPE_HEADING, type ChangeOp, type OpScope } from '@/lib/canvas/changeCard'
+import { choiceHeading, isEventOp, opRow, opScope, planHeading, SCOPE_HEADING, type ChangeOp, type OpScope } from '@/lib/canvas/changeCard'
 
 interface Props {
   set: PendingChangeSet
@@ -66,7 +66,8 @@ export function ChangeCard({ set, today, onApprove, onDismiss, chat = false, upd
 
 /** Spell out AM/PM in chat without changing placement or the existing page labels. */
 function chatWhere(op: ChangeOp, where: string): string {
-  if (!op.time) return where
+  // A log row's where is its summary, in the person's words; a plan's has no time.
+  if (!op.time || isEventOp(op)) return where
   const [hour, minute] = op.time.split(':').map(Number)
   const clock = `${hour % 12 || 12}${minute ? `:${String(minute).padStart(2, '0')}` : ''} ${hour >= 12 ? 'p.m.' : 'a.m.'}`
   return where.replace(/\b\d{1,2}:\d{2}\b/, clock)

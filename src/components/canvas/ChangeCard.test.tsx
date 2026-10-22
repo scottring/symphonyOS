@@ -63,3 +63,17 @@ it('a mixed card groups choice rows under the goal and the choice', () => {
   expect(group).toHaveTextContent('→ Heard back')
   expect(group).toHaveTextContent('FOLLOW UP')
 })
+
+it('chat leaves a time inside a LOG row\'s summary as written', () => {
+  const today = new Date(2026, 9, 14, 8)
+  render(<ChangeCard chat set={pending({ ops: [
+    { key: 's:0', op: 'event_log', title: 'Scher Remodeling', choiceId: 'ch1', choiceTitle: 'Contractor', goalTitle: 'Redo the bathrooms', optionId: 'o1', optionName: 'Scher Remodeling', logKind: 'call', date: '2026-10-14', time: '09:30', summary: 'Coming Thursday at 10:00' },
+    { key: 's:1', op: 'event_plan', title: 'Redo the bathrooms', goalTaskId: 'g1', goalTitle: 'Redo the bathrooms', logKind: 'visit', date: '2026-10-30', time: '10:00', summary: 'Measure' },
+  ] })} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
+  expect(screen.getByText('“Coming Thursday at 10:00”')).toBeInTheDocument()
+  expect(screen.getByText('Scher Remodeling · Phone call · Today 9:30')).toBeInTheDocument()
+  expect(screen.getByText('Redo the bathrooms · Home visit · Fri Oct 30, 10:00')).toBeInTheDocument()
+  expect(screen.getByText('goes on your calendar')).toBeInTheDocument()
+  expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Redo the bathrooms · Contractor', 'Redo the bathrooms'])
+})
+

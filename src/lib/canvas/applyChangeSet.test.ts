@@ -640,6 +640,10 @@ describe('applyChangeSet: choice ops', () => {
       deleteTask: vi.fn(async () => true),
       chooseOption: vi.fn(async () => true),
       reopenChoice: vi.fn(async () => true),
+      addLogEntry: vi.fn(async (input) => ({ id: next('log'), userId: 'u', ...input, createdAt: new Date() })),
+      deleteLogEntry: vi.fn(async () => true),
+      planEvent: vi.fn(async () => next('task')),
+      loadGoalFacts: vi.fn(async () => ({ context: 'personal' as const, scope: 'individual' })),
       ...over,
     }
   }
@@ -863,6 +867,121 @@ describe('applyChangeSet: choice ops', () => {
     ] }
     expect(await applyChangeSet(s, choiceDeps(w))).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     expect(w.updateOption).not.toHaveBeenCalled()
+  })
+
+  describe('log and plan ops', () => {
+    /** A local day `n` days from now, as the card carries it. */
+    const day = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+    const refused = { ok: false, reason: 'failed', reverted: true, kept: [] }
+    const store = () => new Map([['ch1', detailOf(baseChoice('ch1'), [baseOption('o1', 'ch1', { contactId: 'k1' })])]])
+    const onOption = { ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1' }
+    const onYearGoal = { goalTitle: 'Redo the bathrooms', goalId: 'yg1' }
+    const logOp = (x: Partial<ChangeOp>): ChangeOp => ({ key: 'e:0', op: 'event_log', title: 'x', logKind: 'call', date: day(0), summary: 'Coming Thursday at 10', ...x })
+    const one = (x: Partial<ChangeOp>): ChangeSet => ({ key: 'e', title: 'x', ops: [logOp(x)] })
+
+    it('accepts an option-level log and a goal-level plan', async () => {
+      const w = fakeWriters(store())
+      expect(await applyChangeSet(one({ ...onOption, time: '09:30' }), choiceDeps(w))).toMatchObject({ ok: true })
+      expect(w.addLogEntry).toHaveBeenCalledWith({ goal: { kind: 'task', id: 'g1' }, optionId: 'o1', kind: 'call', on: day(0), time: '09:30', summary: 'Coming Thursday at 10' })
+      expect(w.updateOption).not.toHaveBeenCalled()
+      const p = fakeWriters(store())
+      expect(await applyChangeSet(one({ ...onYearGoal, op: 'event_plan', logKind: 'meeting', date: day(3) }), choiceDeps(p))).toMatchObject({ ok: true })
+      expect(p.loadChoice).not.toHaveBeenCalled()
+    })
+
+    it('refuses a log dated ahead, a plan dated today, a missing summary, a bad kind or time, and two targets', async () => {
+      const bad: Partial<ChangeOp>[] = [
+        { ...onOption, date: day(1) },
+        { ...onYearGoal, op: 'event_plan', date: day(0) },
+        { ...onYearGoal, op: 'event_plan', date: day(-2) },
+        { ...onOption, summary: '   ' },
+        { ...onOption, summary: undefined },
+        { ...onOption, summary: 'x'.repeat(501) },
+        { ...onOption, logKind: 'email' as never },
+        { ...onOption, logKind: undefined },
+        { ...onOption, date: 'Oct 22' },
+        { ...onOption, time: '9:30' },
+        { ...onOption, goalTaskId: 'g1' },
+        { ...onYearGoal, goalTaskId: 'g1' },
+        { title: 'x' },
+        // An existing option belongs to an existing choice.
+        { goalTitle: 'x', choiceKey: 'nope', optionId: 'o1' },
+      ]
+      for (const x of bad) {
+        const w = fakeWriters(store())
+        expect(await applyChangeSet(one(x), choiceDeps(w))).toEqual(refused)
+        expect(w.addLogEntry).not.toHaveBeenCalled()
+        expect(w.planEvent).not.toHaveBeenCalled()
+      }
+      expect(await applyChangeSet(one({ ...onOption, summary: 'x'.repeat(500) }), choiceDeps(fakeWriters(store())))).toMatchObject({ ok: true })
+    })
+
+    it('logs about an option the same card adds to an existing choice; Undo removes both', async () => {
+      const w = fakeWriters(store())
+      const s: ChangeSet = { key: 'e', title: 'x', ops: [
+        { key: 'k', op: 'option_add', title: 'Scher', ...g, choiceId: 'ch1', optionName: 'Scher' },
+        logOp({ key: 'e:1', ...g, choiceId: 'ch1', optionKey: 'k', optionName: 'Scher', logKind: 'visit', summary: '  Walked the main bath  ' }),
+      ] }
+      const r = await applyChangeSet(s, choiceDeps(w))
+      if (!r.ok) throw new Error('expected ok')
+      expect(w.addLogEntry).toHaveBeenCalledWith({ goal: { kind: 'task', id: 'g1' }, optionId: 'opt1', kind: 'visit', on: day(0), summary: 'Walked the main bath' })
+      expect(r.ids).toEqual(['opt1', 'log2'])
+      expect(await r.undo()).toBe(true)
+      expect(w.deleteLogEntry).toHaveBeenCalledWith('log2')
+      expect(w.deleteOption).toHaveBeenCalledWith('opt1')
+      expect(vi.mocked(w.deleteLogEntry).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(w.deleteOption).mock.invocationCallOrder[0])
+    })
+
+    it('a plan on a year goal takes the goal\'s domain and scope; Undo deletes the task', async () => {
+      const w = fakeWriters(store(), { loadGoalFacts: vi.fn(async () => ({ context: 'family' as const, scope: 'compound' })) })
+      const r = await applyChangeSet(one({ ...onYearGoal, op: 'event_plan', logKind: 'visit', date: day(5), time: '10:00', summary: 'Measure the hall bath' }), choiceDeps(w))
+      if (!r.ok) throw new Error('expected ok')
+      expect(w.loadGoalFacts).toHaveBeenCalledWith({ kind: 'goal', id: 'yg1' })
+      expect(w.planEvent).toHaveBeenCalledWith({ goal: { kind: 'goal', id: 'yg1' }, goalContext: 'family', goalScope: 'compound', kind: 'visit', on: day(5), time: '10:00', summary: 'Measure the hall bath' })
+      expect(r.ids).toEqual(['task1'])
+      expect(await r.undo()).toBe(true)
+      expect(w.deleteTask).toHaveBeenCalledWith('task1')
+    })
+
+    it('a plan about an option uses its choice\'s goal and names the option and its contact', async () => {
+      const s = new Map([['ch1', detailOf(baseChoice('ch1', { goal: { kind: 'goal', id: 'yg1' } }), [baseOption('o1', 'ch1', { name: 'Scher Remodeling', contactId: 'k1' })])]])
+      const w = fakeWriters(s)
+      expect(await applyChangeSet(one({ ...onOption, op: 'event_plan', date: day(2) }), choiceDeps(w))).toMatchObject({ ok: true })
+      expect(w.loadGoalFacts).not.toHaveBeenCalled()
+      expect(w.planEvent).toHaveBeenCalledWith({
+        goal: { kind: 'goal', id: 'yg1' }, goalContext: 'family', goalScope: 'compound',
+        optionId: 'o1', optionName: 'Scher Remodeling', contactId: 'k1', kind: 'call', on: day(2), summary: 'Coming Thursday at 10',
+      })
+    })
+
+    it('an option-level log on a choice changed since it was read is stale', async () => {
+      const s = new Map([['ch1', detailOf(baseChoice('ch1', { updatedAt: new Date(Date.parse(seen) + 60_000) }), [baseOption('o1', 'ch1')])]])
+      const w = fakeWriters(s)
+      expect(await applyChangeSet(one({ ...onOption, seen }), choiceDeps(w))).toEqual({ ok: false, reason: 'stale', title: 'Contractor' })
+      expect(w.addLogEntry).not.toHaveBeenCalled()
+    })
+
+    it('a goal that cannot be read, or a write that fails, fails the set and puts back what saved', async () => {
+      const w = fakeWriters(store(), { loadGoalFacts: vi.fn(async () => null) })
+      const s: ChangeSet = { key: 'e', title: 'x', ops: [
+        logOp({ ...onOption }),
+        logOp({ key: 'e:1', ...onYearGoal, op: 'event_plan', date: day(1) }),
+      ] }
+      expect(await applyChangeSet(s, choiceDeps(w))).toEqual(refused)
+      expect(w.planEvent).not.toHaveBeenCalled()
+      expect(w.deleteLogEntry).toHaveBeenCalledWith('log1')
+      const f = fakeWriters(store(), { addLogEntry: vi.fn(async () => null) })
+      expect(await applyChangeSet(one(onOption), choiceDeps(f))).toEqual(refused)
+    })
+
+    it('announces Choices like any choice op, and the wall cannot apply them', async () => {
+      const events: string[] = []
+      const listen = (e: Event) => events.push(e.type)
+      window.addEventListener(CHOICES_UPDATED, listen)
+      try { await applyChangeSet(one(onYearGoal), choiceDeps(fakeWriters(store()))) } finally { window.removeEventListener(CHOICES_UPDATED, listen) }
+      expect(events).toContain(CHOICES_UPDATED)
+      expect(canApply(one(onYearGoal), choiceDeps(undefined))).toBe(false)
+    })
   })
 
   it('choosing again on a decided choice: Undo puts back both options and the earlier decision', async () => {

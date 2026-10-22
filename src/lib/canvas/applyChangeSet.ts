@@ -11,10 +11,12 @@ import type { Goal, GoalStatus } from '@/types/goal'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { CreateRoutineInput, UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { RescheduleResult } from '@/hooks/useActionableInstances'
-import { isChoiceOp, opWhen, opWrite, withSteps, type ChangeOp, type ChangeOpKind, type ChangeSet, type ChoiceOpKind, type DayKey } from './changeCard'
+import { isChoiceOp, isEventOp, isGoalEvent, opWhen, opWrite, withSteps, type ChangeOp, type ChangeOpKind, type ChangeSet, type ChoiceOpKind, type DayKey } from './changeCard'
 import type { ChoiceWriters } from '@/lib/choices/applyDeps'
 import type { ChoiceDetail } from '@/lib/choices/db'
-import { OPTION_STATUSES, type CellValue, type Choice, type ChoiceColumn, type ChoiceOption, type ColumnKind, type WorkPiece } from '@/types/choice'
+import { OPTION_STATUSES, type CellValue, type Choice, type ChoiceColumn, type ChoiceOption, type ColumnKind, type GoalRef, type WorkPiece } from '@/types/choice'
+import { LOG_KINDS } from '@/types/goalLog'
+import { isAhead } from '@/lib/choices/log'
 import { priceFor } from '@/lib/choices/price'
 import { announceChoices } from '@/lib/choices/events'
 import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
@@ -212,7 +214,7 @@ const NEEDS: Partial<Record<ChangeOpKind, (keyof MoreApplyDeps)[]>> = {
   routine_change: ['routines', 'updateRoutine'],
   routine_rest: ['routines', 'updateRoutine'],
   routine_add: ['addRoutine', 'deleteRoutine'],
-  ...Object.fromEntries((['choice_add', 'option_add', 'option_status', 'option_set', 'price_line', 'column_add', 'work_set', 'choice_choose', 'choice_reopen', 'follow_up'] satisfies ChoiceOpKind[])
+  ...Object.fromEntries((['choice_add', 'option_add', 'option_status', 'option_set', 'price_line', 'column_add', 'work_set', 'choice_choose', 'choice_reopen', 'follow_up', 'event_log', 'event_plan'] satisfies ChoiceOpKind[])
     .map((k) => [k, ['choiceWriters']])),
 }
 
@@ -220,11 +222,21 @@ const NEEDS: Partial<Record<ChangeOpKind, (keyof MoreApplyDeps)[]>> = {
 const OPTION_LEVEL = new Set<ChangeOpKind>(['option_status', 'option_set', 'price_line', 'choice_choose', 'follow_up'])
 const COLUMN_KINDS: readonly ColumnKind[] = ['text', 'money', 'date', 'yesno']
 const exactlyOne = (a?: string, b?: string) => !!a !== !!b
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/** A log op's own fields: a known kind, a day, a summary that fits, and a
+ *  day on the right side of today (ahead is a plan; today or earlier, a log). */
+function eventFieldsOk(op: ChangeOp, now: Date): boolean {
+  const summary = op.summary?.trim() ?? ''
+  if (!op.logKind || !LOG_KINDS.includes(op.logKind) || !op.date || !YMD.test(op.date)) return false
+  if (!summary || summary.length > 500 || (op.time != null && !HHMM.test(op.time))) return false
+  return isAhead(op.date, now) === (op.op === 'event_plan')
+}
 
 /** Complete enough to write, and every choiceKey / optionKey names an add
  *  earlier in the set. Symphony validates too; this keeps a malformed op from
  *  writing half a set. */
-function choiceOpsWellFormed(ops: readonly ChangeOp[]): boolean {
+function choiceOpsWellFormed(ops: readonly ChangeOp[], now: Date): boolean {
   const choices = new Set<string>()
   const options = new Set<string>()
   for (const op of ops) {
@@ -233,8 +245,17 @@ function choiceOpsWellFormed(ops: readonly ChangeOp[]): boolean {
       choices.add(op.key)
       continue
     }
+    if (isEventOp(op)) {
+      if (!eventFieldsOk(op, now)) return false
+      // About exactly one thing: the goal itself, or an option (below).
+      if (isGoalEvent(op)) {
+        if (!exactlyOne(op.goalTaskId, op.goalId) || op.optionId || op.optionKey) return false
+        continue
+      }
+      if (op.goalTaskId || op.goalId) return false
+    }
     if (!exactlyOne(op.choiceId, op.choiceKey) || (op.choiceKey && !choices.has(op.choiceKey))) return false
-    if (OPTION_LEVEL.has(op.op)) {
+    if (OPTION_LEVEL.has(op.op) || isEventOp(op)) {
       if (!exactlyOne(op.optionId, op.optionKey) || (op.optionKey && !options.has(op.optionKey))) return false
       // An existing option belongs to an existing choice.
       if (op.optionId && !op.choiceId) return false
@@ -274,6 +295,7 @@ function choiceValuesFit(ops: readonly ChangeOp[], details: ReadonlyMap<string, 
   const columns = new Map<string, ChoiceColumn[]>()
   for (const op of ops) {
     if (op.op === 'choice_add') { columns.set(op.key, []); continue }
+    if (isGoalEvent(op)) continue
     const ref = (op.choiceId ?? op.choiceKey)!
     const cols = columns.get(ref) ?? details.get(ref)?.choice.columns ?? []
     if (op.op === 'column_add') columns.set(ref, [...cols.filter((c) => c.id !== op.columnId), { id: op.columnId!, label: op.columnLabel!, kind: op.columnKind! }])
@@ -346,7 +368,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
   /** Choices with no work when the set began: their first pieces start selected. */
   const workStartedEmpty = new Set<string>()
   if (choiceOps.length) {
-    if (!choiceOpsWellFormed(choiceOps)) return { ok: false, reason: 'failed', reverted: true, kept: [] }
+    if (!choiceOpsWellFormed(choiceOps, new Date())) return { ok: false, reason: 'failed', reverted: true, kept: [] }
     for (const id of new Set(choiceOps.flatMap((o) => (o.choiceId ? [o.choiceId] : [])))) {
       const named = choiceOps.filter((o) => o.choiceId === id)
       let d: ChoiceDetail | null
@@ -399,6 +421,32 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
     const cw = deps.choiceWriters
     wroteChoices = true
     const made = (id: string, undo: () => Promise<unknown>) => { ids.push(id); undos.push({ id, undo }) }
+    /** A log entry or a planned event, about the goal or one option. Never a
+     *  status change: the card proposes that as its own row. */
+    const writeEvent = async (goal: GoalRef, about?: { option: ChoiceOption; detail: ChoiceDetail }): Promise<boolean> => {
+      const base = { goal, kind: op.logKind!, on: op.date!, ...(op.time ? { time: op.time } : {}), summary: op.summary!.trim() }
+      if (op.op === 'event_log') {
+        const entry = await cw.addLogEntry(about ? { ...base, optionId: about.option.id } : base)
+        if (!entry) return false
+        made(entry.id, () => cw.deleteLogEntry(entry.id))
+        return true
+      }
+      // The task takes the goal's domain and scope, as a follow-up does.
+      const facts = about ? { context: about.detail.goalContext, scope: about.detail.goalScope } : await cw.loadGoalFacts(goal)
+      if (!facts) return false
+      const opt = about?.option
+      const taskId = await cw.planEvent({
+        ...base, goalContext: facts.context, goalScope: facts.scope,
+        ...(opt ? { optionId: opt.id, optionName: opt.name, ...(opt.contactId ? { contactId: opt.contactId } : {}) } : {}),
+      })
+      if (!taskId) return false
+      made(taskId, () => cw.deleteTask(taskId))
+      return true
+    }
+
+    if (isGoalEvent(op)) {
+      return writeEvent(op.goalTaskId ? { kind: 'task', id: op.goalTaskId } : { kind: 'goal', id: op.goalId! })
+    }
 
     if (op.op === 'choice_add') {
       const goal = op.goalTaskId ? { kind: 'task' as const, id: op.goalTaskId } : { kind: 'goal' as const, id: op.goalId! }
@@ -535,6 +583,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
         made(taskId, () => cw.deleteTask(taskId))
         return true
       }
+      case 'event_log': case 'event_plan': return !!o && writeEvent(d.choice.goal, { option: o, detail: d })
       default: return false
     }
   }
@@ -712,7 +761,8 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           continue
         }
         case 'choice_add': case 'option_add': case 'option_status': case 'option_set': case 'price_line':
-        case 'column_add': case 'work_set': case 'choice_choose': case 'choice_reopen': case 'follow_up': {
+        case 'column_add': case 'work_set': case 'choice_choose': case 'choice_reopen': case 'follow_up':
+        case 'event_log': case 'event_plan': {
           if (!(await applyChoiceOp(op))) return fail()
           continue
         }

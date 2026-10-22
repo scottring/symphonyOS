@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Task } from '@/types/task'
-import { choiceHeading, opRow, opScope, opWhen, opWrite, type ChangeOp } from './changeCard'
+import { choiceHeading, isChoiceOp, opRow, opScope, opWhen, opWrite, type ChangeOp } from './changeCard'
 
 const today = new Date(2026, 9, 14, 8, 0) // Wed Oct 14
 const op = (x: Partial<ChangeOp>): ChangeOp => ({ key: 'k', op: 'place', title: 'Reply to Christian', ...x })
@@ -87,5 +87,28 @@ describe('choice rows', () => {
     expect(opScope(c({ op: 'option_status' }))).toBe('choice')
     expect(opScope(c({ op: 'follow_up' }))).toBe('choice')
     expect(choiceHeading(c({ op: 'option_status' }))).toBe('Redo the bathrooms · Contractor')
+  })
+})
+
+describe('log and plan rows', () => {
+  const goal = { goalTaskId: 'g1', goalTitle: 'Redo the bathrooms' }
+  const opt = { choiceId: 'ch1', choiceTitle: 'Contractor', goalTitle: 'Redo the bathrooms', optionId: 'o1', optionName: 'Scher Remodeling' }
+  const ev = (x: Partial<ChangeOp>): ChangeOp => ({ key: 'e', op: 'event_log', title: 'Scher Remodeling', logKind: 'call', date: '2026-10-14', summary: 'Coming Thursday at 10; quote a week after the visit', ...x })
+  it('LOG names the option, the kind and the day, with the summary under it', () => {
+    expect(opRow(ev(opt), today)).toEqual({ kind: 'LOG', title: 'Scher Remodeling · Phone call · Today', where: '“Coming Thursday at 10; quote a week after the visit”' })
+    expect(opRow(ev({ ...goal, logKind: 'note', date: '2026-10-12', summary: 'Permit filed' }), today)).toEqual({ kind: 'LOG', title: 'Redo the bathrooms · Note · Mon', where: '“Permit filed”' })
+  })
+  it('PLAN names the day and time it goes on the calendar', () => {
+    expect(opRow(ev({ ...opt, op: 'event_plan', logKind: 'visit', date: '2026-10-30', time: '10:00' }), today)).toEqual({ kind: 'PLAN', title: 'Scher Remodeling · Home visit · Fri Oct 30, 10:00', where: 'goes on your calendar' })
+    expect(opRow(ev({ ...goal, op: 'event_plan', logKind: 'meeting', date: '2026-10-16', time: '14:30' }), today).title).toBe('Redo the bathrooms · Meeting · Fri Oct 16, 2:30')
+    expect(opRow(ev({ ...goal, op: 'event_plan', logKind: 'call', date: '2026-10-16' }), today).title).toBe('Redo the bathrooms · Phone call · Fri Oct 16')
+  })
+  it('sit with the choices: under the goal and choice, or the goal alone', () => {
+    for (const kind of ['event_log', 'event_plan'] as const) {
+      expect(opScope(ev({ ...opt, op: kind }))).toBe('choice')
+      expect(isChoiceOp(ev({ ...goal, op: kind }))).toBe(true)
+      expect(choiceHeading(ev({ ...opt, op: kind }))).toBe('Redo the bathrooms · Contractor')
+      expect(choiceHeading(ev({ ...goal, op: kind }))).toBe('Redo the bathrooms')
+    }
   })
 })
