@@ -109,6 +109,16 @@ export async function listDisplays(): Promise<HouseholdDisplay[]> {
     .map((d) => ({ id: d.id, name: d.name, pairedAt: new Date(d.paired_at), lastSeenAt: d.last_seen_at ? new Date(d.last_seen_at) : null, revokedAt: d.revoked_at ? new Date(d.revoked_at) : null, familyMemberId: d.family_member_id ?? null, layout: asLayout(d.layout) }))
 }
 
+/** The display itself: unpair (as a revoke from Settings would) and sign
+ *  out. Signs out even when the server cannot be reached, so a grown-up is
+ *  never stuck in kid mode; the display then stays listed in Settings to
+ *  revoke there. */
+export async function leaveDisplay(): Promise<{ unpaired: boolean }> {
+  const { error } = await supabase.rpc('display_leave').then((r) => r, () => ({ error: true }))
+  await supabase.auth.signOut().catch(() => undefined)
+  return { unpaired: !error }
+}
+
 export async function revokeDisplay(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const { error } = await supabase.rpc('revoke_display', { p_display_id: id })
   return error ? { ok: false, error: message(error, 'Could not revoke that display') } : { ok: true }

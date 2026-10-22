@@ -9,7 +9,7 @@
 // allows only that kid's own items.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
@@ -17,7 +17,7 @@ import { useMemberInstanceHistory } from '@/components/wall-v2/useMemberInstance
 import { PairDisplayScreen } from '@/components/auth/PairDisplayScreen'
 import { AuthForm } from '@/components/AuthForm'
 import { useDisplayHeartbeat } from '@/lib/display/useDisplayHeartbeat'
-import { myDisplay, usePairing, type KidLayout, type MyDisplay } from '@/lib/display/pairing'
+import { leaveDisplay, myDisplay, usePairing, type KidLayout, type MyDisplay } from '@/lib/display/pairing'
 import { displaySetTaskDone, isDisplayUser } from '@/lib/display/displayWrites'
 import { buildMemberDayModel, type MemberDayModel } from '@/lib/wall/kidDayModel'
 import { buildKidPanel, type KidStop } from '@/lib/kids/kidPanelModel'
@@ -111,6 +111,12 @@ function KidKioskLive({ memberId, layout, householdId, viaDisplay }: { memberId:
   const { history } = useMemberInstanceHistory()
   const { markDone, undoDone } = useActionableInstances()
   const now = useNow()
+  const navigate = useNavigate()
+  // Leaving kid mode (a grown-up holds the clock): a tablet unpairs itself and
+  // shows the pairing screen, where "Sign in instead" is one tap away.
+  const exit = useMemo(() => (viaDisplay
+    ? { note: 'This unpairs the tablet and goes to the sign-in screen. Pair it again any time in Settings → Displays.', onExit: async () => { await leaveDisplay(); window.location.replace('/kid') } }
+    : { note: 'Back to Symphony.', onExit: () => navigate('/settings') }), [viaDisplay, navigate])
   const [ticks, setTicks] = useState<Map<string, boolean>>(new Map())
   useEffect(() => { setTicks(new Map()) }, [history, wall.days, wall.homeworkTasks])
 
@@ -186,6 +192,7 @@ function KidKioskLive({ memberId, layout, householdId, viaDisplay }: { memberId:
       thoughts={thoughts}
       onSaveThought={onSaveThought}
       canListen={canListen}
+      exit={exit}
     />
   )
 }

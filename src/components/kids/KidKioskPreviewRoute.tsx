@@ -1,7 +1,8 @@
 // Dev only: /kid-preview?scene=… — a kid's tablet with fixed days and a fixed
 // clock, no reads or writes, for design review screenshots. Scenes:
-// kaleb-tue, kaleb-sat, ella-mon, thoughts, timer, ring, done, and the door
-// panel's routines: kaleb-shower (Tuesday 7:32pm), kaleb-morning, ella-shower.
+// kaleb-tue, kaleb-sat, ella-mon, thoughts, timer, ring, done, exit (the
+// grown-ups' way out), and the door panel's routines: kaleb-shower (Tuesday
+// 7:32pm), kaleb-morning, ella-shower.
 
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -102,7 +103,8 @@ export default function KidKioskPreviewRoute() {
       thoughts={scene === 'ella-mon' ? [] : thoughts}
       onSaveThought={async () => true}
       canListen={scene === 'thoughts'}
-      initialSheet={scene === 'thoughts' ? 'thoughts' : scene === 'timer' ? 'timer' : null}
+      initialSheet={scene === 'thoughts' ? 'thoughts' : scene === 'timer' ? 'timer' : scene === 'exit' ? 'grownups' : null}
+      exit={{ note: 'This unpairs the tablet and goes to the sign-in screen. Pair it again any time in Settings → Displays.', onExit: () => undefined }}
     />
   )
 }

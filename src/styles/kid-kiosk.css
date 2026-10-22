@@ -57,6 +57,9 @@
 .kk-head h1 { font-size: calc(28 * var(--p)); font-weight: 700; }
 .kk-head p { font-size: calc(18 * var(--p)); font-weight: 500; color: var(--kk-muted); }
 .kk-clock { font-family: var(--kk-serif); font-size: calc(64 * var(--p)); line-height: 1; }
+/* The clock is also the hidden way out (press and hold): it must not look or
+   act like a button, select its text or open a long-press menu. */
+button.kk-clock { background: none; border: 0; padding: 0; color: inherit; cursor: default; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 
 .kk-main { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: calc(20 * var(--p)); }
 .kk-lab { font-size: calc(15 * var(--p)); font-weight: 600; letter-spacing: .06em; color: var(--kk-muted); }
@@ -196,6 +199,10 @@
 .kk-field textarea { min-height: calc(96 * var(--p)); box-sizing: border-box; border-radius: calc(8 * var(--p)); border: calc(2 * var(--p)) solid var(--kk-line-strong); padding: calc(14 * var(--p)) calc(18 * var(--p)); font: 500 calc(22 * var(--p)) var(--kk-sans); color: var(--kk-ink); background: #fff; resize: none; -webkit-user-select: text; user-select: text; }
 .kk-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(10 * var(--p)); }
 .kk-error { font-size: calc(18 * var(--p)); color: var(--kk-now); }
+.kk-field .kk-gate-q { font-size: calc(24 * var(--p)); color: var(--kk-ink); }
+.kk-gate-note { font-size: calc(20 * var(--p)); line-height: 1.4; }
+.kk-gate-input { box-sizing: border-box; width: 100%; min-height: calc(72 * var(--p)); border-radius: calc(8 * var(--p)); border: calc(2 * var(--p)) solid var(--kk-line-strong); padding: 0 calc(18 * var(--p)); font: 600 calc(32 * var(--p)) var(--kk-sans); color: var(--kk-ink); background: #fff; -webkit-user-select: text; user-select: text; }
+.kk-gate-actions { display: grid; grid-template-columns: 1fr 2fr; gap: calc(10 * var(--p)); }
 .kk-saved { font-size: calc(19 * var(--p)); color: var(--kk-done); font-weight: 600; }
 .kk-saved-list { list-style: none; margin: calc(10 * var(--p)) 0 0; padding: 0; display: flex; flex-direction: column; gap: calc(8 * var(--p)); }
 .kk-saved-list li { display: flex; align-items: center; gap: calc(16 * var(--p)); padding: calc(16 * var(--p)) calc(20 * var(--p)); background: var(--kk-surface); border: 1px solid var(--kk-line); border-radius: calc(8 * var(--p)); }

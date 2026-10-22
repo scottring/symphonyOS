@@ -19,7 +19,7 @@
 // Presentational: the route passes the day, the clock and the handlers; the
 // preview passes fixed ones.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   ArrowUp, Backpack, Bed, BookOpen, Calculator, Droplets, Footprints, GlassWater, Hand, HandPlatter, Moon, Music, PawPrint, Pencil, Pill,
   Puzzle, Shirt, ShoppingBasket, ShowerHead, Smile, Sparkles, Toilet, ToyBrick, Trash2, Utensils, Wind,
@@ -49,13 +49,17 @@ export interface KidPanelViewProps {
   /** The browser can listen (Web Speech). Fire tablets usually cannot. */
   canListen?: boolean
   /** The preview opens a sheet for its screenshot. */
-  initialSheet?: 'timer' | 'thoughts' | null
+  initialSheet?: 'timer' | 'thoughts' | 'grownups' | null
+  /** Leaving kid mode: a grown-up holds the clock and answers a question.
+   *  `note` says what leaving does here. Absent: no way out from the screen. */
+  exit?: { note: string; onExit: () => void | Promise<void> }
 }
 
 const KID_COLORS: Record<string, string> = {
   blue: '#476d9a', purple: '#7a5a9a', green: '#3b7650', orange: '#bd5c3b', pink: '#b5527a', teal: '#1b6a64',
 }
 const TIMER_CHOICES = [5, 10, 15, 20, 30, 45]
+const HOLD_MS = 2000
 /** The real clock, for a tap (the `now` prop is the screen's clock). */
 const tapMs = () => Date.now()
 
@@ -106,7 +110,7 @@ function Dial({ timer, nowMs }: { timer: KidTimer; nowMs: number }) {
   )
 }
 
-export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, onSaveThought, canListen = false, initialSheet = null }: KidPanelViewProps) {
+export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, onSaveThought, canListen = false, initialSheet = null, exit }: KidPanelViewProps) {
   const color = KID_COLORS[member.color] ?? KID_COLORS.teal
   const nowMs = now.getTime()
 
@@ -132,7 +136,12 @@ export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, o
   const start = (label: string, minutes: number, stopKey: string | null = null) => { unlockAudio(); setTimer(startTimer(label, minutes, tapMs(), stopKey)) }
   const timerFor = (stop: KidStop) => (timer && timer.stopKey === stop.key ? timer : null)
 
-  const [sheet, setSheet] = useState<'timer' | 'thoughts' | null>(initialSheet)
+  const [sheet, setSheet] = useState<'timer' | 'thoughts' | 'grownups' | null>(initialSheet)
+  // The way out is hidden from kids: hold the clock for two seconds.
+  const hold = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const endHold = () => { if (hold.current) clearTimeout(hold.current); hold.current = null }
+  const startHold = () => { endHold(); hold.current = setTimeout(() => setSheet('grownups'), HOLD_MS) }
+  useEffect(() => endHold, [])
 
   const done = (stop: KidStop) => {
     if (timer?.stopKey === stop.key) setTimer(null)
@@ -172,7 +181,20 @@ export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, o
           <h1>{title}</h1>
           <p>{sub}</p>
         </div>
-        <span className="kk-clock">{clock}</span>
+        {exit ? (
+          <button
+            type="button"
+            className="kk-clock"
+            aria-label={`${clock}. For grown-ups: press and hold`}
+            onPointerDown={startHold}
+            onPointerUp={endHold}
+            onPointerLeave={endHold}
+            onPointerCancel={endHold}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {clock}
+          </button>
+        ) : <span className="kk-clock">{clock}</span>}
       </header>
 
       <main className="kk-main">
@@ -320,6 +342,8 @@ export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, o
         </div>
       )}
 
+      {sheet === 'grownups' && exit && <GrownUpExit note={exit.note} onExit={exit.onExit} onClose={() => setSheet(null)} />}
+
       {sheet === 'thoughts' && onSaveThought && (
         <ThoughtCatcher
           thoughts={thoughts}
@@ -330,6 +354,42 @@ export function KidPanelView({ member, layout, panel, now, onToggle, thoughts, o
           onClose={() => setSheet(null)}
         />
       )}
+    </div>
+  )
+}
+
+/** A question a grown-up answers in their head and a young kid cannot. */
+export function gateQuestion(rand: () => number = Math.random): { a: number; b: number } {
+  return { a: 3 + Math.floor(rand() * 7), b: 11 + Math.floor(rand() * 9) }
+}
+
+/** For grown-ups: answer the question to leave kid mode. */
+function GrownUpExit({ note, onExit, onClose }: { note: string; onExit: () => void | Promise<void>; onClose: () => void }) {
+  const [q, setQ] = useState(() => gateQuestion())
+  const [answer, setAnswer] = useState('')
+  const [wrong, setWrong] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (Number(answer.trim()) !== q.a * q.b) { setWrong(true); setAnswer(''); setQ(gateQuestion()); return }
+    setBusy(true)
+    try { await onExit() } finally { setBusy(false) }
+  }
+  return (
+    <div className="kk-overlay" role="dialog" aria-label="For grown-ups" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <form className="kk-card" onSubmit={(e) => void submit(e)}>
+        <h2>For grown-ups</h2>
+        <p className="kk-muted kk-gate-note">{note}</p>
+        <label className="kk-field">
+          <span className="kk-gate-q">What is {q.a} × {q.b}?</span>
+          <input className="kk-gate-input" inputMode="numeric" autoComplete="off" value={answer} onChange={(e) => { setAnswer(e.target.value); setWrong(false) }} autoFocus />
+        </label>
+        {wrong && <p role="alert" className="kk-error">Not quite. Try this one.</p>}
+        <div className="kk-gate-actions">
+          <button type="button" className="kk-btn" onClick={onClose}>Back</button>
+          <button type="submit" className="kk-done" disabled={busy || !answer.trim()}>{busy ? 'Leaving…' : 'Leave kid mode'}</button>
+        </div>
+      </form>
     </div>
   )
 }

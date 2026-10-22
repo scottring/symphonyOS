@@ -15,7 +15,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
-import { claimPairingCode, createPairingCode, isDisplaySession, isPairing, listDisplays, myDisplay, revokeDisplay } from './pairing'
+import { claimPairingCode, createPairingCode, isDisplaySession, isPairing, leaveDisplay, listDisplays, myDisplay, revokeDisplay } from './pairing'
 
 beforeEach(() => { vi.clearAllMocks() })
 
@@ -134,5 +134,18 @@ describe('displays', () => {
     expect(mocks.rpc).toHaveBeenCalledWith('revoke_display', { p_display_id: 'd1' })
     mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: 'Only a household owner or admin can revoke a display' } })
     expect(await revokeDisplay('d1')).toEqual({ ok: false, error: 'Only a household owner or admin can revoke a display' })
+  })
+  it('a display leaves: unpairs itself on the server, then signs out', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: { left: true }, error: null })
+    mocks.signOut.mockResolvedValue({ error: null })
+    expect(await leaveDisplay()).toEqual({ unpaired: true })
+    expect(mocks.rpc).toHaveBeenCalledWith('display_leave')
+    expect(mocks.signOut).toHaveBeenCalledTimes(1)
+  })
+  it('signs out even when the server cannot unpair it, so a grown-up is never stuck', async () => {
+    mocks.rpc.mockRejectedValueOnce(new Error('offline'))
+    mocks.signOut.mockResolvedValue({ error: null })
+    expect(await leaveDisplay()).toEqual({ unpaired: false })
+    expect(mocks.signOut).toHaveBeenCalledTimes(1)
   })
 })

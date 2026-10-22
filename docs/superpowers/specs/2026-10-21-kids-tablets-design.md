@@ -41,6 +41,14 @@ holds only for the trail and list.
   can't read yet can follow it. Tap to check, tap again to undo.
 - Between routines the screen is the trail or list, as before.
 
+## Leaving kid mode (2026-10-22)
+
+A grown-up holds the clock for two seconds and answers a multiplication
+question (3–9 × 11–19). "Leave kid mode" unpairs the tablet (`display_leave`,
+the same as a revoke in Settings) and signs it out, landing on the pairing
+screen, where "Sign in instead" is one tap away. It signs out even when the
+server cannot be reached; the tablet then stays listed in Settings to revoke.
+
 ## Data and safety
 
 Migration `20261021180000_kid_displays.sql`:

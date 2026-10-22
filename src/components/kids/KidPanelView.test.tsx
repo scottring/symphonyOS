@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/kids/timerSounds', async (orig) => ({ ...(await orig<typeof import('@/lib/kids/timerSounds')>()), playTimerSound: vi.fn(), unlockAudio: vi.fn() }))
 
-import { KidPanelView } from './KidPanelView'
+import { KidPanelView, gateQuestion } from './KidPanelView'
 import { buildKidPanel } from '@/lib/kids/kidPanelModel'
 import { playTimerSound } from '@/lib/kids/timerSounds'
 import { withTicks } from './KidKioskRoute'
@@ -101,6 +101,47 @@ describe('the routine on now', () => {
     const done = withTicks(bedtime, new Map([['routine:towel', true], ['routine:read', true]]))
     render(<KidPanelView member={member} layout="list" panel={buildKidPanel(done, 'kaleb', TUE_NIGHT)} now={TUE_NIGHT} onToggle={vi.fn()} thoughts={[]} />)
     expect(screen.getByRole('status')).toHaveTextContent('All done')
+  })
+})
+
+describe('leaving kid mode', () => {
+  const panel = () => buildKidPanel(model, 'kaleb', NOW)
+  it('opens only when a grown-up holds the clock for two seconds', () => {
+    vi.useFakeTimers()
+    try {
+      render(<KidPanelView member={member} layout="trail" panel={panel()} now={NOW} onToggle={vi.fn()} thoughts={[]} exit={{ note: 'Unpairs the tablet.', onExit: vi.fn() }} />)
+      const clock = screen.getByRole('button', { name: /press and hold/ })
+      fireEvent.pointerDown(clock); act(() => { vi.advanceTimersByTime(1000) }); fireEvent.pointerUp(clock)
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(screen.queryByRole('dialog', { name: 'For grown-ups' })).toBeNull()
+      fireEvent.pointerDown(clock); act(() => { vi.advanceTimersByTime(2000) })
+      expect(screen.getByRole('dialog', { name: 'For grown-ups' })).toHaveTextContent('Unpairs the tablet.')
+    } finally { vi.useRealTimers() }
+  })
+  it('leaves only on the right answer; a wrong one asks a new question', async () => {
+    const onExit = vi.fn()
+    render(<KidPanelView member={member} layout="trail" panel={panel()} now={NOW} onToggle={vi.fn()} thoughts={[]} initialSheet="grownups" exit={{ note: 'x', onExit }} />)
+    const ask = () => screen.getByText(/What is \d+ × \d+\?/).textContent!.match(/(\d+) × (\d+)/)!.slice(1).map(Number)
+    const [a, b] = ask()
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: String(a * b + 1) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Leave kid mode' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not quite')
+    expect(onExit).not.toHaveBeenCalled()
+    const [c, d] = ask()
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: String(c * d) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Leave kid mode' }))
+    await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1))
+  })
+  it('has no way out without an exit (the clock is just a clock)', () => {
+    render(<KidPanelView member={member} layout="trail" panel={panel()} now={NOW} onToggle={vi.fn()} thoughts={[]} />)
+    expect(screen.queryByRole('button', { name: /press and hold/ })).toBeNull()
+  })
+  it('asks a question with a two-digit answer or more', () => {
+    for (const x of [0, 0.5, 0.999]) {
+      const { a, b } = gateQuestion(() => x)
+      expect(a).toBeGreaterThanOrEqual(3); expect(a).toBeLessThanOrEqual(9)
+      expect(b).toBeGreaterThanOrEqual(11); expect(b).toBeLessThanOrEqual(19)
+    }
   })
 })
 
