@@ -17,15 +17,17 @@ function lineText(l: LogLine, name: string | undefined): string {
 
 /** The log, as lines: Coming up (soonest first), then Done (newest first).
  *  Each line: date · kind · option or the project · what happened, and who
- *  logged it. Entry lines have ⋯ Edit and Delete. */
-export function LogList({ log, optionNames, memberName, limit, onEdit, onDelete }: {
+ *  logged it. Entry lines have ⋯ Edit and Delete; a planned event's line
+ *  opens its task (it is edited as a task). */
+export function LogList({ log, optionNames, memberName, limit, onEdit, onDelete, onOpenTask }: {
   log: { upcoming: LogLine[]; done: LogLine[] }
   optionNames: ReadonlyMap<string, string>
   memberName: (userId: string) => string | undefined
-  /** Shows the newest N done lines, with "All n" for the rest. */
+  /** Shows the newest N done lines, with "All n" (n done lines) for the rest. */
   limit?: number
   onEdit?: (entryId: string) => void
   onDelete?: (entryId: string) => Promise<boolean>
+  onOpenTask?: (taskId: string) => void
 }) {
   const [all, setAll] = useState(false)
   const { upcoming, done } = log
@@ -34,7 +36,7 @@ export function LogList({ log, optionNames, memberName, limit, onEdit, onDelete 
   const shownDone = cut ? done.slice(0, limit) : done
   const group = 'px-3.5 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400'
   const line = (l: LogLine) => (
-    <Line key={l.key} line={l} optionNames={optionNames} memberName={memberName} onEdit={onEdit} onDelete={onDelete} />
+    <Line key={l.key} line={l} optionNames={optionNames} memberName={memberName} onEdit={onEdit} onDelete={onDelete} onOpenTask={onOpenTask} />
   )
   return (
     <div className="rounded-xl border border-neutral-200 bg-white">
@@ -53,7 +55,7 @@ export function LogList({ log, optionNames, memberName, limit, onEdit, onDelete 
       {cut && (
         <div className="border-t border-neutral-100 px-3.5 py-2">
           <button type="button" onClick={() => setAll(true)} className={linkButton}>
-            {`All ${upcoming.length + done.length}`}
+            {`All ${done.length}`}
           </button>
         </div>
       )}
@@ -61,12 +63,13 @@ export function LogList({ log, optionNames, memberName, limit, onEdit, onDelete 
   )
 }
 
-function Line({ line: l, optionNames, memberName, onEdit, onDelete }: {
+function Line({ line: l, optionNames, memberName, onEdit, onDelete, onOpenTask }: {
   line: LogLine
   optionNames: ReadonlyMap<string, string>
   memberName: (userId: string) => string | undefined
   onEdit?: (entryId: string) => void
   onDelete?: (entryId: string) => Promise<boolean>
+  onOpenTask?: (taskId: string) => void
 }) {
   const [confirming, setConfirming] = useState(false)
   const name = l.optionId ? optionNames.get(l.optionId) : 'The project'
@@ -96,7 +99,14 @@ function Line({ line: l, optionNames, memberName, onEdit, onDelete }: {
         {l.upcoming ? weekdayLabel(l.on) : dayLabel(l.on)}
       </span>
       <span className="font-medium text-neutral-900">{LOG_KIND_LABEL[l.kind]}</span>
-      <span className="col-span-3 text-neutral-700 sm:col-span-1">{about}</span>
+      {l.taskId && onOpenTask ? (
+        <button type="button" onClick={() => onOpenTask(l.taskId as string)}
+          className="col-span-3 text-left text-neutral-700 underline-offset-2 hover:text-primary-700 hover:underline sm:col-span-1">
+          {about}
+        </button>
+      ) : (
+        <span className="col-span-3 text-neutral-700 sm:col-span-1">{about}</span>
+      )}
       <span className="col-start-3 row-start-1 flex items-baseline gap-2 justify-self-end text-xs text-neutral-400 sm:col-start-auto sm:row-start-auto">
         {who}
         {items.length > 0 && <PopMenu label="Entry actions" trigger="⋯" items={items} />}

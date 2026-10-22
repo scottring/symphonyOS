@@ -15,9 +15,10 @@ vi.mock('@/contexts/CanvasActivityContext', () => ({ useCanvasActivity: () => ({
 // The page reads the log through useGoalLog and hands it to the view; the
 // view never reads it itself.
 vi.mock('@/hooks/useGoalLog', () => ({ useGoalLog: vi.fn(() => { throw new Error('the view must not read the log') }) }))
+const navigate = vi.fn()
 vi.mock('react-router-dom', async (orig) => ({
   ...(await orig<typeof import('react-router-dom')>()),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
 }))
 
 import { ChoicePageView, type ChoicePageWriters, type PageLog } from './ChoicePage'
@@ -108,7 +109,7 @@ async function openLogFor(name: string) {
 }
 
 describe('the log on the comparison page', () => {
-  beforeEach(() => { setWide(); run.mockClear(); w = makeWriters() })
+  beforeEach(() => { setWide(); run.mockClear(); navigate.mockClear(); w = makeWriters() })
 
   it('each row has Log, which opens the dialog about that option', async () => {
     render(<ChoicePageView detail={detail} writers={w} goalLog={pageLog()} />)
@@ -164,6 +165,32 @@ describe('the log on the comparison page', () => {
     expect(w.updateOption).toHaveBeenCalledWith('mar', { status: 'contacted' })
     await lastUndo()()
     expect(w.deleteTask).toHaveBeenCalledWith('tnew')
+    expect(w.updateOption).toHaveBeenLastCalledWith('mar', { status: 'considering' })
+  })
+
+  it('when the status change fails, the new entry is taken back and the save fails', async () => {
+    w.updateOption.mockResolvedValueOnce(false)
+    render(<ChoicePageView detail={detail} writers={w} goalLog={pageLog()} />)
+    const d = await openLogFor('Martinez Tile & Bath')
+    await userEvent.type(within(d).getByLabelText("What happened, or what it's for"), 'Left a voicemail')
+    await userEvent.click(within(d).getByRole('button', { name: 'Save' }))
+    expect(w.deleteLogEntry).toHaveBeenCalledWith('new')
+    expect(await run.mock.results[0].value).toBe(false)
+    // Nothing was left behind, so the receipt's own "Nothing changed" is true.
+    expect(run.mock.calls[0][2]).not.toHaveProperty('failureSummary')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('when the status change throws and the entry cannot be taken back, the receipt says what stayed', async () => {
+    w.updateOption.mockRejectedValueOnce(new Error('offline'))
+    w.deleteLogEntry.mockResolvedValueOnce(false)
+    render(<ChoicePageView detail={detail} writers={w} goalLog={pageLog()} />)
+    const d = await openLogFor('Martinez Tile & Bath')
+    await userEvent.type(within(d).getByLabelText("What happened, or what it's for"), 'Left a voicemail')
+    await userEvent.click(within(d).getByRole('button', { name: 'Save' }))
+    expect(w.deleteLogEntry).toHaveBeenCalledWith('new')
+    expect(await run.mock.results[0].value).toBe(false)
+    expect(run.mock.calls[0][2]).toMatchObject({ failureState: 'partial', failureSummary: "Logged, but the status didn't change." })
   })
 
   it('logging on a Heard back option leaves its status alone', async () => {
@@ -223,7 +250,8 @@ describe('the log on the comparison page', () => {
     const section = screen.getByRole('region', { name: 'Log' })
     expect(within(section).getAllByRole('listitem')).toHaveLength(11)
     expect(within(section).queryByText(/Line 2$/)).not.toBeInTheDocument()
-    await userEvent.click(within(section).getByRole('button', { name: 'All 13' }))
+    // The count is of the done lines (the ones the limit trims).
+    await userEvent.click(within(section).getByRole('button', { name: 'All 12' }))
     expect(within(section).getAllByRole('listitem')).toHaveLength(13)
   })
 
@@ -257,6 +285,30 @@ describe('the log on the comparison page', () => {
     expect(w.updateLogEntry).toHaveBeenCalledWith('e1', { kind: 'call', on: '2026-10-22', time: null, summary: 'Can come Friday' })
     await lastUndo()()
     expect(w.updateLogEntry).toHaveBeenLastCalledWith('e1', { kind: 'call', on: '2026-10-22', time: null, summary: 'Can come Thursday' })
+  })
+
+  it('a planned line opens its task, where tasks are edited', async () => {
+    render(<ChoicePageView detail={detail} writers={w} goalLog={pageLog()} />)
+    const section = screen.getByRole('region', { name: 'Log' })
+    await userEvent.click(within(section).getByRole('button', { name: /Walk through upstairs bath/ }))
+    expect(navigate).toHaveBeenCalledWith('/today?detail=task:t1')
+  })
+
+  it('editing an entry about another choice\'s option titles the dialog with its name', async () => {
+    const other = entry({ id: 'e9', optionId: 'x9', summary: 'Called about grout' })
+    render(<ChoicePageView detail={detail} writers={w}
+      goalLog={{ ...pageLog([other], []), optionNames: new Map([['x9', 'Harbor Bath']]) }} />)
+    const section = screen.getByRole('region', { name: 'Log' })
+    expect(within(section).getByText(/Harbor Bath · Called about grout/)).toBeInTheDocument()
+    await userEvent.click(within(section).getByRole('button', { name: 'Entry actions' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Edit' }))
+    expect(within(dialog()).getByRole('heading', { name: 'Log for Harbor Bath' })).toBeInTheDocument()
+  })
+
+  it('the table keeps a row\'s verbs on one line', () => {
+    render(<ChoicePageView detail={detail} writers={w} goalLog={pageLog()} />)
+    const verbs = within(rowOf('Scher Remodeling')).getByRole('button', { name: 'Log' }).parentElement as HTMLElement
+    expect(verbs).toHaveClass('flex-nowrap')
   })
 
   it('⋯ History shows the log for that option only', async () => {

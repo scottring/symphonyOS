@@ -48,7 +48,11 @@ export function InlineEdit({ label, initial, multiline, onSave, onCancel }: {
 /** A row's verbs, shared by the table and the cards: Choose this, Follow up
  *  on… (when Contacted), Log, Status, files, and ⋯ (Rename, Notes, History,
  *  Delete after a confirm). */
-export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete, onFiles, onRename, onNotes, onLog, onHistory }: OptionActionHandlers & { option: ChoiceOption }) {
+export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete, onFiles, onRename, onNotes, onLog, onHistory, nowrap }: OptionActionHandlers & {
+  option: ChoiceOption
+  /** One line (the table, which scrolls sideways); the cards let verbs wrap. */
+  nowrap?: boolean
+}) {
   const [followingUp, setFollowingUp] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [editing, setEditing] = useState<'name' | 'notes' | null>(null)
@@ -94,7 +98,7 @@ export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 whitespace-nowrap text-[13px]">
+      <div className={`flex ${nowrap ? 'flex-nowrap' : 'flex-wrap'} items-center gap-x-3 gap-y-1 whitespace-nowrap text-[13px]`}>
         {option.status !== 'ruled_out' && option.status !== 'chosen' && (
           <button type="button" onClick={() => onChoose(option)} className="font-medium text-primary-600 hover:text-primary-700">
             Choose this

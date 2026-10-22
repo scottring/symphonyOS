@@ -108,6 +108,8 @@ export function ChoicePageView({ detail, writers, files, goalLog = NO_LOG }: {
   const { log } = goalLog
   const logged = (o: ChoiceOption) => log.upcoming.some((l) => l.optionId === o.id) || log.done.some((l) => l.optionId === o.id)
 
+  // A planned event is edited as a task: open it where tasks open (as the task panel's links do).
+  const openTask = (taskId: string) => navigate(`/today?detail=task:${taskId}`)
   const back = () => { if (window.history.length > 1) navigate(-1); else navigate('/today') }
   const close = () => setOpen(null)
 
@@ -138,6 +140,7 @@ export function ChoicePageView({ detail, writers, files, goalLog = NO_LOG }: {
         onDelete={edit.deleteOption}
         onRename={edit.rename}
         onNotes={edit.setNotes}
+        nowrap={!narrow}
         onFiles={files && ((x) => setOpen({ kind: 'files', optionId: x.id }))}
         onLog={(x) => setOpen({ kind: 'log', optionId: x.id })}
         onHistory={logged(o) ? (x) => setOpen({ kind: 'history', optionId: x.id }) : undefined}
@@ -188,8 +191,8 @@ export function ChoicePageView({ detail, writers, files, goalLog = NO_LOG }: {
       )}
       {!decided && narrow && <div className="mt-3"><ColumnAdd onAdd={edit.addColumn} /></div>}
       {!decided && <AddOptionInput onAdd={edit.addOption} />}
-      <LogSection goalLog={goalLog} options={options} edit={edit} onOpen={setOpen} />
-      <Dialogs open={open} close={close} detail={detail} edit={edit} files={files} optionOf={optionOf} goalLog={goalLog} onOpen={setOpen} />
+      <LogSection goalLog={goalLog} options={options} edit={edit} onOpen={setOpen} onOpenTask={openTask} />
+      <Dialogs open={open} close={close} detail={detail} edit={edit} files={files} optionOf={optionOf} goalLog={goalLog} onOpen={setOpen} onOpenTask={openTask} />
     </div>
   )
 }
@@ -244,11 +247,12 @@ function namesOf(goalLog: PageLog, options: readonly ChoiceOption[]): Map<string
 const noName = () => undefined
 
 /** The goal's whole log under the comparison: latest 10 done, with "+ Log". */
-function LogSection({ goalLog, options, edit, onOpen }: {
+function LogSection({ goalLog, options, edit, onOpen, onOpenTask }: {
   goalLog: PageLog
   options: readonly ChoiceOption[]
   edit: ReturnType<typeof useChoiceEditing>
   onOpen: (open: Open) => void
+  onOpenTask: (taskId: string) => void
 }) {
   const id = useId()
   const entryOf = (entryId: string) => goalLog.entries.find((e) => e.id === entryId)
@@ -260,12 +264,13 @@ function LogSection({ goalLog, options, edit, onOpen }: {
       </div>
       <LogList log={goalLog.log} optionNames={namesOf(goalLog, options)} memberName={goalLog.memberName ?? noName} limit={10}
         onEdit={(entryId) => onOpen({ kind: 'editLog', entryId })}
-        onDelete={async (entryId) => { const e = entryOf(entryId); return e ? edit.deleteLogEntry(e) : false }} />
+        onDelete={async (entryId) => { const e = entryOf(entryId); return e ? edit.deleteLogEntry(e) : false }}
+        onOpenTask={onOpenTask} />
     </section>
   )
 }
 
-function Dialogs({ open, close, detail, edit, files, optionOf, goalLog, onOpen }: {
+function Dialogs({ open, close, detail, edit, files, optionOf, goalLog, onOpen, onOpenTask }: {
   open: Open
   close: () => void
   detail: ChoiceDetail
@@ -274,6 +279,7 @@ function Dialogs({ open, close, detail, edit, files, optionOf, goalLog, onOpen }
   optionOf: (id: string) => ChoiceOption | undefined
   goalLog: PageLog
   onOpen: (open: Open) => void
+  onOpenTask: (taskId: string) => void
 }) {
   if (!open) return null
   // Today as of now, not as of when the page opened: saving decides entry or plan the same way.
@@ -281,7 +287,8 @@ function Dialogs({ open, close, detail, edit, files, optionOf, goalLog, onOpen }
   if (open.kind === 'work') return <WorkEditor work={detail.choice.work} onSave={edit.saveWork} onClose={close} />
   const choices = [...detail.options].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => ({ id: o.id, name: o.name }))
   const titleFor = (optionId?: string) => {
-    const name = optionId && optionOf(optionId)?.name
+    // An entry can be about another choice's option on the same goal.
+    const name = optionId && namesOf(goalLog, detail.options).get(optionId)
     return name ? `Log for ${name}` : 'Log'
   }
   if (open.kind === 'log') {
@@ -305,7 +312,8 @@ function Dialogs({ open, close, detail, edit, files, optionOf, goalLog, onOpen }
         <LogList log={{ upcoming: only(goalLog.log.upcoming), done: only(goalLog.log.done) }}
           optionNames={namesOf(goalLog, detail.options)} memberName={goalLog.memberName ?? noName}
           onEdit={(entryId) => onOpen({ kind: 'editLog', entryId })}
-          onDelete={async (entryId) => { const e = entryOf(entryId); return e ? edit.deleteLogEntry(e) : false }} />
+          onDelete={async (entryId) => { const e = entryOf(entryId); return e ? edit.deleteLogEntry(e) : false }}
+          onOpenTask={onOpenTask} />
         <div className="mt-3 flex justify-end">
           <button type="button" onClick={close} className={quietButton}>Done</button>
         </div>

@@ -42,6 +42,21 @@ describe('useGoalLog', () => {
     expect(result.current.entries).toHaveLength(1)
   })
 
+  it('an older read that finishes last does not replace a newer one', async () => {
+    const { result } = renderHook(() => useGoalLog(goal))
+    await waitFor(() => expect(result.current.entries).toHaveLength(1))
+    let finishOld: (v: unknown) => void = () => {}
+    listGoalLog.mockReturnValueOnce(new Promise((r) => { finishOld = r }))
+    listGoalLog.mockResolvedValueOnce({ entries: [entry('new', '2026-10-21')], planned: [] })
+    await act(async () => {
+      window.dispatchEvent(new Event(CHOICES_UPDATED)) // old read, still out
+      window.dispatchEvent(new Event(CHOICES_UPDATED)) // newer read
+    })
+    await waitFor(() => expect(result.current.log.done.map((l) => l.text)).toEqual(['new']))
+    await act(async () => { finishOld({ entries: [entry('old', '2026-10-01')], planned: [] }) })
+    expect(result.current.log.done.map((l) => l.text)).toEqual(['new'])
+  })
+
   it('no goal: an empty log and no read', async () => {
     const { result } = renderHook(() => useGoalLog(null))
     await waitFor(() => expect(result.current.loading).toBe(false))

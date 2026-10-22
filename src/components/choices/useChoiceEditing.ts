@@ -287,6 +287,12 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
         if (made.taskId) return w.deleteTask(made.taskId)
         return true
       }
+      const opts: { undo: () => Promise<boolean>; failureState?: 'partial'; failureSummary?: string } = {
+        undo: async () => {
+          const ok = await takeBack()
+          return ok && (option && status ? w.updateOption(option.id, { status: option.status }) : true)
+        },
+      }
       return run('Log', async () => {
         const fields = entryFields(input)
         if (isAhead(input.on, new Date())) {
@@ -299,18 +305,17 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
           made.entryId = (await w.addLogEntry({ goal: choice.goal, ...fields }))?.id
         }
         if (!made.entryId && !made.taskId) return false
-        if (option && status && !(await w.updateOption(option.id, { status }))) {
-          // One save: without the status change, the log line goes too.
-          await takeBack()
-          return false
+        if (!option || !status) return true
+        const statusSet = await w.updateOption(option.id, { status }).catch(() => false)
+        if (statusSet) return true
+        // One save: without the status change, the log line goes too. If it
+        // can't be taken back, the receipt must not say nothing changed.
+        if (!(await takeBack().catch(() => false))) {
+          opts.failureState = 'partial'
+          opts.failureSummary = "Logged, but the status didn't change."
         }
-        return true
-      }, {
-        undo: async () => {
-          const ok = await takeBack()
-          return ok && (option && status ? w.updateOption(option.id, { status: option.status }) : true)
-        },
-      })
+        return false
+      }, opts)
     },
 
     editLogEntry: (e: LogEntry, patch: EntryPatch) => {

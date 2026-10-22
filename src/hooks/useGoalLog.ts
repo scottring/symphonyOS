@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useRefetchEvents, useRefetchOnReturn } from '@/hooks/useChoices'
@@ -20,10 +20,14 @@ export function useGoalLog(goal: GoalRef | null) {
   const goalKind = goal?.kind
   const goalId = goal?.id
   const key = goalKind && goalId ? `${goalKind}:${goalId}` : null
+  // Reads can finish out of order; only the latest one asked for counts.
+  const seq = useRef(0)
 
   const refetch = useCallback(async () => {
+    const n = ++seq.current
     if (!user || !goalKind || !goalId) { setRead(null); setLoading(false); return }
     const next = await listGoalLog(supabase, { kind: goalKind, id: goalId })
+    if (n !== seq.current) return
     if (next) setRead({ key: `${goalKind}:${goalId}`, ...next }) // a failed read keeps the log already shown
     setLoading(false)
   }, [user, goalKind, goalId])
