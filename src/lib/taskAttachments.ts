@@ -6,7 +6,7 @@ import { isDocumentKind, type DocumentKind, type DocumentStatus } from '@/types/
  *  attach under 'event_note', keyed by the stable Google event id — the same
  *  key event notes use — so no note row needs to exist first. 'document' is a
  *  shelf upload with no parent entity: entity_id is the user's own id. */
-export type AttachmentEntityType = 'task' | 'project' | 'event_note' | 'instance_note' | 'note' | 'routine' | 'document'
+export type AttachmentEntityType = 'task' | 'project' | 'event_note' | 'instance_note' | 'note' | 'routine' | 'document' | 'choice_option'
 
 export interface Attachment {
   id: string
