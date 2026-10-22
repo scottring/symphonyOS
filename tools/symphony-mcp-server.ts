@@ -338,6 +338,7 @@ server.tool(
 
 const toolText = (text: string) => ({ content: [{ type: 'text' as const, text }] })
 const toolError = (text: string) => toolText(`Error: ${text}`)
+const LOG_KINDS = ['call', 'visit', 'message', 'meeting', 'note'] as const // mirrors src/types/goalLog.ts
 
 server.tool(
   'symphony_list_choices',
@@ -385,6 +386,65 @@ server.tool(
     if (contactId) row.contact_id = contactId
     const { data, error } = await supabase.from('choice_options').insert(row).select('id, name, status, contact_id').single()
     if (error) return toolError(error.message)
+    return toolText(JSON.stringify(data, null, 2))
+  }
+)
+
+server.tool(
+  'symphony_log_event',
+  `Record something that already happened on a goal's choice: a call, home visit, message, meeting or note.
+Name exactly one of option_id (the entry is about that option), goal_task_id (month/season goal) or goal_id (year goal).
+on is the day it happened (YYYY-MM-DD, today or earlier; a future visit is planned in Symphony instead). time is optional HH:MM.
+Logging a call, visit, message or meeting about a Considering option moves it to Contacted. Facts only, in the person's words.`,
+  {
+    goal_task_id: z.string().optional().describe('Month/season goal task id'),
+    goal_id: z.string().optional().describe('Year goal id'),
+    option_id: z.string().optional().describe('Option UUID (from symphony_list_choices)'),
+    kind: z.enum(LOG_KINDS),
+    on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('YYYY-MM-DD'),
+    time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().describe('HH:MM'),
+    summary: z.string().describe('What happened, in the person\'s words (1-500 characters)'),
+  },
+  async (params) => {
+    if ([params.goal_task_id, params.goal_id, params.option_id].filter((x) => x !== undefined).length !== 1) {
+      return toolError('Give exactly one of goal_task_id, goal_id or option_id')
+    }
+    const summary = params.summary.trim()
+    if (summary.length < 1 || summary.length > 500) return toolError('summary must be 1 to 500 characters')
+    // Machine-local day (this server has no household timezone helper).
+    if (params.on > new Date().toLocaleDateString('en-CA')) return toolError('on is in the future; plan it in Symphony instead')
+
+    let goalTaskId = params.goal_task_id ?? null
+    let goalId = params.goal_id ?? null
+    let option: { id: string; status: OptionStatus } | null = null
+    if (params.option_id) {
+      const { data: o, error: oErr } = await supabase
+        .from('choice_options').select('id, status, choice_id').eq('id', params.option_id).maybeSingle()
+      if (oErr) return toolError(oErr.message)
+      if (!o) return toolError('No such option')
+      const { data: choice, error: cErr } = await supabase
+        .from('choices').select('goal_task_id, goal_id').eq('id', o.choice_id).maybeSingle()
+      if (cErr) return toolError(cErr.message)
+      if (!choice) return toolError('No such choice')
+      goalTaskId = choice.goal_task_id as string | null
+      goalId = choice.goal_id as string | null
+      option = { id: o.id as string, status: o.status as OptionStatus }
+    }
+    const row: Record<string, unknown> = {
+      user_id: userId, goal_task_id: goalTaskId, goal_id: goalId, choice_option_id: option?.id ?? null,
+      kind: params.kind, happened_on: params.on, summary,
+    }
+    if (params.time) row.happened_at_time = params.time
+    const { data, error } = await supabase.from('goal_log_entries').insert(row)
+      .select('id, goal_task_id, goal_id, choice_option_id, kind, happened_on, happened_at_time, summary').single()
+    if (error) return toolError(error.message)
+
+    // Contact moves Considering to Contacted; any other status stays.
+    if (option && option.status === 'considering' && params.kind !== 'note') {
+      const { error: sErr } = await supabase.from('choice_options')
+        .update({ status: 'contacted', status_changed_at: new Date().toISOString() }).eq('id', option.id)
+      if (sErr) return toolError(`Logged, but could not set the option to Contacted: ${sErr.message}`)
+    }
     return toolText(JSON.stringify(data, null, 2))
   }
 )
@@ -933,6 +993,64 @@ function choiceRows<T>(r: { data: T[] | null; error: { message?: string } | null
   return r.data ?? []
 }
 
+type LogKind = (typeof LOG_KINDS)[number]
+const LOG_KIND_LABEL: Record<LogKind, string> = { call: 'Phone call', visit: 'Home visit', message: 'Message', meeting: 'Meeting', note: 'Note' }
+const MAX_DONE = 20
+const MAX_DONE_ALL = 5
+
+/** Each goal's log, as the agent reads it (choices.ts goalLogs): done entries newest first
+ *  (latest maxDone), open planned events soonest first, past-due ones set apart. Times are machine-local. */
+async function goalLogsLocal(goals: { id: string; title: string; kind: 'task' | 'goal' }[], names: Map<string, string>, today: string, maxDone: number) {
+  type Entry = { id: string; goal_task_id: string | null; goal_id: string | null; choice_option_id: string | null; kind: LogKind; happened_on: string; happened_at_time: string | null; summary: string; created_at: string }
+  type Planned = { id: string; goal_task_id: string | null; goal_id: string | null; choice_option_id: string | null; log_kind: LogKind; title: string; scheduled_for: string | null; is_all_day: boolean | null; completed: boolean; completed_at: string | null }
+  const taskIds = goals.filter((g) => g.kind === 'task').map((g) => g.id)
+  const yearIds = goals.filter((g) => g.kind === 'goal').map((g) => g.id)
+  const ENTRY = 'id, goal_task_id, goal_id, choice_option_id, kind, happened_on, happened_at_time, summary, created_at'
+  const PLANNED = 'id, goal_task_id, goal_id, choice_option_id, log_kind, title, scheduled_for, is_all_day, completed, completed_at'
+  const empty = { data: [], error: null }
+  const [eT, eY, pT, pY] = await Promise.all([
+    taskIds.length ? supabase.from('goal_log_entries').select(ENTRY).in('goal_task_id', taskIds) : empty,
+    yearIds.length ? supabase.from('goal_log_entries').select(ENTRY).in('goal_id', yearIds) : empty,
+    taskIds.length ? supabase.from('tasks').select(PLANNED).in('goal_task_id', taskIds).not('log_kind', 'is', null) : empty,
+    yearIds.length ? supabase.from('tasks').select(PLANNED).in('goal_id', yearIds).not('log_kind', 'is', null) : empty,
+  ])
+  const entries = [...choiceRows<Entry>(eT as never, 'the log'), ...choiceRows<Entry>(eY as never, 'the log')]
+  const planned = [...choiceRows<Planned>(pT as never, 'the planned events'), ...choiceRows<Planned>(pY as never, 'the planned events')].filter((p) => p.scheduled_for)
+  const missing = [...new Set([...entries, ...planned].map((r) => r.choice_option_id).filter((id): id is string => !!id && !names.has(id)))]
+  if (missing.length) {
+    for (const o of choiceRows<{ id: string; name: string }>((await supabase.from('choice_options').select('id, name').in('id', missing)) as never, 'the options')) names.set(o.id, o.name)
+  }
+  const line = (on: string, time: string | null | undefined, kind: LogKind, option: string | null, text: string) => ({
+    on, ...(time ? { time } : {}), kind: LOG_KIND_LABEL[kind] ?? kind, about: option ? names.get(option) ?? 'an option' : 'the project', text,
+  })
+  const at = (iso: string, allDay: boolean | null) => {
+    const d = new Date(iso)
+    return { on: d.toLocaleDateString('en-CA'), time: allDay ? null : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) }
+  }
+  return goals.map((g) => {
+    const mine = (r: { goal_task_id: string | null; goal_id: string | null }) => (g.kind === 'task' ? r.goal_task_id : r.goal_id) === g.id
+    const open = planned.filter((p) => mine(p) && !p.completed)
+      .sort((a, b) => Date.parse(a.scheduled_for!) - Date.parse(b.scheduled_for!))
+      .map((p) => { const w = at(p.scheduled_for!, p.is_all_day); return line(w.on, w.time, p.log_kind, p.choice_option_id, p.title) })
+    const upcoming = open.filter((l) => l.on >= today)
+    const passed = open.filter((l) => l.on < today)
+    const done = [
+      ...entries.filter(mine).map((e) => ({ sort: `${e.happened_on} ${e.happened_at_time?.slice(0, 5) ?? '00:00'}`, made: e.created_at, l: line(e.happened_on, e.happened_at_time?.slice(0, 5), e.kind, e.choice_option_id, e.summary) })),
+      ...planned.filter((p) => mine(p) && p.completed).map((p) => {
+        const w = at(p.completed_at ?? p.scheduled_for!, p.is_all_day)
+        return { sort: `${w.on} ${w.time ?? '00:00'}`, made: '', l: line(w.on, w.time, p.log_kind, p.choice_option_id, p.title) }
+      }),
+    ].sort((a, b) => (a.sort === b.sort ? b.made.localeCompare(a.made) : b.sort.localeCompare(a.sort))).map((x) => x.l)
+    return {
+      goal: { title: g.title, id: g.id },
+      upcoming,
+      ...(passed.length ? { planned_date_passed_not_ticked_done: passed } : {}),
+      done: done.slice(0, maxDone),
+      ...(done.length > maxDone ? { older_not_shown: done.length - maxDone } : {}),
+    }
+  })
+}
+
 async function readChoicesLocal(goalId?: string): Promise<string> {
   const statusLabel: Record<OptionStatus, string> = { considering: 'Considering', contacted: 'Contacted', heard_back: 'Heard back', ruled_out: 'Ruled out', chosen: 'Chosen' }
   const cols = 'id, title, status, goal_task_id, goal_id, chosen_option_id, decided_at, decided_note, decided_work, decided_amount_cents, columns, work, selected_work'
@@ -955,7 +1073,22 @@ async function readChoicesLocal(goalId?: string): Promise<string> {
     found = choiceRows<ChoiceRow>(
       (await supabase.from('choices').select(cols).eq('status', 'open').order('created_at').limit(50)) as never, 'the choices')
   }
-  if (!found.length) return JSON.stringify({ choices: [], note: 'No choices here.' })
+  const today = new Date().toLocaleDateString('en-CA')
+  const named = !!goalId
+  if (!found.length) {
+    // A goal's log is read even when it has no choices yet.
+    if (!goalId) return JSON.stringify({ choices: [], note: 'No choices here.' })
+    const [t, g] = await Promise.all([
+      supabase.from('tasks').select('id, title').eq('id', goalId).eq('is_goal', true),
+      supabase.from('goals').select('id, name').eq('id', goalId),
+    ])
+    const goal = [
+      ...choiceRows<{ id: string; title: string }>(t as never, 'goals').map((r) => ({ id: r.id, title: r.title, kind: 'task' as const })),
+      ...choiceRows<{ id: string; name: string }>(g as never, 'year goals').map((r) => ({ id: r.id, title: r.name, kind: 'goal' as const })),
+    ]
+    const log = goal.length ? await goalLogsLocal(goal.slice(0, 1), new Map(), today, MAX_DONE) : []
+    return JSON.stringify({ choices: [], note: 'No choices here.', ...(log.length ? { log } : {}) })
+  }
 
   const options = choiceRows<OptionRow>((await supabase.from('choice_options')
     .select('id, choice_id, name, contact_id, status, status_changed_at, values, notes')
@@ -967,7 +1100,7 @@ async function readChoicesLocal(goalId?: string): Promise<string> {
   const empty = { data: [], error: null }
   const [linesRead, followRead, contactsRead, tasksRead, goalsRead] = await Promise.all([
     optionIds.length ? supabase.from('choice_price_lines').select('id, option_id, work_ids, amount_cents, note, sort_order').in('option_id', optionIds).order('sort_order') : empty,
-    optionIds.length ? supabase.from('tasks').select('id, choice_option_id, scheduled_for, completed, waiting_since').in('choice_option_id', optionIds).order('created_at', { ascending: false }) : empty,
+    optionIds.length ? supabase.from('tasks').select('id, choice_option_id, scheduled_for, completed, waiting_since').in('choice_option_id', optionIds).is('log_kind', null).order('created_at', { ascending: false }) : empty,
     contactIds.length ? supabase.from('contacts').select('id, name, phone').in('id', contactIds) : empty,
     taskIds.length ? supabase.from('tasks').select('id, title').in('id', taskIds) : empty,
     goalIds.length ? supabase.from('goals').select('id, name').in('id', goalIds) : empty,
@@ -1051,5 +1184,13 @@ async function readChoicesLocal(goalId?: string): Promise<string> {
       } : {}),
     }
   })
-  return JSON.stringify({ choices })
+  const seen = new Set<string>()
+  const readGoals = found.flatMap((c) => {
+    const id = (c.goal_task_id ?? c.goal_id)!
+    if (seen.has(id)) return []
+    seen.add(id)
+    return [{ id, title: goalTitle.get(id) ?? '', kind: c.goal_task_id ? 'task' as const : 'goal' as const }]
+  })
+  const log = await goalLogsLocal(readGoals, new Map(options.map((o) => [o.id, o.name])), today, named ? MAX_DONE : MAX_DONE_ALL)
+  return JSON.stringify({ choices, log })
 }
