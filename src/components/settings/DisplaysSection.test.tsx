@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), revoke: vi.fn() }))
-vi.mock('@/lib/display/pairing', () => ({ createPairingCode: mocks.create, listDisplays: mocks.list, revokeDisplay: mocks.revoke }))
+const mocks = vi.hoisted(() => ({ create: vi.fn(), cancel: vi.fn(), list: vi.fn(), revoke: vi.fn() }))
+vi.mock('@/lib/display/pairing', () => ({ createPairingCode: mocks.create, cancelPairingCode: mocks.cancel, listDisplays: mocks.list, revokeDisplay: mocks.revoke }))
 const thoughtMocks = vi.hoisted(() => ({ list: vi.fn(), reviewed: vi.fn() }))
 vi.mock('@/lib/kids/kidThoughts', () => ({ listOpenThoughts: thoughtMocks.list, markThoughtReviewed: thoughtMocks.reviewed, kindLabel: (k: string | null) => (k === 'ask' ? 'Ask a grown-up' : null) }))
 
@@ -10,7 +10,7 @@ import { DisplaysSection } from './DisplaysSection'
 import type { FamilyMember } from '@/types/family'
 
 beforeEach(() => {
-  mocks.create.mockReset(); mocks.list.mockReset(); mocks.revoke.mockReset()
+  mocks.create.mockReset(); mocks.cancel.mockReset().mockResolvedValue({ ok: true }); mocks.list.mockReset(); mocks.revoke.mockReset()
   mocks.list.mockResolvedValue([])
   thoughtMocks.list.mockReset().mockResolvedValue([]); thoughtMocks.reviewed.mockReset().mockResolvedValue(true)
 })
@@ -28,6 +28,32 @@ describe('a kid’s tablet in Settings', () => {
     fireEvent.click(screen.getByLabelText('A list, in any order'))
     fireEvent.click(screen.getByRole('button', { name: 'Pair a display' }))
     await waitFor(() => expect(mocks.create).toHaveBeenCalledWith('Kaleb’s tablet', { familyMemberId: 'kaleb', layout: 'list' }))
+  })
+  it('starts over: the code stops working and the kid can be changed', async () => {
+    mocks.create.mockResolvedValueOnce({ ok: true, code: { code: 'KAL234', expiresAt: new Date(Date.now() + 10 * 60_000) } })
+      .mockResolvedValueOnce({ ok: true, code: { code: 'WAL567', expiresAt: new Date(Date.now() + 10 * 60_000) } })
+    render(<DisplaysSection members={[scott, kaleb]} />)
+    fireEvent.change(screen.getByLabelText('For'), { target: { value: 'kaleb' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Pair a display' }))
+    expect(await screen.findByLabelText('Pairing code')).toHaveTextContent('KAL234')
+    expect(screen.queryByLabelText('For')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Start over' }))
+    await waitFor(() => expect(mocks.cancel).toHaveBeenCalledWith('KAL234'))
+    expect(await screen.findByLabelText('For')).toHaveValue('kaleb')
+    expect(screen.queryByLabelText('Pairing code')).toBeNull()
+    fireEvent.change(screen.getByLabelText('For'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Pair a display' }))
+    expect(await screen.findByLabelText('Pairing code')).toHaveTextContent('WAL567')
+    expect(mocks.create).toHaveBeenLastCalledWith('Kitchen wall')
+  })
+  it('keeps the code on screen when it could not be cancelled', async () => {
+    mocks.create.mockResolvedValue({ ok: true, code: { code: 'KAL234', expiresAt: new Date(Date.now() + 10 * 60_000) } })
+    mocks.cancel.mockResolvedValue({ ok: false, error: 'Could not cancel that code' })
+    render(<DisplaysSection members={[scott, kaleb]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Pair a display' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Start over' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not cancel that code')
+    expect(screen.getByLabelText('Pairing code')).toHaveTextContent('KAL234')
   })
   it('names the kid a paired tablet is for', async () => {
     mocks.list.mockResolvedValue([{ id: 'd1', name: 'Kaleb’s tablet', pairedAt: new Date(), lastSeenAt: null, revokedAt: null, familyMemberId: 'kaleb', layout: 'trail' }])

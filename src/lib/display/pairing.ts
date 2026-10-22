@@ -32,6 +32,13 @@ export async function createPairingCode(name = 'Kitchen wall', forMember?: { fam
   return { ok: true, code: { code: row.code, expiresAt: new Date(row.expires_at) } }
 }
 
+/** Owner or admin: the code stops working at once (Settings' "Start over").
+ *  A code a display has already claimed is left alone. */
+export async function cancelPairingCode(code: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabase.rpc('cancel_display_pairing_code', { p_code: code })
+  return error ? { ok: false, error: message(error, 'Could not cancel that code') } : { ok: true }
+}
+
 /** The display: sign in anonymously (if not already) and claim the code.
  *  Refused for a person's account: a display must never be an adult's login. */
 export async function claimPairingCode(code: string): Promise<{ ok: true; householdId: string; name: string; familyMemberId: string | null } | { ok: false; error: string }> {

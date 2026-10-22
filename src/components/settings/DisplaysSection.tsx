@@ -1,14 +1,15 @@
 // src/components/settings/DisplaysSection.tsx
 //
 // Settings → Displays: pair a kitchen wall, or a tablet for one kid, with a
-// ten-minute code; see which displays are paired, and revoke one. A display
+// ten-minute code (or start over: the code stops working and the picker
+// comes back); see which displays are paired, and revoke one. A display
 // has its own restricted sign-in (src/lib/display/pairing.ts); revoking
 // fails it closed at once. A kid's tablet keeps the thoughts that kid saved
 // for later; a grown-up marks them gone over here.
 
 import { useCallback, useEffect, useState } from 'react'
 import { SectionHeading } from '@/components/layout/SectionHeading'
-import { createPairingCode, listDisplays, revokeDisplay, type HouseholdDisplay, type KidLayout, type PairingCode } from '@/lib/display/pairing'
+import { cancelPairingCode, createPairingCode, listDisplays, revokeDisplay, type HouseholdDisplay, type KidLayout, type PairingCode } from '@/lib/display/pairing'
 import { listOpenThoughts, markThoughtReviewed, kindLabel, type KidThought } from '@/lib/kids/kidThoughts'
 import { memberShape } from '@/lib/wall/memberPageModel'
 import type { FamilyMember } from '@/types/family'
@@ -51,6 +52,16 @@ export function DisplaysSection({ members = [] }: { members?: FamilyMember[] }) 
       if (!r.ok) { setError(r.error); return }
       setCode(r.code);setNow(Date.now())
     } catch {setError('Could not make a pairing code. Try again.')} finally {setBusy(false)}
+  }
+  const startOver = async () => {
+    if (!code) return
+    setError(null)
+    setBusy(true)
+    try {
+      const r = await cancelPairingCode(code.code)
+      if (!r.ok) { setError(r.error); return }
+      setCode(null)
+    } catch {setError('Could not cancel that code. Try again.')} finally {setBusy(false)}
   }
   const revoke = async (d: HouseholdDisplay) => {
     setError(null)
@@ -102,6 +113,7 @@ export function DisplaysSection({ members = [] }: { members?: FamilyMember[] }) 
           <p className="text-[12px] text-neutral-600 mb-1">On the display, open Symphony and enter</p>
           <p className="font-mono text-3xl tracking-[0.4em] text-neutral-900" aria-label="Pairing code">{code.code}</p>
           <p className="text-[12px] text-neutral-500 mt-1">Good for {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</p>
+          <button className="onboarding-link mt-2" disabled={busy} onClick={() => void startOver()}>Start over</button>
         </div>
       ) : (
         <button onClick={makeCode} disabled={busy} className="w-full p-3 border-2 border-dashed border-primary-200 rounded-lg text-primary-600 hover:border-primary-300 hover:bg-primary-50/50 transition-colors disabled:opacity-50">
