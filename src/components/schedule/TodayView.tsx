@@ -62,6 +62,8 @@ import { SECTIONS_ORDER } from '@/lib/today/types'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox'
+import { useInProgressGoals } from '@/hooks/useChoices'
+import { matchesLayers } from '@/lib/today/domainFilter'
 import { WaitingOnYouBanner } from '@/components/discussion/WaitingOnYouBanner'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -543,6 +545,10 @@ export function TodayView({
 
   // Open talk-abouts (flagged tasks): one quiet line under For today.
   const discussion = discussionItems(tasks)
+  // Goals with an open choice: a way back to a project once the day's
+  // tasks for it are ticked off. Same area filter as everything else here.
+  const inProgressAll = useInProgressGoals()
+  const inProgress = inProgressAll.filter((g) => matchesLayers(g.context, layers))
 
   // ── Tasks map for parent task lookup ─────────────────────────────────────────
   const tasksMap = useMemo(() => {
@@ -1428,6 +1434,17 @@ export function TodayView({
                     {t.title}{t.note ? ` · ${t.note}` : ''}
                     <span className="sr-only"> (proposed, not saved yet)</span>
                   </span>
+                ))}
+              </div>
+            )}
+            {inProgress.length > 0 && (
+              <div className="today-talk" aria-label="In progress" role="group">
+                <span className="today-talk-label">In progress</span>
+                {inProgress.map((g) => (
+                  <button key={`${g.goal.kind}:${g.goal.id}`} type="button" className="today-talk-chip"
+                    onClick={() => (g.goal.kind === 'task' ? handleSelectItem(`task-${g.goal.id}`) : navigate(`/goals/${g.goal.id}`))}>
+                    {g.title} · {g.choices.map((c) => c.title).join(', ')}
+                  </button>
                 ))}
               </div>
             )}

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { listChoicesForGoal, loadChoice, createChoice, type ChoiceRow, type ChoiceDetail } from '@/lib/choices/db'
 import type { Choice, GoalRef } from '@/types/choice'
+import { listInProgressGoals, type InProgressGoal } from '@/lib/choices/inProgress'
 
 import { CHOICES_UPDATED } from '@/lib/choices/events'
 
@@ -94,4 +95,25 @@ export function useChoice(id: string | undefined) {
   useRefetchOnReturn(refetch)
 
   return { detail, loading, refetch }
+}
+
+/** Goals with an open choice, for Today's "In progress" line. */
+export function useInProgressGoals() {
+  const { user } = useAuth()
+  const [goals, setGoals] = useState<InProgressGoal[]>([])
+
+  const refetch = useCallback(async () => {
+    if (!user) { setGoals([]); return }
+    const next = await listInProgressGoals(supabase)
+    if (next) setGoals(next) // a failed read keeps the line as it was
+  }, [user])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount / sign-in
+    void refetch()
+  }, [refetch])
+  useRefetchEvents(refetch)
+  useRefetchOnReturn(refetch)
+
+  return goals
 }

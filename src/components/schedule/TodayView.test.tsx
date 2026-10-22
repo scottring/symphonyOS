@@ -41,8 +41,14 @@ vi.mock('@/components/home/week/useWeekInstances', () => ({ useWeekInstances: ()
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
-  return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: ALL_LAYERS, setDomain: vi.fn() }) }
+  return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: mockLayers ?? ALL_LAYERS, setDomain: vi.fn() }) }
 })
+let mockLayers: ReadonlySet<string> | null = null
+let mockInProgress: unknown[] = []
+vi.mock('@/hooks/useChoices', async (importOriginal) => ({
+  ...await importOriginal<object>(),
+  useInProgressGoals: () => mockInProgress,
+}))
 
 // Mutable state for useTimelineInsert so individual tests can override noteComposer
 let mockNoteComposer: { anchor: Date | null } | null = null
@@ -275,6 +281,32 @@ describe('TodayView', () => {
       // Reset so other tests are unaffected
       mockNoteComposer = null
     }
+  })
+
+  describe('In progress', () => {
+    const bath = { goal: { kind: 'task', id: 'g1' }, title: 'Renovate Upstairs Bathroom', context: 'family', choices: [{ id: 'c1', title: 'Contractor' }] }
+    const work = { goal: { kind: 'task', id: 'g2' }, title: 'Hire an analyst', context: 'work', choices: [{ id: 'c2', title: 'Candidates' }] }
+    afterEach(() => { mockInProgress = []; mockLayers = null })
+    it('lists goals with an open choice; a chip opens the goal', () => {
+      mockInProgress = [bath]
+      const onSelectItem = vi.fn()
+      renderView({ onSelectItem })
+      const line = screen.getByRole('group', { name: 'In progress' })
+      fireEvent.click(within(line).getByRole('button', { name: 'Renovate Upstairs Bathroom · Contractor' }))
+      expect(onSelectItem).toHaveBeenCalledWith('task-g1')
+    })
+    it('follows the area filter', () => {
+      mockInProgress = [bath, work]
+      mockLayers = new Set(['work'])
+      renderView({})
+      const line = screen.getByRole('group', { name: 'In progress' })
+      expect(within(line).queryByText(/Renovate Upstairs Bathroom/)).toBeNull()
+      expect(within(line).getByRole('button', { name: 'Hire an analyst · Candidates' })).toBeInTheDocument()
+    })
+    it('is absent with no goals in progress', () => {
+      renderView({})
+      expect(screen.queryByRole('group', { name: 'In progress' })).toBeNull()
+    })
   })
 
   describe('To talk about', () => {
