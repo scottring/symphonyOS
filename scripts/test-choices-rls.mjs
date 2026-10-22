@@ -269,7 +269,7 @@ try {
     assert.equal(as(OWNER, E(OWNER, { col: 'goal_task_id', val: GOAL_PRIVATE })), '1')
     assert.equal(as(MEMBER, `select count(*) from public.goal_log_entries where goal_task_id = '${GOAL_PRIVATE}'`), '0')
     // The goal check runs first and reads tasks under RLS, so an outsider is refused there.
-    failsAs(OUTSIDER, E(OUTSIDER, { col: 'goal_task_id', val: GOAL_FAMILY }), /row-level security|A choice belongs to a goal/)
+    failsAs(OUTSIDER, E(OUTSIDER, { col: 'goal_task_id', val: GOAL_FAMILY }), /A choice belongs to a goal/)
   })
   check('goal log: member cannot write as the owner', () => {
     failsAs(MEMBER, `insert into public.goal_log_entries (user_id,goal_task_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_FAMILY}','call','2026-10-22','Spoofed')`, RLS)
@@ -277,13 +277,14 @@ try {
   check('goal log: entries cannot be moved to another goal or option', () => {
     failsAs(OWNER, `update public.goal_log_entries set goal_task_id = '${GOAL_PRIVATE}' where goal_task_id = '${GOAL_FAMILY}'`, /goal_task_id is immutable/)
     failsAs(MEMBER, `update public.goal_log_entries set user_id = '${MEMBER}' where goal_task_id = '${GOAL_FAMILY}'`, /user_id is immutable/)
-    failsAs(OWNER, `update public.goal_log_entries set choice_option_id = '${O_OWNER}' where goal_task_id = '${GOAL_FAMILY}'`, /choice_option_id is immutable|belongs to that option/)
+    failsAs(OWNER, `update public.goal_log_entries set choice_option_id = '${O_OWNER}' where goal_task_id = '${GOAL_FAMILY}'`, /choice_option_id is immutable/)
     assert.equal(as(MEMBER, `update public.goal_log_entries set summary = 'Called Acme back' where goal_task_id = '${GOAL_FAMILY}' returning 1`), '1')
   })
   check('goal log: option entries must sit on the option\'s own goal; goal_task_id must be a goal', () => {
     assert.equal(as(OWNER, `insert into public.goal_log_entries (user_id,goal_task_id,choice_option_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_FAMILY}','${O_OWNER}','visit','2026-10-22','Site visit') returning 1`), '1')
     assert.equal(as(MEMBER, `select count(*) from public.goal_log_entries where choice_option_id = '${O_OWNER}'`), '1')
-    failsAs(OWNER, `insert into public.goal_log_entries (user_id,goal_task_id,choice_option_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_PRIVATE}','${O_OWNER}','visit','2026-10-22','Wrong goal')`, /23514|belongs to that option/)
+    assert.equal(as(MEMBER, `insert into public.goal_log_entries (user_id,goal_task_id,choice_option_id,kind,happened_on,summary) values ('${MEMBER}','${GOAL_FAMILY}','${O_OWNER}','message','2026-10-22','Texted about the quote') returning 1`), '1')
+    failsAs(OWNER, `insert into public.goal_log_entries (user_id,goal_task_id,choice_option_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_PRIVATE}','${O_OWNER}','visit','2026-10-22','Wrong goal')`, /belongs to that option's goal/)
     fails(`insert into public.goal_log_entries (user_id,goal_task_id,choice_option_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_PRIVATE}','${O_OWNER}','visit','2026-10-22','Wrong goal')`, /belongs to that option's goal/)
     fails(`insert into public.goal_log_entries (user_id,goal_task_id,kind,happened_on,summary) values ('${OWNER}','${TASK_PLAIN}','call','2026-10-22','Not a goal')`, /A choice belongs to a goal/)
     fails(`insert into public.goal_log_entries (user_id,goal_task_id,goal_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_FAMILY}','${YEAR_GOAL}','call','2026-10-22','Two')`, /goal_log_entries_check/)
