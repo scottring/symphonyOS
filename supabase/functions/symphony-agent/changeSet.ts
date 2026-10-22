@@ -22,6 +22,13 @@ export type PlanOpKind = 'plan_add' | 'plan_carry' | 'plan_let_go' | 'plan_done'
  *  Proposed only by symphony_propose_choice_changes (choices.ts), never by
  *  symphony_propose_changes: they are not in OP_KINDS. */
 export type ChoiceOpKind = 'choice_add' | 'option_add' | 'option_status' | 'option_set' | 'price_line' | 'column_add' | 'work_set' | 'choice_choose' | 'choice_reopen' | 'follow_up'
+  | EventOpKind
+/** Log ops (spec 2026-10-22-choice-log, "Chat"): a call or visit that happened
+ *  (event_log) or one planned ahead (event_plan), about a goal or one of its
+ *  choices' options. Never a status change by itself: that is its own row. */
+export type EventOpKind = 'event_log' | 'event_plan'
+/** Mirrors src/types/goalLog.ts. */
+export type LogKind = 'call' | 'visit' | 'message' | 'meeting' | 'note'
 export type ChangeOpKind = TaskOpKind | RoutineOpKind | PlanOpKind | ChoiceOpKind
 /** Mirrors src/types/choice.ts. */
 export type OptionStatus = 'considering' | 'contacted' | 'heard_back' | 'ruled_out' | 'chosen'
@@ -130,6 +137,12 @@ export interface ChangeOp {
   amountCents?: number
   /** work_set: what the piece of work is. */
   description?: string
+  // Log ops. About exactly one of a goal (goalTaskId / goalId) or an option
+  // (named as the option-level choice ops name theirs). `date` is the day it
+  // happened or will, `time` its HH:MM if any.
+  logKind?: LogKind
+  /** event_log / event_plan: what happened, or what it is for. */
+  summary?: string
 }
 
 export interface ChangeSet {
@@ -155,7 +168,7 @@ const MAX_OPS = 40
 const MAX_NOTE = 120
 const MAX_NAME = 200
 const MAX_GOAL = 500
-const realTime = (v: unknown): string | null =>
+export const realTime = (v: unknown): string | null =>
   typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null
 const isId = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v)
 

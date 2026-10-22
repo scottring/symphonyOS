@@ -7,7 +7,7 @@
 // Facts only: the read reports what is recorded and the arithmetic on each
 // option's own lines. Nothing ranks, scores or marks an option.
 
-import type { CellValue, ChangeOp, ChangeSet, ChoiceColumn, ChoiceOpKind, ColumnKind, OptionStatus } from './changeSet.ts'
+import { realTime, type CellValue, type ChangeOp, type ChangeSet, type ChoiceColumn, type ChoiceOpKind, type ColumnKind, type LogKind, type OptionStatus } from './changeSet.ts'
 import { formatCents, liveLines, orderLines, priceFor, workLabel, type PriceLine, type WorkPiece } from './choicePrice.ts'
 import { realDate } from './readPlan.ts'
 import { local } from './readWeek.ts'
@@ -20,10 +20,15 @@ const rows = <T>(r: Read<T>, what: string): T[] => {
   return r.data ?? []
 }
 
-export const CHOICE_OP_KINDS: readonly ChoiceOpKind[] = ['choice_add', 'option_add', 'option_status', 'option_set', 'price_line', 'column_add', 'work_set', 'choice_choose', 'choice_reopen', 'follow_up']
+export const CHOICE_OP_KINDS: readonly ChoiceOpKind[] = ['choice_add', 'option_add', 'option_status', 'option_set', 'price_line', 'column_add', 'work_set', 'choice_choose', 'choice_reopen', 'follow_up', 'event_log', 'event_plan']
 const KINDS = new Set<string>(CHOICE_OP_KINDS)
 /** Ops that act on one option (applyChangeSet's OPTION_LEVEL). */
 const OPTION_LEVEL = new Set<ChoiceOpKind>(['option_status', 'option_set', 'price_line', 'choice_choose', 'follow_up'])
+/** Log ops: about the goal alone, or one option as the option-level ops name it. */
+const EVENT_OPS = new Set<ChoiceOpKind>(['event_log', 'event_plan'])
+/** Mirrors src/types/goalLog.ts, in its order. */
+const LOG_KINDS: readonly LogKind[] = ['call', 'visit', 'message', 'meeting', 'note']
+const LOG_KIND_LABEL: Record<LogKind, string> = { call: 'Phone call', visit: 'Home visit', message: 'Message', meeting: 'Meeting', note: 'Note' }
 export const OPTION_STATUSES: readonly OptionStatus[] = ['considering', 'contacted', 'heard_back', 'ruled_out', 'chosen']
 /** option_status sets these; Chosen comes only with deciding the choice (choice_choose). */
 const SETTABLE_STATUSES: readonly OptionStatus[] = OPTION_STATUSES.filter((s) => s !== 'chosen')
@@ -35,9 +40,13 @@ const MAX_NAME = 200
 const MAX_NOTE = 300
 const MAX_TEXT = 1000
 const MAX_CHOICES = 50
+/** goal_log_entries.summary's check. */
+const MAX_SUMMARY = 500
+/** Done log lines a read gives per goal (all upcoming ones are given). */
+const MAX_DONE = 20
 const MAX_AMOUNT = 1_000_000_000
 /** Optional fields where an explicit null means "not given". */
-const NULL_IS_ABSENT = ['status', 'date', 'amount', 'phone', 'note', 'description', 'contact_id'] as const
+const NULL_IS_ABSENT = ['status', 'date', 'amount', 'phone', 'note', 'description', 'contact_id', 'time', 'log_kind'] as const
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const isId = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v)
 const text = (v: unknown, n: number): string => (typeof v === 'string' ? v.trim().slice(0, n) : '')
@@ -88,7 +97,7 @@ export const READ_CHOICES_TOOL = {
 
 export const PROPOSE_CHOICE_CHANGES_TOOL = {
   name: 'symphony_propose_choice_changes' as const,
-  description: 'Propose ONE list of changes to choices (options compared on a goal), shown as a change card in chat. Nothing is saved until the person saves it. Every change to a choice goes here, even a single one; never on symphony_propose_changes. Name an existing choice by choice_id and an existing option by option_id (from symphony_read_choices); name one added earlier in this same list by its choice_title or option_name. Ops: choice_add (goal_id from symphony_read_plan, choice_title), option_add (name; contact_id when the person names someone already in their contacts, found with symphony_list_contacts, else an optional phone), option_status (status; never chosen: choosing is choice_choose), option_set (column_label, value as the person said it: money like "$19,750", a date YYYY-MM-DD, yes or no, or text; an empty value clears it), price_line (work_labels: the pieces of work this one price covers, together; amount in dollars; optional note), column_add (column_label, kind), work_set (work_labels: [one piece], optional description; an existing piece gets the new description), choice_choose (the option chosen, optional note: the reason in their words), choice_reopen, follow_up (the option, date YYYY-MM-DD). Use the person\'s words; never add a column, value or price they did not give. Each call replaces the card: send the whole list so far.',
+  description: 'Propose ONE list of changes to choices (options compared on a goal), shown as a change card in chat. Nothing is saved until the person saves it. Every change to a choice goes here, even a single one; never on symphony_propose_changes. Name an existing choice by choice_id and an existing option by option_id (from symphony_read_choices); name one added earlier in this same list by its choice_title or option_name. Ops: choice_add (goal_id from symphony_read_plan, choice_title), option_add (name; contact_id when the person names someone already in their contacts, found with symphony_list_contacts, else an optional phone), option_status (status; never chosen: choosing is choice_choose), option_set (column_label, value as the person said it: money like "$19,750", a date YYYY-MM-DD, yes or no, or text; an empty value clears it), price_line (work_labels: the pieces of work this one price covers, together; amount in dollars; optional note), column_add (column_label, kind), work_set (work_labels: [one piece], optional description; an existing piece gets the new description), choice_choose (the option chosen, optional note: the reason in their words), choice_reopen, follow_up (the option, date YYYY-MM-DD), event_log (something that already happened, date today or earlier: log_kind, date, optional time, summary in their words), event_plan (a future visit, call or meeting, date after today, that goes on the calendar: the same fields). For event_log and event_plan name an option (option_id or option_name, with choice_id) or the goal alone (goal_id: the month or season goal task id or the year goal id, as for choice_add). Use the person\'s words; never add a column, value or price they did not give. Each call replaces the card: send the whole list so far.',
   input_schema: {
     type: 'object',
     properties: {
@@ -99,7 +108,7 @@ export const PROPOSE_CHOICE_CHANGES_TOOL = {
           type: 'object',
           properties: {
             op: { type: 'string', enum: [...CHOICE_OP_KINDS] },
-            goal_id: { type: 'string', description: 'choice_add: the goal it goes under, a month or season goal task id or a year goal id, from symphony_read_plan' },
+            goal_id: { type: 'string', description: 'choice_add: the goal it goes under; event_log / event_plan about the goal alone (no option): that goal. A month or season goal task id or a year goal id, from symphony_read_plan' },
             choice_id: { type: 'string', description: 'An existing choice id (from symphony_read_choices)' },
             choice_title: { type: 'string', description: 'choice_add: the new choice\'s title (e.g. "Contractor"). Other ops: the title of a choice_add earlier in this list' },
             option_id: { type: 'string', description: 'An existing option id (from symphony_read_choices)' },
@@ -115,7 +124,10 @@ export const PROPOSE_CHOICE_CHANGES_TOOL = {
             description: { type: 'string', description: 'work_set: what the piece of work is, in the person\'s words' },
             amount: { type: 'number', description: 'price_line: dollars, e.g. 19750 or 18400.50 (at most 1,000,000,000)' },
             note: { type: 'string', description: 'price_line: e.g. "excludes fixtures"; choice_choose: the reason, in their words' },
-            date: { type: 'string', description: 'follow_up: YYYY-MM-DD' },
+            date: { type: 'string', description: 'follow_up, event_log, event_plan: YYYY-MM-DD' },
+            log_kind: { type: 'string', enum: [...LOG_KINDS], description: 'event_log / event_plan: call, visit (a home visit), message, meeting or note' },
+            time: { type: 'string', description: 'event_log / event_plan, optional: HH:MM, 24-hour' },
+            summary: { type: 'string', description: 'event_log: what happened; event_plan: what it is for. One line, in the person\'s words (at most 500 characters)' },
           },
           required: ['op'],
         },
@@ -136,6 +148,19 @@ type ChoiceRow = {
 type OptionRow = { id: string; choice_id: string; name: string; contact_id: string | null; status: OptionStatus; status_changed_at: string; values: Record<string, CellValue> | null; notes: string | null }
 type LineRow = { id: string; option_id: string; work_ids: string[] | null; amount_cents: number | string; note: string | null; sort_order: number }
 type FollowUpRow = { id: string; choice_option_id: string; scheduled_for: string | null; completed: boolean; waiting_since: string | null }
+
+type LogEntryRow = {
+  id: string; goal_task_id: string | null; goal_id: string | null; choice_option_id: string | null
+  kind: LogKind; happened_on: string; happened_at_time: string | null; summary: string; created_at: string
+}
+/** A planned event: a task with log_kind (src/lib/choices/logDb.ts). */
+type PlannedRow = {
+  id: string; goal_task_id: string | null; goal_id: string | null; choice_option_id: string | null
+  log_kind: LogKind; title: string; scheduled_for: string | null; is_all_day: boolean | null; completed: boolean; completed_at: string | null
+}
+type LogLine = { on: string; time?: string; kind: string; about: string; text: string }
+type Goal = { id: string; title: string; kind: 'task' | 'goal' }
+const none = { data: [], error: null }
 
 const CHOICE_COLS = 'id, title, status, goal_task_id, goal_id, chosen_option_id, decided_at, decided_note, decided_work, decided_amount_cents, columns, work, selected_work, updated_at'
 
@@ -165,6 +190,54 @@ async function goalTitles(db: Db, taskIds: string[], goalIds: string[]): Promise
   ]
 }
 
+/** Each goal's log as the page's Log section merges it (src/lib/choices/log.ts
+ *  mergeLog): entries and done planned events newest first, the latest
+ *  MAX_DONE of them, and every planned event still open, soonest first.
+ *  `names` holds the option names already read; others are read here. */
+async function goalLogs(db: Db, goals: Goal[], names: Map<string, string>) {
+  const taskIds = goals.filter((g) => g.kind === 'task').map((g) => g.id)
+  const yearIds = goals.filter((g) => g.kind === 'goal').map((g) => g.id)
+  const ENTRY = 'id, goal_task_id, goal_id, choice_option_id, kind, happened_on, happened_at_time, summary, created_at'
+  const PLANNED = 'id, goal_task_id, goal_id, choice_option_id, log_kind, title, scheduled_for, is_all_day, completed, completed_at'
+  const [eT, eY, pT, pY] = await Promise.all([
+    taskIds.length ? db.from('goal_log_entries').select(ENTRY).in('goal_task_id', taskIds) : none,
+    yearIds.length ? db.from('goal_log_entries').select(ENTRY).in('goal_id', yearIds) : none,
+    taskIds.length ? db.from('tasks').select(PLANNED).in('goal_task_id', taskIds).not('log_kind', 'is', null) : none,
+    yearIds.length ? db.from('tasks').select(PLANNED).in('goal_id', yearIds).not('log_kind', 'is', null) : none,
+  ])
+  const entries = [...rows<LogEntryRow>(eT, 'the log'), ...rows<LogEntryRow>(eY, 'the log')]
+  const planned = [...rows<PlannedRow>(pT, 'the planned events'), ...rows<PlannedRow>(pY, 'the planned events')].filter((p) => p.scheduled_for)
+  // An option of another choice on the goal than the ones read.
+  const missing = [...new Set([...entries, ...planned].map((r) => r.choice_option_id).filter((id): id is string => !!id && !names.has(id)))]
+  if (missing.length) {
+    for (const o of rows<{ id: string; name: string }>(await db.from('choice_options').select('id, name').in('id', missing), 'the options')) names.set(o.id, o.name)
+  }
+  const line = (on: string, time: string | null | undefined, kind: LogKind, option: string | null, text: string): LogLine => ({
+    on, ...(time ? { time } : {}), kind: LOG_KIND_LABEL[kind] ?? kind, about: option ? names.get(option) ?? 'an option' : 'the project', text,
+  })
+  const at = (iso: string, allDay: boolean | null) => ({ on: local(iso).date, time: allDay ? null : local(iso).time })
+
+  return goals.map((g) => {
+    const mine = (r: { goal_task_id: string | null; goal_id: string | null }) => (g.kind === 'task' ? r.goal_task_id : r.goal_id) === g.id
+    const upcoming = planned.filter((p) => mine(p) && !p.completed)
+      .sort((a, b) => Date.parse(a.scheduled_for!) - Date.parse(b.scheduled_for!))
+      .map((p) => { const w = at(p.scheduled_for!, p.is_all_day); return line(w.on, w.time, p.log_kind, p.choice_option_id, p.title) })
+    const done = [
+      ...entries.filter(mine).map((e) => ({ sort: `${e.happened_on} ${e.happened_at_time?.slice(0, 5) ?? '00:00'}`, made: e.created_at, l: line(e.happened_on, e.happened_at_time?.slice(0, 5), e.kind, e.choice_option_id, e.summary) })),
+      ...planned.filter((p) => mine(p) && p.completed).map((p) => {
+        const w = at(p.completed_at ?? p.scheduled_for!, p.is_all_day)
+        return { sort: `${w.on} ${w.time ?? '00:00'}`, made: '', l: line(w.on, w.time, p.log_kind, p.choice_option_id, p.title) }
+      }),
+    ].sort((a, b) => (a.sort === b.sort ? b.made.localeCompare(a.made) : b.sort.localeCompare(a.sort))).map((x) => x.l)
+    return {
+      goal: { title: g.title, id: g.id },
+      upcoming,
+      done: done.slice(0, MAX_DONE),
+      ...(done.length > MAX_DONE ? { older_not_shown: done.length - MAX_DONE } : {}),
+    }
+  })
+}
+
 /** symphony_read_choices, through the person's RLS client: a choice they
  *  cannot see is simply absent. JSON text. */
 export async function readChoices(db: Db, input: { goal_id?: unknown; choice_id?: unknown }): Promise<string> {
@@ -182,7 +255,12 @@ export async function readChoices(db: Db, input: { goal_id?: unknown; choice_id?
   } else {
     found = rows(await db.from('choices').select(CHOICE_COLS).eq('status', 'open').order('created_at', { ascending: true }).limit(MAX_CHOICES), 'the choices')
   }
-  if (!found.length) return JSON.stringify({ choices: [], note: 'No choices here that this person can see.' })
+  if (!found.length) {
+    // A goal's log is read even when it has no choices yet.
+    const goal = input.goal_id !== undefined && input.goal_id !== null ? await goalTitles(db, [input.goal_id as string], [input.goal_id as string]) : []
+    const log = goal.length ? await goalLogs(db, goal.slice(0, 1), new Map()) : []
+    return JSON.stringify({ choices: [], note: 'No choices here that this person can see.', ...(log.length ? { log } : {}) })
+  }
 
   const choiceIds = found.map((c) => c.id)
   const options = rows<OptionRow>(await db.from('choice_options').select('id, choice_id, name, contact_id, status, status_changed_at, values, notes')
@@ -261,15 +339,25 @@ export async function readChoices(db: Db, input: { goal_id?: unknown; choice_id?
       } : {}),
     }
   })
-  return JSON.stringify({ choices })
+  // Per goal read, its log (calls, visits, notes; planned ones too).
+  const seenGoals = new Set<string>()
+  const readGoals = found.flatMap((c) => {
+    const id = (c.goal_task_id ?? c.goal_id)!
+    if (seenGoals.has(id)) return []
+    seenGoals.add(id)
+    return [{ id, title: goalTitle.get(id) ?? '', kind: c.goal_task_id ? 'task' as const : 'goal' as const }]
+  })
+  const log = await goalLogs(db, readGoals, new Map(options.map((o) => [o.id, o.name])))
+  return JSON.stringify({ choices, log })
 }
 
 // ── symphony_propose_choice_changes ─────────────────────────────────
 
 /** The model's call, checked and shaped. References by title, name or label
  *  are kept as given here (choiceTitle, optionName, columnLabel, workLabels,
- *  a raw string value) and resolved by resolveChoiceRefs. */
-export function choiceSetFromInput(input: Record<string, unknown>, key: string): { set: ChangeSet } | { error: string } {
+ *  a raw string value) and resolved by resolveChoiceRefs. `today` is the
+ *  household's local day (YYYY-MM-DD), which decides log versus plan. */
+export function choiceSetFromInput(input: Record<string, unknown>, key: string, today: string): { set: ChangeSet } | { error: string } {
   const raw = Array.isArray(input.ops) ? input.ops : null
   if (!raw || !raw.length) return { error: 'Provide at least one op' }
   if (raw.length > MAX_OPS) return { error: `Propose at most ${MAX_OPS} changes at a time` }
@@ -293,6 +381,35 @@ export function choiceSetFromInput(input: Record<string, unknown>, key: string):
       return { error: `${at}: amount must be a number of dollars, 0 to ${MAX_AMOUNT.toLocaleString('en-US')} (e.g. 19750)` }
     }
     if (o.contact_id !== undefined && !isId(o.contact_id)) return { error: `${at}: contact_id must be a contact id from symphony_list_contacts` }
+    if (o.log_kind !== undefined && (typeof o.log_kind !== 'string' || !(LOG_KINDS as readonly string[]).includes(o.log_kind))) {
+      return { error: `${at}: log_kind must be one of ${LOG_KINDS.join(', ')}` }
+    }
+    if (o.time !== undefined && !realTime(o.time)) return { error: `${at}: time must be HH:MM (24-hour)` }
+
+    if (EVENT_OPS.has(op)) {
+      if (o.log_kind === undefined) return { error: `${at}: ${op} needs log_kind (${LOG_KINDS.join(', ')})` }
+      if (o.date === undefined) return { error: `${at}: ${op} needs a date (YYYY-MM-DD)` }
+      if (op === 'event_log' && (o.date as string) > today) return { error: `${at}: event_log is for things that already happened; use event_plan for a future date` }
+      if (op === 'event_plan' && (o.date as string) <= today) return { error: `${at}: event_plan is for a future date; use event_log for something that already happened (today or earlier)` }
+      const summary = typeof o.summary === 'string' ? o.summary.trim() : ''
+      if (!summary) return { error: `${at}: ${op} needs a summary: ${op === 'event_log' ? 'what happened' : 'what it is for'}, in the person's words` }
+      if (summary.length > MAX_SUMMARY) return { error: `${at}: summary must be at most ${MAX_SUMMARY} characters` }
+      base.logKind = o.log_kind as LogKind
+      base.date = o.date as string
+      if (o.time !== undefined) base.time = o.time as string
+      base.summary = summary
+      // About exactly one thing: the goal alone, or an option (below).
+      // An explicit null names nothing.
+      const aboutOption = o.choice_id != null || o.choice_title != null || o.option_id != null || o.option_name != null
+      if (o.goal_id != null) {
+        if (aboutOption) return { error: `${at}: name either the goal (goal_id) or an option (option_id or option_name, with choice_id), not both` }
+        if (!isId(o.goal_id)) return { error: `${at}: goal_id must be a goal id from symphony_read_plan` }
+        base.goalId = o.goal_id
+        ops.push(base)
+        continue
+      }
+      if (!aboutOption) return { error: `${at}: name the goal (goal_id) or an option (option_id or option_name, with choice_id)` }
+    }
 
     if (op === 'choice_add') {
       if (!isId(o.goal_id)) return { error: `${at}: choice_add needs goal_id, a goal id from symphony_read_plan` }
@@ -309,7 +426,7 @@ export function choiceSetFromInput(input: Record<string, unknown>, key: string):
     else if (text(o.choice_title, MAX_NAME)) base.choiceTitle = text(o.choice_title, MAX_NAME)
     else return { error: `${at}: name the choice with choice_id or choice_title` }
 
-    if (OPTION_LEVEL.has(op)) {
+    if (OPTION_LEVEL.has(op) || EVENT_OPS.has(op)) {
       if (isId(o.option_id)) base.optionId = o.option_id
       else if (text(o.option_name, MAX_NAME)) base.optionName = text(o.option_name, MAX_NAME)
       else return { error: `${at}: name the option with option_id or option_name` }
@@ -469,6 +586,19 @@ export function resolveChoiceRefs(set: ChangeSet, refs: ChoiceRefs): { set: Chan
       continue
     }
 
+    // A log op about the goal alone: the goal, as a choice_add names it.
+    if (EVENT_OPS.has(op.op as ChoiceOpKind) && op.goalId && !op.choiceId && !op.choiceKey && !op.choiceTitle) {
+      const goal = goals.get(op.goalId)
+      if (!goal) return { error: `No goal ${op.goalId} that this person can see. Read the plan (symphony_read_plan) and use its ids.` }
+      delete next.goalId
+      if (goal.kind === 'task') next.goalTaskId = goal.id
+      else next.goalId = goal.id
+      next.goalTitle = goal.title
+      next.title = goal.title
+      ops.push(next)
+      continue
+    }
+
     // The choice: an existing one by id, or a choice_add earlier in the set by title.
     let c: Running | undefined
     if (op.choiceId) {
@@ -492,7 +622,7 @@ export function resolveChoiceRefs(set: ChangeSet, refs: ChoiceRefs): { set: Chan
 
     // The option: an existing one by id, an option_add earlier in the set by
     // name, or an existing one by its exact name (any case).
-    if (OPTION_LEVEL.has(op.op as ChoiceOpKind)) {
+    if (OPTION_LEVEL.has(op.op as ChoiceOpKind) || EVENT_OPS.has(op.op as ChoiceOpKind)) {
       delete next.optionId
       delete next.optionKey
       if (op.optionId) {

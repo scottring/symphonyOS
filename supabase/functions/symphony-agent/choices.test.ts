@@ -6,6 +6,7 @@ import type { ChangeSet as AppChangeSet } from '../../../src/lib/canvas/changeCa
 import type { ChoiceDetail } from '../../../src/lib/choices/db'
 import type { ChoiceWriters } from '../../../src/lib/choices/applyDeps'
 import type { Choice, ChoiceOption } from '../../../src/types/choice'
+import { localYmd } from '../../../src/lib/choices/log'
 import * as mirror from './choicePrice'
 import {
   choiceSetFromInput, loadChoiceRefs, PROPOSE_CHOICE_CHANGES_TOOL, READ_CHOICES_TOOL, readChoices, resolveChoiceRefs, type ChoiceRefs,
@@ -22,14 +23,18 @@ const CH = '4d5e6f7a-8b9c-4d0e-9f2a-3b4c5d6e7f80'
 const RB = '5e6f7a8b-9c0d-4e1f-8a3b-4c5d6e7f8091'
 const CT = '6f7a8b9c-0d1e-4f2a-9b4c-5d6e7f809102'
 const SEEN = '2026-10-20T14:00:00.123456+00:00'
+// The household's local day, as index.ts computes it; the app checks a log's
+// day against the device's own, so the tests use the real one.
+const TODAY = localYmd(new Date())
+const dayFrom = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return localYmd(d) }
 
 const parse = (ops: Record<string, unknown>[], title?: string) => {
-  const r = choiceSetFromInput({ ...(title ? { title } : {}), ops }, 'k')
+  const r = choiceSetFromInput({ ...(title ? { title } : {}), ops }, 'k', TODAY)
   if ('error' in r) throw new Error(r.error)
   return r.set
 }
 const refused = (ops: Record<string, unknown>[]) => {
-  const r = choiceSetFromInput({ ops }, 'k')
+  const r = choiceSetFromInput({ ops }, 'k', TODAY)
   return 'error' in r ? r.error : null
 }
 
@@ -213,6 +218,10 @@ describe('resolveChoiceRefs', () => {
       deleteTask: vi.fn(async () => true),
       chooseOption: vi.fn(async () => true),
       reopenChoice: vi.fn(async () => true),
+      addLogEntry: vi.fn(async () => null),
+      deleteLogEntry: vi.fn(async () => true),
+      planEvent: vi.fn(async () => null),
+      loadGoalFacts: vi.fn(async () => null),
     }
     const deps: ApplyDeps = {
       managedRecovery: true, tasks: [], updateTask: vi.fn(async () => true), addTask: vi.fn(async () => 'x'), deleteTask: vi.fn(async () => {}),
@@ -272,6 +281,7 @@ function fakeDb(tables: Record<string, Row[]>) {
         in: (c: string, vs: unknown[]) => { rows = rows.filter((r) => vs.includes(r[c])); return q },
         order: () => q,
         limit: (k: number) => { rows = rows.slice(0, k); return q },
+        not: (c: string, op: string, v: unknown) => { if (op === 'is' && v === null) rows = rows.filter((r) => r[c] != null); return q },
         then: (ok: (v: { data: Row[]; error: null }) => unknown, bad?: (e: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(ok, bad),
       }
       return q
@@ -373,7 +383,7 @@ describe('tools and prompt', () => {
     const { OP_KINDS } = await import('./changeSet')
     expect(OP_KINDS).not.toContain('choice_add')
     const kinds = (PROPOSE_CHOICE_CHANGES_TOOL.input_schema as { properties: { ops: { items: { properties: { op: { enum: string[] } } } } } }).properties.ops.items.properties.op.enum
-    expect(kinds).toEqual(['choice_add', 'option_add', 'option_status', 'option_set', 'price_line', 'column_add', 'work_set', 'choice_choose', 'choice_reopen', 'follow_up'])
+    expect(kinds).toEqual(['choice_add', 'option_add', 'option_status', 'option_set', 'price_line', 'column_add', 'work_set', 'choice_choose', 'choice_reopen', 'follow_up', 'event_log', 'event_plan'])
     const set: ChangeSet = parse([{ op: 'choice_reopen', choice_id: C }])
     expect(set.ops[0].op).toBe('choice_reopen')
   })
@@ -436,6 +446,7 @@ describe('review fixes', () => {
       addOption, deleteOption: vi.fn(async () => true), updateOption: vi.fn(async () => true), addPriceLine: vi.fn(async () => null), deletePriceLine: vi.fn(async () => true),
       addContact, deleteContact: vi.fn(async () => true), createFollowUp: vi.fn(async () => null), deleteTask: vi.fn(async () => true),
       chooseOption: vi.fn(async () => true), reopenChoice: vi.fn(async () => true),
+      addLogEntry: vi.fn(async () => null), deleteLogEntry: vi.fn(async () => true), planEvent: vi.fn(async () => null), loadGoalFacts: vi.fn(async () => null),
     } as ChoiceWriters
     const applied = await applyChangeSet(r.set as unknown as AppChangeSet, {
       managedRecovery: true, tasks: [], updateTask: vi.fn(async () => true), addTask: vi.fn(async () => 'x'), deleteTask: vi.fn(async () => {}),
@@ -529,5 +540,146 @@ describe('final review fixes', () => {
     const by = Object.fromEntries(c.options.map((o: { name: string }) => [o.name, o]))
     expect(by['Martinez Tile & Bath']).toMatchObject({ status: 'heard_back', waiting_since: null, follow_up: '2026-10-20' })
     expect(by["Rob (Dave's cousin)"].waiting_since).toBe('2026-10-16')
+  })
+})
+
+describe('log events', () => {
+  const PAST = dayFrom(-7)
+  const LATER = dayFrom(8)
+
+  it('parses event_log with the option_status it brings', () => {
+    const set = parse([
+      { op: 'event_log', choice_id: C, option_id: MZ, log_kind: 'call', date: TODAY, time: '14:30', summary: ' Can start the week of Nov 17 ' },
+      { op: 'option_status', choice_id: C, option_id: MZ, status: 'contacted' },
+    ])
+    expect(set.ops[0]).toMatchObject({ op: 'event_log', choiceId: C, optionId: MZ, logKind: 'call', date: TODAY, time: '14:30', summary: 'Can start the week of Nov 17' })
+    expect(set.ops[1]).toMatchObject({ op: 'option_status', status: 'contacted' })
+    const r = resolveChoiceRefs(set, REFS)
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.ops[0]).toMatchObject({ choiceId: C, seen: SEEN, optionId: MZ, optionName: 'Martinez Tile & Bath', title: 'Martinez Tile & Bath', goalTitle: 'Redo the bathrooms' })
+    expect(r.set.ops[0].goalId).toBeUndefined()
+    expect(r.set.ops[0].goalTaskId).toBeUndefined()
+  })
+
+  it('refuses an event_log dated after today, and an event_plan dated today or earlier', () => {
+    const tomorrow = dayFrom(1)
+    expect(refused([{ op: 'event_log', choice_id: C, option_id: MZ, log_kind: 'call', date: tomorrow, summary: 'Call' }]))
+      .toBe('Op 1: event_log is for things that already happened; use event_plan for a future date')
+    expect(refused([{ op: 'event_plan', goal_id: G, log_kind: 'visit', date: TODAY, summary: 'Walkthrough' }])).toMatch(/^Op 1: event_plan .*event_log/)
+    expect(refused([{ op: 'event_plan', goal_id: G, log_kind: 'visit', date: PAST, summary: 'Walkthrough' }])).toMatch(/event_log/)
+    // Today is the household's day as given, not UTC's.
+    expect('set' in choiceSetFromInput({ ops: [{ op: 'event_log', goal_id: G, log_kind: 'note', date: '2026-10-23', summary: 'x' }] }, 'k', '2026-10-23')).toBe(true)
+    expect('error' in choiceSetFromInput({ ops: [{ op: 'event_log', goal_id: G, log_kind: 'note', date: '2026-10-23', summary: 'x' }] }, 'k', '2026-10-22')).toBe(true)
+    // Each field is checked.
+    expect(refused([{ op: 'event_log', goal_id: G, log_kind: 'email', date: TODAY, summary: 'x' }])).toMatch(/log_kind/)
+    expect(refused([{ op: 'event_log', goal_id: G, date: TODAY, summary: 'x' }])).toMatch(/log_kind/)
+    expect(refused([{ op: 'event_log', goal_id: G, log_kind: 'call', summary: 'x' }])).toMatch(/date/)
+    expect(refused([{ op: 'event_log', goal_id: G, log_kind: 'call', date: TODAY, summary: '  ' }])).toMatch(/summary/)
+    expect(refused([{ op: 'event_log', goal_id: G, log_kind: 'call', date: TODAY, summary: 'x'.repeat(501) }])).toMatch(/500/)
+    expect(refused([{ op: 'event_log', goal_id: G, log_kind: 'call', date: TODAY, time: '2pm', summary: 'x' }])).toMatch(/HH:MM/)
+    // About exactly one thing: the goal, or an option of a choice.
+    expect(refused([{ op: 'event_log', log_kind: 'call', date: TODAY, summary: 'x' }])).toMatch(/goal_id.*option/)
+    expect(refused([{ op: 'event_log', goal_id: G, choice_id: C, option_id: MZ, log_kind: 'call', date: TODAY, summary: 'x' }])).toMatch(/not both/)
+    expect(refused([{ op: 'event_log', choice_id: C, log_kind: 'call', date: TODAY, summary: 'x' }])).toMatch(/option_id or option_name/)
+    // A null on an unused optional field is not given.
+    expect(parse([{ op: 'event_log', goal_id: G, choice_id: null, option_id: null, log_kind: 'call', date: TODAY, time: null, summary: 'x' }]).ops[0]).toMatchObject({ goalId: G })
+    expect(parse([{ op: 'event_log', goal_id: G, log_kind: 'call', date: TODAY, time: null, summary: 'x' }]).ops[0].time).toBeUndefined()
+    expect(parse([{ op: 'follow_up', choice_id: C, option_id: MZ, date: LATER, log_kind: null, time: null }]).ops[0].logKind).toBeUndefined()
+  })
+
+  it('an event_plan about the goal alone resolves the goal and its title', () => {
+    const r = resolveChoiceRefs(parse([
+      { op: 'event_plan', goal_id: G, log_kind: 'meeting', date: LATER, time: '10:00', summary: 'Walk the bathrooms with Iris' },
+      { op: 'event_log', goal_id: Y, log_kind: 'note', date: PAST, summary: 'Budget agreed' },
+    ]), REFS)
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.ops[0]).toMatchObject({ op: 'event_plan', goalTaskId: G, goalTitle: 'Redo the bathrooms', title: 'Redo the bathrooms', logKind: 'meeting', date: LATER, time: '10:00' })
+    expect(r.set.ops[0].goalId).toBeUndefined()
+    expect(r.set.ops[1]).toMatchObject({ goalId: Y, goalTitle: 'A calmer house' })
+    expect(r.set.ops[1].goalTaskId).toBeUndefined()
+    for (const o of r.set.ops) expect(o.choiceId ?? o.choiceKey ?? o.optionId ?? o.optionKey).toBeUndefined()
+    const hidden = resolveChoiceRefs(parse([{ op: 'event_plan', goal_id: C2, log_kind: 'visit', date: LATER, summary: 'x' }]), REFS)
+    expect(hidden).toEqual({ error: expect.stringContaining('symphony_read_plan') })
+  })
+
+  it('the app applies the log and plan ops Symphony resolves', async () => {
+    const set = parse([
+      { op: 'option_add', choice_id: C, name: 'Scher Remodeling' },
+      { op: 'event_log', choice_id: C, option_name: 'scher remodeling', log_kind: 'call', date: TODAY, summary: 'Left a message' },
+      { op: 'event_plan', choice_id: C, option_id: MZ, log_kind: 'visit', date: LATER, time: '10:00', summary: 'Measure the hall bath' },
+      { op: 'event_plan', goal_id: G, log_kind: 'meeting', date: LATER, summary: 'Decide with Iris' },
+    ])
+    const r = resolveChoiceRefs(set, REFS)
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.ops[1]).toMatchObject({ choiceId: C, optionKey: 'k:0', optionName: 'Scher Remodeling' })
+    const at = new Date(SEEN)
+    const c: Choice = { id: C, userId: 'u', goal: { kind: 'task', id: G }, title: 'Contractor', status: 'open', decidedWork: [], columns: [], work: [], selectedWork: [], sortOrder: 0, createdAt: at, updatedAt: at }
+    const mz: ChoiceOption = { id: MZ, choiceId: C, userId: 'u', name: 'Martinez Tile & Bath', status: 'heard_back', statusChangedAt: at, values: {}, sortOrder: 0, updatedAt: at }
+    const detail: ChoiceDetail = { choice: c, goalTitle: 'Redo the bathrooms', goalContext: 'family', goalScope: 'compound', options: [mz], lines: [], followUps: [], contacts: new Map() }
+    const w = {
+      loadChoice: vi.fn(async () => detail), createChoice: vi.fn(async () => c), deleteChoice: vi.fn(async () => true), updateChoice: vi.fn(async () => true),
+      addOption: vi.fn(async (choiceId: string, input: { name: string }): Promise<ChoiceOption> => ({ ...mz, id: 'opt-new', choiceId, name: input.name, status: 'considering' })),
+      deleteOption: vi.fn(async () => true), updateOption: vi.fn(async () => true), addPriceLine: vi.fn(async () => null), deletePriceLine: vi.fn(async () => true),
+      addContact: vi.fn(async () => null), deleteContact: vi.fn(async () => true), createFollowUp: vi.fn(async () => null), deleteTask: vi.fn(async () => true),
+      chooseOption: vi.fn(async () => true), reopenChoice: vi.fn(async () => true),
+      addLogEntry: vi.fn(async () => ({ id: 'entry1', userId: 'u', goal: { kind: 'task' as const, id: G }, kind: 'call' as const, on: TODAY, summary: 'Left a message', createdAt: at })),
+      deleteLogEntry: vi.fn(async () => true),
+      planEvent: vi.fn(async () => 'task1'),
+      loadGoalFacts: vi.fn(async () => ({ context: 'family' as const, scope: 'compound' })),
+    } satisfies ChoiceWriters
+    const applied = await applyChangeSet(r.set as unknown as AppChangeSet, {
+      managedRecovery: true, tasks: [], updateTask: vi.fn(async () => true), addTask: vi.fn(async () => 'x'), deleteTask: vi.fn(async () => {}),
+      weekStart: new Date(2026, 9, 18), choiceWriters: w,
+    })
+    expect(applied).toMatchObject({ ok: true })
+    expect(w.addLogEntry).toHaveBeenCalledWith({ goal: { kind: 'task', id: G }, kind: 'call', on: TODAY, summary: 'Left a message', optionId: 'opt-new' })
+    expect(w.planEvent).toHaveBeenCalledWith(expect.objectContaining({ goal: { kind: 'task', id: G }, kind: 'visit', on: LATER, time: '10:00', optionId: MZ, optionName: 'Martinez Tile & Bath' }))
+    expect(w.planEvent).toHaveBeenCalledWith(expect.objectContaining({ goal: { kind: 'task', id: G }, kind: 'meeting', on: LATER, summary: 'Decide with Iris' }))
+    expect(w.loadGoalFacts).toHaveBeenCalledWith({ kind: 'task', id: G })
+  })
+
+  it('readChoices gives each goal read its log: upcoming events and the latest done lines', async () => {
+    const entry = (id: string, x: Row) => ({ id, user_id: 'u', goal_task_id: G, goal_id: null, choice_option_id: null, happened_at_time: null, created_at: SEEN, ...x })
+    const db = fakeDb({
+      ...MOCKUP,
+      goal_log_entries: [
+        entry('e1', { choice_option_id: MZ, kind: 'call', happened_on: '2026-10-15', happened_at_time: '14:30:00', summary: 'Can start Nov 17' }),
+        entry('e2', { kind: 'note', happened_on: '2026-10-18', summary: 'Budget is $30k' }),
+        ...Array.from({ length: 25 }, (_, i) => entry(`old${i}`, { kind: 'message', happened_on: `2026-09-${String(i + 1).padStart(2, '0')}`, summary: `Old ${i + 1}` })),
+      ],
+      tasks: [...MOCKUP.tasks, {
+        id: 'v1', goal_task_id: G, goal_id: null, choice_option_id: CH, log_kind: 'visit', title: 'Home visit: Measure the hall bath (Chesapeake Renovations)',
+        scheduled_for: '2026-10-30T14:00:00+00:00', is_all_day: false, completed: false, completed_at: null, waiting_since: null, created_at: SEEN,
+      }],
+    })
+    const out = JSON.parse(await readChoices(db, { goal_id: G }))
+    expect(out.log).toHaveLength(1)
+    const [log] = out.log
+    expect(log.goal).toEqual({ title: 'Redo the bathrooms', id: G })
+    expect(log.upcoming).toEqual([{ on: '2026-10-30', time: '10:00', kind: 'Home visit', about: 'Chesapeake Renovations', text: 'Home visit: Measure the hall bath (Chesapeake Renovations)' }])
+    expect(log.done).toHaveLength(20)
+    expect(log.done[0]).toEqual({ on: '2026-10-18', kind: 'Note', about: 'the project', text: 'Budget is $30k' })
+    expect(log.done[1]).toEqual({ on: '2026-10-15', time: '14:30', kind: 'Phone call', about: 'Martinez Tile & Bath', text: 'Can start Nov 17' })
+    expect(log.done[19].text).toBe('Old 8')
+    expect(log.older_not_shown).toBe(7)
+    // A goal with no choices still has its log read; the plain read gives every goal's.
+    const bare = JSON.parse(await readChoices(fakeDb({ ...MOCKUP, choices: [], goal_log_entries: [entry('e3', { kind: 'visit', happened_on: '2026-10-01', summary: 'Looked at tile' })] }), { goal_id: G }))
+    expect(bare.choices).toEqual([])
+    expect(bare.log[0].done).toEqual([{ on: '2026-10-01', kind: 'Home visit', about: 'the project', text: 'Looked at tile' }])
+    const all = JSON.parse(await readChoices(db, {}))
+    expect(all.log.map((l: { goal: { id: string } }) => l.goal.id)).toEqual([G])
+    expect(JSON.stringify(out)).not.toMatch(/best|recommend|cheapest|rank/i)
+  })
+
+  it('the tool and the prompt name the log ops', () => {
+    const items = PROPOSE_CHOICE_CHANGES_TOOL.input_schema.properties.ops.items.properties
+    expect(items.log_kind.enum).toEqual(['call', 'visit', 'message', 'meeting', 'note'])
+    expect(items.time).toBeDefined()
+    expect(items.summary).toBeDefined()
+    expect(PROPOSE_CHOICE_CHANGES_TOOL.description).toMatch(/event_log \(something that already happened/)
+    expect(PROPOSE_CHOICE_CHANGES_TOOL.description).toMatch(/event_plan \(a future visit, call or meeting/)
+    const src = readFileSync('supabase/functions/symphony-agent/index.ts', 'utf8')
+    expect(src).toContain('Log calls, visits, messages, meetings and notes with event_log (past) and plan future ones with event_plan. When logging a contact with an option that is Considering, also propose option_status → contacted in the same card. Never set a status backward.')
+    expect(src).toMatch(/choiceSetFromInput\(block\.input \?\? \{\}, .*, today\)/)
   })
 })
