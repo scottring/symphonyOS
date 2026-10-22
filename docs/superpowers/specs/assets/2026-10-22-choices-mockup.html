@@ -134,10 +134,19 @@
   .chat .cc{align-self:stretch}
   .drafttag{font-size:12px;color:var(--ink-3)}
   .canvas-link{font-size:13px;color:var(--sage);cursor:pointer}
+  .season{display:grid;grid-template-columns:1fr 520px;gap:0;min-height:640px}
+  .slist{padding:26px 34px;opacity:.6}
+  .sline{background:rgba(255,255,255,.8);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:6px;font-size:14.5px}
+  .sline.on{opacity:1;box-shadow:0 0 0 1.5px hsl(150 24% 62%);background:#fff}
+  .muted2{color:var(--ink-3);background:transparent;border-style:dashed}
+  .gpanel{background:#fbfbfa;border-left:1px solid var(--line);padding:22px 24px;box-shadow:-20px 0 40px -30px rgba(0,0,0,.25)}
+  .gkind{font:600 10.5px 'DM Sans';letter-spacing:.12em;color:var(--ink-3);margin-bottom:4px}
+  .tabs span.on{background:var(--navy);color:#fff}
   .callouts{max-width:1280px;margin:0 auto 18px;color:#cfc8d8;font-size:13px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px}
   .callouts div{background:#34313f;border-radius:10px;padding:10px 12px;line-height:1.45}
   .callouts b{color:#fff;font-weight:600}
   @media (max-width:860px){
+    .season{grid-template-columns:1fr} .slist{display:none}
     .parts{grid-template-columns:1fr}
     .page{grid-template-columns:1fr;padding:20px 16px}
     .cmp{padding:18px 16px} .strip{grid-template-columns:1fr;margin:0 16px 24px}
@@ -148,9 +157,9 @@
 </style>
 </head>
 <body>
-<div class="note">Mockup with example data: the bathroom renovation and four contractors. The app's top bar and the project page layout are unchanged; the new parts are the Choices section and what opens from it.</div>
+<div class="note">Mockup with example data: a Fall goal, "Redo the bathrooms", and four contractors. The goal panel is simplified; the new parts are its Choices section and the comparison page it opens.</div>
 <div class="modes">
-  <button data-v="project" class="on">1 · Project page</button>
+  <button data-v="project" class="on">1 · On the goal</button>
   <button data-v="compare">2 · Comparing contractors</button>
   <button data-v="phone">3 · On a phone</button>
   <button data-v="dropin">4 · In chat</button>
@@ -158,48 +167,40 @@
 </div>
 <div class="callouts" id="callouts"></div>
 
-<!-- 1 PROJECT PAGE -->
+<!-- 1 ON THE GOAL -->
 <div class="win view on" id="v-project">
   <div class="nav"><div class="brand"><i></i>SYMPHONY</div><span style="color:var(--ink-2)">☰</span>
-    <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span>Season</span><span>Year</span></div>
+    <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span class="on">Season</span><span>Year</span></div>
     <div class="navr"><span>People</span><span>Family</span><span>Search</span></div></div>
-  <div class="page">
-    <div>
-      <div class="crumb">Projects · Family</div>
-      <h1>Bathroom renovation</h1>
-      <div class="sub">In progress · <b>shared with Iris</b></div>
-
+  <div class="season">
+    <div class="slist">
+      <h1>Fall</h1><div class="sub">Sep 22 – Dec 20 · 9 goals</div>
+      <div class="sline">Kaleb's college visits</div>
+      <div class="sline on">Redo the bathrooms</div>
+      <div class="sline">Get the garden ready for winter</div>
+      <div class="sline">Iris's half marathon</div>
+      <div class="sline muted2">+5 more</div>
+    </div>
+    <div class="gpanel">
+      <div class="gkind">GOAL · FALL · FAMILY</div>
+      <h1 style="font-size:30px">Redo the bathrooms</h1>
+      <div class="sub">Shared with Iris</div>
       <div class="section">
-        <h2>Choices <span class="add">+ Choice</span></h2>
-        <div class="choice" data-goto="compare">
-          <div><div class="t">Contractor</div>
-            <div class="f">4 options · 3 heard back · <b>1 waiting 6 days</b> · 1 ruled out</div></div>
-          <span class="go">›</span>
-        </div>
-        <div class="choice">
-          <div><div class="t">Floor tile</div>
-            <div class="f">3 options · none heard back yet</div></div>
-          <span class="go">›</span>
-        </div>
-      </div>
-
-      <div class="section">
-        <h2>Tasks <span class="add">+ Task</span></h2>
+        <h2>Steps <span class="add">+ Step</span></h2>
         <div class="tk"><i></i>Follow up with Rob about a quote <span class="tag">Waiting · Contractor</span><span class="w">Thu Oct 23</span></div>
-        <div class="tk"><i></i>Send the work to Rob once he replies<span class="w">Fri Oct 24</span></div>
-        <div class="tk"><i></i>Measure the bathroom for the vanity<span class="w">Sat Oct 25</span></div>
+        <div class="tk"><i></i>Measure for the vanity<span class="w">Sat Oct 25</span></div>
         <div class="tk" style="opacity:.55"><i style="background:var(--sage);border-color:var(--sage)"></i><s>Get Martinez to come look</s><span class="w">Done</span></div>
       </div>
-
+      <div class="section">
+        <h2>Choices <span class="add">+ Choice</span></h2>
+        <div class="choice" data-goto="compare"><div><div class="t">Contractor</div>
+            <div class="f">4 options · 3 heard back · <b>1 waiting 6 days</b> · 1 ruled out</div></div><span class="go">›</span></div>
+        <div class="choice"><div><div class="t">Floor tile</div><div class="f">3 options · none heard back yet</div></div><span class="go">›</span></div>
+      </div>
       <div class="section">
         <h2>Notes</h2>
-        <div class="tk" style="color:var(--ink-2)">Keep the tub. Want a walk-in shower where the linen closet is.</div>
+        <div class="tk" style="color:var(--ink-2)">Keep the tub. Walk-in shower where the linen closet is.</div>
       </div>
-    </div>
-    <div class="side">
-      <div class="card"><h3>Status</h3><p>In progress</p></div>
-      <div class="card"><h3>Progress</h3><p>1 of 4 tasks done</p><div class="bar"><i></i></div></div>
-      <div class="card"><h3>Project context</h3><p>Permit office · 410-555-0100</p></div>
     </div>
   </div>
 </div>
@@ -210,7 +211,7 @@
     <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span>Season</span><span>Year</span></div>
     <div class="navr"><span>People</span><span>Family</span><span>Search</span></div></div>
   <div class="cmp">
-    <span class="back" data-goto="project">‹ Bathroom renovation</span>
+    <span class="back" data-goto="project">‹ Redo the bathrooms</span>
     <div class="cmphead">
       <div><h1>Contractor</h1><div class="sub" style="margin-bottom:0">4 options · 3 heard back · 1 waiting</div></div>
       <div class="r"><button class="btn">⋯</button></div>
@@ -262,7 +263,7 @@
 
 <!-- 3 PHONE -->
 <div class="win view phone" id="v-phone">
-  <div class="phnav"><span style="color:var(--sage)">‹ Bathroom renovation</span><span style="margin-left:auto">⋯</span></div>
+  <div class="phnav"><span style="color:var(--sage)">‹ Redo the bathrooms</span><span style="margin-left:auto">⋯</span></div>
   <div class="ph">
     <h1>Contractor</h1>
     <div class="sub">4 options · 3 heard back · 1 waiting</div>
@@ -289,7 +290,7 @@
     <div class="me">Chesapeake called back. $19,750 for the main bath, or $27,000 for main and hall together. They can start December 1st and they're insured.<span class="file" style="display:block;margin-top:6px">Chesapeake-Renovations-proposal.pdf</span></div>
     <div class="cc">
       <header><h4>Contractor</h4><span class="drafttag">Draft · Not saved</span></header>
-      <h5>Bathroom renovation · Contractor · Chesapeake Renovations</h5>
+      <h5>Redo the bathrooms · Contractor · Chesapeake Renovations</h5>
       <ul>
         <li><span class="k">STATUS</span><span>Heard back</span><span class="wh">was Considering</span></li>
         <li><span class="k">PRICE</span><span>Main bath</span><span class="wh">$19,750</span></li>
@@ -305,7 +306,7 @@
     <div class="me">Add a column for warranty, and Harbor said 2 years.</div>
     <div class="cc">
       <header><h4>Contractor</h4><span class="drafttag">Draft · Not saved</span></header>
-      <h5>Bathroom renovation · Contractor</h5>
+      <h5>Redo the bathrooms · Contractor</h5>
       <ul>
         <li><span class="k">COLUMN</span><span>Warranty</span><span class="wh">text</span></li>
         <li><span class="k">SET</span><span>Harbor Bath Remodeling · Warranty</span><span class="wh">2 years</span></li>
@@ -318,45 +319,37 @@
 <!-- 5 DECIDED -->
 <div class="win view" id="v-decided">
   <div class="nav"><div class="brand"><i></i>SYMPHONY</div><span style="color:var(--ink-2)">☰</span>
-    <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span>Season</span><span>Year</span></div>
+    <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span class="on">Season</span><span>Year</span></div>
     <div class="navr"><span>People</span><span>Family</span><span>Search</span></div></div>
-  <div class="page">
-    <div>
-      <div class="crumb">Projects · Family</div>
-      <h1>Bathroom renovation</h1>
-      <div class="sub">In progress · <b>shared with Iris</b></div>
+  <div class="season">
+    <div class="slist">
+      <h1>Fall</h1><div class="sub">Sep 22 – Dec 20 · 9 goals</div>
+      <div class="sline">Kaleb's college visits</div>
+      <div class="sline on">Redo the bathrooms</div>
+      <div class="sline">Get the garden ready for winter</div>
+      <div class="sline">Iris's half marathon</div>
+      <div class="sline muted2">+5 more</div>
+    </div>
+    <div class="gpanel">
+      <div class="gkind">GOAL · FALL · FAMILY</div>
+      <h1 style="font-size:30px">Redo the bathrooms</h1>
+      <div class="sub">Shared with Iris</div>
+      <div class="section">
+        <h2>Steps <span class="add">+ Step</span></h2>
+        <div class="tk"><i style="background:var(--sage);border-color:var(--sage)"></i><s>Pick a contractor</s><span class="w">Done</span></div>
+        <div class="tk"><i></i>Sign with Martinez<span class="w">Mon Nov 3</span></div>
+        <div class="tk"><i></i>Measure for the vanity<span class="w">Sat Oct 25</span></div>
+      </div>
       <div class="section">
         <h2>Choices <span class="add">+ Choice</span></h2>
-        <div class="choice decided">
-          <div><div class="t">Contractor</div>
-            <div class="f">Chose Martinez Tile &amp; Bath · Oct 30 · $18,400 · Luis 410-555-0142</div></div>
-          <span class="go">›</span>
-        </div>
-        <div class="choice">
-          <div><div class="t">Floor tile</div><div class="f">3 options · 1 heard back</div></div><span class="go">›</span>
-        </div>
+        <div class="choice decided"><div><div class="t">Contractor</div>
+            <div class="f">Chose Martinez Tile &amp; Bath · Oct 30 · Main + Hall · $28,200</div></div><span class="go">›</span></div>
+        <div class="choice"><div><div class="t">Floor tile</div><div class="f">3 options · 1 heard back</div></div><span class="go">›</span></div>
       </div>
-      <div class="section muted">
-        <h2 style="font-size:15px;color:var(--ink-3)">Tapping Contractor opens:</h2>
-        <div class="decided-banner">
-          <div><div class="t">Chose Martinez Tile &amp; Bath</div>
-            <div class="why">"Earliest start and Dana's bathroom looks great." · Scott, Oct 30</div></div>
-          <div class="r"><button class="btn">Reopen</button></div>
-        </div>
-        <table>
-          <thead><tr><th>Option</th><th>Price</th><th>Earliest start</th><th>Insured</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td><b>Martinez Tile &amp; Bath</b></td><td>$18,400</td><td>Nov 17</td><td>Yes</td><td><span class="st chosen">Chosen</span></td></tr>
-            <tr><td>Chesapeake Renovations</td><td>$19,750</td><td>Dec 1</td><td>Yes</td><td><span class="st heard">Heard back</span></td></tr>
-            <tr><td>Harbor Bath Remodeling</td><td>$22,900</td><td>Jan 5</td><td>Yes</td><td><span class="st heard">Heard back</span></td></tr>
-            <tr><td>Rob (Dave's cousin)</td><td class="empty">—</td><td class="empty">—</td><td class="empty">—</td><td><span class="st contacted">Contacted</span></td></tr>
-          </tbody>
-        </table>
+      <div class="section">
+        <h2>Notes</h2>
+        <div class="tk" style="color:var(--ink-2)">Keep the tub. Walk-in shower where the linen closet is.</div>
       </div>
-    </div>
-    <div class="side">
-      <div class="card"><h3>Status</h3><p>In progress</p></div>
-      <div class="card"><h3>Progress</h3><p>2 of 5 tasks done</p><div class="bar"><i style="width:40%"></i></div></div>
     </div>
   </div>
 </div>
@@ -364,9 +357,9 @@
 <script>
 const CALLOUTS = {
   project: [
-    ["Choices sit above Tasks.", "Each one is a single line of facts: how many options, how many heard back, who you're waiting on. Nothing is ranked."],
-    ["Follow-ups are ordinary tasks.", "\"Follow up on…\" makes a waiting task linked to the option, so it shows on its day and here."],
-    ["Shared like the project.", "A Family project's choices are visible to Iris and editable by her, the same as its tasks."]
+    ["Choices sit on the goal, after its Steps.", "Each one is a single line of facts: how many options, how many heard back, who you're waiting on. Nothing is ranked."],
+    ["Follow-ups are steps.", "\"Follow up on…\" makes a waiting step of this goal, linked to the option, so it shows on its day and here."],
+    ["Shared like the goal.", "A Family goal's choices are Iris's too, to see and to change."]
   ],
   compare: [
     ["The work is part of the choice.", "List the pieces once (here, three bathrooms, each with what you want done). Tap them to price one, two or all three. Try it."],
@@ -384,7 +377,7 @@ const CALLOUTS = {
     ["Questions get facts.", "\"What would all three cost with Martinez?\" is answered from what's recorded, with the sum shown. Symphony doesn't offer opinions about which to pick."]
   ],
   decided: [
-    ["The decision is one line.", "Who, when, price and contact, so the project page answers \"who's doing it?\""],
+    ["The decision is one line.", "Who, when, which bathrooms and the price, so the goal answers \"who's doing it?\""],
     ["Your reason, in your words.", "Optional, one line, kept with the choice. Symphony doesn't write it."],
     ["Nothing is lost.", "The comparison stays readable, and Reopen undoes the decision."]
   ]
