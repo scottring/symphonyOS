@@ -149,6 +149,7 @@ try {
     insert into public.goals (id,user_id,name,scope) values ('${YEAR_GOAL}','${OWNER}','New car this year','compound');`)
   // The migration runs unchanged.
   sql(readFileSync(new URL('../supabase/migrations/20261022120000_choices.sql', import.meta.url), 'utf8'))
+  sql(readFileSync(new URL('../supabase/migrations/20261022180000_goal_log.sql', import.meta.url), 'utf8'))
 
   check('owner creates choice on family goal', () => {
     assert.equal(as(OWNER, `insert into public.choices (id,user_id,goal_task_id,title) values ('${C_FAMILY}','${OWNER}','${GOAL_FAMILY}','Roofer') returning 1`), '1')
@@ -260,6 +261,47 @@ try {
     assert.equal(as(MEMBER, `select count(*) from public.attachments where entity_type = 'task'`), '1')
     fails(`insert into public.attachments (user_id,entity_type,entity_id) values ('${OWNER}','choice','x')`, /attachments_entity_type_check/)
   })
+  check('goal log follows the goal: family visible to member, private not, outsider never', () => {
+    const E = (user, extra) => `insert into public.goal_log_entries (user_id,${extra.col},kind,happened_on,summary) values ('${user}','${extra.val}','call','2026-10-22','Called Acme') returning 1`
+    assert.equal(as(OWNER, E(OWNER, { col: 'goal_task_id', val: GOAL_FAMILY })), '1')
+    assert.equal(as(MEMBER, `select count(*) from public.goal_log_entries where goal_task_id = '${GOAL_FAMILY}'`), '1')
+    assert.equal(as(OUTSIDER, `select count(*) from public.goal_log_entries`), '0')
+    assert.equal(as(OWNER, E(OWNER, { col: 'goal_task_id', val: GOAL_PRIVATE })), '1')
+    assert.equal(as(MEMBER, `select count(*) from public.goal_log_entries where goal_task_id = '${GOAL_PRIVATE}'`), '0')
+    // The goal check runs first and reads tasks under RLS, so an outsider is refused there.
+    failsAs(OUTSIDER, E(OUTSIDER, { col: 'goal_task_id', val: GOAL_FAMILY }), /row-level security|A choice belongs to a goal/)
+  })
+  check('goal log: member cannot write as the owner', () => {
+    failsAs(MEMBER, `insert into public.goal_log_entries (user_id,goal_task_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_FAMILY}','call','2026-10-22','Spoofed')`, RLS)
+  })
+  check('goal log: entries cannot be moved to another goal or option', () => {
+    failsAs(OWNER, `update public.goal_log_entries set goal_task_id = '${GOAL_PRIVATE}' where goal_task_id = '${GOAL_FAMILY}'`, /goal_task_id is immutable/)
+    failsAs(MEMBER, `update public.goal_log_entries set user_id = '${MEMBER}' where goal_task_id = '${GOAL_FAMILY}'`, /user_id is immutable/)
+    failsAs(OWNER, `update public.goal_log_entries set choice_option_id = '${O_OWNER}' where goal_task_id = '${GOAL_FAMILY}'`, /choice_option_id is immutable|belongs to that option/)
+    assert.equal(as(MEMBER, `update public.goal_log_entries set summary = 'Called Acme back' where goal_task_id = '${GOAL_FAMILY}' returning 1`), '1')
+  })
+  check('goal log: option entries must sit on the option\'s own goal; goal_task_id must be a goal', () => {
+    assert.equal(as(OWNER, `insert into public.goal_log_entries (user_id,goal_task_id,choice_option_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_FAMILY}','${O_OWNER}','visit','2026-10-22','Site visit') returning 1`), '1')
+    assert.equal(as(MEMBER, `select count(*) from public.goal_log_entries where choice_option_id = '${O_OWNER}'`), '1')
+    failsAs(OWNER, `insert into public.goal_log_entries (user_id,goal_task_id,choice_option_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_PRIVATE}','${O_OWNER}','visit','2026-10-22','Wrong goal')`, /23514|belongs to that option/)
+    fails(`insert into public.goal_log_entries (user_id,goal_task_id,choice_option_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_PRIVATE}','${O_OWNER}','visit','2026-10-22','Wrong goal')`, /belongs to that option's goal/)
+    fails(`insert into public.goal_log_entries (user_id,goal_task_id,kind,happened_on,summary) values ('${OWNER}','${TASK_PLAIN}','call','2026-10-22','Not a goal')`, /A choice belongs to a goal/)
+    fails(`insert into public.goal_log_entries (user_id,goal_task_id,goal_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_FAMILY}','${YEAR_GOAL}','call','2026-10-22','Two')`, /goal_log_entries_check/)
+    fails(`insert into public.goal_log_entries (user_id,goal_task_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_FAMILY}','email','2026-10-22','Bad kind')`, /goal_log_entries_kind_check/)
+    fails(`insert into public.goal_log_entries (user_id,goal_task_id,kind,happened_on,summary) values ('${OWNER}','${GOAL_FAMILY}','call','2026-10-22','   ')`, /goal_log_entries_summary_check/)
+    fails(`update public.tasks set log_kind = 'email' where id = '${TASK_PLAIN}'`, /tasks_log_kind_check/)
+  })
+  check('goal log: year-goal entries follow the goals row', () => {
+    const q = `select count(*) from public.goal_log_entries where goal_id = '${YEAR_GOAL}'`
+    assert.equal(as(OWNER, `insert into public.goal_log_entries (user_id,goal_id,choice_option_id,kind,happened_on,summary) values ('${OWNER}','${YEAR_GOAL}','${O_YEAR}','call','2026-10-22','Test drive booked') returning 1`), '1')
+    assert.equal(as(MEMBER, q), '1')
+    assert.equal(as(OUTSIDER, q), '0')
+    as(OWNER, `update public.goals set scope = 'individual' where id = '${YEAR_GOAL}'`)
+    assert.equal(as(MEMBER, q), '0')
+    assert.equal(as(OWNER, q), '1')
+    as(OWNER, `update public.goals set scope = 'compound' where id = '${YEAR_GOAL}'`)
+    assert.equal(as(MEMBER, q), '1')
+  })
   check('deleting goal deletes choices', () => {
     as(OWNER, `insert into public.tasks (id,user_id,title,scope,choice_option_id) values ('${FOLLOW_UP}','${OWNER}','Call Acme back','compound','${O_OWNER}');
       update public.choices set status = 'decided', chosen_option_id = '${O_OWNER}' where id = '${C_FAMILY}';`)
@@ -273,9 +315,11 @@ try {
     assert.equal(as(OWNER, `delete from public.goals where id = '${YEAR_GOAL}' returning 1`), '1')
     assert.equal(sql(`select count(*) from public.choices where id = '${C_YEAR}'`), '0')
     assert.equal(sql(`select count(*) from public.choice_options where id = '${O_YEAR}'`), '0')
+    assert.equal(sql(`select count(*) from public.goal_log_entries where goal_id = '${YEAR_GOAL}' or goal_task_id = '${GOAL_FAMILY}'`), '0')
+    assert.equal(sql(`select count(*) from public.goal_log_entries where goal_task_id = '${GOAL_PRIVATE}'`), '1')
   })
-  check('journal triggers exist on choice tables and contacts', () => {
-    assert.equal(sql(`select count(*) from pg_trigger where tgname in ('reviewed_change_before','zz_reviewed_change_after') and tgrelid::regclass::text in ('choices','choice_options','choice_price_lines','contacts')`), '8')
+  check('journal triggers exist on choice tables, goal log and contacts', () => {
+    assert.equal(sql(`select count(*) from pg_trigger where tgname in ('reviewed_change_before','zz_reviewed_change_after') and tgrelid::regclass::text in ('choices','choice_options','choice_price_lines','contacts','goal_log_entries')`), '10')
     assert.equal(sql(`select count(*) from pg_trigger where tgname in ('reviewed_change_before','zz_reviewed_change_after') and tgrelid::regclass::text = 'contacts'`), '2')
   })
   console.log(`${checks} local PostgreSQL checks passed. No remote database or provider was contacted.`)

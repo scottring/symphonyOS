@@ -133,6 +133,7 @@ try {
     insert into public.goals (id,user_id,name,scope) values ('${YEAR_GOAL}','${OWNER}','New car this year','compound');`)
   sql(readFileSync(new URL('../supabase/migrations/20261016100000_reviewed_change_recovery.sql', import.meta.url), 'utf8'))
   sql(readFileSync(new URL('../supabase/migrations/20261022120000_choices.sql', import.meta.url), 'utf8'))
+  sql(readFileSync(new URL('../supabase/migrations/20261022180000_goal_log.sql', import.meta.url), 'utf8'))
 
   // One change card: begun, written under its header, finished; then Undo.
   let n = 0
@@ -213,6 +214,20 @@ try {
     assert.equal(one(`select count(*) from public.choice_options where id = '${DAVE}'`), '0')
     assert.equal(one(`select count(*) from public.tasks where id = '${TASK}'`), '0')
     assert.equal(decision(C), 'open|-|-')
+  })
+
+  check('log a call, add a visit follow-up and mark the option contacted: Undo takes all three back', () => {
+    const OPT = '50000000-0000-0000-0000-0000000000e1', ENTRY = '70000000-0000-0000-0000-0000000000e1', VISIT = '60000000-0000-0000-0000-0000000000e1'
+    as(OWNER, `insert into public.choice_options (id,choice_id,user_id,name) values ('${OPT}','${C}','${OWNER}','Eve');`)
+    const { undo } = card(`insert into public.goal_log_entries (id,user_id,goal_task_id,choice_option_id,kind,happened_on,summary) values ('${ENTRY}','${OWNER}','${GOAL_FAMILY}','${OPT}','call','2026-10-22','Called Eve');
+      insert into public.tasks (id,user_id,title,choice_option_id,scope,log_kind) values ('${VISIT}','${OWNER}','Visit Eve','${OPT}','compound','visit');
+      update public.choice_options set status = 'contacted', status_changed_at = now() where id = '${OPT}';`)
+    assert.equal(optionStatus(OPT), 'contacted')
+    assert.equal(undo(), 't')
+    assert.equal(one(`select count(*) from public.goal_log_entries where id = '${ENTRY}'`), '0')
+    assert.equal(one(`select count(*) from public.tasks where id = '${VISIT}'`), '0')
+    assert.equal(optionStatus(OPT), 'considering')
+    as(OWNER, `delete from public.choice_options where id = '${OPT}'`)
   })
 
   check('why chat refuses it: add an option and choose it on an existing choice cannot be undone', () => {
