@@ -1,4 +1,5 @@
-import {describe,it,expect,vi,beforeEach} from 'vitest'
+import {describe,it,expect,vi,beforeEach,afterEach} from 'vitest'
+import {CHOICES_UPDATED} from '@/lib/choices/events'
 import {applyReviewedChange} from './reviewedChange'
 import {applyChangeSet,type ApplyDeps} from './applyChangeSet'
 import type {ChangeSet} from './changeCard'
@@ -51,4 +52,35 @@ it('the same Undo receipt can be retried after a lost acknowledgement',async()=>
  const saved=await applyReviewedChange(set,deps,writer(),db as never)
  expect(saved.ok).toBe(true)
  if(saved.ok){await expect(saved.undo()).rejects.toMatchObject({name:'UndoOutcomeUnknown'});db.rpc.mockResolvedValue({data:true,error:null} as never);await expect(saved.undo()).resolves.toBe(true)}
+})
+
+describe('choice views refetch once the outcome is settled',()=>{
+ const choiceSet:ChangeSet={key:'turn-two',title:'A status',ops:[{key:'c',op:'option_status',title:'Rob',choiceId:'ch1',optionId:'o1',optionName:'Rob',status:'contacted'}]}
+ const events:string[]=[]
+ const order:string[]=[]
+ const listen=()=>{events.push('announce');order.push('announce')}
+ beforeEach(()=>{events.length=0;order.length=0;window.addEventListener(CHOICES_UPDATED,listen)})
+ afterEach(()=>window.removeEventListener(CHOICES_UPDATED,listen))
+ it('a managed failure announces once, after the journal undo resolves',async()=>{
+  vi.mocked(applyChangeSet).mockImplementation(async()=>{order.push('write');return {ok:false,reason:'failed',reverted:false,kept:['o1']}})
+  const db={rpc:vi.fn(async(name:string)=>{order.push(name);return {data:name==='begin_reviewed_change'?receipt:true,error:null}})}
+  expect(await applyReviewedChange(choiceSet,deps,writer(),db as never)).toMatchObject({ok:false,reverted:true})
+  expect(order).toEqual(['begin_reviewed_change','write','undo_reviewed_change','announce'])
+ })
+ it('a managed success announces once, after finish; its later Undo announces after it resolves',async()=>{
+  vi.mocked(applyChangeSet).mockImplementation(async()=>{order.push('write');return {ok:true,ids:['o1'],undo:async()=>true}})
+  const db={rpc:vi.fn(async(name:string)=>{order.push(name);return {data:name==='begin_reviewed_change'?receipt:true,error:null}})}
+  const r=await applyReviewedChange(choiceSet,deps,writer(),db as never)
+  expect(r.ok).toBe(true)
+  expect(order).toEqual(['begin_reviewed_change','write','finish_reviewed_change','announce'])
+  if(r.ok)await r.undo()
+  expect(order.slice(4)).toEqual(['undo_reviewed_change','announce'])
+  expect(events).toHaveLength(2)
+ })
+ it('a set with no choice ops does not announce',async()=>{
+  vi.mocked(applyChangeSet).mockResolvedValue({ok:true,ids:['one'],undo:async()=>true})
+  const db={rpc:vi.fn(async(name:string)=>({data:name==='begin_reviewed_change'?receipt:true,error:null}))}
+  await applyReviewedChange(set,deps,writer(),db as never)
+  expect(events).toEqual([])
+ })
 })

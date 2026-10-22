@@ -4,8 +4,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { listChoicesForGoal, loadChoice, createChoice, type ChoiceRow, type ChoiceDetail } from '@/lib/choices/db'
 import type { Choice, GoalRef } from '@/types/choice'
 
-/** Window event; every writer caller dispatches it after a write. */
-export const CHOICES_UPDATED = 'symphony-choices-updated'
+import { CHOICES_UPDATED } from '@/lib/choices/events'
+
+export { CHOICES_UPDATED }
 
 function useRefetchEvents(refetch: () => Promise<void>) {
   useEffect(() => {

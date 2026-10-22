@@ -133,8 +133,11 @@ create policy "Users can view reachable attachments" on public.attachments for s
 );
 
 -- Undo journal: the reviewed-change triggers (20261016100000_reviewed_change_recovery.sql).
+-- contacts too: chat's option_add makes a contact for a phone, and the card's
+-- Undo must take it back. The journal acts only on writes carrying the
+-- x-symphony-command header, so ordinary contact writes are unaffected.
 do $$declare t text;begin
- foreach t in array array['choices','choice_options','choice_price_lines'] loop
+ foreach t in array array['choices','choice_options','choice_price_lines','contacts'] loop
    execute format('create trigger reviewed_change_before before insert or update or delete on public.%I for each row execute function public.journal_reviewed_change()',t);
    execute format('create trigger zz_reviewed_change_after after insert or update or delete on public.%I for each row execute function public.journal_reviewed_change()',t);
  end loop;

@@ -14,9 +14,9 @@ import type { RescheduleResult } from '@/hooks/useActionableInstances'
 import { isChoiceOp, opWhen, opWrite, withSteps, type ChangeOp, type ChangeOpKind, type ChangeSet, type ChoiceOpKind, type DayKey } from './changeCard'
 import type { ChoiceWriters } from '@/lib/choices/applyDeps'
 import type { ChoiceDetail } from '@/lib/choices/db'
-import { OPTION_STATUSES, type Choice, type ChoiceColumn, type ChoiceOption, type ColumnKind, type WorkPiece } from '@/types/choice'
+import { OPTION_STATUSES, type CellValue, type Choice, type ChoiceColumn, type ChoiceOption, type ColumnKind, type WorkPiece } from '@/types/choice'
 import { priceFor } from '@/lib/choices/price'
-import { CHOICES_UPDATED } from '@/hooks/useChoices'
+import { announceChoices } from '@/lib/choices/events'
 import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { liveCommitments } from '@/lib/placement/model'
@@ -252,6 +252,35 @@ function choiceOpsWellFormed(ops: readonly ChangeOp[]): boolean {
   return true
 }
 
+/** A typed value fits its column's kind (null clears any kind). */
+function valueFits(kind: ColumnKind, value: CellValue): boolean {
+  if (value === null) return true
+  switch (kind) {
+    case 'money': return typeof value === 'number' && Number.isFinite(value)
+    case 'date': return typeof value === 'string' && YMD.test(value)
+    case 'yesno': return typeof value === 'boolean'
+    case 'text': return typeof value === 'string'
+  }
+}
+
+/** Every option_set names a column the choice has by then (its columns as
+ *  read, plus column_adds earlier in the set) with a value of that kind. */
+function choiceValuesFit(ops: readonly ChangeOp[], details: ReadonlyMap<string, ChoiceDetail>): boolean {
+  // By choiceId (an existing choice) or by the choice_add's key (a new one).
+  const columns = new Map<string, ChoiceColumn[]>()
+  for (const op of ops) {
+    if (op.op === 'choice_add') { columns.set(op.key, []); continue }
+    const ref = (op.choiceId ?? op.choiceKey)!
+    const cols = columns.get(ref) ?? details.get(ref)?.choice.columns ?? []
+    if (op.op === 'column_add') columns.set(ref, [...cols.filter((c) => c.id !== op.columnId), { id: op.columnId!, label: op.columnLabel!, kind: op.columnKind! }])
+    if (op.op === 'option_set') {
+      const col = cols.find((c) => c.id === op.columnId)
+      if (!col || !valueFits(col.kind, op.value!)) return false
+    }
+  }
+  return true
+}
+
 /** A choice's decision fields as they are, for an Undo that states them back. */
 function decisionOf(c: Choice): Parameters<ChoiceWriters['updateChoice']>[1] {
   return {
@@ -262,10 +291,6 @@ function decisionOf(c: Choice): Parameters<ChoiceWriters['updateChoice']>[1] {
     decided_work: c.decidedWork,
     decided_amount_cents: c.decidedAmountCents ?? null,
   }
-}
-
-function announceChoices() {
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event(CHOICES_UPDATED))
 }
 
 /** Whether this page has every writer the set needs. */
@@ -330,6 +355,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
       details.set(id, d)
       if (d.choice.work.length === 0) workStartedEmpty.add(id)
     }
+    if (!choiceValuesFit(choiceOps, details)) return { ok: false, reason: 'failed', reverted: true, kept: [] }
   }
 
   const undos: Array<{ id: string; undo: () => Promise<unknown>; kind?: 'task' | 'routine' }> = []
@@ -350,10 +376,13 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
     return true
   }
   let wroteChoices = false
+  // Managed (the chat card): applyReviewedChange announces once the server
+  // journal's undo or finish has resolved, so views never refetch a half save.
+  const announce = deps.managedRecovery ? () => {} : announceChoices
   const fail = async (): Promise<ApplyResult> => {
-    if (deps.managedRecovery) { if (wroteChoices) announceChoices(); return { ok: false, reason: 'failed', reverted: false, kept: ids } }
+    if (deps.managedRecovery) return { ok: false, reason: 'failed', reverted: false, kept: ids }
     const kept = await rollback()
-    if (wroteChoices) announceChoices()
+    if (wroteChoices) announce()
     return { ok: false, reason: 'failed', reverted: kept.length === 0, kept }
   }
 
@@ -692,7 +721,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
 
   // Everything saved: from here on, a later edit by someone else is theirs.
   const appliedAt = Date.now()
-  if (choiceOps.length) announceChoices()
+  if (choiceOps.length) announce()
   return {
     ok: true, ids,
     undo: async () => {
@@ -703,7 +732,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
         if (now && u.kind && editedSince(u.kind === 'task' ? now.tasks.find((t) => t.id === u.id)?.updatedAt : routineUpdatedAt(now.routines, u.id), appliedAt)) { ok = false; continue }
         try { if ((await u.undo()) === false) ok = false } catch { ok = false }
       }
-      if (choiceOps.length) announceChoices()
+      if (choiceOps.length) announce()
       return ok
     },
   }

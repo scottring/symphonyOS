@@ -1,7 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { applyChangeSet, type ApplyDeps, type ApplyResult } from './applyChangeSet'
-import type { ChangeSet } from './changeCard'
+import { isChoiceOp, type ChangeSet } from './changeCard'
+import { announceChoices } from '@/lib/choices/events'
 
 // A separate client is used ONLY by the chat card's writers. Other pages and
 // background writes cannot accidentally become part of the card's Undo.
@@ -34,6 +35,10 @@ export async function applyReviewedChange(set:ChangeSet,deps:ApplyDeps,writer:Wr
   const key=`${set.key}:${Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('')}`
   let receipt:Receipt|undefined
   let undoConflict=false
+  // Choice views refetch only once the outcome is settled: after finish, or
+  // after the journal's undo of a failed attempt, never mid-save.
+  const touchesChoices=set.ops.some(isChoiceOp)
+  let wrote=false
   const undo=async()=>{
     if(!receipt)return false
     const {data,error}=await db.rpc('undo_reviewed_change',{p_id:receipt.id,p_attempt:receipt.attempt})
@@ -42,6 +47,10 @@ export async function applyReviewedChange(set:ChangeSet,deps:ApplyDeps,writer:Wr
     if(error||data!==true){const unknown=new Error('Could not confirm Undo');unknown.name='UndoOutcomeUnknown';throw unknown}
     return true
   }
+  /** The receipt's Undo, as the card's Undo button calls it later. */
+  const laterUndo=async()=>{
+    try {return await undo()} finally {if(touchesChoices)announceChoices()}
+  }
   const begin=async()=>{
     const {data,error}=await db.rpc('begin_reviewed_change',{p_key:key,p_payload:payload})
     if(error||!data)throw new Error('Could not read the save receipt')
@@ -49,7 +58,7 @@ export async function applyReviewedChange(set:ChangeSet,deps:ApplyDeps,writer:Wr
   }
   try {
     receipt=await begin()
-    if(receipt.status==='saved')return {ok:true,ids:receipt.ids,undo}
+    if(receipt.status==='saved')return {ok:true,ids:receipt.ids,undo:laterUndo}
     if(!receipt.fresh) {
       // A previous browser/request may have disappeared after committing. Close
       // that attempt under its database lock BEFORE starting another one.
@@ -57,6 +66,7 @@ export async function applyReviewedChange(set:ChangeSet,deps:ApplyDeps,writer:Wr
       receipt=await begin()
     }
     writer.setReceipt(receipt)
+    wrote=true
     const result=await applyChangeSet(set,{...deps,managedRecovery:true})
     await writer.drain()
     writer.setReceipt(null)
@@ -66,10 +76,13 @@ export async function applyReviewedChange(set:ChangeSet,deps:ApplyDeps,writer:Wr
     }
     const {data,error}=await db.rpc('finish_reviewed_change',{p_id:receipt.id,p_attempt:receipt.attempt,p_ids:result.ids})
     if(error||!data)throw new Error('Could not confirm the save receipt')
-    return {ok:true,ids:result.ids,undo}
+    return {ok:true,ids:result.ids,undo:laterUndo}
   } catch {
     // Never guess that a lost acknowledgement means nothing saved. Retrying
     // first consults this durable receipt; it cannot blindly create a second row.
     return {ok:false,reason:'failed',reverted:false,kept:receipt?.ids??[],recoverable:true}
-  } finally {writer.setReceipt(null)}
+  } finally {
+    writer.setReceipt(null)
+    if(wrote&&touchesChoices)announceChoices()
+  }
 }

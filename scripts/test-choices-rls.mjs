@@ -274,8 +274,9 @@ try {
     assert.equal(sql(`select count(*) from public.choices where id = '${C_YEAR}'`), '0')
     assert.equal(sql(`select count(*) from public.choice_options where id = '${O_YEAR}'`), '0')
   })
-  check('journal triggers exist on choice tables', () => {
-    assert.equal(sql(`select count(*) from pg_trigger where tgname in ('reviewed_change_before','zz_reviewed_change_after') and tgrelid::regclass::text in ('choices','choice_options','choice_price_lines')`), '6')
+  check('journal triggers exist on choice tables and contacts', () => {
+    assert.equal(sql(`select count(*) from pg_trigger where tgname in ('reviewed_change_before','zz_reviewed_change_after') and tgrelid::regclass::text in ('choices','choice_options','choice_price_lines','contacts')`), '8')
+    assert.equal(sql(`select count(*) from pg_trigger where tgname in ('reviewed_change_before','zz_reviewed_change_after') and tgrelid::regclass::text = 'contacts'`), '2')
   })
   console.log(`${checks} local PostgreSQL checks passed. No remote database or provider was contacted.`)
 } finally {

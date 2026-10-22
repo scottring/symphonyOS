@@ -3,7 +3,7 @@ import type { Task, TaskCommitment } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import type { Routine } from '@/types/actionable'
 import { applyChangeSet, canApply, plannedWeekStart, type ApplyDeps } from './applyChangeSet'
-import type { ChangeSet } from './changeCard'
+import type { ChangeOp, ChangeSet } from './changeCard'
 import { planKeep, planPlacement } from '@/lib/placement/intentions'
 import type { Choice, ChoiceOption, PriceLine } from '@/types/choice'
 import type { ChoiceDetail } from '@/lib/choices/db'
@@ -778,6 +778,56 @@ describe('applyChangeSet: choice ops', () => {
     expect(w.updateChoice).toHaveBeenLastCalledWith('ch1', restore)
     expect(w.updateOption).toHaveBeenCalledWith('o2', { status: 'heard_back' })
     expect(w.updateOption).toHaveBeenLastCalledWith('o1', { status: 'chosen' })
+  })
+
+  it('an option_set whose value does not fit its column is refused before anything is written', async () => {
+    const cols = [{ id: 'm', label: 'Deposit', kind: 'money' as const }, { id: 'd', label: 'Start', kind: 'date' as const }, { id: 'y', label: 'Permit', kind: 'yesno' as const }, { id: 't', label: 'Warranty', kind: 'text' as const }]
+    const store = () => new Map([['ch1', detailOf(baseChoice('ch1', { columns: cols }), [baseOption('o1', 'ch1')])]])
+    const setOp = (columnId: string, value: ChangeOp['value']): ChangeSet => ({ key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'option_set', title: 'o1', ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1', columnId, columnLabel: columnId, value },
+    ] })
+    const refused = { ok: false, reason: 'failed', reverted: true, kept: [] }
+    for (const [col, bad] of [['m', '18400'], ['m', Number.NaN], ['d', 'Dec 1'], ['d', 20261201], ['y', 'yes'], ['t', 5]] as const) {
+      const w = fakeWriters(store())
+      expect(await applyChangeSet(setOp(col, bad), choiceDeps(w))).toEqual(refused)
+      expect(w.updateOption).not.toHaveBeenCalled()
+    }
+    for (const [col, ok] of [['m', 1840000], ['d', '2026-12-01'], ['y', false], ['t', '5 years'], ['m', null]] as const) {
+      expect(await applyChangeSet(setOp(col, ok), choiceDeps(fakeWriters(store())))).toMatchObject({ ok: true })
+    }
+    // A column added earlier in the set is the one the value must fit.
+    const added: ChangeSet = { key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'column_add', title: 'Cost', ...g, choiceId: 'ch1', columnId: 'new', columnLabel: 'Cost', columnKind: 'money' },
+      { key: 'c:1', op: 'option_set', title: 'o1', ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1', columnId: 'new', columnLabel: 'Cost', value: 'lots' },
+    ] }
+    const w = fakeWriters(store())
+    expect(await applyChangeSet(added, choiceDeps(w))).toEqual(refused)
+    expect(w.updateChoice).not.toHaveBeenCalled()
+    // A column that does not exist by then is refused too.
+    expect(await applyChangeSet(setOp('nope', 'x'), choiceDeps(fakeWriters(store())))).toEqual(refused)
+  })
+
+  it('on the managed (chat) path it never announces: applyReviewedChange does, once the outcome is settled', async () => {
+    const events: string[] = []
+    const listen = (e: Event) => events.push(e.type)
+    window.addEventListener(CHOICES_UPDATED, listen)
+    try {
+      const store = () => new Map([['ch1', detailOf(baseChoice('ch1'), [baseOption('o1', 'ch1')])]])
+      const s: ChangeSet = { key: 'c', title: 'x', ops: [
+        { key: 'c:0', op: 'option_status', title: 'o1', ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1', status: 'contacted' },
+        { key: 'c:1', op: 'price_line', title: 'o1', ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1', workIds: [], workLabels: [], amountCents: 5 },
+      ] }
+      const failing = fakeWriters(store(), { addPriceLine: vi.fn(async () => null) })
+      expect(await applyChangeSet(s, { ...choiceDeps(failing), managedRecovery: true })).toMatchObject({ ok: false, reverted: false })
+      const ok = await applyChangeSet(s, { ...choiceDeps(fakeWriters(store())), managedRecovery: true })
+      if (!ok.ok) throw new Error('expected ok')
+      expect(events).toEqual([])
+      // The non-managed path still announces after its own rollback.
+      await applyChangeSet(s, choiceDeps(fakeWriters(store(), { addPriceLine: vi.fn(async () => null) })))
+      expect(events).toEqual([CHOICES_UPDATED])
+    } finally {
+      window.removeEventListener(CHOICES_UPDATED, listen)
+    }
   })
 
   it('the wall cannot apply choice ops', () => {
