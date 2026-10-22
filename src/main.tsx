@@ -194,6 +194,7 @@ createRoot(document.getElementById('root')!).render(
               {/* /, /today, /inbox, /task/:id are served by the Shell via the
                   /* catch-all below (explicit routes here win by specificity). */}
               <Route path="/goals/*" element={cutoverShell} />
+              <Route path="/choice/*" element={cutoverShell} />
               {/* /projects retired from the UI (2026-09-02): "Projects" read as
                   GTD jargon and muddied the household-OS pitch. HIDE THE NOUN,
                   KEEP THE DATA — the table, useProjects, types/project.ts and
