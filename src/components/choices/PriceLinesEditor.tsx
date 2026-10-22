@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ChoiceOption, PriceLine, WorkPiece } from '@/types/choice'
 import { parseCell } from '@/lib/choices/db'
 import { formatCents } from '@/lib/choices/price'
+import { useLatest } from './useLatest'
 import { DialogFrame, inputClass, linkButton, primaryButton, quietButton } from './DialogFrame'
 
 const MONEY_HINT = 'Use a number, like 19,750'
@@ -52,38 +53,57 @@ function AmountInput({ value, onChange, onEnter, onBlur }: { value: string; onCh
   )
 }
 
+const PIECE_HINT = 'Pick at least one piece'
+
 function LineRow({ line, work, onUpdate, onDelete }: { line: PriceLine; work: readonly WorkPiece[] } & Pick<Props, 'onUpdate' | 'onDelete'>) {
   const [amount, setAmount] = useState(formatCents(line.amountCents).replace('$', ''))
   const [note, setNote] = useState(line.note ?? '')
-  const [hint, setHint] = useState(false)
+  const [hint, setHint] = useState<string | null>(null)
+  // Ticks and amounts as the last edit left them, so quick edits build on
+  // each other before the page refetches.
+  const pieces = useLatest<string[]>()
+  const cents = useLatest<number>()
+  const notes = useLatest<string | null>()
+  const ids = pieces.get(line.id, line.workIds)
+
   const saveAmount = () => {
-    const cents = parseCell('money', amount)
-    if (typeof cents !== 'number') { setHint(true); return }
-    if (cents !== line.amountCents) void onUpdate(line, { amount_cents: cents })
+    const next = parseCell('money', amount)
+    if (typeof next !== 'number') { setHint(MONEY_HINT); return }
+    const prev = cents.get(line.id, line.amountCents)
+    if (next === prev) return
+    void cents.write(line.id, line.amountCents, next, () => onUpdate({ ...line, amountCents: prev }, { amount_cents: next }))
   }
   const toggle = (id: string) => {
-    const ids = new Set(line.workIds)
-    if (ids.has(id)) ids.delete(id)
-    else ids.add(id)
-    const kept = line.workIds.filter((x) => !work.some((w) => w.id === x))
-    void onUpdate(line, { work_ids: [...inOrder(ids, work), ...kept] })
+    const prev = pieces.get(line.id, line.workIds)
+    const set = new Set(prev)
+    if (set.has(id)) set.delete(id)
+    else set.add(id)
+    const live = inOrder(set, work)
+    if (work.length > 0 && live.length === 0) { setHint(PIECE_HINT); return }
+    setHint(null)
+    const next = [...live, ...prev.filter((x) => !work.some((w) => w.id === x))]
+    void pieces.write(line.id, line.workIds, next, () => onUpdate({ ...line, workIds: prev }, { work_ids: next }))
   }
   return (
     <li className="space-y-1.5 border-t border-neutral-100 py-2.5 first:border-t-0">
-      <Pieces work={work} ids={line.workIds} onToggle={toggle} />
+      <Pieces work={work} ids={ids} onToggle={toggle} />
       <div className="flex items-center gap-2">
-        <AmountInput value={amount} onChange={(v) => { setAmount(v); setHint(false) }} onEnter={saveAmount} onBlur={saveAmount} />
+        <AmountInput value={amount} onChange={(v) => { setAmount(v); setHint(null) }} onEnter={saveAmount} onBlur={saveAmount} />
         <input
           aria-label="Note"
           placeholder="Note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          onBlur={() => { if (note.trim() !== (line.note ?? '')) void onUpdate(line, { note: note.trim() || null }) }}
+          onBlur={() => {
+            const prev = notes.get(line.id, line.note ?? null)
+            const next = note.trim() || null
+            if (next !== prev) void notes.write(line.id, line.note ?? null, next, () => onUpdate({ ...line, note: prev ?? undefined }, { note: next }))
+          }}
           className={inputClass}
         />
         <button type="button" onClick={() => void onDelete(line)} className={quietButton} aria-label="Remove line">×</button>
       </div>
-      {hint && <div className="text-xs text-amber-700">{MONEY_HINT}</div>}
+      {hint && <div className="text-xs text-amber-700">{hint}</div>}
     </li>
   )
 }

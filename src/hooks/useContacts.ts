@@ -4,6 +4,8 @@ import { showToast } from '@/hooks/useToast'
 import { useAuth } from '@/hooks/useAuth'
 import { shareInFlight } from '@/lib/sharedRequest'
 import type { Contact, ContactCategory } from '@/types/contact'
+import type { TaskContext } from '@/types/task'
+import { scopeForDomain } from '@/lib/scope'
 
 interface DbContact {
   id: string
@@ -89,6 +91,9 @@ export function useContacts() {
     relationship?: string
     preferences?: string
     placeId?: string
+    /** The domain the contact belongs to (e.g. the goal it was added from).
+     *  When given, the contact carries it and the scope it implies. */
+    context?: TaskContext
   }) => {
     if (!user) return null
 
@@ -130,6 +135,7 @@ export function useContacts() {
         relationship: contact.relationship ?? null,
         preferences: contact.preferences ?? null,
         place_id: contact.placeId ?? null,
+        ...(contact.context ? { context: contact.context, scope: scopeForDomain(contact.context, [], null) } : {}),
       })
       .select()
       .single()

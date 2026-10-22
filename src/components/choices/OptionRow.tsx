@@ -9,15 +9,66 @@ export interface OptionActionHandlers {
   onStatus: (o: ChoiceOption, status: OptionStatus) => Promise<boolean>
   onFollowUp: (o: ChoiceOption, on: Date) => Promise<boolean>
   onDelete: (o: ChoiceOption) => Promise<boolean>
+  onRename: (o: ChoiceOption, name: string) => Promise<boolean>
+  onNotes: (o: ChoiceOption, notes: string | null) => Promise<boolean>
   /** Opens the option's files; left out when files aren't available. */
   onFiles?: (o: ChoiceOption) => void
 }
 
+/** Rename or Notes, inline: one field, Save or Cancel. */
+function InlineEdit({ label, initial, multiline, onSave, onCancel }: {
+  label: string
+  initial: string
+  multiline?: boolean
+  onSave: (text: string) => void
+  onCancel: () => void
+}) {
+  const [text, setText] = useState(initial)
+  const field = 'w-full min-w-[180px] rounded-md border border-neutral-200 bg-white px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary-500'
+  return (
+    <div className="mt-1 space-y-1.5">
+      {multiline
+        ? <textarea autoFocus aria-label={label} rows={2} value={text} onChange={(e) => setText(e.target.value)} className={field} />
+        : <input autoFocus aria-label={label} value={text} onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') onSave(text); if (e.key === 'Escape') onCancel() }} className={field} />}
+      <div className="flex gap-2">
+        <button type="button" onClick={() => onSave(text)}
+          className="rounded-lg bg-primary-600 px-3 py-1 text-[13px] font-medium text-white hover:bg-primary-700">Save</button>
+        <button type="button" onClick={onCancel}
+          className="px-2 py-1 text-[13px] font-medium text-neutral-500 hover:text-neutral-700">Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 /** A row's verbs, shared by the table and the cards: Choose this, Follow up
- *  on… (when Contacted), Status, files, and ⋯ (Delete, after a confirm). */
-export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete, onFiles }: OptionActionHandlers & { option: ChoiceOption }) {
+ *  on… (when Contacted), Status, files, and ⋯ (Rename, Notes, Delete after a
+ *  confirm). */
+export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete, onFiles, onRename, onNotes }: OptionActionHandlers & { option: ChoiceOption }) {
   const [followingUp, setFollowingUp] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [editing, setEditing] = useState<'name' | 'notes' | null>(null)
+
+  if (editing === 'name') {
+    return (
+      <InlineEdit label="Option name" initial={option.name} onCancel={() => setEditing(null)}
+        onSave={async (text) => {
+          const name = text.trim()
+          if (!name || name === option.name) { setEditing(null); return }
+          if (await onRename(option, name)) setEditing(null)
+        }} />
+    )
+  }
+  if (editing === 'notes') {
+    return (
+      <InlineEdit label="Notes" multiline initial={option.notes ?? ''} onCancel={() => setEditing(null)}
+        onSave={async (text) => {
+          const notes = text.trim() || null
+          if (notes === (option.notes ?? null)) { setEditing(null); return }
+          if (await onNotes(option, notes)) setEditing(null)
+        }} />
+    )
+  }
 
   const pickStatus = async (s: OptionStatus) => {
     if (s === 'chosen') { onChoose(option); return }
@@ -57,7 +108,11 @@ export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete
             <Paperclip className="h-3.5 w-3.5" />
           </button>
         )}
-        <PopMenu label="More" trigger="⋯" items={[{ label: 'Delete option', danger: true, onPick: () => setConfirming(true) }]} />
+        <PopMenu label="More" trigger="⋯" items={[
+          { label: 'Rename', onPick: () => setEditing('name') },
+          { label: 'Notes', onPick: () => setEditing('notes') },
+          { label: 'Delete option', danger: true, onPick: () => setConfirming(true) },
+        ]} />
       </div>
       {followingUp && (
         <FollowUpPicker

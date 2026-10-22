@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { CellValue, ChoiceOption } from '@/types/choice'
 import { optionFact } from '@/lib/choices/facts'
 import { StatusChip } from './StatusChip'
-import { formatCell } from './cells'
+import { contactLine, formatCell } from './cells'
 import { PriceCellView, type ComparisonProps } from './ComparisonTable'
 
 /** Narrow layout: one card per option, facts as lines in the table's order.
@@ -24,6 +24,7 @@ function Card({ p, o, editing, onEdit }: { p: ComparisonProps; o: ChoiceOption; 
     .filter((f) => editing || f.text)
   const files = p.renderFiles?.(o)
   const canEdit = !!p.renderCell
+  const contact = contactLine(o, p.contacts)
   return (
     <li className={`rounded-xl border border-neutral-200 bg-white p-3 ${o.status === 'ruled_out' ? 'opacity-60' : ''}`}>
       <div className="flex items-start justify-between gap-2">
@@ -37,6 +38,7 @@ function Card({ p, o, editing, onEdit }: { p: ComparisonProps; o: ChoiceOption; 
           )}
         </span>
       </div>
+      {contact && <div className="mt-0.5 text-xs text-neutral-500">{contact}</div>}
       {fact && <div className="mt-1 text-xs text-neutral-500">{fact}</div>}
       <dl className="mt-2 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-sm">
         {(editing || cell.kind !== 'none') && (

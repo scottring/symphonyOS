@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  listChoicesForGoal, listOpenChoices, updateOption, createFollowUp, chooseOption, reopenChoice, parseCell, loadChoice, createChoice, updateChoice,
+  listChoicesForGoal, listOpenChoices, updateOption, createFollowUp, deleteFollowUp, chooseOption, reopenChoice, parseCell, loadChoice, createChoice, updateChoice,
   type ChoiceDetail,
 } from './db'
 import type { Choice, ChoiceOption, PriceLine } from '@/types/choice'
@@ -255,5 +255,24 @@ describe('createChoice / updateChoice', () => {
     const { client, calls } = fake()
     expect(await updateChoice(client, 'c1', { title: 'N' })).toBe(true)
     expect(op(calls[0], 'update')![0]).toEqual({ title: 'N' })
+  })
+})
+
+describe('deleteFollowUp', () => {
+  it('counts a returned row as deleted', async () => {
+    const { client, calls } = fake({ tasks: [{ data: [{ id: 't1' }] }] })
+    expect(await deleteFollowUp(client, 't1')).toBe(true)
+    expect(op(calls[0], 'eq')).toEqual(['id', 't1'])
+    expect(op(calls[0], 'select')).toEqual(['id'])
+  })
+
+  it('treats zero rows (an RLS-forbidden delete) as a failure', async () => {
+    const { client } = fake({ tasks: [{ data: [] }] })
+    expect(await deleteFollowUp(client, 't1')).toBe(false)
+  })
+
+  it('treats an error as a failure', async () => {
+    const { client } = fake({ tasks: [{ error: { message: 'no' } }] })
+    expect(await deleteFollowUp(client, 't1')).toBe(false)
   })
 })

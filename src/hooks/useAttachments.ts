@@ -55,10 +55,12 @@ export function useAttachments(): UseAttachmentsReturn {
       setIsLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
-        .from('attachments')
-        .select('*')
-        .eq('user_id', user.id)
+      // A choice option's files are shared with everyone who can see the
+      // option (a Family goal's quotes are both partners'), so RLS decides;
+      // every other entity keeps reading only the user's own files.
+      let query = supabase.from('attachments').select('*')
+      if (entityType !== 'choice_option') query = query.eq('user_id', user.id)
+      const { data, error: fetchError } = await query
         .eq('entity_type', entityType)
         .eq('entity_id', entityId)
         .order('created_at', { ascending: false })

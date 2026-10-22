@@ -8,6 +8,8 @@ import type {
 import type { LineInput } from './PriceLinesEditor'
 import type { OptionFilesApi } from './useOptionFiles'
 import type { Attachment } from '@/types/attachment'
+import type { TaskContext } from '@/types/task'
+import { useLatest } from './useLatest'
 
 type ChoicePatch = Partial<Pick<DbChoice, 'columns' | 'work' | 'selected_work'>>
 type OptionPatch = Partial<Pick<DbChoiceOption, 'name' | 'contact_id' | 'status' | 'values' | 'notes'>>
@@ -28,7 +30,7 @@ export interface ChoicePageWriters {
   deleteTask: (id: string) => Promise<boolean>
   chooseOption: (detail: ChoiceDetail, optionId: string, note: string | null, now: Date) => Promise<boolean>
   reopenChoice: (detail: ChoiceDetail) => Promise<boolean>
-  addContact: (input: { name: string; phone: string }) => Promise<{ id: string } | null>
+  addContact: (input: { name: string; phone: string; context?: TaskContext }) => Promise<{ id: string } | null>
   deleteContact: (id: string) => Promise<boolean>
 }
 
@@ -42,6 +44,9 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
   // The selection the last toggle asked for, so quick taps build on each
   // other instead of on a render that hasn't refetched yet.
   const selection = useRef({ from: choice.selectedWork, ids: choice.selectedWork })
+  // Each option's values as the last edit left them (quick edits on one row
+  // build on each other).
+  const values = useLatest<Record<string, CellValue>>()
 
   const setColumns = (label: string, next: ChoiceColumn[]) => {
     const prev = choice.columns
@@ -61,7 +66,7 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
       const made: { optionId?: string; contactId?: string } = {}
       return run('Add option', async () => {
         if (phone) {
-          const c = await w.addContact({ name, phone })
+          const c = await w.addContact(detail.goalContext ? { name, phone, context: detail.goalContext } : { name, phone })
           if (!c) return false
           made.contactId = c.id
         }
@@ -93,12 +98,28 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
       }, { undo: async () => (taskId ? w.deleteTask(taskId) : false) })
     },
 
-    setValue: (o: ChoiceOption, columnId: string, value: CellValue) => {
-      const prev = o.values
+    /** The option's values including edits still being written. */
+    valuesOf: (o: ChoiceOption) => values.get(o.id, o.values),
+
+    /** Sets one value; an updater reads the latest value (yes/no taps). */
+    setValue: (o: ChoiceOption, columnId: string, value: CellValue | ((prev: CellValue | undefined) => CellValue)) => {
+      const prev = values.get(o.id, o.values)
+      const v = typeof value === 'function' ? value(prev[columnId]) : value
       const next = { ...prev }
-      if (value === null) delete next[columnId]
-      else next[columnId] = value
-      return run('Change a value', () => w.updateOption(o.id, { values: next }), { undo: () => w.updateOption(o.id, { values: prev }) })
+      if (v === null) delete next[columnId]
+      else next[columnId] = v
+      const put = (vals: Record<string, CellValue>) => values.write(o.id, o.values, vals, () => w.updateOption(o.id, { values: vals }))
+      return run('Change a value', () => put(next), { undo: () => put(prev) })
+    },
+
+    rename: (o: ChoiceOption, name: string) => {
+      const prev = o.name
+      return run('Rename option', () => w.updateOption(o.id, { name }), { undo: () => w.updateOption(o.id, { name: prev }) })
+    },
+
+    setNotes: (o: ChoiceOption, notes: string | null) => {
+      const prev = o.notes ?? null
+      return run('Change notes', () => w.updateOption(o.id, { notes }), { undo: () => w.updateOption(o.id, { notes: prev }) })
     },
 
     addLine: (o: ChoiceOption, input: LineInput) => {

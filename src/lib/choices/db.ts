@@ -230,6 +230,13 @@ export async function createFollowUp(
   return (data as { id: string }).id
 }
 
+/** Deletes a follow-up task. RLS turns a forbidden DELETE into zero rows with
+ *  no error, so only a returned row counts as deleted. */
+export async function deleteFollowUp(db: Db, taskId: string): Promise<boolean> {
+  const { data, error } = await db.from('tasks').delete().eq('id', taskId).select('id')
+  return !error && ((data ?? []) as { id: string }[]).some((r) => r.id === taskId)
+}
+
 export async function chooseOption(
   db: Db, detail: ChoiceDetail, optionId: string, note: string | null, now: Date,
 ): Promise<boolean> {

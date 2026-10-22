@@ -21,7 +21,8 @@ export function CellEditor({ column, value, optionName, onSave }: {
   column: ChoiceColumn
   value: CellValue | undefined
   optionName: string
-  onSave: (value: CellValue) => Promise<boolean> | void
+  /** A value, or (yes/no) an updater from the latest value. */
+  onSave: (value: CellValue | ((prev: CellValue | undefined) => CellValue)) => Promise<boolean> | void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -31,9 +32,9 @@ export function CellEditor({ column, value, optionName, onSave }: {
   const label = `${column.label} for ${optionName}`
 
   if (column.kind === 'yesno') {
-    const next = value === true ? false : value === false ? null : true
     return (
-      <button type="button" aria-label={label} onClick={() => void onSave(next)}
+      <button type="button" aria-label={label}
+        onClick={() => void onSave((prev) => (prev === true ? false : prev === false ? null : true))}
         className={`text-left hover:text-neutral-900 ${text ? 'text-neutral-800' : 'text-neutral-400'}`}>
         {text ?? '—'}
       </button>

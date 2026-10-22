@@ -110,6 +110,8 @@ export function ChoicePageView({ detail, writers, files }: {
         onStatus={edit.setStatus}
         onFollowUp={edit.followUp}
         onDelete={edit.deleteOption}
+        onRename={edit.rename}
+        onNotes={edit.setNotes}
         onFiles={files && ((x) => setOpen({ kind: 'files', optionId: x.id }))}
       />
     ),
@@ -118,7 +120,7 @@ export function ChoicePageView({ detail, writers, files }: {
       <ColumnMenu column={c} onRename={(l) => edit.renameColumn(c, l)} onRemove={() => void edit.removeColumn(c)} />
     ),
     renderCell: (o, c) => (
-      <CellEditor column={c} value={o.values[c.id] as CellValue | undefined} optionName={o.name}
+      <CellEditor column={c} value={edit.valuesOf(o)[c.id] as CellValue | undefined} optionName={o.name}
         onSave={(v) => edit.setValue(o, c.id, v)} />
     ),
     onEditPrice: (o) => setOpen({ kind: 'price', optionId: o.id }),
@@ -142,7 +144,7 @@ export function ChoicePageView({ detail, writers, files }: {
         <DecidedBanner name={chosen?.name ?? 'an option'} note={choice.decidedNote} decidedAt={choice.decidedAt}
           onReopen={() => void edit.reopen()} />
       )}
-      <WorkBar work={choice.work} selected={selected} onToggle={(id) => void edit.toggleWork(id)} action={editWork} />
+      <WorkBar work={choice.work} selected={selected} onToggle={(id) => void edit.toggleWork(id)} action={editWork} disabled={decided} />
       {choice.work.length === 0 && editWork && <div className="mb-3">{editWork}</div>}
       {narrow ? <OptionCards {...props} /> : <ComparisonTable {...props} />}
       {ruledOut.length > 0 && (
@@ -224,7 +226,7 @@ function useBoundWriters(choiceId: string): ChoicePageWriters {
         const me = uid()
         return me ? announce(db.createFollowUp(supabase, me, detail, option, on)) : null
       },
-      deleteTask: (id) => announce((async () => !(await supabase.from('tasks').delete().eq('id', id)).error)()),
+      deleteTask: (id) => announce(db.deleteFollowUp(supabase, id)),
       chooseOption: (detail, optionId, note, now) => announce(db.chooseOption(supabase, detail, optionId, note, now)),
       reopenChoice: (detail) => announce(db.reopenChoice(supabase, detail)),
       // Contacts: their own hook, read through a ref so an Undo made later

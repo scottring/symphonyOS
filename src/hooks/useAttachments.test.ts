@@ -31,28 +31,20 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: mockUserState }),
 }))
 
-// Create chainable mock for select operations
-const createSelectChain = () => ({
-  eq: (field: string, value: string) => {
-    mockEq(field, value)
-    return {
-      eq: (field2: string, value2: string) => {
-        mockEq(field2, value2)
-        return {
-          eq: (field3: string, value3: string) => {
-            mockEq(field3, value3)
-            return {
-              order: (col: string, opts: { ascending: boolean }) => {
-                mockOrder(col, opts)
-                return Promise.resolve({ data: mockFetchResult, error: mockError })
-              },
-            }
-          },
-        }
-      },
-    }
-  },
-})
+// Create chainable mock for select operations: any number of eq filters, then order
+const createSelectChain = () => {
+  const chain = {
+    eq: (field: string, value: string) => {
+      mockEq(field, value)
+      return chain
+    },
+    order: (col: string, opts: { ascending: boolean }) => {
+      mockOrder(col, opts)
+      return Promise.resolve({ data: mockFetchResult, error: mockError })
+    },
+  }
+  return chain
+}
 
 // Create chainable mock for insert operations
 const createInsertChain = () => ({
@@ -172,6 +164,24 @@ describe('useAttachments', () => {
   })
 
   describe('fetchAttachments', () => {
+    it("reads only the user's own files for an ordinary entity", async () => {
+      mockFetchResult = []
+      const { result } = renderHook(() => useAttachments())
+      await act(async () => { await result.current.fetchAttachments('task', 'task-1') })
+      expect(mockEq).toHaveBeenCalledWith('user_id', mockUser.id)
+    })
+
+    it("leaves a choice option's files to RLS, so a partner's quotes show", async () => {
+      mockFetchResult = [createMockDbAttachment({ user_id: 'partner', entity_type: 'choice_option', entity_id: 'opt-1' })]
+      const { result } = renderHook(() => useAttachments())
+      let fetched: unknown[] = []
+      await act(async () => { fetched = await result.current.fetchAttachments('choice_option', 'opt-1') })
+      expect(mockEq).not.toHaveBeenCalledWith('user_id', expect.anything())
+      expect(mockEq).toHaveBeenCalledWith('entity_type', 'choice_option')
+      expect(mockEq).toHaveBeenCalledWith('entity_id', 'opt-1')
+      expect(fetched).toHaveLength(1)
+    })
+
     it('fetches attachments for an entity', async () => {
       const mockAttachment = createMockDbAttachment()
       mockFetchResult = [mockAttachment]

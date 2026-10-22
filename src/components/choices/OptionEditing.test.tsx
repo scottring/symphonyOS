@@ -94,7 +94,8 @@ describe('editing on the comparison page', () => {
     await userEvent.click(screen.getByPlaceholderText('Add an option: a name, or paste a phone number'))
     await userEvent.paste('Martinez Tile 410-555-0142')
     await userEvent.keyboard('{Enter}')
-    expect(w.addContact).toHaveBeenCalledWith({ name: 'Martinez Tile', phone: '410-555-0142' })
+    // The contact takes the goal's domain (here Family), so both partners see it.
+    expect(w.addContact).toHaveBeenCalledWith({ name: 'Martinez Tile', phone: '410-555-0142', context: 'family' })
     expect(w.addOption).toHaveBeenCalledWith({ name: 'Martinez Tile', contactId: 'k9' })
     expectUndoOnEveryRun(1)
     await lastUndo()()
@@ -256,6 +257,109 @@ describe('editing on the comparison page', () => {
     await userEvent.click(within(rob).getByRole('button', { name: "Bid for Rob (Dave's cousin)" }))
     await userEvent.type(within(rob).getByRole('textbox', { name: 'Bid' }), '12,000{Enter}')
     expect(w.updateOption).toHaveBeenCalledWith('rob', { values: { bid: 1200000 } })
+  })
+
+  it('two quick edits on one row both land: the second builds on the first', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Bid for Chesapeake Renovations' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Bid' }), '19750{Enter}')
+    await userEvent.click(screen.getByRole('button', { name: 'Earliest start for Chesapeake Renovations' }))
+    fireEvent.change(within(rowOf('Chesapeake Renovations')).getByLabelText('Earliest start'), { target: { value: '2026-12-08' } })
+    fireEvent.keyDown(within(rowOf('Chesapeake Renovations')).getByLabelText('Earliest start'), { key: 'Enter' })
+    await vi.waitFor(() => expect(w.updateOption).toHaveBeenCalledTimes(2))
+    expect(w.updateOption).toHaveBeenLastCalledWith('che', { values: { start: '2026-12-08', bid: 1975000 } })
+    // Undo of the second puts back exactly what it replaced, the first edit included.
+    await lastUndo()()
+    expect(w.updateOption).toHaveBeenLastCalledWith('che', { values: { start: '2026-12-01', bid: 1975000 } })
+  })
+
+  it('double-tapping a yes/no goes Yes then No', async () => {
+    const withIns: ChoiceDetail = { ...detail, choice: { ...choice, columns: [...choice.columns, { id: 'ins', label: 'Insured', kind: 'yesno' }] } }
+    render(<ChoicePageView detail={withIns} writers={w} />)
+    const cell = screen.getByRole('button', { name: 'Insured for Chesapeake Renovations' })
+    await userEvent.click(cell)
+    await userEvent.click(cell)
+    expect(w.updateOption).toHaveBeenNthCalledWith(1, 'che', { values: { start: '2026-12-01', ins: true } })
+    expect(w.updateOption).toHaveBeenNthCalledWith(2, 'che', { values: { start: '2026-12-01', ins: false } })
+  })
+
+  it('a failed edit is rolled back, so the next edit does not carry it', async () => {
+    w.updateOption.mockResolvedValueOnce(false)
+    render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Bid for Chesapeake Renovations' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Bid' }), '19750{Enter}')
+    await userEvent.click(screen.getByRole('button', { name: 'Bid for Chesapeake Renovations' }))
+    expect(screen.getByRole('textbox', { name: 'Bid' })).toHaveValue('')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Bid' }), '500{Enter}')
+    expect(w.updateOption).toHaveBeenLastCalledWith('che', { values: { start: '2026-12-01', bid: 50000 } })
+  })
+
+  it('quick ticks on an existing line build on each other, and undo restores the true previous pieces', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Price for Martinez Tile & Bath' }))
+    const first = within(screen.getByRole('dialog')).getAllByRole('listitem')[0]
+    await userEvent.click(within(first).getByRole('checkbox', { name: 'Hall bath' }))
+    await userEvent.click(within(first).getByRole('checkbox', { name: "Kids' bath" }))
+    expect(w.updatePriceLine).toHaveBeenNthCalledWith(1, 'l1', { work_ids: ['main', 'hall'] })
+    expect(w.updatePriceLine).toHaveBeenNthCalledWith(2, 'l1', { work_ids: ['main', 'hall', 'kids'] })
+    await lastUndo()()
+    expect(w.updatePriceLine).toHaveBeenLastCalledWith('l1', { work_ids: ['main', 'hall'] })
+  })
+
+  it('unticking the last piece of a line is refused, not saved as no pieces', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Price for Martinez Tile & Bath' }))
+    const first = within(screen.getByRole('dialog')).getAllByRole('listitem')[0]
+    await userEvent.click(within(first).getByRole('checkbox', { name: 'Main bath' }))
+    expect(w.updatePriceLine).not.toHaveBeenCalled()
+    expect(within(first).getByText('Pick at least one piece')).toBeInTheDocument()
+    expect(within(first).getByRole('checkbox', { name: 'Main bath' })).toBeChecked()
+  })
+
+  it('a decided choice cannot change the work', async () => {
+    const decided: ChoiceDetail = { ...detail, choice: { ...choice, status: 'decided', chosenOptionId: 'che' } }
+    render(<ChoicePageView detail={decided} writers={w} />)
+    const kids = screen.getByRole('button', { name: "Kids' bath" })
+    expect(kids).toBeDisabled()
+    await userEvent.click(kids)
+    expect(w.setSelectedWork).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Edit the work' })).not.toBeInTheDocument()
+  })
+
+  it('Rename and Notes in the ⋯ menu edit the option, with undo', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(within(rowOf('Chesapeake Renovations')).getByRole('button', { name: 'More' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+    const name = screen.getByRole('textbox', { name: 'Option name' })
+    await userEvent.clear(name)
+    await userEvent.type(name, 'Chesapeake Reno{Enter}')
+    expect(w.updateOption).toHaveBeenCalledWith('che', { name: 'Chesapeake Reno' })
+    await lastUndo()()
+    expect(w.updateOption).toHaveBeenLastCalledWith('che', { name: 'Chesapeake Renovations' })
+
+    await userEvent.click(within(rowOf('Chesapeake Renovations')).getByRole('button', { name: 'More' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Notes' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), 'From Nextdoor')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(w.updateOption).toHaveBeenLastCalledWith('che', { notes: 'From Nextdoor' })
+    await lastUndo()()
+    expect(w.updateOption).toHaveBeenLastCalledWith('che', { notes: null })
+    expectUndoOnEveryRun(2)
+  })
+
+  it('cards show the contact line', () => {
+    window.matchMedia = ((q: string) => ({
+      matches: true, media: q, onchange: null, addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+    const withContact: ChoiceDetail = {
+      ...detail,
+      options: detail.options.map((o) => (o.id === 'mar' ? { ...o, contactId: 'k1' } : o)),
+      contacts: new Map([['k1', { name: 'Luis', phone: '410-555-0142' }]]),
+    }
+    render(<ChoicePageView detail={withContact} writers={w} />)
+    const card = screen.getByText('Martinez Tile & Bath').closest('li') as HTMLElement
+    expect(within(card).getByText('Luis · 410-555-0142')).toBeInTheDocument()
   })
 })
 

@@ -265,6 +265,39 @@ describe('useContacts', () => {
     })
   })
 
+  describe('addContact context', () => {
+    beforeEach(() => {
+      mockSingle.mockResolvedValue({
+        data: { id: 'new-1', user_id: 'test-user-id', name: 'Martinez Tile', phone: '410-555-0142', email: null, notes: null,
+          created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+        error: null,
+      })
+    })
+
+    it('a family contact is inserted with its domain and the household scope', async () => {
+      const { result } = renderHook(() => useContacts())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => { await result.current.addContact({ name: 'Martinez Tile', phone: '410-555-0142', context: 'family' }) })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ context: 'family', scope: 'compound' }))
+    })
+
+    it('a personal contact stays individual', async () => {
+      const { result } = renderHook(() => useContacts())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => { await result.current.addContact({ name: 'Rob', context: 'personal' }) })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ context: 'personal', scope: 'individual' }))
+    })
+
+    it('without a context, nothing about domain or scope is sent', async () => {
+      const { result } = renderHook(() => useContacts())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => { await result.current.addContact({ name: 'Rob' }) })
+      const row = mockInsert.mock.calls[0][0] as Record<string, unknown>
+      expect('context' in row).toBe(false)
+      expect('scope' in row).toBe(false)
+    })
+  })
+
   describe('contactsMap', () => {
     it('provides efficient lookup by ID', async () => {
       mockSupabaseData.push(
