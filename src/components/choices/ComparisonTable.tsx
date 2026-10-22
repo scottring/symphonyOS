@@ -37,11 +37,16 @@ export const addLabel = 'text-primary-600'
  *  part in the primary color. */
 export function LogLineView({ line }: { line: { next?: string; last?: string } | null | undefined }) {
   if (!line) return null
+  // Each phrase stays whole; only the quoted summary after " · " may wrap.
+  const cut = line.last ? line.last.indexOf(' · ') : -1
+  const lastHead = line.last && (cut < 0 ? line.last : line.last.slice(0, cut))
+  const lastTail = line.last && cut >= 0 ? line.last.slice(cut) : ''
   return (
-    <div className="mt-1 text-xs text-neutral-500">
-      {line.next && <span className="text-primary-600">{line.next}</span>}
+    <div className="mt-1 break-words text-xs text-neutral-500">
+      {line.next && <span className="whitespace-nowrap text-primary-600">{line.next}</span>}
       {line.next && line.last && ' · '}
-      {line.last && (line.next ? `last: ${line.last}` : line.last)}
+      {lastHead && <span className="whitespace-nowrap">{line.next ? `last: ${lastHead}` : lastHead}</span>}
+      {lastTail}
     </div>
   )
 }
