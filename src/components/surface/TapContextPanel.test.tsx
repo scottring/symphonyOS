@@ -10,6 +10,10 @@ vi.mock('@/hooks/useChoices', () => ({
   useGoalChoices: () => ({ rows: [], loading: false, refetch: vi.fn(), create: vi.fn() }),
 }))
 
+vi.mock('@/hooks/useGoalLog', () => ({
+  useGoalLog: () => ({ log: { upcoming: [], done: [] }, entries: [], loading: false, refetch: vi.fn() }),
+}))
+
 describe('TapContextPanel', () => {
   const baseHandlers = {
     onClose: vi.fn(),
@@ -42,6 +46,7 @@ describe('TapContextPanel', () => {
       siblingTaskCandidates={[]} allTasks={[goal]} {...baseHandlers}
     />)
     expect(screen.getByText('Choices')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Log' })).toBeInTheDocument()
     unmount()
     const plain = createMockTask({ title: 'Call', isGoal: false })
     render(<TapContextPanel
@@ -49,6 +54,7 @@ describe('TapContextPanel', () => {
       siblingTaskCandidates={[]} allTasks={[plain]} {...baseHandlers}
     />)
     expect(screen.queryByText('Choices')).toBeNull()
+    expect(screen.queryByRole('button', { name: '+ Log' })).toBeNull()
   })
 
   it('renders task title in the header', () => {

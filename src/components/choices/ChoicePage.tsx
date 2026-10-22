@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CHOICES_UPDATED, useChoice, useGoalChoices } from '@/hooks/useChoices'
 import { useAuth } from '@/hooks/useAuth'
 import { useContacts } from '@/hooks/useContacts'
-import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useLogWriters } from '@/hooks/useLogWriters'
+import { useMemberName } from '@/hooks/useMemberName'
 import { useGoalLog } from '@/hooks/useGoalLog'
 import { supabase } from '@/lib/supabase'
 import * as db from '@/lib/choices/db'
-import * as logDb from '@/lib/choices/logDb'
 import { rowLine, type LogLine } from '@/lib/choices/log'
 import type { LogEntry } from '@/types/goalLog'
 import type { ChoiceDetail } from '@/lib/choices/db'
@@ -342,6 +342,7 @@ function Dialogs({ open, close, detail, edit, files, optionOf, goalLog, onOpen, 
 function useBoundWriters(choiceId: string): ChoicePageWriters {
   const { user } = useAuth()
   const contacts = useContacts()
+  const { addLogEntry, updateLogEntry, deleteLogEntry, planEvent } = useLogWriters()
   const latest = useRef({ user, contacts })
   useEffect(() => { latest.current = { user, contacts } })
   return useMemo<ChoicePageWriters>(() => {
@@ -380,18 +381,9 @@ function useBoundWriters(choiceId: string): ChoicePageWriters {
       // sees the contact list that includes the one it added.
       addContact: (input) => latest.current.contacts.addContact(input),
       deleteContact: (id) => latest.current.contacts.deleteContact(id),
-      addLogEntry: async (input) => {
-        const me = uid()
-        return me ? announce(logDb.addLogEntry(supabase, me, input)) : null
-      },
-      updateLogEntry: (id, patch) => announce(logDb.updateLogEntry(supabase, id, patch)),
-      deleteLogEntry: (id) => announce(logDb.deleteLogEntry(supabase, id)),
-      planEvent: async (input) => {
-        const me = uid()
-        return me ? announce(logDb.planEvent(supabase, me, input)) : null
-      },
+      addLogEntry, updateLogEntry, deleteLogEntry, planEvent,
     }
-  }, [choiceId])
+  }, [choiceId, addLogEntry, updateLogEntry, deleteLogEntry, planEvent])
 }
 
 /** The goal's log for the page, with names for its options and loggers. */
@@ -400,14 +392,8 @@ function usePageLog(detail: ChoiceDetail | null): PageLog {
   const { log, entries } = useGoalLog(goal)
   // The log covers every choice on the goal, so lines can be about another choice's option.
   const { rows } = useGoalChoices(goal)
-  const { members } = useFamilyMembers()
+  const memberName = useMemberName()
   const optionNames = useMemo(() => new Map(rows.flatMap((r) => r.options.map((o) => [o.id, o.name] as const))), [rows])
-  const memberName = useCallback((userId: string) => {
-    // A joined member is matched by their account; the household's own full member by user_id.
-    const m = members.find((x) => x.auth_user_id === userId)
-      ?? members.find((x) => !x.auth_user_id && x.is_full_user && x.user_id === userId)
-    return m?.name.trim().split(/\s+/)[0] || undefined
-  }, [members])
   return useMemo(() => ({ log, entries, optionNames, memberName }), [log, entries, optionNames, memberName])
 }
 

@@ -16,6 +16,7 @@ import { PanelNotes } from './sections/PanelNotes'
 import { PanelSource } from './sections/PanelSource'
 import { PanelSubtasks } from './sections/PanelSubtasks'
 import { ChoicesSection } from '@/components/choices/ChoicesSection'
+import { GoalLogSection } from '@/components/choices/GoalLogSection'
 import { PanelPeople } from './sections/PanelPeople'
 import { PanelLinked } from './sections/PanelLinked'
 import { PanelLinks } from './sections/PanelLinks'
@@ -552,6 +553,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
             />
           </div>)}
           {task.isGoal && <ChoicesSection goal={{ kind: 'task', id: task.id }} />}
+          {task.isGoal && <GoalLogSection goal={{ kind: 'task', id: task.id }} goalContext={task.context ?? null} goalScope={task.scope ?? 'individual'} />}
           {show('person') && (<div data-prep-field="person" className="empty:hidden">
             <PanelPeople
               contact={linked.contact}

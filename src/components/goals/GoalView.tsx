@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { GoalChapters } from './GoalChapters'
 import { ChoicesSection } from '@/components/choices/ChoicesSection'
+import { GoalLogSection } from '@/components/choices/GoalLogSection'
 import { GoalSupportLinks } from './GoalSupportLinks'
 import { seasonGoalsSupporting } from '@/lib/planning/goalSupport'
 import { readSeasons } from '@/lib/cadence/seasons'
@@ -156,6 +157,7 @@ export function GoalView({
         <GoalChapters goalId={goal.id} tasks={tasks} />
 
         <div className="mt-8"><ChoicesSection goal={{ kind: 'goal', id: goal.id }} /></div>
+        <div className="mt-8"><GoalLogSection goal={{ kind: 'goal', id: goal.id }} goalContext={goal.context ?? null} goalScope={goal.scope ?? 'individual'} /></div>
 
         {/* Danger zone */}
         <div className="mt-12 pt-8 border-t border-neutral-100">
