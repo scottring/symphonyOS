@@ -40,6 +40,7 @@ import { wallQuickAdd, type WallQuickAddData } from '@/lib/wall/wallQuickAdd';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { plannedWeekStart } from '@/lib/canvas/applyChangeSet';
 import { useDisplayHeartbeat } from '@/lib/display/useDisplayHeartbeat';
+import { myDisplay } from '@/lib/display/pairing';
 import { withSteps, type ChangeSet } from '@/lib/canvas/changeCard';
 import type { WallTalkDeps, WallApplyResult } from './activity/useWallTalk';
 import type { WallTalkWeek } from './activity/WallTalk';
@@ -114,6 +115,7 @@ import { findToBuyList } from '@/lib/lists/toBuy';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { PairDisplayScreen } from '@/components/auth/PairDisplayScreen';
+import { isDisplayUser, displaySetTaskDone } from '@/lib/display/displayWrites';
 import { supabase } from '@/lib/supabase';
 import { claimPaper, paperInBackpack, paperNotOurs } from '@/lib/wall/paperActions';
 import type { WallV2TimelineEvent } from './types';
@@ -201,6 +203,13 @@ export function WallV2Shell() {
   const wallData = useWallData();
   // A paired display says it is alive; a person's session sends nothing.
   useDisplayHeartbeat();
+  // A kid's tablet opened on the wall's address goes to its kid's screen.
+  useEffect(() => {
+    if (!isDisplayUser(user)) return;
+    let live = true;
+    void myDisplay().then((d) => { if (live && d?.familyMemberId) window.location.replace('/kid'); });
+    return () => { live = false; };
+  }, [user]);
   const { weather } = useWeather();
   // force:true — surface tonight's planned dinner + its stored recipe on the
   // kiosk even while planned meals stay off the Today/Week/Month timelines.
@@ -578,7 +587,12 @@ export function WallV2Shell() {
   const handleToggleComplete = useCallback((id: string, completed: boolean, on: Date = now) => {
     void (async () => {
       if (id.startsWith('task-')) {
-        await updateTask(id.slice('task-'.length), { completed });
+        // A paired display ticks a task through the server (displayWrites.ts).
+        if (isDisplayUser(user)) {
+          if (!(await displaySetTaskDone(id.slice('task-'.length), completed))) showFlash('Could not save — try again');
+        } else {
+          await updateTask(id.slice('task-'.length), { completed });
+        }
       } else if (id.startsWith('routine-')) {
         const rid = id.slice('routine-'.length);
         await (completed ? markDone('routine', rid, on) : undoDone('routine', rid, on));
@@ -588,7 +602,7 @@ export function WallV2Shell() {
       }
       await wallData.refetch();
     })();
-  }, [updateTask, markDone, undoDone, now, wallData]);
+  }, [updateTask, markDone, undoDone, now, wallData, user, showFlash]);
 
   // Insert an unscheduled family task — same shape WallMicButton uses, so the
   // wall capture surface stays consistent regardless of input method.

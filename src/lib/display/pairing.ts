@@ -9,13 +9,23 @@
 import { supabase } from '@/lib/supabase'
 
 export interface PairingCode { code: string; expiresAt: Date }
-export interface HouseholdDisplay { id: string; name: string; pairedAt: Date; lastSeenAt: Date | null; revokedAt: Date | null }
+/** How a kid's tablet lays out the day (migration 20261021180000_kid_displays):
+ *  'trail' is one thing at a time; 'list' is everything for now, any order. */
+export type KidLayout = 'trail' | 'list'
+export interface HouseholdDisplay { id: string; name: string; pairedAt: Date; lastSeenAt: Date | null; revokedAt: Date | null; familyMemberId: string | null; layout: KidLayout | null }
+/** The signed-in display: a kitchen wall (no member) or one kid's tablet. */
+export interface MyDisplay { id: string; name: string; householdId: string; familyMemberId: string | null; layout: KidLayout | null }
+
+const asLayout = (v: unknown): KidLayout | null => (v === 'trail' || v === 'list' ? v : null)
 
 const message = (e: unknown, fallback: string) => (e && typeof e === 'object' && typeof (e as { message?: unknown }).message === 'string') ? (e as { message: string }).message : fallback
 
-/** Owner or admin: a six-character code, good for ten minutes. */
-export async function createPairingCode(name = 'Kitchen wall'): Promise<{ ok: true; code: PairingCode } | { ok: false; error: string }> {
-  const { data, error } = await supabase.rpc('create_display_pairing_code', { p_name: name })
+/** Owner or admin: a six-character code, good for ten minutes. A kid's
+ *  tablet names the family member it is for and how it lays out the day. */
+export async function createPairingCode(name = 'Kitchen wall', forMember?: { familyMemberId: string; layout: KidLayout }): Promise<{ ok: true; code: PairingCode } | { ok: false; error: string }> {
+  const { data, error } = await supabase.rpc('create_display_pairing_code', forMember
+    ? { p_name: name, p_family_member_id: forMember.familyMemberId, p_layout: forMember.layout }
+    : { p_name: name })
   if (error) return { ok: false, error: message(error, 'Could not make a code') }
   const row = data as { code?: unknown; expires_at?: unknown } | null
   if (!row || typeof row.code !== 'string' || typeof row.expires_at !== 'string') return { ok: false, error: 'Could not make a code' }
@@ -24,7 +34,7 @@ export async function createPairingCode(name = 'Kitchen wall'): Promise<{ ok: tr
 
 /** The display: sign in anonymously (if not already) and claim the code.
  *  Refused for a person's account: a display must never be an adult's login. */
-export async function claimPairingCode(code: string): Promise<{ ok: true; householdId: string; name: string } | { ok: false; error: string }> {
+export async function claimPairingCode(code: string): Promise<{ ok: true; householdId: string; name: string; familyMemberId: string | null } | { ok: false; error: string }> {
   const trimmed = code.trim().toUpperCase()
   if (!/^[A-Z0-9]{6}$/.test(trimmed)) return { ok: false, error: 'A code is six letters and digits.' }
   const { data: { session } } = await supabase.auth.getSession()
@@ -35,9 +45,9 @@ export async function claimPairingCode(code: string): Promise<{ ok: true; househ
   }
   const { data, error } = await supabase.rpc('claim_display_pairing', { p_code: trimmed })
   if (error) return { ok: false, error: message(error, 'That code did not work') }
-  const row = data as { household_id?: unknown; name?: unknown } | null
+  const row = data as { household_id?: unknown; name?: unknown; family_member_id?: unknown } | null
   if (!row || typeof row.household_id !== 'string') return { ok: false, error: 'That code did not work' }
-  return { ok: true, householdId: row.household_id, name: typeof row.name === 'string' ? row.name : 'Kitchen wall' }
+  return { ok: true, householdId: row.household_id, name: typeof row.name === 'string' ? row.name : 'Kitchen wall', familyMemberId: typeof row.family_member_id === 'string' ? row.family_member_id : null }
 }
 
 /** Is this session a paired display? Asks the server; false when it cannot
@@ -47,11 +57,26 @@ export async function isDisplaySession(): Promise<boolean> {
   return !error && data === 'display'
 }
 
+/** This session's display, or null for a person (or a pre-migration server). */
+export async function myDisplay(): Promise<MyDisplay | null> {
+  const { data, error } = await supabase.rpc('my_display')
+  if (error || !data || typeof data !== 'object') return null
+  const d = data as { id?: unknown; name?: unknown; household_id?: unknown; family_member_id?: unknown; layout?: unknown }
+  if (typeof d.id !== 'string' || typeof d.household_id !== 'string') return null
+  return {
+    id: d.id,
+    name: typeof d.name === 'string' ? d.name : 'Display',
+    householdId: d.household_id,
+    familyMemberId: typeof d.family_member_id === 'string' ? d.family_member_id : null,
+    layout: asLayout(d.layout),
+  }
+}
+
 export async function listDisplays(): Promise<HouseholdDisplay[]> {
-  const { data, error } = await supabase.from('household_displays').select('id, name, paired_at, last_seen_at, revoked_at').order('paired_at', { ascending: false })
+  const { data, error } = await supabase.from('household_displays').select('id, name, paired_at, last_seen_at, revoked_at, family_member_id, layout').order('paired_at', { ascending: false })
   if (error || !data) throw new Error('Could not check paired displays.')
-  return (data as { id: string; name: string; paired_at: string; last_seen_at: string | null; revoked_at: string | null }[])
-    .map((d) => ({ id: d.id, name: d.name, pairedAt: new Date(d.paired_at), lastSeenAt: d.last_seen_at ? new Date(d.last_seen_at) : null, revokedAt: d.revoked_at ? new Date(d.revoked_at) : null }))
+  return (data as { id: string; name: string; paired_at: string; last_seen_at: string | null; revoked_at: string | null; family_member_id?: string | null; layout?: string | null }[])
+    .map((d) => ({ id: d.id, name: d.name, pairedAt: new Date(d.paired_at), lastSeenAt: d.last_seen_at ? new Date(d.last_seen_at) : null, revokedAt: d.revoked_at ? new Date(d.revoked_at) : null, familyMemberId: d.family_member_id ?? null, layout: asLayout(d.layout) }))
 }
 
 export async function revokeDisplay(id: string): Promise<{ ok: true } | { ok: false; error: string }> {

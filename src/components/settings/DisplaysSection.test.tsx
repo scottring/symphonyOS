@@ -3,12 +3,46 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), revoke: vi.fn() }))
 vi.mock('@/lib/display/pairing', () => ({ createPairingCode: mocks.create, listDisplays: mocks.list, revokeDisplay: mocks.revoke }))
+const thoughtMocks = vi.hoisted(() => ({ list: vi.fn(), reviewed: vi.fn() }))
+vi.mock('@/lib/kids/kidThoughts', () => ({ listOpenThoughts: thoughtMocks.list, markThoughtReviewed: thoughtMocks.reviewed, kindLabel: (k: string | null) => (k === 'ask' ? 'Ask a grown-up' : null) }))
 
 import { DisplaysSection } from './DisplaysSection'
+import type { FamilyMember } from '@/types/family'
 
 beforeEach(() => {
   mocks.create.mockReset(); mocks.list.mockReset(); mocks.revoke.mockReset()
   mocks.list.mockResolvedValue([])
+  thoughtMocks.list.mockReset().mockResolvedValue([]); thoughtMocks.reviewed.mockReset().mockResolvedValue(true)
+})
+
+const kaleb = { id: 'kaleb', name: 'Kaleb', role_label: 'child', is_full_user: false, member_type: 'core' } as unknown as FamilyMember
+const scott = { id: 'scott', name: 'Scott', role_label: 'parent', is_full_user: true, member_type: 'core' } as unknown as FamilyMember
+
+describe('a kid’s tablet in Settings', () => {
+  it('pairs a tablet for one kid, with how it shows the day', async () => {
+    mocks.create.mockResolvedValue({ ok: true, code: { code: 'KAL234', expiresAt: new Date(Date.now() + 10 * 60_000) } })
+    render(<DisplaysSection members={[scott, kaleb]} />)
+    const forSelect = screen.getByLabelText('For')
+    expect(Array.from((forSelect as HTMLSelectElement).options).map((o) => o.text)).toEqual(['The kitchen wall', 'Kaleb’s tablet'])
+    fireEvent.change(forSelect, { target: { value: 'kaleb' } })
+    fireEvent.click(screen.getByLabelText('A list, in any order'))
+    fireEvent.click(screen.getByRole('button', { name: 'Pair a display' }))
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith('Kaleb’s tablet', { familyMemberId: 'kaleb', layout: 'list' }))
+  })
+  it('names the kid a paired tablet is for', async () => {
+    mocks.list.mockResolvedValue([{ id: 'd1', name: 'Kaleb’s tablet', pairedAt: new Date(), lastSeenAt: null, revokedAt: null, familyMemberId: 'kaleb', layout: 'trail' }])
+    render(<DisplaysSection members={[scott, kaleb]} />)
+    expect(await screen.findByText(/Shows Kaleb’s day, one thing at a time/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'See it' })).toHaveAttribute('href', '/kid/kaleb?layout=trail')
+  })
+  it('a grown-up marks a saved thought gone over', async () => {
+    thoughtMocks.list.mockResolvedValue([{ id: 't1', familyMemberId: 'kaleb', text: 'Library on Saturday?', kind: 'ask', createdAt: new Date(2026, 9, 21, 16, 58), reviewedAt: null }])
+    render(<DisplaysSection members={[scott, kaleb]} />)
+    expect(await screen.findByText('Library on Saturday?')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Went over it' }))
+    await waitFor(() => expect(screen.queryByText('Library on Saturday?')).not.toBeInTheDocument())
+    expect(thoughtMocks.reviewed).toHaveBeenCalledWith('t1')
+  })
 })
 
 describe('DisplaysSection', () => {
