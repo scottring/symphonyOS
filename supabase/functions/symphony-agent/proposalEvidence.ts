@@ -15,12 +15,12 @@ export function claimsPreparedCard(reply: string): boolean {
   })
 }
 
-export const PROPOSAL_REPAIR = `Application verification: no validated change card was produced in this turn. Your proposed answer claims that a card is ready or contains changes, so it cannot be delivered. Complete the missing symphony_propose_changes call using the user's actual requests and the whole pending list, preserving unchanged items and exact dates/times. Leave unspecified days undated. Do not create tasks directly or infer approval. If you cannot prepare the card, explain that honestly instead. This is one bounded repair attempt.`
+export const PROPOSAL_REPAIR = `Application verification: no validated change card was produced in this turn. Your proposed answer claims that a card is ready or contains changes, so it cannot be delivered. Complete the missing symphony_propose_changes call (symphony_propose_choice_changes for changes to choices) using the user's actual requests and the whole pending list, preserving unchanged items and exact dates/times. Leave unspecified days undated. Do not create tasks directly or infer approval. If you cannot prepare the card, explain that honestly instead. This is one bounded repair attempt.`
 export const PROPOSAL_FAILURE = 'I could not prepare the updated review card. Nothing from this proposal was saved. Your request is still in the conversation.'
 
 
 export function proposalRepairToolAllowed(name: string): boolean {
-  return name === 'symphony_propose_changes' || /^symphony_(read|get|list|search)_/.test(name)
+  return name === 'symphony_propose_changes' || name === 'symphony_propose_choice_changes' || /^symphony_(read|get|list|search)_/.test(name)
 }
 
 /** Chat already displays the verified draft and its Not saved status. Avoid

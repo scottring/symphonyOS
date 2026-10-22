@@ -11,6 +11,7 @@ import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutco
 import { PROPOSE_CHANGES_TOOL, changeCardNote, changeSetFromInput, resolveRefs } from './changeSet.ts'
 import { READ_WEEK_TOOL, local, readCalendarCoverage, shapeWeek, weekWindow } from './readWeek.ts'
 import { READ_PLAN_TOOL, loadPlanRefs, readPlan } from './readPlan.ts'
+import { PROPOSE_CHOICE_CHANGES_TOOL, READ_CHOICES_TOOL, choiceSetFromInput, loadChoiceRefs, readChoices, resolveChoiceRefs } from './choices.ts'
 import { POINT_TOOL, pointAt } from './pointing.ts'
 import { planningRow, validatePlanningParent, planningWeekStart } from './planning.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -169,6 +170,7 @@ Doing versus suggesting:
 - When the person captures several things at once ("the plumber, the Amazon order, the yard, and an all-day test drive this week"), call symphony_propose_changes IN THAT SAME TURN, before you ask anything, with ALL of them as adds, undated where the day is unknown (an add with no date lands in the week); then ask only about what is genuinely unclear, one question. The card is how the person sees that you heard them; a question with no card means they must repeat the list. A correction ("actually Friday", "not the yard, the garage") is a change to the card: re-send the whole revised list in that same turn, before or with your reply; "got it" alone leaves the old card standing. Never hold items back until every day is known, and never make them say the list again. Something named for a day goes on that day; an all-day commitment is an add with a date and no time, and if that day already holds an all-day event, say so and ask before placing it.
 - When several things change, these go on the card with the rest: done (mark a task finished), merge (two tasks that are the same thing: task_id is the one with the better title, from_task_id the duplicate) and talk (something the person wants to discuss with someone before deciding; note like "with Iris"). A single clear done can still be done directly.
 - symphony_propose_changes has no delete. To drop something, use someday.
+- Choices compare options on a goal (contractors, schools, camps). Read them with symphony_read_choices; propose every change to them with symphony_propose_choice_changes (one card; nothing saves until the person saves it). Answer questions about choices with the recorded facts and the computed prices, showing how a total adds up. Never rank options, call one best, cheapest-first, or recommend one, even when asked which to pick: lay the facts side by side and leave the decision to them.
 - Planning the week (or the rest of it): call symphony_read_week first, passing the week's start: the week the message names ("Plan the week of Oct 17" means the week starting on the Oct 17 nearest today), else the week on the page. For beta, do not call symphony_point or symphony_show_on_page while planning. Respond to complete messages; the app shows the final card after the turn completes. Propose early: the moment the person names things (even in their first message, before any question is answered), and again as soon as one answer settles a change, call symphony_propose_changes with the whole list so far (title like "2 changes so far") and week_start set to the start symphony_read_week returned, and call it again with the whole revised list after each later answer, so the draft stays current; the person saves whenever they are ready. Write nothing yourself for the week's changes — the card carries them; include a separate one-off mentioned in passing (e.g. "also call Molly this afternoon") in the same pending card; do not bypass approval during planning. Month, season and year goals are reference only for the week; mention one only when something clearly serves it. Check the calendar and email before asking anything they could answer.
 - "Plan my day" (the Today page's morning chip): call symphony_read_week for this week and look at today. Say the day back in two or three plain sentences: what is fixed and until when, the open stretch, what has to happen tonight. Name tasks that look like the same thing (offer merge) and tasks left over from earlier days that are still open. Ask only what you cannot tell, one or two questions at a time, e.g. what has to happen today and in what order. Then one change card: place with times for the order the person gave (never invent a time they did not give or that the calendar does not fix), merge for duplicates they confirm, place or someday for leftovers. Title like "5 changes to today".
 - "Review my day" (the evening chip): call symphony_read_week and look at today. Say what got done, then name what is still open (at most three at a time) and ask what happened. Then one change card: done for what they finished, place on another day for what carries over (tomorrow unless they say otherwise), talk (note like "with Iris") for what needs a conversation first, someday for what they drop, routine_skip on today's date for a routine they did not do and will not. No row-by-row questionnaire; skip what they did not mention.
@@ -204,6 +206,8 @@ const TOOLS = [
   PROPOSE_CHANGES_TOOL,
   READ_WEEK_TOOL,
   READ_PLAN_TOOL,
+  READ_CHOICES_TOOL,
+  PROPOSE_CHOICE_CHANGES_TOOL,
   POINT_TOOL,
   SHOW_TOOL,
   {name:'symphony_link_plan_item',description:'Connect an existing month goal to a season goal or an existing week task to a month goal. Preserves the existing item, dates and completion. Read both items first. Does not create a replacement or alter either life area.',input_schema:{type:'object',properties:{id:{type:'string'},parent_id:{type:'string'},level:{type:'string',enum:['month','week']}},required:['id','parent_id','level']}},
@@ -762,6 +766,10 @@ async function runTool(
       case 'symphony_read_plan': {
         // Month, Season or Year: this list, the next, and the parent list, through RLS.
         return JSON.stringify(await readPlan(db, input, local(new Date().toISOString()).date))
+      }
+      case 'symphony_read_choices': {
+        // Choices on goals, their options, prices and waits, through RLS.
+        return await readChoices(db, input)
       }
       case 'symphony_list_tasks': {
         let q = db.from('tasks').select('*').order('scheduled_for', { ascending: true, nullsFirst: false })
@@ -1654,6 +1662,26 @@ Deno.serve(async (req) => {
                     send({ type: 'change_set', set: resolved.set })
                     shown.proposal = { key: resolved.set.key, title: resolved.set.title, ops: resolved.set.ops.length }
                     result = JSON.stringify({ shown: resolved.set.ops.length, saved: false, note: wall ? 'Shown as a change card. Nothing is saved until a grown-up approves. Ask your next useful question or say it is ready to approve.' : 'Shown as a draft in chat, marked Not saved. The plan is unchanged until the person clicks Save. Do not repeat the list or the review reminder; acknowledge the change or ask your next useful question.' })
+                  }
+                }
+              } else if (block.name === PROPOSE_CHOICE_CHANGES_TOOL.name) {
+                // A choice card: like the change card above, checked and
+                // resolved through the person's own RLS client (a choice or
+                // goal they cannot see is absent and refused), streamed to the
+                // page, never written here.
+                const parsed = choiceSetFromInput(block.input ?? {}, String(block.id ?? crypto.randomUUID()))
+                if ('error' in parsed) result = JSON.stringify({ error: parsed.error })
+                else if (wall) result = JSON.stringify({ error: 'Choices are changed in the Symphony app, not on the kitchen wall: say so, and offer to note it on the scratchpad.' })
+                else {
+                  const choiceIds = [...new Set(parsed.set.ops.flatMap((o) => (o.choiceId ? [o.choiceId] : [])))]
+                  const goalIds = [...new Set(parsed.set.ops.flatMap((o) => (o.op === 'choice_add' && o.goalId ? [o.goalId] : [])))]
+                  const refs = await loadChoiceRefs(tdb, choiceIds, goalIds).catch(() => null)
+                  const resolved = refs ? resolveChoiceRefs(parsed.set, refs) : { error: 'Could not read the choices and goals to check this list. Try again.' }
+                  if ('error' in resolved) result = JSON.stringify({ error: resolved.error })
+                  else {
+                    send({ type: 'change_set', set: resolved.set })
+                    shown.proposal = { key: resolved.set.key, title: resolved.set.title, ops: resolved.set.ops.length }
+                    result = JSON.stringify({ shown: resolved.set.ops.length, saved: false, note: 'Shown as a draft in chat, marked Not saved. The plan is unchanged until the person clicks Save. Do not repeat the list or the review reminder; acknowledge the change or ask your next useful question.' })
                   }
                 }
               } else if (block.name === PROPOSE_TOOL.name) {

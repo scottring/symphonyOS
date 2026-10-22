@@ -17,7 +17,17 @@ export type RoutineOpKind = 'routine_skip' | 'routine_move' | 'routine_who' | 'r
 /** Plan ops: goals on the Month, Season and Year lists. Month and season goals
  *  are tasks committed to a period; year goals are `goals` rows (itemKind). */
 export type PlanOpKind = 'plan_add' | 'plan_carry' | 'plan_let_go' | 'plan_done'
-export type ChangeOpKind = TaskOpKind | RoutineOpKind | PlanOpKind
+/** Choice ops (spec 2026-10-22-choices, "Chat"): a choice on a goal, its
+ *  options, their prices and values, the columns and the work, the decision.
+ *  Proposed only by symphony_propose_choice_changes (choices.ts), never by
+ *  symphony_propose_changes: they are not in OP_KINDS. */
+export type ChoiceOpKind = 'choice_add' | 'option_add' | 'option_status' | 'option_set' | 'price_line' | 'column_add' | 'work_set' | 'choice_choose' | 'choice_reopen' | 'follow_up'
+export type ChangeOpKind = TaskOpKind | RoutineOpKind | PlanOpKind | ChoiceOpKind
+/** Mirrors src/types/choice.ts. */
+export type OptionStatus = 'considering' | 'contacted' | 'heard_back' | 'ruled_out' | 'chosen'
+export type ColumnKind = 'text' | 'money' | 'date' | 'yesno'
+export interface ChoiceColumn { id: string; label: string; kind: ColumnKind }
+export type CellValue = string | number | boolean | null
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
 export type RoutineContext = 'family' | 'personal' | 'work'
 
@@ -85,6 +95,41 @@ export interface ChangeOp {
   parentTitle?: string
   /** plan_carry: the new wording, if the person reworded it. */
   newTitle?: string
+  // Choice ops. Every one except choice_add names its choice by exactly one of
+  // choiceId (an existing choice) or choiceKey (the `key` of a choice_add
+  // earlier in this set); option-level ops name their option the same way
+  // (optionId, or optionKey of an option_add). `seen` is the choice's
+  // updated_at when Symphony read it; `note` is the choose reason or a price
+  // line's note; `date` is a follow-up's day.
+  choiceId?: string
+  choiceKey?: string
+  choiceTitle?: string
+  /** choice_add: the goal it is under, a goal task (month / season goal) or a
+   *  year goal row (`goalId`, above). */
+  goalTaskId?: string
+  goalTitle?: string
+  optionId?: string
+  optionKey?: string
+  optionName?: string
+  /** option_add: an existing contact to link; else `phone` makes one. */
+  contactId?: string
+  phone?: string
+  /** option_status: the new status. */
+  status?: OptionStatus
+  /** option_set / column_add: the column (column_add carries the id assigned
+   *  at resolve time, which later ops in the set use). */
+  columnId?: string
+  columnLabel?: string
+  columnKind?: ColumnKind
+  /** option_set: the value, already typed (money cents, ISO date, yes/no, text). */
+  value?: CellValue
+  /** price_line: the pieces it covers; work_set: [the piece's id]. */
+  workIds?: string[]
+  workLabels?: string[]
+  /** price_line: integer cents. */
+  amountCents?: number
+  /** work_set: what the piece of work is. */
+  description?: string
 }
 
 export interface ChangeSet {

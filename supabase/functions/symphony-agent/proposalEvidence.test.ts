@@ -30,6 +30,7 @@ it('repair tools cannot create or change persisted data',()=>{
  for(const name of ['symphony_create_task','symphony_update_task','symphony_draft_email','symphony_attach_source','symphony_add_to_scratchpad'])expect(proposalRepairToolAllowed(name)).toBe(false)
  expect(proposalRepairToolAllowed('symphony_read_week')).toBe(true)
  expect(proposalRepairToolAllowed('symphony_propose_changes')).toBe(true)
+ expect(proposalRepairToolAllowed('symphony_propose_choice_changes')).toBe(true)
 })
 
 it('lets chat use its visible draft status without repeating a review preamble', () => {
