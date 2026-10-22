@@ -84,5 +84,8 @@ export default function ChoiceFixture() {
     addContact: async () => ({ id: 'fx-contact' }),
     deleteContact: ok,
   }
-  return <ChoicePageView detail={fixtureDetail(selected)} writers={writers} />
+  const detail = fixtureDetail(selected)
+  // ?empty shows a new choice with no options yet.
+  const shown = params.has('empty') ? { ...detail, options: [], lines: [], followUps: [] } : detail
+  return <ChoicePageView detail={shown} writers={writers} />
 }

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { CellValue, ChoiceColumn } from '@/types/choice'
 import { parseCell } from '@/lib/choices/db'
 import { formatCell } from './cells'
+import { addLabel, editableCell } from './ComparisonTable'
 
 const HINT: Record<string, string> = {
   money: 'Use a number, like 19,750',
@@ -35,8 +36,8 @@ export function CellEditor({ column, value, optionName, onSave }: {
     return (
       <button type="button" aria-label={label}
         onClick={() => void onSave((prev) => (prev === true ? false : prev === false ? null : true))}
-        className={`text-left hover:text-neutral-900 ${text ? 'text-neutral-800' : 'text-neutral-400'}`}>
-        {text ?? '—'}
+        className={`${editableCell} ${text ? 'text-neutral-800' : addLabel}`}>
+        {text ?? 'Yes or no'}
       </button>
     )
   }
@@ -45,8 +46,8 @@ export function CellEditor({ column, value, optionName, onSave }: {
     return (
       <button type="button" aria-label={label}
         onClick={() => { setDraft(editText(column, value)); setHint(null); done.current = false; setEditing(true) }}
-        className={`text-left hover:text-neutral-900 ${text ? 'text-neutral-800' : 'text-neutral-400'}`}>
-        {text ?? '—'}
+        className={`${editableCell} ${text ? 'text-neutral-800' : addLabel}`}>
+        {text ?? 'Add'}
       </button>
     )
   }

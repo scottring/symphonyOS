@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { inputClass } from './DialogFrame'
+import { inputClass, primaryButton } from './DialogFrame'
 import { splitPhone } from './cells'
 
 export function AddOptionInput({ onAdd }: { onAdd: (name: string, phone?: string) => Promise<boolean> }) {
@@ -15,14 +15,17 @@ export function AddOptionInput({ onAdd }: { onAdd: (name: string, phone?: string
       busy.current = false
     }
   }
+  // A visible Add beside the box: Enter alone left a typed name looking saved.
   return (
-    <input
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
-      placeholder="Add an option: a name, or paste a phone number"
-      aria-label="Add an option"
-      className={`mt-4 ${inputClass} py-2`}
-    />
+    <form className="mt-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); void submit() }}>
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Add an option: a name, or paste a phone number"
+        aria-label="Add an option"
+        className={`${inputClass} py-2`}
+      />
+      <button type="submit" aria-label="Add option" disabled={!text.trim()} className={primaryButton}>Add</button>
+    </form>
   )
 }

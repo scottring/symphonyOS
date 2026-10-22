@@ -27,13 +27,17 @@ export interface ComparisonProps {
   onEditPrice?: (o: ChoiceOption) => void
 }
 
+/** An editable value looks tappable; an empty one says what tapping adds. */
+export const editableCell = '-mx-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-neutral-100'
+export const addLabel = 'text-primary-600'
+
 /** The price block, as a button that opens the editor when editing. */
 export function PriceCellView({ option, cell, onEdit }: { option: ChoiceOption; cell: PriceCell; onEdit?: (o: ChoiceOption) => void }) {
   if (!onEdit) return <PriceBlock cell={cell} />
   return (
     <button type="button" aria-label={`Price for ${option.name}`} onClick={() => onEdit(option)}
-      className="block rounded-md text-left hover:bg-neutral-50">
-      <PriceBlock cell={cell} />
+      className={`${editableCell} block`}>
+      {cell.kind === 'none' ? <span className={addLabel}>Add price</span> : <PriceBlock cell={cell} />}
     </button>
   )
 }
@@ -86,6 +90,13 @@ export function ComparisonTable(p: ComparisonProps) {
           </tr>
         </thead>
         <tbody>
+          {p.options.length === 0 && (
+            <tr>
+              <td colSpan={p.columns.length + 4} className="px-3 py-4 text-neutral-500">
+                No options yet. Type a name below and press Add.
+              </td>
+            </tr>
+          )}
           {p.options.map((o) => {
             const contact = contactLine(o, p.contacts)
             const fact = optionFact(o, p.followUpOf(o), p.now)

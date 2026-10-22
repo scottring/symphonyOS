@@ -9,6 +9,9 @@ import { PriceCellView, type ComparisonProps } from './ComparisonTable'
  *  Empty facts are left out; "Edit" on a card shows every fact, editable. */
 export function OptionCards(p: ComparisonProps) {
   const [editing, setEditing] = useState<string | null>(null)
+  if (p.options.length === 0) {
+    return <p className="rounded-xl border border-neutral-200 bg-white p-3 text-sm text-neutral-500">No options yet. Type a name below and press Add.</p>
+  }
   return (
     <ul className="space-y-3">
       {p.options.map((o) => <Card key={o.id} p={p} o={o} editing={editing === o.id} onEdit={(on) => setEditing(on ? o.id : null)} />)}

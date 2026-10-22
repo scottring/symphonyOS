@@ -136,6 +136,30 @@ describe('editing on the comparison page', () => {
     expect(w.addOption).toHaveBeenCalledWith({ name: 'Harbor Bath' })
   })
 
+  it('the Add button adds the typed option, and is disabled while the box is empty', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    const add = screen.getByRole('button', { name: 'Add option' })
+    expect(add).toBeDisabled()
+    await userEvent.type(screen.getByPlaceholderText('Add an option: a name, or paste a phone number'), 'Scher')
+    await userEvent.click(add)
+    expect(w.addOption).toHaveBeenCalledWith({ name: 'Scher' })
+  })
+
+  it('an empty choice says where to add the first option', () => {
+    render(<ChoicePageView detail={{ ...detail, options: [], lines: [] }} writers={w} />)
+    expect(screen.getByText('No options yet. Type a name below and press Add.')).toBeInTheDocument()
+  })
+
+  it('empty cells say what tapping them does', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    const row = rowOf('Chesapeake Renovations')
+    expect(within(row).getByRole('button', { name: 'Price for Chesapeake Renovations' })).toHaveTextContent('Add price')
+    const bid = within(row).getByRole('button', { name: 'Bid for Chesapeake Renovations' })
+    expect(bid).toHaveTextContent('Add')
+    await userEvent.click(bid)
+    expect(within(row).getByRole('textbox', { name: 'Bid' })).toBeInTheDocument()
+  })
+
   it('setting Contacted offers a follow-up, and the date creates it', async () => {
     render(<ChoicePageView detail={detail} writers={w} />)
     await userEvent.click(within(rowOf('Martinez Tile & Bath')).getByRole('button', { name: 'Status ▾' }))
