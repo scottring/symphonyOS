@@ -5,6 +5,11 @@ import { render } from '@/test/test-utils'
 import { TapContextPanel } from './TapContextPanel'
 import { createMockTask, createMockContact, createMockProject } from '@/test/mocks/factories'
 
+vi.mock('@/hooks/useChoices', () => ({
+  CHOICES_UPDATED: 'symphony-choices-updated',
+  useGoalChoices: () => ({ rows: [], loading: false, refetch: vi.fn(), create: vi.fn() }),
+}))
+
 describe('TapContextPanel', () => {
   const baseHandlers = {
     onClose: vi.fn(),
@@ -29,6 +34,22 @@ describe('TapContextPanel', () => {
   }
 
   beforeEach(() => { vi.clearAllMocks() })
+
+  it('shows Choices for a goal task and not for an ordinary task', () => {
+    const goal = createMockTask({ title: 'Redo roof', isGoal: true })
+    const { unmount } = render(<TapContextPanel
+      task={goal} contacts={[]} projects={[]} events={[]} familyMembers={[]}
+      siblingTaskCandidates={[]} allTasks={[goal]} {...baseHandlers}
+    />)
+    expect(screen.getByText('Choices')).toBeInTheDocument()
+    unmount()
+    const plain = createMockTask({ title: 'Call', isGoal: false })
+    render(<TapContextPanel
+      task={plain} contacts={[]} projects={[]} events={[]} familyMembers={[]}
+      siblingTaskCandidates={[]} allTasks={[plain]} {...baseHandlers}
+    />)
+    expect(screen.queryByText('Choices')).toBeNull()
+  })
 
   it('renders task title in the header', () => {
     const task = createMockTask({ title: 'Call Dr. Smith' })

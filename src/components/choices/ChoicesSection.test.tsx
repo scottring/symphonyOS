@@ -32,6 +32,7 @@ import { ChoicesSection } from './ChoicesSection'
 
 describe('ChoicesSection', () => {
   beforeEach(() => {
+    localStorage.clear()
     navigate.mockClear()
     create.mockReset()
     rows = [
@@ -89,5 +90,35 @@ describe('ChoicesSection', () => {
     expect(screen.getByText('Choices')).toBeInTheDocument()
     expect(screen.getByText('+ Choice')).toBeInTheDocument()
     expect(screen.queryByRole('listitem')).toBeNull()
+  })
+
+  it('creates only once on a double Enter', async () => {
+    let resolve!: (c: Choice) => void
+    create.mockReturnValue(new Promise<Choice>((r) => { resolve = r }))
+    render(<ChoicesSection goal={{ kind: 'task', id: 'g1' }} />)
+    await userEvent.click(screen.getByText('+ Choice'))
+    await userEvent.type(screen.getByPlaceholderText(/What are you choosing/), 'X{Enter}{Enter}')
+    resolve(choice({ id: 'new' }))
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/choice/new'))
+    expect(create).toHaveBeenCalledTimes(1)
+  })
+
+  it('collapsed: hides + Choice and previews the count', async () => {
+    render(<ChoicesSection goal={{ kind: 'task', id: 'g1' }} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse Choices' }))
+    expect(screen.queryByText('+ Choice')).toBeNull()
+    expect(screen.getByText('2 choices')).toBeInTheDocument()
+    expect(screen.queryByText('Roofer')).toBeNull()
+  })
+
+  it('previews a singular count and none when empty', async () => {
+    rows = [rows[0]]
+    const { unmount } = render(<ChoicesSection goal={{ kind: 'task', id: 'g1' }} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse Choices' }))
+    expect(screen.getByText('1 choice')).toBeInTheDocument()
+    unmount()
+    rows = []
+    render(<ChoicesSection goal={{ kind: 'task', id: 'g1' }} />)
+    expect(document.querySelector('[data-panel-preview]')).toBeNull()
   })
 })
