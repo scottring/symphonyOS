@@ -1675,7 +1675,8 @@ Deno.serve(async (req) => {
                 else {
                   const choiceIds = [...new Set(parsed.set.ops.flatMap((o) => (o.choiceId ? [o.choiceId] : [])))]
                   const goalIds = [...new Set(parsed.set.ops.flatMap((o) => (o.op === 'choice_add' && o.goalId ? [o.goalId] : [])))]
-                  const refs = await loadChoiceRefs(tdb, choiceIds, goalIds).catch(() => null)
+                  const contactIds = [...new Set(parsed.set.ops.flatMap((o) => (o.op === 'option_add' && o.contactId ? [o.contactId] : [])))]
+                  const refs = await loadChoiceRefs(tdb, choiceIds, goalIds, contactIds).catch(() => null)
                   const resolved = refs ? resolveChoiceRefs(parsed.set, refs) : { error: 'Could not read the choices and goals to check this list. Try again.' }
                   if ('error' in resolved) result = JSON.stringify({ error: resolved.error })
                   else {

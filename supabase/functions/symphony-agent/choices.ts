@@ -32,10 +32,14 @@ const MAX_NAME = 200
 const MAX_NOTE = 300
 const MAX_TEXT = 1000
 const MAX_CHOICES = 50
+const MAX_AMOUNT = 1_000_000_000
+/** Optional fields where an explicit null means "not given". */
+const NULL_IS_ABSENT = ['status', 'date', 'amount', 'phone', 'note', 'description', 'contact_id'] as const
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const isId = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v)
 const text = (v: unknown, n: number): string => (typeof v === 'string' ? v.trim().slice(0, n) : '')
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+const fold = (a: string) => a.trim().toLowerCase()
 
 /** Typed cell input, as src/lib/choices/db.ts parseCell reads it.
  *  undefined = not valid for that kind; null = cleared. */
@@ -81,7 +85,7 @@ export const READ_CHOICES_TOOL = {
 
 export const PROPOSE_CHOICE_CHANGES_TOOL = {
   name: 'symphony_propose_choice_changes' as const,
-  description: 'Propose ONE list of changes to choices (options compared on a goal), shown as a change card in chat. Nothing is saved until the person saves it. Every change to a choice goes here, even a single one; never on symphony_propose_changes. Name an existing choice by choice_id and an existing option by option_id (from symphony_read_choices); name one added earlier in this same list by its choice_title or option_name. Ops: choice_add (goal_id from symphony_read_plan, choice_title), option_add (name, optional phone), option_status (status), option_set (column_label, value as the person said it: money like "$19,750", a date YYYY-MM-DD, yes or no, or text; an empty value clears it), price_line (work_labels: the pieces of work this one price covers, together; amount in dollars; optional note), column_add (column_label, kind), work_set (work_labels: [one piece], optional description; an existing piece gets the new description), choice_choose (the option chosen, optional note: the reason in their words), choice_reopen, follow_up (the option, date YYYY-MM-DD). Use the person\'s words; never add a column, value or price they did not give. Each call replaces the card: send the whole list so far.',
+  description: 'Propose ONE list of changes to choices (options compared on a goal), shown as a change card in chat. Nothing is saved until the person saves it. Every change to a choice goes here, even a single one; never on symphony_propose_changes. Name an existing choice by choice_id and an existing option by option_id (from symphony_read_choices); name one added earlier in this same list by its choice_title or option_name. Ops: choice_add (goal_id from symphony_read_plan, choice_title), option_add (name; contact_id when the person names someone already in their contacts, found with symphony_list_contacts, else an optional phone), option_status (status), option_set (column_label, value as the person said it: money like "$19,750", a date YYYY-MM-DD, yes or no, or text; an empty value clears it), price_line (work_labels: the pieces of work this one price covers, together; amount in dollars; optional note), column_add (column_label, kind), work_set (work_labels: [one piece], optional description; an existing piece gets the new description), choice_choose (the option chosen, optional note: the reason in their words), choice_reopen, follow_up (the option, date YYYY-MM-DD). Use the person\'s words; never add a column, value or price they did not give. Each call replaces the card: send the whole list so far.',
   input_schema: {
     type: 'object',
     properties: {
@@ -98,14 +102,15 @@ export const PROPOSE_CHOICE_CHANGES_TOOL = {
             option_id: { type: 'string', description: 'An existing option id (from symphony_read_choices)' },
             option_name: { type: 'string', description: 'The name of an option_add earlier in this list (or an existing option\'s exact name)' },
             name: { type: 'string', description: 'option_add: the option\'s name, e.g. "Martinez Tile & Bath"' },
-            phone: { type: 'string', description: 'option_add, optional: a phone number; saved as a new contact' },
+            contact_id: { type: 'string', description: 'option_add, optional: an existing contact (from symphony_list_contacts) to link. Prefer it whenever the person names someone already in their contacts; phone is then ignored' },
+            phone: { type: 'string', description: 'option_add, optional, for someone not in contacts: a phone number; saved as a new contact' },
             status: { type: 'string', enum: [...OPTION_STATUSES], description: 'option_status: considering, contacted, heard_back, ruled_out or chosen' },
             column_label: { type: 'string', description: 'option_set: an existing column or one added earlier in this list; column_add: the new column\'s label' },
             kind: { type: 'string', enum: [...COLUMN_KINDS], description: 'column_add: text, money, date or yesno' },
             value: { type: 'string', description: 'option_set: the value, read by the column\'s kind' },
             work_labels: { type: 'array', items: { type: 'string' }, description: 'price_line: the pieces of work one price covers; work_set: [the piece]' },
             description: { type: 'string', description: 'work_set: what the piece of work is, in the person\'s words' },
-            amount: { type: 'number', description: 'price_line: dollars, e.g. 19750 or 18400.50' },
+            amount: { type: 'number', description: 'price_line: dollars, e.g. 19750 or 18400.50 (at most 1,000,000,000)' },
             note: { type: 'string', description: 'price_line: e.g. "excludes fixtures"; choice_choose: the reason, in their words' },
             date: { type: 'string', description: 'follow_up: YYYY-MM-DD' },
           },
@@ -267,8 +272,10 @@ export function choiceSetFromInput(input: Record<string, unknown>, key: string):
   const ops: ChangeOp[] = []
   for (let i = 0; i < raw.length; i++) {
     const at = `Op ${i + 1}`
-    const o = raw[i] as Record<string, unknown> | null
-    if (!o || typeof o !== 'object') return { error: `${at} is not an object` }
+    const given = raw[i] as Record<string, unknown> | null
+    if (!given || typeof given !== 'object') return { error: `${at} is not an object` }
+    const o: Record<string, unknown> = { ...given }
+    for (const k of NULL_IS_ABSENT) if (o[k] === null) delete o[k]
     if (typeof o.op !== 'string' || !KINDS.has(o.op)) return { error: `${at}: unknown op "${String(o.op)}" (use ${CHOICE_OP_KINDS.slice(0, -1).join(', ')} or ${CHOICE_OP_KINDS[CHOICE_OP_KINDS.length - 1]})` }
     const op = o.op as ChoiceOpKind
     const base: ChangeOp = { key: `${key}:${i}`, op, title: '' }
@@ -278,9 +285,10 @@ export function choiceSetFromInput(input: Record<string, unknown>, key: string):
       return { error: `${at}: status must be one of ${OPTION_STATUSES.join(', ')}` }
     }
     if (o.date !== undefined && !realDate(o.date)) return { error: `${at}: date must be a real YYYY-MM-DD date` }
-    if (o.amount !== undefined && (typeof o.amount !== 'number' || !Number.isFinite(o.amount) || o.amount < 0)) {
-      return { error: `${at}: amount must be a number of dollars, 0 or more (e.g. 19750)` }
+    if (o.amount !== undefined && (typeof o.amount !== 'number' || !Number.isFinite(o.amount) || o.amount < 0 || o.amount > MAX_AMOUNT || !Number.isSafeInteger(Math.round(o.amount * 100)))) {
+      return { error: `${at}: amount must be a number of dollars, 0 to ${MAX_AMOUNT.toLocaleString('en-US')} (e.g. 19750)` }
     }
+    if (o.contact_id !== undefined && !isId(o.contact_id)) return { error: `${at}: contact_id must be a contact id from symphony_list_contacts` }
 
     if (op === 'choice_add') {
       if (!isId(o.goal_id)) return { error: `${at}: choice_add needs goal_id, a goal id from symphony_read_plan` }
@@ -308,8 +316,12 @@ export function choiceSetFromInput(input: Record<string, unknown>, key: string):
         const name = text(o.name, MAX_NAME)
         if (!name) return { error: `${at}: option_add needs a name` }
         base.optionName = name
-        const phone = text(o.phone, 40)
-        if (phone) base.phone = phone
+        // An existing contact is linked; a phone makes a new one only without it.
+        if (isId(o.contact_id)) base.contactId = o.contact_id
+        else {
+          const phone = text(o.phone, 40)
+          if (phone) base.phone = phone
+        }
         break
       }
       case 'option_status':
@@ -371,13 +383,15 @@ export function choiceSetFromInput(input: Record<string, unknown>, key: string):
 export type ChoiceRefs = {
   choices: { id: string; title: string; updated_at: string; goal_title: string; goal_task_id: string | null; goal_id: string | null; columns: ChoiceColumn[]; work: WorkPiece[]; options: { id: string; name: string }[] }[]
   goals: { id: string; title: string; kind: 'task' | 'goal' }[]
+  /** The contacts option_add ops link (contact_id), as the person can see them. */
+  contacts?: { id: string; name: string }[]
 }
 
 /** What resolving a choice card needs: the choices it names (with their
  *  options, columns and work) and the goals a choice_add names. Through the
  *  person's RLS client: what they cannot see is simply absent. Throws when a
  *  read fails. */
-export async function loadChoiceRefs(db: Db, choiceIds: string[], goalIds: string[]): Promise<ChoiceRefs> {
+export async function loadChoiceRefs(db: Db, choiceIds: string[], goalIds: string[], contactIds: string[] = []): Promise<ChoiceRefs> {
   const ids = [...new Set(choiceIds.filter(isId))]
   const found = ids.length
     ? rows<ChoiceRow>(await db.from('choices').select('id, title, updated_at, goal_task_id, goal_id, columns, work').in('id', ids), 'the choices')
@@ -391,6 +405,10 @@ export async function loadChoiceRefs(db: Db, choiceIds: string[], goalIds: strin
     [...new Set([...wanted, ...found.flatMap((c) => (c.goal_task_id ? [c.goal_task_id] : []))])],
     [...new Set([...wanted, ...found.flatMap((c) => (c.goal_id ? [c.goal_id] : []))])])
   const title = new Map(goals.map((g) => [g.id, g.title]))
+  const linked = [...new Set(contactIds.filter(isId))]
+  const contacts = linked.length
+    ? rows<{ id: string; name: string }>(await db.from('contacts').select('id, name').in('id', linked), 'the contacts').map((c) => ({ id: c.id, name: c.name }))
+    : []
   return {
     choices: found.map((c) => ({
       id: c.id, title: c.title, updated_at: c.updated_at,
@@ -400,6 +418,7 @@ export async function loadChoiceRefs(db: Db, choiceIds: string[], goalIds: strin
       options: options.filter((o) => o.choice_id === c.id).map((o) => ({ id: o.id, name: o.name })),
     })),
     goals,
+    contacts,
   }
 }
 
@@ -422,6 +441,7 @@ const readAgain = 'Read the choices again (symphony_read_choices) and use their 
 export function resolveChoiceRefs(set: ChangeSet, refs: ChoiceRefs): { set: ChangeSet } | { error: string } {
   const goals = new Map(refs.goals.map((g) => [g.id, g]))
   const known = new Map(refs.choices.map((c) => [c.id, c]))
+  const contacts = new Set((refs.contacts ?? []).map((c) => c.id))
   const running = new Map<string, Running>()
   const newByTitle = new Map<string, Running>()
   const ops: ChangeOp[] = []
@@ -432,14 +452,14 @@ export function resolveChoiceRefs(set: ChangeSet, refs: ChoiceRefs): { set: Chan
       const goal = goals.get(op.goalId!)
       if (!goal) return { error: `No goal ${op.goalId} that this person can see. Read the plan (symphony_read_plan) and use its ids.` }
       const title = op.choiceTitle!
-      if (newByTitle.has(title)) return { error: `Two new choices are titled "${title}". Give each its own title.` }
+      if (newByTitle.has(fold(title))) return { error: `Two new choices are titled "${title}". Give each its own title.` }
       delete next.goalId
       if (goal.kind === 'task') next.goalTaskId = goal.id
       else next.goalId = goal.id
       next.goalTitle = goal.title
       const r: Running = { ref: { choiceKey: op.key }, title, goalTitle: goal.title, columns: [], work: [], existing: [], added: [] }
       running.set(op.key, r)
-      newByTitle.set(title, r)
+      newByTitle.set(fold(title), r)
       ops.push(next)
       continue
     }
@@ -455,7 +475,7 @@ export function resolveChoiceRefs(set: ChangeSet, refs: ChoiceRefs): { set: Chan
         running.set(k.id, c)
       }
     } else {
-      c = newByTitle.get(op.choiceTitle!)
+      c = newByTitle.get(fold(op.choiceTitle!))
       if (!c) return { error: `No choice "${op.choiceTitle}" in this list or on the goal. ${readAgain}` }
     }
     delete next.choiceId
@@ -477,7 +497,7 @@ export function resolveChoiceRefs(set: ChangeSet, refs: ChoiceRefs): { set: Chan
         next.optionName = o.name
       } else {
         const name = op.optionName!
-        const added = c.added.find((x) => x.name === name)
+        const added = c.added.find((x) => same(x.name, name))
         const o = added ? undefined : c.existing.find((x) => same(x.name, name))
         if (added) { next.optionKey = added.key; next.optionName = added.name }
         else if (o) { next.optionId = o.id; next.optionName = o.name }
@@ -488,6 +508,9 @@ export function resolveChoiceRefs(set: ChangeSet, refs: ChoiceRefs): { set: Chan
 
     switch (op.op) {
       case 'option_add':
+        if (op.contactId && !contacts.has(op.contactId)) {
+          return { error: `No contact ${op.contactId} that this person can see. List the contacts again (symphony_list_contacts) and use their ids.` }
+        }
         c.added.push({ key: op.key, name: op.optionName! })
         next.title = op.optionName!
         break

@@ -401,3 +401,89 @@ describe('surfaces', () => {
     expect(toolsForSurface(tools, null)).toEqual(tools)
   })
 })
+
+describe('review fixes', () => {
+  const NEW_REFS: ChoiceRefs = { choices: [], goals: REFS.goals }
+
+  it('option_add links an existing contact the person can see, and makes no new one', async () => {
+    const set = parse([
+      { op: 'choice_add', goal_id: G, choice_title: 'Contractor' },
+      { op: 'option_add', choice_title: 'Contractor', name: 'Luis Martinez', contact_id: CT, phone: '410-555-0142' },
+    ])
+    expect(set.ops[1]).toMatchObject({ contactId: CT })
+    expect(set.ops[1].phone).toBeUndefined()
+    expect(refused([{ op: 'option_add', choice_id: C, name: 'Luis', contact_id: 'luis' }])).toMatch(/contact_id/)
+
+    // Absent from the person's contacts: refused, pointing at symphony_list_contacts.
+    const hidden = resolveChoiceRefs(set, NEW_REFS)
+    expect(hidden).toEqual({ error: expect.stringContaining('symphony_list_contacts') })
+    const r = resolveChoiceRefs(set, { ...NEW_REFS, contacts: [{ id: CT, name: 'Luis Martinez' }] })
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.ops[1]).toMatchObject({ contactId: CT, optionName: 'Luis Martinez' })
+
+    // loadChoiceRefs reads the named contacts through the RLS client.
+    const refs = await loadChoiceRefs(fakeDb(MOCKUP), [], [G], [CT, '9c0d1e2f-3a4b-4c5d-8e7f-809102132435'])
+    expect(refs.contacts).toEqual([{ id: CT, name: 'Luis Martinez' }])
+
+    // The app links it: addOption gets the contact, addContact is never called.
+    const at = new Date(SEEN)
+    const c: Choice = { id: 'ch1', userId: 'u', goal: { kind: 'task', id: G }, title: 'Contractor', status: 'open', decidedWork: [], columns: [], work: [], selectedWork: [], sortOrder: 0, createdAt: at, updatedAt: at }
+    const detail: ChoiceDetail = { choice: c, goalTitle: 'Redo the bathrooms', goalContext: 'family', goalScope: 'compound', options: [], lines: [], followUps: [], contacts: new Map() }
+    const addContact = vi.fn(async () => 'contact-new')
+    const addOption = vi.fn(async (choiceId: string, input: { name: string; contactId?: string }): Promise<ChoiceOption> => ({ id: 'opt1', choiceId, userId: 'u', name: input.name, contactId: input.contactId, status: 'considering', statusChangedAt: at, values: {}, sortOrder: 0, updatedAt: at }))
+    const w = {
+      loadChoice: vi.fn(async () => detail), createChoice: vi.fn(async () => c), deleteChoice: vi.fn(async () => true), updateChoice: vi.fn(async () => true),
+      addOption, deleteOption: vi.fn(async () => true), updateOption: vi.fn(async () => true), addPriceLine: vi.fn(async () => null), deletePriceLine: vi.fn(async () => true),
+      addContact, deleteContact: vi.fn(async () => true), createFollowUp: vi.fn(async () => null), deleteTask: vi.fn(async () => true),
+      chooseOption: vi.fn(async () => true), reopenChoice: vi.fn(async () => true),
+    } as ChoiceWriters
+    const applied = await applyChangeSet(r.set as unknown as AppChangeSet, {
+      managedRecovery: true, tasks: [], updateTask: vi.fn(async () => true), addTask: vi.fn(async () => 'x'), deleteTask: vi.fn(async () => {}),
+      weekStart: new Date(2026, 9, 18), choiceWriters: w,
+    })
+    expect(applied).toMatchObject({ ok: true })
+    expect(addOption).toHaveBeenCalledWith('ch1', { name: 'Luis Martinez', contactId: CT })
+    expect(addContact).not.toHaveBeenCalled()
+  })
+
+  it('same-card choice titles and option names match in any case', () => {
+    const r = resolveChoiceRefs(parse([
+      { op: 'choice_add', goal_id: G, choice_title: 'Contractor' },
+      { op: 'option_add', choice_title: 'contractor ', name: 'Martinez' },
+      { op: 'option_status', choice_title: 'CONTRACTOR', option_name: 'martinez', status: 'contacted' },
+    ]), NEW_REFS)
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.ops[1]).toMatchObject({ choiceKey: 'k:0', choiceTitle: 'Contractor' })
+    expect(r.set.ops[2]).toMatchObject({ choiceKey: 'k:0', optionKey: 'k:1', optionName: 'Martinez' })
+    const twice = resolveChoiceRefs(parse([
+      { op: 'choice_add', goal_id: G, choice_title: 'Contractor' },
+      { op: 'choice_add', goal_id: G, choice_title: 'contractor' },
+    ]), NEW_REFS)
+    expect(twice).toEqual({ error: expect.stringMatching(/Two new choices/) })
+  })
+
+  it('caps amounts at a billion dollars, in safe integer cents', () => {
+    const price = (amount: unknown) => [{ op: 'price_line', choice_id: C, option_id: MZ, work_labels: ['Main bath'], amount }]
+    expect(parse(price(1_000_000_000)).ops[0].amountCents).toBe(100_000_000_000)
+    expect(refused(price(1_000_000_000.01))).toMatch(/amount/)
+    expect(refused(price(Number.MAX_SAFE_INTEGER))).toMatch(/amount/)
+    expect(refused(price(1e300))).toMatch(/amount/)
+  })
+
+  it('an explicit null on an unused optional field is not given', () => {
+    const set = parse([
+      { op: 'option_add', choice_id: C, name: 'Rob', phone: null, contact_id: null, status: null, date: null, amount: null, note: null, description: null },
+      { op: 'price_line', choice_id: C, option_id: MZ, work_labels: ['Main bath'], amount: 100, note: null, date: null, status: null },
+      { op: 'work_set', choice_id: C, work_labels: ['Hall bath'], description: null },
+      { op: 'choice_choose', choice_id: C, option_id: MZ, note: null },
+    ])
+    expect(set.ops[0].phone).toBeUndefined()
+    expect(set.ops[0].contactId).toBeUndefined()
+    expect(set.ops[1].note).toBeUndefined()
+    expect(set.ops[2].description).toBeUndefined()
+    // Still required where the op needs it.
+    expect(refused([{ op: 'option_status', choice_id: C, option_id: MZ, status: null }])).toMatch(/status/)
+    expect(refused([{ op: 'follow_up', choice_id: C, option_id: MZ, date: null }])).toMatch(/date/)
+    expect(refused([{ op: 'price_line', choice_id: C, option_id: MZ, work_labels: ['Main bath'], amount: null }])).toMatch(/amount/)
+  })
+})
