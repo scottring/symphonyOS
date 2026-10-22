@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choices (mockup)</title>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#232322; --ink-2:#5e5e5a; --ink-3:#8a8a86; --line:#e4e4e2; --paper:#fff;
+    --sage:hsl(150 34% 30%); --sage-soft:hsl(150 19% 93%); --navy:hsl(210 45% 22%);
+    --amber:#9a6a2a; --amber-soft:hsl(38 60% 94%);
+    --sky:linear-gradient(180deg,#eef3f2 0%,#f3f6f5 60%,#f6f7f6 100%);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#2a2733;font-family:'DM Sans',system-ui,sans-serif;color:var(--ink)}
+  .note{color:#cfc8d8;font-size:12.5px;text-align:center;padding:12px 16px 4px;max-width:900px;margin:0 auto;line-height:1.45}
+  .modes{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:8px 16px 14px}
+  .modes button{font:500 12.5px 'DM Sans';border:1px solid #57536a;background:transparent;color:#cfc8d8;padding:6px 14px;border-radius:99px;cursor:pointer}
+  .modes button.on{background:#e9e4f2;color:#2a2733;border-color:#e9e4f2}
+  .win{max-width:1280px;margin:0 auto 32px;border-radius:14px;overflow:hidden;background:var(--sky);box-shadow:0 30px 70px -30px rgba(0,0,0,.6)}
+  .win.phone{max-width:390px;border-radius:30px}
+  .nav{display:flex;align-items:center;gap:18px;padding:14px 26px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.7)}
+  .brand{display:flex;align-items:center;gap:8px;font:600 11px 'DM Sans';letter-spacing:.18em;color:#3b3b39}
+  .brand i{width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#9fbf9a,#5d8a62);display:block}
+  .tabs{display:flex;gap:4px;font-size:14px;color:var(--ink-2)} .tabs span{padding:6px 11px;border-radius:9px}
+  .navr{margin-left:auto;display:flex;gap:16px;color:var(--ink-2);font-size:12.5px}
+  .view{display:none} .view.on{display:block}
+
+  /* project page */
+  .page{display:grid;grid-template-columns:1fr 280px;gap:22px;padding:26px 34px 34px}
+  .crumb{font-size:12.5px;color:var(--ink-3);margin-bottom:6px}
+  h1{font:500 36px/1.05 'Crimson Pro',serif;margin:0}
+  .sub{font-size:13px;color:var(--ink-2);margin:8px 0 22px}
+  .sub b{font-weight:500;color:var(--sage)}
+  h2{font:500 21px 'Crimson Pro',serif;margin:0 0 12px;display:flex;align-items:baseline;gap:10px}
+  h2 .add{margin-left:auto;font:500 13px 'DM Sans';color:var(--sage);cursor:pointer}
+  .section{margin-bottom:26px}
+  .choice{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:8px;cursor:pointer}
+  .choice:hover{box-shadow:0 0 0 1.5px hsl(150 24% 72%)}
+  .choice .t{font:500 18px 'Crimson Pro',serif}
+  .choice .f{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+  .choice .f b{font-weight:500;color:var(--amber)}
+  .choice .go{margin-left:auto;color:var(--ink-3);font-size:18px}
+  .choice.decided .t::before{content:"✓ ";color:var(--sage)}
+  .tk{display:flex;gap:10px;align-items:center;font-size:14px;padding:10px 12px;background:rgba(255,255,255,.75);border:1px solid var(--line);border-radius:12px;margin-bottom:6px}
+  .tk i{width:15px;height:15px;border:1.5px solid #b9b9b5;border-radius:4px;flex:none}
+  .tk .w{margin-left:auto;font-size:12px;color:var(--ink-3)}
+  .tag{font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;background:var(--amber-soft);color:var(--amber)}
+  .side .card{background:rgba(255,255,255,.8);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+  .side h3{font:600 10.5px 'DM Sans';letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px}
+  .side p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+  .bar{height:6px;border-radius:9px;background:var(--line);margin-top:8px;overflow:hidden} .bar i{display:block;height:100%;width:25%;background:var(--sage)}
+
+  /* comparison */
+  .cmp{padding:22px 34px 30px}
+  .back{font-size:13px;color:var(--sage);cursor:pointer;margin-bottom:10px;display:inline-block}
+  .cmphead{display:flex;align-items:flex-end;gap:12px;margin-bottom:16px}
+  .cmphead .r{margin-left:auto;display:flex;gap:8px}
+  .btn{font:500 13.5px 'DM Sans';background:#fff;border:1px solid var(--line);color:var(--ink);padding:8px 14px;border-radius:11px;cursor:pointer}
+  .btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:14px}
+  th{font:600 10.5px 'DM Sans';letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;background:#fbfbfa}
+  th.sorted{color:var(--ink)} th.sorted::after{content:" ↑"}
+  th.addcol{color:var(--sage);text-transform:none;letter-spacing:0;font:500 13px 'DM Sans'}
+  td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.name b{display:block;font-weight:600}
+  td.name small{display:block;color:var(--ink-3);font-size:12px;margin-top:2px}
+  .empty{color:#c4c4bf}
+  .st{display:inline-block;font-size:11.5px;font-weight:500;padding:2px 9px;border-radius:99px;margin-top:5px;border:1px solid var(--line);color:var(--ink-2);background:#fff}
+  .st.heard{background:var(--sage-soft);color:var(--sage);border-color:transparent}
+  .st.contacted{background:var(--amber-soft);color:var(--amber);border-color:transparent}
+  .st.chosen{background:var(--sage);color:#fff;border-color:transparent}
+  .fact{font-size:12px;color:var(--amber);margin-top:4px}
+  .file{font-size:12.5px;color:var(--navy);text-decoration:underline;text-underline-offset:3px}
+  .rowact{font-size:12.5px;color:var(--sage);white-space:nowrap;text-align:right}
+  .rowact span{cursor:pointer;display:block;margin-bottom:4px}
+  .folded{font-size:13px;color:var(--ink-3);padding:12px 14px;background:rgba(255,255,255,.7);border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;margin-top:-8px;padding-top:18px}
+  .addopt{margin-top:12px;display:flex;gap:8px}
+  .addopt input{flex:1;font:14px 'DM Sans';padding:10px 14px;border:1px dashed #c9c9c5;border-radius:12px;background:rgba(255,255,255,.6)}
+
+  /* phone */
+  .ph{padding:18px 16px 26px}
+  .ph h1{font-size:28px}
+  .opt{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:9px}
+  .opt .top{display:flex;align-items:center;gap:8px}
+  .opt .top b{font-weight:600;font-size:15px}
+  .opt .top .st{margin:0 0 0 auto}
+  .opt dl{display:grid;grid-template-columns:76px 1fr;gap:4px 12px;margin:10px 0 0;font-size:13.5px}
+  .opt dt{color:var(--ink-3);font-size:12px;padding-top:1px} .opt dd{margin:0}
+  .phnav{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.7);font-size:13px;color:var(--ink-2)}
+
+  /* change card */
+  .strip{margin:0 34px 30px;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+  .said{background:rgba(255,255,255,.75);border:1px solid var(--line);border-radius:14px;padding:16px 18px;font-size:14.5px;line-height:1.5;color:var(--ink-2)}
+  .said small{display:block;font:600 10.5px 'DM Sans';letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+  .cc{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 14px 34px -18px rgba(0,0,0,.3);overflow:hidden}
+  .cc header{display:flex;align-items:center;padding:14px 16px 6px}
+  .cc header h4{margin:0;font:500 19px 'Crimson Pro',serif}
+  .cc header span{margin-left:auto;color:var(--ink-3)}
+  .cc h5{margin:8px 16px 4px;font:600 10.5px 'DM Sans';letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+  .cc ul{list-style:none;margin:0;padding:0 8px}
+  .cc li{display:grid;grid-template-columns:62px 1fr auto;gap:10px;padding:8px;font-size:13.5px;border-radius:9px}
+  .cc li .k{font:600 10px 'DM Sans';letter-spacing:.1em;color:var(--sage);padding-top:2px}
+  .cc li .wh{color:var(--ink-3);font-size:12.5px}
+  .cc footer{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px 14px;border-top:1px solid var(--line);margin-top:8px}
+  .cc footer .note2{font-size:12px;color:var(--ink-3)}
+
+  /* decided */
+  .decided-banner{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;display:flex;gap:16px;align-items:center}
+  .decided-banner .t{font:500 22px 'Crimson Pro',serif}
+  .decided-banner .why{font-size:13.5px;color:var(--ink-2);margin-top:3px;font-style:italic}
+  .decided-banner .r{margin-left:auto;display:flex;gap:8px}
+  .muted table{opacity:.7}
+
+  .callouts{max-width:1280px;margin:0 auto 18px;color:#cfc8d8;font-size:13px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px}
+  .callouts div{background:#34313f;border-radius:10px;padding:10px 12px;line-height:1.45}
+  .callouts b{color:#fff;font-weight:600}
+  @media (max-width:860px){
+    .page{grid-template-columns:1fr;padding:20px 16px}
+    .cmp{padding:18px 16px} .strip{grid-template-columns:1fr;margin:0 16px 24px}
+    .callouts{grid-template-columns:1fr}
+    .tabs,.navr{display:none}
+    .tablewrap{overflow-x:auto}
+  }
+</style>
+</head>
+<body>
+<div class="note">Mockup with example data: the bathroom renovation and four contractors. The app's top bar and the project page layout are unchanged; the new parts are the Choices section and what opens from it.</div>
+<div class="modes">
+  <button data-v="project" class="on">1 · Project page</button>
+  <button data-v="compare">2 · Comparing contractors</button>
+  <button data-v="phone">3 · On a phone</button>
+  <button data-v="dropin">4 · Dropping something in</button>
+  <button data-v="decided">5 · After choosing</button>
+</div>
+<div class="callouts" id="callouts"></div>
+
+<!-- 1 PROJECT PAGE -->
+<div class="win view on" id="v-project">
+  <div class="nav"><div class="brand"><i></i>SYMPHONY</div><span style="color:var(--ink-2)">☰</span>
+    <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span>Season</span><span>Year</span></div>
+    <div class="navr"><span>People</span><span>Family</span><span>Search</span></div></div>
+  <div class="page">
+    <div>
+      <div class="crumb">Projects · Family</div>
+      <h1>Bathroom renovation</h1>
+      <div class="sub">In progress · <b>shared with Iris</b></div>
+
+      <div class="section">
+        <h2>Choices <span class="add">+ Choice</span></h2>
+        <div class="choice" data-goto="compare">
+          <div><div class="t">Contractor</div>
+            <div class="f">4 options · 2 heard back · <b>1 waiting 6 days</b> · 1 ruled out</div></div>
+          <span class="go">›</span>
+        </div>
+        <div class="choice">
+          <div><div class="t">Floor tile</div>
+            <div class="f">3 options · none heard back yet</div></div>
+          <span class="go">›</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Tasks <span class="add">+ Task</span></h2>
+        <div class="tk"><i></i>Follow up with Rob about a quote <span class="tag">Waiting · Contractor</span><span class="w">Thu Oct 23</span></div>
+        <div class="tk"><i></i>Call Chesapeake Renovations<span class="w">Fri Oct 24</span></div>
+        <div class="tk"><i></i>Measure the bathroom for the vanity<span class="w">Sat Oct 25</span></div>
+        <div class="tk" style="opacity:.55"><i style="background:var(--sage);border-color:var(--sage)"></i><s>Get Martinez to come look</s><span class="w">Done</span></div>
+      </div>
+
+      <div class="section">
+        <h2>Notes</h2>
+        <div class="tk" style="color:var(--ink-2)">Keep the tub. Want a walk-in shower where the linen closet is.</div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="card"><h3>Status</h3><p>In progress</p></div>
+      <div class="card"><h3>Progress</h3><p>1 of 4 tasks done</p><div class="bar"><i></i></div></div>
+      <div class="card"><h3>Project context</h3><p>Permit office · 410-555-0100</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- 2 COMPARISON -->
+<div class="win view" id="v-compare">
+  <div class="nav"><div class="brand"><i></i>SYMPHONY</div><span style="color:var(--ink-2)">☰</span>
+    <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span>Season</span><span>Year</span></div>
+    <div class="navr"><span>People</span><span>Family</span><span>Search</span></div></div>
+  <div class="cmp">
+    <span class="back" data-goto="project">‹ Bathroom renovation</span>
+    <div class="cmphead">
+      <div><h1>Contractor</h1><div class="sub" style="margin-bottom:0">4 options · 2 heard back · 1 waiting</div></div>
+      <div class="r"><button class="btn">⋯</button></div>
+    </div>
+    <div class="tablewrap">
+    <table id="tbl">
+      <thead><tr>
+        <th data-k="name">Option</th><th data-k="price">Price</th><th data-k="start">Earliest start</th><th data-k="ins">Insured</th><th data-k="ref">References</th><th>Quote</th><th class="addcol">+ Column</th>
+      </tr></thead>
+      <tbody>
+        <tr data-name="Martinez Tile &amp; Bath" data-price="18400" data-start="2026-11-17" data-order="1">
+          <td class="name"><b>Martinez Tile &amp; Bath</b><small>Luis · 410-555-0142 · from Iris's friend Dana</small><span class="st heard">Heard back</span></td>
+          <td>$18,400</td><td>Nov 17</td><td>Yes</td><td>Called two, both happy</td><td><span class="file">quote.pdf</span></td>
+          <td class="rowact"><span>Choose this</span><span style="color:var(--ink-3)">Status ▾</span></td>
+        </tr>
+        <tr data-name="Harbor Bath Remodeling" data-price="22900" data-start="2027-01-05" data-order="2">
+          <td class="name"><b>Harbor Bath Remodeling</b><small>office · 443-555-0187 · Google</small><span class="st heard">Heard back</span></td>
+          <td>$22,900</td><td>Jan 5</td><td>Yes</td><td class="empty">—</td><td><span class="file">Harbor-estimate.pdf</span></td>
+          <td class="rowact"><span>Choose this</span><span style="color:var(--ink-3)">Status ▾</span></td>
+        </tr>
+        <tr data-name="Rob (Dave's cousin)" data-price="" data-start="" data-order="3">
+          <td class="name"><b>Rob (Dave's cousin)</b><small>410-555-0119</small><span class="st contacted">Contacted</span><div class="fact">Contacted Oct 16 · no reply · follow-up Thu</div></td>
+          <td class="empty">—</td><td class="empty">—</td><td class="empty">—</td><td>Did Dave's kitchen</td><td class="empty">—</td>
+          <td class="rowact"><span>Follow up on…</span><span style="color:var(--ink-3)">Status ▾</span></td>
+        </tr>
+        <tr data-name="Chesapeake Renovations" data-price="" data-start="" data-order="4">
+          <td class="name"><b>Chesapeake Renovations</b><small>Nextdoor</small><span class="st">Considering</span></td>
+          <td class="empty">—</td><td class="empty">—</td><td class="empty">—</td><td class="empty">—</td><td class="empty">—</td>
+          <td class="rowact"><span style="color:var(--ink-3)">Status ▾</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="folded">+1 ruled out · BathFitter <span style="color:var(--ink-3)">("acrylic only")</span></div>
+    <div class="addopt"><input placeholder="Add an option: a name, or paste a phone number or a quote"></div>
+  </div>
+</div>
+
+<!-- 3 PHONE -->
+<div class="win view phone" id="v-phone">
+  <div class="phnav"><span style="color:var(--sage)">‹ Bathroom renovation</span><span style="margin-left:auto">⋯</span></div>
+  <div class="ph">
+    <h1>Contractor</h1>
+    <div class="sub">4 options · 2 heard back · 1 waiting</div>
+    <div class="opt"><div class="top"><b>Martinez Tile &amp; Bath</b><span class="st heard">Heard back</span></div>
+      <dl><dt>Price</dt><dd>$18,400</dd><dt>Start</dt><dd>Nov 17</dd><dt>Insured</dt><dd>Yes</dd><dt>References</dt><dd>Called two, both happy</dd><dt>Quote</dt><dd><span class="file">quote.pdf</span></dd></dl></div>
+    <div class="opt"><div class="top"><b>Harbor Bath Remodeling</b><span class="st heard">Heard back</span></div>
+      <dl><dt>Price</dt><dd>$22,900</dd><dt>Start</dt><dd>Jan 5</dd><dt>Insured</dt><dd>Yes</dd><dt>Quote</dt><dd><span class="file">Harbor-estimate.pdf</span></dd></dl></div>
+    <div class="opt"><div class="top"><b>Rob (Dave's cousin)</b><span class="st contacted">Contacted</span></div>
+      <div class="fact">Contacted Oct 16 · no reply · follow-up Thu</div>
+      <dl><dt>References</dt><dd>Did Dave's kitchen</dd></dl></div>
+    <div class="opt"><div class="top"><b>Chesapeake Renovations</b><span class="st">Considering</span></div></div>
+    <div class="folded" style="border-radius:14px;margin-top:0;padding-top:12px;border-top:1px solid var(--line)">+1 ruled out</div>
+  </div>
+</div>
+
+<!-- 4 DROP-IN -->
+<div class="win view" id="v-dropin">
+  <div class="nav"><div class="brand"><i></i>SYMPHONY</div><span style="color:var(--ink-2)">☰</span>
+    <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span>Season</span><span>Year</span></div>
+    <div class="navr"><span>People</span><span>Family</span><span>Search</span></div></div>
+  <div class="cmp" style="padding-bottom:16px">
+    <span class="back" data-goto="project">‹ Bathroom renovation</span>
+    <h1>Contractor</h1>
+    <div class="sub">4 options · 2 heard back · 1 waiting</div>
+  </div>
+  <div class="strip">
+    <div class="said"><small>Said to Symphony</small>"Chesapeake called back. Nineteen seven fifty, they can start December 1st, and they're insured." <br><br><small style="margin-top:6px">Attached</small><span class="file">Chesapeake-Renovations-proposal.pdf</span></div>
+    <div class="cc">
+      <header><h4>Contractor</h4><span>✕</span></header>
+      <h5>Bathroom renovation · Contractor</h5>
+      <ul>
+        <li><span class="k">STATUS</span><span>Chesapeake Renovations</span><span class="wh">→ Heard back</span></li>
+        <li><span class="k">SET</span><span>Price</span><span class="wh">$19,750</span></li>
+        <li><span class="k">SET</span><span>Earliest start</span><span class="wh">Dec 1</span></li>
+        <li><span class="k">SET</span><span>Insured</span><span class="wh">Yes</span></li>
+        <li><span class="k">ATTACH</span><span>Chesapeake-Renovations-proposal.pdf</span><span class="wh">to Chesapeake</span></li>
+      </ul>
+      <footer><button class="btn primary">Approve all 5</button><span class="note2">Nothing is saved until you approve. Or say what to change.</span></footer>
+    </div>
+  </div>
+</div>
+
+<!-- 5 DECIDED -->
+<div class="win view" id="v-decided">
+  <div class="nav"><div class="brand"><i></i>SYMPHONY</div><span style="color:var(--ink-2)">☰</span>
+    <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span>Season</span><span>Year</span></div>
+    <div class="navr"><span>People</span><span>Family</span><span>Search</span></div></div>
+  <div class="page">
+    <div>
+      <div class="crumb">Projects · Family</div>
+      <h1>Bathroom renovation</h1>
+      <div class="sub">In progress · <b>shared with Iris</b></div>
+      <div class="section">
+        <h2>Choices <span class="add">+ Choice</span></h2>
+        <div class="choice decided">
+          <div><div class="t">Contractor</div>
+            <div class="f">Chose Martinez Tile &amp; Bath · Oct 30 · $18,400 · Luis 410-555-0142</div></div>
+          <span class="go">›</span>
+        </div>
+        <div class="choice">
+          <div><div class="t">Floor tile</div><div class="f">3 options · 1 heard back</div></div><span class="go">›</span>
+        </div>
+      </div>
+      <div class="section muted">
+        <h2 style="font-size:15px;color:var(--ink-3)">Tapping Contractor opens:</h2>
+        <div class="decided-banner">
+          <div><div class="t">Chose Martinez Tile &amp; Bath</div>
+            <div class="why">"Earliest start and Dana's bathroom looks great." · Scott, Oct 30</div></div>
+          <div class="r"><button class="btn">Reopen</button></div>
+        </div>
+        <table>
+          <thead><tr><th>Option</th><th>Price</th><th>Earliest start</th><th>Insured</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><b>Martinez Tile &amp; Bath</b></td><td>$18,400</td><td>Nov 17</td><td>Yes</td><td><span class="st chosen">Chosen</span></td></tr>
+            <tr><td>Chesapeake Renovations</td><td>$19,750</td><td>Dec 1</td><td>Yes</td><td><span class="st heard">Heard back</span></td></tr>
+            <tr><td>Harbor Bath Remodeling</td><td>$22,900</td><td>Jan 5</td><td>Yes</td><td><span class="st heard">Heard back</span></td></tr>
+            <tr><td>Rob (Dave's cousin)</td><td class="empty">—</td><td class="empty">—</td><td class="empty">—</td><td><span class="st contacted">Contacted</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="side">
+      <div class="card"><h3>Status</h3><p>In progress</p></div>
+      <div class="card"><h3>Progress</h3><p>2 of 5 tasks done</p><div class="bar"><i style="width:40%"></i></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CALLOUTS = {
+  project: [
+    ["Choices sit above Tasks.", "Each one is a single line of facts: how many options, how many heard back, who you're waiting on. Nothing is ranked."],
+    ["Follow-ups are ordinary tasks.", "\"Follow up on…\" makes a waiting task linked to the option, so it shows on its day and here."],
+    ["Shared like the project.", "A Family project's choices are visible to Iris and editable by her, the same as its tasks."]
+  ],
+  compare: [
+    ["Options are rows, facts are columns.", "You name the columns. A new choice starts with only Price. Tap a heading to sort; nothing gets highlighted as best."],
+    ["Statuses are yours to set.", "Considering · Contacted · Heard back · Ruled out · Chosen. Ruled-out options fold away below."],
+    ["Facts, not advice.", "\"Contacted Oct 16 · no reply\" comes from the status date and the linked waiting task."]
+  ],
+  phone: [
+    ["Same order, stacked.", "Each option becomes a card with its facts as lines, in the column order."],
+    ["Empty facts are left out", "on the phone, so Rob's card shows only what's known."],
+    ["Everything else matches", "the wide screen: status, Choose this, Follow up on…, ruled-out fold."]
+  ],
+  dropin: [
+    ["Talk or drop a file in.", "Symphony sorts what you said into the right option and column."],
+    ["The existing change card.", "Same rows, same Approve. Nothing is written until you approve, and it's one Undo."],
+    ["Quotes (stage 3).", "A dropped proposal PDF is attached to the option; reading values from it comes in the last stage."]
+  ],
+  decided: [
+    ["The decision is one line.", "Who, when, price and contact, so the project page answers \"who's doing it?\""],
+    ["Your reason, in your words.", "Optional, one line, kept with the choice. Symphony doesn't write it."],
+    ["Nothing is lost.", "The comparison stays readable, and Reopen undoes the decision."]
+  ]
+};
+function show(v){
+  document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on', e.id==='v-'+v));
+  document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
+  document.getElementById('callouts').innerHTML = CALLOUTS[v].map(([b,t])=>`<div><b>${b}</b> ${t}</div>`).join('');
+}
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>show(b.dataset.v));
+document.querySelectorAll('[data-goto]').forEach(e=>e.onclick=()=>show(e.dataset.goto));
+// Sort by a tapped column; blanks always last, no highlighting.
+document.querySelectorAll('#tbl th[data-k]').forEach(th=>th.onclick=()=>{
+  const k = th.dataset.k, body = document.querySelector('#tbl tbody');
+  const rows = [...body.rows];
+  const key = r => k==='name' ? r.dataset.name : k==='price' ? r.dataset.price : k==='start' ? r.dataset.start : r.cells[th.cellIndex].textContent.trim().replace('—','');
+  rows.sort((a,b)=>{ const x=key(a), y=key(b); if(!x&&!y) return a.dataset.order-b.dataset.order; if(!x) return 1; if(!y) return -1; return k==='price' ? x-y : String(x).localeCompare(String(y)); });
+  rows.forEach(r=>body.appendChild(r));
+  document.querySelectorAll('#tbl th').forEach(h=>h.classList.toggle('sorted', h===th));
+});
+show('project');
+</script>
+</body>
+</html>
