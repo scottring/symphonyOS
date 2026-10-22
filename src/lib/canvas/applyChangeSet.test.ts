@@ -978,8 +978,11 @@ describe('applyChangeSet: choice ops', () => {
       const events: string[] = []
       const listen = (e: Event) => events.push(e.type)
       window.addEventListener(CHOICES_UPDATED, listen)
-      try { await applyChangeSet(one(onYearGoal), choiceDeps(fakeWriters(store()))) } finally { window.removeEventListener(CHOICES_UPDATED, listen) }
+      const w = fakeWriters(store())
+      try { await applyChangeSet(one(onYearGoal), choiceDeps(w)) } finally { window.removeEventListener(CHOICES_UPDATED, listen) }
       expect(events).toContain(CHOICES_UPDATED)
+      expect(w.addLogEntry).toHaveBeenCalledWith({ goal: { kind: 'goal', id: 'yg1' }, kind: 'call', on: day(0), summary: 'Coming Thursday at 10' })
+      expect(vi.mocked(w.addLogEntry).mock.calls[0][0]).not.toHaveProperty('optionId')
       expect(canApply(one(onYearGoal), choiceDeps(undefined))).toBe(false)
     })
   })

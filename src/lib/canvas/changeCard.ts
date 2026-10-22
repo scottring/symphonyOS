@@ -281,6 +281,19 @@ function cellWords(kind: ColumnKind | undefined, value: CellValue | undefined): 
   return String(value)
 }
 
+/** "Fri Oct 30, 10:00": the date itself, not a weekday alone, for a day that
+ *  may be outside this week. */
+function datedWords(op: ChangeOp): string {
+  return `${weekdayLabel(op.date!)}${op.time ? `, ${clock(op.time)}` : ''}`
+}
+
+/** A log's day: "Today" as other rows say it, else the date ("Tue Oct 13"),
+ *  so an older log is not read as this week. */
+function logDay(op: ChangeOp, today: Date): string {
+  if (!op.date) return ''
+  return op.date === localYmd(today) ? dayWords(op, today) : datedWords(op)
+}
+
 /** "Scher Remodeling · Phone call · Today": what it is about, the kind, the day. */
 function eventTitle(op: ChangeOp, when: string): string {
   return [op.optionName ?? op.goalTitle ?? op.title, op.logKind ? LOG_KIND_LABEL[op.logKind] : null, when || null].filter(Boolean).join(' · ')
@@ -341,9 +354,9 @@ export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string
     case 'choice_choose': return { kind: 'CHOOSE', title: op.optionName ?? op.title, where: op.note ? `“${op.note}”` : '' }
     case 'choice_reopen': return { kind: 'REOPEN', title: op.choiceTitle ?? op.title, where: '' }
     case 'follow_up': return { kind: 'FOLLOW UP', title: op.optionName ?? op.title, where: op.date ? dayWords(op, today) : '' }
-    case 'event_log': return { kind: 'LOG', title: eventTitle(op, op.date ? dayWords(op, today) : ''), where: op.summary ? `“${op.summary}”` : '' }
-    // Always ahead, so the date itself ("Fri Oct 30") rather than a weekday alone.
-    case 'event_plan': return { kind: 'PLAN', title: eventTitle(op, op.date ? `${weekdayLabel(op.date)}${op.time ? `, ${clock(op.time)}` : ''}` : ''), where: 'goes on your calendar' }
+    // The summary as it will be written (trimmed).
+    case 'event_log': return { kind: 'LOG', title: eventTitle(op, logDay(op, today)), where: op.summary?.trim() ? `“${op.summary.trim()}”` : '' }
+    case 'event_plan': return { kind: 'PLAN', title: eventTitle(op, op.date ? datedWords(op) : ''), where: 'goes on your calendar' }
     case 'routine_add': {
       const when = [op.days ? daysWords(op.days) : null, op.time ? clock(op.time) : null,
         op.showOnTimeline === undefined ? null : op.showOnTimeline ? '· Show in Today and Week' : '· Hidden from Today and Week · Kept in Routines'].filter(Boolean).join(' ')

@@ -96,7 +96,9 @@ describe('log and plan rows', () => {
   const ev = (x: Partial<ChangeOp>): ChangeOp => ({ key: 'e', op: 'event_log', title: 'Scher Remodeling', logKind: 'call', date: '2026-10-14', summary: 'Coming Thursday at 10; quote a week after the visit', ...x })
   it('LOG names the option, the kind and the day, with the summary under it', () => {
     expect(opRow(ev(opt), today)).toEqual({ kind: 'LOG', title: 'Scher Remodeling · Phone call · Today', where: '“Coming Thursday at 10; quote a week after the visit”' })
-    expect(opRow(ev({ ...goal, logKind: 'note', date: '2026-10-12', summary: 'Permit filed' }), today)).toEqual({ kind: 'LOG', title: 'Redo the bathrooms · Note · Mon', where: '“Permit filed”' })
+    expect(opRow(ev({ ...goal, logKind: 'note', date: '2026-10-12', summary: 'Permit filed' }), today)).toEqual({ kind: 'LOG', title: 'Redo the bathrooms · Note · Mon Oct 12', where: '“Permit filed”' })
+    expect(opRow(ev({ ...goal, date: '2026-10-13', time: '16:00', summary: '  Left a message  ' }), today)).toEqual({ kind: 'LOG', title: 'Redo the bathrooms · Phone call · Tue Oct 13, 4:00', where: '“Left a message”' })
+    expect(opRow(ev({ ...goal, time: '09:30' }), today).title).toBe('Redo the bathrooms · Phone call · Today 9:30')
   })
   it('PLAN names the day and time it goes on the calendar', () => {
     expect(opRow(ev({ ...opt, op: 'event_plan', logKind: 'visit', date: '2026-10-30', time: '10:00' }), today)).toEqual({ kind: 'PLAN', title: 'Scher Remodeling · Home visit · Fri Oct 30, 10:00', where: 'goes on your calendar' })
