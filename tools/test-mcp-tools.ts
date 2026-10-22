@@ -13,6 +13,7 @@ const EXPECTED = [
   'symphony_get_week_plan', 'symphony_add_meal_entry', 'symphony_remove_meal_entry',
   'symphony_list_lists', 'symphony_add_list_item',
   'symphony_get_note_by_title', 'symphony_upsert_note',
+  'symphony_list_choices', 'symphony_add_option', 'symphony_set_price_line', 'symphony_update_option',
 ]
 
 const transport = new StdioClientTransport({
@@ -30,7 +31,7 @@ if (missing.length) {
   console.error(`MISSING TOOLS (${missing.length}):\n` + missing.join('\n'))
   process.exit(1)
 }
-console.log(`OK — all ${EXPECTED.length} meal tools registered (${tools.length} total).`)
+console.log(`OK — all ${EXPECTED.length} expected tools registered (${tools.length} total).`)
 
 // Live round-trip: list recipes, then add + remove an ad-hoc entry on this week's plan.
 const text = (r: Awaited<ReturnType<typeof client.callTool>>) =>
@@ -69,5 +70,22 @@ console.log('symphony_get_week_plan: OK')
 const removed = await client.callTool({ name: 'symphony_remove_meal_entry', arguments: { id: entryId } })
 if (text(removed).startsWith('Error:')) { console.error('remove_meal_entry failed: ' + text(removed)); process.exit(1) }
 console.log('symphony_remove_meal_entry: OK — round-trip clean.')
+
+// Choices (read-only here: writes need a real choice, so they are checked for clean error text on bogus ids).
+const choices = await client.callTool({ name: 'symphony_list_choices', arguments: {} })
+const choicesText = text(choices)
+if (choicesText.startsWith('Error:') || !Array.isArray(JSON.parse(choicesText).choices)) { console.error('list_choices failed: ' + choicesText); process.exit(1) }
+console.log('symphony_list_choices: OK')
+
+const BOGUS = '00000000-0000-0000-0000-000000000000'
+for (const [name, args] of [
+  ['symphony_add_option', { choice_id: BOGUS, name: 'MCP smoke test' }],
+  ['symphony_set_price_line', { option_id: BOGUS, work_labels: ['x'], amount: 1 }],
+  ['symphony_update_option', { option_id: BOGUS, status: 'contacted' }],
+] as const) {
+  const r = text(await client.callTool({ name, arguments: args }))
+  if (!r.startsWith('Error:')) { console.error(`${name} should reject a bogus id, got: ${r}`); process.exit(1) }
+  console.log(`${name}: OK (rejects bogus id)`)
+}
 
 await client.close()

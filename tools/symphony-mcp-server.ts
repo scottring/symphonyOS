@@ -334,6 +334,151 @@ server.tool(
   }
 )
 
+// ── Choices ─────────────────────────────────────────────
+
+const toolText = (text: string) => ({ content: [{ type: 'text' as const, text }] })
+const toolError = (text: string) => toolText(`Error: ${text}`)
+
+server.tool(
+  'symphony_list_choices',
+  `List choices (options being compared: contractors, schools, camps) with each option's status, contact,
+values by column, priced lines, price for the selected work and for all the work, who is waiting since when,
+and follow-up dates. With goal_id: that goal's choices (month/season goal task id or year goal id), decided ones too.
+Without it: every open choice. Facts only; nothing is ranked.`,
+  { goal_id: z.string().optional().describe('Goal id (task id for month/season goals, goals id for year goals)') },
+  async (params) => {
+    try {
+      return toolText(await readChoicesLocal(params.goal_id))
+    } catch (e) {
+      return toolError(e instanceof Error ? e.message : String(e))
+    }
+  }
+)
+
+server.tool(
+  'symphony_add_option',
+  'Add an option to a choice. With phone, creates a contact and links it to the option.',
+  {
+    choice_id: z.string().describe('Choice UUID (from symphony_list_choices)'),
+    name: z.string().describe('Option name, e.g. "Martinez Tile & Bath"'),
+    phone: z.string().optional().describe('Phone number; creates and links a new contact'),
+  },
+  async (params) => {
+    const name = params.name.trim()
+    if (!name) return toolError('name is required')
+    const { data: choice, error: cErr } = await supabase
+      .from('choices').select('id, goal_task_id, goal_id').eq('id', params.choice_id).maybeSingle()
+    if (cErr) return toolError(cErr.message)
+    if (!choice) return toolError('No such choice')
+
+    let contactId: string | null = null
+    const phone = params.phone?.trim()
+    if (phone) {
+      const context = await goalContext(choice as { goal_task_id: string | null; goal_id: string | null })
+      const row: Record<string, unknown> = { user_id: userId, name, phone }
+      if (context === 'family') { row.context = 'family'; row.scope = 'compound' } // scopeForDomain: family → compound
+      const { data: contact, error } = await supabase.from('contacts').insert(row).select('id').single()
+      if (error) return toolError(`Could not create the contact: ${error.message}`)
+      contactId = contact.id as string
+    }
+    const row: Record<string, unknown> = { user_id: userId, choice_id: params.choice_id, name }
+    if (contactId) row.contact_id = contactId
+    const { data, error } = await supabase.from('choice_options').insert(row).select('id, name, status, contact_id').single()
+    if (error) return toolError(error.message)
+    return toolText(JSON.stringify(data, null, 2))
+  }
+)
+
+server.tool(
+  'symphony_set_price_line',
+  `Add a price line to an option: one amount covering one or more pieces of the choice's work.
+work_labels are matched (case-insensitive) against the choice's work list. amount is in dollars (e.g. 19750 or 18400.50).`,
+  {
+    option_id: z.string().describe('Option UUID (from symphony_list_choices)'),
+    work_labels: z.array(z.string()).min(1).describe("Labels of the work this price covers"),
+    amount: z.number().describe('Dollars'),
+    note: z.string().optional().describe('e.g. "excludes fixtures"'),
+  },
+  async (params) => {
+    if (!Number.isFinite(params.amount) || params.amount < 0 || params.amount > 1_000_000_000 || !Number.isSafeInteger(Math.round(params.amount * 100))) {
+      return toolError('amount must be a number of dollars, 0 to 1,000,000,000')
+    }
+    const { data: option, error: oErr } = await supabase
+      .from('choice_options').select('id, choice_id').eq('id', params.option_id).maybeSingle()
+    if (oErr) return toolError(oErr.message)
+    if (!option) return toolError('No such option')
+    const { data: choice, error: cErr } = await supabase
+      .from('choices').select('work').eq('id', option.choice_id).single()
+    if (cErr) return toolError(cErr.message)
+    const work = ((choice.work ?? []) as WorkPiece[])
+    if (work.length === 0) return toolError('This choice has no work list yet; add work pieces on the page first.')
+
+    const ids: string[] = []
+    for (const label of params.work_labels) {
+      const piece = work.find((w) => w.label.trim().toLowerCase() === label.trim().toLowerCase())
+      if (!piece) return toolError(`Unknown work label "${label}". This choice's work: ${work.map((w) => w.label).join(', ')}`)
+      if (!ids.includes(piece.id)) ids.push(piece.id)
+    }
+    const row: Record<string, unknown> = {
+      user_id: userId, option_id: params.option_id, work_ids: ids, amount_cents: Math.round(params.amount * 100),
+    }
+    const note = params.note?.trim()
+    if (note) row.note = note
+    const { error } = await supabase.from('choice_price_lines').insert(row)
+    if (error) return toolError(error.message)
+    return toolText(`Added: ${workLabel(ids, work)} ${formatCents(Math.round(params.amount * 100))}${note ? ` (${note})` : ''}`)
+  }
+)
+
+server.tool(
+  'symphony_update_option',
+  `Update an option: status (considering, contacted, heard_back, ruled_out, chosen), a column value, and/or notes.
+value is read by the column's kind: money "$19,750", yes/no, date YYYY-MM-DD, or text. An empty value clears it.`,
+  {
+    option_id: z.string().describe('Option UUID (from symphony_list_choices)'),
+    status: z.enum(['considering', 'contacted', 'heard_back', 'ruled_out', 'chosen']).optional(),
+    column_label: z.string().optional().describe("An existing column's label (needs value)"),
+    value: z.string().optional().describe('The value for column_label'),
+    notes: z.string().optional(),
+  },
+  async (params) => {
+    if ((params.column_label === undefined) !== (params.value === undefined)) {
+      return toolError('column_label and value go together')
+    }
+    const { data: option, error: oErr } = await supabase
+      .from('choice_options').select('id, choice_id, values').eq('id', params.option_id).maybeSingle()
+    if (oErr) return toolError(oErr.message)
+    if (!option) return toolError('No such option')
+
+    const patch: Record<string, unknown> = {}
+    if (params.status) {
+      patch.status = params.status
+      patch.status_changed_at = new Date().toISOString()
+    }
+    if (params.notes !== undefined) patch.notes = params.notes.trim() === '' ? null : params.notes
+    if (params.column_label !== undefined && params.value !== undefined) {
+      const { data: choice, error: cErr } = await supabase
+        .from('choices').select('columns').eq('id', option.choice_id).single()
+      if (cErr) return toolError(cErr.message)
+      const columns = ((choice.columns ?? []) as { id: string; label: string; kind: 'text' | 'money' | 'date' | 'yesno' }[])
+      const col = columns.find((c) => c.label.trim().toLowerCase() === params.column_label!.trim().toLowerCase())
+      if (!col) return toolError(`Unknown column "${params.column_label}". Columns: ${columns.map((c) => c.label).join(', ') || '(none)'}`)
+      const parsed = parseCellLocal(col.kind, params.value)
+      if (parsed === undefined) return toolError(`"${params.value}" is not a valid ${col.kind} value for "${col.label}"`)
+      const values = { ...((option.values ?? {}) as Record<string, unknown>) }
+      if (parsed === null) delete values[col.id]
+      else values[col.id] = parsed
+      patch.values = values
+    }
+    if (Object.keys(patch).length === 0) return toolError('Nothing to update: give status, column_label + value, or notes')
+    const { data, error } = await supabase
+      .from('choice_options').update(patch).eq('id', params.option_id).select('id, name, status, values, notes')
+    if (error) return toolError(error.message)
+    if (!data || data.length === 0) return toolError('Option not updated (not found or not allowed)')
+    return toolText(JSON.stringify(data[0], null, 2))
+  }
+)
+
 // ── Contacts ────────────────────────────────────────────
 
 server.tool(
@@ -670,3 +815,236 @@ main().catch((err) => {
   console.error('Failed to start Symphony MCP server:', err)
   process.exit(1)
 })
+
+// --- Choices helpers (local copies; this server imports nothing from src/) ---
+// Mirrors: supabase/functions/symphony-agent/choices.ts (readChoices),
+// choicePrice.ts (priceFor, workLabel, formatCents), src/lib/choices/db.ts (parseCell).
+
+interface WorkPiece { id: string; label: string; description?: string }
+interface PriceLine { id: string; workIds: string[]; amountCents: number; note?: string; sortOrder?: number }
+type CellValue = string | number | boolean | null
+type ColumnKind = 'text' | 'money' | 'date' | 'yesno'
+type OptionStatus = 'considering' | 'contacted' | 'heard_back' | 'ruled_out' | 'chosen'
+
+function formatCents(cents: number): string {
+  const whole = cents % 100 === 0
+  return (cents / 100).toLocaleString('en-US', {
+    style: 'currency', currency: 'USD',
+    minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2,
+  })
+}
+
+function workLabel(ids: readonly string[], work: readonly WorkPiece[]): string {
+  const numberWords = ['', '', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+  const picked = work.filter((w) => ids.includes(w.id))
+  if (picked.length === 0) return ''
+  if (picked.length >= 3 && picked.length === work.length) return `All ${numberWords[picked.length] ?? picked.length}`
+  return picked.map((w) => w.label).join(' + ')
+}
+
+function liveLines(lines: readonly PriceLine[], work: readonly WorkPiece[]): PriceLine[] {
+  const ids = new Set(work.map((w) => w.id))
+  return lines.filter((l) => l.workIds.length > 0 && l.workIds.every((id) => ids.has(id)))
+}
+
+function orderLines(lines: readonly PriceLine[], work: readonly WorkPiece[]): PriceLine[] {
+  const idx = (line: PriceLine) => Math.min(...line.workIds.map((id) => work.findIndex((w) => w.id === id)))
+  return [...lines].sort((a, b) => idx(a) - idx(b) || a.workIds.length - b.workIds.length)
+}
+
+function priceFor(
+  lines: readonly PriceLine[], selected: readonly string[], work: readonly WorkPiece[],
+): { totalCents: number; lines: PriceLine[] } | null {
+  if (work.length === 0) {
+    if (lines.length === 0) return null
+    return { totalCents: lines.reduce((s, l) => s + l.amountCents, 0), lines: [...lines] }
+  }
+  const target = new Set(work.filter((w) => selected.includes(w.id)).map((w) => w.id))
+  if (target.size === 0) return null
+  const usable = liveLines(lines, work).filter((l) => l.workIds.every((id) => target.has(id)))
+  let best: { totalCents: number; lines: PriceLine[] } | null = null
+  const search = (start: number, covered: Set<string>, chosen: PriceLine[], total: number) => {
+    if (covered.size === target.size) {
+      if (!best || total < best.totalCents || (total === best.totalCents && chosen.length < best.lines.length)) {
+        best = { totalCents: total, lines: [...chosen] }
+      }
+      return
+    }
+    for (let i = start; i < usable.length; i++) {
+      const l = usable[i]
+      if (l.workIds.some((id) => covered.has(id))) continue
+      const next = new Set(covered)
+      l.workIds.forEach((id) => next.add(id))
+      search(i + 1, next, [...chosen, l], total + l.amountCents)
+    }
+  }
+  search(0, new Set(), [], 0)
+  if (!best) return null
+  const r: { totalCents: number; lines: PriceLine[] } = best
+  return { totalCents: r.totalCents, lines: orderLines(r.lines, work) }
+}
+
+/** undefined = not valid for that kind; null = cleared. */
+function parseCellLocal(kind: ColumnKind, raw: string): CellValue | undefined {
+  const s = raw.trim()
+  if (s === '') return null
+  switch (kind) {
+    case 'text':
+      return s
+    case 'money': {
+      const n = s.replace(/^\$/, '').replace(/,/g, '')
+      if (!/^\d+(\.\d{1,2})?$/.test(n)) return undefined
+      return Math.round(parseFloat(n) * 100)
+    }
+    case 'date': {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+      if (!m) return undefined
+      const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]))
+      return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? s : undefined
+    }
+    case 'yesno': {
+      const v = s.toLowerCase()
+      if (v === 'yes' || v === 'y' || v === 'true') return true
+      if (v === 'no' || v === 'n' || v === 'false') return false
+      return undefined
+    }
+  }
+}
+
+/** The goal's life-area context ('work' | 'family' | 'personal' | null), via the choice's goal reference. */
+async function goalContext(choice: { goal_task_id: string | null; goal_id: string | null }): Promise<string | null> {
+  if (choice.goal_task_id) {
+    const { data } = await supabase.from('tasks').select('context').eq('id', choice.goal_task_id).maybeSingle()
+    return (data?.context as string | null) ?? null
+  }
+  if (choice.goal_id) {
+    const { data } = await supabase.from('goals').select('context').eq('id', choice.goal_id).maybeSingle()
+    return (data?.context as string | null) ?? null
+  }
+  return null
+}
+
+function choiceRows<T>(r: { data: T[] | null; error: { message?: string } | null }, what: string): T[] {
+  if (r.error) throw new Error(`Could not read ${what}: ${r.error.message ?? 'unknown error'}`)
+  return r.data ?? []
+}
+
+async function readChoicesLocal(goalId?: string): Promise<string> {
+  const statusLabel: Record<OptionStatus, string> = { considering: 'Considering', contacted: 'Contacted', heard_back: 'Heard back', ruled_out: 'Ruled out', chosen: 'Chosen' }
+  const cols = 'id, title, status, goal_task_id, goal_id, chosen_option_id, decided_at, decided_note, decided_work, decided_amount_cents, columns, work, selected_work'
+  type ChoiceRow = {
+    id: string; title: string; status: 'open' | 'decided'; goal_task_id: string | null; goal_id: string | null
+    chosen_option_id: string | null; decided_at: string | null; decided_note: string | null; decided_work: string[] | null
+    decided_amount_cents: number | string | null; columns: { id: string; label: string; kind: ColumnKind }[] | null
+    work: WorkPiece[] | null; selected_work: string[] | null
+  }
+  type OptionRow = { id: string; choice_id: string; name: string; contact_id: string | null; status: OptionStatus; status_changed_at: string; values: Record<string, CellValue> | null; notes: string | null }
+
+  let found: ChoiceRow[]
+  if (goalId) {
+    const [a, b] = await Promise.all([
+      supabase.from('choices').select(cols).eq('goal_task_id', goalId).order('sort_order').order('created_at').limit(50),
+      supabase.from('choices').select(cols).eq('goal_id', goalId).order('sort_order').order('created_at').limit(50),
+    ])
+    found = [...choiceRows<ChoiceRow>(a as never, 'the choices'), ...choiceRows<ChoiceRow>(b as never, 'the choices')]
+  } else {
+    found = choiceRows<ChoiceRow>(
+      (await supabase.from('choices').select(cols).eq('status', 'open').order('created_at').limit(50)) as never, 'the choices')
+  }
+  if (!found.length) return JSON.stringify({ choices: [], note: 'No choices here.' })
+
+  const options = choiceRows<OptionRow>((await supabase.from('choice_options')
+    .select('id, choice_id, name, contact_id, status, status_changed_at, values, notes')
+    .in('choice_id', found.map((c) => c.id)).order('sort_order').order('created_at')) as never, 'the options')
+  const optionIds = options.map((o) => o.id)
+  const contactIds = [...new Set(options.map((o) => o.contact_id).filter((c): c is string => !!c))]
+  const taskIds = [...new Set(found.flatMap((c) => (c.goal_task_id ? [c.goal_task_id] : [])))]
+  const goalIds = [...new Set(found.flatMap((c) => (c.goal_id ? [c.goal_id] : [])))]
+  const empty = { data: [], error: null }
+  const [linesRead, followRead, contactsRead, tasksRead, goalsRead] = await Promise.all([
+    optionIds.length ? supabase.from('choice_price_lines').select('id, option_id, work_ids, amount_cents, note, sort_order').in('option_id', optionIds).order('sort_order') : empty,
+    optionIds.length ? supabase.from('tasks').select('id, choice_option_id, scheduled_for, completed, waiting_since').in('choice_option_id', optionIds).order('created_at', { ascending: false }) : empty,
+    contactIds.length ? supabase.from('contacts').select('id, name, phone').in('id', contactIds) : empty,
+    taskIds.length ? supabase.from('tasks').select('id, title').in('id', taskIds) : empty,
+    goalIds.length ? supabase.from('goals').select('id, name').in('id', goalIds) : empty,
+  ])
+  const lines = choiceRows<{ id: string; option_id: string; work_ids: string[] | null; amount_cents: number | string; note: string | null; sort_order: number }>(linesRead as never, 'the prices')
+    .map((l): PriceLine & { optionId: string } => ({
+      id: l.id, optionId: l.option_id, workIds: l.work_ids ?? [], amountCents: Number(l.amount_cents), ...(l.note ? { note: l.note } : {}), sortOrder: l.sort_order,
+    }))
+  const followUps = choiceRows<{ id: string; choice_option_id: string; scheduled_for: string | null; completed: boolean; waiting_since: string | null }>(followRead as never, 'the follow-ups')
+  const contacts = new Map(choiceRows<{ id: string; name: string; phone: string | null }>(contactsRead as never, 'the contacts').map((c) => [c.id, c]))
+  const goalTitle = new Map<string, string>([
+    ...choiceRows<{ id: string; title: string }>(tasksRead as never, 'goals').map((r) => [r.id, r.title] as [string, string]),
+    ...choiceRows<{ id: string; name: string }>(goalsRead as never, 'year goals').map((r) => [r.id, r.name] as [string, string]),
+  ])
+  const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-CA') : null)
+  const priced = (ls: readonly PriceLine[], work: readonly WorkPiece[]) => ls.map((l) => {
+    const label = workLabel(l.workIds, work)
+    return { ...(label ? { work: label } : {}), amount: formatCents(l.amountCents), ...(l.note ? { note: l.note } : {}) }
+  })
+  const cellText = (kind: ColumnKind, v: CellValue): string | null => {
+    if (v == null || v === '') return null
+    if (kind === 'money' && typeof v === 'number') return formatCents(v)
+    if (kind === 'yesno' && typeof v === 'boolean') return v ? 'Yes' : 'No'
+    return String(v)
+  }
+
+  const choices = found.map((c) => {
+    const columns = c.columns ?? []
+    const work = c.work ?? []
+    const selected = c.selected_work ?? []
+    const goalRef = (c.goal_task_id ?? c.goal_id)!
+    const opts = options.filter((o) => o.choice_id === c.id).map((o) => {
+      const own = lines.filter((l) => l.optionId === o.id)
+      const shown = work.length === 0 ? own : orderLines(liveLines(own, work), work)
+      const forSelected = priceFor(own, selected, work)
+      const forAll = priceFor(own, work.map((w) => w.id), work)
+      const follow = followUps.find((f) => f.choice_option_id === o.id && !f.completed)
+      const contact = o.contact_id ? contacts.get(o.contact_id) : undefined
+      const values: Record<string, string> = {}
+      for (const col of columns) {
+        const v = cellText(col.kind, (o.values ?? {})[col.id] ?? null)
+        if (v !== null) values[col.label] = v
+      }
+      return {
+        id: o.id,
+        name: o.name,
+        status: o.status,
+        status_label: statusLabel[o.status] ?? o.status,
+        status_since: day(o.status_changed_at),
+        ...(contact ? { contact: { name: contact.name, ...(contact.phone ? { phone: contact.phone } : {}) } } : {}),
+        values,
+        priced: priced(shown, work),
+        price_for_selected: forSelected ? formatCents(forSelected.totalCents) : null,
+        ...(forSelected ? { selected_adds_up: priced(forSelected.lines, work) } : {}),
+        price_for_all_work: forAll ? formatCents(forAll.totalCents) : null,
+        ...(forAll ? { all_work_adds_up: priced(forAll.lines, work) } : {}),
+        waiting_since: day(follow?.waiting_since ?? (o.status === 'contacted' ? o.status_changed_at : null)),
+        follow_up: day(follow?.scheduled_for ?? null),
+        ...(o.notes ? { notes: o.notes } : {}),
+      }
+    })
+    const chosen = c.chosen_option_id ? options.find((o) => o.id === c.chosen_option_id) : undefined
+    return {
+      id: c.id,
+      title: c.title,
+      goal: { title: goalTitle.get(goalRef) ?? '', id: goalRef },
+      status: c.status,
+      work: work.map((w) => ({ label: w.label, ...(w.description ? { description: w.description } : {}) })),
+      selected_work: work.filter((w) => selected.includes(w.id)).map((w) => w.label),
+      columns: columns.map((col) => ({ label: col.label, kind: col.kind })),
+      options: opts,
+      ...(c.status === 'decided' ? {
+        decided: {
+          option: chosen?.name ?? null,
+          on: day(c.decided_at),
+          work: workLabel(c.decided_work ?? [], work) || null,
+          amount: c.decided_amount_cents == null ? null : formatCents(Number(c.decided_amount_cents)),
+          ...(c.decided_note ? { note: c.decided_note } : {}),
+        },
+      } : {}),
+    }
+  })
+  return JSON.stringify({ choices })
+}
