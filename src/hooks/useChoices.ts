@@ -22,10 +22,19 @@ function useRefetchEvents(refetch: () => Promise<void>) {
 
 /** A partner may have edited the choice while this tab was in the
  *  background: read it again when the tab is back in view or focused. */
+const RETURN_DEDUPE_MS = 500
 function useRefetchOnReturn(refetch: () => Promise<void>) {
   useEffect(() => {
-    const onFocus = () => { void refetch() }
-    const onVisible = () => { if (document.visibilityState === 'visible') void refetch() }
+    // Focus and visibilitychange often fire together: one read for both.
+    let last = 0
+    const again = () => {
+      const now = Date.now()
+      if (now - last < RETURN_DEDUPE_MS) return
+      last = now
+      void refetch()
+    }
+    const onFocus = () => again()
+    const onVisible = () => { if (document.visibilityState === 'visible') again() }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisible)
     return () => {

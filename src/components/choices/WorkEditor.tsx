@@ -6,9 +6,12 @@ import { DialogFrame, inputClass, linkButton, primaryButton, quietButton } from 
  *  one change. */
 export function WorkEditor({ work, onSave, onClose }: {
   work: readonly WorkPiece[]
-  onSave: (next: WorkPiece[]) => Promise<boolean>
+  /** next: the list as saved; base: the list this editor opened on, so only
+   *  what the person changed is applied (a partner's edit since stays). */
+  onSave: (next: WorkPiece[], base: readonly WorkPiece[]) => Promise<boolean>
   onClose: () => void
 }) {
+  const [base] = useState<readonly WorkPiece[]>(() => work)
   const [pieces, setPieces] = useState<WorkPiece[]>(() => work.map((w) => ({ ...w })))
   const set = (id: string, patch: Partial<WorkPiece>) =>
     setPieces((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)))
@@ -21,7 +24,7 @@ export function WorkEditor({ work, onSave, onClose }: {
         return piece
       })
       .filter((p) => p.label)
-    if (await onSave(next)) onClose()
+    if (await onSave(next, base)) onClose()
   }
   return (
     <DialogFrame title="The work" onClose={onClose}>

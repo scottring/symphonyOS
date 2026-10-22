@@ -458,6 +458,24 @@ describe('a partner\'s edits made since the page loaded are kept', () => {
     expect(w.updateChoice).toHaveBeenLastCalledWith({ work: [...choice.work, basement], selected_work: ['main', 'hall', 'base'] })
   })
 
+  it('a piece a partner added while Edit the work was open is kept on save', async () => {
+    const { rerender } = render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Edit the work' }))
+    // The page refetches (focus) while the editor is open: a partner added Basement.
+    const basement = { id: 'base', label: 'Basement' }
+    w.server.lists = { ...w.server.lists, work: [...choice.work, basement] }
+    rerender(<ChoicePageView detail={{ ...detail, choice: { ...choice, work: [...choice.work, basement] } }} writers={w} />)
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getAllByRole('textbox', { name: 'Piece name' })).toHaveLength(3)
+    await userEvent.type(within(dialog).getAllByRole('textbox', { name: 'Description' })[1], 'Tile only')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await vi.waitFor(() => expect(w.updateChoice).toHaveBeenCalledTimes(1))
+    expect(w.updateChoice).toHaveBeenLastCalledWith({
+      work: [choice.work[0], { id: 'hall', label: 'Hall bath', description: 'Tile only' }, choice.work[2], basement],
+      selected_work: ['main', 'hall'],
+    })
+  })
+
   it('a refused fresh read writes nothing', async () => {
     w.readOptionValues.mockResolvedValueOnce(null)
     render(<ChoicePageView detail={detail} writers={w} />)

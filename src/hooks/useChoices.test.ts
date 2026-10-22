@@ -26,6 +26,7 @@ describe('useChoice', () => {
     expect(loadChoice).toHaveBeenCalledTimes(2)
 
     const visibility = vi.spyOn(document, 'visibilityState', 'get')
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000)
     try {
       visibility.mockReturnValue('hidden')
       await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
@@ -35,6 +36,28 @@ describe('useChoice', () => {
       expect(loadChoice).toHaveBeenCalledTimes(3)
     } finally {
       visibility.mockRestore()
+      clock.mockRestore()
+    }
+  })
+
+  it('focus and visibilitychange together read once', async () => {
+    renderHook(() => useChoice('c1'))
+    await waitFor(() => expect(loadChoice).toHaveBeenCalledTimes(1))
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000_000)
+    try {
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+        window.dispatchEvent(new Event('focus'))
+      })
+      expect(loadChoice).toHaveBeenCalledTimes(2)
+      // A later return reads again.
+      clock.mockReturnValue(1_000_600)
+      await act(async () => { window.dispatchEvent(new Event('focus')) })
+      expect(loadChoice).toHaveBeenCalledTimes(3)
+    } finally {
+      visibility.mockRestore()
+      clock.mockRestore()
     }
   })
 

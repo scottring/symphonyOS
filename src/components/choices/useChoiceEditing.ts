@@ -198,8 +198,10 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
     /** Edit the work saves the whole list; only what this save changed
      *  (pieces added, renamed or described, removed) lands on the work as it
      *  is now. */
-    saveWork: (next: WorkPiece[]) => {
-      const diff = workDiff(choice.work, choice.selectedWork, next)
+    saveWork: (next: WorkPiece[], base: readonly WorkPiece[] = choice.work) => {
+      // Against the list the editor opened on, not the page's (which may have
+      // refetched a partner's edit while the editor was open).
+      const diff = workDiff(base, choice.selectedWork, next)
       const write = (f: typeof applyWorkDiff) => onChoice((fresh) => {
         const r = f(fresh, diff)
         return { work: r.work, selected_work: r.selectedWork }
