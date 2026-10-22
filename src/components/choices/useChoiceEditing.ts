@@ -5,18 +5,23 @@ import {
   applyWorkDiff, renamedColumn, restoredColumn, revertWorkDiff, withColumn, withSelected, withValue, withoutColumn, workDiff,
 } from '@/lib/choices/edits'
 import type {
-  CellValue, ChoiceColumn, ChoiceOption, ColumnKind, DbChoice, DbChoiceOption, DbPriceLine,
+  CellValue, ChoiceColumn, ChoiceOption, ColumnKind, DbChoice, DbChoiceOption, DbPriceLine, GoalRef,
   OptionStatus, PriceLine, WorkPiece,
 } from '@/types/choice'
 import type { LineInput } from './PriceLinesEditor'
 import type { OptionFilesApi } from './useOptionFiles'
 import type { Attachment } from '@/types/attachment'
 import type { TaskContext } from '@/types/task'
+import type { LogEntry, LogKind } from '@/types/goalLog'
+import { isAhead, statusAfterLog } from '@/lib/choices/log'
 import { useLatest } from './useLatest'
 
 type ChoicePatch = Partial<Pick<DbChoice, 'title' | 'columns' | 'work' | 'selected_work'>>
 type OptionPatch = Partial<Pick<DbChoiceOption, 'name' | 'contact_id' | 'status' | 'values' | 'notes'>>
 type LinePatch = Partial<Pick<DbPriceLine, 'work_ids' | 'amount_cents' | 'note'>>
+type EntryPatch = Partial<{ kind: LogKind; on: string; time: string | null; summary: string }>
+/** What the Log dialog saves: about an option, or the project when optionId is left out. */
+export interface LogInput { optionId?: string; kind: LogKind; on: string; time?: string; summary: string }
 
 /** The writers this page calls, already bound to the client and the user.
  *  Each mirrors its db.ts writer without (db, userId), and announces the change. */
@@ -41,9 +46,24 @@ export interface ChoicePageWriters {
   reopenChoice: (detail: ChoiceDetail) => Promise<boolean>
   addContact: (input: { name: string; phone: string; context?: TaskContext }) => Promise<{ id: string } | null>
   deleteContact: (id: string) => Promise<boolean>
+  addLogEntry: (input: { goal: GoalRef; optionId?: string; kind: LogKind; on: string; time?: string; summary: string }) => Promise<LogEntry | null>
+  updateLogEntry: (id: string, patch: EntryPatch) => Promise<boolean>
+  deleteLogEntry: (id: string) => Promise<boolean>
+  /** A future event, as a task that is a step of the goal; its id. */
+  planEvent: (input: {
+    goal: GoalRef; goalContext: TaskContext | null; goalScope: string
+    optionId?: string; optionName?: string; contactId?: string
+    kind: LogKind; on: string; time?: string; summary: string
+  }) => Promise<string | null>
 }
 
 const all = async (steps: Promise<boolean>[]) => (await Promise.all(steps)).every(Boolean)
+
+/** The entry's fields as a log input (no keys for what it doesn't have). */
+const entryFields = (e: Pick<LogEntry, 'optionId' | 'kind' | 'on' | 'time' | 'summary'>) => ({
+  ...(e.optionId ? { optionId: e.optionId } : {}),
+  kind: e.kind, on: e.on, ...(e.time ? { time: e.time } : {}), summary: e.summary,
+})
 
 /** Runs writes to one row one at a time, in the order asked, so each one's
  *  fresh read sees the one before it. */
@@ -254,6 +274,58 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
         return !!added
       }, { undo: async () => (added ? files.remove(added) : false) })
     },
+
+    /** Logs a past event, or plans one on a later day (a task on the
+     *  calendar). A contact with a Considering option sets it to Contacted in
+     *  the same save; Undo takes back both. */
+    logEvent: (input: LogInput) => {
+      const option = input.optionId ? detail.options.find((o) => o.id === input.optionId) : undefined
+      const status = option ? statusAfterLog(option.status, input.kind) : null
+      const made: { entryId?: string; taskId?: string } = {}
+      const takeBack = async () => {
+        if (made.entryId) return w.deleteLogEntry(made.entryId)
+        if (made.taskId) return w.deleteTask(made.taskId)
+        return true
+      }
+      return run('Log', async () => {
+        const fields = entryFields(input)
+        if (isAhead(input.on, new Date())) {
+          made.taskId = (await w.planEvent({
+            goal: choice.goal, goalContext: detail.goalContext, goalScope: detail.goalScope,
+            ...(option ? { optionName: option.name, ...(option.contactId ? { contactId: option.contactId } : {}) } : {}),
+            ...fields,
+          })) ?? undefined
+        } else {
+          made.entryId = (await w.addLogEntry({ goal: choice.goal, ...fields }))?.id
+        }
+        if (!made.entryId && !made.taskId) return false
+        if (option && status && !(await w.updateOption(option.id, { status }))) {
+          // One save: without the status change, the log line goes too.
+          await takeBack()
+          return false
+        }
+        return true
+      }, {
+        undo: async () => {
+          const ok = await takeBack()
+          return ok && (option && status ? w.updateOption(option.id, { status: option.status }) : true)
+        },
+      })
+    },
+
+    editLogEntry: (e: LogEntry, patch: EntryPatch) => {
+      const prev: EntryPatch = {}
+      if (patch.kind !== undefined) prev.kind = e.kind
+      if (patch.on !== undefined) prev.on = e.on
+      if (patch.time !== undefined) prev.time = e.time ?? null
+      if (patch.summary !== undefined) prev.summary = e.summary
+      return run('Change log entry', () => w.updateLogEntry(e.id, patch), { undo: () => w.updateLogEntry(e.id, prev) })
+    },
+
+    /** Undo logs it again with the same fields (as a new row). */
+    deleteLogEntry: (e: LogEntry) => run('Remove log entry', () => w.deleteLogEntry(e.id), {
+      undo: async () => !!(await w.addLogEntry({ goal: e.goal, ...entryFields(e) })),
+    }),
 
     deleteOption: (o: ChoiceOption) => {
       const lines = detail.lines.filter((l) => l.optionId === o.id)

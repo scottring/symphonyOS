@@ -8,7 +8,7 @@ import { CHOICES_UPDATED } from '@/lib/choices/events'
 
 export { CHOICES_UPDATED }
 
-function useRefetchEvents(refetch: () => Promise<void>) {
+export function useRefetchEvents(refetch: () => Promise<void>) {
   useEffect(() => {
     const handler = () => { void refetch() }
     window.addEventListener(CHOICES_UPDATED, handler)
@@ -23,7 +23,7 @@ function useRefetchEvents(refetch: () => Promise<void>) {
 /** A partner may have edited the choice while this tab was in the
  *  background: read it again when the tab is back in view or focused. */
 const RETURN_DEDUPE_MS = 500
-function useRefetchOnReturn(refetch: () => Promise<void>) {
+export function useRefetchOnReturn(refetch: () => Promise<void>) {
   useEffect(() => {
     // Focus and visibilitychange often fire together: one read for both.
     let last = 0

@@ -71,8 +71,12 @@ export function mergeLog(
 }
 
 const monthDay = (d: Date) => `${MONTHS[d.getMonth()]} ${d.getDate()}`
-// Stored HH:MM with the leading zero dropped, e.g. 09:05 -> 9:05, 14:30 stays
-const shortTime = (t: string) => t.replace(/^0/, '')
+/** "Oct 22" for a YYYY-MM-DD day. */
+export const dayLabel = (on: string) => monthDay(parseYmd(on))
+/** "Fri Oct 30" for a YYYY-MM-DD day. */
+export const weekdayLabel = (on: string) => `${WEEKDAYS[parseYmd(on).getDay()]} ${dayLabel(on)}`
+/** Stored HH:MM with the leading zero dropped, e.g. 09:05 -> 9:05, 14:30 stays. */
+export const shortTime = (t: string) => t.replace(/^0/, '')
 
 export function rowLine(
   log: { upcoming: LogLine[]; done: LogLine[] }, optionId: string,
@@ -81,11 +85,10 @@ export function rowLine(
   const lastLine = log.done.find((l) => l.optionId === optionId)
   const out: { next?: string; last?: string } = {}
   if (nextLine) {
-    const d = parseYmd(nextLine.on)
-    out.next = `${LOG_KIND_LABEL[nextLine.kind]} ${WEEKDAYS[d.getDay()]} ${monthDay(d)}${nextLine.time ? `, ${shortTime(nextLine.time)}` : ''}`
+    out.next = `${LOG_KIND_LABEL[nextLine.kind]} ${weekdayLabel(nextLine.on)}${nextLine.time ? `, ${shortTime(nextLine.time)}` : ''}`
   }
   if (lastLine) {
-    let s = `${LOG_KIND_LABEL[lastLine.kind]} ${monthDay(parseYmd(lastLine.on))}`
+    let s = `${LOG_KIND_LABEL[lastLine.kind]} ${dayLabel(lastLine.on)}`
     if (!nextLine && lastLine.text.length <= 40) s += ` · “${lastLine.text}”`
     out.last = s
   }

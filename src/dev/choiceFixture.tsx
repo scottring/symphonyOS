@@ -2,9 +2,11 @@
 // page with the mockup's data and in-memory writers, for visual review without
 // the database. Never imported by production code paths.
 import { useRef, useState } from 'react'
-import { ChoicePageView, type ChoicePageWriters } from '@/components/choices/ChoicePage'
+import { ChoicePageView, type ChoicePageWriters, type PageLog } from '@/components/choices/ChoicePage'
 import type { ChoiceDetail } from '@/lib/choices/db'
+import { mergeLog } from '@/lib/choices/log'
 import type { ChoiceOption, PriceLine, OptionStatus } from '@/types/choice'
+import { LOG_KIND_LABEL, type LogEntry, type PlannedEvent } from '@/types/goalLog'
 
 const at = (iso: string) => new Date(iso)
 const NOW = at('2026-10-22T12:00:00Z')
@@ -57,11 +59,25 @@ export const fixtureDetail = (selectedWork: string[]): ChoiceDetail => ({
   contacts: new Map(),
 })
 
+const GOAL = { kind: 'goal', id: 'fx-goal' } as const
+const fixtureEntries: LogEntry[] = [
+  { id: 'fx-e1', userId: 'fx-user', goal: GOAL, optionId: 'o1', kind: 'call', on: '2026-10-19', summary: 'Quote came; can start Nov 17', createdAt: at('2026-10-19T15:00:00Z') },
+  { id: 'fx-e2', userId: 'fx-iris', goal: GOAL, kind: 'note', on: '2026-10-20', summary: 'Iris wants to keep the clawfoot tub', createdAt: at('2026-10-20T15:00:00Z') },
+]
+const fixturePlanned: PlannedEvent[] = [
+  { taskId: 'fx-t2', optionId: 'o4', kind: 'visit', title: "Home visit: Walk through upstairs bath (Rob (Dave's cousin))", scheduledFor: new Date(2026, 9, 30, 10, 0), allDay: false, completed: false },
+]
+const fixtureMembers: Record<string, string> = { 'fx-user': 'Scott', 'fx-iris': 'Iris' }
+
 export default function ChoiceFixture() {
   const params = new URLSearchParams(window.location.search)
   const [selected, setSelected] = useState((params.get('selected') ?? 'main,hall').split(','))
   const ok = async () => true
   const current = useRef(selected)
+  // The log in memory: saves show up at once, as the real page's refetch would.
+  const [entries, setEntries] = useState(fixtureEntries)
+  const [planned, setPlanned] = useState(fixturePlanned)
+  const goalLog: PageLog = { log: mergeLog(entries, planned), entries, memberName: (id) => fixtureMembers[id] }
   const writers: ChoicePageWriters = {
     readChoice: async () => {
       const { choice } = fixtureDetail(current.current)
@@ -78,14 +94,37 @@ export default function ChoiceFixture() {
     updatePriceLine: ok,
     deletePriceLine: ok,
     createFollowUp: async () => 'fx-task',
-    deleteTask: ok,
+    deleteTask: async (id) => { setPlanned((xs) => xs.filter((p) => p.taskId !== id)); return true },
     chooseOption: ok,
     reopenChoice: ok,
     addContact: async () => ({ id: 'fx-contact' }),
     deleteContact: ok,
+    addLogEntry: async (input) => {
+      const e: LogEntry = { id: crypto.randomUUID(), userId: 'fx-user', createdAt: new Date(), ...input }
+      setEntries((xs) => [...xs, e])
+      return e
+    },
+    updateLogEntry: async (id, patch) => {
+      setEntries((xs) => xs.map((e) => (e.id === id
+        ? { ...e, ...patch, time: patch.time === undefined ? e.time : (patch.time ?? undefined) }
+        : e)))
+      return true
+    },
+    deleteLogEntry: async (id) => { setEntries((xs) => xs.filter((e) => e.id !== id)); return true },
+    planEvent: async (input) => {
+      const taskId = crypto.randomUUID()
+      const [y, m, d] = input.on.split('-').map(Number)
+      const [hh, mm] = input.time ? input.time.split(':').map(Number) : [0, 0]
+      setPlanned((xs) => [...xs, {
+        taskId, optionId: input.optionId, kind: input.kind, allDay: !input.time, completed: false,
+        title: `${LOG_KIND_LABEL[input.kind]}: ${input.summary}${input.optionName ? ` (${input.optionName})` : ''}`,
+        scheduledFor: new Date(y, m - 1, d, hh, mm),
+      }])
+      return taskId
+    },
   }
   const detail = fixtureDetail(selected)
   // ?empty shows a new choice with no options yet.
   const shown = params.has('empty') ? { ...detail, options: [], lines: [], followUps: [] } : detail
-  return <ChoicePageView detail={shown} writers={writers} />
+  return <ChoicePageView detail={shown} writers={writers} goalLog={params.has('empty') ? undefined : goalLog} />
 }

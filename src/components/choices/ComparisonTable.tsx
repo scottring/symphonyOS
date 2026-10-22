@@ -17,6 +17,8 @@ export interface ComparisonProps {
   now: Date
   sortKey: SortKey | null
   onSort: (key: SortKey) => void
+  /** The option's one log line: the next planned event and the last one done. */
+  logLineOf?: (o: ChoiceOption) => { next?: string; last?: string } | null
   /** Editing places: attachments cell, per-row actions, "+ Column", a
    *  column's heading menu, an editable value, and the price editor. */
   renderFiles?: (o: ChoiceOption) => ReactNode
@@ -30,6 +32,19 @@ export interface ComparisonProps {
 /** An editable value looks tappable; an empty one says what tapping adds. */
 export const editableCell = '-mx-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-neutral-100'
 export const addLabel = 'text-primary-600'
+
+/** "Home visit Fri Oct 30, 10:00 · last: Phone call Oct 22"; the planned
+ *  part in the primary color. */
+export function LogLineView({ line }: { line: { next?: string; last?: string } | null | undefined }) {
+  if (!line) return null
+  return (
+    <div className="mt-1 text-xs text-neutral-500">
+      {line.next && <span className="text-primary-600">{line.next}</span>}
+      {line.next && line.last && ' · '}
+      {line.last && (line.next ? `last: ${line.last}` : line.last)}
+    </div>
+  )
+}
 
 /** The price block, as a button that opens the editor when editing. */
 export function PriceCellView({ option, cell, onEdit }: { option: ChoiceOption; cell: PriceCell; onEdit?: (o: ChoiceOption) => void }) {
@@ -107,6 +122,7 @@ export function ComparisonTable(p: ComparisonProps) {
                   {contact && <small className="block text-xs text-neutral-500">{contact}</small>}
                   <span className="mt-1 inline-block"><StatusChip status={o.status} /></span>
                   {fact && <div className="mt-1 text-xs text-neutral-500">{fact}</div>}
+                  <LogLineView line={p.logLineOf?.(o)} />
                 </td>
                 <td className="px-3 py-3"><PriceCellView option={o} cell={p.priceCellOf(o)} onEdit={p.onEditPrice} /></td>
                 {p.columns.map((c) => {

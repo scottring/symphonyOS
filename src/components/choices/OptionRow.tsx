@@ -13,6 +13,10 @@ export interface OptionActionHandlers {
   onNotes: (o: ChoiceOption, notes: string | null) => Promise<boolean>
   /** Opens the option's files; left out when files aren't available. */
   onFiles?: (o: ChoiceOption) => void
+  /** Opens the Log dialog about this option. */
+  onLog?: (o: ChoiceOption) => void
+  /** Opens the option's log; left out when nothing is logged for it. */
+  onHistory?: (o: ChoiceOption) => void
 }
 
 /** Rename or Notes, inline: one field, Save or Cancel. */
@@ -42,9 +46,9 @@ export function InlineEdit({ label, initial, multiline, onSave, onCancel }: {
 }
 
 /** A row's verbs, shared by the table and the cards: Choose this, Follow up
- *  on… (when Contacted), Status, files, and ⋯ (Rename, Notes, Delete after a
- *  confirm). */
-export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete, onFiles, onRename, onNotes }: OptionActionHandlers & { option: ChoiceOption }) {
+ *  on… (when Contacted), Log, Status, files, and ⋯ (Rename, Notes, History,
+ *  Delete after a confirm). */
+export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete, onFiles, onRename, onNotes, onLog, onHistory }: OptionActionHandlers & { option: ChoiceOption }) {
   const [followingUp, setFollowingUp] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [editing, setEditing] = useState<'name' | 'notes' | null>(null)
@@ -101,6 +105,11 @@ export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete
             Follow up on…
           </button>
         )}
+        {onLog && (
+          <button type="button" onClick={() => onLog(option)} className="text-primary-600 hover:text-primary-700">
+            Log
+          </button>
+        )}
         <StatusMenu status={option.status} onPick={(s) => void pickStatus(s)} />
         {onFiles && (
           <button type="button" aria-label={`Files for ${option.name}`} onClick={() => onFiles(option)}
@@ -111,6 +120,7 @@ export function OptionActions({ option, onChoose, onStatus, onFollowUp, onDelete
         <PopMenu label="More" trigger="⋯" items={[
           { label: 'Rename', onPick: () => setEditing('name') },
           { label: 'Notes', onPick: () => setEditing('notes') },
+          ...(onHistory ? [{ label: 'History', onPick: () => onHistory(option) }] : []),
           { label: 'Delete option', danger: true, onPick: () => setConfirming(true) },
         ]} />
       </div>

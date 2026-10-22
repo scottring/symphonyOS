@@ -73,6 +73,10 @@ const writers: ChoicePageWriters = {
   reopenChoice: vi.fn(async () => true),
   addContact: vi.fn(async () => null),
   deleteContact: vi.fn(async () => true),
+  addLogEntry: vi.fn(async () => null),
+  updateLogEntry: vi.fn(async () => true),
+  deleteLogEntry: vi.fn(async () => true),
+  planEvent: vi.fn(async () => null),
 }
 
 function setNarrow(narrow: boolean) {

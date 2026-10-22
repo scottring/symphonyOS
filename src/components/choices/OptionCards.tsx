@@ -3,7 +3,7 @@ import type { CellValue, ChoiceOption } from '@/types/choice'
 import { optionFact } from '@/lib/choices/facts'
 import { StatusChip } from './StatusChip'
 import { contactLine, formatCell } from './cells'
-import { PriceCellView, type ComparisonProps } from './ComparisonTable'
+import { LogLineView, PriceCellView, type ComparisonProps } from './ComparisonTable'
 
 /** Narrow layout: one card per option, facts as lines in the table's order.
  *  Empty facts are left out; "Edit" on a card shows every fact, editable. */
@@ -43,6 +43,7 @@ function Card({ p, o, editing, onEdit }: { p: ComparisonProps; o: ChoiceOption; 
       </div>
       {contact && <div className="mt-0.5 text-xs text-neutral-500">{contact}</div>}
       {fact && <div className="mt-1 text-xs text-neutral-500">{fact}</div>}
+      <LogLineView line={p.logLineOf?.(o)} />
       <dl className="mt-2 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-sm">
         {(editing || cell.kind !== 'none') && (
           <>

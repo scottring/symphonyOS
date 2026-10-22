@@ -1,10 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CHOICES_UPDATED, useChoice } from '@/hooks/useChoices'
+import { CHOICES_UPDATED, useChoice, useGoalChoices } from '@/hooks/useChoices'
 import { useAuth } from '@/hooks/useAuth'
 import { useContacts } from '@/hooks/useContacts'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useGoalLog } from '@/hooks/useGoalLog'
 import { supabase } from '@/lib/supabase'
 import * as db from '@/lib/choices/db'
+import * as logDb from '@/lib/choices/logDb'
+import { rowLine, type LogLine } from '@/lib/choices/log'
+import type { LogEntry } from '@/types/goalLog'
 import type { ChoiceDetail } from '@/lib/choices/db'
 import { choiceSummary } from '@/lib/choices/facts'
 import { workLabel } from '@/lib/choices/price'
@@ -25,7 +30,9 @@ import { ChooseDialog, DecidedBanner } from './ChooseDialog'
 import { AddOptionInput } from './AddOptionInput'
 import { FilesCell, FilesDialog } from './OptionFiles'
 import { useOptionFiles, type OptionFilesApi } from './useOptionFiles'
-import { linkButton } from './DialogFrame'
+import { DialogFrame, linkButton, quietButton } from './DialogFrame'
+import { LogDialog } from './LogDialog'
+import { LogList } from './LogList'
 
 export type { ChoicePageWriters } from './useChoiceEditing'
 
@@ -45,6 +52,17 @@ function useNarrow(): boolean {
   return narrow
 }
 
+/** The goal's log as the page shows it; ChoicePage reads it (useGoalLog). */
+export interface PageLog {
+  log: { upcoming: LogLine[]; done: LogLine[] }
+  entries: readonly LogEntry[]
+  /** Option names across the goal's choices, for lines about another choice's option. */
+  optionNames?: ReadonlyMap<string, string>
+  /** A logger's first name. */
+  memberName?: (userId: string) => string | undefined
+}
+const NO_LOG: PageLog = { log: { upcoming: [], done: [] }, entries: [] }
+
 const sameKey = (a: SortKey | null, b: SortKey) =>
   !!a && a.kind === b.kind && (a.kind !== 'column' || (b.kind === 'column' && a.columnId === b.columnId))
 
@@ -53,13 +71,17 @@ type Open =
   | { kind: 'choose'; optionId: string }
   | { kind: 'files'; optionId: string }
   | { kind: 'work' }
+  | { kind: 'log'; optionId?: string }
+  | { kind: 'editLog'; entryId: string }
+  | { kind: 'history'; optionId: string }
   | null
 
-export function ChoicePageView({ detail, writers, files }: {
+export function ChoicePageView({ detail, writers, files, goalLog = NO_LOG }: {
   detail: ChoiceDetail
   writers: ChoicePageWriters
   /** Option attachments; left out where they aren't loaded (tests). */
   files?: OptionFilesApi
+  goalLog?: PageLog
 }) {
   const { choice, options, lines, followUps, contacts } = detail
   const navigate = useNavigate()
@@ -83,6 +105,8 @@ export function ChoicePageView({ detail, writers, files }: {
   const sorted = sortOptions(live, sortKey, priceOf)
   const shown = showRuledOut ? [...sorted, ...ruledOut] : sorted
   const optionOf = (id: string) => options.find((o) => o.id === id)
+  const { log } = goalLog
+  const logged = (o: ChoiceOption) => log.upcoming.some((l) => l.optionId === o.id) || log.done.some((l) => l.optionId === o.id)
 
   const back = () => { if (window.history.length > 1) navigate(-1); else navigate('/today') }
   const close = () => setOpen(null)
@@ -98,6 +122,7 @@ export function ChoicePageView({ detail, writers, files }: {
     now,
     sortKey,
     onSort: (k) => setSortKey((cur) => (sameKey(cur, k) ? null : k)),
+    logLineOf: (o) => rowLine(log, o.id),
     renderFiles: files && ((o) => {
       const list = files.filesOf(o.id)
       return list.length > 0 ? <FilesCell files={list} onOpen={files.open} /> : null
@@ -114,6 +139,8 @@ export function ChoicePageView({ detail, writers, files }: {
         onRename={edit.rename}
         onNotes={edit.setNotes}
         onFiles={files && ((x) => setOpen({ kind: 'files', optionId: x.id }))}
+        onLog={(x) => setOpen({ kind: 'log', optionId: x.id })}
+        onHistory={logged(o) ? (x) => setOpen({ kind: 'history', optionId: x.id }) : undefined}
       />
     ),
     addColumnSlot: <ColumnAdd onAdd={edit.addColumn} />,
@@ -161,7 +188,8 @@ export function ChoicePageView({ detail, writers, files }: {
       )}
       {!decided && narrow && <div className="mt-3"><ColumnAdd onAdd={edit.addColumn} /></div>}
       {!decided && <AddOptionInput onAdd={edit.addOption} />}
-      <Dialogs open={open} close={close} detail={detail} edit={edit} files={files} optionOf={optionOf} />
+      <LogSection goalLog={goalLog} options={options} edit={edit} onOpen={setOpen} />
+      <Dialogs open={open} close={close} detail={detail} edit={edit} files={files} optionOf={optionOf} goalLog={goalLog} onOpen={setOpen} />
     </div>
   )
 }
@@ -207,18 +235,83 @@ function ChoiceHeading({ title, onRename, onDelete }: {
   )
 }
 
-function Dialogs({ open, close, detail, edit, files, optionOf }: {
+/** Option names for log lines: this choice's as they are now, over the goal's. */
+function namesOf(goalLog: PageLog, options: readonly ChoiceOption[]): Map<string, string> {
+  const names = new Map(goalLog.optionNames ?? [])
+  for (const o of options) names.set(o.id, o.name)
+  return names
+}
+const noName = () => undefined
+
+/** The goal's whole log under the comparison: latest 10 done, with "+ Log". */
+function LogSection({ goalLog, options, edit, onOpen }: {
+  goalLog: PageLog
+  options: readonly ChoiceOption[]
+  edit: ReturnType<typeof useChoiceEditing>
+  onOpen: (open: Open) => void
+}) {
+  const id = useId()
+  const entryOf = (entryId: string) => goalLog.entries.find((e) => e.id === entryId)
+  return (
+    <section aria-labelledby={id} className="mt-8">
+      <div className="mb-2 flex items-baseline gap-3">
+        <h2 id={id} className="font-display text-xl font-semibold text-neutral-900">Log</h2>
+        <button type="button" onClick={() => onOpen({ kind: 'log' })} className={linkButton}>+ Log</button>
+      </div>
+      <LogList log={goalLog.log} optionNames={namesOf(goalLog, options)} memberName={goalLog.memberName ?? noName} limit={10}
+        onEdit={(entryId) => onOpen({ kind: 'editLog', entryId })}
+        onDelete={async (entryId) => { const e = entryOf(entryId); return e ? edit.deleteLogEntry(e) : false }} />
+    </section>
+  )
+}
+
+function Dialogs({ open, close, detail, edit, files, optionOf, goalLog, onOpen }: {
   open: Open
   close: () => void
   detail: ChoiceDetail
   edit: ReturnType<typeof useChoiceEditing>
   files?: OptionFilesApi
   optionOf: (id: string) => ChoiceOption | undefined
+  goalLog: PageLog
+  onOpen: (open: Open) => void
 }) {
   if (!open) return null
+  // Today as of now, not as of when the page opened: saving decides entry or plan the same way.
+  const now = new Date()
   if (open.kind === 'work') return <WorkEditor work={detail.choice.work} onSave={edit.saveWork} onClose={close} />
+  const choices = [...detail.options].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => ({ id: o.id, name: o.name }))
+  const titleFor = (optionId?: string) => {
+    const name = optionId && optionOf(optionId)?.name
+    return name ? `Log for ${name}` : 'Log'
+  }
+  if (open.kind === 'log') {
+    return <LogDialog title={titleFor(open.optionId)} options={choices} about={open.optionId} now={now} onSave={edit.logEvent} onCancel={close} />
+  }
+  if (open.kind === 'editLog') {
+    const e = goalLog.entries.find((x) => x.id === open.entryId)
+    if (!e) return null
+    return (
+      <LogDialog title={titleFor(e.optionId)} options={choices} initial={e} now={now} onCancel={close}
+        onSave={(input) => edit.editLogEntry(e, { kind: input.kind, on: input.on, time: input.time ?? null, summary: input.summary })} />
+    )
+  }
   const o = optionOf(open.optionId)
   if (!o) return null
+  if (open.kind === 'history') {
+    const only = (lines: LogLine[]) => lines.filter((l) => l.optionId === o.id)
+    const entryOf = (entryId: string) => goalLog.entries.find((e) => e.id === entryId)
+    return (
+      <DialogFrame title={`History · ${o.name}`} onClose={close}>
+        <LogList log={{ upcoming: only(goalLog.log.upcoming), done: only(goalLog.log.done) }}
+          optionNames={namesOf(goalLog, detail.options)} memberName={goalLog.memberName ?? noName}
+          onEdit={(entryId) => onOpen({ kind: 'editLog', entryId })}
+          onDelete={async (entryId) => { const e = entryOf(entryId); return e ? edit.deleteLogEntry(e) : false }} />
+        <div className="mt-3 flex justify-end">
+          <button type="button" onClick={close} className={quietButton}>Done</button>
+        </div>
+      </DialogFrame>
+    )
+  }
   if (open.kind === 'choose') return <ChooseDialog name={o.name} onSave={(note) => edit.choose(o, note)} onClose={close} />
   if (open.kind === 'files') {
     return files ? <FilesDialog option={o} api={files} onUpload={(x, f) => edit.addFile(x, f, files)} onClose={close} /> : null
@@ -279,16 +372,44 @@ function useBoundWriters(choiceId: string): ChoicePageWriters {
       // sees the contact list that includes the one it added.
       addContact: (input) => latest.current.contacts.addContact(input),
       deleteContact: (id) => latest.current.contacts.deleteContact(id),
+      addLogEntry: async (input) => {
+        const me = uid()
+        return me ? announce(logDb.addLogEntry(supabase, me, input)) : null
+      },
+      updateLogEntry: (id, patch) => announce(logDb.updateLogEntry(supabase, id, patch)),
+      deleteLogEntry: (id) => announce(logDb.deleteLogEntry(supabase, id)),
+      planEvent: async (input) => {
+        const me = uid()
+        return me ? announce(logDb.planEvent(supabase, me, input)) : null
+      },
     }
   }, [choiceId])
+}
+
+/** The goal's log for the page, with names for its options and loggers. */
+function usePageLog(detail: ChoiceDetail | null): PageLog {
+  const goal = detail?.choice.goal ?? null
+  const { log, entries } = useGoalLog(goal)
+  // The log covers every choice on the goal, so lines can be about another choice's option.
+  const { rows } = useGoalChoices(goal)
+  const { members } = useFamilyMembers()
+  const optionNames = useMemo(() => new Map(rows.flatMap((r) => r.options.map((o) => [o.id, o.name] as const))), [rows])
+  const memberName = useCallback((userId: string) => {
+    // A joined member is matched by their account; the household's own full member by user_id.
+    const m = members.find((x) => x.auth_user_id === userId)
+      ?? members.find((x) => !x.auth_user_id && x.is_full_user && x.user_id === userId)
+    return m?.name.trim().split(/\s+/)[0] || undefined
+  }, [members])
+  return useMemo(() => ({ log, entries, optionNames, memberName }), [log, entries, optionNames, memberName])
 }
 
 export function ChoicePage({ id }: { id: string }) {
   const { detail, loading } = useChoice(id)
   const writers = useBoundWriters(id)
   const files = useOptionFiles(detail?.options.map((o) => o.id) ?? [])
+  const goalLog = usePageLog(detail)
 
   if (loading && !detail) return <div className="p-8 text-center text-neutral-500">Loading…</div>
   if (!detail) return <div className="p-8 text-center text-neutral-500">This choice isn't available</div>
-  return <ChoicePageView detail={detail} writers={writers} files={files} />
+  return <ChoicePageView detail={detail} writers={writers} files={files} goalLog={goalLog} />
 }

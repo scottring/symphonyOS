@@ -91,6 +91,10 @@ function makeWriters(start: ChoiceDetail = detail) {
     reopenChoice: vi.fn(async () => true),
     addContact: vi.fn(async () => ({ id: 'k9' })),
     deleteContact: vi.fn(async () => true),
+    addLogEntry: vi.fn(async () => null),
+    updateLogEntry: vi.fn(async () => true),
+    deleteLogEntry: vi.fn(async () => true),
+    planEvent: vi.fn(async () => null),
   } satisfies ChoicePageWriters & { server: unknown }
 }
 let w: ReturnType<typeof makeWriters>
