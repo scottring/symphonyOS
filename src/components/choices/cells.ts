@@ -45,3 +45,17 @@ export function contactLine(
   const parts = [c?.name, c?.phone, option.notes].filter(Boolean)
   return parts.length ? parts.join(' · ') : null
 }
+
+const PHONE = /(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/
+
+/** "Martinez Tile 410-555-0142" → name "Martinez Tile", phone "410-555-0142".
+ *  A phone alone names the option by the number. */
+export function splitPhone(text: string): { name: string; phone?: string } {
+  const m = PHONE.exec(text)
+  if (!m) return { name: text.trim() }
+  const phone = m[0].trim()
+  const rest = (text.slice(0, m.index) + ' ' + text.slice(m.index + m[0].length))
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,·:–-]+|[\s,·:–-]+$/g, '')
+  return { name: rest || phone, phone }
+}

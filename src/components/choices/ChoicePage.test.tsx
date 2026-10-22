@@ -11,7 +11,7 @@ vi.mock('react-router-dom', async (orig) => ({
   useNavigate: () => navigate,
 }))
 
-import { ChoicePageView } from './ChoicePage'
+import { ChoicePageView, type ChoicePageWriters } from './ChoicePage'
 
 const now = new Date()
 const choice: Choice = {
@@ -55,7 +55,22 @@ const detail: ChoiceDetail = {
 }
 
 const setSelectedWork = vi.fn(async () => true)
-const writers = { setSelectedWork }
+const writers: ChoicePageWriters = {
+  setSelectedWork,
+  updateChoice: vi.fn(async () => true),
+  addOption: vi.fn(async () => null),
+  updateOption: vi.fn(async () => true),
+  deleteOption: vi.fn(async () => true),
+  addPriceLine: vi.fn(async () => null),
+  updatePriceLine: vi.fn(async () => true),
+  deletePriceLine: vi.fn(async () => true),
+  createFollowUp: vi.fn(async () => null),
+  deleteTask: vi.fn(async () => true),
+  chooseOption: vi.fn(async () => true),
+  reopenChoice: vi.fn(async () => true),
+  addContact: vi.fn(async () => null),
+  deleteContact: vi.fn(async () => true),
+}
 
 function setNarrow(narrow: boolean) {
   window.matchMedia = ((q: string) => ({
@@ -91,7 +106,7 @@ describe('ChoicePageView', () => {
 
   it('clicking the Price heading orders by price, with no-price options after', async () => {
     render(<ChoicePageView detail={detail} writers={writers} />)
-    await userEvent.click(screen.getByRole('button', { name: /^Price/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Price · Main bath + Hall bath' }))
     const names = screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0].textContent ?? '')
     const order = ['Chesapeake', 'Martinez', 'Harbor', 'Rob'].map((n) => names.findIndex((t) => t.includes(n)))
     expect(order).toEqual([0, 1, 2, 3])

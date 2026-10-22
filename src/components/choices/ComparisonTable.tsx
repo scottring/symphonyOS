@@ -17,10 +17,25 @@ export interface ComparisonProps {
   now: Date
   sortKey: SortKey | null
   onSort: (key: SortKey) => void
-  /** Task 6 places: attachments cell, per-row actions, "+ Column". */
+  /** Editing places: attachments cell, per-row actions, "+ Column", a
+   *  column's heading menu, an editable value, and the price editor. */
   renderFiles?: (o: ChoiceOption) => ReactNode
   renderActions?: (o: ChoiceOption) => ReactNode
   addColumnSlot?: ReactNode
+  renderColumnMenu?: (c: ChoiceColumn) => ReactNode
+  renderCell?: (o: ChoiceOption, c: ChoiceColumn) => ReactNode
+  onEditPrice?: (o: ChoiceOption) => void
+}
+
+/** The price block, as a button that opens the editor when editing. */
+export function PriceCellView({ option, cell, onEdit }: { option: ChoiceOption; cell: PriceCell; onEdit?: (o: ChoiceOption) => void }) {
+  if (!onEdit) return <PriceBlock cell={cell} />
+  return (
+    <button type="button" aria-label={`Price for ${option.name}`} onClick={() => onEdit(option)}
+      className="block rounded-md text-left hover:bg-neutral-50">
+      <PriceBlock cell={cell} />
+    </button>
+  )
 }
 
 export function PriceBlock({ cell }: { cell: PriceCell }) {
@@ -45,8 +60,8 @@ const isActive = (k: SortKey | null, t: SortKey) =>
   !!k && k.kind === t.kind && (k.kind !== 'column' || (t.kind === 'column' && k.columnId === t.columnId))
 
 export function ComparisonTable(p: ComparisonProps) {
-  const head = (label: string, key: SortKey, id?: string) => (
-    <th key={id} scope="col" className="px-3 py-2 text-left align-bottom text-[12px] font-semibold text-neutral-500">
+  const head = (label: string, key: SortKey, column?: ChoiceColumn) => (
+    <th key={column?.id} scope="col" className="whitespace-nowrap px-3 py-2 text-left align-bottom text-[12px] font-semibold text-neutral-500">
       <button
         type="button"
         onClick={() => p.onSort(key)}
@@ -55,6 +70,7 @@ export function ComparisonTable(p: ComparisonProps) {
       >
         {label}{isActive(p.sortKey, key) ? ' ↑' : ''}
       </button>
+      {column && p.renderColumnMenu?.(column)}
     </th>
   )
   return (
@@ -64,7 +80,7 @@ export function ComparisonTable(p: ComparisonProps) {
           <tr>
             {head('Option', { kind: 'name' })}
             {head(p.priceHeading, { kind: 'price' })}
-            {p.columns.map((c) => head(c.label, { kind: 'column', columnId: c.id }, c.id))}
+            {p.columns.map((c) => head(c.label, { kind: 'column', columnId: c.id }, c))}
             <th scope="col" className="px-3 py-2 text-left align-bottom text-[12px] font-semibold text-neutral-500">Files</th>
             <th scope="col" className="px-3 py-2 text-left align-bottom text-[12px] font-normal text-neutral-500">{p.addColumnSlot}</th>
           </tr>
@@ -81,14 +97,15 @@ export function ComparisonTable(p: ComparisonProps) {
                   <span className="mt-1 inline-block"><StatusChip status={o.status} /></span>
                   {fact && <div className="mt-1 text-xs text-neutral-500">{fact}</div>}
                 </td>
-                <td className="px-3 py-3"><PriceBlock cell={p.priceCellOf(o)} /></td>
+                <td className="px-3 py-3"><PriceCellView option={o} cell={p.priceCellOf(o)} onEdit={p.onEditPrice} /></td>
                 {p.columns.map((c) => {
+                  if (p.renderCell) return <td key={c.id} className="px-3 py-3">{p.renderCell(o, c)}</td>
                   const text = formatCell(c, o.values[c.id] as CellValue | undefined)
                   return (
                     <td key={c.id} className={`px-3 py-3 ${text ? 'text-neutral-800' : 'text-neutral-400'}`}>{text ?? '—'}</td>
                   )
                 })}
-                <td className="px-3 py-3">{p.renderFiles?.(o)}</td>
+                <td className="px-3 py-3">{p.renderFiles?.(o) ?? <span className="text-neutral-400">—</span>}</td>
                 <td className="px-3 py-3 text-xs">{p.renderActions?.(o)}</td>
               </tr>
             )
