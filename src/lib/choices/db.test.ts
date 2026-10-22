@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  updateOption, createFollowUp, chooseOption, reopenChoice, parseCell, loadChoice, createChoice, updateChoice,
+  listChoicesForGoal, listOpenChoices, updateOption, createFollowUp, chooseOption, reopenChoice, parseCell, loadChoice, createChoice, updateChoice,
   type ChoiceDetail,
 } from './db'
 import type { Choice, ChoiceOption, PriceLine } from '@/types/choice'
@@ -96,6 +96,11 @@ describe('createFollowUp', () => {
     expect(p.goal_id).toBe('y1')
     expect('goal_task_id' in p).toBe(false)
     expect(p.contact_id).toBeNull()
+  })
+  it('falls back to individual scope when scope is empty', async () => {
+    const { client, calls } = fake({ tasks: [{ data: { id: 't3' } }] })
+    await createFollowUp(client, 'u1', { ...detail, goalScope: '' }, option, new Date())
+    expect((op(calls[0], 'insert')![0] as Record<string, unknown>).scope).toBe('individual')
   })
   it('returns null on error', async () => {
     const { client } = fake({ tasks: [{ error: { message: 'x' } }] })
@@ -194,6 +199,45 @@ describe('loadChoice', () => {
     expect(d?.contacts.get('k1')).toEqual({ name: 'Acme Co', phone: '555' })
     const t = calls.filter((c) => c.table === 'tasks')[1]
     expect(op(t, 'in')).toEqual(['choice_option_id', ['o1']])
+  })
+  const crow = {
+    id: 'c1', user_id: 'u1', goal_task_id: 'g1', goal_id: null, title: 'T', status: 'open', chosen_option_id: null,
+    decided_at: null, decided_note: null, decided_work: [], decided_amount_cents: null, columns: [], work: [],
+    selected_work: [], sort_order: 0, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+  }
+  const orow2 = {
+    id: 'o1', choice_id: 'c1', user_id: 'u1', name: 'Acme', contact_id: null, status: 'contacted',
+    status_changed_at: '2026-01-01T00:00:00Z', values: {}, notes: null, sort_order: 0,
+    created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+  }
+  it('returns null when the lines read fails', async () => {
+    const { client } = fake({
+      choices: [{ data: crow }], tasks: [{ data: { title: 'H', context: null, scope: null } }],
+      choice_options: [{ data: [orow2] }], choice_price_lines: [{ error: { message: 'x' } }],
+    })
+    expect(await loadChoice(client, 'c1')).toBeNull()
+  })
+  it('returns null when the options read fails', async () => {
+    const { client } = fake({
+      choices: [{ data: crow }], tasks: [{ data: { title: 'H', context: null, scope: null } }],
+      choice_options: [{ error: { message: 'x' } }],
+    })
+    expect(await loadChoice(client, 'c1')).toBeNull()
+  })
+  it('defaults a missing goal scope to individual', async () => {
+    const { client } = fake({
+      choices: [{ data: crow }], tasks: [{ data: { title: 'H', context: null, scope: null } }],
+      choice_options: [{ data: [] }],
+    })
+    expect((await loadChoice(client, 'c1'))?.goalScope).toBe('individual')
+  })
+  it('list functions signal failure with null, not []', async () => {
+    const a = fake({ choices: [{ data: [crow] }], choice_options: [{ error: { message: 'x' } }] })
+    expect(await listChoicesForGoal(a.client, { kind: 'task', id: 'g1' })).toBeNull()
+    const b = fake({ choices: [{ data: [crow] }], choice_options: [{ data: [orow2] }], tasks: [{ error: { message: 'x' } }] })
+    expect(await listOpenChoices(b.client)).toBeNull()
+    const c = fake({ choices: [{ data: [] }] })
+    expect(await listOpenChoices(c.client)).toEqual([])
   })
   it('returns null when the choice is missing', async () => {
     const { client } = fake({ choices: [{ error: { message: 'none' } }] })

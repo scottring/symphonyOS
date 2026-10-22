@@ -41,26 +41,28 @@ function mapFollowUp(t: DbFollowUpTask): FollowUp {
   }
 }
 
-async function fetchOptions(db: Db, choiceIds: string[]): Promise<ChoiceOption[]> {
+async function fetchOptions(db: Db, choiceIds: string[]): Promise<ChoiceOption[] | null> {
   if (choiceIds.length === 0) return []
   const { data, error } = await db.from('choice_options').select('*').in('choice_id', choiceIds)
     .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
-  if (error || !data) return []
+  if (error || !data) return null
   return (data as DbChoiceOption[]).map(dbOptionToOption)
 }
 
-async function fetchFollowUps(db: Db, optionIds: string[]): Promise<FollowUp[]> {
+async function fetchFollowUps(db: Db, optionIds: string[]): Promise<FollowUp[] | null> {
   if (optionIds.length === 0) return []
   const { data, error } = await db.from('tasks')
     .select('id, choice_option_id, title, scheduled_for, completed, waiting_since')
     .in('choice_option_id', optionIds).order('created_at', { ascending: false })
-  if (error || !data) return []
+  if (error || !data) return null
   return (data as DbFollowUpTask[]).map(mapFollowUp)
 }
 
-async function assemble(db: Db, choices: Choice[]): Promise<ChoiceRow[]> {
+async function assemble(db: Db, choices: Choice[]): Promise<ChoiceRow[] | null> {
   const options = await fetchOptions(db, choices.map((c) => c.id))
+  if (!options) return null
   const followUps = await fetchFollowUps(db, options.map((o) => o.id))
+  if (!followUps) return null
   return choices.map((choice) => {
     const opts = options.filter((o) => o.choiceId === choice.id)
     const ids = new Set(opts.map((o) => o.id))
@@ -68,18 +70,19 @@ async function assemble(db: Db, choices: Choice[]): Promise<ChoiceRow[]> {
   })
 }
 
-export async function listChoicesForGoal(db: Db, goal: GoalRef): Promise<ChoiceRow[]> {
+/** null = a read failed (not the same as no choices). */
+export async function listChoicesForGoal(db: Db, goal: GoalRef): Promise<ChoiceRow[] | null> {
   const { data, error } = await db.from('choices').select('*')
     .eq(goal.kind === 'task' ? 'goal_task_id' : 'goal_id', goal.id)
     .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
-  if (error || !data) return []
+  if (error || !data) return null
   return assemble(db, (data as DbChoice[]).map(dbChoiceToChoice))
 }
 
-export async function listOpenChoices(db: Db): Promise<ChoiceRow[]> {
+export async function listOpenChoices(db: Db): Promise<ChoiceRow[] | null> {
   const { data, error } = await db.from('choices').select('*').eq('status', 'open')
     .order('created_at', { ascending: true })
-  if (error || !data) return []
+  if (error || !data) return null
   return assemble(db, (data as DbChoice[]).map(dbChoiceToChoice))
 }
 
@@ -95,23 +98,25 @@ export async function loadChoice(db: Db, id: string): Promise<ChoiceDetail | nul
   const g = goalRes.data as { title?: string; name?: string; context: string | null; scope: string | null }
 
   const options = await fetchOptions(db, [id])
+  if (!options) return null
   const optionIds = options.map((o) => o.id)
   let lines: PriceLine[] = []
   if (optionIds.length > 0) {
     const res = await db.from('choice_price_lines').select('*').in('option_id', optionIds)
       .order('sort_order', { ascending: true })
-    if (!res.error && res.data) lines = (res.data as DbPriceLine[]).map(dbLineToLine)
+    if (res.error || !res.data) return null
+    lines = (res.data as DbPriceLine[]).map(dbLineToLine)
   }
   const followUps = await fetchFollowUps(db, optionIds)
+  if (!followUps) return null
 
   const contacts = new Map<string, { name: string; phone?: string }>()
   const contactIds = [...new Set(options.map((o) => o.contactId).filter((c): c is string => !!c))]
   if (contactIds.length > 0) {
     const res = await db.from('contacts').select('id, name, phone').in('id', contactIds)
-    if (!res.error && res.data) {
-      for (const c of res.data as { id: string; name: string; phone: string | null }[]) {
-        contacts.set(c.id, { name: c.name, phone: c.phone ?? undefined })
-      }
+    if (res.error || !res.data) return null
+    for (const c of res.data as { id: string; name: string; phone: string | null }[]) {
+      contacts.set(c.id, { name: c.name, phone: c.phone ?? undefined })
     }
   }
 
@@ -119,7 +124,7 @@ export async function loadChoice(db: Db, id: string): Promise<ChoiceDetail | nul
     choice,
     goalTitle: g.title ?? g.name ?? '',
     goalContext: (g.context as TaskContext | null) ?? null,
-    goalScope: g.scope ?? '',
+    goalScope: g.scope || 'individual',
     options, lines, followUps, contacts,
   }
 }
@@ -216,7 +221,7 @@ export async function createFollowUp(
     contact_id: option.contactId ?? null,
     choice_option_id: option.id,
     context: detail.goalContext,
-    scope: detail.goalScope,
+    scope: detail.goalScope || 'individual',
   }
   if (goal.kind === 'task') row.goal_task_id = goal.id
   else row.goal_id = goal.id

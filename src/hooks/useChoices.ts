@@ -28,7 +28,8 @@ export function useGoalChoices(goal: GoalRef | null) {
 
   const refetch = useCallback(async () => {
     if (!user || !goalKind || !goalId) { setRows([]); setLoading(false); return }
-    setRows(await listChoicesForGoal(supabase, { kind: goalKind, id: goalId }))
+    const next = await listChoicesForGoal(supabase, { kind: goalKind, id: goalId })
+    if (next) setRows(next) // a failed read keeps the rows already shown
     setLoading(false)
   }, [user, goalKind, goalId])
 
@@ -55,7 +56,8 @@ export function useChoice(id: string | undefined) {
 
   const refetch = useCallback(async () => {
     if (!user || !id) { setDetail(null); setLoading(false); return }
-    setDetail(await loadChoice(supabase, id))
+    const next = await loadChoice(supabase, id)
+    setDetail((prev) => next ?? (prev?.choice.id === id ? prev : null)) // a failed refetch keeps the current detail
     setLoading(false)
   }, [user, id])
 
