@@ -7,7 +7,7 @@
 import { useId } from 'react'
 import { X } from 'lucide-react'
 import { useCanvasActivity, type PendingChangeSet } from '@/contexts/CanvasActivityContext'
-import { opRow, opScope, planHeading, SCOPE_HEADING, type ChangeOp, type OpScope } from '@/lib/canvas/changeCard'
+import { choiceHeading, opRow, opScope, planHeading, SCOPE_HEADING, type ChangeOp, type OpScope } from '@/lib/canvas/changeCard'
 
 interface Props {
   set: PendingChangeSet
@@ -73,14 +73,15 @@ function chatWhere(op: ChangeOp, where: string): string {
 }
 
 /** Rows under their scope (tasks, this week's routines, lasting routine
- *  changes, and goal changes under the list they change: "November",
- *  "October", "Fall"). A card of tasks alone keeps no heading, as before. */
+ *  changes, goal changes under the list they change: "November", "October",
+ *  "Fall", and choice changes under their goal and choice: "Redo the
+ *  bathrooms · Contractor"). A card of tasks alone keeps no heading, as before. */
 function groups(ops: ChangeOp[]): { key: string; heading: string | null; ops: ChangeOp[] }[] {
-  const order: OpScope[] = ['plan', 'task', 'week', 'lasting']
+  const order: OpScope[] = ['plan', 'choice', 'task', 'week', 'lasting']
   const out: { key: string; scope: OpScope; heading: string; ops: ChangeOp[] }[] = []
   for (const op of ops) {
     const scope = opScope(op)
-    const heading = scope === 'plan' ? planHeading(op) : SCOPE_HEADING[scope]
+    const heading = scope === 'plan' ? planHeading(op) : scope === 'choice' ? choiceHeading(op) : SCOPE_HEADING[scope]
     const key = `${scope}:${heading}`
     const g = out.find((x) => x.key === key)
     if (g) g.ops.push(op)

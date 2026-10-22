@@ -11,7 +11,12 @@ import type { Goal, GoalStatus } from '@/types/goal'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { CreateRoutineInput, UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { RescheduleResult } from '@/hooks/useActionableInstances'
-import { opWhen, opWrite, withSteps, type ChangeOp, type ChangeOpKind, type ChangeSet, type DayKey } from './changeCard'
+import { isChoiceOp, opWhen, opWrite, withSteps, type ChangeOp, type ChangeOpKind, type ChangeSet, type ChoiceOpKind, type DayKey } from './changeCard'
+import type { ChoiceWriters } from '@/lib/choices/applyDeps'
+import type { ChoiceDetail } from '@/lib/choices/db'
+import { OPTION_STATUSES, type Choice, type ChoiceColumn, type ChoiceOption, type ColumnKind, type WorkPiece } from '@/types/choice'
+import { priceFor } from '@/lib/choices/price'
+import { CHOICES_UPDATED } from '@/hooks/useChoices'
 import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { liveCommitments } from '@/lib/placement/model'
@@ -73,6 +78,9 @@ export interface MoreApplyDeps {
   keepForward: (id: string, period: { monthStart?: Date; seasonStart?: Date }, from?: Date) => Promise<string | undefined>
   /** The page's Remove from this period. */
   dropCommitment: (id: string, level: PlacementLevel, periodStart: Date) => Promise<boolean>
+  /** Choice ops (spec 2026-10-22-choices): the shell binds these to the
+   *  reviewed writer's client. The wall has none, so it refuses them. */
+  choiceWriters: ChoiceWriters
 }
 
 export type ApplyResult =
@@ -204,6 +212,60 @@ const NEEDS: Partial<Record<ChangeOpKind, (keyof MoreApplyDeps)[]>> = {
   routine_change: ['routines', 'updateRoutine'],
   routine_rest: ['routines', 'updateRoutine'],
   routine_add: ['addRoutine', 'deleteRoutine'],
+  ...Object.fromEntries((['choice_add', 'option_add', 'option_status', 'option_set', 'price_line', 'column_add', 'work_set', 'choice_choose', 'choice_reopen', 'follow_up'] satisfies ChoiceOpKind[])
+    .map((k) => [k, ['choiceWriters']])),
+}
+
+/** Choice ops that act on one option. */
+const OPTION_LEVEL = new Set<ChangeOpKind>(['option_status', 'option_set', 'price_line', 'choice_choose', 'follow_up'])
+const COLUMN_KINDS: readonly ColumnKind[] = ['text', 'money', 'date', 'yesno']
+const exactlyOne = (a?: string, b?: string) => !!a !== !!b
+
+/** Complete enough to write, and every choiceKey / optionKey names an add
+ *  earlier in the set. Symphony validates too; this keeps a malformed op from
+ *  writing half a set. */
+function choiceOpsWellFormed(ops: readonly ChangeOp[]): boolean {
+  const choices = new Set<string>()
+  const options = new Set<string>()
+  for (const op of ops) {
+    if (op.op === 'choice_add') {
+      if (!(op.choiceTitle ?? op.title)?.trim() || !exactlyOne(op.goalTaskId, op.goalId)) return false
+      choices.add(op.key)
+      continue
+    }
+    if (!exactlyOne(op.choiceId, op.choiceKey) || (op.choiceKey && !choices.has(op.choiceKey))) return false
+    if (OPTION_LEVEL.has(op.op)) {
+      if (!exactlyOne(op.optionId, op.optionKey) || (op.optionKey && !options.has(op.optionKey))) return false
+      // An existing option belongs to an existing choice.
+      if (op.optionId && !op.choiceId) return false
+    }
+    switch (op.op) {
+      case 'option_add': if (!op.optionName?.trim()) return false; options.add(op.key); break
+      case 'option_status': if (!op.status || !OPTION_STATUSES.includes(op.status)) return false; break
+      case 'option_set': if (!op.columnId || op.value === undefined) return false; break
+      case 'price_line': if (!Array.isArray(op.workIds) || !Number.isInteger(op.amountCents) || (op.amountCents as number) < 0) return false; break
+      case 'column_add': if (!op.columnId || !op.columnLabel?.trim() || !op.columnKind || !COLUMN_KINDS.includes(op.columnKind)) return false; break
+      case 'work_set': if (!op.workIds?.[0] || !op.workLabels?.[0]?.trim()) return false; break
+      case 'follow_up': if (!op.date || !YMD.test(op.date)) return false; break
+    }
+  }
+  return true
+}
+
+/** A choice's decision fields as they are, for an Undo that states them back. */
+function decisionOf(c: Choice): Parameters<ChoiceWriters['updateChoice']>[1] {
+  return {
+    status: c.status,
+    chosen_option_id: c.chosenOptionId ?? null,
+    decided_at: c.decidedAt?.toISOString() ?? null,
+    decided_note: c.decidedNote ?? null,
+    decided_work: c.decidedWork,
+    decided_amount_cents: c.decidedAmountCents ?? null,
+  }
+}
+
+function announceChoices() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(CHOICES_UPDATED))
 }
 
 /** Whether this page has every writer the set needs. */
@@ -247,6 +309,29 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
     }
   }
 
+  // Choice ops: each existing choice read once, as it is now. Later ops in the
+  // set build on a running copy (two new columns both land; a value set in a
+  // column added just before finds it).
+  const choiceOps = set.ops.filter(isChoiceOp)
+  const details = new Map<string, ChoiceDetail>()
+  /** Choices with no work when the set began: their first pieces start selected. */
+  const workStartedEmpty = new Set<string>()
+  if (choiceOps.length) {
+    if (!choiceOpsWellFormed(choiceOps)) return { ok: false, reason: 'failed', reverted: true, kept: [] }
+    for (const id of new Set(choiceOps.flatMap((o) => (o.choiceId ? [o.choiceId] : [])))) {
+      const named = choiceOps.filter((o) => o.choiceId === id)
+      let d: ChoiceDetail | null
+      try { d = await deps.choiceWriters.loadChoice(id) } catch { return { ok: false, reason: 'failed', reverted: true, kept: [] } }
+      if (!d || named.some((o) => o.seen && changedSince(d.choice.updatedAt.getTime(), o.seen))) {
+        return { ok: false, reason: 'stale', title: named[0].choiceTitle ?? named[0].title }
+      }
+      const gone = named.find((o) => o.optionId && !d.options.some((x) => x.id === o.optionId))
+      if (gone) return { ok: false, reason: 'stale', title: gone.optionName ?? gone.title }
+      details.set(id, d)
+      if (d.choice.work.length === 0) workStartedEmpty.add(id)
+    }
+  }
+
   const undos: Array<{ id: string; undo: () => Promise<unknown>; kind?: 'task' | 'routine' }> = []
   const ids: string[] = []
   /** Reverse what saved, newest first; the ids that would not reverse. */
@@ -264,7 +349,157 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
     undos.push({ id, undo, kind: routinesById.has(id) ? 'routine' : 'task' })
     return true
   }
-  const fail = async (): Promise<ApplyResult> => { if (deps.managedRecovery) return { ok: false, reason: 'failed', reverted: false, kept: ids }; const kept = await rollback(); return { ok: false, reason: 'failed', reverted: kept.length === 0, kept } }
+  let wroteChoices = false
+  const fail = async (): Promise<ApplyResult> => {
+    if (deps.managedRecovery) { if (wroteChoices) announceChoices(); return { ok: false, reason: 'failed', reverted: false, kept: ids } }
+    const kept = await rollback()
+    if (wroteChoices) announceChoices()
+    return { ok: false, reason: 'failed', reverted: kept.length === 0, kept }
+  }
+
+  // Ids of rows created earlier in this set, by the creating op's key.
+  const madeChoices = new Map<string, string>()
+  const madeOptions = new Map<string, string>()
+  /** One choice op through the choice writers, its Undo recorded. false = it
+   *  did not save (the set fails and what saved is put back). */
+  const applyChoiceOp = async (op: ChangeOp): Promise<boolean> => {
+    const cw = deps.choiceWriters
+    wroteChoices = true
+    const made = (id: string, undo: () => Promise<unknown>) => { ids.push(id); undos.push({ id, undo }) }
+
+    if (op.op === 'choice_add') {
+      const goal = op.goalTaskId ? { kind: 'task' as const, id: op.goalTaskId } : { kind: 'goal' as const, id: op.goalId! }
+      const c = await cw.createChoice(goal, op.choiceTitle ?? op.title)
+      if (!c) return false
+      madeChoices.set(op.key, c.id)
+      made(c.id, () => cw.deleteChoice(c.id))
+      // Read back with its goal's title, domain and scope (a follow-up and a
+      // new contact take the goal's).
+      const d = await cw.loadChoice(c.id)
+      if (!d) return false
+      details.set(c.id, d)
+      workStartedEmpty.add(c.id)
+      return true
+    }
+
+    const choiceId = op.choiceId ?? madeChoices.get(op.choiceKey!)
+    const d = choiceId ? details.get(choiceId) : undefined
+    if (!d) return false
+    const cid = d.choice.id
+    const optionId = op.optionId ?? (op.optionKey ? madeOptions.get(op.optionKey) : undefined)
+    const o = optionId ? d.options.find((x) => x.id === optionId) : undefined
+    if (OPTION_LEVEL.has(op.op) && !o) return false
+    const withChoice = (patch: Partial<Choice>, base = d) => details.set(cid, { ...base, choice: { ...base.choice, ...patch } })
+    const withOption = (next: ChoiceOption, base = d) => ({ ...base, options: base.options.map((x) => (x.id === next.id ? next : x)) })
+
+    switch (op.op) {
+      case 'option_add': {
+        let contactId = op.contactId
+        if (!contactId && op.phone) {
+          const id = await cw.addContact(op.optionName!, op.phone, d.goalContext)
+          if (!id) return false
+          made(id, () => cw.deleteContact(id))
+          contactId = id
+        }
+        const added = await cw.addOption(cid, contactId ? { name: op.optionName!, contactId } : { name: op.optionName! })
+        if (!added) return false
+        madeOptions.set(op.key, added.id)
+        made(added.id, () => cw.deleteOption(added.id))
+        details.set(cid, { ...d, options: [...d.options, added] })
+        return true
+      }
+      case 'option_status': {
+        const option = o!
+        const prev = option.status
+        if (prev === op.status) { ids.push(option.id); return true }
+        if (!(await cw.updateOption(option.id, { status: op.status }))) return false
+        made(option.id, () => cw.updateOption(option.id, { status: prev }))
+        details.set(cid, withOption({ ...option, status: op.status!, statusChangedAt: new Date() }))
+        return true
+      }
+      case 'option_set': {
+        const option = o!
+        if (!d.choice.columns.some((c) => c.id === op.columnId)) return false
+        const prev = option.values
+        const values = { ...prev, [op.columnId!]: op.value! }
+        if (!(await cw.updateOption(option.id, { values }))) return false
+        made(option.id, () => cw.updateOption(option.id, { values: prev }))
+        details.set(cid, withOption({ ...option, values }))
+        return true
+      }
+      case 'price_line': {
+        const option = o!
+        const workIds = op.workIds ?? []
+        if (!workIds.every((id) => d.choice.work.some((p) => p.id === id))) return false
+        const line = await cw.addPriceLine(option.id, { workIds, amountCents: op.amountCents!, ...(op.note ? { note: op.note } : {}) })
+        if (!line) return false
+        made(line.id, () => cw.deletePriceLine(line.id))
+        details.set(cid, { ...d, lines: [...d.lines, line] })
+        return true
+      }
+      case 'column_add': {
+        const prev = d.choice.columns
+        const col: ChoiceColumn = { id: op.columnId!, label: op.columnLabel!, kind: op.columnKind! }
+        const columns = prev.some((c) => c.id === col.id) ? prev.map((c) => (c.id === col.id ? col : c)) : [...prev, col]
+        if (!(await cw.updateChoice(cid, { columns }))) return false
+        made(cid, () => cw.updateChoice(cid, { columns: prev }))
+        withChoice({ columns })
+        return true
+      }
+      case 'work_set': {
+        const prevWork = d.choice.work
+        const prevSelected = d.choice.selectedWork
+        const piece: WorkPiece = { id: op.workIds![0], label: op.workLabels![0], ...(op.description ? { description: op.description } : {}) }
+        const isNew = !prevWork.some((p) => p.id === piece.id)
+        const work = isNew ? [...prevWork, piece] : prevWork.map((p) => (p.id === piece.id ? piece : p))
+        // The page's rule: a first list of pieces starts all selected, so
+        // prices show at once; a piece added to existing work does not.
+        const selected = isNew && workStartedEmpty.has(cid) ? [...prevSelected, piece.id] : prevSelected
+        if (!(await cw.updateChoice(cid, { work, selected_work: selected }))) return false
+        made(cid, () => cw.updateChoice(cid, { work: prevWork, selected_work: prevSelected }))
+        withChoice({ work, selectedWork: selected })
+        return true
+      }
+      case 'choice_choose': {
+        const option = o!
+        const before = d.choice
+        const prevStatus = option.status
+        const note = op.note ?? null
+        if (!(await cw.chooseOption(d, option.id, note))) return false
+        made(cid, async () => {
+          const ok = prevStatus === 'chosen' || (await cw.updateOption(option.id, { status: prevStatus }))
+          return (await cw.updateChoice(cid, decisionOf(before))) && ok
+        })
+        const amount = priceFor(d.lines.filter((l) => l.optionId === option.id), before.selectedWork, before.work)?.totalCents
+        withChoice({
+          status: 'decided', chosenOptionId: option.id, decidedAt: new Date(), decidedNote: note ?? undefined,
+          decidedWork: before.selectedWork, decidedAmountCents: amount,
+        }, withOption({ ...option, status: 'chosen' }))
+        return true
+      }
+      case 'choice_reopen': {
+        const before = d.choice
+        if (before.status === 'open') { ids.push(cid); return true }
+        const chosen = d.options.find((x) => x.id === before.chosenOptionId)
+        if (!(await cw.reopenChoice(d))) return false
+        made(cid, async () => {
+          const ok = await cw.updateChoice(cid, decisionOf(before))
+          return (chosen ? await cw.updateOption(chosen.id, { status: chosen.status }) : true) && ok
+        })
+        withChoice({
+          status: 'open', chosenOptionId: undefined, decidedAt: undefined, decidedNote: undefined, decidedWork: [], decidedAmountCents: undefined,
+        }, chosen ? withOption({ ...chosen, status: 'heard_back' }) : d)
+        return true
+      }
+      case 'follow_up': {
+        const taskId = await cw.createFollowUp(d, o!, localDay(op.date!))
+        if (!taskId) return false
+        made(taskId, () => cw.deleteTask(taskId))
+        return true
+      }
+      default: return false
+    }
+  }
 
   try {
     for (const op of set.ops) {
@@ -438,6 +673,11 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           if (!(await step(() => deps.completeTask(task.id), () => deps.reopenTask(task.id), task.id))) return fail()
           continue
         }
+        case 'choice_add': case 'option_add': case 'option_status': case 'option_set': case 'price_line':
+        case 'column_add': case 'work_set': case 'choice_choose': case 'choice_reopen': case 'follow_up': {
+          if (!(await applyChoiceOp(op))) return fail()
+          continue
+        }
         default: {
           // place / unplace / someday / assign / talk: plain task writes.
           const task = byId.get(op.taskId!)!
@@ -452,6 +692,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
 
   // Everything saved: from here on, a later edit by someone else is theirs.
   const appliedAt = Date.now()
+  if (choiceOps.length) announceChoices()
   return {
     ok: true, ids,
     undo: async () => {
@@ -462,6 +703,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
         if (now && u.kind && editedSince(u.kind === 'task' ? now.tasks.find((t) => t.id === u.id)?.updatedAt : routineUpdatedAt(now.routines, u.id), appliedAt)) { ok = false; continue }
         try { if ((await u.undo()) === false) ok = false } catch { ok = false }
       }
+      if (choiceOps.length) announceChoices()
       return ok
     },
   }

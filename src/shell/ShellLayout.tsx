@@ -1,4 +1,5 @@
 import { createReviewedWriter, applyReviewedChange } from '@/lib/canvas/reviewedChange'
+import { makeChoiceWriters } from '@/lib/choices/applyDeps'
 import {resolveConversationAction} from '@/lib/conversationActions';
 import { connectedDestination, defaultPlanningDestination } from '@/lib/planning/connectedDestination';
 import { useCadenceConfig } from '@/lib/cadence/config';
@@ -204,6 +205,10 @@ function ShellLayoutInner({ children }: Props) {
   const references = useReferenceLists();
 
   const reviewedWriter = useMemo(() => createReviewedWriter(), []);
+  // Chat's choice ops write through the reviewed client too, so the card's
+  // save receipt journals them and its Undo reverses them.
+  const userId = user?.id;
+  const choiceWriters = useMemo(() => (userId ? makeChoiceWriters(reviewedWriter.client, userId) : undefined), [reviewedWriter, userId]);
   const { tasks, refetch, deleteTask, updateTask, addTask, completeTask, toggleTask, keepForward, dropCommitment } = useSupabaseTasks(reviewedWriter.client);
   const { goals, deleteGoal, updateGoal, addGoal } = useGoals(reviewedWriter.client);
   // Held so routine writes from a conversation are seen (and undoable) too.
@@ -442,9 +447,10 @@ function ShellLayoutInner({ children }: Props) {
     addGoal: async (name, { year, context, carriedFrom, areaId, notes, strategy, assignedToAll }) =>
       (await addGoal(areaId ?? null, name, context, { year, carriedFrom, notes, strategy, assignedToAll }))?.id,
     updateGoal, deleteGoal, keepForward, dropCommitment,
+    choiceWriters,
     // Undo's conflict check reads the rows as they are then.
     latest: () => ({ tasks: latestTasks.current, routines: canvasRoutines }),
-  }, reviewedWriter), [reviewedWriter, tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment]);
+  }, reviewedWriter), [reviewedWriter, tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment, choiceWriters]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   // School review saves happen in Settings. Refresh the mounted planning
   // data immediately, including when the realtime socket has gone to sleep.

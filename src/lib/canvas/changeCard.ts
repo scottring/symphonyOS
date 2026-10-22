@@ -8,6 +8,8 @@ import type { Task } from '@/types/task'
 import { lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { timingRemoval } from '@/lib/planning/planActions'
 import { localYmd } from '@/lib/cadence/config'
+import { STATUS_LABEL, type CellValue, type ColumnKind, type OptionStatus } from '@/types/choice'
+import { formatCents } from '@/lib/choices/price'
 
 export type TaskOpKind = 'place' | 'unplace' | 'add' | 'someday' | 'assign' | 'done' | 'merge' | 'talk'
 /** Routine ops (stage 3, spec 2026-10-14-routines-talk-first). skip/move/who
@@ -19,7 +21,10 @@ export type RoutineOpKind = 'routine_skip' | 'routine_move' | 'routine_who' | 'r
  *  (itemKind). Done, merge and someday for month/season goals reuse the task
  *  ops above. */
 export type PlanOpKind = 'plan_add' | 'plan_carry' | 'plan_let_go' | 'plan_done'
-export type ChangeOpKind = TaskOpKind | RoutineOpKind | PlanOpKind
+/** Choice ops (spec 2026-10-22-choices, "Chat"): a choice on a goal, its
+ *  options, their prices and values, the columns and the work, the decision. */
+export type ChoiceOpKind = 'choice_add' | 'option_add' | 'option_status' | 'option_set' | 'price_line' | 'column_add' | 'work_set' | 'choice_choose' | 'choice_reopen' | 'follow_up'
+export type ChangeOpKind = TaskOpKind | RoutineOpKind | PlanOpKind | ChoiceOpKind
 export type PlanLevel = 'year' | 'season' | 'month'
 
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
@@ -89,11 +94,49 @@ export interface ChangeOp {
   parentTitle?: string
   /** plan_carry: the new wording, if the person reworded it. */
   newTitle?: string
+  // Choice ops. Every one except choice_add names its choice by exactly one of
+  // choiceId (an existing choice) or choiceKey (the `key` of a choice_add
+  // earlier in this set); option-level ops name their option the same way
+  // (optionId, or optionKey of an option_add). `seen` is the choice's
+  // updated_at when Symphony read it; `note` is the choose reason or a price
+  // line's note; `date` is a follow-up's day.
+  choiceId?: string
+  choiceKey?: string
+  choiceTitle?: string
+  /** choice_add: the goal it is under, a goal task (month / season goal) or a
+   *  year goal row (`goalId`, above). */
+  goalTaskId?: string
+  goalTitle?: string
+  optionId?: string
+  optionKey?: string
+  optionName?: string
+  /** option_add: an existing contact to link; else `phone` makes one. */
+  contactId?: string
+  phone?: string
+  /** option_status: the new status. */
+  status?: OptionStatus
+  /** option_set / column_add: the column (column_add carries the id the parser
+   *  assigned, which later ops in the set use). */
+  columnId?: string
+  columnLabel?: string
+  columnKind?: ColumnKind
+  /** option_set: the value, already typed (money cents, ISO date, yes/no, text). */
+  value?: CellValue
+  /** price_line: the pieces it covers; work_set: [the piece's id]. */
+  workIds?: string[]
+  workLabels?: string[]
+  /** price_line: integer cents. */
+  amountCents?: number
+  /** work_set: what the piece of work is. */
+  description?: string
 }
 
 /** Which heading a row sits under on the card. */
-export type OpScope = 'task' | 'week' | 'lasting' | 'plan'
+export type OpScope = 'task' | 'week' | 'lasting' | 'plan' | 'choice'
+export const CHOICE_OPS: ReadonlySet<ChangeOpKind> = new Set<ChoiceOpKind>(['choice_add', 'option_add', 'option_status', 'option_set', 'price_line', 'column_add', 'work_set', 'choice_choose', 'choice_reopen', 'follow_up'])
+export const isChoiceOp = (op: ChangeOp) => CHOICE_OPS.has(op.op)
 export function opScope(op: ChangeOp): OpScope {
+  if (isChoiceOp(op)) return 'choice'
   if (op.op.startsWith('plan_')) return 'plan'
   if (op.op === 'routine_skip' || op.op === 'routine_move' || op.op === 'routine_who') return 'week'
   if (op.op.startsWith('routine_')) return 'lasting'
@@ -104,6 +147,14 @@ export const SCOPE_HEADING: Record<OpScope, string> = {
   week: 'Routines · this week only',
   lasting: 'Routines · from now on',
   plan: 'Goals',
+  choice: 'Choices',
+}
+
+/** The card heading a choice op sits under: its goal and the choice
+ *  ("Redo the bathrooms · Contractor"). */
+export function choiceHeading(op: ChangeOp): string {
+  const choice = op.choiceTitle ?? op.title
+  return op.goalTitle ? `${op.goalTitle} · ${choice}` : choice
 }
 
 /** The card heading a plan op sits under: the list it changes ("November",
@@ -198,6 +249,20 @@ export function daysWords(days: readonly DayKey[]): string {
 const names = (list?: string[]) => (list?.length ? list.join(', ') : 'no one')
 
 export type RowKind = 'MOVE' | 'ADD' | 'LATER' | 'WHO' | 'DONE' | 'MERGE' | 'TALK' | 'SKIP' | 'TIME' | 'DAYS' | 'NAME' | 'CHANGE' | 'REST' | 'NEW' | 'CARRY' | 'LET GO' | 'MET'
+  | 'STATUS' | 'PRICE' | 'SET' | 'COLUMN' | 'WORK' | 'CHOOSE' | 'REOPEN' | 'FOLLOW UP'
+
+const KIND_WORD: Record<ColumnKind, string> = { text: 'text', money: 'money', date: 'date', yesno: 'yes/no' }
+
+/** A value as the comparison shows it: $18,400, Dec 1, Yes / No. */
+function cellWords(kind: ColumnKind | undefined, value: CellValue | undefined): string {
+  if (value == null || value === '') return 'blank'
+  if (kind === 'money' && typeof value === 'number') return formatCents(value)
+  if (kind === 'yesno' && typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (kind === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return ymdDate(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+  return String(value)
+}
 
 /** One card row: what kind of change, to what, and where it lands. */
 export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string; where: string } {
@@ -237,6 +302,23 @@ export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string
     }
     case 'plan_let_go': return { kind: 'LET GO', title: op.title, where: '→ Let go' }
     case 'plan_done': return op.level === 'year' ? { kind: 'MET', title: op.title, where: '→ Met' } : { kind: 'DONE', title: op.title, where: '→ Done' }
+    case 'choice_add': return { kind: 'NEW', title: op.choiceTitle ?? op.title, where: '' }
+    case 'option_add': return { kind: 'ADD', title: op.optionName ?? op.title, where: op.phone ?? '' }
+    case 'option_status': return { kind: 'STATUS', title: op.optionName ?? op.title, where: op.status ? `→ ${STATUS_LABEL[op.status]}` : '' }
+    case 'option_set': return { kind: 'SET', title: `${op.optionName ?? op.title} · ${op.columnLabel ?? ''}`, where: cellWords(op.columnKind, op.value) }
+    case 'price_line': {
+      const labels = op.workLabels ?? []
+      return {
+        kind: 'PRICE',
+        title: `${op.optionName ?? op.title} · ${labels.length ? labels.join(' + ') : 'Price'}${labels.length > 1 ? ', together' : ''}`,
+        where: formatCents(op.amountCents ?? 0),
+      }
+    }
+    case 'column_add': return { kind: 'COLUMN', title: op.columnLabel ?? op.title, where: op.columnKind ? `(${KIND_WORD[op.columnKind]})` : '' }
+    case 'work_set': return { kind: 'WORK', title: op.workLabels?.[0] ?? op.title, where: op.description ?? '' }
+    case 'choice_choose': return { kind: 'CHOOSE', title: op.optionName ?? op.title, where: op.note ? `“${op.note}”` : '' }
+    case 'choice_reopen': return { kind: 'REOPEN', title: op.choiceTitle ?? op.title, where: '' }
+    case 'follow_up': return { kind: 'FOLLOW UP', title: op.optionName ?? op.title, where: op.date ? dayWords(op, today) : '' }
     case 'routine_add': {
       const when = [op.days ? daysWords(op.days) : null, op.time ? clock(op.time) : null,
         op.showOnTimeline === undefined ? null : op.showOnTimeline ? '· Show in Today and Week' : '· Hidden from Today and Week · Kept in Routines'].filter(Boolean).join(' ')

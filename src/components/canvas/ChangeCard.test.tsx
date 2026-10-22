@@ -47,3 +47,19 @@ it.each([['00:00', '12 a.m.'], ['12:00', '12 p.m.'], ['16:00', '4 p.m.'], ['17:3
   expect(screen.getByText('Draft · Not saved')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Save 1 change' })).toBeInTheDocument()
 })
+
+it('a mixed card groups choice rows under the goal and the choice', () => {
+  const today = new Date(2026, 9, 14, 8)
+  const choice = { choiceId: 'ch1', choiceTitle: 'Contractor', goalTitle: 'Redo the bathrooms' }
+  render(<ChangeCard set={pending({ ops: [
+    { key: 's:0', op: 'place', taskId: 'a', title: 'Reply to Christian', date: '2026-10-14', time: '09:00' },
+    { key: 's:1', op: 'option_status', title: 'Chesapeake Renovations', ...choice, optionId: 'o1', optionName: 'Chesapeake Renovations', status: 'heard_back' },
+    { key: 's:2', op: 'follow_up', title: 'Rob', ...choice, optionId: 'o2', optionName: 'Rob', date: '2026-10-15' },
+  ] })} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
+  const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+  expect(headings).toEqual(['Redo the bathrooms · Contractor', 'Tasks'])
+  const group = screen.getByRole('heading', { name: 'Redo the bathrooms · Contractor' }).parentElement!
+  expect(group).toHaveTextContent('STATUS')
+  expect(group).toHaveTextContent('→ Heard back')
+  expect(group).toHaveTextContent('FOLLOW UP')
+})

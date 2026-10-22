@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Task } from '@/types/task'
-import { opRow, opWhen, opWrite, type ChangeOp } from './changeCard'
+import { choiceHeading, opRow, opScope, opWhen, opWrite, type ChangeOp } from './changeCard'
 
 const today = new Date(2026, 9, 14, 8, 0) // Wed Oct 14
 const op = (x: Partial<ChangeOp>): ChangeOp => ({ key: 'k', op: 'place', title: 'Reply to Christian', ...x })
@@ -51,5 +51,41 @@ describe('opWrite', () => {
     const w = opWrite(op({ op: 'unplace' }), t)
     expect(w.updates.scheduledFor).toBeUndefined()
     expect(w.previous.scheduledFor).toEqual(new Date(2026, 9, 14))
+  })
+})
+
+describe('choice rows', () => {
+  const c = (x: Partial<ChangeOp>): ChangeOp => ({ key: 'c', op: 'choice_add', title: 'Contractor', choiceId: 'ch1', choiceTitle: 'Contractor', goalTitle: 'Redo the bathrooms', ...x })
+  const opt = { optionId: 'o1', optionName: 'Chesapeake Renovations' }
+  it('names each choice change in the card’s words', () => {
+    expect(opRow(c({ op: 'choice_add', choiceId: undefined }), today)).toEqual({ kind: 'NEW', title: 'Contractor', where: '' })
+    expect(opRow(c({ op: 'option_add', optionName: 'Martinez Tile & Bath', phone: '410-555-0142' }), today)).toEqual({ kind: 'ADD', title: 'Martinez Tile & Bath', where: '410-555-0142' })
+    expect(opRow(c({ op: 'option_add', optionName: 'Rob' }), today).where).toBe('')
+    expect(opRow(c({ op: 'option_status', ...opt, status: 'heard_back' }), today)).toEqual({ kind: 'STATUS', title: 'Chesapeake Renovations', where: '→ Heard back' })
+    expect(opRow(c({ op: 'price_line', ...opt, workLabels: ['Main bath', 'Hall bath'], amountCents: 2700000 }), today)).toEqual({ kind: 'PRICE', title: 'Chesapeake Renovations · Main bath + Hall bath, together', where: '$27,000' })
+    expect(opRow(c({ op: 'price_line', ...opt, workLabels: ['Main bath'], amountCents: 1975000 }), today)).toEqual({ kind: 'PRICE', title: 'Chesapeake Renovations · Main bath', where: '$19,750' })
+    expect(opRow(c({ op: 'price_line', ...opt, workLabels: [], amountCents: 1840050 }), today)).toEqual({ kind: 'PRICE', title: 'Chesapeake Renovations · Price', where: '$18,400.50' })
+    expect(opRow(c({ op: 'column_add', columnId: 'w', columnLabel: 'Warranty', columnKind: 'text' }), today)).toEqual({ kind: 'COLUMN', title: 'Warranty', where: '(text)' })
+    expect(opRow(c({ op: 'column_add', columnId: 'p', columnLabel: 'Permit', columnKind: 'yesno' }), today).where).toBe('(yes/no)')
+    expect(opRow(c({ op: 'work_set', workIds: ['k'], workLabels: ["Kids' bath"], description: 'Tile and fixtures only' }), today)).toEqual({ kind: 'WORK', title: "Kids' bath", where: 'Tile and fixtures only' })
+    expect(opRow(c({ op: 'work_set', workIds: ['k'], workLabels: ["Kids' bath"] }), today).where).toBe('')
+    expect(opRow(c({ op: 'choice_choose', optionName: 'Martinez Tile & Bath', note: 'Earliest start' }), today)).toEqual({ kind: 'CHOOSE', title: 'Martinez Tile & Bath', where: '“Earliest start”' })
+    expect(opRow(c({ op: 'choice_choose', optionName: 'Martinez Tile & Bath' }), today).where).toBe('')
+    expect(opRow(c({ op: 'choice_reopen' }), today)).toEqual({ kind: 'REOPEN', title: 'Contractor', where: '' })
+    expect(opRow(c({ op: 'follow_up', optionName: "Rob (Dave's cousin)", date: '2026-10-15' }), today)).toEqual({ kind: 'FOLLOW UP', title: "Rob (Dave's cousin)", where: 'Thu' })
+    expect(opRow(c({ op: 'follow_up', optionName: 'Rob', date: '2026-10-14' }), today).where).toBe('Today')
+  })
+  it('a SET row shows the value as the comparison does', () => {
+    const set = (columnKind: ChangeOp['columnKind'], value: ChangeOp['value']) => opRow(c({ op: 'option_set', ...opt, columnLabel: 'Earliest start', columnKind, value }), today)
+    expect(set('date', '2026-12-01')).toEqual({ kind: 'SET', title: 'Chesapeake Renovations · Earliest start', where: 'Dec 1' })
+    expect(set('money', 1840000).where).toBe('$18,400')
+    expect(set('yesno', true).where).toBe('Yes')
+    expect(set('yesno', false).where).toBe('No')
+    expect(set('text', '5 years').where).toBe('5 years')
+  })
+  it('choice rows sit under the goal and the choice', () => {
+    expect(opScope(c({ op: 'option_status' }))).toBe('choice')
+    expect(opScope(c({ op: 'follow_up' }))).toBe('choice')
+    expect(choiceHeading(c({ op: 'option_status' }))).toBe('Redo the bathrooms · Contractor')
   })
 })

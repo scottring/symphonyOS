@@ -5,6 +5,10 @@ import type { Routine } from '@/types/actionable'
 import { applyChangeSet, canApply, plannedWeekStart, type ApplyDeps } from './applyChangeSet'
 import type { ChangeSet } from './changeCard'
 import { planKeep, planPlacement } from '@/lib/placement/intentions'
+import type { Choice, ChoiceOption, PriceLine } from '@/types/choice'
+import type { ChoiceDetail } from '@/lib/choices/db'
+import type { ChoiceWriters } from '@/lib/choices/applyDeps'
+import { CHOICES_UPDATED } from '@/hooks/useChoices'
 
 const seen = '2026-10-14T07:00:00.123456+00:00'
 const task = (id: string, x: Partial<Task> = {}) => ({ id, title: id, completed: false, createdAt: new Date(2026, 8, 1), updatedAt: new Date(Date.parse(seen)), bucket: 'week', ...x }) as Task
@@ -601,5 +605,184 @@ describe('Undo leaves what someone else changed after Approve (plan §7)', () =>
     const r = await applyChangeSet(set, d)
     if (!r.ok) throw new Error('expected ok')
     expect(await r.undo()).toBe(true)
+  })
+})
+
+describe('applyChangeSet: choice ops', () => {
+  const at = new Date(Date.parse(seen))
+  const baseChoice = (id: string, x: Partial<Choice> = {}): Choice => ({
+    id, userId: 'u', goal: { kind: 'task', id: 'g1' }, title: 'Contractor', status: 'open', decidedWork: [],
+    columns: [], work: [], selectedWork: [], sortOrder: 0, createdAt: at, updatedAt: at, ...x,
+  })
+  const baseOption = (id: string, choiceId: string, x: Partial<ChoiceOption> = {}): ChoiceOption => ({
+    id, choiceId, userId: 'u', name: id, status: 'considering', statusChangedAt: at, values: {}, sortOrder: 0, updatedAt: at, ...x,
+  })
+  const detailOf = (choice: Choice, options: ChoiceOption[] = [], lines: PriceLine[] = []): ChoiceDetail => ({
+    choice, goalTitle: 'Redo the bathrooms', goalContext: 'family', goalScope: 'compound', options, lines, followUps: [], contacts: new Map(),
+  })
+  /** Writers over an in-memory store, so loadChoice after a create sees it. */
+  function fakeWriters(store: Map<string, ChoiceDetail>, over: Partial<ChoiceWriters> = {}): ChoiceWriters {
+    let n = 0
+    const next = (p: string) => `${p}${++n}`
+    return {
+      loadChoice: vi.fn(async (id: string) => store.get(id) ?? null),
+      createChoice: vi.fn(async (goal, title) => { const c = baseChoice(next('ch'), { goal, title }); store.set(c.id, detailOf(c)); return c }),
+      deleteChoice: vi.fn(async () => true),
+      updateChoice: vi.fn(async () => true),
+      addOption: vi.fn(async (choiceId, input) => baseOption(next('opt'), choiceId, { name: input.name, contactId: input.contactId })),
+      deleteOption: vi.fn(async () => true),
+      updateOption: vi.fn(async () => true),
+      addPriceLine: vi.fn(async (optionId, input) => ({ id: next('line'), optionId, workIds: input.workIds, amountCents: input.amountCents, sortOrder: 0 })),
+      deletePriceLine: vi.fn(async () => true),
+      addContact: vi.fn(async () => next('contact')),
+      deleteContact: vi.fn(async () => true),
+      createFollowUp: vi.fn(async () => next('task')),
+      deleteTask: vi.fn(async () => true),
+      chooseOption: vi.fn(async () => true),
+      reopenChoice: vi.fn(async () => true),
+      ...over,
+    }
+  }
+  const choiceDeps = (choiceWriters: ChoiceWriters | undefined): ApplyDeps => ({ ...deps(), choiceWriters })
+  const g = { goalTitle: 'Redo the bathrooms', choiceTitle: 'Contractor' }
+
+  it('applies a card that builds a new choice end to end', async () => {
+    const store = new Map<string, ChoiceDetail>()
+    const w = fakeWriters(store)
+    const build: ChangeSet = { key: 'c', title: 'A new choice', ops: [
+      { key: 'c:0', op: 'choice_add', title: 'Contractor', ...g, goalTaskId: 'g1' },
+      { key: 'c:1', op: 'column_add', title: 'Warranty', ...g, choiceKey: 'c:0', columnId: 'col-w', columnLabel: 'Warranty', columnKind: 'text' },
+      { key: 'c:2', op: 'work_set', title: 'Main bath', ...g, choiceKey: 'c:0', workIds: ['w-main'], workLabels: ['Main bath'] },
+      { key: 'c:3', op: 'option_add', title: 'Martinez', ...g, choiceKey: 'c:0', optionName: 'Martinez', phone: '410-555-0142' },
+      { key: 'c:4', op: 'price_line', title: 'Martinez', ...g, choiceKey: 'c:0', optionKey: 'c:3', optionName: 'Martinez', workIds: ['w-main'], workLabels: ['Main bath'], amountCents: 1840000 },
+      { key: 'c:5', op: 'option_set', title: 'Martinez', ...g, choiceKey: 'c:0', optionKey: 'c:3', optionName: 'Martinez', columnId: 'col-w', columnLabel: 'Warranty', columnKind: 'text', value: '5 years' },
+    ] }
+    const events: string[] = []
+    const listen = (e: Event) => events.push(e.type)
+    window.addEventListener(CHOICES_UPDATED, listen)
+    const r = await applyChangeSet(build, choiceDeps(w))
+    window.removeEventListener(CHOICES_UPDATED, listen)
+    expect(r).toMatchObject({ ok: true })
+    if (!r.ok) throw new Error('expected ok')
+    expect(w.createChoice).toHaveBeenCalledWith({ kind: 'task', id: 'g1' }, 'Contractor')
+    expect(w.updateChoice).toHaveBeenNthCalledWith(1, 'ch1', { columns: [{ id: 'col-w', label: 'Warranty', kind: 'text' }] })
+    // A first piece of work starts selected, so prices show at once.
+    expect(w.updateChoice).toHaveBeenNthCalledWith(2, 'ch1', { work: [{ id: 'w-main', label: 'Main bath' }], selected_work: ['w-main'] })
+    // The contact carries the goal's domain.
+    expect(w.addContact).toHaveBeenCalledWith('Martinez', '410-555-0142', 'family')
+    expect(w.addOption).toHaveBeenCalledWith('ch1', { name: 'Martinez', contactId: 'contact2' })
+    expect(w.addPriceLine).toHaveBeenCalledWith('opt3', { workIds: ['w-main'], amountCents: 1840000 })
+    expect(w.updateOption).toHaveBeenCalledWith('opt3', { values: { 'col-w': '5 years' } })
+    expect(r.ids).toEqual(expect.arrayContaining(['ch1', 'contact2', 'opt3', 'line4']))
+    const order = [w.createChoice, w.updateChoice, w.addContact, w.addOption, w.addPriceLine, w.updateOption].map((f) => vi.mocked(f).mock.invocationCallOrder[0])
+    expect(order).toEqual([...order].sort((x, y) => x - y))
+    expect(events).toContain(CHOICES_UPDATED)
+  })
+
+  it('two column_add ops in one set both persist, the second building on the first', async () => {
+    const store = new Map([['ch1', detailOf(baseChoice('ch1', { columns: [{ id: 'old', label: 'Start', kind: 'date' }] }))]])
+    const w = fakeWriters(store)
+    const two: ChangeSet = { key: 'c', title: 'Columns', ops: [
+      { key: 'c:0', op: 'column_add', title: 'A', ...g, choiceId: 'ch1', columnId: 'a', columnLabel: 'A', columnKind: 'text' },
+      { key: 'c:1', op: 'column_add', title: 'B', ...g, choiceId: 'ch1', columnId: 'b', columnLabel: 'B', columnKind: 'money' },
+    ] }
+    const r = await applyChangeSet(two, choiceDeps(w))
+    if (!r.ok) throw new Error('expected ok')
+    expect(w.updateChoice).toHaveBeenLastCalledWith('ch1', { columns: [{ id: 'old', label: 'Start', kind: 'date' }, { id: 'a', label: 'A', kind: 'text' }, { id: 'b', label: 'B', kind: 'money' }] })
+    vi.mocked(w.updateChoice).mockClear()
+    expect(await r.undo()).toBe(true)
+    expect(vi.mocked(w.updateChoice).mock.calls).toEqual([
+      ['ch1', { columns: [{ id: 'old', label: 'Start', kind: 'date' }, { id: 'a', label: 'A', kind: 'text' }] }],
+      ['ch1', { columns: [{ id: 'old', label: 'Start', kind: 'date' }] }],
+    ])
+  })
+
+  it('refuses a choice op when the choice changed since it was read', async () => {
+    const store = new Map([['ch1', detailOf(baseChoice('ch1', { updatedAt: new Date(Date.parse(seen) + 60_000) }), [baseOption('o1', 'ch1')])]])
+    const w = fakeWriters(store)
+    const s: ChangeSet = { key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'option_status', title: 'o1', ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1', status: 'contacted', seen },
+    ] }
+    expect(await applyChangeSet(s, choiceDeps(w))).toEqual({ ok: false, reason: 'stale', title: 'Contractor' })
+    expect(w.updateOption).not.toHaveBeenCalled()
+  })
+
+  it('a choice that has gone, or an option that has gone, is stale', async () => {
+    const w = fakeWriters(new Map([['ch1', detailOf(baseChoice('ch1'))]]))
+    const gone: ChangeSet = { key: 'c', title: 'x', ops: [{ key: 'c:0', op: 'choice_reopen', title: 'x', ...g, choiceId: 'nope' }] }
+    expect(await applyChangeSet(gone, choiceDeps(w))).toEqual({ ok: false, reason: 'stale', title: 'Contractor' })
+    const noOption: ChangeSet = { key: 'c', title: 'x', ops: [{ key: 'c:0', op: 'option_status', title: 'x', ...g, choiceId: 'ch1', optionId: 'o9', optionName: 'Rob', status: 'contacted' }] }
+    expect(await applyChangeSet(noOption, choiceDeps(w))).toEqual({ ok: false, reason: 'stale', title: 'Rob' })
+  })
+
+  it('a choiceKey or optionKey with no earlier add is refused before anything is written', async () => {
+    const w = fakeWriters(new Map())
+    const s: ChangeSet = { key: 'c', title: 'x', ops: [{ key: 'c:0', op: 'option_add', title: 'x', ...g, choiceKey: 'c:9', optionName: 'Rob' }] }
+    expect(await applyChangeSet(s, choiceDeps(w))).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
+    expect(w.addOption).not.toHaveBeenCalled()
+  })
+
+  it('a failure part way puts back what saved', async () => {
+    const store = new Map<string, ChoiceDetail>()
+    const w = fakeWriters(store, { addPriceLine: vi.fn(async () => null) })
+    const s: ChangeSet = { key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'choice_add', title: 'Contractor', ...g, goalId: 'yg1' },
+      { key: 'c:1', op: 'option_add', title: 'Rob', ...g, choiceKey: 'c:0', optionName: 'Rob' },
+      { key: 'c:2', op: 'price_line', title: 'Rob', ...g, choiceKey: 'c:0', optionKey: 'c:1', optionName: 'Rob', workIds: [], workLabels: [], amountCents: 500 },
+    ] }
+    expect(await applyChangeSet(s, choiceDeps(w))).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
+    expect(w.createChoice).toHaveBeenCalledWith({ kind: 'goal', id: 'yg1' }, 'Contractor')
+    expect(w.deleteOption).toHaveBeenCalledWith('opt2')
+    expect(w.deleteChoice).toHaveBeenCalledWith('ch1')
+    expect(vi.mocked(w.deleteOption).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(w.deleteChoice).mock.invocationCallOrder[0])
+  })
+
+  it('undo reverses an option_status and a price_line', async () => {
+    const store = new Map([['ch1', detailOf(baseChoice('ch1', { work: [{ id: 'w1', label: 'Main bath' }] }), [baseOption('o1', 'ch1', { status: 'contacted' })])]])
+    const w = fakeWriters(store)
+    const s: ChangeSet = { key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'option_status', title: 'o1', ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1', status: 'heard_back', seen },
+      { key: 'c:1', op: 'price_line', title: 'o1', ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1', workIds: ['w1'], workLabels: ['Main bath'], amountCents: 1975000, note: 'tile included' },
+    ] }
+    const r = await applyChangeSet(s, choiceDeps(w))
+    if (!r.ok) throw new Error('expected ok')
+    expect(w.updateOption).toHaveBeenCalledWith('o1', { status: 'heard_back' })
+    expect(w.addPriceLine).toHaveBeenCalledWith('o1', { workIds: ['w1'], amountCents: 1975000, note: 'tile included' })
+    expect(await r.undo()).toBe(true)
+    expect(w.deletePriceLine).toHaveBeenCalledWith('line1')
+    expect(w.updateOption).toHaveBeenLastCalledWith('o1', { status: 'contacted' })
+  })
+
+  it('choose, reopen and follow up go through their writers, with an Undo that restores the decision', async () => {
+    const decided = baseChoice('ch1', { status: 'decided', chosenOptionId: 'o1', decidedNote: 'Earliest', decidedAt: at, decidedWork: ['w1'], decidedAmountCents: 100 })
+    const store = new Map([['ch1', detailOf(decided, [baseOption('o1', 'ch1', { status: 'chosen' }), baseOption('o2', 'ch1', { status: 'heard_back' })])]])
+    const w = fakeWriters(store)
+    const s: ChangeSet = { key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'choice_reopen', title: 'Contractor', ...g, choiceId: 'ch1' },
+      { key: 'c:1', op: 'choice_choose', title: 'o2', ...g, choiceId: 'ch1', optionId: 'o2', optionName: 'o2', note: 'Warranty' },
+      { key: 'c:2', op: 'follow_up', title: 'o2', ...g, choiceId: 'ch1', optionId: 'o2', optionName: 'o2', date: '2026-10-23' },
+    ] }
+    const r = await applyChangeSet(s, choiceDeps(w))
+    if (!r.ok) throw new Error('expected ok')
+    expect(w.reopenChoice).toHaveBeenCalledWith(expect.objectContaining({ choice: decided }))
+    // Choose builds on the reopened choice.
+    const chosenWith = vi.mocked(w.chooseOption).mock.calls[0]
+    expect(chosenWith[0].choice.status).toBe('open')
+    expect(chosenWith.slice(1)).toEqual(['o2', 'Warranty'])
+    expect(w.createFollowUp).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 'o2' }), new Date(2026, 9, 23))
+    vi.mocked(w.updateChoice).mockClear()
+    vi.mocked(w.updateOption).mockClear()
+    expect(await r.undo()).toBe(true)
+    expect(w.deleteTask).toHaveBeenCalledWith('task1')
+    const restore = { status: 'decided', chosen_option_id: 'o1', decided_at: at.toISOString(), decided_note: 'Earliest', decided_work: ['w1'], decided_amount_cents: 100 }
+    expect(w.updateChoice).toHaveBeenLastCalledWith('ch1', restore)
+    expect(w.updateOption).toHaveBeenCalledWith('o2', { status: 'heard_back' })
+    expect(w.updateOption).toHaveBeenLastCalledWith('o1', { status: 'chosen' })
+  })
+
+  it('the wall cannot apply choice ops', () => {
+    const s: ChangeSet = { key: 'c', title: 'x', ops: [{ key: 'c:0', op: 'choice_reopen', title: 'x', ...g, choiceId: 'ch1' }] }
+    expect(canApply(s, choiceDeps(undefined))).toBe(false)
+    expect(canApply(s, choiceDeps(fakeWriters(new Map())))).toBe(true)
   })
 })
