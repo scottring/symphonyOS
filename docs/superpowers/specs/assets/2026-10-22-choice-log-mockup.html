@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project log (mockup)</title>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#262624; --ink-2:#5e5e5a; --ink-3:#8f8f8a; --line:#e5e5e2; --paper:#fff;
+    --primary:#2c5f86; --primary-soft:#eaf1f7; --amber:#9a6a2a; --amber-soft:#f8efdf; --sage:#2f6b4f; --sage-soft:#e6f1ea;
+    --sky:linear-gradient(180deg,#eef3f6 0%,#f4f7f8 60%,#f7f8f8 100%);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#2a2733;font-family:'DM Sans',system-ui,sans-serif;color:var(--ink)}
+  .note{color:#cfc8d8;font-size:13px;text-align:center;padding:14px 16px 4px;max-width:900px;margin:0 auto;line-height:1.45}
+  .modes{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:8px 16px 14px}
+  .modes button{font:500 12.5px 'DM Sans';border:1px solid #57536a;background:transparent;color:#cfc8d8;padding:6px 14px;border-radius:99px;cursor:pointer}
+  .modes button.on{background:#e9e4f2;color:#2a2733;border-color:#e9e4f2}
+  .win{max-width:1180px;margin:0 auto 32px;border-radius:14px;overflow:hidden;background:var(--sky);box-shadow:0 30px 70px -30px rgba(0,0,0,.6);position:relative}
+  .nav{display:flex;align-items:center;gap:18px;padding:14px 26px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.7);font-size:14px;color:var(--ink-2)}
+  .brand{font:600 11px 'DM Sans';letter-spacing:.18em;color:#3b3b39}
+  .nav .tabs{margin:0 auto;display:flex;gap:22px}
+  .view{display:none} .view.on{display:block}
+  .page{max-width:980px;margin:0 auto;padding:24px 20px 40px}
+  .back{font-size:13px;color:var(--primary)}
+  h1{font:600 28px 'Crimson Pro',serif;margin:10px 0 2px}
+  .sub{font-size:14px;color:var(--ink-2);margin-bottom:18px}
+  .link{color:var(--primary);font-size:13px;cursor:pointer}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+  th{font:600 12px 'DM Sans';color:var(--ink-3);text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  td{padding:12px;border-top:1px solid #f0f0ee;vertical-align:top}
+  td b{font-weight:500}
+  .chip{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:99px;margin-top:4px}
+  .chip.c{background:var(--amber-soft);color:var(--amber)} .chip.h{background:var(--sage-soft);color:var(--sage)} .chip.k{background:#f1f1ef;color:var(--ink-2)}
+  .latest{font-size:12px;color:var(--ink-2);margin-top:4px}
+  .latest .up{color:var(--primary)}
+  .add{color:var(--primary)}
+  .acts{font-size:13px;white-space:nowrap} .acts span{margin-right:12px;color:var(--primary)} .acts .q{color:var(--ink-3)}
+  .new{outline:2px solid #f0b43c;outline-offset:2px;border-radius:6px}
+  .addrow{display:flex;gap:8px;margin-top:14px}
+  .addrow input{flex:1;font:14px 'DM Sans';padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .btn{font:500 14px 'DM Sans';background:var(--primary);color:#fff;border:0;padding:8px 14px;border-radius:10px}
+  .btn.ghost{background:transparent;color:var(--ink-2)}
+  h2{font:600 20px 'Crimson Pro',serif;margin:30px 0 8px;display:flex;align-items:baseline;gap:12px}
+  h2 .link{font:500 13px 'DM Sans'}
+  .log{background:#fff;border:1px solid var(--line);border-radius:12px}
+  .log .grp{font:600 11px 'DM Sans';letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:10px 14px 4px}
+  .entry{display:grid;grid-template-columns:92px 120px 1fr auto;gap:12px;padding:9px 14px;border-top:1px solid #f3f3f1;font-size:14px;align-items:baseline}
+  .entry .d{color:var(--ink-2);font-size:13px}
+  .entry .who{font-size:12px;color:var(--ink-3)}
+  .entry .kind{font-weight:500}
+  .entry .tick{font-size:12px;color:var(--ink-3)}
+  .entry.up .d{color:var(--primary);font-weight:500}
+  /* dialog */
+  .scrim{position:absolute;inset:0;background:rgba(30,30,30,.25);display:flex;align-items:flex-start;justify-content:center;padding-top:110px}
+  .dlg{background:#fff;border-radius:14px;box-shadow:0 20px 50px -20px rgba(0,0,0,.45);width:440px;padding:18px 20px}
+  .dlg h3{font:600 20px 'Crimson Pro',serif;margin:0 0 12px}
+  .lbl{font-size:12px;color:var(--ink-3);margin:12px 0 5px}
+  .kinds{display:flex;flex-wrap:wrap;gap:6px}
+  .kinds span{font-size:13px;padding:5px 11px;border:1px solid var(--line);border-radius:99px;color:var(--ink-2)}
+  .kinds span.on{background:var(--primary);border-color:var(--primary);color:#fff}
+  .field{font:14px 'DM Sans';width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:9px;color:var(--ink)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .hint{font-size:12.5px;margin-top:10px;padding:8px 10px;border-radius:9px;background:var(--primary-soft);color:var(--primary)}
+  .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+  /* panel */
+  .panelwrap{display:grid;grid-template-columns:1fr 400px;min-height:620px}
+  .panelwrap .left{padding:24px;color:var(--ink-3);font-size:14px}
+  .panel{background:#fff;border-left:1px solid var(--line);padding:20px 22px}
+  .panel h3{font:600 22px 'Crimson Pro',serif;margin:0 0 4px}
+  .panel .meta{font-size:13px;color:var(--ink-3);margin-bottom:16px}
+  .sec{border-top:1px solid #f0f0ee;padding:12px 0}
+  .sec .h{display:flex;font:600 11px 'DM Sans';letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+  .sec .h .link{margin-left:auto;text-transform:none;letter-spacing:0;font:500 13px 'DM Sans'}
+  .pl{font-size:13.5px;padding:4px 0;display:flex;gap:8px} .pl .d{color:var(--ink-3);width:62px;flex:none} .pl .up{color:var(--primary)}
+  .crow{font-size:14px;padding:6px 0} .crow small{display:block;color:var(--ink-3);font-size:12.5px}
+  /* chat */
+  .chat{display:grid;grid-template-columns:1fr 1fr;gap:22px;padding:28px}
+  .said{background:rgba(255,255,255,.8);border:1px solid var(--line);border-radius:14px;padding:16px 18px;font-size:15px;line-height:1.5;color:var(--ink-2)}
+  .said small{display:block;font:600 11px 'DM Sans';letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+  .cc{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 14px 34px -18px rgba(0,0,0,.3)}
+  .cc header{display:flex;padding:14px 16px 4px;font:600 19px 'Crimson Pro',serif}
+  .cc header span{margin-left:auto;font:500 12px 'DM Sans';color:var(--ink-3)}
+  .cc ul{list-style:none;margin:0;padding:4px 10px}
+  .cc li{display:grid;grid-template-columns:70px 1fr;gap:10px;padding:7px 6px;font-size:14px}
+  .cc li .k{font:600 10.5px 'DM Sans';letter-spacing:.1em;color:var(--sage);padding-top:3px}
+  .cc li .w{display:block;color:var(--ink-3);font-size:12.5px}
+  .cc footer{display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--line);align-items:center}
+</style>
+</head>
+<body>
+<p class="note">Mockup: a log of what happened on a project and with each contractor. Gold outlines mark what's new compared to today's page. Sample data.</p>
+<div class="modes">
+  <button class="on" data-v="page">1 · The comparison page</button>
+  <button data-v="dialog">2 · Logging a visit</button>
+  <button data-v="panel">3 · On the goal</button>
+  <button data-v="chat">4 · In chat</button>
+</div>
+
+<div class="win">
+  <div class="nav"><span class="brand">SYMPHONY</span><span class="tabs"><span>Today</span><span>Week</span><span>Month</span><span>Season</span><span>Year</span></span></div>
+
+  <!-- 1 -->
+  <section class="view on" id="page">
+    <div class="page">
+      <div class="back">‹ Renovate Upstairs Bathroom</div>
+      <h1>Contractor</h1>
+      <div class="sub">3 options · 1 heard back · 1 waiting 4 days</div>
+      <div class="link" style="margin-bottom:10px">+ The work</div>
+      <table>
+        <tr><th>Option</th><th>Price</th><th>Earliest start</th><th>Files</th><th class="add">+ Column</th></tr>
+        <tr>
+          <td><b>Scher Remodeling</b><br><span class="chip c">Contacted</span>
+            <div class="latest new"><span class="up">Home visit Thu Oct 30, 10:00</span> · last: Phone call Oct 22</div></td>
+          <td class="add">Add price</td><td class="add">Add</td><td>—</td>
+          <td class="acts"><span>Choose this</span><span class="new">Log</span><span class="q">Status ▾</span><span class="q">⋯</span></td></tr>
+        <tr>
+          <td><b>Martinez Tile &amp; Bath</b><br><span class="chip h">Heard back</span>
+            <div class="latest new">Home visit Oct 17 · “Measured both baths”</div></td>
+          <td><b>$18,400</b><div class="latest">Main bath</div></td><td>Nov 17</td><td>quote.pdf</td>
+          <td class="acts"><span>Choose this</span><span class="new">Log</span><span class="q">Status ▾</span><span class="q">⋯</span></td></tr>
+        <tr>
+          <td><b>Rob (Dave's cousin)</b><br><span class="chip k">Considering</span></td>
+          <td class="add">Add price</td><td class="add">Add</td><td>—</td>
+          <td class="acts"><span>Choose this</span><span class="new">Log</span><span class="q">Status ▾</span><span class="q">⋯</span></td></tr>
+      </table>
+      <div class="addrow"><input placeholder="Add an option: a name, or paste a phone number"><button class="btn" style="opacity:.5">Add</button></div>
+
+      <div class="new" style="margin-top:6px">
+      <h2>Log <span class="link">+ Log</span></h2>
+      <div class="log">
+        <div class="grp">Coming up</div>
+        <div class="entry up"><span class="d">Thu Oct 30</span><span class="kind">Home visit</span><span>Scher Remodeling · 10:00 · walk through upstairs bath</span><span class="tick">on your calendar</span></div>
+        <div class="grp">Done</div>
+        <div class="entry"><span class="d">Oct 22</span><span class="kind">Phone call</span><span>Scher Remodeling · Can come Thursday; quote within a week of the visit</span><span class="tick">Scott</span></div>
+        <div class="entry"><span class="d">Oct 20</span><span class="kind">Note</span><span>The project · Iris wants to keep the clawfoot tub</span><span class="tick">Iris</span></div>
+        <div class="entry"><span class="d">Oct 17</span><span class="kind">Home visit</span><span>Martinez Tile &amp; Bath · Measured both baths. Quote came Oct 19.</span><span class="tick">Scott</span></div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="view" id="dialog">
+    <div class="page" style="opacity:.35">
+      <div class="back">‹ Renovate Upstairs Bathroom</div><h1>Contractor</h1><div class="sub">3 options</div>
+      <table><tr><th>Option</th><th>Price</th><th>Earliest start</th></tr><tr><td><b>Scher Remodeling</b></td><td>Add price</td><td>Add</td></tr><tr><td><b>Martinez Tile &amp; Bath</b></td><td>$18,400</td><td>Nov 17</td></tr></table>
+    </div>
+    <div class="scrim"><div class="dlg">
+      <h3>Log for Scher Remodeling</h3>
+      <div class="lbl">What</div>
+      <div class="kinds"><span>Phone call</span><span class="on">Home visit</span><span>Message</span><span>Meeting</span><span>Note</span></div>
+      <div class="lbl">When</div>
+      <div class="two"><input class="field" value="Thu, Oct 30"><input class="field" value="10:00 AM"></div>
+      <div class="lbl">What happened, or what it's for</div>
+      <input class="field" value="Walk through upstairs bath">
+      <div class="lbl">About</div>
+      <select class="field"><option>Scher Remodeling</option><option>The project (no one contractor)</option></select>
+      <div class="hint">That date is ahead, so this goes on your calendar for Thu Oct 30 at 10:00. It joins the log when you tick it done.</div>
+      <div class="foot"><button class="btn ghost">Cancel</button><button class="btn">Save</button></div>
+    </div></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="view" id="panel">
+    <div class="panelwrap">
+      <div class="left">Season · Fall<br><br>(your Season list, with the goal open on the right)</div>
+      <div class="panel">
+        <h3>Renovate Upstairs Bathroom</h3>
+        <div class="meta">Goal · Family · Fall</div>
+        <div class="sec"><div class="h">Steps</div><div class="crow">Get three quotes</div></div>
+        <div class="sec"><div class="h">Choices</div><div class="crow">Contractor<small>3 options · 1 heard back · 1 waiting 4 days</small></div></div>
+        <div class="sec new"><div class="h">Log <span class="link">+ Log</span></div>
+          <div class="pl"><span class="d up">Oct 30</span><span class="up">Home visit · Scher Remodeling · 10:00</span></div>
+          <div class="pl"><span class="d">Oct 22</span><span>Phone call · Scher Remodeling</span></div>
+          <div class="pl"><span class="d">Oct 20</span><span>Note · Iris wants to keep the clawfoot tub</span></div>
+          <div class="pl"><span class="link">All 4</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="view" id="chat">
+    <div class="chat">
+      <div class="said"><small>You said</small>Talked to Scher today, they're coming Thursday at 10 to look at the upstairs bath. Quote should come a week after.</div>
+      <div class="cc">
+        <header>Contractor<span>Draft · Not saved</span></header>
+        <ul>
+          <li><span class="k">LOG</span><span>Scher Remodeling · Phone call · Today<span class="w">“Coming Thursday at 10; quote a week after the visit”</span></span></li>
+          <li><span class="k">STATUS</span><span>Scher Remodeling → Contacted<span class="w">because a call was logged</span></span></li>
+          <li><span class="k">PLAN</span><span>Scher Remodeling · Home visit · Thu Oct 30, 10:00<span class="w">goes on your calendar</span></span></li>
+          <li><span class="k">FOLLOW UP</span><span>Scher Remodeling · Thu Nov 6<span class="w">quote expected</span></span></li>
+        </ul>
+        <footer><button class="btn">Save 4 changes</button><span class="link">Make a change</span></footer>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+  document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.modes button').forEach(x=>x.classList.toggle('on',x===b));
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id===b.dataset.v));
+  });
+</script>
+</body>
+</html>
