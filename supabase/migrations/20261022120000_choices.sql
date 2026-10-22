@@ -1,6 +1,7 @@
 -- Choices (spec 2026-10-22-choices-design.md). Visibility follows the goal:
 -- a choice is reachable exactly when its goal (an is_goal task, or a goals
 -- row) is reachable under that table's own RLS. No scope column to drift.
+begin;
 create table public.choices (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -142,3 +143,5 @@ do $$declare t text;begin
    execute format('create trigger zz_reviewed_change_after after insert or update or delete on public.%I for each row execute function public.journal_reviewed_change()',t);
  end loop;
 end;$$;
+
+commit;

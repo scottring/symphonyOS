@@ -487,3 +487,47 @@ describe('review fixes', () => {
     expect(refused([{ op: 'price_line', choice_id: C, option_id: MZ, work_labels: ['Main bath'], amount: null }])).toMatch(/amount/)
   })
 })
+
+describe('final review fixes', () => {
+  it('refuses choosing an option the same card adds to an existing choice (its Undo would fail)', () => {
+    const r = resolveChoiceRefs(parse([
+      { op: 'option_add', choice_id: C, name: 'Rob' },
+      { op: 'choice_choose', choice_id: C, option_name: 'rob', note: 'Cheapest call-back' },
+    ]), REFS)
+    expect(r).toEqual({ error: expect.stringMatching(/"Rob" is added in this same list.*second card/) })
+    // Adding it alone is fine, and so is choosing an option the choice already has.
+    expect('set' in resolveChoiceRefs(parse([{ op: 'option_add', choice_id: C, name: 'Rob' }]), REFS)).toBe(true)
+    expect('set' in resolveChoiceRefs(parse([
+      { op: 'option_add', choice_id: C, name: 'Rob' },
+      { op: 'choice_choose', choice_id: C, option_id: MZ },
+    ]), REFS)).toBe(true)
+    // A choice the same card creates is new as a whole: choosing its new option is fine.
+    const made = resolveChoiceRefs(parse([
+      { op: 'choice_add', goal_id: G, choice_title: 'Tile shop' },
+      { op: 'option_add', choice_title: 'Tile shop', name: 'Shop' },
+      { op: 'choice_choose', choice_title: 'Tile shop', option_name: 'Shop' },
+    ]), REFS)
+    if ('error' in made) throw new Error(made.error)
+    expect(made.set.ops[2]).toMatchObject({ choiceKey: 'k:0', optionKey: 'k:1' })
+  })
+
+  it('option_status never sets chosen: it points to choice_choose', () => {
+    expect(refused([{ op: 'option_status', choice_id: C, option_id: MZ, status: 'chosen' }])).toMatch(/cannot set chosen.*choice_choose/)
+    const status = PROPOSE_CHOICE_CHANGES_TOOL.input_schema.properties.ops.items.properties.status
+    expect(status.enum).not.toContain('chosen')
+    // Resolve refuses it too (a set built some other way).
+    const set: ChangeSet = { key: 'k', title: 'x', ops: [{ key: 'k:0', op: 'option_status', title: '', choiceId: C, optionId: MZ, status: 'chosen' }] }
+    expect(resolveChoiceRefs(set, REFS)).toEqual({ error: expect.stringMatching(/^Martinez Tile & Bath: option_status cannot set chosen/) })
+  })
+
+  it('waiting_since is a Contacted option\'s fact, even with an open follow-up', async () => {
+    const db = fakeDb({
+      ...MOCKUP,
+      tasks: [...MOCKUP.tasks, { id: 'f2', choice_option_id: MZ, title: 'Follow up with Martinez', scheduled_for: '2026-10-20T04:00:00+00:00', completed: false, waiting_since: '2026-10-10T15:00:00+00:00', created_at: SEEN }],
+    })
+    const [c] = JSON.parse(await readChoices(db, {})).choices
+    const by = Object.fromEntries(c.options.map((o: { name: string }) => [o.name, o]))
+    expect(by['Martinez Tile & Bath']).toMatchObject({ status: 'heard_back', waiting_since: null, follow_up: '2026-10-20' })
+    expect(by["Rob (Dave's cousin)"].waiting_since).toBe('2026-10-16')
+  })
+})

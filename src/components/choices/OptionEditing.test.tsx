@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, within, fireEvent } from '@testing-library/react'
+import { screen, within, fireEvent, renderHook, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { render } from '@/test/test-utils'
-import type { Choice, ChoiceOption, PriceLine, CellValue } from '@/types/choice'
+import type { Choice, ChoiceColumn, ChoiceOption, PriceLine, CellValue, WorkPiece } from '@/types/choice'
 import type { ChoiceDetail } from '@/lib/choices/db'
 
 type Undo = { undo?: () => Promise<unknown> }
@@ -10,9 +10,15 @@ const { run } = vi.hoisted(() => ({
   run: vi.fn(async (_label: string, command: () => Promise<unknown>, _opts?: Undo) => (await command()) !== false),
 }))
 vi.mock('@/contexts/CanvasActivityContext', () => ({ useCanvasActivity: () => ({ run }) }))
+const navigate = vi.fn()
+vi.mock('react-router-dom', async (orig) => ({
+  ...(await orig<typeof import('react-router-dom')>()),
+  useNavigate: () => navigate,
+}))
 
 import { ChoicePageView, type ChoicePageWriters } from './ChoicePage'
 import { splitPhone } from './cells'
+import { useChoiceEditing } from './useChoiceEditing'
 
 const now = new Date()
 const choice: Choice = {
@@ -48,12 +54,32 @@ const detail: ChoiceDetail = {
   contacts: new Map(),
 }
 
-function makeWriters() {
+/** Writers over an in-memory copy of the rows, so each write's fresh read
+ *  sees what the writes before it (or another device) left. */
+function makeWriters(start: ChoiceDetail = detail) {
+  const server = {
+    lists: { columns: start.choice.columns, work: start.choice.work, selectedWork: start.choice.selectedWork },
+    values: new Map(start.options.map((o) => [o.id, o.values])),
+  }
   return {
-    setSelectedWork: vi.fn(async () => true),
-    updateChoice: vi.fn(async () => true),
+    server,
+    readChoice: vi.fn(async () => ({ ...server.lists })),
+    readOptionValues: vi.fn(async (id: string) => server.values.get(id) ?? null),
+    setSelectedWork: vi.fn(async (ids: string[]) => { server.lists = { ...server.lists, selectedWork: ids }; return true }),
+    updateChoice: vi.fn(async (patch: { title?: string; columns?: ChoiceColumn[]; work?: WorkPiece[]; selected_work?: string[] }) => {
+      server.lists = {
+        columns: patch.columns ?? server.lists.columns,
+        work: patch.work ?? server.lists.work,
+        selectedWork: patch.selected_work ?? server.lists.selectedWork,
+      }
+      return true
+    }),
+    deleteChoice: vi.fn(async () => true),
     addOption: vi.fn(async (input: { name: string; contactId?: string }) => opt('new', input.name, 9, { contactId: input.contactId })),
-    updateOption: vi.fn(async () => true),
+    updateOption: vi.fn(async (id: string, patch: { values?: Record<string, CellValue> }) => {
+      if (patch.values) server.values.set(id, patch.values)
+      return true
+    }),
     deleteOption: vi.fn(async () => true),
     addPriceLine: vi.fn(async (optionId: string, input: { workIds: string[]; amountCents: number; note?: string }) =>
       ({ id: 'nl', optionId, ...input, sortOrder: 0 })),
@@ -65,7 +91,7 @@ function makeWriters() {
     reopenChoice: vi.fn(async () => true),
     addContact: vi.fn(async () => ({ id: 'k9' })),
     deleteContact: vi.fn(async () => true),
-  } satisfies ChoicePageWriters
+  } satisfies ChoicePageWriters & { server: unknown }
 }
 let w: ReturnType<typeof makeWriters>
 
@@ -360,6 +386,155 @@ describe('editing on the comparison page', () => {
     render(<ChoicePageView detail={withContact} writers={w} />)
     const card = screen.getByText('Martinez Tile & Bath').closest('li') as HTMLElement
     expect(within(card).getByText('Luis · 410-555-0142')).toBeInTheDocument()
+  })
+})
+
+describe('a partner\'s edits made since the page loaded are kept', () => {
+  beforeEach(() => { setWide(); run.mockClear(); w = makeWriters() })
+
+  it('a value write lands on the option as it is now, and Undo takes back only that value', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    // Another device sets Chesapeake's bid after this page loaded.
+    w.server.values.set('che', { start: '2026-12-01', bid: 1975000 })
+    await userEvent.click(screen.getByRole('button', { name: 'Earliest start for Chesapeake Renovations' }))
+    fireEvent.change(within(rowOf('Chesapeake Renovations')).getByLabelText('Earliest start'), { target: { value: '2026-12-08' } })
+    fireEvent.keyDown(within(rowOf('Chesapeake Renovations')).getByLabelText('Earliest start'), { key: 'Enter' })
+    await vi.waitFor(() => expect(w.updateOption).toHaveBeenCalledTimes(1))
+    expect(w.updateOption).toHaveBeenLastCalledWith('che', { values: { start: '2026-12-08', bid: 1975000 } })
+    // Meanwhile the partner clears the bid; Undo puts back the date only.
+    w.server.values.set('che', { start: '2026-12-08' })
+    await act(async () => { await lastUndo()() })
+    expect(w.updateOption).toHaveBeenLastCalledWith('che', { values: { start: '2026-12-01' } })
+  })
+
+  it('a column added, renamed or removed keeps a column the partner added', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    const theirs = { id: 'warranty', label: 'Warranty', kind: 'text' as const }
+    w.server.lists = { ...w.server.lists, columns: [...choice.columns, theirs] }
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bid options' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+    await vi.waitFor(() => expect(w.updateChoice).toHaveBeenCalledTimes(1))
+    expect(w.updateChoice).toHaveBeenLastCalledWith({ columns: [choice.columns[0], theirs] })
+    await lastUndo()()
+    // Back where it was, the partner's column still there.
+    expect(w.updateChoice).toHaveBeenLastCalledWith({ columns: [choice.columns[0], choice.columns[1], theirs] })
+
+    await userEvent.click(screen.getByRole('button', { name: '+ Column' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Column name' }), 'Permit')
+    await userEvent.click(screen.getByRole('button', { name: 'Yes/no' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await vi.waitFor(() => expect(w.updateChoice).toHaveBeenCalledTimes(3))
+    expect(w.updateChoice).toHaveBeenLastCalledWith({ columns: [...choice.columns, theirs, { id: expect.any(String), label: 'Permit', kind: 'yesno' }] })
+    await lastUndo()()
+    expect(w.updateChoice).toHaveBeenLastCalledWith({ columns: [...choice.columns, theirs] })
+  })
+
+  it('a work tick changes only that piece; the partner\'s ticks stay', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    w.server.lists = { ...w.server.lists, selectedWork: ['main', 'hall', 'kids'] }
+    await userEvent.click(screen.getByRole('button', { name: 'Hall bath' }))
+    await vi.waitFor(() => expect(w.setSelectedWork).toHaveBeenCalledTimes(1))
+    expect(w.setSelectedWork).toHaveBeenLastCalledWith(['main', 'kids'])
+    await lastUndo()()
+    expect(w.setSelectedWork).toHaveBeenLastCalledWith(['main', 'hall', 'kids'])
+  })
+
+  it('Edit the work saves only what it changed, onto the work as it is now', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    const basement = { id: 'base', label: 'Basement' }
+    w.server.lists = { ...w.server.lists, work: [...choice.work, basement], selectedWork: ['main', 'hall', 'base'] }
+    await userEvent.click(screen.getByRole('button', { name: 'Edit the work' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.type(within(dialog).getAllByRole('textbox', { name: 'Description' })[0], 'Gut it')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Remove Hall bath' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await vi.waitFor(() => expect(w.updateChoice).toHaveBeenCalledTimes(1))
+    expect(w.updateChoice).toHaveBeenLastCalledWith({
+      work: [{ id: 'main', label: 'Main bath', description: 'Gut it' }, choice.work[2], basement],
+      selected_work: ['main', 'base'],
+    })
+    await lastUndo()()
+    expect(w.updateChoice).toHaveBeenLastCalledWith({ work: [...choice.work, basement], selected_work: ['main', 'hall', 'base'] })
+  })
+
+  it('a refused fresh read writes nothing', async () => {
+    w.readOptionValues.mockResolvedValueOnce(null)
+    render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Bid for Chesapeake Renovations' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Bid' }), '19750{Enter}')
+    await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+    expect(w.updateOption).not.toHaveBeenCalled()
+    expect(await run.mock.results[0].value).toBe(false)
+  })
+})
+
+describe('the choice itself: Rename and Delete', () => {
+  beforeEach(() => { setWide(); run.mockClear(); navigate.mockClear(); w = makeWriters() })
+
+  it('Rename in the heading ⋯ renames the choice, with undo', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Choice actions' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+    const name = screen.getByRole('textbox', { name: 'Choice name' })
+    await userEvent.clear(name)
+    await userEvent.type(name, 'Bathroom contractor{Enter}')
+    expect(w.updateChoice).toHaveBeenCalledWith({ title: 'Bathroom contractor' })
+    expectUndoOnEveryRun(1)
+    await lastUndo()()
+    expect(w.updateChoice).toHaveBeenLastCalledWith({ title: 'Contractor' })
+  })
+
+  it('Delete asks first, says it cannot be undone, then goes back', async () => {
+    render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Choice actions' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete choice' }))
+    expect(w.deleteChoice).not.toHaveBeenCalled()
+    expect(screen.getByText(/Delete Contractor\? .*Can't be undone\./)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText(/Can't be undone/)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choice actions' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete choice' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(w.deleteChoice).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledWith('Delete choice', expect.any(Function))
+    expect(navigate).toHaveBeenCalledWith('/today')
+  })
+
+  it('a failed delete stays on the page', async () => {
+    w.deleteChoice.mockResolvedValueOnce(false)
+    render(<ChoicePageView detail={detail} writers={w} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Choice actions' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete choice' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(navigate).not.toHaveBeenCalled()
+    expect(screen.getByText(/Can't be undone/)).toBeInTheDocument()
+  })
+})
+
+describe('choosing again (useChoiceEditing.choose on a decided choice)', () => {
+  it('Undo chooses the earlier option again with its reason and date', async () => {
+    run.mockClear()
+    w = makeWriters()
+    const decidedAt = new Date(2026, 9, 20)
+    const decided: ChoiceDetail = {
+      ...detail,
+      choice: { ...choice, status: 'decided', chosenOptionId: 'mar', decidedAt, decidedNote: 'Earliest start' },
+      options: detail.options.map((o) => (o.id === 'mar' ? { ...o, status: 'chosen' } : o)),
+    }
+    const { result } = renderHook(() => useChoiceEditing(decided, w))
+    const che = decided.options.find((o) => o.id === 'che')!
+    await act(async () => { await result.current.choose(che, 'Warranty') })
+    expect(w.chooseOption).toHaveBeenCalledWith(decided, 'che', 'Warranty', expect.any(Date))
+    await lastUndo()()
+    const [after, id, note, at] = w.chooseOption.mock.calls[1] as unknown as [ChoiceDetail, string, string | null, Date]
+    expect([id, note, at]).toEqual(['mar', 'Earliest start', decidedAt])
+    expect(after.choice.chosenOptionId).toBe('che')
+    expect(after.options.find((o) => o.id === 'che')!.status).toBe('chosen')
+    expect(w.reopenChoice).not.toHaveBeenCalled()
+    // Chesapeake was Heard back before: nothing more to put back.
+    expect(w.updateOption).not.toHaveBeenCalled()
   })
 })
 

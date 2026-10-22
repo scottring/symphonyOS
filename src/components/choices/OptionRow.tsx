@@ -16,7 +16,7 @@ export interface OptionActionHandlers {
 }
 
 /** Rename or Notes, inline: one field, Save or Cancel. */
-function InlineEdit({ label, initial, multiline, onSave, onCancel }: {
+export function InlineEdit({ label, initial, multiline, onSave, onCancel }: {
   label: string
   initial: string
   multiline?: boolean

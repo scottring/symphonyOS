@@ -25,6 +25,9 @@ const KINDS = new Set<string>(CHOICE_OP_KINDS)
 /** Ops that act on one option (applyChangeSet's OPTION_LEVEL). */
 const OPTION_LEVEL = new Set<ChoiceOpKind>(['option_status', 'option_set', 'price_line', 'choice_choose', 'follow_up'])
 export const OPTION_STATUSES: readonly OptionStatus[] = ['considering', 'contacted', 'heard_back', 'ruled_out', 'chosen']
+/** option_status sets these; Chosen comes only with deciding the choice (choice_choose). */
+const SETTABLE_STATUSES: readonly OptionStatus[] = OPTION_STATUSES.filter((s) => s !== 'chosen')
+const CHOSEN_BY_CHOOSING = (at: string) => `${at}: option_status cannot set chosen. Use choice_choose for the option instead; it marks the option Chosen and decides the choice.`
 const STATUS_LABEL: Record<OptionStatus, string> = { considering: 'Considering', contacted: 'Contacted', heard_back: 'Heard back', ruled_out: 'Ruled out', chosen: 'Chosen' }
 const COLUMN_KINDS: readonly ColumnKind[] = ['text', 'money', 'date', 'yesno']
 const MAX_OPS = 40
@@ -85,7 +88,7 @@ export const READ_CHOICES_TOOL = {
 
 export const PROPOSE_CHOICE_CHANGES_TOOL = {
   name: 'symphony_propose_choice_changes' as const,
-  description: 'Propose ONE list of changes to choices (options compared on a goal), shown as a change card in chat. Nothing is saved until the person saves it. Every change to a choice goes here, even a single one; never on symphony_propose_changes. Name an existing choice by choice_id and an existing option by option_id (from symphony_read_choices); name one added earlier in this same list by its choice_title or option_name. Ops: choice_add (goal_id from symphony_read_plan, choice_title), option_add (name; contact_id when the person names someone already in their contacts, found with symphony_list_contacts, else an optional phone), option_status (status), option_set (column_label, value as the person said it: money like "$19,750", a date YYYY-MM-DD, yes or no, or text; an empty value clears it), price_line (work_labels: the pieces of work this one price covers, together; amount in dollars; optional note), column_add (column_label, kind), work_set (work_labels: [one piece], optional description; an existing piece gets the new description), choice_choose (the option chosen, optional note: the reason in their words), choice_reopen, follow_up (the option, date YYYY-MM-DD). Use the person\'s words; never add a column, value or price they did not give. Each call replaces the card: send the whole list so far.',
+  description: 'Propose ONE list of changes to choices (options compared on a goal), shown as a change card in chat. Nothing is saved until the person saves it. Every change to a choice goes here, even a single one; never on symphony_propose_changes. Name an existing choice by choice_id and an existing option by option_id (from symphony_read_choices); name one added earlier in this same list by its choice_title or option_name. Ops: choice_add (goal_id from symphony_read_plan, choice_title), option_add (name; contact_id when the person names someone already in their contacts, found with symphony_list_contacts, else an optional phone), option_status (status; never chosen: choosing is choice_choose), option_set (column_label, value as the person said it: money like "$19,750", a date YYYY-MM-DD, yes or no, or text; an empty value clears it), price_line (work_labels: the pieces of work this one price covers, together; amount in dollars; optional note), column_add (column_label, kind), work_set (work_labels: [one piece], optional description; an existing piece gets the new description), choice_choose (the option chosen, optional note: the reason in their words), choice_reopen, follow_up (the option, date YYYY-MM-DD). Use the person\'s words; never add a column, value or price they did not give. Each call replaces the card: send the whole list so far.',
   input_schema: {
     type: 'object',
     properties: {
@@ -104,7 +107,7 @@ export const PROPOSE_CHOICE_CHANGES_TOOL = {
             name: { type: 'string', description: 'option_add: the option\'s name, e.g. "Martinez Tile & Bath"' },
             contact_id: { type: 'string', description: 'option_add, optional: an existing contact (from symphony_list_contacts) to link. Prefer it whenever the person names someone already in their contacts; phone is then ignored' },
             phone: { type: 'string', description: 'option_add, optional, for someone not in contacts: a phone number; saved as a new contact' },
-            status: { type: 'string', enum: [...OPTION_STATUSES], description: 'option_status: considering, contacted, heard_back, ruled_out or chosen' },
+            status: { type: 'string', enum: [...SETTABLE_STATUSES], description: 'option_status: considering, contacted, heard_back or ruled_out (to choose an option, use choice_choose)' },
             column_label: { type: 'string', description: 'option_set: an existing column or one added earlier in this list; column_add: the new column\'s label' },
             kind: { type: 'string', enum: [...COLUMN_KINDS], description: 'column_add: text, money, date or yesno' },
             value: { type: 'string', description: 'option_set: the value, read by the column\'s kind' },
@@ -231,7 +234,8 @@ export async function readChoices(db: Db, input: { goal_id?: unknown; choice_id?
         ...(forSelected ? { selected_adds_up: priced(forSelected.lines, work) } : {}),
         price_for_all_work: forAll ? formatCents(forAll.totalCents) : null,
         ...(forAll ? { all_work_adds_up: priced(forAll.lines, work) } : {}),
-        waiting_since: day(follow?.waiting_since ?? (o.status === 'contacted' ? o.status_changed_at : null)),
+        // Waiting is a Contacted option's fact (the page's "N waiting").
+        waiting_since: o.status === 'contacted' ? day(follow?.waiting_since ?? o.status_changed_at) : null,
         follow_up: day(follow?.scheduled_for ?? null),
         ...(o.notes ? { notes: o.notes } : {}),
       }
@@ -325,7 +329,8 @@ export function choiceSetFromInput(input: Record<string, unknown>, key: string):
         break
       }
       case 'option_status':
-        if (o.status === undefined) return { error: `${at}: option_status needs a status (${OPTION_STATUSES.join(', ')})` }
+        if (o.status === undefined) return { error: `${at}: option_status needs a status (${SETTABLE_STATUSES.join(', ')})` }
+        if (o.status === 'chosen') return { error: CHOSEN_BY_CHOOSING(at) }
         base.status = o.status as OptionStatus
         break
       case 'option_set': {
@@ -499,7 +504,14 @@ export function resolveChoiceRefs(set: ChangeSet, refs: ChoiceRefs): { set: Chan
         const name = op.optionName!
         const added = c.added.find((x) => same(x.name, name))
         const o = added ? undefined : c.existing.find((x) => same(x.name, name))
-        if (added) { next.optionKey = added.key; next.optionName = added.name }
+        if (added) {
+          // On an existing choice, the journal's Undo cannot take back a
+          // decision that points at an option the same card adds.
+          if (op.op === 'choice_choose' && 'choiceId' in c.ref) {
+            return { error: `"${added.name}" is added in this same list, so choosing it here could not be undone. Propose adding it without choice_choose; once that card is saved, choose it in a second card.` }
+          }
+          next.optionKey = added.key; next.optionName = added.name
+        }
         else if (o) { next.optionId = o.id; next.optionName = o.name }
         else return { error: `No option "${name}" in this list or on ${c.title}. ${readAgain}` }
       }
@@ -507,6 +519,9 @@ export function resolveChoiceRefs(set: ChangeSet, refs: ChoiceRefs): { set: Chan
     }
 
     switch (op.op) {
+      case 'option_status':
+        if (op.status === 'chosen') return { error: CHOSEN_BY_CHOOSING(next.optionName ?? 'This change') }
+        break
       case 'option_add':
         if (op.contactId && !contacts.has(op.contactId)) {
           return { error: `No contact ${op.contactId} that this person can see. List the contacts again (symphony_list_contacts) and use their ids.` }

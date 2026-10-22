@@ -835,4 +835,56 @@ describe('applyChangeSet: choice ops', () => {
     expect(canApply(s, choiceDeps(undefined))).toBe(false)
     expect(canApply(s, choiceDeps(fakeWriters(new Map())))).toBe(true)
   })
+
+  it('choosing an option the same set adds to an existing choice is refused before anything is written', async () => {
+    const w = fakeWriters(new Map([['ch1', detailOf(baseChoice('ch1'), [baseOption('o1', 'ch1')])]]))
+    const s: ChangeSet = { key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'option_add', title: 'Rob', ...g, choiceId: 'ch1', optionName: 'Rob' },
+      { key: 'c:1', op: 'choice_choose', title: 'Rob', ...g, choiceId: 'ch1', optionKey: 'c:0', optionName: 'Rob' },
+    ] }
+    expect(await applyChangeSet(s, choiceDeps(w))).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
+    expect(w.addOption).not.toHaveBeenCalled()
+    expect(w.chooseOption).not.toHaveBeenCalled()
+    // On a choice the same set creates, the whole tree is new: choosing is fine.
+    const fresh = fakeWriters(new Map())
+    const made: ChangeSet = { key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'choice_add', title: 'Contractor', ...g, goalTaskId: 'g1' },
+      { key: 'c:1', op: 'option_add', title: 'Rob', ...g, choiceKey: 'c:0', optionName: 'Rob' },
+      { key: 'c:2', op: 'choice_choose', title: 'Rob', ...g, choiceKey: 'c:0', optionKey: 'c:1', optionName: 'Rob' },
+    ] }
+    expect(await applyChangeSet(made, choiceDeps(fresh))).toMatchObject({ ok: true })
+    expect(fresh.chooseOption).toHaveBeenCalled()
+  })
+
+  it('option_status never sets Chosen (choosing decides the choice)', async () => {
+    const w = fakeWriters(new Map([['ch1', detailOf(baseChoice('ch1'), [baseOption('o1', 'ch1')])]]))
+    const s: ChangeSet = { key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'option_status', title: 'o1', ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1', status: 'chosen' },
+    ] }
+    expect(await applyChangeSet(s, choiceDeps(w))).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
+    expect(w.updateOption).not.toHaveBeenCalled()
+  })
+
+  it('choosing again on a decided choice: Undo puts back both options and the earlier decision', async () => {
+    const decided = baseChoice('ch1', { status: 'decided', chosenOptionId: 'o1', decidedNote: 'Earliest', decidedAt: at, decidedWork: [], decidedAmountCents: 100 })
+    const store = new Map([['ch1', detailOf(decided, [baseOption('o1', 'ch1', { status: 'chosen' }), baseOption('o2', 'ch1', { status: 'contacted' })])]])
+    const w = fakeWriters(store)
+    const s: ChangeSet = { key: 'c', title: 'x', ops: [
+      { key: 'c:0', op: 'choice_choose', title: 'o2', ...g, choiceId: 'ch1', optionId: 'o2', optionName: 'o2' },
+      // A later op sees the earlier option back at Heard back.
+      { key: 'c:1', op: 'option_status', title: 'o1', ...g, choiceId: 'ch1', optionId: 'o1', optionName: 'o1', status: 'ruled_out' },
+    ] }
+    const r = await applyChangeSet(s, choiceDeps(w))
+    if (!r.ok) throw new Error('expected ok')
+    expect(w.chooseOption).toHaveBeenCalledWith(expect.objectContaining({ choice: decided }), 'o2', null)
+    vi.mocked(w.updateChoice).mockClear()
+    vi.mocked(w.updateOption).mockClear()
+    expect(await r.undo()).toBe(true)
+    expect(vi.mocked(w.updateOption).mock.calls).toEqual([
+      ['o1', { status: 'heard_back' }], // the option_status, undone first
+      ['o2', { status: 'contacted' }],
+      ['o1', { status: 'chosen' }],
+    ])
+    expect(w.updateChoice).toHaveBeenLastCalledWith('ch1', { status: 'decided', chosen_option_id: 'o1', decided_at: at.toISOString(), decided_note: 'Earliest', decided_work: [], decided_amount_cents: 100 })
+  })
 })

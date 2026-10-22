@@ -20,6 +20,21 @@ function useRefetchEvents(refetch: () => Promise<void>) {
   }, [refetch])
 }
 
+/** A partner may have edited the choice while this tab was in the
+ *  background: read it again when the tab is back in view or focused. */
+function useRefetchOnReturn(refetch: () => Promise<void>) {
+  useEffect(() => {
+    const onFocus = () => { void refetch() }
+    const onVisible = () => { if (document.visibilityState === 'visible') void refetch() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [refetch])
+}
+
 export function useGoalChoices(goal: GoalRef | null) {
   const { user } = useAuth()
   const [rows, setRows] = useState<ChoiceRow[]>([])
@@ -67,6 +82,7 @@ export function useChoice(id: string | undefined) {
     void refetch()
   }, [refetch])
   useRefetchEvents(refetch)
+  useRefetchOnReturn(refetch)
 
   return { detail, loading, refetch }
 }

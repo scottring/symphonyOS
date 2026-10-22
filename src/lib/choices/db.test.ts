@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   listChoicesForGoal, listOpenChoices, updateOption, createFollowUp, deleteFollowUp, chooseOption, reopenChoice, parseCell, loadChoice, createChoice, updateChoice,
+  readChoiceLists, readOptionValues, deleteChoice,
   type ChoiceDetail,
 } from './db'
 import type { Choice, ChoiceOption, PriceLine } from '@/types/choice'
@@ -131,6 +132,44 @@ describe('chooseOption', () => {
     const { client, calls } = fake()
     await chooseOption(client, { ...detail, lines: [] }, 'o1', null, new Date())
     expect((op(calls[1], 'update')![0] as Record<string, unknown>).decided_amount_cents).toBeNull()
+  })
+
+  const earlier: ChoiceOption = { ...option, id: 'o2', name: 'Best Roofs', status: 'chosen', statusChangedAt: new Date(5000) }
+  const decided: ChoiceDetail = {
+    ...detail, options: [option, earlier],
+    choice: { ...choice, status: 'decided', chosenOptionId: 'o2', decidedAt: new Date(5000) },
+  }
+  it('choosing again sets the option chosen before back to Heard back, so only one is Chosen', async () => {
+    const { client, calls } = fake()
+    const now = new Date('2026-10-22T10:00:00Z')
+    expect(await chooseOption(client, decided, 'o1', null, now)).toBe(true)
+    expect(calls.map((c) => c.table)).toEqual(['choice_options', 'choice_options', 'choices'])
+    expect(op(calls[0], 'update')![0]).toEqual({ status: 'heard_back', status_changed_at: now.toISOString() })
+    expect(op(calls[0], 'eq')).toEqual(['id', 'o2'])
+    expect(op(calls[1], 'update')![0]).toEqual({ status: 'chosen', status_changed_at: now.toISOString() })
+    expect(op(calls[1], 'eq')).toEqual(['id', 'o1'])
+    expect((op(calls[2], 'update')![0] as Record<string, unknown>).chosen_option_id).toBe('o1')
+  })
+  it('choosing the same option again leaves the others alone', async () => {
+    const { client, calls } = fake()
+    expect(await chooseOption(client, decided, 'o2', null, new Date())).toBe(true)
+    expect(calls.map((c) => c.table)).toEqual(['choice_options', 'choices'])
+    expect(op(calls[0], 'eq')).toEqual(['id', 'o2'])
+  })
+  it('a failed decision puts both options back as they were', async () => {
+    const { client, calls } = fake({ choices: [{ error: { message: 'x' } }] })
+    expect(await chooseOption(client, decided, 'o1', null, new Date())).toBe(false)
+    expect(calls.map((c) => c.table)).toEqual(['choice_options', 'choice_options', 'choices', 'choice_options', 'choice_options'])
+    expect(op(calls[3], 'update')![0]).toEqual({ status: 'contacted', status_changed_at: new Date(0).toISOString() })
+    expect(op(calls[3], 'eq')).toEqual(['id', 'o1'])
+    expect(op(calls[4], 'update')![0]).toEqual({ status: 'chosen', status_changed_at: new Date(5000).toISOString() })
+    expect(op(calls[4], 'eq')).toEqual(['id', 'o2'])
+  })
+  it('a failed choose of the new option puts the earlier one back to Chosen', async () => {
+    const { client, calls } = fake({ choice_options: [{}, { error: { message: 'x' } }] })
+    expect(await chooseOption(client, decided, 'o1', null, new Date())).toBe(false)
+    expect(calls.map((c) => c.table)).toEqual(['choice_options', 'choice_options', 'choice_options'])
+    expect(op(calls[2], 'update')![0]).toEqual({ status: 'chosen', status_changed_at: new Date(5000).toISOString() })
   })
 })
 
@@ -274,5 +313,26 @@ describe('deleteFollowUp', () => {
   it('treats an error as a failure', async () => {
     const { client } = fake({ tasks: [{ error: { message: 'no' } }] })
     expect(await deleteFollowUp(client, 't1')).toBe(false)
+  })
+})
+
+describe('fresh reads and deleteChoice', () => {
+  it('readChoiceLists reads the JSON lists as they are now', async () => {
+    const { client, calls } = fake({ choices: [{ data: { columns: [{ id: 'a', label: 'A', kind: 'text' }], work: null, selected_work: ['w1'] } }] })
+    expect(await readChoiceLists(client, 'c1')).toEqual({ columns: [{ id: 'a', label: 'A', kind: 'text' }], work: [], selectedWork: ['w1'] })
+    expect(op(calls[0], 'select')).toEqual(['columns, work, selected_work'])
+    expect(op(calls[0], 'eq')).toEqual(['id', 'c1'])
+    expect(await readChoiceLists(fake({ choices: [{ error: { message: 'x' } }] }).client, 'c1')).toBeNull()
+  })
+  it('readOptionValues reads one option\'s values', async () => {
+    const { client } = fake({ choice_options: [{ data: { values: { a: 1 } } }] })
+    expect(await readOptionValues(client, 'o1')).toEqual({ a: 1 })
+    expect(await readOptionValues(fake({ choice_options: [{ data: { values: null } }] }).client, 'o1')).toEqual({})
+    expect(await readOptionValues(fake({ choice_options: [{ error: { message: 'x' } }] }).client, 'o1')).toBeNull()
+  })
+  it('deleteChoice counts only a returned row as deleted', async () => {
+    expect(await deleteChoice(fake({ choices: [{ data: [{ id: 'c1' }] }] }).client, 'c1')).toBe(true)
+    expect(await deleteChoice(fake({ choices: [{ data: [] }] }).client, 'c1')).toBe(false)
+    expect(await deleteChoice(fake({ choices: [{ error: { message: 'x' } }] }).client, 'c1')).toBe(false)
   })
 })

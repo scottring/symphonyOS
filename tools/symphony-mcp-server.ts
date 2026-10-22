@@ -432,7 +432,8 @@ work_labels are matched (case-insensitive) against the choice's work list. amoun
 
 server.tool(
   'symphony_update_option',
-  `Update an option: status (considering, contacted, heard_back, ruled_out, chosen), a column value, and/or notes.
+  `Update an option: status (considering, contacted, heard_back, ruled_out), a column value, and/or notes.
+status chosen is refused: choosing an option decides the choice, which is done in the app (Choose this) or in Symphony's chat.
 value is read by the column's kind: money "$19,750", yes/no, date YYYY-MM-DD, or text. An empty value clears it.`,
   {
     option_id: z.string().describe('Option UUID (from symphony_list_choices)'),
@@ -442,6 +443,9 @@ value is read by the column's kind: money "$19,750", yes/no, date YYYY-MM-DD, or
     notes: z.string().optional(),
   },
   async (params) => {
+    if (params.status === 'chosen') {
+      return toolError("An option becomes Chosen only by deciding the choice: choose it in the app (Choose this on the comparison page) or ask in Symphony's chat. Nothing was changed.")
+    }
     if ((params.column_label === undefined) !== (params.value === undefined)) {
       return toolError('column_label and value go together')
     }
@@ -1020,7 +1024,8 @@ async function readChoicesLocal(goalId?: string): Promise<string> {
         ...(forSelected ? { selected_adds_up: priced(forSelected.lines, work) } : {}),
         price_for_all_work: forAll ? formatCents(forAll.totalCents) : null,
         ...(forAll ? { all_work_adds_up: priced(forAll.lines, work) } : {}),
-        waiting_since: day(follow?.waiting_since ?? (o.status === 'contacted' ? o.status_changed_at : null)),
+        // Waiting is a Contacted option's fact (the app's "N waiting").
+        waiting_since: o.status === 'contacted' ? day(follow?.waiting_since ?? o.status_changed_at) : null,
         follow_up: day(follow?.scheduled_for ?? null),
         ...(o.notes ? { notes: o.notes } : {}),
       }

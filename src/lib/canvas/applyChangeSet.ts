@@ -241,7 +241,11 @@ function choiceOpsWellFormed(ops: readonly ChangeOp[]): boolean {
     }
     switch (op.op) {
       case 'option_add': if (!op.optionName?.trim()) return false; options.add(op.key); break
-      case 'option_status': if (!op.status || !OPTION_STATUSES.includes(op.status)) return false; break
+      // Chosen comes only with deciding the choice (choice_choose).
+      case 'option_status': if (!op.status || !OPTION_STATUSES.includes(op.status) || op.status === 'chosen') return false; break
+      // On an existing choice, the journal's Undo cannot take back a decision
+      // that points at an option this same set adds: choose it in a later set.
+      case 'choice_choose': if (op.choiceId && op.optionKey) return false; break
       case 'option_set': if (!op.columnId || op.value === undefined) return false; break
       case 'price_line': if (!Array.isArray(op.workIds) || !Number.isInteger(op.amountCents) || (op.amountCents as number) < 0) return false; break
       case 'column_add': if (!op.columnId || !op.columnLabel?.trim() || !op.columnKind || !COLUMN_KINDS.includes(op.columnKind)) return false; break
@@ -493,17 +497,22 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
         const option = o!
         const before = d.choice
         const prevStatus = option.status
+        // Choosing again: chooseOption sets the option chosen before back to Heard back.
+        const earlier = before.chosenOptionId && before.chosenOptionId !== option.id
+          ? d.options.find((x) => x.id === before.chosenOptionId) : undefined
         const note = op.note ?? null
         if (!(await cw.chooseOption(d, option.id, note))) return false
         made(cid, async () => {
           const ok = prevStatus === 'chosen' || (await cw.updateOption(option.id, { status: prevStatus }))
-          return (await cw.updateChoice(cid, decisionOf(before))) && ok
+          const okEarlier = !earlier || earlier.status === 'heard_back' || (await cw.updateOption(earlier.id, { status: earlier.status }))
+          return (await cw.updateChoice(cid, decisionOf(before))) && ok && okEarlier
         })
         const amount = priceFor(d.lines.filter((l) => l.optionId === option.id), before.selectedWork, before.work)?.totalCents
+        const chosenNow = withOption({ ...option, status: 'chosen' })
         withChoice({
           status: 'decided', chosenOptionId: option.id, decidedAt: new Date(), decidedNote: note ?? undefined,
           decidedWork: before.selectedWork, decidedAmountCents: amount,
-        }, withOption({ ...option, status: 'chosen' }))
+        }, earlier ? withOption({ ...earlier, status: 'heard_back' }, chosenNow) : chosenNow)
         return true
       }
       case 'choice_reopen': {

@@ -56,8 +56,11 @@ const detail: ChoiceDetail = {
 
 const setSelectedWork = vi.fn(async () => true)
 const writers: ChoicePageWriters = {
+  readChoice: vi.fn(async () => ({ columns: detail.choice.columns, work: detail.choice.work, selectedWork: detail.choice.selectedWork })),
+  readOptionValues: vi.fn(async (id: string) => detail.options.find((o) => o.id === id)?.values ?? null),
   setSelectedWork,
   updateChoice: vi.fn(async () => true),
+  deleteChoice: vi.fn(async () => true),
   addOption: vi.fn(async () => null),
   updateOption: vi.fn(async () => true),
   deleteOption: vi.fn(async () => true),

@@ -1,6 +1,9 @@
 import { useRef } from 'react'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
-import type { ChoiceDetail } from '@/lib/choices/db'
+import type { ChoiceDetail, ChoiceLists } from '@/lib/choices/db'
+import {
+  applyWorkDiff, renamedColumn, restoredColumn, revertWorkDiff, withColumn, withSelected, withValue, withoutColumn, workDiff,
+} from '@/lib/choices/edits'
 import type {
   CellValue, ChoiceColumn, ChoiceOption, ColumnKind, DbChoice, DbChoiceOption, DbPriceLine,
   OptionStatus, PriceLine, WorkPiece,
@@ -11,15 +14,21 @@ import type { Attachment } from '@/types/attachment'
 import type { TaskContext } from '@/types/task'
 import { useLatest } from './useLatest'
 
-type ChoicePatch = Partial<Pick<DbChoice, 'columns' | 'work' | 'selected_work'>>
+type ChoicePatch = Partial<Pick<DbChoice, 'title' | 'columns' | 'work' | 'selected_work'>>
 type OptionPatch = Partial<Pick<DbChoiceOption, 'name' | 'contact_id' | 'status' | 'values' | 'notes'>>
 type LinePatch = Partial<Pick<DbPriceLine, 'work_ids' | 'amount_cents' | 'note'>>
 
 /** The writers this page calls, already bound to the client and the user.
  *  Each mirrors its db.ts writer without (db, userId), and announces the change. */
 export interface ChoicePageWriters {
+  /** The choice's columns, work and selection as they are now (null: the read failed). */
+  readChoice: () => Promise<ChoiceLists | null>
+  /** One option's values as they are now (null: the read failed). */
+  readOptionValues: (id: string) => Promise<Record<string, CellValue> | null>
   setSelectedWork: (ids: string[]) => Promise<boolean>
   updateChoice: (patch: ChoicePatch) => Promise<boolean>
+  /** Deletes the choice, its options and their price lines. */
+  deleteChoice: () => Promise<boolean>
   addOption: (input: { name: string; contactId?: string; status?: OptionStatus }) => Promise<ChoiceOption | null>
   updateOption: (id: string, patch: OptionPatch) => Promise<boolean>
   deleteOption: (id: string) => Promise<boolean>
@@ -36,6 +45,17 @@ export interface ChoicePageWriters {
 
 const all = async (steps: Promise<boolean>[]) => (await Promise.all(steps)).every(Boolean)
 
+/** Runs writes to one row one at a time, in the order asked, so each one's
+ *  fresh read sees the one before it. */
+function useSerial() {
+  const tails = useRef(new Map<string, Promise<unknown>>())
+  return <T,>(key: string, step: () => Promise<T>): Promise<T> => {
+    const next = (tails.current.get(key) ?? Promise.resolve()).then(step, step)
+    tails.current.set(key, next.catch(() => {}))
+    return next
+  }
+}
+
 /** Every edit on the comparison page, each run as one command with an Undo
  *  built from the values captured before the write. */
 export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
@@ -47,19 +67,40 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
   // Each option's values as the last edit left them (quick edits on one row
   // build on each other).
   const values = useLatest<Record<string, CellValue>>()
+  const serial = useSerial()
 
-  const setColumns = (label: string, next: ChoiceColumn[]) => {
-    const prev = choice.columns
-    return run(label, () => w.updateChoice({ columns: next }), { undo: () => w.updateChoice({ columns: prev }) })
+  // Whole-JSON writes: re-read the row, apply this one change to what is
+  // there now, write that. null from a change = it no longer applies (the
+  // write is refused, nothing written).
+  const onChoice = (change: (fresh: ChoiceLists) => ChoicePatch | null) => serial('choice', async () => {
+    const fresh = await w.readChoice()
+    const patch = fresh && change(fresh)
+    return patch ? w.updateChoice(patch) : false
+  })
+  const onSelection = (id: string, on: boolean) => serial('choice', async () => {
+    const fresh = await w.readChoice()
+    return fresh ? w.setSelectedWork(withSelected(fresh.work, fresh.selectedWork, id, on)) : false
+  })
+  const onValues = (optionId: string, key: string, value: CellValue | undefined) => serial(`option:${optionId}`, async () => {
+    const fresh = await w.readOptionValues(optionId)
+    return fresh ? w.updateOption(optionId, { values: withValue(fresh, key, value) }) : false
+  })
+  const columnEdit = (label: string, change: (cols: ChoiceColumn[]) => ChoiceColumn[] | null, undo: (cols: ChoiceColumn[]) => ChoiceColumn[] | null) => {
+    const patch = (f: (cols: ChoiceColumn[]) => ChoiceColumn[] | null) => (fresh: ChoiceLists) => {
+      const columns = f(fresh.columns)
+      return columns ? { columns } : null
+    }
+    return run(label, () => onChoice(patch(change)), { undo: () => onChoice(patch(undo)) })
   }
 
   return {
     toggleWork: (id: string) => {
       const s = selection.current
       const prev = s.from === choice.selectedWork ? s.ids : choice.selectedWork
-      const next = choice.work.filter((p) => (p.id === id ? !prev.includes(id) : prev.includes(p.id))).map((p) => p.id)
-      selection.current = { from: choice.selectedWork, ids: next }
-      return run('Change the work', () => w.setSelectedWork(next), { undo: () => w.setSelectedWork(prev) })
+      const on = !prev.includes(id)
+      selection.current = { from: choice.selectedWork, ids: withSelected(choice.work, prev, id, on) }
+      // Only this piece's tick changes; a partner's other ticks stay.
+      return run('Change the work', () => onSelection(id, on), { undo: () => onSelection(id, !on) })
     },
 
     addOption: (name: string, phone?: string) => {
@@ -105,11 +146,11 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
     setValue: (o: ChoiceOption, columnId: string, value: CellValue | ((prev: CellValue | undefined) => CellValue)) => {
       const prev = values.get(o.id, o.values)
       const v = typeof value === 'function' ? value(prev[columnId]) : value
-      const next = { ...prev }
-      if (v === null) delete next[columnId]
-      else next[columnId] = v
-      const put = (vals: Record<string, CellValue>) => values.write(o.id, o.values, vals, () => w.updateOption(o.id, { values: vals }))
-      return run('Change a value', () => put(next), { undo: () => put(prev) })
+      const was = prev[columnId]
+      // Shown at once; saved as this one value onto the option as it is now.
+      const put = (to: CellValue | undefined) =>
+        values.write(o.id, o.values, withValue(values.get(o.id, o.values), columnId, to), () => onValues(o.id, columnId, to))
+      return run('Change a value', () => put(v), { undo: () => put(was) })
     },
 
     rename: (o: ChoiceOption, name: string) => {
@@ -143,29 +184,53 @@ export function useChoiceEditing(detail: ChoiceDetail, w: ChoicePageWriters) {
       undo: async () => !!(await w.addPriceLine(l.optionId, { workIds: l.workIds, amountCents: l.amountCents, ...(l.note ? { note: l.note } : {}) })),
     }),
 
-    addColumn: (label: string, kind: ColumnKind) =>
-      setColumns('Add column', [...choice.columns, { id: crypto.randomUUID(), label, kind }]),
-    renameColumn: (c: ChoiceColumn, label: string) =>
-      setColumns('Rename column', choice.columns.map((x) => (x.id === c.id ? { ...x, label } : x))),
-    removeColumn: (c: ChoiceColumn) =>
-      setColumns('Remove column', choice.columns.filter((x) => x.id !== c.id)),
-
-    saveWork: (next: WorkPiece[]) => {
-      const prevWork = choice.work
-      const prevSelected = choice.selectedWork
-      const ids = new Set(next.map((p) => p.id))
-      // A first list of pieces starts all selected, so prices show at once.
-      const selected = prevWork.length === 0 ? next.map((p) => p.id) : prevSelected.filter((id) => ids.has(id))
-      return run('Change the work', () => w.updateChoice({ work: next, selected_work: selected }), {
-        undo: () => w.updateChoice({ work: prevWork, selected_work: prevSelected }),
-      })
+    addColumn: (label: string, kind: ColumnKind) => {
+      const col: ChoiceColumn = { id: crypto.randomUUID(), label, kind }
+      return columnEdit('Add column', (cols) => withColumn(cols, col), (cols) => withoutColumn(cols, col.id))
     },
+    renameColumn: (c: ChoiceColumn, label: string) =>
+      columnEdit('Rename column', (cols) => renamedColumn(cols, c.id, label), (cols) => renamedColumn(cols, c.id, c.label)),
+    removeColumn: (c: ChoiceColumn) => {
+      const index = choice.columns.findIndex((x) => x.id === c.id)
+      return columnEdit('Remove column', (cols) => withoutColumn(cols, c.id), (cols) => restoredColumn(cols, c, index))
+    },
+
+    /** Edit the work saves the whole list; only what this save changed
+     *  (pieces added, renamed or described, removed) lands on the work as it
+     *  is now. */
+    saveWork: (next: WorkPiece[]) => {
+      const diff = workDiff(choice.work, choice.selectedWork, next)
+      const write = (f: typeof applyWorkDiff) => onChoice((fresh) => {
+        const r = f(fresh, diff)
+        return { work: r.work, selected_work: r.selectedWork }
+      })
+      return run('Change the work', () => write(applyWorkDiff), { undo: () => write(revertWorkDiff) })
+    },
+
+    renameChoice: (title: string) => {
+      const prev = choice.title
+      return run('Rename choice', () => w.updateChoice({ title }), { undo: () => w.updateChoice({ title: prev }) })
+    },
+
+    /** No Undo: its options, prices and values go with it. The page says so
+     *  before it asks. */
+    deleteChoice: () => run('Delete choice', () => w.deleteChoice()),
 
     choose: (o: ChoiceOption, note: string | null) => {
       const prevStatus = o.status
+      // Choosing again (chooseOption sets the earlier option back to Heard back):
+      // Undo chooses the earlier one again, with its reason and date.
+      const earlier = choice.status === 'decided' && choice.chosenOptionId && choice.chosenOptionId !== o.id ? choice.chosenOptionId : undefined
+      const after: ChoiceDetail = {
+        ...detail,
+        choice: { ...choice, status: 'decided', chosenOptionId: o.id },
+        options: detail.options.map((x) => (x.id === o.id ? { ...x, status: 'chosen' } : x.id === earlier ? { ...x, status: 'heard_back' } : x)),
+      }
       return run('Choose', () => w.chooseOption(detail, o.id, note, new Date()), {
         undo: async () => {
-          const ok = await w.reopenChoice({ ...detail, choice: { ...choice, chosenOptionId: o.id } })
+          const ok = earlier
+            ? await w.chooseOption(after, earlier, choice.decidedNote ?? null, choice.decidedAt ?? new Date())
+            : await w.reopenChoice(after)
           return ok && (prevStatus === 'heard_back' ? true : w.updateOption(o.id, { status: prevStatus }))
         },
       })

@@ -87,5 +87,9 @@ for (const [name, args] of [
   if (!r.startsWith('Error:')) { console.error(`${name} should reject a bogus id, got: ${r}`); process.exit(1) }
   console.log(`${name}: OK (rejects bogus id)`)
 }
+// Chosen is refused before anything is read or written (choosing decides the choice).
+const chosen = text(await client.callTool({ name: 'symphony_update_option', arguments: { option_id: BOGUS, status: 'chosen' } }))
+if (!/^Error: An option becomes Chosen only by deciding the choice/.test(chosen)) { console.error(`update_option should refuse chosen, got: ${chosen}`); process.exit(1) }
+console.log('symphony_update_option: OK (refuses chosen)')
 
 await client.close()

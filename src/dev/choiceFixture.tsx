@@ -1,7 +1,7 @@
 // Dev only (registered in main.tsx under import.meta.env.DEV): the comparison
 // page with the mockup's data and in-memory writers, for visual review without
 // the database. Never imported by production code paths.
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ChoicePageView, type ChoicePageWriters } from '@/components/choices/ChoicePage'
 import type { ChoiceDetail } from '@/lib/choices/db'
 import type { ChoiceOption, PriceLine, OptionStatus } from '@/types/choice'
@@ -61,9 +61,16 @@ export default function ChoiceFixture() {
   const params = new URLSearchParams(window.location.search)
   const [selected, setSelected] = useState((params.get('selected') ?? 'main,hall').split(','))
   const ok = async () => true
+  const current = useRef(selected)
   const writers: ChoicePageWriters = {
-    setSelectedWork: async (ids) => { setSelected(ids); return true },
+    readChoice: async () => {
+      const { choice } = fixtureDetail(current.current)
+      return { columns: choice.columns, work: choice.work, selectedWork: current.current }
+    },
+    readOptionValues: async (id) => fixtureDetail(current.current).options.find((o) => o.id === id)?.values ?? null,
+    setSelectedWork: async (ids) => { current.current = ids; setSelected(ids); return true },
     updateChoice: ok,
+    deleteChoice: ok,
     addOption: async () => null,
     updateOption: ok,
     deleteOption: ok,

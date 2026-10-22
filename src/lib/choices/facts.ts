@@ -21,8 +21,11 @@ export function choiceSummary(
   const waits = new Set<string>()
   let longest = 0
   for (const f of followUps) {
-    if (f.completed) continue
-    const since = f.waitingSince ?? byId.get(f.optionId)?.statusChangedAt
+    // Waiting is a Contacted option's fact: once it has heard back (or is
+    // ruled out or chosen) an open follow-up no longer counts.
+    const o = byId.get(f.optionId)
+    if (f.completed || o?.status !== 'contacted') continue
+    const since = f.waitingSince ?? o.statusChangedAt
     waits.add(f.optionId)
     if (since) longest = Math.max(longest, Math.floor((now.getTime() - since.getTime()) / DAY))
   }

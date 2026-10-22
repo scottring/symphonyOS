@@ -3,7 +3,7 @@ import type { TaskContext } from '@/types/task'
 import {
   dbChoiceToChoice, dbOptionToOption, dbLineToLine,
   type Choice, type ChoiceOption, type PriceLine, type FollowUp, type GoalRef, type OptionStatus,
-  type DbChoice, type DbChoiceOption, type DbPriceLine, type ColumnKind, type CellValue,
+  type DbChoice, type DbChoiceOption, type DbPriceLine, type ColumnKind, type CellValue, type ChoiceColumn, type WorkPiece,
 } from '@/types/choice'
 import { priceFor } from './price'
 
@@ -144,9 +144,30 @@ export async function updateChoice(
   return !error
 }
 
+/** A choice's JSON lists as they are now. Whole-list writers read these just
+ *  before writing, so one person's edit lands on top of another's. null = the
+ *  read failed or the choice is gone. */
+export interface ChoiceLists { columns: ChoiceColumn[]; work: WorkPiece[]; selectedWork: string[] }
+export async function readChoiceLists(db: Db, id: string): Promise<ChoiceLists | null> {
+  const { data, error } = await db.from('choices').select('columns, work, selected_work').eq('id', id).single()
+  if (error || !data) return null
+  const row = data as Pick<DbChoice, 'columns' | 'work' | 'selected_work'>
+  return { columns: row.columns ?? [], work: row.work ?? [], selectedWork: row.selected_work ?? [] }
+}
+
+/** An option's values as they are now (see readChoiceLists). */
+export async function readOptionValues(db: Db, id: string): Promise<Record<string, CellValue> | null> {
+  const { data, error } = await db.from('choice_options').select('values').eq('id', id).single()
+  if (error || !data) return null
+  return ((data as { values: Record<string, CellValue> | null }).values ?? {})
+}
+
+/** Deletes a choice (its options and price lines go with it). RLS turns a
+ *  forbidden DELETE into zero rows with no error, so only a returned row
+ *  counts as deleted. */
 export async function deleteChoice(db: Db, id: string): Promise<boolean> {
-  const { error } = await db.from('choices').delete().eq('id', id)
-  return !error
+  const { data, error } = await db.from('choices').delete().eq('id', id).select('id')
+  return !error && ((data ?? []) as { id: string }[]).some((r) => r.id === id)
 }
 
 export async function addOption(
@@ -237,18 +258,35 @@ export async function deleteFollowUp(db: Db, taskId: string): Promise<boolean> {
   return !error && ((data ?? []) as { id: string }[]).some((r) => r.id === taskId)
 }
 
+/** Decides the choice for one option. Choosing again on a decided choice sets
+ *  the option chosen before back to Heard back, so only one is Chosen. A
+ *  failed write puts back what the earlier ones changed. */
 export async function chooseOption(
   db: Db, detail: ChoiceDetail, optionId: string, note: string | null, now: Date,
 ): Promise<boolean> {
   const { choice } = detail
   const option = detail.options.find((o) => o.id === optionId)
   if (!option) return false
+  const earlier = choice.chosenOptionId && choice.chosenOptionId !== optionId
+    ? detail.options.find((o) => o.id === choice.chosenOptionId) : undefined
   const optionLines = detail.lines.filter((l) => l.optionId === optionId)
   const amount = priceFor(optionLines, choice.selectedWork, choice.work)?.totalCents ?? null
+  const putBack = async (o: ChoiceOption) => {
+    await db.from('choice_options')
+      .update({ status: o.status, status_changed_at: o.statusChangedAt.toISOString() }).eq('id', o.id)
+  }
 
+  if (earlier && earlier.status !== 'heard_back') {
+    const before = await db.from('choice_options')
+      .update({ status: 'heard_back', status_changed_at: now.toISOString() }).eq('id', earlier.id)
+    if (before.error) return false
+  }
   const first = await db.from('choice_options')
     .update({ status: 'chosen', status_changed_at: now.toISOString() }).eq('id', optionId)
-  if (first.error) return false
+  if (first.error) {
+    if (earlier && earlier.status !== 'heard_back') await putBack(earlier)
+    return false
+  }
   const second = await db.from('choices').update({
     status: 'decided',
     chosen_option_id: optionId,
@@ -258,8 +296,8 @@ export async function chooseOption(
     decided_amount_cents: amount,
   }).eq('id', choice.id)
   if (second.error) {
-    await db.from('choice_options')
-      .update({ status: option.status, status_changed_at: option.statusChangedAt.toISOString() }).eq('id', optionId)
+    await putBack(option)
+    if (earlier && earlier.status !== 'heard_back') await putBack(earlier)
     return false
   }
   return true

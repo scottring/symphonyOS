@@ -26,6 +26,17 @@ describe('facts', () => {
     expect(choiceSummary([o], [fu], NOW)).toBe('1 option · none heard back yet · 1 waiting 1 day')
     expect(choiceSummary([o], [{ ...fu, completed: true }], NOW)).toBe('1 option · none heard back yet')
   })
+  it('counts as waiting only options still Contacted', () => {
+    const open = (id: string): FollowUp => ({ ...ROB_FU, taskId: `t-${id}`, optionId: id, waitingSince: new Date(2026, 9, 2) })
+    const heard = opt('hb', 'Heard', 'heard_back')
+    const out = opt('ro', 'Out', 'ruled_out')
+    const chosen = opt('co', 'Chosen', 'chosen')
+    const considering = opt('cn', 'Considering', 'considering')
+    // Their open follow-ups are older, but only Rob (Contacted) is waiting.
+    expect(choiceSummary([ROB, heard, out, chosen, considering], [ROB_FU, open('hb'), open('ro'), open('co'), open('cn')], NOW))
+      .toBe('4 options · 1 heard back · 1 waiting 6 days · 1 ruled out')
+    expect(choiceSummary([heard], [open('hb')], NOW)).toBe('1 option · 1 heard back')
+  })
   it('states an option fact', () => {
     expect(optionFact(ROB, ROB_FU, NOW)).toBe('Contacted Oct 16 · no reply · follow-up Thu')
     expect(optionFact(ROB, undefined, NOW)).toBe('Contacted Oct 16 · no reply')

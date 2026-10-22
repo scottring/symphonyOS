@@ -15,7 +15,8 @@ import { ComparisonTable, type ComparisonProps } from './ComparisonTable'
 import { OptionCards } from './OptionCards'
 import { optionLines, priceCellFor } from './cells'
 import { useChoiceEditing, type ChoicePageWriters } from './useChoiceEditing'
-import { OptionActions } from './OptionRow'
+import { InlineEdit, OptionActions } from './OptionRow'
+import { PopMenu } from './StatusMenu'
 import { CellEditor } from './CellEditor'
 import { PriceLinesEditor } from './PriceLinesEditor'
 import { ColumnAdd, ColumnMenu } from './ColumnAdd'
@@ -138,7 +139,8 @@ export function ChoicePageView({ detail, writers, files }: {
       <button type="button" onClick={back} className="mb-3 text-[13px] text-primary-600 hover:text-primary-700">
         ‹ {detail.goalTitle}
       </button>
-      <h1 className="font-display text-[28px] font-semibold leading-tight text-neutral-900">{choice.title}</h1>
+      <ChoiceHeading title={choice.title} onRename={edit.renameChoice}
+        onDelete={async () => { const ok = await edit.deleteChoice(); if (ok) back(); return ok }} />
       <p className="mb-5 mt-1 text-sm text-neutral-500">{choiceSummary(options, followUps, now)}</p>
       {decided && (
         <DecidedBanner name={chosen?.name ?? 'an option'} note={choice.decidedNote} decidedAt={choice.decidedAt}
@@ -160,6 +162,47 @@ export function ChoicePageView({ detail, writers, files }: {
       {!decided && narrow && <div className="mt-3"><ColumnAdd onAdd={edit.addColumn} /></div>}
       {!decided && <AddOptionInput onAdd={edit.addOption} />}
       <Dialogs open={open} close={close} detail={detail} edit={edit} files={files} optionOf={optionOf} />
+    </div>
+  )
+}
+
+/** The title, with ⋯ Rename and Delete (after an inline confirm). */
+function ChoiceHeading({ title, onRename, onDelete }: {
+  title: string
+  onRename: (title: string) => Promise<boolean>
+  onDelete: () => Promise<boolean>
+}) {
+  const [mode, setMode] = useState<'rename' | 'delete' | null>(null)
+  if (mode === 'rename') {
+    return (
+      <div className="max-w-md">
+        <InlineEdit label="Choice name" initial={title} onCancel={() => setMode(null)}
+          onSave={async (text) => {
+            const next = text.trim()
+            if (!next || next === title) { setMode(null); return }
+            if (await onRename(next)) setMode(null)
+          }} />
+      </div>
+    )
+  }
+  return (
+    <div>
+      <div className="flex items-start gap-3">
+        <h1 className="min-w-0 flex-1 font-display text-[28px] font-semibold leading-tight text-neutral-900">{title}</h1>
+        <PopMenu label="Choice actions" trigger="⋯" className="mt-1.5 px-1 text-lg leading-none text-neutral-500 hover:text-neutral-700" items={[
+          { label: 'Rename', onPick: () => setMode('rename') },
+          { label: 'Delete choice', danger: true, onPick: () => setMode('delete') },
+        ]} />
+      </div>
+      {mode === 'delete' && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-[13px] text-neutral-600">{`Delete ${title}? Its options, prices and values go too. Can't be undone.`}</span>
+          <button type="button" onClick={async () => { if (await onDelete()) setMode(null) }}
+            className="rounded-lg bg-red-500 px-3 py-1 text-[13px] font-medium text-white hover:bg-red-600">Delete</button>
+          <button type="button" onClick={() => setMode(null)}
+            className="px-2 py-1 text-[13px] font-medium text-neutral-500 hover:text-neutral-700">Cancel</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -208,8 +251,11 @@ function useBoundWriters(choiceId: string): ChoicePageWriters {
     }
     const uid = () => latest.current.user?.id
     return {
+      readChoice: () => db.readChoiceLists(supabase, choiceId),
+      readOptionValues: (id) => db.readOptionValues(supabase, id),
       setSelectedWork: (ids) => announce(db.updateChoice(supabase, choiceId, { selected_work: ids })),
       updateChoice: (patch) => announce(db.updateChoice(supabase, choiceId, patch)),
+      deleteChoice: () => announce(db.deleteChoice(supabase, choiceId)),
       addOption: async (input) => {
         const me = uid()
         return me ? announce(db.addOption(supabase, me, choiceId, input)) : null
