@@ -1,4 +1,5 @@
 import { createClient, type User } from '@supabase/supabase-js'
+import { patientLock } from './authLock'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -25,6 +26,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     debug: authDebugEnabled(),
+    // A frozen tab must not hold every other tab's sign-in for ever (authLock.ts).
+    lock: patientLock,
   },
 })
 

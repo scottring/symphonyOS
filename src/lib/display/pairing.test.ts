@@ -39,7 +39,8 @@ describe('a kid’s tablet', () => {
     expect(mocks.rpc).toHaveBeenCalledWith('create_display_pairing_code', { p_name: 'Kaleb’s tablet', p_family_member_id: 'kaleb', p_layout: 'trail' })
   })
   it('claims and says which kid it is for', async () => {
-    mocks.getSession.mockResolvedValue({ data: { session: { user: { is_anonymous: true } } } })
+    mocks.getSession.mockResolvedValue({ data: { session: null } })
+    mocks.signInAnonymously.mockResolvedValue({ error: null })
     mocks.rpc.mockResolvedValue({ data: { household_id: 'h1', name: 'Ella’s tablet', family_member_id: 'ella' }, error: null })
     expect(await claimPairingCode('ELL234')).toEqual({ ok: true, householdId: 'h1', name: 'Ella’s tablet', familyMemberId: 'ella' })
   })
@@ -83,12 +84,14 @@ describe('claimPairingCode', () => {
     expect(r).toEqual({ ok: false, error: 'Display sign-in is not enabled for this Symphony yet.' })
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
-  it('an already-anonymous session claims without signing in again', async () => {
+  it('an old display sign-in is set aside: each pairing starts fresh', async () => {
     mocks.getSession.mockResolvedValue({ data: { session: { user: { is_anonymous: true } } } })
-    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'That code is not valid or has expired' } })
-    expect(await claimPairingCode('abc234')).toEqual({ ok: false, error: 'That code is not valid or has expired' })
-    expect(mocks.signInAnonymously).not.toHaveBeenCalled()
-    expect(mocks.signOut).not.toHaveBeenCalled()
+    mocks.signInAnonymously.mockResolvedValue({ error: null })
+    mocks.rpc.mockResolvedValue({ data: { household_id: 'h1', name: 'Kaleb’s tablet', family_member_id: 'kaleb' }, error: null })
+    expect(await claimPairingCode('abc234')).toEqual({ ok: true, householdId: 'h1', name: 'Kaleb’s tablet', familyMemberId: 'kaleb' })
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(mocks.signOut.mock.invocationCallOrder[0]).toBeLessThan(mocks.signInAnonymously.mock.invocationCallOrder[0])
+    expect(mocks.signInAnonymously).toHaveBeenCalledTimes(1)
   })
   it('is pairing from the sign-in until the claim answers, so nothing signs the new session out meanwhile', async () => {
     mocks.getSession.mockResolvedValue({ data: { session: null } })

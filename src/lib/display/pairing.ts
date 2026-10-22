@@ -51,7 +51,7 @@ export const isPairing = (): boolean => pairing
 export function subscribePairing(l: () => void): () => void { pairingListeners.add(l); return () => { pairingListeners.delete(l) } }
 export function usePairing(): boolean { return useSyncExternalStore(subscribePairing, isPairing, isPairing) }
 
-/** The display: sign in anonymously (if not already) and claim the code.
+/** The display: sign in anonymously (afresh each time) and claim the code.
  *  Refused for a person's account: a display must never be an adult's login.
  *  A refused code signs out the sign-in this call made, so the screen stays
  *  on pairing with the reason. */
@@ -62,12 +62,14 @@ export async function claimPairingCode(code: string): Promise<{ ok: true; househ
   if (session && !session.user.is_anonymous) return { ok: false, error: 'Sign out first: a display uses its own sign-in, not a person’s account.' }
   setPairing(true)
   try {
-    if (!session) {
-      const { error } = await supabase.auth.signInAnonymously()
-      if (error) return { ok: false, error: /anonymous sign-ins are disabled/i.test(error.message) ? 'Display sign-in is not enabled for this Symphony yet.' : message(error, 'Could not start the display’s sign-in') }
-    }
+    // Every pairing starts from a fresh display sign-in. An old one (a revoked
+    // wall being paired again) already has a display row of its own, and
+    // claiming with it would fail.
+    if (session) await supabase.auth.signOut({ scope: 'local' })
+    const signIn = await supabase.auth.signInAnonymously()
+    if (signIn.error) return { ok: false, error: /anonymous sign-ins are disabled/i.test(signIn.error.message) ? 'Display sign-in is not enabled for this Symphony yet.' : message(signIn.error, 'Could not start the display’s sign-in') }
     const refused = async (error: string) => {
-      if (!session) await supabase.auth.signOut().catch(() => undefined)
+      await supabase.auth.signOut().catch(() => undefined)
       return { ok: false as const, error }
     }
     const { data, error } = await supabase.rpc('claim_display_pairing', { p_code: trimmed })
