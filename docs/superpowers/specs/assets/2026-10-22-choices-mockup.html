@@ -114,10 +114,31 @@
   .decided-banner .r{margin-left:auto;display:flex;gap:8px}
   .muted table{opacity:.7}
 
+  .work{background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+  .workhead{display:flex;gap:12px;align-items:baseline;font-size:12.5px;color:var(--ink-3);margin-bottom:10px}
+  .workhead b{font:500 17px 'Crimson Pro',serif;color:var(--ink)} .workhead .add{margin-left:auto;color:var(--sage);cursor:pointer}
+  .parts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .part{text-align:left;font:inherit;background:#fff;border:1px solid var(--line);border-radius:11px;padding:9px 12px;cursor:pointer;color:var(--ink-3)}
+  .part b{display:block;font-weight:600;font-size:13.5px;color:var(--ink-2)} .part small{font-size:12px;line-height:1.35;display:block;margin-top:2px}
+  .part::before{content:"○ ";color:var(--ink-3)}
+  .part.on{border-color:hsl(150 24% 62%);box-shadow:0 0 0 1px hsl(150 24% 72%);color:var(--ink-2)} .part.on b{color:var(--ink)} .part.on::before{content:"● ";color:var(--sage)}
+  .part::before{float:right}
+  td.price b{font-weight:600} .how{display:block;font-size:11.5px;color:var(--ink-3);margin-top:3px;line-height:1.35}
+  .gap{color:var(--ink-3);font-size:13px}
+  .phparts{display:flex;gap:6px;margin:-8px 0 12px;flex-wrap:wrap} .phparts span{font-size:12px;padding:4px 10px;border-radius:99px;border:1px solid var(--line);background:#fff;color:var(--ink-3)}
+  .phparts span.on{border-color:hsl(150 24% 62%);color:var(--sage);background:var(--sage-soft)}
+  .chat{max-width:720px;margin:0 auto;padding:26px 20px 30px;display:flex;flex-direction:column;gap:12px}
+  .me{align-self:flex-end;max-width:78%;background:var(--navy);color:#fff;border-radius:16px 16px 4px 16px;padding:11px 14px;font-size:14.5px;line-height:1.45}
+  .me .file{color:#cfe0f2}
+  .them{align-self:flex-start;max-width:80%;background:#fff;border:1px solid var(--line);border-radius:16px 16px 16px 4px;padding:11px 14px;font-size:14.5px;line-height:1.45}
+  .chat .cc{align-self:stretch}
+  .drafttag{font-size:12px;color:var(--ink-3)}
+  .canvas-link{font-size:13px;color:var(--sage);cursor:pointer}
   .callouts{max-width:1280px;margin:0 auto 18px;color:#cfc8d8;font-size:13px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px}
   .callouts div{background:#34313f;border-radius:10px;padding:10px 12px;line-height:1.45}
   .callouts b{color:#fff;font-weight:600}
   @media (max-width:860px){
+    .parts{grid-template-columns:1fr}
     .page{grid-template-columns:1fr;padding:20px 16px}
     .cmp{padding:18px 16px} .strip{grid-template-columns:1fr;margin:0 16px 24px}
     .callouts{grid-template-columns:1fr}
@@ -132,7 +153,7 @@
   <button data-v="project" class="on">1 · Project page</button>
   <button data-v="compare">2 · Comparing contractors</button>
   <button data-v="phone">3 · On a phone</button>
-  <button data-v="dropin">4 · Dropping something in</button>
+  <button data-v="dropin">4 · In chat</button>
   <button data-v="decided">5 · After choosing</button>
 </div>
 <div class="callouts" id="callouts"></div>
@@ -152,7 +173,7 @@
         <h2>Choices <span class="add">+ Choice</span></h2>
         <div class="choice" data-goto="compare">
           <div><div class="t">Contractor</div>
-            <div class="f">4 options · 2 heard back · <b>1 waiting 6 days</b> · 1 ruled out</div></div>
+            <div class="f">4 options · 3 heard back · <b>1 waiting 6 days</b> · 1 ruled out</div></div>
           <span class="go">›</span>
         </div>
         <div class="choice">
@@ -165,7 +186,7 @@
       <div class="section">
         <h2>Tasks <span class="add">+ Task</span></h2>
         <div class="tk"><i></i>Follow up with Rob about a quote <span class="tag">Waiting · Contractor</span><span class="w">Thu Oct 23</span></div>
-        <div class="tk"><i></i>Call Chesapeake Renovations<span class="w">Fri Oct 24</span></div>
+        <div class="tk"><i></i>Send the work to Rob once he replies<span class="w">Fri Oct 24</span></div>
         <div class="tk"><i></i>Measure the bathroom for the vanity<span class="w">Sat Oct 25</span></div>
         <div class="tk" style="opacity:.55"><i style="background:var(--sage);border-color:var(--sage)"></i><s>Get Martinez to come look</s><span class="w">Done</span></div>
       </div>
@@ -191,34 +212,45 @@
   <div class="cmp">
     <span class="back" data-goto="project">‹ Bathroom renovation</span>
     <div class="cmphead">
-      <div><h1>Contractor</h1><div class="sub" style="margin-bottom:0">4 options · 2 heard back · 1 waiting</div></div>
+      <div><h1>Contractor</h1><div class="sub" style="margin-bottom:0">4 options · 3 heard back · 1 waiting</div></div>
       <div class="r"><button class="btn">⋯</button></div>
+    </div>
+    <div class="work">
+      <div class="workhead"><b>The work</b><span>Tap to change what you're pricing. Each contractor's lines add up to that.</span><span class="add">Edit the work</span></div>
+      <div class="parts" id="parts">
+        <button class="part on" data-p="main"><b>Main bath</b><small>Gut it. Walk-in shower where the linen closet is. Keep the tub.</small></button>
+        <button class="part on" data-p="hall"><b>Hall bath</b><small>New vanity and tile floor. Reglaze the tub.</small></button>
+        <button class="part" data-p="kids"><b>Kids' bath</b><small>Tile and fixtures only.</small></button>
+      </div>
     </div>
     <div class="tablewrap">
     <table id="tbl">
       <thead><tr>
-        <th data-k="name">Option</th><th data-k="price">Price</th><th data-k="start">Earliest start</th><th data-k="ins">Insured</th><th data-k="ref">References</th><th>Quote</th><th class="addcol">+ Column</th>
+        <th data-k="name">Option</th><th data-k="price" id="pricehead">Price</th><th data-k="start">Earliest start</th><th data-k="ins">Insured</th><th data-k="ref">References</th><th>Quote</th><th class="addcol">+ Column</th>
       </tr></thead>
       <tbody>
-        <tr data-name="Martinez Tile &amp; Bath" data-price="18400" data-start="2026-11-17" data-order="1">
+        <tr data-name="Martinez Tile &amp; Bath" data-start="2026-11-17" data-order="1"
+            data-lines='[{"p":["main"],"c":18400},{"p":["hall"],"c":9800},{"p":["kids"],"c":7200}]'>
           <td class="name"><b>Martinez Tile &amp; Bath</b><small>Luis · 410-555-0142 · from Iris's friend Dana</small><span class="st heard">Heard back</span></td>
-          <td>$18,400</td><td>Nov 17</td><td>Yes</td><td>Called two, both happy</td><td><span class="file">quote.pdf</span></td>
+          <td class="price"></td><td>Nov 17</td><td>Yes</td><td>Called two, both happy</td><td><span class="file">quote.pdf</span></td>
           <td class="rowact"><span>Choose this</span><span style="color:var(--ink-3)">Status ▾</span></td>
         </tr>
-        <tr data-name="Harbor Bath Remodeling" data-price="22900" data-start="2027-01-05" data-order="2">
+        <tr data-name="Harbor Bath Remodeling" data-start="2027-01-05" data-order="2"
+            data-lines='[{"p":["main"],"c":22900},{"p":["main","hall","kids"],"c":44500}]'>
           <td class="name"><b>Harbor Bath Remodeling</b><small>office · 443-555-0187 · Google</small><span class="st heard">Heard back</span></td>
-          <td>$22,900</td><td>Jan 5</td><td>Yes</td><td class="empty">—</td><td><span class="file">Harbor-estimate.pdf</span></td>
+          <td class="price"></td><td>Jan 5</td><td>Yes</td><td class="empty">—</td><td><span class="file">Harbor-estimate.pdf</span></td>
           <td class="rowact"><span>Choose this</span><span style="color:var(--ink-3)">Status ▾</span></td>
         </tr>
-        <tr data-name="Rob (Dave's cousin)" data-price="" data-start="" data-order="3">
-          <td class="name"><b>Rob (Dave's cousin)</b><small>410-555-0119</small><span class="st contacted">Contacted</span><div class="fact">Contacted Oct 16 · no reply · follow-up Thu</div></td>
-          <td class="empty">—</td><td class="empty">—</td><td class="empty">—</td><td>Did Dave's kitchen</td><td class="empty">—</td>
-          <td class="rowact"><span>Follow up on…</span><span style="color:var(--ink-3)">Status ▾</span></td>
+        <tr data-name="Chesapeake Renovations" data-start="2026-12-01" data-order="3"
+            data-lines='[{"p":["main"],"c":19750},{"p":["main","hall"],"c":27000}]'>
+          <td class="name"><b>Chesapeake Renovations</b><small>Nextdoor</small><span class="st heard">Heard back</span></td>
+          <td class="price"></td><td>Dec 1</td><td>Yes</td><td class="empty">—</td><td><span class="file">proposal.pdf</span></td>
+          <td class="rowact"><span>Choose this</span><span style="color:var(--ink-3)">Status ▾</span></td>
         </tr>
-        <tr data-name="Chesapeake Renovations" data-price="" data-start="" data-order="4">
-          <td class="name"><b>Chesapeake Renovations</b><small>Nextdoor</small><span class="st">Considering</span></td>
-          <td class="empty">—</td><td class="empty">—</td><td class="empty">—</td><td class="empty">—</td><td class="empty">—</td>
-          <td class="rowact"><span style="color:var(--ink-3)">Status ▾</span></td>
+        <tr data-name="Rob (Dave's cousin)" data-start="" data-order="4" data-lines='[]'>
+          <td class="name"><b>Rob (Dave's cousin)</b><small>410-555-0119</small><span class="st contacted">Contacted</span><div class="fact">Contacted Oct 16 · no reply · follow-up Thu</div></td>
+          <td class="price"></td><td class="empty">—</td><td class="empty">—</td><td>Did Dave's kitchen</td><td class="empty">—</td>
+          <td class="rowact"><span>Follow up on…</span><span style="color:var(--ink-3)">Status ▾</span></td>
         </tr>
       </tbody>
     </table>
@@ -233,42 +265,52 @@
   <div class="phnav"><span style="color:var(--sage)">‹ Bathroom renovation</span><span style="margin-left:auto">⋯</span></div>
   <div class="ph">
     <h1>Contractor</h1>
-    <div class="sub">4 options · 2 heard back · 1 waiting</div>
+    <div class="sub">4 options · 3 heard back · 1 waiting</div>
+    <div class="phparts"><span class="on">Main bath</span><span class="on">Hall bath</span><span>Kids' bath</span></div>
     <div class="opt"><div class="top"><b>Martinez Tile &amp; Bath</b><span class="st heard">Heard back</span></div>
-      <dl><dt>Price</dt><dd>$18,400</dd><dt>Start</dt><dd>Nov 17</dd><dt>Insured</dt><dd>Yes</dd><dt>References</dt><dd>Called two, both happy</dd><dt>Quote</dt><dd><span class="file">quote.pdf</span></dd></dl></div>
+      <dl><dt>Price</dt><dd>$28,200<small class="how">Main $18,400 + Hall $9,800</small></dd><dt>Start</dt><dd>Nov 17</dd><dt>Insured</dt><dd>Yes</dd><dt>References</dt><dd>Called two, both happy</dd><dt>Quote</dt><dd><span class="file">quote.pdf</span></dd></dl></div>
+    <div class="opt"><div class="top"><b>Chesapeake Renovations</b><span class="st heard">Heard back</span></div>
+      <dl><dt>Price</dt><dd>$27,000<small class="how">Main + Hall, one price</small></dd><dt>Start</dt><dd>Dec 1</dd><dt>Insured</dt><dd>Yes</dd><dt>Quote</dt><dd><span class="file">proposal.pdf</span></dd></dl></div>
     <div class="opt"><div class="top"><b>Harbor Bath Remodeling</b><span class="st heard">Heard back</span></div>
-      <dl><dt>Price</dt><dd>$22,900</dd><dt>Start</dt><dd>Jan 5</dd><dt>Insured</dt><dd>Yes</dd><dt>Quote</dt><dd><span class="file">Harbor-estimate.pdf</span></dd></dl></div>
+      <dl><dt>Price</dt><dd><span class="gap">No price for just these</span><small class="how">Priced: Main $22,900 · All three $44,500</small></dd><dt>Start</dt><dd>Jan 5</dd><dt>Insured</dt><dd>Yes</dd></dl></div>
     <div class="opt"><div class="top"><b>Rob (Dave's cousin)</b><span class="st contacted">Contacted</span></div>
       <div class="fact">Contacted Oct 16 · no reply · follow-up Thu</div>
       <dl><dt>References</dt><dd>Did Dave's kitchen</dd></dl></div>
-    <div class="opt"><div class="top"><b>Chesapeake Renovations</b><span class="st">Considering</span></div></div>
     <div class="folded" style="border-radius:14px;margin-top:0;padding-top:12px;border-top:1px solid var(--line)">+1 ruled out</div>
   </div>
 </div>
 
-<!-- 4 DROP-IN -->
+<!-- 4 CHAT -->
 <div class="win view" id="v-dropin">
   <div class="nav"><div class="brand"><i></i>SYMPHONY</div><span style="color:var(--ink-2)">☰</span>
     <div class="tabs"><span>Today</span><span>Week</span><span>Month</span><span>Season</span><span>Year</span></div>
     <div class="navr"><span>People</span><span>Family</span><span>Search</span></div></div>
-  <div class="cmp" style="padding-bottom:16px">
-    <span class="back" data-goto="project">‹ Bathroom renovation</span>
-    <h1>Contractor</h1>
-    <div class="sub">4 options · 2 heard back · 1 waiting</div>
-  </div>
-  <div class="strip">
-    <div class="said"><small>Said to Symphony</small>"Chesapeake called back. Nineteen seven fifty, they can start December 1st, and they're insured." <br><br><small style="margin-top:6px">Attached</small><span class="file">Chesapeake-Renovations-proposal.pdf</span></div>
+  <div class="chat">
+    <div class="me">Chesapeake called back. $19,750 for the main bath, or $27,000 for main and hall together. They can start December 1st and they're insured.<span class="file" style="display:block;margin-top:6px">Chesapeake-Renovations-proposal.pdf</span></div>
     <div class="cc">
-      <header><h4>Contractor</h4><span>✕</span></header>
-      <h5>Bathroom renovation · Contractor</h5>
+      <header><h4>Contractor</h4><span class="drafttag">Draft · Not saved</span></header>
+      <h5>Bathroom renovation · Contractor · Chesapeake Renovations</h5>
       <ul>
-        <li><span class="k">STATUS</span><span>Chesapeake Renovations</span><span class="wh">→ Heard back</span></li>
-        <li><span class="k">SET</span><span>Price</span><span class="wh">$19,750</span></li>
+        <li><span class="k">STATUS</span><span>Heard back</span><span class="wh">was Considering</span></li>
+        <li><span class="k">PRICE</span><span>Main bath</span><span class="wh">$19,750</span></li>
+        <li><span class="k">PRICE</span><span>Main bath + Hall bath, together</span><span class="wh">$27,000</span></li>
         <li><span class="k">SET</span><span>Earliest start</span><span class="wh">Dec 1</span></li>
         <li><span class="k">SET</span><span>Insured</span><span class="wh">Yes</span></li>
         <li><span class="k">ATTACH</span><span>Chesapeake-Renovations-proposal.pdf</span><span class="wh">to Chesapeake</span></li>
       </ul>
-      <footer><button class="btn primary">Approve all 5</button><span class="note2">Nothing is saved until you approve. Or say what to change.</span></footer>
+      <footer><button class="btn primary">Save 6 changes</button><span class="canvas-link">Make a change</span><span class="note2">Changes appear after you save.</span></footer>
+    </div>
+    <div class="me">What would all three bathrooms cost with Martinez?</div>
+    <div class="them">Martinez: <b>$35,400</b> for all three. Main $18,400 + Hall $9,800 + Kids' $7,200. They have no price for the three together.</div>
+    <div class="me">Add a column for warranty, and Harbor said 2 years.</div>
+    <div class="cc">
+      <header><h4>Contractor</h4><span class="drafttag">Draft · Not saved</span></header>
+      <h5>Bathroom renovation · Contractor</h5>
+      <ul>
+        <li><span class="k">COLUMN</span><span>Warranty</span><span class="wh">text</span></li>
+        <li><span class="k">SET</span><span>Harbor Bath Remodeling · Warranty</span><span class="wh">2 years</span></li>
+      </ul>
+      <footer><button class="btn primary">Save 2 changes</button><span class="canvas-link">Make a change</span></footer>
     </div>
   </div>
 </div>
@@ -327,19 +369,19 @@ const CALLOUTS = {
     ["Shared like the project.", "A Family project's choices are visible to Iris and editable by her, the same as its tasks."]
   ],
   compare: [
-    ["Options are rows, facts are columns.", "You name the columns. A new choice starts with only Price. Tap a heading to sort; nothing gets highlighted as best."],
-    ["Statuses are yours to set.", "Considering · Contacted · Heard back · Ruled out · Chosen. Ruled-out options fold away below."],
-    ["Facts, not advice.", "\"Contacted Oct 16 · no reply\" comes from the status date and the linked waiting task."]
+    ["The work is part of the choice.", "List the pieces once (here, three bathrooms, each with what you want done). Tap them to price one, two or all three. Try it."],
+    ["Each quote is priced lines.", "A line covers one piece or several together (Harbor's all-three price). Price shows what that quote adds up to for exactly what's selected, and how."],
+    ["Gaps are facts, not advice.", "\"No price for just these\" with what they did price. Nothing is highlighted as best; tap a heading to sort."]
   ],
   phone: [
     ["Same order, stacked.", "Each option becomes a card with its facts as lines, in the column order."],
-    ["Empty facts are left out", "on the phone, so Rob's card shows only what's known."],
-    ["Everything else matches", "the wide screen: status, Choose this, Follow up on…, ruled-out fold."]
+    ["The work as chips", "at the top: tap to change what the prices add up to."],
+    ["Empty facts are left out,", "so Rob's card shows only what's known."]
   ],
   dropin: [
-    ["Talk or drop a file in.", "Symphony sorts what you said into the right option and column."],
-    ["The existing change card.", "Same rows, same Approve. Nothing is written until you approve, and it's one Undo."],
-    ["Quotes (stage 3).", "A dropped proposal PDF is attached to the option; reading values from it comes in the last stage."]
+    ["Chat does everything the page does.", "Add options, priced lines, columns and values; change status; follow up; choose; reopen. Talk or type, with files."],
+    ["Changes come back as the change card.", "Nothing is saved until you save it, and it's one Undo."],
+    ["Questions get facts.", "\"What would all three cost with Martinez?\" is answered from what's recorded, with the sum shown. Symphony doesn't offer opinions about which to pick."]
   ],
   decided: [
     ["The decision is one line.", "Who, when, price and contact, so the project page answers \"who's doing it?\""],
@@ -347,6 +389,44 @@ const CALLOUTS = {
     ["Nothing is lost.", "The comparison stays readable, and Reopen undoes the decision."]
   ]
 };
+const PART = {main:'Main', hall:'Hall', kids:"Kids'"};
+const ALL = Object.keys(PART);
+const money = c => '$' + c.toLocaleString('en-US');
+const label = ps => ps.length === ALL.length ? 'All three' : ps.map(p=>PART[p]).join(' + ');
+const selected = () => [...document.querySelectorAll('#parts .part.on')].map(b=>b.dataset.p);
+// The lowest sum of non-overlapping lines that covers exactly the selected pieces.
+function priceFor(lines, sel){
+  const want = new Set(sel); let best = null;
+  const usable = lines.filter(l => l.p.every(p => want.has(p)));
+  (function walk(i, used, picked, total){
+    if (used.size === want.size){ if(!best || total < best.total) best = {total, picked:[...picked]}; return; }
+    for (let j=i; j<usable.length; j++){
+      const l = usable[j]; if (l.p.some(p=>used.has(p))) continue;
+      const u = new Set(used); l.p.forEach(p=>u.add(p));
+      walk(j+1, u, [...picked, l], total + l.c);
+    }
+  })(0, new Set(), [], 0);
+  return best;
+}
+function renderPrices(){
+  const sel = selected();
+  document.getElementById('pricehead').textContent = sel.length ? 'Price · ' + label(sel) : 'Price';
+  document.querySelectorAll('#tbl tbody tr').forEach(r=>{
+    const lines = JSON.parse(r.dataset.lines), td = r.querySelector('td.price');
+    const best = sel.length && lines.length ? priceFor(lines, sel) : null;
+    r.dataset.price = best ? best.total : '';
+    if (!lines.length){ td.innerHTML = '<span class="empty">—</span>'; return; }
+    if (best){
+      const how = best.picked.length === 1
+        ? (best.picked[0].p.length > 1 ? label(best.picked[0].p) + ', one price' : 'One line')
+        : best.picked.map(l => label(l.p) + ' ' + money(l.c)).join(' + ');
+      td.innerHTML = `<b>${money(best.total)}</b><span class="how">${how}</span>`;
+    } else {
+      td.innerHTML = `<span class="gap">No price for just these</span><span class="how">Priced: ${lines.map(l=>label(l.p)+' '+money(l.c)).join(' · ')}</span>`;
+    }
+  });
+}
+document.querySelectorAll('#parts .part').forEach(b=>b.onclick=()=>{ b.classList.toggle('on'); renderPrices(); });
 function show(v){
   document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on', e.id==='v-'+v));
   document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
@@ -363,6 +443,7 @@ document.querySelectorAll('#tbl th[data-k]').forEach(th=>th.onclick=()=>{
   rows.forEach(r=>body.appendChild(r));
   document.querySelectorAll('#tbl th').forEach(h=>h.classList.toggle('sorted', h===th));
 });
+renderPrices();
 show('project');
 </script>
 </body>

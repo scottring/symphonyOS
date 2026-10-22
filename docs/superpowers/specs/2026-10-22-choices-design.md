@@ -38,8 +38,16 @@ sorts what they drop in into that place, and shows it back.
 - Deciding records what was chosen, when, and the person's own one-line reason.
   The comparison is kept, never deleted.
 - Scott and Iris see and edit the same choice when the project is Family.
-- Things said or dropped in ("Iris's friend used Martinez Tile, 410-555-0142",
-  a quote PDF) land in the right choice through the change card.
+- **The work being priced is part of the choice** (Scott, 2026-10-22: "if I
+  want to redo all three bathrooms in the house, or just two, or just one").
+  The person lists the pieces of work once. Each quote is a set of priced
+  lines, and the comparison shows what each quote adds up to for exactly the
+  pieces selected.
+- **Chat does everything the page does** (Scott, 2026-10-22: "deeply
+  integrated with chat"): add and change options, priced lines, columns,
+  values, statuses, follow-ups and the decision, by voice or typing, with
+  files. Changes come back as the change card. Questions are answered with the
+  recorded facts.
 
 ## Non-goals (v1)
 
@@ -86,10 +94,9 @@ Tapping a choice opens it.
   status. Tap a column heading to sort by it.
 - **Narrow screens:** each option is a card with its facts as lines, in the same
   order.
-- **Columns** are named by the person. A new choice starts with one column,
-  **Price**, which can be renamed or removed (Claude's call: money needs a typed
-  column, and an empty table is friction). "+ Column" adds one with a name and a
-  kind: text, money, date, or yes/no.
+- **Price is built in**, computed from the option's priced lines (see "The
+  work, and priced lines"). Every other **column** is named by the person. "+
+  Column" adds one with a name and a kind: text, money, date, or yes/no.
 - **Each option** has a name, an optional linked contact (phone and email shown
   from the contact), a status, its column values, notes, and attachments.
 - **Status** is a short fixed set the person sets: **Considering · Contacted ·
@@ -106,21 +113,62 @@ Tapping a choice opens it.
   choice becomes Decided with `decided_at`. "Reopen" undoes it.
 - Every write has Undo, the same as the rest of the app.
 
-### Dropping things in (change card)
+### The work, and priced lines
 
-Free input goes through the existing change card, never chat prose. New rows,
-in the change card's existing voice:
+Contractors quote different scopes: one bathroom, two together, all three at a
+bundle price. A single Price column can't compare those.
 
-- `Contractor · Add Martinez Tile (410-555-0142)`, which can create or link the
-  contact
-- `Contractor · Martinez Tile · Price $18,400`
-- `Contractor · Harbor Bath → Heard back`
-- `Bathroom renovation · New choice: Tile`
+- **The work** is an optional list of pieces on the choice, each with a name and
+  the person's own description ("Main bath · Gut it. Walk-in shower where the
+  linen closet is. Keep the tub."). It shows above the comparison. "Edit the
+  work" adds, renames, describes or removes pieces. It doubles as the scope you
+  send each contractor.
+- **Each option's price is a set of lines.** A line covers one piece or several
+  together, has an amount, and an optional note ("excludes fixtures"). For
+  example, Harbor: Main $22,900, and All three $44,500.
+- **Selecting what to price.** Each piece is a toggle; the selection is
+  remembered per choice. The Price column becomes "Price · Main + Hall" and
+  shows, for each option, the total of its lines that cover exactly the
+  selected pieces, with how it adds up underneath ("Main $18,400 + Hall
+  $9,800", or "Main + Hall, one price"). When a quote can be added up more
+  than one way, the lowest total for that option is shown. That is arithmetic
+  on its own lines, not a comparison between options.
+- **Gaps are facts:** an option that can't cover the selection shows "No price
+  for just these" and what it did price ("Priced: Main $22,900 · All three
+  $44,500").
+- **A choice with no pieces** keeps a plain Price, which is then just a one-line
+  quote. The contractor case and a camp choice use the same model.
+- When the choice is decided, the decision records the selected pieces and the
+  price shown for them ("Chose Martinez · Main + Hall · $28,200").
 
-A quote PDF dropped on an option, or on the choice with the option named, is
-attached to that option. Stage 3 reads it (the existing attachment `facets`
-analysis) and proposes the values it found as change-card rows for the person
-to approve. Nothing is written without approval.
+### Chat
+
+Chat is a full way in, not a later add-on. Everything the page can do, chat can
+do. It reads as the existing chat with the existing change card
+(`ChangeCard.tsx`, chat mode: "Draft · Not saved", "Save N changes", "Make a
+change"). New rows, in the card's existing voice:
+
+- `STATUS · Chesapeake Renovations · Heard back (was Considering)`
+- `PRICE · Main bath · $19,750`, or `PRICE · Main bath + Hall bath, together ·
+  $27,000`
+- `SET · Earliest start · Dec 1`
+- `ADD · Martinez Tile (410-555-0142)`, which can create or link the contact
+- `COLUMN · Warranty (text)`
+- `WORK · Kids' bath · Tile and fixtures only`
+- `CHOOSE · Martinez Tile & Bath · Main + Hall · "Earliest start"`
+- `FOLLOW UP · Rob · Thu Oct 23`, which makes the waiting task
+- `CHOICE · Bathroom renovation · New choice: Floor tile`
+
+**Questions get facts.** "What would all three cost with Martinez?" is answered
+from what's recorded, with the sum shown ("$35,400 for all three. Main $18,400
++ Hall $9,800 + Kids' $7,200. They have no price for the three together."). "Who
+hasn't gotten back to us?" lists them with dates. Chat doesn't volunteer which
+option looks best, and doesn't rank. If asked directly "which should we pick?",
+it answers with the facts side by side and leaves the call to the people.
+
+A quote PDF dropped in chat or on an option is attached to that option. Stage 2
+reads it (the existing attachment `facets` analysis) and proposes the lines and
+values it found as change-card rows. Nothing is written without approval.
 
 ## Data model
 
@@ -130,10 +178,22 @@ the owner can insert.
 
 **`choices`**: `id, user_id, project_id (FK projects, on delete cascade),
 title, status (open|decided), chosen_option_id (nullable FK), decided_at,
-decided_note text, columns jsonb, scope, sort_order, created_at, updated_at`
+decided_note text, decided_work text[], decided_amount_cents, columns jsonb,
+work jsonb, selected_work text[], scope, sort_order, created_at, updated_at`
 
 - `columns` is an ordered array of `{ id, label, kind: text|money|date|yesno }`.
   Kinds are fixed; labels are the person's.
+- `work` is an ordered array of `{ id, label, description }`. `selected_work`
+  is the current toggle state, shared by everyone who sees the choice.
+
+**`choice_price_lines`**: `id, option_id (FK choice_options, on delete
+cascade), user_id, work_ids text[], amount_cents, note, scope, sort_order,
+created_at, updated_at`
+
+- A separate table rather than JSON on the option, so Scott and Iris adding
+  lines at the same time can't overwrite each other.
+- An empty `work_ids` means the line isn't tied to pieces (a choice with no
+  work list).
 
 **`choice_options`**: `id, choice_id (FK, on delete cascade), user_id, name,
 contact_id (nullable FK contacts, on delete set null),
@@ -155,7 +215,7 @@ follow-up task links to its option by a new nullable
 `tasks.choice_option_id`, so the row can show "Waiting 6 days" without guessing
 from text.
 
-**Undo journal:** add both tables to the reviewed-change trigger list
+**Undo journal:** add all three tables to the reviewed-change trigger list
 (`20261016100000_reviewed_change_recovery.sql:58`).
 
 ## Prerequisites found while reading the code
@@ -178,18 +238,24 @@ exist (`lists.project_id`, `list_items.is_checked`).
 
 ## Build in stages, each usable on its own
 
-1. **Fix the scope gaps (1 and 2), then add choices by hand.** Tables, RLS, the
-   Choices section, the comparison (table and cards), statuses, columns,
-   attachments on options, Follow up, Choose and Reopen, Undo. Real test: the
-   bathroom contractor, with Iris looking from her own account.
-2. **Drop-in.** Agent project tools (prerequisite 3); change-card op kinds
-   `choice_add`, `option_add`, `option_set`, `option_choose` across the six
-   touch points (both `changeSet.ts` files, `PROPOSE_CHANGES_TOOL`,
-   `resolveRefs`, `changeCard.ts` rows and scope headings, an `applyChangeSet`
-   case); MCP tools for Claude Code (`symphony_list_choices`,
-   `symphony_add_option`, `symphony_update_option`).
-3. **Quotes read themselves.** A quote attached to an option proposes its
-   values (price, start date, and any column it matches) as change-card rows.
+Chat moved into the first stage (Scott, 2026-10-22), so the page and chat ship
+together.
+
+1. **Choices, by page and by chat.**
+   - Fix prerequisites 1–3 first.
+   - Tables and RLS, the Choices section, the comparison (table and cards),
+     the work and priced lines, statuses, columns, attachments on options,
+     Follow up, Choose and Reopen, Undo.
+   - Chat: agent read tools for choices; change-card op kinds `choice_add`,
+     `option_add`, `option_set`, `price_line_set`, `work_set`, `column_add`,
+     `option_choose`, `choice_reopen` across the six touch points (both
+     `changeSet.ts` files, `PROPOSE_CHANGES_TOOL`, `resolveRefs`,
+     `changeCard.ts` rows and scope headings, an `applyChangeSet` case).
+   - MCP tools for Claude Code: `symphony_list_choices`, `symphony_add_option`,
+     `symphony_update_option`, `symphony_set_price_line`.
+   - Real test: the bathroom contractor, with Iris using her own account.
+2. **Quotes read themselves.** A quote attached to an option proposes its
+   priced lines, start date and any matching column as change-card rows.
 
 ## Claude's calls (Scott to confirm or change)
 
@@ -198,7 +264,12 @@ exist (`lists.project_id`, `list_items.is_checked`).
 - **A choice always lives in a project in v1.** "Pick a summer camp" becomes a
   small project. This avoids a new top-level place. A standalone home can come
   later if it keeps happening.
-- **Price is the one starting column.** Everything else is added by the person.
+- **Price is built in and computed from priced lines.** Everything else is
+  added by the person.
+- **When a quote adds up more than one way,** the lowest total for that option
+  is shown, with how it adds up. The alternative is listing every combination.
+- **The pieces selected are shared,** not per person, so Scott and Iris see the
+  same numbers when they talk it over.
 - **The five statuses** above, the same for every kind of choice ("Heard back"
   rather than "Quoted", so it fits schools and camps too).
 - **Options are rows, columns are facts.** That works on phones; options as
