@@ -400,36 +400,40 @@ function RoutineChecklist({ routine, onToggle, timerControls }: {
   onToggle: (stop: KidStop) => void
   timerControls: (stop: KidStop, big: boolean) => ReactNode
 }) {
-  const allDone = routine.doneCount === routine.steps.length
+  const total = routine.steps.length
+  const allDone = routine.doneCount === total
+  const stepRow = (s: KidStop, time: string | null) => {
+    const Icon = STEP_ICONS[stepIcon(s.title)]
+    // The whole step, wrapped: the checklist has room the trail doesn't.
+    const head = headTitle(s.title)
+    const rest = s.title.slice(head.length).replace(/^[\s,:—–(-]+/, '').replace(/\)$/, '').trim() || null
+    const sub = [clockLabel(time), rest].filter(Boolean).join(' · ') || null
+    return (
+      <li key={s.key} className={`kk-step${s.done ? ' is-done' : ''}`}>
+        <button type="button" aria-pressed={s.done} aria-label={s.done ? `Mark ${head} not done` : `Mark ${head} done`} onClick={() => onToggle(s)}>
+          <span className="kk-step-icon"><Icon aria-hidden="true" /></span>
+          <span className="kk-step-words">
+            <span className="kk-step-title">{head}</span>
+            {sub && <span className="kk-step-sub">{sub}</span>}
+          </span>
+          <span className="kk-step-check"><Check done={s.done} /></span>
+        </button>
+        {!s.done && timerControls(s, false)}
+      </li>
+    )
+  }
   return (
     <section className="kk-routine" aria-label={routine.title}>
       <div className="kk-routine-head">
         <h2>{routine.title}</h2>
-        <span className="kk-count">{routine.doneCount} of {routine.steps.length}</span>
+        <span className="kk-count">{routine.doneCount} of {total}</span>
       </div>
       <div className="kk-routine-dots" aria-hidden="true">
         {routine.steps.map((s) => <i key={s.key} className={s.done ? 'is-done' : ''} />)}
       </div>
       <ul className="kk-steps">
-        {routine.steps.map((s) => {
-          const Icon = STEP_ICONS[stepIcon(s.title)]
-          // The whole step, wrapped: the checklist has room the trail doesn't.
-          const head = headTitle(s.title)
-          const rest = s.title.slice(head.length).replace(/^[\s,:—–(-]+/, '').replace(/\)$/, '').trim() || null
-          return (
-            <li key={s.key} className={`kk-step${s.done ? ' is-done' : ''}`}>
-              <button type="button" aria-pressed={s.done} aria-label={s.done ? `Mark ${head} not done` : `Mark ${head} done`} onClick={() => onToggle(s)}>
-                <span className="kk-step-icon"><Icon aria-hidden="true" /></span>
-                <span className="kk-step-words">
-                  <span className="kk-step-title">{head}</span>
-                  {rest && <span className="kk-step-sub">{rest}</span>}
-                </span>
-                <span className="kk-step-check"><Check done={s.done} /></span>
-              </button>
-              {!s.done && timerControls(s, false)}
-            </li>
-          )
-        })}
+        {/* A loose routine slotted in says its time: it is not one of this routine's steps. */}
+        {routine.steps.map((s) => stepRow(s, routine.also.includes(s) ? s.time : null))}
       </ul>
       {allDone && (
         <p className="kk-routine-done" role="status"><Check done />All done</p>

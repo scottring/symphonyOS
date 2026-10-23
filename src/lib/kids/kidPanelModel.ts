@@ -43,7 +43,13 @@ export interface KidRoutineNow {
   title: string
   /** 'HH:MM' it starts. */
   time: string
+  /** The routine's steps, with `also` slotted in by time. */
   steps: KidStop[]
+  /** The kid's own loose routines timed while this one is on (Feed Jax at
+   *  7:00 during School morning). Without them the checklist would hide them
+   *  until the routine is over. Each sits after the last step at or before
+   *  its time (an untimed step counts as the routine's start). */
+  also: KidStop[]
   doneCount: number
   /** The kid's next routine today, for the line at the bottom. */
   next: { title: string; time: string } | null
@@ -189,14 +195,34 @@ export function routineNow(model: MemberDayModel, memberId: string, now: Date): 
   const pick = started[started.length - 1] ?? on[0]
   if (!pick) return null
   const next = routines.find((c) => c.start > nowMin && c !== pick && c.start > pick.start)
+  // Loose routines (bands and the reading card), not other collections' steps.
+  const inSteps = new Set(pick.steps.map((s) => s.key))
+  const also = [...(model.reading ? [model.reading] : []), ...Object.values(model.bands).flat()]
+    .filter((r) => r.timeOfDay != null && isMine(r, memberId))
+    .map((r) => ({ ...stopFor(r, r.timeOfDay!.slice(0, 5), null), missed: false }))
+    .filter((s) => !inSteps.has(s.key) && toMin(s.time!) >= pick.from && toMin(s.time!) < pick.until)
+    .sort((a, b) => toMin(a.time!) - toMin(b.time!))
   return {
     id: pick.id,
     title: pick.title,
     time: pick.time,
-    steps: pick.steps,
-    doneCount: pick.steps.filter((s) => s.done).length,
+    steps: slotIn(pick.steps, also, pick.start),
+    also,
+    doneCount: [...pick.steps, ...also].filter((s) => s.done).length,
     next: next ? { title: next.title, time: next.time } : null,
   }
+}
+
+/** `extra` (in time order) into `steps`, each after the last step at or before its time. */
+function slotIn(steps: KidStop[], extra: KidStop[], start: number): KidStop[] {
+  const out = [...steps]
+  for (const e of extra) {
+    const t = toMin(e.time!)
+    let at = 0
+    for (let i = 0; i < out.length; i++) if ((out[i].time ? toMin(out[i].time!) : start) <= t) at = i + 1
+    out.splice(at, 0, e)
+  }
+  return out
 }
 
 /** "6:00" from "18:00" — am/pm is obvious on a kid's afternoon. */

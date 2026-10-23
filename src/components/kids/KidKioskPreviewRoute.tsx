@@ -2,7 +2,8 @@
 // clock, no reads or writes, for design review screenshots. Scenes:
 // kaleb-tue, kaleb-sat, ella-mon, thoughts, timer, ring, done, exit (the
 // grown-ups' way out), and the door panel's routines: kaleb-shower (Tuesday
-// 7:32pm), kaleb-morning, ella-shower.
+// 7:32pm), kaleb-morning, ella-shower, and with Feed Jax beside them:
+// ella-morning (7:05am), kaleb-home (Tuesday 6:05pm).
 
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -62,6 +63,8 @@ const routines: MemberDayModel = {
       r('wait', 'Wait quietly for Mommy to read', null),
     ] },
   ],
+  // Loose routines timed inside the routines above: on the checklist as "Also now".
+  bands: { morning: [r('jaxam', 'Feed Jax AM Meal', '07:00', false, [ELLA.id])], afternoon: [], evening: [r('jaxpm', 'Feed Jaxx Dinner', '18:00', false, k)], anytime: [] },
 }
 const thoughts: KidThought[] = [
   { id: 't1', familyMemberId: KALEB.id, text: 'Can we go to the library on Saturday?', kind: 'ask', createdAt: new Date(2026, 9, 20, 16, 58), reviewedAt: null },
@@ -77,6 +80,8 @@ export default function KidKioskPreviewRoute() {
     if (scene === 'ella-mon') return { member: ELLA, layout: 'list' as const, model: weekday('math'), now: new Date(2026, 9, 19, 17, 50) }
     if (scene === 'kaleb-shower') return { member: KALEB, layout: 'trail' as const, model: routines, now: new Date(2026, 9, 20, 19, 32) }
     if (scene === 'ella-shower') return { member: { ...ELLA, id: 'preview-ella' }, layout: 'list' as const, model: routines, now: new Date(2026, 9, 20, 19, 32) }
+    if (scene === 'ella-morning') return { member: ELLA, layout: 'list' as const, model: routines, now: new Date(2026, 9, 21, 7, 5) }
+    if (scene === 'kaleb-home') return { member: KALEB, layout: 'trail' as const, model: routines, now: new Date(2026, 9, 20, 18, 5) }
     if (scene === 'kaleb-morning') return { member: KALEB, layout: 'trail' as const, model: routines, now: new Date(2026, 9, 21, 7, 5) }
     if (scene === 'done') return { member: KALEB, layout: 'trail' as const, model: weekday('reading', true), now: new Date(2026, 9, 20, 20, 40) }
     return { member: KALEB, layout: 'trail' as const, model: weekday('reading'), now: tue }

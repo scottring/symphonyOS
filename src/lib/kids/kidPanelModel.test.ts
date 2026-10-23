@@ -148,6 +148,31 @@ describe('the routine on now (the door panel)', () => {
     expect(routineNow(day, KALEB, tue(19, 30))?.title).toBe('Kids Bedtime routine')
   })
 
+  it('a loose routine of the kid’s due during it is on the checklist too (Feed Jax at 7:00, Oct 23)', () => {
+    const withJax = model({
+      collections: day.collections,
+      bands: {
+        morning: [row('jaxam', 'Feed Jax AM Meal', '07:00:00', false, ['ella'])],
+        afternoon: [],
+        evening: [row('jaxpm', 'Feed Jaxx Dinner', '18:00:00', true, [KALEB]), row('late', 'Puzzle Trail', '22:30')],
+        anytime: [row('tidy', 'Tidy bedrooms', null)],
+      },
+    })
+    const ella = routineNow(withJax, 'ella', tue(7, 5))!
+    expect(ella.title).toBe('School morning')
+    expect(ella.also.map((s) => [s.title, s.time])).toEqual([['Feed Jax AM Meal', '07:00']])
+    // Slotted in by time: after breakfast (7:00), before shoes (7:18).
+    expect(ella.steps.map((s) => s.title)).toEqual(['Get dressed', 'Eat breakfast', 'Feed Jax AM Meal', 'Shoes and jacket on'])
+    expect(routineNow(withJax, KALEB, tue(7, 5))!.also).toEqual([])
+    // Home from school (17:45) is on until 19:15: dinner at 18:00 is in it, done, and counts.
+    const kaleb = routineNow(withJax, KALEB, tue(18, 10))!
+    expect(kaleb.title).toBe('Home from school')
+    expect(kaleb.steps.map((s) => s.title)).toEqual(['Empty take-home folder', 'Feed Jaxx Dinner'])
+    expect(kaleb.doneCount).toBe(1)
+    // Anytime things and things after the routine stay on the trail.
+    expect(routineNow(withJax, KALEB, tue(21, 0))!.also).toEqual([])
+  })
+
   it('a routine with nothing for this kid is not theirs', () => {
     const onlyKaleb = model({ collections: [{ id: 'j', title: 'Jax', timeOfDay: '18:00', rows: [row('jax', 'Feed Jax dinner', null, false, [KALEB])] }] })
     expect(routineNow(onlyKaleb, 'ella', tue(18, 0))).toBeNull()
