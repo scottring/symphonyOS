@@ -89,7 +89,13 @@ final class AppState {
     /// floating bars by `bottomInset` so nothing sits behind the dock.
     var dockHeight: CGFloat = DockMetrics.height
     var keyboardVisible = false
+    #if os(iOS)
+    /// Bottom, or a side column where the system puts its bars (iPhone Duo).
+    var dockLayout = DockLayout()
+    var bottomInset: CGFloat { keyboardVisible || dockLayout.edge != .bottom ? 0 : dockHeight }
+    #else
     var bottomInset: CGFloat { keyboardVisible ? 0 : dockHeight }
+    #endif
 
     // Domain filter
     var domainFilter: DomainFilter = .all

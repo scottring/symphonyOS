@@ -36,6 +36,32 @@ struct iOSMainView: View {
             })
     }
 
+    /// The same dock as a side column, where the system puts its own bars
+    /// (iPhone Duo: outside screen, and inside screen held sideways). There
+    /// that's inside the status-bar column, below the clock and camera, so
+    /// it's placed by the frame the system gives a bar of its width.
+    @ViewBuilder private var sideDock: some View {
+        @Bindable var state = appState
+        let layout = appState.dockLayout
+        if layout.edge != .bottom {
+            ZStack(alignment: .topLeading) {
+                Color.clear
+                SymphonyDock(activeTab: $state.activeTab, edge: layout.edge) { showCapture = true }
+                    .frame(width: layout.frame.width, height: layout.frame.height, alignment: .top)
+                    .offset(x: layout.frame.minX, y: layout.frame.minY)
+            }
+            .environment(\.layoutDirection, .leftToRight) // the frame is in window coordinates
+            .ignoresSafeArea()
+        }
+    }
+
+    /// The content stops at the side dock's inner side, which can sit
+    /// further in than the safe area.
+    private func sidePadding(_ edge: DockEdge) -> CGFloat {
+        let layout = appState.dockLayout
+        return layout.edge == edge ? max(0, layout.contentInset - layout.safeInset) : 0
+    }
+
     var body: some View {
         @Bindable var state = appState
         Group {
@@ -67,7 +93,15 @@ struct iOSMainView: View {
         // While typing, the keyboard owns the bottom edge: hide the dock so
         // the capture bar sits right on the keyboard instead of above a dock.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !appState.keyboardVisible { dock }
+            if appState.dockLayout.edge == .bottom && !appState.keyboardVisible { dock }
+        }
+        // A side dock leaves the bottom edge to the keyboard, so it stays up.
+        .padding(.leading, sidePadding(.leading))
+        .padding(.trailing, sidePadding(.trailing))
+        .overlay { sideDock }
+        .background {
+            Color.bgBase.ignoresSafeArea()
+            DockLayoutReader { layout in appState.dockLayout = layout }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             appState.keyboardVisible = true
@@ -113,9 +147,29 @@ enum DockMetrics {
 
 private struct SymphonyDock: View {
     @Binding var activeTab: AppTab
+    var edge: DockEdge = .bottom
     var onAdd: () -> Void
 
     var body: some View {
+        if edge == .bottom { bottomBar } else { sideColumn }
+    }
+
+    // Side column: "+" on top, then the tabs, as the system's vertical bars.
+    private var sideColumn: some View {
+        VStack(spacing: 4) {
+            addButton
+                .padding(.bottom, 10)
+            tab(.planner, icon: AppTab.planner.icon, label: "Planner")
+            tab(.inbox, icon: AppTab.inbox.icon, label: "Inbox")
+            tab(.routines, icon: AppTab.routines.icon, label: "Routines")
+            tab(.more, icon: AppTab.more.icon, label: "More")
+            Spacer(minLength: 0)
+        }
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+        .padding(.top, 8)
+    }
+
+    private var bottomBar: some View {
         HStack(alignment: .center, spacing: 0) {
             tab(.planner, icon: AppTab.planner.icon, label: "Planner")
             tab(.inbox, icon: AppTab.inbox.icon, label: "Inbox")
@@ -160,6 +214,12 @@ private struct SymphonyDock: View {
     // The center "+" is its own equal-width slot (so it sits between Inbox and
     // Projects without overlapping them) and is visually larger than the tabs.
     private var addSlot: some View {
+        addButton
+            .frame(maxWidth: .infinity)
+            .offset(y: -8)
+    }
+
+    private var addButton: some View {
         Button(action: onAdd) {
             Image(systemName: "plus")
                 .font(.system(size: 24, weight: .semibold))
@@ -170,8 +230,6 @@ private struct SymphonyDock: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add")
-        .frame(maxWidth: .infinity)
-        .offset(y: -8)
     }
 }
 
