@@ -50,93 +50,21 @@ struct TodayView: View {
         return dinners.dinner(on: date)
     }
 
+    /// Two columns once there's room (iPhone Duo's inside screen): the day on
+    /// the left, the lists on the right. Width decides, not orientation or
+    /// device, as Apple's iPhone Duo guidance asks.
+    @State private var width: CGFloat = 0
+    static let twoColumnMinWidth: CGFloat = 600
+    private var isTwoColumn: Bool { width >= Self.twoColumnMinWidth }
+
     var body: some View {
-        let plan = plan
-        let dinner = dinner
-        let offerTasks = plan.chooserTasks(on: date).count
-        let offerRoutines = plan.chooserRoutines(on: date).filter { !$0.chosen }.count
-
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                header
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-
-                if showSearch {
-                    searchField
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-
-                DomainSwitcher()
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
-
-                if isSearching {
-                    searchResultsContent
-                } else {
-                    if !viewModel.carriedOverTasks.isEmpty {
-                        let n = viewModel.carriedOverTasks.count
-                        CalmRow(text: "Review \(n) unfinished \(n == 1 ? "item" : "items")") { showUnfinished = true }
-                            .accessibilityHint("Decide what happens to each. Nothing moves on its own.")
-                    }
-
-                    let forToday = viewModel.forToday
-                    if !forToday.isEmpty || offerTasks + offerRoutines > 0 {
-                        Eyebrow(text: "For today")
-                        ForEach(forToday) { item in card(item) }
-                    }
-                    if offerTasks + offerRoutines > 0 {
-                        CalmRow(text: "Choose from this week", detail: offerDetail(offerTasks, offerRoutines)) {
-                            showChooser = true
-                        }
-                    }
-
-                    // Tonight's dinner, after what you chose and before the
-                    // timed day (Scott, 2026-10-07).
-                    if let dinner {
-                        Eyebrow(text: appState.isToday ? "Dinner tonight" : "Dinner")
-                        DinnerCard(dinner: dinner)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 3)
-                    }
-
-                    // The day, to scale — every timed thing where it falls,
-                    // free time named. Always drawn: an empty day says so.
-                    Eyebrow(text: "The day")
-                    TodayDayColumn(items: viewModel.schedule, isToday: appState.isToday,
-                                   members: familyMembers) { opened = $0 }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 6)
-
-                    // First visit to a day: say the calendar is coming instead
-                    // of showing an empty schedule that then fills in.
-                    let eventsPending = calendar.items(for: date) == nil && calendar.isLoading(date)
-                    if eventsPending {
-                        CalendarLoadingRow()
-                            .padding(.horizontal, 20)
-                            .padding(.top, 18)
-                    }
-                }
-            }
-            .padding(.bottom, 12)
+        Group {
+            if isTwoColumn { twoColumns } else { oneColumn }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .scrollDismissesKeyboard(.interactively)
         .background(Color.bgBase.ignoresSafeArea())
         .statusBarScrim()
-        // The capture bar is an inset, not an overlay: the list's scroll
-        // extent ends above it, so the last card (and every subtask) can
-        // always scroll fully into view — with the keyboard up too.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            QuickCaptureBar(userId: userId, defaultDate: date)
-                .padding(.top, 4)
-                .background(alignment: .bottom) {
-                    LinearGradient(colors: [Color.bgBase.opacity(0), Color.bgBase], startPoint: .top, endPoint: .center)
-                        .ignoresSafeArea()
-                }
-                .padding(.bottom, appState.bottomInset)
-        }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
@@ -167,6 +95,150 @@ struct TodayView: View {
         .onChange(of: focusRows.count) { _, _ in rebuildTimeline() }
         .onChange(of: eventNotesRevision) { _, _ in rebuildTimeline() }
         .onChange(of: eventsRevision) { _, _ in rebuildTimeline() }
+    }
+
+    // MARK: - Layouts
+
+    private var oneColumn: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                topControls
+                if isSearching {
+                    searchResultsContent
+                } else {
+                    lists
+                    day
+                }
+            }
+            .padding(.bottom, 12)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { captureBar }
+    }
+
+    private var twoColumns: some View {
+        HStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    topControls
+                    if isSearching { searchResultsContent } else { day }
+                }
+                .padding(.bottom, 12)
+            }
+            .frame(width: leftColumnWidth)
+            .safeAreaPadding(.bottom, appState.bottomInset)
+
+            Rectangle().fill(Color.cardBorder).frame(width: 1).ignoresSafeArea(edges: .vertical)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) { lists }
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
+            }
+            .frame(maxWidth: .infinity)
+            .safeAreaInset(edge: .bottom, spacing: 0) { captureBar }
+        }
+    }
+
+    /// The columns meet at the fold when the screen has one running top to
+    /// bottom (iPhone Duo held sideways or half-open like a book), so nothing
+    /// sits in the crease; otherwise they share the width.
+    private var leftColumnWidth: CGFloat {
+        #if os(iOS)
+        let layout = appState.dockLayout
+        if let fold = layout.fold, fold.height > fold.width {
+            let leadingInset = layout.edge == .leading ? layout.contentInset : 0
+            let x = fold.midX - leadingInset
+            if x > 240 && x < width - 240 { return x }
+        }
+        #endif
+        return (width / 2).rounded()
+    }
+
+    private var topControls: some View {
+        Group {
+            header
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+
+            if showSearch {
+                searchField
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            DomainSwitcher()
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+        }
+    }
+
+    /// For today, the way into this week's shelf, and tonight's dinner.
+    @ViewBuilder
+    private var lists: some View {
+        let plan = plan
+        let dinner = dinner
+        let offerTasks = plan.chooserTasks(on: date).count
+        let offerRoutines = plan.chooserRoutines(on: date).filter { !$0.chosen }.count
+
+        if !viewModel.carriedOverTasks.isEmpty {
+            let n = viewModel.carriedOverTasks.count
+            CalmRow(text: "Review \(n) unfinished \(n == 1 ? "item" : "items")") { showUnfinished = true }
+                .accessibilityHint("Decide what happens to each. Nothing moves on its own.")
+        }
+
+        let forToday = viewModel.forToday
+        if !forToday.isEmpty || offerTasks + offerRoutines > 0 {
+            Eyebrow(text: "For today")
+            ForEach(forToday) { item in card(item) }
+        }
+        if offerTasks + offerRoutines > 0 {
+            CalmRow(text: "Choose from this week", detail: offerDetail(offerTasks, offerRoutines)) {
+                showChooser = true
+            }
+        }
+
+        // Tonight's dinner, after what you chose and before the
+        // timed day (Scott, 2026-10-07).
+        if let dinner {
+            Eyebrow(text: appState.isToday ? "Dinner tonight" : "Dinner")
+            DinnerCard(dinner: dinner)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 3)
+        }
+    }
+
+    /// The day, to scale — every timed thing where it falls, free time named.
+    /// Always drawn: an empty day says so.
+    @ViewBuilder
+    private var day: some View {
+        Eyebrow(text: "The day")
+        TodayDayColumn(items: viewModel.schedule, isToday: appState.isToday,
+                       members: familyMembers) { opened = $0 }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+
+        // First visit to a day: say the calendar is coming instead
+        // of showing an empty schedule that then fills in.
+        let eventsPending = calendar.items(for: date) == nil && calendar.isLoading(date)
+        if eventsPending {
+            CalendarLoadingRow()
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+        }
+    }
+
+    // The capture bar is an inset, not an overlay: the list's scroll
+    // extent ends above it, so the last card (and every subtask) can
+    // always scroll fully into view — with the keyboard up too.
+    private var captureBar: some View {
+        QuickCaptureBar(userId: userId, defaultDate: date)
+            .padding(.top, 4)
+            .background(alignment: .bottom) {
+                LinearGradient(colors: [Color.bgBase.opacity(0), Color.bgBase], startPoint: .top, endPoint: .center)
+                    .ignoresSafeArea()
+            }
+            .padding(.bottom, appState.bottomInset)
     }
 
     /// What a tap on the day column opens: a task's details, an event's, or

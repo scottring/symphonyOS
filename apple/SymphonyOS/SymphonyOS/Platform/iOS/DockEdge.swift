@@ -31,6 +31,9 @@ struct DockLayout: Equatable {
     var contentInset: CGFloat = 0
     /// The window's own safe-area inset on the dock's edge.
     var safeInset: CGFloat = 0
+    /// The fold, in window coordinates, when the screen has one (iPhone Duo's
+    /// inside screen): two-column layouts split along it.
+    var fold: CGRect?
 
     static let sideWidth: CGFloat = 72
 
@@ -101,6 +104,7 @@ struct DockLayoutReader: UIViewRepresentable {
                     let safe = onLeft ? window.safeAreaInsets.left : window.safeAreaInsets.right
                     layout = .side(edge, onLeft: onLeft, window: window.bounds.size, barInsets: insets, safeInset: safe)
                 }
+                layout.fold = window.reservedRegions(kind: .division, options: .includeInactive).first?.frame
             }
             guard layout != last else { return }
             last = layout
