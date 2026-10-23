@@ -37,6 +37,7 @@
 		38A50C4687C8342D2B6F0DE0 /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B89F2EB3CAD8F9EF5A476A8 /* Contact.swift */; };
 		3BD45BCD6DC5749F4AA19BC0 /* CarriedOverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */; };
 		414C7AC80E35A0CC4027D21D /* EventNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF0FC1CF6088ADE5D739EB5 /* EventNote.swift */; };
+		41AE4C762EAFD3902E7DF083 /* NextUpCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BD95A959DE58FFA206B8F70 /* NextUpCard.swift */; };
 		47E06813C2F26251F785910B /* RoutineListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C82C536D6E13BD9ECB5DDD /* RoutineListView.swift */; };
 		4AE3289D3236007A5F98C6C0 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4D95EEAD58A126302E8231 /* MainView.swift */; };
 		4BCF33CAF546B310C3757000 /* TimelineViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39EA5F28070C6203DFC10DC7 /* TimelineViewModel.swift */; };
@@ -71,6 +72,7 @@
 		9629B1BFE3138DBA463C6A9C /* DayScaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056F5BF746D2B10ED8954A53 /* DayScaleTests.swift */; };
 		974478A2BCD64DC6B9DE8293 /* RoutineMoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC0B9818E92AB5B6E37390A /* RoutineMoveTests.swift */; };
 		98E7592BB31BDA426F553216 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F78B0DC6BEC5E61D5289ABA6 /* ProjectDetailView.swift */; };
+		9AF8FDD2B1C9DBB74ABCE747 /* DayGlanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 169FC19A952F954EECF671DF /* DayGlanceTests.swift */; };
 		9DE0E7DCA9AA2156DC5F8942 /* StepFoldTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F969B799D302BBB50A132BE /* StepFoldTests.swift */; };
 		9E7990B3FEE174CECCB7444E /* SafariView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC4EC7581B16A756929F754 /* SafariView.swift */; };
 		9F7F645DDEABED299DE4578C /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EBED2D101D6AFAD857742E3 /* SyncEngine.swift */; };
@@ -150,6 +152,7 @@
 		0EFF39D03A032DEB889523B4 /* SymphonyList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyList.swift; sourceTree = "<group>"; };
 		12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCaptureBar.swift; sourceTree = "<group>"; };
 		15C9B2674A0AE5DFA973DAF0 /* CardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStyle.swift; sourceTree = "<group>"; };
+		169FC19A952F954EECF671DF /* DayGlanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayGlanceTests.swift; sourceTree = "<group>"; };
 		187DEF77B7597EB968E30562 /* PeriodPlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodPlanView.swift; sourceTree = "<group>"; };
 		1A3E9139010E51C7040394A0 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
 		1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
@@ -186,6 +189,7 @@
 		692BB44DC5FA145FA412DB96 /* GoogleCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCalendarService.swift; sourceTree = "<group>"; };
 		6B165E6B770010DB9EC2731C /* NotesHTMLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesHTMLTests.swift; sourceTree = "<group>"; };
 		6BC4EC7581B16A756929F754 /* SafariView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariView.swift; sourceTree = "<group>"; };
+		6BD95A959DE58FFA206B8F70 /* NextUpCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextUpCard.swift; sourceTree = "<group>"; };
 		6C272C7DF4B6BF8AA2ED024E /* DockLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockLayoutTests.swift; sourceTree = "<group>"; };
 		6D0E0B44FF0171B957F8A6E8 /* PageIngest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageIngest.swift; sourceTree = "<group>"; };
 		6E12BCB3F98A56A73FBB104A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -570,6 +574,7 @@
 			isa = PBXGroup;
 			children = (
 				A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */,
+				169FC19A952F954EECF671DF /* DayGlanceTests.swift */,
 				056F5BF746D2B10ED8954A53 /* DayScaleTests.swift */,
 				FDA21FA32A236A44EDB99EE6 /* DesignSystemTests.swift */,
 				E7A9598FAC1528BAE33CC441 /* DinnerPickTests.swift */,
@@ -620,6 +625,7 @@
 				7F3522449230AFDDBFBBAA95 /* DateNavigator.swift */,
 				B4559D7757792E8224AEBAD9 /* DinnerCard.swift */,
 				C98347D43F09BA622FEB4503 /* DomainSwitcher.swift */,
+				6BD95A959DE58FFA206B8F70 /* NextUpCard.swift */,
 				D1383EE5C83DE0489DE695E0 /* RoutineOccurrenceSheet.swift */,
 				96334CB8EF20C74A0CFEF840 /* TimelineItemCard.swift */,
 				D221F6CA1BFCFE2656D2828E /* TodayDayColumn.swift */,
@@ -770,6 +776,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3BD45BCD6DC5749F4AA19BC0 /* CarriedOverTests.swift in Sources */,
+				9AF8FDD2B1C9DBB74ABCE747 /* DayGlanceTests.swift in Sources */,
 				9629B1BFE3138DBA463C6A9C /* DayScaleTests.swift in Sources */,
 				6FA7A8C0F8DCA3F3F9D2293F /* DesignSystemTests.swift in Sources */,
 				1A33ACD19D55C2BC2F3E4BAA /* DinnerPickTests.swift in Sources */,
@@ -828,6 +835,7 @@
 				D4B40B6C5DF437E57BA45693 /* LogMedicationIntent.swift in Sources */,
 				4AE3289D3236007A5F98C6C0 /* MainView.swift in Sources */,
 				ED73ECCD14D5BD8905977FBC /* MedTokenStore.swift in Sources */,
+				41AE4C762EAFD3902E7DF083 /* NextUpCard.swift in Sources */,
 				69C0D3EC970FE467BCEB47DC /* NordicColors.swift in Sources */,
 				1D60E707A576F8C670198484 /* NotesHTML.swift in Sources */,
 				E37FD1B1732BE60FE7357D84 /* PageIngest.swift in Sources */,

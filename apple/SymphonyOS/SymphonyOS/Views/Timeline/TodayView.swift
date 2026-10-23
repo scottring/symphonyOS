@@ -57,9 +57,21 @@ struct TodayView: View {
     static let twoColumnMinWidth: CGFloat = 600
     private var isTwoColumn: Bool { width >= Self.twoColumnMinWidth }
 
+    /// The outside screen of iPhone Duo — narrow, with the system's bars in a
+    /// side column — opens Today as a dashboard. The bar's edge, not the
+    /// device, decides; a regular iPhone keeps the full Today.
+    private var isDashboard: Bool {
+        #if os(iOS)
+        return appState.dockLayout.edge != .bottom && !isTwoColumn
+        #else
+        return false
+        #endif
+    }
+    @State private var showWholeDay = false
+
     var body: some View {
         Group {
-            if isTwoColumn { twoColumns } else { oneColumn }
+            if isTwoColumn { twoColumns } else if isDashboard { dashboard } else { oneColumn }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .scrollDismissesKeyboard(.interactively)
@@ -108,6 +120,29 @@ struct TodayView: View {
                 } else {
                     lists
                     day
+                }
+            }
+            .padding(.bottom, 12)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { captureBar }
+    }
+
+    /// What's on now or next, the day's lists, and the whole day on request.
+    private var dashboard: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                topControls
+                if isSearching {
+                    searchResultsContent
+                } else {
+                    NextUpCard(items: viewModel.schedule, isToday: appState.isToday) { opened = $0 }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
+                    lists
+                    CalmRow(text: showWholeDay ? "Hide the whole day" : "The whole day") {
+                        withAnimation(.easeInOut(duration: 0.2)) { showWholeDay.toggle() }
+                    }
+                    if showWholeDay { day }
                 }
             }
             .padding(.bottom, 12)
