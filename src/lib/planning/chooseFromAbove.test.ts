@@ -12,7 +12,10 @@ const task = (o: Partial<Task>) => createMockTask({ createdAt: new Date(2026, 9,
 
 const base = (lines: Task[], pool: Task[], extra: Partial<ChooseInput> = {}): ChooseInput => ({
   lines, pool, level: 'week', periodStart: WEEK, prevStart: LAST, isCurrent: true,
-  hereWord: 'this week', lastWord: 'last week', aboveWord: 'October', ...extra,
+  hereWord: 'this week', lastWord: 'last week', aboveWord: 'October',
+  // A fixed "now" inside the week, so a day later in it isn't read as missed
+  // once the real date passes it.
+  now: new Date(2026, 9, 19), ...extra,
 })
 
 describe('buildChooseTree', () => {
