@@ -14,7 +14,7 @@ export interface WeekRangePopoverProps {
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
 
 /** Header control for a week's active range: pick the first and last planned
- *  day of the Sunday-anchored week. Week edges (0 / 6) write null so a full
+ *  day of the week as the page shows it (positions from `weekStart`). Week edges (0 / 6) write null so a full
  *  week stores no bounds at all. */
 export function WeekRangePopover({ weekStart, activeRange, onChange }: WeekRangePopoverProps) {
   const [open, setOpen] = useState(false)
@@ -37,7 +37,10 @@ export function WeekRangePopover({ weekStart, activeRange, onChange }: WeekRange
     )
   }
 
-  const dayOption = (d: number) => `${dayLabelFor(d)} ${formatDateMonthDay(dateForDayOfWeek(weekStart, d))}`
+  const dayOption = (d: number) => {
+    const date = dateForDayOfWeek(weekStart, d)
+    return `${dayLabelFor(date.getDay())} ${formatDateMonthDay(date)}`
+  }
 
   return (
     <div ref={rootRef} className="relative">

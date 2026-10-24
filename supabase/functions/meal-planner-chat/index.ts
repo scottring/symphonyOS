@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
+import { DAY_NAMES, addDaysIso, dateInWindow, dayInWindow, dayLabel, weekdayOf, windowWeeks } from './window.ts'
 
 // ════════════════════════════════════════════════════════════════
 // MEAL-PLANNER CHAT — a Claude tool-calling loop that writes DIRECTLY to
@@ -24,6 +25,11 @@ import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 //   (the brief predates this schema check) — do not use it. The stale
 //   comment on DbMealPlanEntry.day_of_week in src/types/meal-planner.ts
 //   ("0=Mon, 6=Sun") is *also* wrong and should be fixed separately.
+//
+// The week planned (2026-10-24) is the Meals page's: seven days from the
+// household's week start, sent as `windowStart` (window.ts). A Saturday week
+// draws on two stored Sunday weeks; a weekday names one date in it. An older
+// client sends only `weekStart`, and the window is that Sunday's week.
 //
 // SSE event shape consumed by the (future) chat rail:
 //   {type:'text', text} | {type:'tool', name} | {type:'done', reply} | {type:'error', message}
@@ -49,7 +55,6 @@ function scopeFor(
 const MODEL = 'claude-sonnet-4-6'
 const MAX_TURNS = 12
 
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const SLOTS = ['breakfast', 'lunch', 'dinner'] as const
 type MealSlot = typeof SLOTS[number]
 
@@ -67,7 +72,7 @@ function seasonForMonth(month: number): string {
 }
 
 /** Server-computed seasonal grounding line for the system prompt. weekStart
- *  is always a Sunday (YYYY-MM-DD); parsed as UTC so the date math can't
+ *  is the window's first day (YYYY-MM-DD); parsed as UTC so the date math can't
  *  drift a day from a local-timezone Date() interpretation. Season is
  *  derived from the week's start-of-week month; the date range itself
  *  names the month(s) precisely so the model can reason about actual
@@ -85,11 +90,6 @@ function seasonalGroundingLine(weekStart: string): string {
   return `This is the week of ${range} — peak ${season}. Assume a US market unless the preferences note says otherwise.`
 }
 
-/** Add days to a YYYY-MM-DD string in UTC (no timezone drift). */
-function addDaysIso(iso: string, days: number): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
-}
 
 // ── Tool schemas (Anthropic tool-use format) ───────────────────────
 const TOOLS: any[] = [
@@ -99,7 +99,7 @@ const TOOLS: any[] = [
     input_schema: {
       type: 'object',
       properties: {
-        day_of_week: { type: 'integer', minimum: 0, maximum: 6, description: '0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday — matches JS Date.getDay(). weekStart is always that week\'s Sunday.' },
+        day_of_week: { type: 'integer', minimum: 0, maximum: 6, description: '0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday — matches JS Date.getDay(). Each weekday is one date in the week being planned (listed in the system prompt).' },
         slot: { type: 'string', enum: ['breakfast', 'lunch', 'dinner'] },
         recipe_id: { type: 'string' },
         title: { type: 'string' },
@@ -159,8 +159,8 @@ const TOOLS: any[] = [
     input_schema: {
       type: 'object',
       properties: {
-        starts_on: { type: 'string', description: 'First planned day, YYYY-MM-DD, within this week. Omit for the week start (Sunday).' },
-        ends_on: { type: 'string', description: 'Last planned day, YYYY-MM-DD, within this week. Omit for the week end (Saturday).' },
+        starts_on: { type: 'string', description: 'First planned day, YYYY-MM-DD, within this week. Omit for the week\'s first day.' },
+        ends_on: { type: 'string', description: 'Last planned day, YYYY-MM-DD, within this week. Omit for the week\'s last day.' },
       },
     },
   },
@@ -168,10 +168,12 @@ const TOOLS: any[] = [
 
 // ── Context loading (RLS-scoped via the anon+Authorization client) ─
 interface PlanContext {
+  /** The stored plan id for each Sunday week the window draws on. */
+  planIds: Map<string, string>
   planId: string | null
   startsOn: string | null
   endsOn: string | null
-  entries: Array<{ id: string; day_of_week: number; slot: string; recipe_id: string | null; ad_hoc_title: string | null; leftover_from: string | null; for_member_id: string | null }>
+  entries: Array<{ id: string; date: string; day_of_week: number; slot: string; recipe_id: string | null; ad_hoc_title: string | null; leftover_from: string | null; for_member_id: string | null }>
   recipes: Array<{ id: string; title: string; tags: string[] | null; prep_minutes: number | null }>
   preferences: string | null
   /** id of the canonical household preferences note (couple-scoped), so
@@ -181,27 +183,39 @@ interface PlanContext {
   members: Array<{ id: string; name: string }>
 }
 
-async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanContext> {
+async function loadContext(db: SupabaseClient, windowStart: string): Promise<PlanContext> {
   // "Oldest wins" — same determinism rule as useMealPlan.refresh if more
   // than one household member somehow created a plan for the same week.
-  const { data: planRows, error: planErr } = await db
-    .from('meal_plans').select('id, starts_on, ends_on')
-    .eq('week_start', weekStart)
-    .order('created_at', { ascending: true })
-    .limit(1)
-  if (planErr) throw planErr
-  const planRow = planRows?.[0] ?? null
+  const { weeks, anchor } = windowWeeks(windowStart)
+  const planIds = new Map<string, string>()
+  let planRow: { id: string; starts_on: string | null; ends_on: string | null } | null = null
+  for (const week of weeks) {
+    const { data: planRows, error: planErr } = await db
+      .from('meal_plans').select('id, starts_on, ends_on')
+      .eq('week_start', week)
+      .order('created_at', { ascending: true })
+      .limit(1)
+    if (planErr) throw planErr
+    const row = planRows?.[0] ?? null
+    if (row) planIds.set(week, row.id)
+    if (week === anchor) planRow = row
+  }
   const planId: string | null = planRow?.id ?? null
 
   let entries: PlanContext['entries'] = []
-  if (planId) {
+  if (planIds.size) {
+    const weekOfPlan = new Map([...planIds].map(([week, id]) => [id, week]))
     const { data, error } = await db
       .from('meal_plan_entries')
-      .select('id, day_of_week, slot, recipe_id, ad_hoc_title, leftover_from, for_member_id')
-      .eq('meal_plan_id', planId)
-      .order('day_of_week', { ascending: true })
+      .select('id, meal_plan_id, day_of_week, slot, recipe_id, ad_hoc_title, leftover_from, for_member_id')
+      .in('meal_plan_id', [...planIds.values()])
     if (error) throw error
-    entries = data ?? []
+    // Only the window's days: a stored week it partly covers has days in the
+    // window before or after.
+    entries = (data ?? []).flatMap(({ meal_plan_id, ...e }: any) => {
+      const date = dateInWindow(windowStart, weekOfPlan.get(meal_plan_id) ?? '', e.day_of_week)
+      return date ? [{ ...e, date }] : []
+    }).sort((a: { date: string }, b: { date: string }) => a.date.localeCompare(b.date))
   }
 
   // Dozens of rows, not thousands — no pagination needed, cap defensively.
@@ -224,6 +238,7 @@ async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanC
   if (memberErr) throw memberErr
 
   return {
+    planIds,
     planId,
     startsOn: planRow?.starts_on ?? null,
     endsOn: planRow?.ends_on ?? null,
@@ -246,7 +261,7 @@ function buildSystemPrompt(weekStart: string, ctx: PlanContext): string {
         : (e.ad_hoc_title ?? '(untitled)')
       const leftoverNote = e.leftover_from ? ` [leftover from entry ${e.leftover_from}]` : ''
       const memberNote = e.for_member_id ? ` [just for ${memberNameById.get(e.for_member_id) ?? 'one person'}]` : ''
-      const dayName = DAY_NAMES[e.day_of_week] ?? `day ${e.day_of_week}`
+      const dayName = dayLabel(e.date)
       return `- ${dayName} ${e.slot}: ${what} (entry id ${e.id})${memberNote}${leftoverNote}`
     }).join('\n')
     : '(nothing planned yet this week)'
@@ -266,11 +281,15 @@ function buildSystemPrompt(weekStart: string, ctx: PlanContext): string {
   const seasonLine = seasonalGroundingLine(weekStart)
 
   const weekEnd = addDaysIso(weekStart, 6)
+  const dayLines = Array.from({ length: 7 }, (_, i) => {
+    const date = addDaysIso(weekStart, i)
+    return `${dayLabel(date)} (${date}) = day_of_week ${weekdayOf(date)}`
+  }).join('; ')
   const rangeLine = (ctx.startsOn || ctx.endsOn)
     ? `ACTIVE RANGE: this week is PARTIAL. Only ${ctx.startsOn ?? weekStart} through ${ctx.endsOn ?? weekEnd} is being planned. Never propose meals, call set_slot, or suggest groceries for days outside this range.`
     : ''
 
-  return `You are the household's meal-planning consultant — a chef friend with strong seasonal instincts, not a meal-kit service. Voice: warm, concise, food-literate. Recommendations are simple, inspired, and grounded in what is currently in season. You're planning the household's week of ${weekStart} (that Sunday through the following Saturday).
+  return `You are the household's meal-planning consultant — a chef friend with strong seasonal instincts, not a meal-kit service. Voice: warm, concise, food-literate. Recommendations are simple, inspired, and grounded in what is currently in season. You're planning the household's week of ${dayLabel(weekStart)} through ${dayLabel(weekEnd)}.
 
 ${seasonLine}
 ${rangeLine}
@@ -284,7 +303,7 @@ Rules:
 
 Day/slot model:
 - Each day has three slots: breakfast, lunch, dinner.
-- day_of_week is 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday — this matches JS Date.getDay(). weekStart (${weekStart}) is always that week's Sunday.
+- day_of_week is 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday — this matches JS Date.getDay(). This week runs ${dayLabel(weekStart)} to ${dayLabel(weekEnd)}, so each weekday is exactly one date: ${dayLines}. Propose and list the nights in that order, starting with ${DAY_NAMES[weekdayOf(weekStart)]}.
 - Use set_slot to fill or replace a slot (it replaces whatever was there), clear_slot to empty one.
 - Meals can DIVERGE per person. A slot normally has one shared whole-family meal, but when the household eats differently that day (e.g. Scott and Iris have different lunches, or the kids eat separately on date night) call set_slot with for_member = a person's name to set just their meal. Omit for_member for the shared meal. Setting one person's meal leaves the shared meal and everyone else's untouched. Household members: ${ctx.members.map(m => m.name).join(', ') || '(none on record)'}.
 - The week can be PARTIAL. If the user says they are away or unavailable for part of the week ("we get back Tuesday", "we leave Friday morning"), call set_week_range with the first and/or last planned date, then plan only the days inside the range. Days outside the active range never get proposals, set_slot calls, or grocery items.
@@ -330,7 +349,7 @@ Standing preferences (master prompt) policy — this is important:
 - Call update_preferences ONLY when the user states a STANDING, going-forward change to how meals should always be planned — signaled by language like "from now on", "always", "never again", "going forward", "update my preferences", "change the master prompt". When unsure whether a change is standing or just this week, ASK ("just this week, or should I make that a standing rule?") rather than editing the master.
 - When you DO update the master, say so plainly in your reply (e.g. "Updated your standing preferences.") so the user knows it will carry into future weeks. The note is shared with the household, so both partners plan from the same master prompt.
 
-Current plan for week of ${weekStart}:
+Current plan for the week of ${dayLabel(weekStart)}:
 ${entryLines}
 
 Recipe library (id, title, tags, prep time):
@@ -348,9 +367,10 @@ async function resolvePlanId(
   db: SupabaseClient,
   userId: string,
   weekStart: string,
-  planCache: { id: string | null },
+  planCache: Map<string, string>,
 ): Promise<string> {
-  if (planCache.id) return planCache.id
+  const cached = planCache.get(weekStart)
+  if (cached) return cached
   const { data: rows, error } = await db
     .from('meal_plans').select('id')
     .eq('week_start', weekStart)
@@ -359,7 +379,7 @@ async function resolvePlanId(
   if (error) throw error
   const existingId: string | undefined = rows?.[0]?.id
   if (existingId) {
-    planCache.id = existingId
+    planCache.set(weekStart, existingId)
     return existingId
   }
   const { data: created, error: createErr } = await db
@@ -368,7 +388,7 @@ async function resolvePlanId(
     .select('id').single()
   if (createErr) throw createErr
   const newId: string = created.id
-  planCache.id = newId
+  planCache.set(weekStart, newId)
   return newId
 }
 
@@ -390,7 +410,7 @@ async function runTool(
   weekStart: string,
   name: string,
   input: Record<string, unknown>,
-  planCache: { id: string | null },
+  planCache: Map<string, string>,
   prefsNoteId: string | null,
   members: Array<{ id: string; name: string }>,
 ): Promise<string> {
@@ -419,9 +439,11 @@ async function runTool(
           forMemberId = match.id
         }
 
-        const planId = await resolvePlanId(db, userId, weekStart, planCache)
+        // The weekday's date in this week, stored under its own Sunday week.
+        const day = dayInWindow(weekStart, dayOfWeek)
+        const planId = await resolvePlanId(db, userId, day.week, planCache)
 
-        // leftover_from must point at a REAL entry in THIS SAME plan —
+        // leftover_from must point at a REAL entry in THIS week's plans —
         // otherwise a stale/cross-week id from earlier history would link
         // silently to the wrong week (or nothing, if RLS just hides it).
         if (leftoverFrom) {
@@ -429,7 +451,7 @@ async function runTool(
             .from('meal_plan_entries').select('id, meal_plan_id')
             .eq('id', leftoverFrom).maybeSingle()
           if (sourceErr) throw sourceErr
-          if (!sourceEntry || sourceEntry.meal_plan_id !== planId) {
+          if (!sourceEntry || ![...planCache.values()].includes(sourceEntry.meal_plan_id)) {
             return `Error: leftover_from_entry_id ${leftoverFrom} does not refer to an entry in this week's plan. Look up a real entry id from the current plan or a prior set_slot result before linking a leftover.`
           }
         }
@@ -449,7 +471,7 @@ async function runTool(
           leftover_from: leftoverFrom,
           for_member_id: forMemberId,
         }).select().single()
-        if (insErr) return `Error: could not set ${DAY_NAMES[dayOfWeek]} ${slot}: ${insErr.message}. The existing entry in that slot (if any) was left untouched.`
+        if (insErr) return `Error: could not set ${dayLabel(day.date)} ${slot}: ${insErr.message}. The existing entry in that slot (if any) was left untouched.`
 
         // Replace only the SAME scope: a shared meal replaces the shared meal;
         // a person's meal replaces only that person's — never wiping the shared
@@ -462,7 +484,7 @@ async function runTool(
         if (delErr) throw delErr
 
         const who = forMemberName ? ` (for ${forMemberName})` : ''
-        return `Set ${DAY_NAMES[dayOfWeek]} ${slot}${who} -> ${title ?? recipeId}. Entry: ${JSON.stringify(data)}`
+        return `Set ${dayLabel(day.date)} ${slot}${who} -> ${title ?? recipeId}. Entry: ${JSON.stringify(data)}`
       }
       case 'clear_slot': {
         const dayOfWeek = strictDayOfWeek(input.day_of_week)
@@ -472,12 +494,13 @@ async function runTool(
         }
         if (!SLOTS.includes(slot)) return 'Error: slot must be one of breakfast, lunch, dinner.'
 
-        const planId = await resolvePlanId(db, userId, weekStart, planCache)
+        const day = dayInWindow(weekStart, dayOfWeek)
+        const planId = await resolvePlanId(db, userId, day.week, planCache)
         const { error, count } = await db.from('meal_plan_entries')
           .delete({ count: 'exact' })
           .eq('meal_plan_id', planId).eq('day_of_week', dayOfWeek).eq('slot', slot)
         if (error) throw error
-        return `Cleared ${DAY_NAMES[dayOfWeek]} ${slot} (${count ?? 0} entr${count === 1 ? 'y' : 'ies'} removed).`
+        return `Cleared ${dayLabel(day.date)} ${slot} (${count ?? 0} entr${count === 1 ? 'y' : 'ies'} removed).`
       }
       case 'save_recipe': {
         const title = asNonEmptyString(input.title)
@@ -570,9 +593,11 @@ async function runTool(
           return 'Error: starts_on must not be after ends_on.'
         }
 
-        const planId = await resolvePlanId(db, userId, weekStart, planCache)
+        // The range rides the stored week holding most of this week's days.
+        const planId = await resolvePlanId(db, userId, windowWeeks(weekStart).anchor, planCache)
+        // A bound at the week's own edge is stored as none, as the page does.
         const { error } = await db.from('meal_plans')
-          .update({ starts_on: start.value, ends_on: end.value })
+          .update({ starts_on: start.value === weekStart ? null : start.value, ends_on: end.value === weekEnd ? null : end.value })
           .eq('id', planId)
         if (error) throw error
         return `Active range set: ${start.value ?? weekStart} through ${end.value ?? weekEnd}.`
@@ -652,11 +677,13 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}))
   const message = typeof body.message === 'string' ? body.message.trim() : ''
-  const weekStart = typeof body.weekStart === 'string' ? body.weekStart : ''
+  const storedWeek = typeof body.weekStart === 'string' ? body.weekStart : ''
+  // The week planned: the page's window when sent, else the stored Sunday week.
+  const weekStart = typeof body.windowStart === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.windowStart) ? body.windowStart : storedWeek
   const history = Array.isArray(body.history) ? body.history : []
 
   if (!message) return json({ error: 'message is required' }, 400)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) return json({ error: 'weekStart must be YYYY-MM-DD' }, 400)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(storedWeek)) return json({ error: 'weekStart must be YYYY-MM-DD' }, 400)
 
   let ctx: PlanContext
   try {
@@ -681,7 +708,7 @@ Deno.serve(async (req) => {
     { role: 'user', content: message },
   ]
 
-  const planCache = { id: ctx.planId }
+  const planCache = new Map(ctx.planIds)
 
   const stream = new ReadableStream({
     async start(controller) {

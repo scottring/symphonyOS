@@ -15,6 +15,9 @@ export interface MemberMeal {
 
 export interface SlotCellProps {
   dayOfWeek: number
+  /** The day's name when `dayOfWeek` is a position in a week that does not
+   *  start on Sunday. */
+  dayLabel?: string
   slot: MealSlot
   /** The shared / whole-family meal for this slot, if any. */
   entry?: MealPlanEntry
@@ -50,7 +53,7 @@ export interface SlotCellProps {
  *  and, when a meal diverges, a per-person row per member below it. Menus
  *  dismiss on outside-click / Escape. */
 export function SlotCell({
-  dayOfWeek, slot, entry, title, memberEntries = [],
+  dayOfWeek, dayLabel: dayLabelIn, slot, entry, title, memberEntries = [],
   canLeftoverTomorrow, canLeftoverFromLastNight, previousDinnerTitle,
   canMoveUp = false, canMoveDown = false,
   onChangeRecipe, onClear, onLeftoverTomorrow,
@@ -63,7 +66,7 @@ export function SlotCell({
   const [draftTitle, setDraftTitle] = useState('')
 
   const slotLabel = MEAL_SLOT_LABEL[slot]
-  const dayLabel = dayLabelFor(dayOfWeek)
+  const dayLabel = dayLabelIn ?? dayLabelFor(dayOfWeek)
 
   const closeAddMenu = () => { setAddMenuOpen(false); setTyping(false); setDraftTitle('') }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
+import { positionOf, storageFor, windowWeeks } from '@/lib/mealWeek'
 import { useAuth } from '@/hooks/useAuth'
 import { showToast } from '@/hooks/useToast'
 import {
@@ -9,6 +10,7 @@ import {
 } from '@/types/meal-planner'
 
 interface AddMealInput {
+  /** The day's position in the window (0 = its first day); see mealWeek.ts. */
   dayOfWeek: number
   slot: MealSlot
   recipeId?: string
@@ -21,6 +23,8 @@ interface AddMealInput {
 }
 
 interface UseMealPlanResult {
+  /** The window as one plan: the anchor week's id and range, and every meal
+   *  in the window with `dayOfWeek` as its position (0 = the first day). */
   plan: MealPlan | null
   loading: boolean
   error: string | null
@@ -33,15 +37,35 @@ interface UseMealPlanResult {
   setWeekRange: (startsOn: string | null, endsOn: string | null) => Promise<void>
 }
 
+const parseIso = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 // Unique per-mount channel names — same-topic channels conflict in supabase-js.
 let mealPlanChannelSeq = 0
 
-export function useMealPlan(weekStart: Date): UseMealPlanResult {
+/** The oldest plan for a Sunday week, or null. RLS handles household
+ *  visibility; when several members each created one, the oldest wins. */
+async function oldestPlan(weekStart: string): Promise<{ row: DbMealPlan | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('meal_plans').select('*')
+    .eq('week_start', weekStart)
+    .order('created_at', { ascending: true })
+    .limit(1)
+  return { row: ((data && data[0]) as DbMealPlan | undefined) ?? null, error: error?.message ?? null }
+}
+
+/** `windowStart` is the page's first day, on the household's week start.
+ *  Meals are stored under the Sunday week of their date (mealWeek.ts). */
+export function useMealPlan(windowStart: Date): UseMealPlanResult {
   const [plan, setPlan] = useState<MealPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const weekStartIso = toIsoDate(weekStart)
+  const windowIso = toIsoDate(windowStart)
   const { user } = useAuth()
+  // The stored plan id for each Sunday week the window draws on.
+  const planIds = useRef(new Map<string, string>())
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -50,39 +74,75 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     const userId = userResult?.user?.id
     if (!userId) { setError('not authenticated'); setLoading(false); return }
 
-    // RLS handles household visibility — query by week_start only. If multiple
-    // household members each created a plan, the oldest wins (deterministic).
-    const { data: planRows, error: planErr } = await supabase
-      .from('meal_plans').select('*')
-      .eq('week_start', weekStartIso)
-      .order('created_at', { ascending: true })
-      .limit(1)
-
-    if (planErr) { setError(planErr.message); setLoading(false); return }
-
-    let row = (planRows && planRows[0]) as DbMealPlan | null
-    if (!row) {
-      const { data: created, error: createErr } = await supabase
-        .from('meal_plans').insert({ user_id: userId, week_start: weekStartIso }).select().single()
-      if (createErr || !created) { setError(createErr?.message ?? 'create failed'); setLoading(false); return }
-      row = created as DbMealPlan
+    const start = parseIso(windowIso)
+    const { weeks, anchor } = windowWeeks(start)
+    const ids = new Map<string, string>()
+    let anchorRow: DbMealPlan | null = null
+    for (const week of weeks) {
+      const found = await oldestPlan(week)
+      if (found.error) { setError(found.error); setLoading(false); return }
+      let row = found.row
+      // The anchor week's plan is made on first look, as before; the other
+      // week's only when a meal is put on one of its days.
+      if (!row && week === anchor) {
+        const { data: created, error: createErr } = await supabase
+          .from('meal_plans').insert({ user_id: userId, week_start: week }).select().single()
+        if (createErr || !created) { setError(createErr?.message ?? 'create failed'); setLoading(false); return }
+        row = created as DbMealPlan
+      }
+      if (row) ids.set(week, row.id)
+      if (week === anchor) anchorRow = row
     }
+    if (!anchorRow) { setError('create failed'); setLoading(false); return }
 
+    const weekOfPlan = new Map([...ids].map(([week, id]) => [id, week]))
     const { data: entries, error: entryErr } = await supabase
-      .from('meal_plan_entries').select('*').eq('meal_plan_id', row.id).order('day_of_week', { ascending: true })
+      .from('meal_plan_entries').select('*').in('meal_plan_id', [...ids.values()]).order('day_of_week', { ascending: true })
 
     if (entryErr) { setError(entryErr.message); setLoading(false); return }
 
-    setPlan(dbMealPlanToMealPlan(row, (entries ?? []) as DbMealPlanEntry[]))
+    // Each meal at its position in the window; the far end of a partly
+    // covered Sunday week belongs to the window before or after.
+    const inWindow = ((entries ?? []) as DbMealPlanEntry[]).flatMap((e) => {
+      const position = positionOf(start, weekOfPlan.get(e.meal_plan_id) ?? '', e.day_of_week)
+      return position == null ? [] : [{ ...e, day_of_week: position }]
+    }).sort((a, b) => a.day_of_week - b.day_of_week)
+    planIds.current = ids
+    setPlan({ ...dbMealPlanToMealPlan(anchorRow, inWindow), weekStart: start })
     setLoading(false)
-  }, [weekStartIso])
+  }, [windowIso])
+
+  /** The stored plan for a position, made when that week has none yet. */
+  const planFor = useCallback(async (position: number): Promise<{ planId: string; dayOfWeek: number } | null> => {
+    const at = storageFor(parseIso(windowIso), position)
+    const known = planIds.current.get(at.weekStart)
+    if (known) return { planId: known, dayOfWeek: at.dayOfWeek }
+    const found = await oldestPlan(at.weekStart)
+    let id = found.row?.id
+    if (!id) {
+      const { data: userResult } = await getAuthUser()
+      const userId = userResult?.user?.id
+      if (!userId) return null
+      const { data: created } = await supabase
+        .from('meal_plans').insert({ user_id: userId, week_start: at.weekStart }).select().single()
+      id = (created as DbMealPlan | null)?.id
+    }
+    if (!id) return null
+    planIds.current.set(at.weekStart, id)
+    return { planId: id, dayOfWeek: at.dayOfWeek }
+  }, [windowIso])
 
   const addMeal = useCallback(async (input: AddMealInput) => {
     if (!plan) return
+    const stored = await planFor(input.dayOfWeek)
+    if (!stored) {
+      showToast("Couldn't add that meal. Please try again.", 'error')
+      throw new Error('addMeal failed: no plan for that day')
+    }
     const { data, error: insertErr } = await supabase
       .from('meal_plan_entries').insert({
-        meal_plan_id: plan.id,
-        day_of_week: input.dayOfWeek,
+        meal_plan_id: stored.planId,
+        day_of_week: stored.dayOfWeek,
         slot: input.slot,
         recipe_id: input.recipeId ?? null,
         ad_hoc_title: input.adHocTitle ?? null,
@@ -102,7 +162,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
       setPlan(prev => prev ? {
         ...prev,
         entries: [...prev.entries, {
-          id: data.id, mealPlanId: data.meal_plan_id, dayOfWeek: data.day_of_week,
+          id: data.id, mealPlanId: data.meal_plan_id, dayOfWeek: input.dayOfWeek,
           slot: data.slot, recipeId: data.recipe_id ?? undefined,
           adHocTitle: data.ad_hoc_title ?? undefined, notes: data.notes ?? undefined,
           leftoverFrom: data.leftover_from ?? undefined,
@@ -110,7 +170,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
         }],
       } : prev)
     }
-  }, [plan])
+  }, [plan, planFor])
 
   const removeMeal = useCallback(async (entryId: string) => {
     if (!plan) return
@@ -141,23 +201,25 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
       }),
     } : prev)
 
-    const updates = [
-      supabase.from('meal_plan_entries').update({ day_of_week: targetDayOfWeek, slot: targetSlot }).eq('id', source.id),
-    ]
+    // A move can cross from one stored Sunday week into the other.
+    const [to, from] = await Promise.all([planFor(targetDayOfWeek), target ? planFor(source.dayOfWeek) : null])
+    const updates = to ? [
+      supabase.from('meal_plan_entries').update({ meal_plan_id: to.planId, day_of_week: to.dayOfWeek, slot: targetSlot }).eq('id', source.id),
+    ] : []
     // No unique (plan, day, slot) constraint exists, so the two updates can run
     // without a temp value even though they briefly share a cell.
-    if (target) {
+    if (target && from) {
       updates.push(
-        supabase.from('meal_plan_entries').update({ day_of_week: source.dayOfWeek, slot: source.slot }).eq('id', target.id),
+        supabase.from('meal_plan_entries').update({ meal_plan_id: from.planId, day_of_week: from.dayOfWeek, slot: source.slot }).eq('id', target.id),
       )
     }
     const results = await Promise.all(updates)
-    const failed = results.find(r => r.error)
-    if (failed?.error) {
+    const failed = !to || (target && !from) || results.some(r => r.error)
+    if (failed) {
       setPlan(prev => prev ? { ...prev, entries: previous } : prev)
       showToast("Couldn't move that meal.", 'error')
     }
-  }, [plan])
+  }, [plan, planFor])
 
   const setWeekRange = useCallback(async (startsOn: string | null, endsOn: string | null) => {
     if (!plan) return

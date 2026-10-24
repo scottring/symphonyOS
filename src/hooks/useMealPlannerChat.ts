@@ -78,8 +78,12 @@ export interface UseMealPlannerChatResult {
  * rather than breaking the live chat — the meals are the source of truth, the
  * transcript is a convenience.
  */
-export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
+/** `weekStart` is the stored Sunday week the conversation is kept under;
+ *  `windowStart` the first day of the week the page shows (mealWeek.ts),
+ *  which is the week the chat plans. */
+export function useMealPlannerChat(weekStart: Date, windowStart: Date = weekStart): UseMealPlannerChatResult {
   const weekStartIso = toIsoDate(weekStart)
+  const windowStartIso = toIsoDate(windowStart)
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [busy, setBusy] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(true)
@@ -173,7 +177,7 @@ export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: trimmed, weekStart: weekStartIso, history }),
+        body: JSON.stringify({ message: trimmed, weekStart: weekStartIso, windowStart: windowStartIso, history }),
       })
 
       if (!res.ok || !res.body) {
@@ -216,7 +220,7 @@ export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
       setBusy(false)
       setToolActivity(null)
     }
-  }, [weekStartIso, busy, applyMessages, patchLastMessage, persist])
+  }, [weekStartIso, windowStartIso, busy, applyMessages, patchLastMessage, persist])
 
   const clear = useCallback(() => {
     applyMessages([])

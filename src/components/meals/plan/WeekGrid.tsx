@@ -8,9 +8,9 @@ import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 import type { FamilyMember } from '@/types/family'
 
 export interface WeekGridProps {
-  /** The Sunday that starts this week (matches `meal_plans.week_start`). */
+  /** The first day shown, on the household's week start (mealWeek.ts). */
   weekStart: Date
-  /** Day-of-week bounds of the plan's active range (0=Sun..6=Sat). Days
+  /** Position bounds of the plan's active range (0 = the first day). Days
    *  outside render nothing; their entries stay in the DB untouched. */
   activeRange: ActiveDayRange
   entries: MealPlanEntry[]
@@ -31,10 +31,11 @@ export interface WeekGridProps {
 
 /** The week as a 7-day x 3-slot grid. Pure presentational — all writes
  *  bubble up to PlanPage, which owns useMealPlan. Realtime updates flow
- *  down as new `entries` props; day_of_week is 0=Sunday..6=Saturday so the
- *  grid renders in DB order with no remapping. */
-function skippedLabel(from: number, to: number): string {
-  return from === to ? dayLabelFor(from) : `${dayLabelFor(from)} – ${dayLabelFor(to)}`
+ *  down as new `entries` props; an entry's dayOfWeek is its position from
+ *  `weekStart`, so the grid renders in that order with no remapping. */
+const labelAt = (weekStart: Date, position: number) => dayLabelFor(dateForDayOfWeek(weekStart, position).getDay())
+function skippedLabel(weekStart: Date, from: number, to: number): string {
+  return from === to ? labelAt(weekStart, from) : `${labelAt(weekStart, from)} – ${labelAt(weekStart, to)}`
 }
 
 export function WeekGrid({
@@ -72,7 +73,7 @@ export function WeekGrid({
     <div className="flex-1 min-w-0 space-y-3">
       {activeRange.firstDay > 0 && (
         <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-400 px-1">
-          {skippedLabel(0, activeRange.firstDay - 1)} · not planned
+          {skippedLabel(weekStart, 0, activeRange.firstDay - 1)} · not planned
         </div>
       )}
       {days.map(d => {
@@ -90,7 +91,7 @@ export function WeekGrid({
             className={`card px-5 py-4 ${today ? 'ring-1 ring-primary-300' : ''}`}
           >
             <div className={`text-[10px] font-bold uppercase tracking-[0.22em] mb-2 ${today ? 'text-primary-600' : 'text-neutral-400'}`}>
-              {dayLabelFor(d)} · {formatDateMonthDay(date).toUpperCase()}{today && ' · TODAY'}
+              {dayLabelFor(date.getDay())} · {formatDateMonthDay(date).toUpperCase()}{today && ' · TODAY'}
             </div>
             <div>
               {DAY_MEAL_SLOTS.map(slot => {
@@ -114,6 +115,7 @@ export function WeekGrid({
                   <SlotCell
                     key={slot}
                     dayOfWeek={d}
+                    dayLabel={dayLabelFor(date.getDay())}
                     slot={slot}
                     entry={entry}
                     title={entry ? resolveMealTitle(entry, entriesById, recipesById) : undefined}
@@ -141,7 +143,7 @@ export function WeekGrid({
       })}
       {activeRange.lastDay < 6 && (
         <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-400 px-1">
-          {skippedLabel(activeRange.lastDay + 1, 6)} · not planned
+          {skippedLabel(weekStart, activeRange.lastDay + 1, 6)} · not planned
         </div>
       )}
     </div>

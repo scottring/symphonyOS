@@ -7,7 +7,9 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useMealPlannerChat } from '@/hooks/useMealPlannerChat'
 import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { useMobile } from '@/hooks/useMobile'
-import { sundayOfWeek, formatDateMonthDay, dayLabelFor, dateForDayOfWeek, activeDayRange } from '@/lib/weekHelpers'
+import { formatDateMonthDay, dayLabelFor, dateForDayOfWeek, activeDayRange } from '@/lib/weekHelpers'
+import { useCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
+import { storageFor, windowWeeks } from '@/lib/mealWeek'
 import { WeekGrid } from './WeekGrid'
 import { WeekRangePopover } from './WeekRangePopover'
 import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
@@ -43,12 +45,20 @@ interface PickerState {
  *  behalf — useMealPlan's postgres_changes subscription does that. */
 export function PlanPage() {
   const [weekOffset, setWeekOffset] = useState(0)
-  const weekStart = useMemo(() => addWeeks(sundayOfWeek(new Date()), weekOffset), [weekOffset])
+  // The week starts on the household's day (Settings → Planning rhythm), as
+  // the Week page does; meals stay stored by Sunday week (mealWeek.ts).
+  const { config: { weekStartsOn } } = useCadenceConfig()
+  const weekStart = useMemo(() => addWeeks(weekStartAnchor(new Date(), weekStartsOn), weekOffset), [weekStartsOn, weekOffset])
+  // The chat plans one stored Sunday week: the one holding most of these days.
+  const chatWeek = useMemo(() => {
+    const [y, m, d] = windowWeeks(weekStart).anchor.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }, [weekStart])
 
   const { plan, loading, error, addMeal, removeMeal, moveMeal, setWeekRange } = useMealPlan(weekStart)
   const { recipes, refresh: refreshRecipes, addManual } = useRecipes()
   const { members: familyMembers } = useFamilyMembers()
-  const chat = useMealPlannerChat(weekStart)
+  const chat = useMealPlannerChat(chatWeek, weekStart)
   const isMobile = useMobile()
   const groceryStatus = useGroceryStatus(plan, recipes)
 
@@ -74,10 +84,12 @@ export function PlanPage() {
       if (e.leftoverFrom) continue
       const recipe = e.recipeId ? recipesById.get(e.recipeId) : undefined
       if (recipe?.isPrepFriendly !== true) continue
-      out.push({ entry: e, recipe, dayLabel: `${dayLabelFor(e.dayOfWeek)} ${e.slot}` })
+      out.push({ entry: e, recipe, dayLabel: `${dayLabelFor(dateForDayOfWeek(weekStart, e.dayOfWeek).getDay())} ${e.slot}` })
     }
     return out
-  }, [plan, recipesById])
+  }, [plan, recipesById, weekStart])
+  // The slot suggestions read the stored week and day of the picked slot.
+  const pickerStored = picker ? storageFor(weekStart, picker.dayOfWeek) : null
 
   const handlePickRecipe = useCallback((dayOfWeek: number, slot: MealSlot) => {
     setPicker({ dayOfWeek, slot })
@@ -280,8 +292,8 @@ export function PlanPage() {
         familyMembers={familyMembers}
         initialFamilyMemberId={picker?.forMemberId}
         leftoverCandidates={leftoverCandidates}
-        weekStart={weekStart}
-        dayOfWeek={picker?.dayOfWeek}
+        weekStart={pickerStored ? new Date(`${pickerStored.weekStart}T00:00:00`) : undefined}
+        dayOfWeek={pickerStored?.dayOfWeek}
         onClose={() => setPicker(null)}
         onPick={handlePick}
         onPickLeftover={handlePickLeftover}
