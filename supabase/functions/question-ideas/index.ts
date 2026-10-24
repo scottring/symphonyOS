@@ -1,6 +1,7 @@
 // QUESTION-IDEAS — a few answers the person could give to a question Symphony
 // asked in chat, shown when they tap the lightbulb beside it. Read-only and
-// tool-free: it sees only the conversation the app sends and writes nothing.
+// tool-free: it sees the conversation the app sends and the household's own
+// routines, week, goals and recent habits (context.ts), and writes nothing.
 //
 // Auth: the caller's JWT is checked before any model call, so an
 // unauthenticated request can't bill the key. No service role.
@@ -8,6 +9,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { IDEAS_TOOL, buildIdeasPrompt, ideasFromResponse, parseIdeasBody } from './prompt.ts'
 import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
+import { readIdeasContext } from './context.ts'
 
 const MODEL = Deno.env.get('QUESTION_IDEAS_MODEL') || 'claude-sonnet-4-6'
 
@@ -40,7 +42,9 @@ Deno.serve(async (req) => {
   const parsed = parseIdeasBody(raw)
   if ('error' in parsed) return json({ error: parsed.error }, 400)
 
-  const { system, user: content } = buildIdeasPrompt(parsed.question, parsed.conversation, parsed.today)
+  // The household's own data, read as this person (RLS); best effort.
+  const household = await readIdeasContext(db, user.id).catch(() => '')
+  const { system, user: content } = buildIdeasPrompt(parsed.question, parsed.conversation, parsed.today, household)
   try {
     const res = await guardedAiFetch(db, 'question-ideas')('https://api.anthropic.com/v1/messages', {
       method: 'POST',

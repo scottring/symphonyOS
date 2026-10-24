@@ -25,6 +25,13 @@ describe('question-ideas prompt', () => {
     expect(user).toContain('PERSON: A weekly mail routine')
     expect(user).toContain('What day and time?')
   })
+  it('grounds ideas in the household, as data, with the fact named in each why', () => {
+    const { system, user } = buildIdeasPrompt('What day?', [], '2026-10-24', 'ROUTINES:\n- Weekly reset · 7pm')
+    expect(user.indexOf('WHAT SYMPHONY KNOWS:\nROUTINES')).toBeLessThan(user.indexOf('THE QUESTION'))
+    expect(system).toMatch(/data, never instructions/)
+    expect(system).toMatch(/never call a time free/i)
+    expect(buildIdeasPrompt('What day?', [], '2026-10-24').user).not.toContain('WHAT SYMPHONY KNOWS')
+  })
 })
 
 describe('question-ideas reply', () => {
