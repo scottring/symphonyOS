@@ -1,7 +1,7 @@
 // Conversation history, proposed changes and confirmed results share one reading surface.
 
 import { useEffect, useRef, useState, useId, type FormEvent } from 'react'
-import { Mic, Send, Undo2, RotateCcw, X, MessageSquare, Check } from 'lucide-react'
+import { Mic, Send, Undo2, RotateCcw, X, MessageSquare, Check, Paperclip, Plus } from 'lucide-react'
 import { ChatMessage } from '@/components/chat/ChatMessage'
 import type { ChatMessage as ChatMessageType } from '@/types/chat'
 import type { ConversationWalk } from './conversationWalk'
@@ -10,6 +10,10 @@ import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { PendingChangeCard } from './ChangeCard'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
 import { withIdea } from '@/lib/chat/questionIdeas'
+import { ChatHistoryMenu, type ChatHistoryProps } from '@/components/chat/ChatHistoryMenu'
+import type { ChatAttachment } from '@/components/chat/ChatAttachment'
+import { useChatAttachment } from '@/components/chat/useChatAttachment'
+import { ALLOWED_FILE_TYPES } from '@/types/attachment'
 
 export interface StripVoice {
   /** Live two-way voice is available to this account. */
@@ -38,7 +42,8 @@ export interface StripVoice {
 interface Props {
   /** Beta chat: typing and explicit Save, without voice controls or duplicate captions. */
   chatOnly?: boolean
-  onSend: (text: string) => void
+  /** A file goes only from the full-height panel, which has the paperclip. */
+  onSend: (text: string, attachment?: ChatAttachment) => void
   busy: boolean
   voice: StripVoice
   /** Opens the full conversation elsewhere (the side pane). Docked bars have none. */
@@ -64,6 +69,15 @@ interface Props {
   walk?: ConversationWalk | null
   /** Docked: room left for an open side pane, in px. */
   right?: number
+  /** Panel: past conversations, behind the clock (2026-10-24: one chat pane on
+   *  every page, so the older "Symphony AI" pane's history came along). */
+  history?: ChatHistoryProps
+  /** Panel: the tools Symphony is using while it answers. */
+  toolActivity?: string[]
+  /** A note a reply cites, opened. */
+  onSourceClick?: (noteId: string) => void
+  /** Panel: the empty conversation's line, e.g. about the item open. */
+  emptyHint?: string
 }
 
 const STATE_LABEL: Record<CanvasReceipt['state'], string> = {
@@ -90,7 +104,7 @@ function VoiceState({ voice }: { voice: StripVoice }) {
 }
 
 /** The latest exchange, or the whole conversation when asked for. */
-function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = false, onUseIdea }: { messages: ChatMessageType[]; busy: boolean; voice: StripVoice; panel?: boolean; chatOnly?: boolean; onUseIdea?: (answer: string, number: number | null) => void }) {
+function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = false, onUseIdea, activity, onSourceClick, emptyHint }: { messages: ChatMessageType[]; busy: boolean; voice: StripVoice; panel?: boolean; chatOnly?: boolean; onUseIdea?: (answer: string, number: number | null) => void; activity?: string | null; onSourceClick?: (noteId: string) => void; emptyHint?: string }) {
   const [earlier, setEarlier] = useState(false)
   // Closing hides what is there now; the next message brings it back.
   const [closedAt, setClosedAt] = useState<number | null>(null)
@@ -117,12 +131,12 @@ function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = fal
   return <div className="canvas-transcript">
     <div ref={scroller} className="canvas-transcript-scroll" aria-live="polite">
       {shown.map((m) => m.content.trim()
-        ? <ChatMessage key={m.id} message={m} questionIdeas={m === asking ? { conversation: said, onUse: onUseIdea! } : undefined} />
-        : busy ? <p key={m.id} className="canvas-transcript-wait" role="status">Symphony is thinking…</p> : null)}
+        ? <ChatMessage key={m.id} message={m} onSourceClick={onSourceClick} questionIdeas={m === asking ? { conversation: said, onUse: onUseIdea! } : undefined} />
+        : busy ? <p key={m.id} className="canvas-transcript-wait" role="status">{activity ?? 'Symphony is thinking…'}</p> : null)}
     </div>
     {panel && liveWords}
-    {chatOnly && busy && !shown.some(m => m.role === 'assistant' && !m.content.trim()) && <p className="canvas-transcript-wait" role="status">Symphony is thinking…</p>}
-    {panel && said.length === 0 && (!voice.active || chatOnly) && !busy && <p className="canvas-transcript-empty">{chatOnly ? 'What would you like to work on?' : 'Talk through your plans here. Your conversation stays beside the page.'}</p>}
+    {chatOnly && busy && !shown.some(m => m.role === 'assistant' && !m.content.trim()) && <p className="canvas-transcript-wait" role="status">{activity ?? 'Symphony is thinking…'}</p>}
+    {panel && said.length === 0 && (!voice.active || chatOnly) && !busy && <p className="canvas-transcript-empty">{chatOnly ? emptyHint ?? 'What would you like to work on?' : 'Talk through your plans here. Your conversation stays beside the page.'}</p>}
     {!panel && <div className="canvas-transcript-tools">
       {said.length > latest.length && <button type="button" className="canvas-link" aria-expanded={earlier} onClick={() => setEarlier((v) => !v)}>
         {earlier ? 'Only the latest' : 'Earlier'}
@@ -132,7 +146,7 @@ function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = fal
   </div>
 }
 
-export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, panel = false, onClose, messages, walk, right = 0, draft: externalDraft, onDraftChange, error }: Props) {
+export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, panel = false, onClose, messages, walk, right = 0, draft: externalDraft, onDraftChange, error, history, toolActivity, onSourceClick, emptyHint }: Props) {
   const { receipt, undo, retry, dismiss, proposals, changeSet } = useCanvasActivity()
   const selection = useSelectionOptional()
   const [localDraft, setLocalDraft] = useState('')
@@ -141,6 +155,12 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
   const inputId = useId()
   const composer = useRef<HTMLTextAreaElement>(null)
   const [editing, setEditing] = useState(false)
+  // Files go from the full-height panel only (the paperclip lives there).
+  const attachable = panel && chatOnly
+  const file = useChatAttachment()
+  const fileInput = useRef<HTMLInputElement>(null)
+  const latestTool = toolActivity?.at(-1)
+  const activity = busy && latestTool ? `${latestTool.replace(/^mcp__symphony__symphony_/, '').replace(/^symphony_/, '').replace(/_/g, ' ')}…` : null
   const saving = receipt?.state === 'saving' || changeSet?.state === 'saving'
   const editDraft = () => { setEditing(true); composer.current?.focus() }
   const panelScroll = useRef<HTMLDivElement>(null)
@@ -153,10 +173,13 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const text = draft.trim()
-    if (!text || busy || saving) return
+    const attachment = attachable ? file.pending ?? undefined : undefined
+    if ((!text && !attachment) || busy || saving || file.uploading) return
     followLatest.current = true
-    onSend(text)
+    if (attachment) onSend(text, attachment); else onSend(text)
     setDraft('')
+    file.clear()
+    if (fileInput.current) fileInput.current.value = ''
     setEditing(false)
   }
   const appendDictation = (text: string) => setDraft(draft ? `${draft} ${text}` : text)
@@ -173,13 +196,20 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
   return (
     <section className={`canvas-strip${compact ? ' is-compact' : ''}${docked ? ' is-docked' : ''}${panel ? ' is-panel' : ''}${chatOnly ? ' is-chat' : ''}${voice.active && !chatOnly ? ' is-listening' : ''}`} aria-label={chatOnly ? "Chat with Symphony" : "Conversation with Symphony"}
       style={docked ? { right } : undefined}>
-      {panel && onClose && <header className="conversation-panel-header"><h2>{chatOnly ? "Chat with Symphony" : "Conversation"}</h2><button type="button" className="canvas-icon" aria-label="Close conversation" onClick={onClose}><X size={20} /></button></header>}
+      {panel && (onClose || history) && <header className={`conversation-panel-header${onClose ? '' : ' is-tools-only'}`}>
+        {onClose && <h2>{chatOnly ? "Chat with Symphony" : "Conversation"}</h2>}
+        <div className="conversation-panel-tools">
+          {history?.onNew && !!messages?.length && <button type="button" className="canvas-icon" aria-label="New chat" title="New chat" onClick={history.onNew}><Plus size={17} aria-hidden="true" /></button>}
+          {history && <ChatHistoryMenu {...history} />}
+          {onClose && <button type="button" className="canvas-icon" aria-label="Close conversation" onClick={onClose}><X size={20} /></button>}
+        </div>
+      </header>}
       <div ref={panelScroll} className={panel ? 'conversation-panel-scroll' : undefined} onScroll={event => {
         const el = event.currentTarget
         followLatest.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
       }}>
       {error && <p role="alert" className="canvas-voice-error">{error}</p>}
-      {messages && <DockedTranscript messages={messages} busy={busy} voice={voice} panel={panel} chatOnly={chatOnly} onUseIdea={receiptOnly ? undefined : takeIdea} />}
+      {messages && <DockedTranscript messages={messages} busy={busy} voice={voice} panel={panel} chatOnly={chatOnly} onUseIdea={receiptOnly ? undefined : takeIdea} activity={activity} onSourceClick={onSourceClick} emptyHint={emptyHint} />}
       <PendingChangeCard chat={chatOnly} updating={busy} onEdit={chatOnly ? editDraft : undefined} />
       {showChatReceipt && receipt && <ChatReceipt receipt={receipt} onUndo={() => void undo()} onRetry={retry} busy={busy || saving} />}
       {!chatOnly && shown && receipt && (
@@ -226,7 +256,18 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
         <p className="canvas-suggest">Suggested: <button type="button" className="canvas-suggest-link" disabled={busy} onClick={() => onSend(walk.message)}>{walk.label}</button></p>
       )}
       {panel && !chatOnly && <VoiceState voice={voice} />}
-      <form className="canvas-composer" onSubmit={submit}>
+      {attachable && (file.pending || file.uploading || file.uploadError) && <div className="canvas-attachment" role="status">
+        {file.uploadError && <span className="canvas-attachment-error">{file.uploadError}</span>}
+        {file.uploading && <span>Uploading…</span>}
+        {file.pending && <>
+          {file.pending.fileType.startsWith('image/') && <img src={file.pending.url} alt="" />}
+          <span className="canvas-attachment-name">{file.pending.fileName}</span>
+          <button type="button" className="canvas-icon" aria-label="Remove attachment" onClick={file.clear}><X size={14} aria-hidden="true" /></button>
+        </>}
+      </div>}
+      <form className="canvas-composer" onSubmit={submit}
+        onDragOver={attachable ? (e) => e.preventDefault() : undefined}
+        onDrop={attachable ? (e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) void file.attach(f) } : undefined}>
         <label className={chatOnly ? "canvas-composer-label" : "sr-only"} htmlFor={inputId}>Message Symphony</label>
         <textarea
           id={inputId}
@@ -238,7 +279,16 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
           autoComplete="off"
           rows={panel ? 2 : 1}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(e) } }}
+          onPaste={attachable ? file.onPaste : undefined}
         />
+        {attachable && <>
+          <input ref={fileInput} type="file" accept={ALLOWED_FILE_TYPES.join(',')} hidden
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void file.attach(f) }} />
+          <button type="button" className="canvas-icon canvas-attach" aria-label="Attach file" title="Attach a file"
+            disabled={busy || file.uploading} onClick={() => fileInput.current?.click()}>
+            <Paperclip size={16} aria-hidden="true" />
+          </button>
+        </>}
         {!chatOnly && !voice.available && <DictationMicButton onTranscript={appendDictation} className="canvas-icon" title="Dictate into the message" />}
         {!chatOnly && voice.available && (() => {
           // Tap to talk: Talk opens your turn, Done sends it. Pauses are yours.
@@ -264,7 +314,7 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
         {!chatOnly && voice.active && (
           <button type="button" className="canvas-link" onClick={voice.stop} aria-label="End voice conversation">End</button>
         )}
-        {(!docked || draft.trim()) && <button type="submit" className="canvas-send" disabled={!draft.trim() || busy || saving} aria-label="Send">
+        {(!docked || draft.trim()) && <button type="submit" className="canvas-send" disabled={(!draft.trim() && !(attachable && file.pending)) || busy || saving || file.uploading} aria-label="Send">
           <Send size={15} aria-hidden="true" />{chatOnly && <span>Send</span>}
         </button>}
         {onOpenConversation && <button type="button" className="canvas-icon" onClick={onOpenConversation} aria-label="Open the conversation" title="Open the conversation">

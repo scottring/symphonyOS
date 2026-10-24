@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Paperclip, X } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
-import { ALLOWED_FILE_TYPES, isAllowedFileType } from '@/types/attachment'
-import { uploadChatFile, type ChatAttachment } from './ChatAttachment'
+import { ALLOWED_FILE_TYPES } from '@/types/attachment'
+import type { ChatAttachment } from './ChatAttachment'
+import { useChatAttachment } from './useChatAttachment'
 
 interface ChatInputProps {
   onSend: (message: string, attachment?: ChatAttachment) => void
@@ -14,10 +14,7 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
   const [value, setValue] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const [pending, setPending] = useState<ChatAttachment | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const { user } = useAuth()
+  const { pending, uploading, uploadError, attach, clear, onPaste: handlePaste } = useChatAttachment()
 
   // Auto-focus on mount
   useEffect(() => {
@@ -37,26 +34,14 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
     }
   }, [value])
 
-  const attach = useCallback(async (file: File) => {
-    if (!user || !isAllowedFileType(file.type)) return
-    setUploadError(null)
-    setUploading(true)
-    try {
-      setPending(await uploadChatFile(file, user.id))
-    } catch {
-      setUploadError('Could not attach file. Try again.')
-    } finally {
-      setUploading(false)
-    }
-  }, [user])
 
   const handleSubmit = useCallback(() => {
     if ((!value.trim() && !pending) || loading || uploading) return
     onSend(value.trim(), pending ?? undefined)
     setValue('')
-    setPending(null)
+    clear()
     if (fileRef.current) fileRef.current.value = ''
-  }, [value, pending, loading, uploading, onSend])
+  }, [value, pending, loading, uploading, onSend, clear])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -68,28 +53,6 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
     [handleSubmit]
   )
 
-  // Paste a screenshot (or any image) straight from the clipboard.
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      const items = e.clipboardData?.items
-      if (!items) return
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith('image/')) {
-          const file = item.getAsFile()
-          if (file) {
-            e.preventDefault()
-            // Clipboard images often arrive unnamed; give them a real filename.
-            const named = file.name
-              ? file
-              : new File([file], `screenshot-${Date.now()}.png`, { type: file.type || 'image/png' })
-            attach(named)
-          }
-          return
-        }
-      }
-    },
-    [attach]
-  )
 
   return (
     <div
@@ -113,7 +76,7 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
             />
           )}
           <span className="truncate flex-1">{pending.fileName}</span>
-          <button onClick={() => { setPending(null); setUploadError(null) }} aria-label="Remove attachment">
+          <button onClick={clear} aria-label="Remove attachment">
             <X className="w-3 h-3" />
           </button>
         </div>

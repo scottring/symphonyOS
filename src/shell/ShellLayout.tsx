@@ -9,7 +9,6 @@ import { planPeopleLens } from '@/lib/planning/peopleLens';
 import { workspaceContext, workspaceDestination } from '@/lib/workspace/context';
 import { useWorkspaceVoiceAccess } from '@/hooks/useWorkspaceVoiceAccess';
 import { useWorkspaceVoice } from '@/hooks/useWorkspaceVoice';
-import { WorkspaceVoiceControls } from '@/components/chat/WorkspaceVoiceControls';
 import './connected-workspace.css';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { assistantSelection } from './assistantSelection';
@@ -34,7 +33,6 @@ import { OmniboxResults } from '@/components/omnibox/OmniboxResults';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { HeaderPeopleFilter } from '@/components/layout/HeaderPeopleFilter';
 import { Toast, ConfirmationToast, ToastLiveRegion } from '@/components/toast';
-import { ChatPanel } from '@/components/chat/ChatPanel';
 import { plannedWeekStart } from '@/lib/canvas/applyChangeSet';
 import { withSteps, type ChangeSet } from '@/lib/canvas/changeCard';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
@@ -56,7 +54,6 @@ import { useSymphonyAssistant, type AssistantTurnObserver } from '@/hooks/useSym
 import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from '@/contexts/CanvasActivityContext';
 import { ConversationStrip } from '@/components/canvas/ConversationStrip';
 import { ChatTaskActionsProvider } from '@/components/chat/ChatTaskActions';
-import { PendingChangeCard } from '@/components/canvas/ChangeCard';
 import { conversationStripPath } from '@/lib/canvas/stripPaths';
 import { ConversationWalkContext, type ConversationWalk } from '@/components/canvas/conversationWalk';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
@@ -462,6 +459,17 @@ function ShellLayoutInner({ children }: Props) {
   }, [canvasRefetch]);
   const showStrip = conversationStripPath(location.pathname);
   const stripVoice = { available: voiceEnabled, active: voiceEnabled && voice.active, status: voice.status, error: voice.error, speaking: voice.speaking, working: voice.working, start: () => { void voice.start(); }, stop: voice.stop, heard: voice.heard, reply: voice.reply, turn: voice.turn, talk: voice.talk, done: voice.done };
+  // One chat pane on every page, desktop and phone (Scott, 2026-10-24: the
+  // planning pages had "Chat" and the rest an older "Symphony AI" pane, so the
+  // same conversation looked like two assistants). Its history, files and
+  // note links came over from the older pane.
+  const chatPane = (onClose?: () => void) => <ConversationStrip chatOnly panel draft={conversationDraft} onDraftChange={setConversationDraft}
+    error={assistant.error} messages={assistant.messages} walk={conversationStripPath(location.pathname) ? walk : null}
+    onSend={sendConversation} busy={assistant.loading} voice={stripVoice} onClose={onClose}
+    history={{ sessions: assistant.sessions, loading: assistant.sessionsLoading, activeSessionId: assistant.activeSessionId,
+      onLoad: (session) => { voice.stop(); assistant.loadSession(session); }, onDelete: assistant.deleteSession, onNew: resetConversation }}
+    toolActivity={assistant.toolActivity} onSourceClick={setActiveNoteId}
+    emptyHint={conversationContext.entityContext ? `Ask about ${conversationContext.entityContext.name}` : undefined} />;
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };
 
   return (
@@ -576,33 +584,12 @@ function ShellLayoutInner({ children }: Props) {
               <SideColumn
                 hasSelection={!!selection}
                 aiOpen={aiOpen}
-                aiLabel={dockedBar ? "Chat" : undefined}
+                aiLabel="Chat"
                 pane={pane}
                 onPaneChange={showPane}
                 onCloseDetails={clearSelection}
                 onCloseAi={() => setAiHidden(true)}
-                ai={conversationStripPath(location.pathname) ? <ConversationStrip chatOnly panel draft={conversationDraft} onDraftChange={setConversationDraft} error={assistant.error} messages={assistant.messages} walk={walk} onSend={sendConversation} busy={assistant.loading} voice={stripVoice} /> :
-                  <ChatPanel
-                    voiceControls={voiceEnabled ? <WorkspaceVoiceControls voice={voice}/> : undefined}
-                    beforeInput={<PendingChangeCard chat updating={assistant.loading} />}
-                    messages={assistant.messages}
-                    loading={assistant.loading}
-                    error={assistant.error}
-                    entityContext={conversationContext.entityContext}
-                    mode="chat"
-                    onSend={sendConversation}
-                    onClear={resetConversation}
-                    onClose={() => { voice.stop(); setAiHidden(true); }}
-                    onNewChat={resetConversation}
-                    onSourceClick={setActiveNoteId}
-                    toolActivity={assistant.toolActivity}
-                    sessions={assistant.sessions}
-                    sessionsLoading={assistant.sessionsLoading}
-                    onLoadSession={session => { voice.stop(); assistant.loadSession(session); }}
-                    onDeleteSession={assistant.deleteSession}
-                    activeSessionId={assistant.activeSessionId}
-                  />
-                }
+                ai={chatPane()}
               >
                 <div className={`scenery-page scenery-page-contents`}>
                   {children}
@@ -682,25 +669,7 @@ function ShellLayoutInner({ children }: Props) {
               Details is still mounted underneath, edits and all. */}
           {selection && <PhonePaneSwitch active="ai" onChange={(p) => { if (p === 'details') setPhoneChatOpen(false); }} />}
           <div className="min-h-0 flex-1">
-          {conversationStripPath(location.pathname) ? <ConversationStrip chatOnly panel draft={conversationDraft} onDraftChange={setConversationDraft} error={assistant.error} messages={assistant.messages} walk={walk} onSend={sendConversation} busy={assistant.loading} voice={stripVoice} onClose={() => setPhoneChatOpen(false)} /> : <ChatPanel
-                    voiceControls={voiceEnabled ? <WorkspaceVoiceControls voice={voice}/> : undefined}
-                    beforeInput={<PendingChangeCard chat updating={assistant.loading} />}
-            messages={assistant.messages}
-            loading={assistant.loading}
-            error={assistant.error}
-            entityContext={conversationContext.entityContext}
-            mode="chat"
-            onSend={sendConversation}
-            onClear={resetConversation}
-            onClose={() => { voice.stop(); setPhoneChatOpen(false); }}
-            onNewChat={resetConversation}
-            toolActivity={assistant.toolActivity}
-            sessions={assistant.sessions}
-            sessionsLoading={assistant.sessionsLoading}
-            onLoadSession={session => { voice.stop(); assistant.loadSession(session); }}
-            onDeleteSession={assistant.deleteSession}
-            activeSessionId={assistant.activeSessionId}
-          />}
+          {chatPane(() => setPhoneChatOpen(false))}
           </div>
         </div>
       )}
