@@ -2436,6 +2436,15 @@ html.desktop-shell a {
 /* Today and Week are for doing; Month, Season and Year hold goals. A hairline
    between them, in the one line of horizons (2026-10-13). */
 .page-navigation-center .horizon-rail-step.is-goals-start::before { content: ""; align-self: center; width: 1px; height: 16px; margin: 0 6px; background: var(--color-neutral-300); }
+/* Routines, at the end of the rail: not a horizon, so set off by a rule like
+   the one before Month, and drawn like the rail's own links. */
+.page-navigation-routines { --rail-pad: 14px; position: relative; display: flex; align-items: center; padding: 7px var(--rail-pad); border-radius: 8px; font-size: 13.5px; color: var(--color-neutral-600); white-space: nowrap; }
+.page-navigation-routines::before { content: ""; position: absolute; left: -4px; top: 50%; width: 1px; height: 16px; transform: translateY(-50%); background: var(--color-neutral-300); }
+.page-navigation-routines { margin-left: 8px; }
+.page-navigation-routines:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.page-navigation-routines.is-current { color: var(--color-primary-700); font-weight: 600; }
+.page-navigation-routines.is-current:hover { background: none; }
+.page-navigation-routines.is-current::after { content: ""; position: absolute; left: var(--rail-pad); right: var(--rail-pad); bottom: 0; height: 2px; border-radius: 2px; background: currentColor; }
 
 .plan-range-control { display: flex; align-items: center; font-size: 12px; color: var(--color-neutral-500); }
 .plan-range-control select { background: transparent; padding: 6px 4px; max-width: 130px; }
@@ -3791,7 +3800,7 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
 /* Narrower windows: the rail tightens (its words are short) and the weather
    keeps its icon and temperature. */
 @media (max-width: 1180px) {
-  .page-navigation-center .horizon-rail a { --rail-pad: 10px; }
+  .page-navigation-center .horizon-rail a, .page-navigation-routines { --rail-pad: 10px; }
   .page-navigation-lead .daybook-weather-line > span:not(.daybook-weather-temp) { display: none; }
 }
 

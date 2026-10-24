@@ -9,6 +9,8 @@ import { appRegistry } from '@/shell/appRegistry'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
 import { HelpDialogs } from './HelpDialogs'
 
+const ROUTINES_ROUTE = '/routines'
+
 export const DesktopControlsContext = createContext<HTMLElement | null>(null)
 export function DesktopPageControls({ children }: { children: ReactNode }) {
   const host = useContext(DesktopControlsContext)
@@ -51,15 +53,18 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
   }
   const go = (path: string) => { setOpen(null); navigate(connectedDestination(path, search)) }
   // Short labelled columns rather than one tall list. Registry apps join Reference.
+  // Routines is on the bar itself (below), so the menu leaves it out.
   const groups: [string, [string, string][]][] = MORE_GROUPS.map(([group, items]): [string, [string, string][]] => [group, [
-    ...items.map(({ label, route }): [string, string] => [label, route]),
+    ...items.filter(({ route }) => route !== ROUTINES_ROUTE).map(({ label, route }): [string, string] => [label, route]),
     ...(group === 'Reference' ? appRegistry.filter(a => a.sidebar).sort((a, b) => a.sidebar!.order - b.sidebar!.order)
       .map((a): [string, string] => [a.sidebar!.label, a.route]) : []),
   ]])
   const destinations = groups.flatMap(([, items]) => items)
   return <nav ref={root} className="page-navigation" aria-label="Main navigation">
-    {/* No "Planner" and no "Routines" here (Scott, 2026-09-28): the horizon
-        rail beneath is the main navigation, and Routines lives under More.
+    {/* No "Planner" here (Scott, 2026-09-28): the horizon rail is the main
+        navigation. Routines sits at the rail's end (Scott, 2026-10-24: "add
+        routines to the top rail instead of having them buried in the
+        hamburger"); before that it lived under More.
         One bar on every page (2026-09-29): the menu at the left; at the right
         Discussions, search and you — page controls live in the page heading. No Add
         button (Scott, 2026-09-29): the round + and ⌘K already add. */}
@@ -102,6 +107,9 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
       <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}
     </NavLink>
     {centerRef && <div ref={centerRef} className="page-navigation-center" />}
+    <NavLink to={connectedDestination(ROUTINES_ROUTE, search)} className={({ isActive }) => `page-navigation-routines${isActive ? ' is-current' : ''}`}>
+      Routines
+    </NavLink>
     </div>
     <div className="page-navigation-utilities">
       {auxiliaryControls}

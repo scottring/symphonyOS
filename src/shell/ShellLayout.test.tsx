@@ -263,9 +263,14 @@ describe('Consolidated desktop navigation', () => {
     expect(screen.getByRole('link', { name: 'Season' })).toHaveAttribute('aria-current', 'page')
     fireEvent.click(screen.getByRole('link', { name: 'Today' }))
     expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
-    // Routines lives under More now.
+    // Routines is on the bar, after the rail, not under More (2026-10-24).
+    const main = screen.getByRole('navigation', { name: 'Main navigation' })
+    expect(within(main).getByRole('link', { name: 'Routines' })).toHaveAttribute('href', expect.stringMatching(/^\/routines/))
     fireEvent.click(screen.getByRole('button', { name: /^More/ }))
-    expect(screen.getByRole('button', { name: 'Routines' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Routines' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Someday' })).toBeInTheDocument()
+    fireEvent.click(within(main).getByRole('link', { name: 'Routines' }))
+    expect(within(main).getByRole('link', { name: 'Routines' })).toHaveAttribute('aria-current', 'page')
   })
   it('places page-specific controls in the consolidated navigation', () => {
     renderAt('/today', <DesktopPageControls><button>Page options</button></DesktopPageControls>)
