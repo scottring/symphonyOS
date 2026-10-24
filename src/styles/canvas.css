@@ -379,6 +379,34 @@
 @media (pointer: coarse) { .chat-task-action { min-height: 32px; padding: 2px 11px; font-size: 13px; } }
 .chat-task-action svg { width: 13px; height: 13px; flex: none; }
 
+/* A question Symphony asked, with the lightbulb for ideas (2026-10-24). */
+.chat-question { margin-top: 6px; }
+.chat-question-line { display: inline; }
+/* Just the icon to look at; the tap area stays full size (44px on narrow screens),
+   pulled into the line with negative margins so it doesn't push the text apart. */
+.chat-question-bulb {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+  width: 32px; height: 32px; margin: -8px -8px -8px 2px; padding: 0;
+  border: 0; border-radius: var(--radius-full); background: transparent; color: var(--color-neutral-500); cursor: pointer;
+}
+.chat-question-bulb svg { width: 17px; height: 17px; }
+.chat-question-bulb:hover, .chat-question-bulb.is-open { color: var(--color-amber-600, #b45309); background: var(--color-amber-50, #fffbeb); }
+.chat-question-bulb.is-open svg { fill: var(--color-amber-100, #fef3c7); }
+.chat-question-bulb:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: -2px; }
+@media (max-width: 767px), (pointer: coarse) { .chat-question-bulb { margin: -14px -12px -14px 2px; } }
+.chat-question-note { margin: 6px 0 2px; font-size: 12px; color: var(--color-neutral-500); white-space: normal; }
+.chat-question-ideas { list-style: none; margin: 6px 0 4px; padding: 0; display: grid; gap: 6px; white-space: normal; }
+.chat-question-idea {
+  display: grid; gap: 2px; width: 100%; padding: 8px 10px; text-align: left; cursor: pointer;
+  border: 1px solid var(--color-neutral-200); border-radius: 12px; background: var(--color-bg-elevated);
+  font-family: var(--font-family-sans); color: var(--color-neutral-800);
+}
+.chat-question-idea:hover { border-color: var(--color-primary-400); background: var(--color-primary-50); }
+.chat-question-idea:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.chat-question-idea.is-used { border-color: var(--color-primary-500); }
+.chat-question-idea-answer { font-size: 13px; line-height: 1.4; }
+.chat-question-idea-why { font-size: 11.5px; color: var(--color-neutral-500); }
+
 /* Motion describes arrival and progress; labels remain the source of truth. */
 .canvas-strip.is-panel { animation: conversation-enter 180ms ease-out; }
 .is-panel > .canvas-voice-state { flex: none; min-height: 24px; }

@@ -10,7 +10,7 @@ let allowed: boolean
 let quotaReady: boolean
 let providerCalls: number
 const rpc = vi.fn()
-const routes = ['symphony-agent', 'wall-ask', 'wall-say', 'workspace-voice'] as const
+const routes = ['symphony-agent', 'wall-ask', 'wall-say', 'workspace-voice', 'question-ideas'] as const
 
 beforeEach(() => {
   vi.resetModules(); vi.clearAllMocks()
@@ -33,6 +33,8 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (input:RequestInfo|URL,init?:RequestInit) => {
     if(String(input).includes('/rest/v1/rpc/')) { const result=await rpc(String(input).split('/').at(-1),JSON.parse(String(init?.body)));return new Response(JSON.stringify(result.data),{headers:{'content-type':'application/json'}}) }
     providerCalls++
+    // question-ideas forces its one tool; everything else answers in text.
+    if (String(init?.body).includes('give_ideas')) return new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'give_ideas', input: { ideas: [{ answer: 'Sunday at 7pm', why: 'End of the week' }] } }], stop_reason: 'tool_use' }))
     return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Answer.' }], stop_reason: 'end_turn' }))
   }))
 })
@@ -42,6 +44,7 @@ async function run(route: typeof routes[number]) {
   if (route === 'symphony-agent') await import('../symphony-agent/index.ts')
   else if (route === 'wall-ask') await import('../wall-ask/index.ts')
   else if (route === 'wall-say') await import('../wall-say/index.ts')
+  else if (route === 'question-ideas') await import('../question-ideas/index.ts')
   else await import('../workspace-voice/index.ts')
   const response = await handler(new Request('https://example.invalid/test', {
     method: 'POST', headers: { Authorization: 'Bearer member-token', 'Content-Type': route === 'workspace-voice' ? 'application/sdp' : 'application/json' },

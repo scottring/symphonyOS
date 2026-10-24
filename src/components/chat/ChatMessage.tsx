@@ -6,6 +6,8 @@ import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { inlineMarkdownToHtml } from '@/lib/notes/notesToHtml'
 import { splitListLines } from '@/lib/chat/taskMentions'
 import { ChatMentionLine, useChatTaskActions } from './ChatTaskActions'
+import { questionLines } from '@/lib/chat/questionIdeas'
+import { QuestionIdeasLine, type QuestionIdeasProps } from './QuestionIdeas'
 
 interface ChatMessageProps {
   message: ChatMessageType
@@ -16,6 +18,8 @@ interface ChatMessageProps {
   currentUserId?: string | null
   /** Used to put a face to an author, matched on auth_user_id. */
   familyMembers?: FamilyMember[]
+  /** A lightbulb beside each question this reply asks (the latest reply only). */
+  questionIdeas?: QuestionIdeasProps
 }
 
 function initialsFrom(name: string): string {
@@ -103,7 +107,7 @@ function AddTaskButton({ task, onAddTask }: { task: string; onAddTask: (title: s
 }
 
 export function ChatMessage({
-  message, onSourceClick, onAddTask, currentUserId, familyMembers = [],
+  message, onSourceClick, onAddTask, currentUserId, familyMembers = [], questionIdeas,
 }: ChatMessageProps) {
   const isUser = message.role === 'user'
   const taskActions = useChatTaskActions()
@@ -112,6 +116,7 @@ export function ChatMessage({
   const named = lines.map((l) => ('text' in l ? taskActions!.match(l.text) : null))
   const namesTasks = named.some(Boolean)
   const bulletItems = !isUser && onAddTask && !namesTasks ? extractBulletItems(message.content) : []
+  const questions = !isUser && questionIdeas ? questionLines(message.content) : []
 
   // In a shared thread a user message written by the OTHER member reads as
   // someone else talking: left-aligned, with a face and a name. Everything
@@ -136,6 +141,24 @@ export function ChatMessage({
 
   // Render content with inline add buttons for bullet items
   function renderContent() {
+    if (questions.length > 0) {
+      // Runs of plain lines stay one block; each question gets its lightbulb.
+      const blocks: React.ReactNode[] = []
+      let run: string[] = []
+      const flush = (key: string) => {
+        if (run.length === 0) return
+        blocks.push(<div key={key} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(inlineMarkdownToHtml(run.join('\n'))) }} />)
+        run = []
+      }
+      message.content.split('\n').forEach((line, i) => {
+        const q = questions.find((x) => x.index === i)
+        if (!q) { run.push(line); return }
+        flush(`text-${i}`)
+        blocks.push(<QuestionIdeasLine key={`q-${i}`} line={q} html={DOMPurify.sanitize(inlineMarkdownToHtml(line))} ideas={questionIdeas!} />)
+      })
+      flush('text-end')
+      return <div className="text-sm leading-relaxed whitespace-pre-wrap">{blocks}</div>
+    }
     if (namesTasks) {
       // Runs of plain lines stay one block; a line naming a task or routine gets its actions.
       const blocks: React.ReactNode[] = []

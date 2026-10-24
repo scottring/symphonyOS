@@ -8,6 +8,7 @@ export const GUARDED_AI_ROUTES = [
   'analyze-attachment', 'analyze-capture', 'analyze-link', 'extract-capture', 'parse-page', 'plan-from-paper', 'routine-from-doc',
   'goal-planning-chat', 'planning-conversation', 'tend-week', 'sharpen-goal', 'suggest-waiting-for', 'rhythms-parse',
   'kiosk-agent', 'math-story', 'meal-planner-chat', 'meal-slot-suggest', 'semantic-search', 'note-match',
+  'question-ideas',
 ] as const
 export type GuardedAiRoute = typeof GUARDED_AI_ROUTES[number]
 type UsageDb = Parameters<typeof serviceBudgetControl>[0] & { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }

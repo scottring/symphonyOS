@@ -9,6 +9,7 @@ import { useCanvasActivity, type CanvasReceipt } from '@/contexts/CanvasActivity
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { PendingChangeCard } from './ChangeCard'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
+import { withIdea } from '@/lib/chat/questionIdeas'
 
 export interface StripVoice {
   /** Live two-way voice is available to this account. */
@@ -89,7 +90,7 @@ function VoiceState({ voice }: { voice: StripVoice }) {
 }
 
 /** The latest exchange, or the whole conversation when asked for. */
-function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = false }: { messages: ChatMessageType[]; busy: boolean; voice: StripVoice; panel?: boolean; chatOnly?: boolean }) {
+function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = false, onUseIdea }: { messages: ChatMessageType[]; busy: boolean; voice: StripVoice; panel?: boolean; chatOnly?: boolean; onUseIdea?: (answer: string, number: number | null) => void }) {
   const [earlier, setEarlier] = useState(false)
   // Closing hides what is there now; the next message brings it back.
   const [closedAt, setClosedAt] = useState<number | null>(null)
@@ -99,6 +100,8 @@ function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = fal
   const latest = lastUser >= 0 ? said.slice(lastUser) : said.slice(-1)
   const shown = panel || earlier ? said : latest
   const end = shown.at(-1)
+  // Only the latest reply's questions are still open; ideas wait for the reply to finish.
+  const asking = !busy && onUseIdea && end?.role === 'assistant' ? end : null
   useEffect(() => { scroller.current?.scrollTo?.({ top: scroller.current.scrollHeight }) }, [end?.id, end?.content, earlier])
 
   const listening = voice.active && voice.turn === 'listening'
@@ -114,7 +117,7 @@ function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = fal
   return <div className="canvas-transcript">
     <div ref={scroller} className="canvas-transcript-scroll" aria-live="polite">
       {shown.map((m) => m.content.trim()
-        ? <ChatMessage key={m.id} message={m} />
+        ? <ChatMessage key={m.id} message={m} questionIdeas={m === asking ? { conversation: said, onUse: onUseIdea! } : undefined} />
         : busy ? <p key={m.id} className="canvas-transcript-wait" role="status">Symphony is thinking…</p> : null)}
     </div>
     {panel && liveWords}
@@ -157,6 +160,7 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
     setEditing(false)
   }
   const appendDictation = (text: string) => setDraft(draft ? `${draft} ${text}` : text)
+  const takeIdea = (answer: string, number: number | null) => { setDraft(withIdea(draft, answer, number)); composer.current?.focus() }
 
   const pending = proposals.filter((p) => p.state !== 'saving').length
   // Docked, an answer is in the transcript; the receipt line is for saves.
@@ -175,7 +179,7 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
         followLatest.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
       }}>
       {error && <p role="alert" className="canvas-voice-error">{error}</p>}
-      {messages && <DockedTranscript messages={messages} busy={busy} voice={voice} panel={panel} chatOnly={chatOnly} />}
+      {messages && <DockedTranscript messages={messages} busy={busy} voice={voice} panel={panel} chatOnly={chatOnly} onUseIdea={receiptOnly ? undefined : takeIdea} />}
       <PendingChangeCard chat={chatOnly} updating={busy} onEdit={chatOnly ? editDraft : undefined} />
       {showChatReceipt && receipt && <ChatReceipt receipt={receipt} onUndo={() => void undo()} onRetry={retry} busy={busy || saving} />}
       {!chatOnly && shown && receipt && (
