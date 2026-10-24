@@ -49,10 +49,13 @@ export function useGroceryStatus(plan: MealPlan | null, recipes: Recipe[]): UseG
     if (!list) { setGroceriesListId(null); setCurrentItems([]); setLoading(false); return }
 
     setGroceriesListId(list.id)
+    // Only items still to buy: the list keeps every checked-off item from past
+    // trips, and those must not hide this week's ingredients.
     const { data: items, error: itemsErr } = await supabase
       .from('list_items')
       .select('text')
       .eq('list_id', list.id)
+      .eq('completed', false)
     if (itemsErr) { setError(itemsErr.message); setLoading(false); return }
     setCurrentItems((items ?? []).map((i: any) => i.text.toLowerCase()))
 

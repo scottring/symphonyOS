@@ -54,4 +54,21 @@ describe('useGroceryStatus', () => {
     expect(result.current.stockedPercent).toBeGreaterThanOrEqual(60)
     expect(result.current.missingItems.some(m => /pasta/i.test(m.text))).toBe(true)
   })
+
+  // The Groceries list keeps every checked-off item from past trips (hundreds
+  // of them); only items still to buy count as "already on the list", or a
+  // past "ricotta" hides this week's "1 cup ricotta".
+  it('matches only items not yet checked off', async () => {
+    let n = 0
+    let itemsChain: any
+    vi.mocked(__mockFrom as any).mockImplementation(() => {
+      n += 1
+      if (n === 1) return makeChain({ id: 'groceries-list-id' })
+      if (n === 2) return (itemsChain = makeChain([]))
+      return makeChain([])
+    })
+    const { result } = renderHook(() => useGroceryStatus(plan, recipes))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(itemsChain.eq).toHaveBeenCalledWith('completed', false)
+  })
 })
