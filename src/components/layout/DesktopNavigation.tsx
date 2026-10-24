@@ -8,6 +8,7 @@ import { HOME_ROUTE } from '@/apps/overview/route'
 import { appRegistry } from '@/shell/appRegistry'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
 import { HelpDialogs } from './HelpDialogs'
+import { BackButton } from './BackButton'
 
 const ROUTINES_ROUTE = '/routines'
 
@@ -74,6 +75,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     <NavLink to={connectedDestination(HOME_ROUTE, search)} className="page-navigation-brand" aria-label="Symphony, go to Home" title="Home">
       <img src="/symphony-logo.png" alt="" width={32} height={32} /><span className="page-navigation-wordmark">Symphony</span>
     </NavLink>
+    <BackButton />
     {leadRef && <div ref={leadRef} className="page-navigation-lead" />}
     </div>
     {/* The menu sits immediately left of the horizon rail, in the bar's

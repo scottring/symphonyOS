@@ -14,6 +14,7 @@ import './connected-workspace.css';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { assistantSelection } from './assistantSelection';
 import { PlanNavigation, planPeriodForPath, MobilePlanControlsContext } from '@/components/layout/PlanNavigation';
+import { PhoneBack } from '@/components/layout/BackButton';
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal';
 import { DesktopNavigation, DesktopControlsContext, DesktopLeadContext, DesktopCenterContext } from '@/components/layout/DesktopNavigation';
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext';
@@ -530,6 +531,7 @@ function ShellLayoutInner({ children }: Props) {
 
         {isMobile ? (
           <div className="scenery-page">
+            <PhoneBack isRoot={location.pathname === HOME_ROUTE || !!planPeriodForPath(location.pathname)} />
             <PlanNavigation mobile mobileControlsRef={setMobilePlanControls} />
             {location.pathname !== '/discussions' && (
               <WaitingOnYouBanner rows={discussionRows}

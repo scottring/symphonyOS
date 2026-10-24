@@ -2398,6 +2398,13 @@ html.desktop-shell a {
 /* The top bar: icon buttons one size (2026-09-29). */
 .page-navigation-icon { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: var(--color-neutral-600); }
 .page-navigation-icon:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.page-navigation-back[aria-disabled] { color: var(--color-neutral-300); cursor: default; }
+.page-navigation-back[aria-disabled]:hover { background: none; color: var(--color-neutral-300); }
+/* Phone: Back above a page reached from somewhere else (not on Home, Today or Plan). */
+.phone-back {
+  display: inline-flex; align-items: center; gap: 2px; min-height: 44px; margin: 0 0 -6px 4px; padding: 0 12px 0 4px;
+  padding-top: env(safe-area-inset-top, 0px); font-family: var(--font-family-sans); font-size: 16px; color: var(--color-primary-700);
+}
 /* A count sits ON its icon's corner as a small pill (Scott, 2026-09-30: a
    bare "1" floating right of Inbox read as part of the search icon). */
 .page-navigation-icon .navigation-count,
