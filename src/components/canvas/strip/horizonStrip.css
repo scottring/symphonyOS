@@ -116,3 +116,16 @@
   .plan-item:hover > .plan-piece-add, .plan-piece-add:focus-visible { opacity: 1; height: auto; margin-top: 2px; }
 }
 .plan-item > .ta { margin: 6px 0 4px 22px; }
+
+/* No day yet in the strip: the when-chips open under the row, wrapped, on
+   "When ▾" — never a floating bar over the rows above. */
+.hs .wc-noday-chip { flex-wrap: wrap; column-gap: 8px; }
+.hs .wc-noday-open { flex: 1 1 0; min-width: 0; }
+.hs .wc-noday-actions { position: static; display: block; flex-basis: 100%; padding: 4px 0 6px 20px; box-shadow: none; background: none; white-space: normal; }
+.hs .wc-noday-chip:hover .wc-noday-actions { display: block; }
+.hs-when { flex: 0 0 auto; min-height: 28px; padding: 0 6px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-neutral-600); font-size: 12px; font-weight: 600; cursor: pointer; }
+.hs-when:hover, .hs-when[aria-expanded='true'] { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+@media (hover: hover) {
+  .hs .wc-noday-chip:not(:hover):not(:focus-within):not(.is-when-open) .hs-when { opacity: 0; }
+}
+.hs-body { overflow-x: hidden; }

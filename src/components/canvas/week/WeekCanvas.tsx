@@ -262,6 +262,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [nodayOpen, setNodayOpen] = useState<boolean | null>(null)
   // The typed add above the days: for the week, or for one day.
   const [composer, setComposer] = useState<{ key: string | null } | null>(null)
+  // In the strip, a row's when-chips open under it on asking (the floating
+  // hover bar overran the narrow strip and covered the rows above).
+  const [whenOpen, setWhenOpen] = useState<string | null>(null)
   // The days opened past their few ("+3 more"), by key.
   const [openDays, setOpenDays] = useState<ReadonlySet<string>>(() => new Set())
   const toggleDayOpen = (key: string) => setOpenDays((was) => {
@@ -623,7 +626,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const lit = kind === 'task' && pointedTask(id)
     const key = `noday:${kind}:${id}`
     return (
-      <li key={key} className={`wc-noday-chip${kind === 'routine' ? ' is-routine' : ''}${lit ? ' is-pointed' : ''}`}>
+      <li key={key} className={`wc-noday-chip${kind === 'routine' ? ' is-routine' : ''}${lit ? ' is-pointed' : ''}${stripMode && whenOpen === key ? ' is-when-open' : ''}`}>
         {/* A task with no day can still be done (Scott, 2026-10-14): its ring
             is the check. A routine needs a day, so its square stays a mark. */}
         {onComplete
@@ -642,7 +645,11 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {/* Triage on hover (Scott, 2026-10-14: no Triage mode — "just add the
             triage actions on hover for each individual item"): the Inbox's
             when-chips and a date, over the row, on hover or keyboard focus. */}
-        {triage && <div className="wc-noday-actions" role="group" aria-label={`When for ${title}`}>{triage}</div>}
+        {triage && stripMode && (
+          <button type="button" className="hs-when" aria-expanded={whenOpen === key} aria-label={`When for ${title}`}
+            onClick={() => setWhenOpen(whenOpen === key ? null : key)}>When ▾</button>
+        )}
+        {triage && (!stripMode || whenOpen === key) && <div className="wc-noday-actions" role="group" aria-label={`When for ${title}`}>{triage}</div>}
         {pick(key, title, onPlace)}
       </li>
     )
@@ -750,8 +757,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {unplaced.length > 0
           ? <ul className="wc-noday-chips hs-noday" aria-label="No day yet">
             {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d), () => writers.toggleTask(t), writers.triageTask && (
-              <TriageWhenMenu
-                onPick={(when) => writers.triageTask!(t, when)}
+              <TriageWhenMenu contained
+                onPick={(when) => { setWhenOpen(null); writers.triageTask!(t, when) }}
                 onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
               />
             )))}
