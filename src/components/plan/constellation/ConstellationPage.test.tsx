@@ -24,6 +24,7 @@ vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:filters.on?filters.laye
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[filters.on?filters.people:[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null,members:[{auth_user_id:'u2',name:'Iris'}]})}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'u1'}})}))
+vi.mock('@/hooks/useRoutines',()=>({useRoutines:()=>({getRoutinesForDate:()=>[]})}))
 const review=vi.hoisted(()=>({reviewed:null as any,prevReviewed:null as any,loading:false,prevLoading:false,mine:null as any,finish:vi.fn(async()=>true),seen:[] as string[]}))
 // The page reads two plan records: the period on screen's (saved, loading),
 // then the next one's (next, nextLoading).
@@ -186,57 +187,73 @@ describe('one plain list',()=>{
  })
 })
 
-describe('the level above, folded to one line',()=>{
- it('Month: the season goals are shown unless hidden, and fold and open in place, without writing',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'t',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
+// The strip on the left (Scott's wireframe, 2026-10-25): the level above to
+// draw from, by drag or "→ Oct", folding to a rail remembered on this device.
+describe('the strip: the level above, on the left',()=>{
+ const strip=(name:string)=>screen.getByRole('complementary',{name})
+ const stripTitles=(name:string)=>Array.from(strip(name).querySelectorAll('.hs-row-title')).map(e=>e.textContent)
+ const stripRow=(name:string,title:string)=>within(strip(name)).getByText(title,{selector:'.hs-row-title'}).closest('li')!
+ const dt=()=>{const data:Record<string,string>={};const types:string[]=[];return{setData:(k:string,v:string)=>{data[k]=v;if(!types.includes(k))types.push(k)},getData:(k:string)=>data[k]??'',types,effectAllowed:'',dropEffect:''}}
+ it('Month: the Fall goals, each saying what October holds under it, before the list',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'t',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s'}]
   month()
-  const line=screen.getByRole('button',{name:/Fall goals.*the season October serves/})
-  expect(line).toHaveAttribute('aria-expanded','true')
-  expect(within(list('Fall goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Autumn outings','Strength'])
-  fireEvent.click(line)
-  expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
-  fireEvent.click(line)
-  expect(within(list('Fall goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Autumn outings','Strength'])
+  expect(stripTitles('Fall strip')).toEqual(['Autumn outings','Strength'])
+  expect(stripRow('Fall strip','Autumn outings')).toHaveTextContent('1 on October')
+  expect(stripRow('Fall strip','Strength')).toHaveTextContent('Nothing on October')
+  expect(strip('Fall strip').compareDocumentPosition(list('October goals'))&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(api.updateTask).not.toHaveBeenCalled()
  })
- it('the toggle names the list it opens, and the open list carries its own Hide',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
+ it('folds to a rail and stays folded for this viewer',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}]
   month()
-  const line=screen.getByRole('button',{name:/Fall goals.*the season October serves/})
-  expect(line).toHaveTextContent(/Hide Fall list$/)
-  const panel=screen.getByRole('complementary',{name:'Fall goals'})
-  fireEvent.click(within(panel).getByRole('button',{name:'Hide Fall list'}))
-  expect(screen.queryByRole('complementary',{name:'Fall goals'})).toBeNull()
-  expect(line).toHaveAttribute('aria-expanded','false')
-  expect(line).toHaveTextContent(/Show Fall list$/)
+  fireEvent.click(within(strip('Fall strip')).getByRole('button',{name:'Hide fall strip'}))
+  expect(screen.queryByRole('complementary',{name:'Fall strip'})).toBeNull()
+  expect(localStorage.getItem('symphony-strip-open:month')).toBe('0')
   cleanup()
-  season()
-  expect(screen.getByRole('button',{name:/2026 goals/})).toHaveTextContent(/Show 2026 list$/)
+  month()
+  expect(screen.queryByRole('complementary',{name:'Fall strip'})).toBeNull()
+  fireEvent.click(screen.getByRole('button',{name:'Show fall strip'}))
+  expect(stripTitles('Fall strip')).toEqual(['Autumn outings'])
+  localStorage.removeItem('symphony-strip-open:month')
  })
- it('sits beside the list, and stays hidden for this viewer once hidden',()=>{
+ it('→ Oct writes under that Fall goal',async()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+  month()
+  fireEvent.click(within(strip('Fall strip')).getByRole('button',{name:'Add to October under Autumn outings'}))
+  expect(screen.getByLabelText('For a Fall goal (optional)')).toHaveValue('1:s')
+  fireEvent.change(screen.getByLabelText('New October goal'),{target:{value:'Picnic'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(api.addTask).toHaveBeenLastCalledWith('Picnic',undefined,undefined,undefined,expect.objectContaining({bucket:'month',sourceId:'s',goalId:'g'})))
+ })
+ it('a Fall goal dragged onto an October line puts the line under it; onto the list, it writes under it',async()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
   month()
-  expect(screen.getByRole('complementary',{name:'Fall goals'})).toContainElement(list('Fall goals'))
-  expect(titles('October goals')).toEqual(['Picnic'])
-  fireEvent.click(screen.getByRole('button',{name:/Fall goals.*the season October serves/}))
-  expect(localStorage.getItem('symphony.plan.aboveOpen')).toBe('0')
-  cleanup()
-  month()
-  expect(screen.getByRole('button',{name:/Fall goals.*the season October serves/})).toHaveAttribute('aria-expanded','false')
-  expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
+  const t=dt()
+  fireEvent.dragStart(stripRow('Fall strip','Autumn outings'),{dataTransfer:t})
+  fireEvent.dragOver(row('Picnic'),{dataTransfer:t})
+  expect(row('Picnic')).toHaveClass('is-link-over')
+  fireEvent.drop(row('Picnic'),{dataTransfer:t})
+  await waitFor(()=>expect(lastRun()?.label).toBe('Move “Picnic” under “Autumn outings”'))
+  expect(api.updateTask).toHaveBeenCalledWith('m',expect.objectContaining({sourceId:'s'}))
+  const t2=dt()
+  fireEvent.dragStart(stripRow('Fall strip','Autumn outings'),{dataTransfer:t2})
+  const listSection=list('October goals').closest('section')!
+  fireEvent.dragOver(listSection,{dataTransfer:t2})
+  fireEvent.drop(listSection,{dataTransfer:t2})
+  expect(screen.getByLabelText('For a Fall goal (optional)')).toHaveValue('1:s')
  })
  it('Season: the year goals',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
   season()
-  expect(screen.getByRole('button',{name:/2026 goals.*the year Fall serves/})).toHaveAttribute('aria-expanded','true')
-  expect(within(list('2026 goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Together','Health'])
+  expect(stripTitles('2026 strip')).toEqual(['Together','Health'])
+  expect(stripRow('2026 strip','Together')).toHaveTextContent('1 on Fall')
  })
- it('Year is a single list: nothing beside it, and nothing to show or hide',()=>{
+ it('Year: last year’s open goals, carried in by → 2026',async()=>{
   api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
   open()
-  expect(screen.queryByRole('complementary')).toBeNull()
-  expect(screen.queryByRole('button',{name:/2025 goals/})).toBeNull()
-  expect(screen.queryByText('Learn to sail')).toBeNull()
-  expect(menu().filter(l=>/list$/.test(l??''))).toEqual([])
+  expect(stripTitles('2025 strip')).toEqual(['Learn to sail'])
+  fireEvent.click(within(strip('2025 strip')).getByRole('button',{name:'Bring Learn to sail into 2026'}))
+  await waitFor(()=>expect(api.addGoal).toHaveBeenLastCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old'})))
  })
 })
 
@@ -693,7 +710,7 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
   month()
-  expect(menu()).toEqual(['Plan November early','Show done','Hide the Fall list','Start with a goal · guided introduction','Talk it through','How this page works'])
+  expect(menu()).toEqual(['Plan November early','Show done','Start with a goal · guided introduction','Talk it through','How this page works'])
   // Show done: a tick, remembered on this device, and the list agrees.
   const done=screen.getByRole('menuitemcheckbox',{name:'Show done'})
   expect(done).toHaveAttribute('aria-checked','false')
@@ -703,11 +720,6 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   expect(localStorage.getItem('symphony-plan-done')).toBe('shown')
   // The done fold says the same.
   expect(screen.getByRole('button',{name:/1 done/})).toHaveAttribute('aria-expanded','true')
-  // Hide the Fall list: the page's own toggle agrees.
-  choose('Hide the Fall list')
-  expect(screen.queryByRole('complementary',{name:'Fall goals'})).toBeNull()
-  expect(screen.getByRole('button',{name:/Fall goals.*the season October serves/})).toHaveAttribute('aria-expanded','false')
-  expect(menu()).toContain('Show the Fall list')
   choose('How this page works')
   expect(launcher.openAssistant).toHaveBeenCalledWith(expect.objectContaining({autoSend:true,stayOnPage:true}))
   choose('Start with a goal · guided introduction')
@@ -1240,11 +1252,11 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
   // The counts are the lines shown.
   expect(facts()).toBe('1 of 3 done')
   expect(screen.getByRole('button',{name:/1 done/})).toHaveTextContent(/^1 done · Pumpkins/)
-  // The side card: the private season goal is absent, and the family one is
-  // not marked "in October" by the hidden lines under it.
-  const side=within(screen.getByRole('complementary',{name:'Fall goals'}))
-  expect(side.getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Fall together'])
-  expect(side.queryByText('in October')).toBeNull()
+  // The strip: the private season goal is absent, and the family one is
+  // not counted as holding the hidden lines under it.
+  const side=within(screen.getByRole('complementary',{name:'Fall strip'}))
+  expect(side.getAllByRole('listitem').map(li=>li.querySelector('.hs-row-title')?.textContent)).toEqual(['Fall together'])
+  expect(side.getByText('Nothing on October')).toBeInTheDocument()
   // A drop that renumbers writes only the lines shown.
   dragTo('Leaf pile','October goals',5)
   await waitFor(()=>expect(api.updateTaskOrders).toHaveBeenCalled())
@@ -1313,37 +1325,15 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
    expect(api.updateTaskOrders).not.toHaveBeenCalled()
   })
  })
- it('Month: the Fall goals beside it, 8 then +13 more, marked when October has a line under one, read-only',()=>{
+ it('Month: every Fall goal in the strip, the one October holds something under marked, each draggable',()=>{
   api.tasks=[...Array.from({length:21},(_,i)=>({id:`s${i+1}`,title:`Fall goal ${i+1}`,bucket:'quarter'})),{id:'m',title:'Picnic',bucket:'month',sourceId:'s2'}]
   month()
-  const side=screen.getByRole('complementary',{name:'Fall goals'})
-  const items=()=>within(list('Fall goals')).getAllByRole('listitem')
-  expect(items()).toHaveLength(8)
-  expect(items()[0].textContent).toBe('Fall goal 1')
-  expect(within(items()[1]).getByText('in October')).toBeInTheDocument()
-  expect(items().filter(li=>/in October/.test(li.textContent??''))).toHaveLength(1)
-  fireEvent.click(within(side).getByRole('button',{name:'+13 more'}))
-  expect(items()).toHaveLength(21)
-  fireEvent.click(within(side).getByRole('button',{name:'Show less'}))
-  expect(items()).toHaveLength(8)
-  // Read-only: no triage, no drag.
-  expect(within(side).queryAllByRole('group')).toHaveLength(0)
-  expect(side.querySelector('[draggable="true"]')).toBeNull()
-  // Phones stack it under the list: it comes after the list.
-  expect(list('October goals').compareDocumentPosition(side)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
- })
- it('Season: a year goal with a Fall goal under it is marked in Fall',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
-  season()
-  const items=within(list('2026 goals')).getAllByRole('listitem')
-  expect(within(items[0]).getByText('in Fall')).toBeInTheDocument()
-  expect(items[1].textContent).toBe('Health')
- })
- it('the side card is hidden when this viewer hid it',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}]
-  localStorage.setItem('symphony.plan.aboveOpen','0')
-  month()
-  expect(screen.queryByRole('complementary',{name:'Fall goals'})).toBeNull()
+  const side=screen.getByRole('complementary',{name:'Fall strip'})
+  const items=within(list('Fall goals')).getAllByRole('listitem')
+  expect(items).toHaveLength(21)
+  expect(items[1]).toHaveTextContent('1 on October')
+  expect(items.filter(li=>/1 on October/.test(li.textContent??''))).toHaveLength(1)
+  expect(side.querySelectorAll('[draggable="true"]')).toHaveLength(21)
  })
  it('Year: a goal tags how many Fall goals it has, Fall · 3',()=>{
   api.tasks=['a','b','c'].map(id=>({id,title:`Fall ${id}`,bucket:'quarter',goalId:'g'}))

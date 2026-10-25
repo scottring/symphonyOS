@@ -10,18 +10,19 @@
 .ad-status { font-size: 13px; color: var(--color-primary-700); margin: 0 2.5rem 10px; }
 .ad-status:empty { display: none; }
 .ad-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
-.ad-open { grid-template-columns: minmax(0, 1fr) 280px; }
-.ad-open > aside.ad-week { margin-right: 2.5rem; margin-top: 64px; }
-@media (min-width: 1024px) { .ad-open > aside.ad-week { margin-right: 3.5rem; } }
+/* The week on the left, as on every horizon (Scott's wireframe, 2026-10-25). */
+.ad-open { grid-template-columns: 280px minmax(0, 1fr); }
+.ad-open > aside.ad-week { order: -1; margin-left: 2.5rem; margin-top: 64px; }
+@media (min-width: 1024px) { .ad-open > aside.ad-week { margin-left: 3.5rem; } }
 .ad-day { min-width: 0; }
 .ad-layout aside { background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: var(--radius-xl); align-self: start; }
 .ad-layout aside h2 { font-family: var(--font-family-display); font-size: 24px; color: var(--color-neutral-900); }
 .ad-layout aside p, .ad-layout small { color: var(--color-neutral-600); }
 .ad-shell button:focus-visible, .ad-shell a:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 3px; }
-@media (max-width: 1000px) { .ad-open { grid-template-columns: minmax(0, 1fr) 240px; } }
+@media (max-width: 1000px) { .ad-open { grid-template-columns: 240px minmax(0, 1fr); } }
 @media (max-width: 767px) {
   .ad-nav { position: static; padding: 8px 16px 0; }
   .ad-status { margin: 0 16px 10px; }
   .ad-open { grid-template-columns: 1fr; }
-  .ad-open > aside.ad-week { margin: 0 16px; }
+  .ad-open > aside.ad-week { order: 0; margin: 0 16px; }
 }

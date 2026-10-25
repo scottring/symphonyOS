@@ -75,7 +75,6 @@ import { parseSpecials } from '@/lib/today/specials'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
-import { todayItem } from '@/components/canvas/week/weekSentence'
 import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
 import { alsoDoneIn, weekReviewState } from '@/lib/planning/periodReview'
@@ -84,7 +83,7 @@ import { buildDeck, deckModeOf, deckWeekAllowed } from '@/lib/planning/deck'
 import { staleForDrain } from '@/lib/planning/drain'
 import { withPlacedSubtasks } from '@/lib/planning/plannedSubtasks'
 import { useChooseWeek } from './useChooseWeek'
-import { openCommitment } from '@/lib/placement/model'
+import { openCommitment, liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { doableBy } from '@/lib/planning/poolViews'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
@@ -839,6 +838,22 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Beta: drafts stay in chat. The week always shows the stored plan;
   // successful writes reach it through the shared task hooks.
 
+  const layerTasks = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
+  const planMonth = useMemo(() => monthStartOf(new Date(weekAnchor.getTime() + 3 * 86_400_000)), [weekAnchor])
+  const planLines = useMemo(() => selectPeriodTasks(layerTasks.filter(lens.keep), 'month', planMonth,
+    planMonth.getTime() === monthStartOf(new Date()).getTime(), lens.scopeId, readSeasons()), [layerTasks, lens, planMonth])
+  // The strip's month tab: the month's open lines, through the same filters.
+  const stripMonth = useMemo(() => {
+    const byId = new Map(tasks.map((t) => [t.id, t]))
+    return {
+      word: planMonth.toLocaleDateString('en-US', { month: 'long' }),
+      href: `/month?view=constellation&horizon=2&start=${localYmd(planMonth)}`,
+      lines: planLines.filter((t) => !t.completed).map((t) => {
+        const above = t.sourceId ? byId.get(t.sourceId) : undefined
+        return { task: t, onWeek: !!committedTo(t, 'week', weekAnchor, { isCurrent: weekIsCurrent }), meta: above ? `Under ${above.title}` : null }
+      }),
+    }
+  }, [planLines, planMonth, tasks, weekAnchor, weekIsCurrent])
   const canvasWriters = useMemo<WeekCanvasWriters>(() => {
     const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     const write = (label: string, t: Task, patch: Partial<Task>, previous?: Partial<Task>) => {
@@ -888,6 +903,30 @@ export function WeekViewV2(props: WeekViewV2Props) {
         }, opts)
       },
       open: (id) => handleSelectBlock(id),
+      // A month line onto this week (the choose flow's "This week": nothing is
+      // copied, the same row keeps its month), and onto a day when dropped on one.
+      pullLine: (t, day) => {
+        const was = { ...timingRemoval(t, 'day').previous, commitments: liveCommitments({ commitments: bootstrapCommitments(t) }) }
+        void activity.run(day ? `Give “${t.title}” ${short(day)}` : `Bring “${t.title}” onto this week`, async () => {
+          if (!(await keepForward(t.id, { weekStart: weekAnchor }))) return false
+          return day ? (await onUpdateTask(t.id, lineDropUpdates(t, { kind: 'day', at: atMidnight(day) }))) !== false : true
+        }, { ids: [t.id], undo: async () => { await onUpdateTask(t.id, was) } })
+      },
+      // A typed sentence: its date decides where it lands (a day this week, a
+      // day elsewhere, or this week with no day); who and where ride the insert.
+      addTyped: async (parse, landing) => {
+        const id = crypto.randomUUID()
+        const at = landing.kind === 'day' ? (parse.hasTime && parse.date ? parse.date : atMidnight(landing.date)) : undefined
+        const people = parse.people
+        const where = landing.kind === 'day' ? short(landing.date) : 'this week'
+        const ok = await activity.run(`Add “${parse.title}” to ${where}`, async () => !!(await addTask(parse.title, parse.quick.contactId, parse.quick.projectId, at, {
+          id, assignedTo: people[0] ?? meId ?? undefined, assignedToAll: people.length > 1 ? people : undefined,
+          location: parse.location, context: parse.quick.context,
+          ...(at ? { isAllDay: !parse.hasTime } : { bucket: 'week' as const, weekStart: weekAnchor }),
+        })), { ids: [id], undo: async () => { await deleteTask(id) } })
+        if (ok && !layers.has(parse.quick.context ?? 'unsorted')) showToast('Added, but hidden by your current view', 'warning', 8000)
+        return ok !== false
+      },
       foreignDrop: (day, payload) => { void planActions.drop(payload, { type: 'day', day }) },
       // No day yet triage: the Inbox's when-vocabulary, through the same gated
       // writes (applyTriageWhen); Undo puts back where the task was.
@@ -935,7 +974,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated])
+  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, keepForward, addTask, deleteTask, meId, layers])
   const canvasSpans = useMemo(() => {
     const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }
     const wd = (i: number) => journalDays[i].date.toLocaleDateString('en-US', { weekday: 'short' })
@@ -955,13 +994,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers} viewerId={meId ?? undefined}
       pointing={activity.pointing}
-      onPlaceUnplaced={deckAvailable ? openPlace : undefined} unplacedCount={placeCount} />
+      onPlaceUnplaced={deckAvailable ? openPlace : undefined} unplacedCount={placeCount} month={stripMonth} />
   )
-  // The header's "Today: {first item}": this week only, once its tasks and
-  // calendar are in (an unloaded day reads as empty). A calendar that is not
-  // connected has nothing to load.
-  const canvasLoaded = (sources?.tasks ?? 'ready') === 'ready' && ['ready', 'not-connected'].includes(sources?.events ?? 'ready')
-  const todayLine = weekIsCurrentFor(weekAnchor) && canvasLoaded ? todayItem(canvasDays.days, localYmd(new Date())) : null
+  const todayLine = null
 
   // A past week is a look-back, not a plan.
   const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
@@ -982,7 +1017,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const tasksLoaded = (sources?.tasks ?? 'ready') === 'ready'
   const lastWeekStart = useMemo(() => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() - 7), [weekAnchor])
   const nextWeekStart = useMemo(() => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7), [weekAnchor])
-  const layerTasks = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
   const scopedTasks = useMemo(() => layerTasks.filter((t) => !t.isGoal).filter(lens.keep), [layerTasks, lens])
   const deckTasks = useMemo(() => scopedTasks.filter((t) => lens.on || !meId || doableBy(t, meId)), [scopedTasks, lens, meId])
   // The drains never move a task assigned only to someone else, even where
@@ -1089,9 +1123,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // ── Plan this week (spec 2026-10-19): Choose from the month, then days ──
   // October's lines from the same scoped rows (areas and the people lens),
   // the month this week mostly lives in.
-  const planMonth = useMemo(() => monthStartOf(new Date(weekAnchor.getTime() + 3 * 86_400_000)), [weekAnchor])
-  const planLines = useMemo(() => selectPeriodTasks(layerTasks.filter(lens.keep), 'month', planMonth,
-    planMonth.getTime() === monthStartOf(new Date()).getTime(), lens.scopeId, readSeasons()), [layerTasks, lens, planMonth])
   const planPool = useMemo(() => {
     const ids = new Set(deckTasks.map((t) => t.id))
     return [...deckTasks, ...planLines.filter((t) => !ids.has(t.id))]

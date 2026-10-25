@@ -11,28 +11,29 @@ import { collectTargets } from './targets'
 export const PAGE_GUIDES: Record<string, string> = {
   year:
     'Year is reference: the few goals you want this year to hold, a list for looking, not doing. ' +
-    'The line above the list holds last year\'s goals; Show opens them. Each row is a year goal; one with a season goal under it names it ("Fall: …"). ' +
+    'The strip on the left holds last year\'s goals still open: → and the year (or a drag onto the list) carries one in. Each row is a year goal; one with a season goal under it names it ("Fall: …"). ' +
     '+ Add a goal at the foot writes a new one. Go to Fall (or the season shown) goes on to the season. The top bar moves between Today, Week, Month, Season and Year.',
   season:
     'A season is a brainstorm list for this stretch of the year: what you would like it to hold. Nothing here is on a calendar. ' +
     'The arrows beside the title step to the previous or next season. ' +
-    'The line above the list holds this year\'s goals; Show opens them. The list holds every season goal, drawn one way. ' +
+    'The strip on the left holds this year\'s goals: drag one onto a season goal to put it under, or onto the list (or press →) to write something new under it. The list holds every season goal, drawn one way. ' +
     'A goal written for a year goal says "For …" under it, and one with a month goal under it names it ("October: …"). A goal on its own says nothing more; that is fine. ' +
     '+ Add a goal at the foot writes one, with an optional "For" to choose a year goal. To change what a goal is for, use Move under in its ⋯ menu. ' +
     'Go to the month goes on to Month.',
   month:
     'Month answers one question: what do you want to accomplish this month? Nothing here is on a calendar yet. ' +
-    'The line above the list holds the season\'s goals; Show opens them. The list holds every goal for the month, drawn one way. ' +
+    'The strip on the left holds the season\'s goals: drag one onto a month goal to put it under, or onto the list (or press →) to write something new under it; its Routines tab holds the monthly routines. The list holds every goal for the month, drawn one way. ' +
     'A goal written for a season goal says "For …" under it, and one with tasks this week names them ("This week: …"). A goal on its own says nothing more; that is fine. ' +
     '+ Add a goal at the foot writes one, with an optional "For" to choose a season goal. To change what a goal is for, use Move under in its ⋯ menu. ' +
     'Go to this week opens Week. To turn a month goal into this week\'s tasks, tell Symphony what to do this week for a goal there.',
   week:
     'Week is for doing: this week\'s tasks and when they happen. ' +
     'The arrows either side of the dates step to the previous or next week; the dates themselves open shorter runs (a weekend, 3 days, a custom range). ' +
-    'The line under the dates says how many things were done last week, whether last week was reviewed (Review opens the review), and today\'s first event. ' +
-    'The days are the picture of the week: each day column shows its events (in blue), the kids\' specials, two of its tasks (circles) and routines (rounded squares) with the rest behind "+N more", and who carries each. Things that repeat are written once above the days. ' +
+    'The line under the dates says how many things are done this week and when the week was planned. ' +
+    'The days are the picture of the week: each day column shows its events (in blue), the kids\' specials and two of its tasks with the rest behind "+N more", and who carries each; the week\'s dinners run in one row under the days. ' +
     'A stay across several days is one bar over those days. Days gone by are dimmed, and this week\'s weekend folds to one line once it is over. ' +
-    '"No day yet" counts what is chosen for this week but has no day; Place them deals those one card at a time. ' +
+    'The strip on the left has three tabs: Week (what is on this week with no day yet — drag one onto a day), Routines (the routines that run on a day or two of this week, by day; every-day ones are on Today) and the month (its open goals — drag one onto a day or press → Week). ' +
+    '+ Add to week and + Add to day read what you type the way you would say it ("Dentist for K and E Nov 23 at 9am at Cross Keys"); a date outside this week goes to that date. ' +
     'Tick a task to finish it, drag it to move it, tap it to open it. ' +
     'Plan this week opens the deck: everything without a home this week, one card at a time. Finishing it marks the week planned. ' +
     'Free time (the hours with nothing scheduled, "Calendar clear") and the weather are off until turned on under ⋯, as are done work and the daily routines in each day; each choice is remembered on this device. The ⋯ menu also holds How this page works and Watch the guide. ' +
