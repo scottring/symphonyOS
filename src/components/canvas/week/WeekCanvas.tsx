@@ -311,7 +311,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     endDrag()
     if (p.kind === 'task') {
       const line = monthLine(p.id)
-      if (line && writers.pullLine && !shelfTasks.has(p.id) && !dayTask(p.id)) { writers.pullLine(line.task, day.date); return }
+      // A goal is never given a day (nested horizons): only its next actions are.
+      if (line && writers.pullLine && !shelfTasks.has(p.id) && !dayTask(p.id)) { if (!line.task.isGoal) writers.pullLine(line.task, day.date); return }
       const fromShelf = shelfTasks.get(p.id)
       if (fromShelf) { writers.placeTask(fromShelf, day.date); return }
       const placed = dayTask(p.id)
@@ -824,7 +825,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       {month.lines.length === 0 && <p className="hs-empty">Nothing open on {month.word}.</p>}
       <ul className="hs-list">
         {month.lines.map((l) => (
-          <li key={l.task.id} className="hs-row" draggable={!coarse && !l.onWeek}
+          <li key={l.task.id} className="hs-row" draggable={!coarse && !l.onWeek && !l.task.isGoal}
             onDragStart={(ev) => startDrag(ev, { kind: 'task', id: l.task.id, date: localYmd(weekStart), title: l.task.title }, { kind: 'task', id: l.task.id })}
             onDragEnd={endDrag}>
             <span className="hs-row-body">

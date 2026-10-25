@@ -184,6 +184,27 @@ describe('WeekCanvas — drag', () => {
 // Scott, 2026-10-12: the column of October goals repeated the goal cards
 // and, stacked full width, pushed the days off the screen. Each goal is
 // named once, on its card, and a task is filed by dropping it on one.
+describe('WeekCanvas — the strip’s month tab', () => {
+  it('a month line drags onto a day; a month goal never gets a day', async () => {
+    const { MemoryRouter } = await import('react-router-dom')
+    const w = { ...writers(), pullLine: vi.fn() }
+    const line = task({ id: 'ml', title: 'Office clean up', bucket: 'month' })
+    const goal = task({ id: 'mg', title: 'Get the paperwork in order', bucket: 'month', isGoal: true })
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={[]} routinesToPlace={[]} isCurrent writers={w}
+      month={{ word: 'October', href: '/month', lines: [{ task: line, meta: null, onWeek: false }, { task: goal, meta: null, onWeek: false }] }} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('tab', { name: 'October' }))
+    expect(screen.getByText('Get the paperwork in order').closest('li')).toHaveAttribute('draggable', 'false')
+    for (const [id, title] of [['ml', 'Office clean up'], ['mg', 'Get the paperwork in order']]) {
+      const d = dt()
+      d.t.setData('application/x-symphony-plan', JSON.stringify({ kind: 'task', id, date: '2026-10-03', title }))
+      d.arm()
+      fireEvent.drop(screen.getByTestId('journal-day-2026-10-06'), { dataTransfer: d.t })
+    }
+    expect(w.pullLine).toHaveBeenCalledTimes(1)
+    expect(w.pullLine).toHaveBeenCalledWith(line, dayOf(3))
+  })
+})
+
 describe('WeekCanvas — filing a task under a goal', () => {
   it('has no separate column of goals: the strip is the only side panel', () => {
     show()
