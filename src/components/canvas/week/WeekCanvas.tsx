@@ -148,6 +148,8 @@ export interface WeekCanvasWriters {
   /** The strip's month tab: bring a month line onto this week, on a day or
    *  (null) with no day. Absent: the month tab is not drawn. */
   pullLine?: (task: Task, day: Date | null) => void
+  /** No day yet: delete a task (the caller offers Undo). Absent: no Delete. */
+  deleteTask?: (task: Task) => void
   /** "+ Add to week" / "+ Add to day": a typed sentence, landed by its date. */
   addTyped?: (parse: HorizonParse, landing: HorizonLanding) => Promise<boolean>
 }
@@ -677,6 +679,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
               <TriageWhenMenu
                 onPick={(when) => writers.triageTask!(t, when)}
                 onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
+                onDelete={writers.deleteTask ? () => writers.deleteTask!(t) : undefined}
               />
             )))}
             {routinesToPlace.map((r) => nodayRow('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
@@ -761,6 +764,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
               <TriageWhenMenu contained
                 onPick={(when) => { setWhenOpen(null); writers.triageTask!(t, when) }}
                 onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
+                onDelete={writers.deleteTask ? () => { setWhenOpen(null); writers.deleteTask!(t) } : undefined}
               />
             )))}
           </ul>

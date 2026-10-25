@@ -285,6 +285,48 @@ describe('pieces of a month goal',()=>{
  })
 })
 
+// Scott, 2026-10-25: "i just lost an item" — a click on Later. Delete asks
+// once and undoes; Someday undoes; a double click can't land on the menu.
+describe('deleting and undoing on the lists',()=>{
+ it('Delete asks once, deletes, and Undo puts the same row back with its pieces',async()=>{
+  api.tasks=[{id:'m',title:'Find K therapist',bucket:'month',monthStart:new Date(2026,9,1),context:'family',subtasks:[{id:'p1',title:'Fill out KK assessment',parentTaskId:'m',bucket:'month'}]}]
+  api.addTask.mockImplementation(async (_t:string,_c:unknown,_p:unknown,_d:unknown,o:{id:string})=>o.id)
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Delete: Find K therapist'}))
+  const ask=screen.getByRole('group',{name:'Delete? Find K therapist'})
+  expect(ask).toHaveTextContent('Delete it and its 1 piece?')
+  expect(api.deleteTask).not.toHaveBeenCalled()
+  fireEvent.click(within(ask).getByRole('button',{name:'Delete: Find K therapist'}))
+  await waitFor(()=>expect(api.deleteTask).toHaveBeenCalledWith('m'))
+  await waitFor(()=>expect(lastRun()?.label).toBe('Delete “Find K therapist”'))
+  await act(async()=>{await lastRun().opts.undo()})
+  expect(api.addTask).toHaveBeenNthCalledWith(1,'Find K therapist',undefined,undefined,undefined,expect.objectContaining({id:'m',bucket:'month',context:'family'}))
+  expect(api.addTask).toHaveBeenNthCalledWith(2,'Fill out KK assessment',undefined,undefined,undefined,expect.objectContaining({id:'p1',parentTaskId:'m'}))
+ })
+ it('a double click on Later opens its menu and does not pick what appears under the pointer',()=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Later: Picnic'}),{detail:1})
+  const menu=within(screen.getByRole('group',{name:'Later: Picnic'}))
+  expect(menu.getAllByRole('button')[0]).toHaveTextContent('Cancel')
+  for(const b of menu.getAllByRole('button').slice(1)) fireEvent.click(b,{detail:2})
+  expect(api.keepForward).not.toHaveBeenCalled()
+  expect(api.setBucket).not.toHaveBeenCalled()
+  expect(screen.getByRole('group',{name:'Later: Picnic'})).toBeInTheDocument()
+ })
+ it('Someday comes with Undo that puts its place back',async()=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month',monthStart:new Date(2026,9,1)}]
+  api.setBucket.mockResolvedValue(true)
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Later: Picnic'}))
+  fireEvent.click(screen.getByRole('button',{name:'Someday: Picnic'}))
+  await waitFor(()=>expect(lastRun()?.label).toMatch(/Picnic/))
+  expect(lastRun().opts.undo).toBeTypeOf('function')
+  await act(async()=>{await lastRun().opts.undo()})
+  expect(api.updateTask).toHaveBeenLastCalledWith('m',expect.objectContaining({bucket:'month',monthStart:new Date(2026,9,1)}))
+ })
+})
+
 describe('writing a goal, with an optional For',()=>{
  it('Month: one of its own takes the page area; one for a season goal is linked in the same write',async()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
@@ -381,7 +423,7 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
    api.toggleTask.mockResolvedValue(true);api.keepForward.mockResolvedValue('m');api.dropCommitment.mockResolvedValue(true);api.setBucket.mockResolvedValue(true)
    month()
    const quick=within(screen.getByRole('group',{name:'Triage Picnic'})).getAllByRole('button').map(b=>b.textContent)
-   expect(quick).toEqual(['This week','Done','Later ▾','Off October'])
+   expect(quick).toEqual(['This week','Done','Later ▾','Off October','Delete'])
    fireEvent.click(screen.getByRole('button',{name:'This week: Picnic'}))
    await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('m',{weekStart:expect.any(Date)}))
    expect(lastRun().label).toBe('This week: “Picnic”')
@@ -393,7 +435,7 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
    expect(api.toggleTask).toHaveBeenCalledTimes(2)
    // Later opens its two choices in place; Cancel puts the verbs back.
    fireEvent.click(screen.getByRole('button',{name:'Later: Picnic'}))
-   expect(within(screen.getByRole('group',{name:'Later: Picnic'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Next month','Someday','Cancel'])
+   expect(within(screen.getByRole('group',{name:'Later: Picnic'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Cancel','Next month','Someday'])
    fireEvent.click(screen.getByRole('button',{name:'Next month: Picnic'}))
    await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('m',{monthStart:new Date(2026,10,1)},new Date(2026,9,1)))
    expect(lastRun().label).toBe('Move “Picnic” to November')
@@ -423,7 +465,7 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
   api.keepForward.mockResolvedValue('s')
   season()
   expect(within(screen.getByRole('group',{name:'Triage Autumn outings'})).getAllByRole('button').map(b=>b.textContent).filter(l=>l!=='October'))
-   .toEqual(['Done','Later ▾','Back to 2026'])
+   .toEqual(['Done','Later ▾','Back to 2026','Delete'])
   fireEvent.click(screen.getByRole('button',{name:'Later: Autumn outings'}))
   fireEvent.click(screen.getByRole('button',{name:'Next season: Autumn outings'}))
   await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('s',{seasonStart:new Date(2026,11,1)},new Date(2026,8,1)))
@@ -436,7 +478,7 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
    api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}]
    api.keepForward.mockResolvedValue('s')
    season()
-   expect(within(screen.getByRole('group',{name:'Triage Autumn outings'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['October','Done','Later ▾','Off Fall'])
+   expect(within(screen.getByRole('group',{name:'Triage Autumn outings'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['October','Done','Later ▾','Off Fall','Delete'])
    fireEvent.click(screen.getByRole('button',{name:'October: Autumn outings'}))
    await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('s',{monthStart:new Date(2026,9,1)}))
    expect(lastRun().label).toBe('October: “Autumn outings”')
@@ -457,7 +499,7 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
    expect(lastRun().opts.undo).toBeTypeOf('function')
    // Later ▾ Next year: a copy in 2027 that remembers it; goals have no Someday.
    fireEvent.click(screen.getByRole('button',{name:'Later: Together'}))
-   expect(within(screen.getByRole('group',{name:'Later: Together'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Next year','Cancel'])
+   expect(within(screen.getByRole('group',{name:'Later: Together'})).getAllByRole('button').map(b=>b.textContent)).toEqual(['Cancel','Next year'])
    fireEvent.click(screen.getByRole('button',{name:'Next year: Together'}))
    await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g'})))
    expect(lastRun().label).toBe('Move “Together” to 2027')
@@ -1310,7 +1352,7 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
   month()
   expect(row('Picnic')).toHaveAttribute('draggable','true')
   expect(row('Pay taxes')).toHaveAttribute('draggable','false')
-  expect(within(screen.getByRole('group',{name:'Triage Picnic'})).getAllByRole('button').map(b=>b.textContent).filter(l=>l!=='This week')).toEqual(['Done','Later ▾','Off October'])
+  expect(within(screen.getByRole('group',{name:'Triage Picnic'})).getAllByRole('button').map(b=>b.textContent).filter(l=>l!=='This week')).toEqual(['Done','Later ▾','Off October','Delete'])
   fireEvent.click(screen.getByRole('button',{name:'Done: Picnic'}))
   await waitFor(()=>expect(api.toggleTask).toHaveBeenCalledWith('m'))
   expect(api.updateTaskOrders).not.toHaveBeenCalled()

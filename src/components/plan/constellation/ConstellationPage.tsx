@@ -93,6 +93,8 @@ import { readChooseView, writeChooseView, type ChooseViewMode } from '@/lib/plan
 import { liveCommitments, openCommitment } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import type { Task } from '@/types/task'
+import { placementOf } from '@/lib/planning/placement'
+import { deleteQuestion, restoreDeleted } from '@/lib/planning/restoreDeleted'
 import { useRoutines } from '@/hooks/useRoutines'
 import { TypedAdd } from '@/components/canvas/strip/TypedAdd'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
@@ -372,7 +374,16 @@ function Inner() {
     const before = liveCommitments({ commitments: bootstrapCommitments(t) })
     return async () => (await updateTask(t.id, { commitments: before })) !== false
   }
-  const somedayOf = (t: Task): ReviewVerb => ({ label: 'Someday', run: () => act(`${describeTriageWhen('someday')}: “${t.title}”`, () => applyTriageWhen('someday', t.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }), { ids: [t.id] }) })
+  // Someday, with the way back: where it was and its periods (2026-10-25: it
+  // saved with no Undo).
+  const somedayOf = (t: Task): ReviewVerb => {
+    const before = { ...placementOf(t), commitments: liveCommitments({ commitments: bootstrapCommitments(t) }) }
+    return { label: 'Someday', run: () => act(`${describeTriageWhen('someday')}: “${t.title}”`, () => applyTriageWhen('someday', t.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }),
+      { ids: [t.id], undo: async () => (await updateTask(t.id, before)) !== false }) }
+  }
+  // Delete, asked once, with Undo: the same row back, and its pieces.
+  const deleteOf = (t: Task): ReviewVerb => ({ label: 'Delete', confirm: deleteQuestion(t),
+    run: () => act(`Delete “${t.title}”`, async () => { await deleteTask(t.id); return true }, { ids: [t.id], undo: () => restoreDeleted(addTask, t) }) })
 
   // Quick triage on an open row (Scott, 2026-10-13, again 2026-10-16), one
   // word per move as in planning (reviewed design, 2026-10-20). A year goal
@@ -417,6 +428,7 @@ function Inner() {
       { label: 'Done', run: () => act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) },
       { label: 'Later', run: async () => true, menu: [{ label: LATER_WORD[lvl], run: carry.onClick }, somedayOf(task)] },
       { label: off.label, run: off.onClick },
+      ...(opts.onPage ? [deleteOf(task)] : []),
     ]
   }
   const quickFor = (node: PlanNode): RowVerb[] => verbsFor(node, { onPage: true }).map(toRowVerb)
@@ -623,6 +635,7 @@ function Inner() {
       ...(thisWeek && !onWeek && !st.scheduledFor ? [{ label: 'This week', run: () => act(`This week: “${st.title}”`, async () => !!(await keepForward(st.id, { weekStart: week })), { ids: [st.id], undo: restoreOf(st) }) }] : []),
       { label: 'Done', run: () => act(`Complete “${st.title}”`, toggle, { ids: [st.id], undo: toggle }) },
       { label: 'Later', run: async () => true, menu: [{ label: LATER_WORD.month, run: carry.onClick }, somedayOf(st)] },
+      deleteOf(st),
     ].map(toRowVerb)
   }
   const addPiece = (parent: Task) => async (parse: HorizonParse, landing: HorizonLanding) => {

@@ -205,6 +205,16 @@ describe('WeekCanvas — the strip’s month tab', () => {
   })
 })
 
+describe('WeekCanvas — deleting from No day yet', () => {
+  it('When ▾ offers Delete, which hands the task to the page (it offers Undo)', () => {
+    const w = { ...writers(), triageTask: vi.fn(), deleteTask: vi.fn() }
+    show(w)
+    fireEvent.click(screen.getByRole('button', { name: 'When for Call the bank' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'When for Call the bank' })).getByRole('button', { name: 'Delete' }))
+    expect(w.deleteTask).toHaveBeenCalledWith(bank)
+  })
+})
+
 describe('WeekCanvas — filing a task under a goal', () => {
   it('has no separate column of goals: the strip is the only side panel', () => {
     show()

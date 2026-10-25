@@ -83,6 +83,7 @@ import { buildDeck, deckModeOf, deckWeekAllowed } from '@/lib/planning/deck'
 import { staleForDrain } from '@/lib/planning/drain'
 import { withPlacedSubtasks } from '@/lib/planning/plannedSubtasks'
 import { useChooseWeek } from './useChooseWeek'
+import { restoreDeleted } from '@/lib/planning/restoreDeleted'
 import { openCommitment, liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { doableBy } from '@/lib/planning/poolViews'
@@ -911,6 +912,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
           if (!(await keepForward(t.id, { weekStart: weekAnchor }))) return false
           return day ? (await onUpdateTask(t.id, lineDropUpdates(t, { kind: 'day', at: atMidnight(day) }))) !== false : true
         }, { ids: [t.id], undo: async () => { await onUpdateTask(t.id, was) } })
+      },
+      // Delete from No day yet, with Undo: the same row back (restoreDeleted).
+      deleteTask: (t) => {
+        void activity.run(`Delete “${t.title}”`, async () => { await deleteTask(t.id); return true }, {
+          ids: [t.id], undo: () => restoreDeleted(addTask, t),
+        })
       },
       // A typed sentence: its date decides where it lands (a day this week, a
       // day elsewhere, or this week with no day); who and where ride the insert.

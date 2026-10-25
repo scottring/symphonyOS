@@ -86,6 +86,11 @@ export function PlanItemRow(p: PlanItemRowProps) {
   const arrived = useArrived(p.node.id)
   // A verb opened in place: its menu (Later), or its one question (Let go).
   const [opened, setOpened] = useState<RowVerb | null>(null)
+  // A menu opens where the row's verbs were: the second click of a double
+  // click must not land on what appeared under the pointer (Scott,
+  // 2026-10-25, a Fall row's Later). That click is ignored, and Cancel
+  // comes first.
+  const settled = (e: { detail: number }) => e.detail < 2
   const { node } = p
   const opensInPlace = !!p.more
   const state = [arrived ? 'is-arrived' : '', p.saved ? 'is-selected' : '', p.done ? 'is-done' : '', p.movedTo && !p.done ? 'is-moved' : ''].filter(Boolean).join(' ')
@@ -110,10 +115,10 @@ export function PlanItemRow(p: PlanItemRowProps) {
       {!p.editing && !open && !p.preview && p.quick && p.quick.length > 0 && (opened
         ? <span className="plan-item-quick is-opened" role="group" aria-label={opened.menu ? `${opened.label}: ${node.title}` : `${opened.label}? ${node.title}`}>
           {opened.confirm && <span className="plan-quick-ask">{opened.confirm}</span>}
+          <button type="button" className="plan-quick" onClick={() => setOpened(null)}>{opened.confirm ? 'Keep' : 'Cancel'}</button>
           {(opened.menu ?? [{ label: opened.label, onSelect: opened.onSelect }]).map((m) => <button key={m.label} type="button"
             className={`plan-quick${opened.confirm ? ' is-strong' : ''}`} disabled={p.disabled}
-            aria-label={`${m.label}: ${node.title}`} onClick={() => { setOpened(null); m.onSelect() }}>{m.label}</button>)}
-          <button type="button" className="plan-quick" onClick={() => setOpened(null)}>{opened.confirm ? 'Keep' : 'Cancel'}</button>
+            aria-label={`${m.label}: ${node.title}`} onClick={(e) => { if (!settled(e)) return; setOpened(null); m.onSelect() }}>{m.label}</button>)}
         </span>
         : <span className="plan-item-quick" role="group" aria-label={`Triage ${node.title}`}>
           {p.quick.map((q) => <button key={q.label} type="button" className="plan-quick" disabled={p.disabled}
