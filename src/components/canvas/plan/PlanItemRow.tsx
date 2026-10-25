@@ -22,7 +22,7 @@
 // An open line orders by drag (calm pass, 2026-10-18): the desk drags it
 // natively; touch holds it, through `liProps` (PlanOrderList).
 
-import { useState, type DragEvent, type HTMLAttributes, type Ref } from 'react'
+import { useState, type DragEvent, type HTMLAttributes, type ReactNode, type Ref } from 'react'
 import { useArrived } from '@/contexts/CanvasActivityContext'
 import type { PlanNode } from '@/components/plan/constellation/model'
 import type { PlanMark } from '@/components/plan/constellation/planPreview'
@@ -78,6 +78,8 @@ export interface PlanItemRowProps {
   liProps?: HTMLAttributes<HTMLLIElement> & { ref?: Ref<HTMLLIElement>; 'data-order-id'?: string }
   /** It orders by drag: a grip shows on hover. */
   orderable?: boolean
+  /** Under the row: a month goal's pieces and the way to add one. */
+  children?: ReactNode
 }
 
 export function PlanItemRow(p: PlanItemRowProps) {
@@ -125,5 +127,6 @@ export function PlanItemRow(p: PlanItemRowProps) {
       {p.meta && <p className="plan-item-meta">{p.meta}</p>}
       {p.more!.map((m) => <button key={m.label} type="button" className="canvas-link" disabled={p.disabled} onClick={m.onSelect}>{m.label}</button>)}
     </div>}
+    {p.children}
   </li>
 }

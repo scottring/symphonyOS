@@ -96,3 +96,15 @@
 .wc-with-strip > .hs { position: sticky; top: 72px; max-height: calc(100vh - 96px); overflow: auto; }
 /* Phones: the list first, the level above under it (as the side card was). */
 @media (max-width: 767px) { .plan-with-strip > .hs, .wc-with-strip > .hs { position: static; max-height: none; } .plan-with-strip > .hs { order: 1; } }
+
+/* A month goal's pieces: indented under it, smaller, the same row verbs. */
+.plan-pieces { list-style: none; margin: 2px 0 0; padding: 0 0 0 22px; border-left: 1px solid var(--color-neutral-200); }
+.plan-pieces > .plan-item { padding-top: 2px; padding-bottom: 2px; border-bottom: 0; }
+.plan-pieces .plan-item-title { font-family: var(--font-family-sans); font-size: 14px; }
+.plan-piece-add { display: inline-block; margin: 2px 0 0 22px; font-size: 12.5px; }
+/* With a mouse it waits for the row's hover, so the list stays a list. */
+@media (hover: hover) {
+  .plan-piece-add { opacity: 0; height: 0; margin-top: 0; overflow: hidden; }
+  .plan-item:hover > .plan-piece-add, .plan-piece-add:focus-visible { opacity: 1; height: auto; margin-top: 2px; }
+}
+.plan-item > .ta { margin: 6px 0 4px 22px; }

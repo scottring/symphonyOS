@@ -257,6 +257,34 @@ describe('the strip: the level above, on the left',()=>{
  })
 })
 
+// A month goal's pieces (2026-10-25): October items under an October goal,
+// triaged like any row; one sent down leaves October's list for its tag.
+describe('pieces of a month goal',()=>{
+ it('+ Piece writes a step under the goal on October; one with a date goes on that day',async()=>{
+  api.tasks=[{id:'m',title:'Find K therapist',bucket:'month',goalId:'g',context:'family'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Add a piece of Find K therapist'}))
+  fireEvent.change(screen.getByLabelText('New piece of Find K therapist'),{target:{value:'Fill out KK assessment'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(api.addTask).toHaveBeenLastCalledWith('Fill out KK assessment',undefined,undefined,undefined,expect.objectContaining({parentTaskId:'m',bucket:'month',monthStart:new Date(2026,9,1),context:'family'})))
+  fireEvent.click(screen.getByRole('button',{name:'Add a piece of Find K therapist'}))
+  fireEvent.change(screen.getByLabelText('New piece of Find K therapist'),{target:{value:'Call Dr. Lee Oct 29 at 3pm'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(api.addTask).toHaveBeenLastCalledWith('Call Dr. Lee',undefined,undefined,new Date(2026,9,29,15),expect.objectContaining({parentTaskId:'m',isAllDay:false})))
+ })
+ it('a piece on October triages like a row; one on this week leaves the list and tags the goal',()=>{
+  api.tasks=[{id:'m',title:'Find K therapist',bucket:'month',subtasks:[
+   {id:'p1',title:'Fill out KK assessment',parentTaskId:'m',bucket:'month'},
+   {id:'p2',title:'Find 2–3 therapists',parentTaskId:'m',bucket:'week'},
+  ]}]
+  month()
+  const pieces=within(screen.getByRole('list',{name:'Pieces of Find K therapist'}))
+  expect(pieces.getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)).toEqual(['Fill out KK assessment'])
+  expect(pieces.getByRole('group',{name:'Triage Fill out KK assessment'})).toHaveTextContent(/Done.*Later/)
+  expect(tag('Find K therapist')).toHaveAttribute('title','Find 2–3 therapists')
+ })
+})
+
 describe('writing a goal, with an optional For',()=>{
  it('Month: one of its own takes the page area; one for a season goal is linked in the same write',async()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]

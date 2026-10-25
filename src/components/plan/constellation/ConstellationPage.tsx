@@ -106,7 +106,7 @@ const ROUTE_LEVEL: Record<string, number> = { '/year': 0, '/season': 1, '/month'
 /** "an October goal", "a Fall goal". */
 const aOrAn = (word: string) => /^[aeiou8]/i.test(word) ? 'an' : 'a'
 
-type Composer = { kind: 'add' } | { kind: 'edit'; key: string }
+type Composer = { kind: 'add' } | { kind: 'edit'; key: string } | { kind: 'piece'; key: string }
 
 /** One line the period before left, with the verbs that answer it. */
 interface ReviewVerb { label: string; run: () => Promise<boolean>; menu?: ReviewVerb[]; confirm?: string }
@@ -608,6 +608,55 @@ function Inner() {
     }
   }
 
+  // ---- A month goal's pieces (Scott, 2026-10-25) ----------------------------
+  // "+ Piece" writes a smaller step under an October goal (a subtask, on
+  // October); each piece triages like any row — This week, Done, Later ▾ —
+  // and a date in the words puts it straight on that day. Each list keeps to
+  // its own horizon: a piece sent to a week or given a day leaves October's
+  // list and shows as its goal's tag ("This week · 2"), as on the week.
+  const stepVerbs = (st: Task): RowVerb[] => {
+    const toggle = async () => (await toggleTask(st.id)) !== false
+    const onWeek = committedTo(st, 'week', week, { isCurrent: thisWeek }) !== undefined
+    const [carry] = periodMoves(st, 'month', bounds, seasons, { updateTask, keepForward, dropCommitment }, activity.run, aboveOf(st, 'month', false, seasonWord, seasonB.start))
+    return [
+      ...(thisWeek && !onWeek && !st.scheduledFor ? [{ label: 'This week', run: () => act(`This week: “${st.title}”`, async () => !!(await keepForward(st.id, { weekStart: week })), { ids: [st.id], undo: restoreOf(st) }) }] : []),
+      { label: 'Done', run: () => act(`Complete “${st.title}”`, toggle, { ids: [st.id], undo: toggle }) },
+      { label: 'Later', run: async () => true, menu: [{ label: LATER_WORD.month, run: carry.onClick }, somedayOf(st)] },
+    ].map(toRowVerb)
+  }
+  const addPiece = (parent: Task) => async (parse: HorizonParse, landing: HorizonLanding) => {
+    const id = crypto.randomUUID()
+    const people = parse.people
+    const dated = landing.kind === 'day'
+    const at = dated ? (parse.hasTime && parse.date ? parse.date : new Date(landing.date.getFullYear(), landing.date.getMonth(), landing.date.getDate())) : undefined
+    const ok = await act(`Add a piece under “${parent.title}”`, async () => !!(await addTask(parse.title, parse.quick.contactId, parse.quick.projectId, at, {
+      id, parentTaskId: parent.id, goalId: parent.goalId, context: parse.quick.context ?? parent.context,
+      assignedTo: people[0] ?? meId ?? undefined, assignedToAll: people.length > 1 ? people : undefined, location: parse.location,
+      ...(at ? { isAllDay: !parse.hasTime } : { bucket: 'month' as const, monthStart: monthB.start }),
+    })), { ids: [id], undo: async () => { await deleteTask(id) } })
+    if (ok) setComposer(null)
+    return ok
+  }
+  const piecesOf = (node: PlanNode) => {
+    if (level !== 2 || !node.task || !isOpen(node)) return undefined
+    const onMonth = (st: Task) => !st.scheduledFor && committedTo(st, 'week', week, { isCurrent: thisWeek }) === undefined
+    const steps = (node.task.subtasks ?? []).filter((st) => st.completed ? showDone : onMonth(st))
+    const adding = composer?.kind === 'piece' && composer.key === node.key
+    return <>
+      {steps.length > 0 && <ul className="plan-pieces" aria-label={`Pieces of ${node.title}`}>
+        {steps.map((st) => <PlanItemRow key={st.id} node={{ key: `piece:${st.id}`, id: st.id, title: st.title, level: 2, parent: node.key, task: st }}
+          done={!!st.completed} saved={false} onOpen={() => selection?.setSelection({ kind: 'task', id: st.id })}
+          quick={st.completed ? undefined : stepVerbs(st)} />)}
+      </ul>}
+      {adding
+        ? <TypedAdd label={`Add a piece of “${node.title}”`} fieldLabel={`New piece of ${node.title}`}
+          period={{ start: bounds.start, end: new Date(bounds.end.getTime() - 1) }} periodWord={periodWord}
+          placeholder="e.g. Call the two therapists on the list by Friday"
+          onSave={addPiece(node.task)} onCancel={() => setComposer(null)} />
+        : <button type="button" className="canvas-link plan-piece-add" aria-label={`Add a piece of ${node.title}`} onClick={() => setComposer({ kind: 'piece', key: node.key })}>+ Piece</button>}
+    </>
+  }
+
   const renderItem = (node: PlanNode, order?: RowOrder) => {
     const scheduled = node.task?.scheduledFor
     const editing = composer?.kind === 'edit' && composer.key === node.key
@@ -636,6 +685,7 @@ function Inner() {
       onCancelEdit={() => setComposer(null)}
       preview={preview.marks.get(node.id)}
       readiness={node.task ? readinessOf(node.task, prepLookup) : undefined}
+      children={piecesOf(node)}
       meta={scheduled ? `Scheduled ${scheduled.toLocaleDateString()}${!node.task?.isAllDay ? ` · ${scheduled.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : null}
       {...order} />
   }
