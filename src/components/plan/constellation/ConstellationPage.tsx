@@ -96,7 +96,8 @@ import type { Task } from '@/types/task'
 import { useRoutines } from '@/hooks/useRoutines'
 import { TypedAdd } from '@/components/canvas/strip/TypedAdd'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
-import { AboveStrip, isAboveDrag, ABOVE_MIME, type AboveGoal, type StripRoutine } from './AboveStrip'
+import { AboveStrip, type AboveGoal, type StripRoutine } from './AboveStrip'
+import { isAboveDrag, ABOVE_MIME } from './aboveDrag'
 
 const TERMS = ['year goal', 'season goal', 'month goal', 'week task'] as const
 const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')

@@ -12,10 +12,8 @@
 import { useState, type DragEvent } from 'react'
 import { HorizonStrip, type StripTab } from '@/components/canvas/strip/HorizonStrip'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
+import { ABOVE_MIME } from './aboveDrag'
 
-/** Carries the dragged goal's node key. */
-export const ABOVE_MIME = 'application/x-symphony-above-goal'
-export const isAboveDrag = (dt: DataTransfer | null) => !!dt && Array.from(dt.types).includes(ABOVE_MIME)
 
 export interface AboveGoal {
   key: string
