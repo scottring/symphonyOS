@@ -3,7 +3,7 @@
    surface, a hairline, the display face for headings, theme tokens only. */
 
 /* Page shape: the strip, then the page. Wraps on narrow screens. */
-.hs-layout { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
+.hs-layout, .plan-horizon .hs-layout { display: flex; flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
 .hs-layout > .hs, .hs-layout > .hs-rail { flex: 0 0 272px; }
 .hs-layout > .hs-rail { flex-basis: 40px; }
 .hs-layout > .hs-main { flex: 999 1 560px; min-width: 0; }
@@ -69,8 +69,10 @@
 .hs .ta-facts dd { font-size: 14px; }
 
 /* The Week with its strip. */
-.wc-with-strip { flex-direction: row; gap: 16px; }
-.wc-with-strip > .hs-main { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
+.wc.wc-with-strip { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
+/* Doubled class: the app loads canvas-today.css (.wc, a column) after this
+   file, and a column here squeezed the days to a sliver. */
+.wc.wc-with-strip > .hs-main { display: flex; flex-direction: column; gap: 16px; flex: 999 1 560px; min-width: 0; width: auto; container-type: inline-size; }
 .hs .wc-noday-chips.hs-noday { grid-template-columns: 1fr; column-gap: 0; margin-top: 6px; }
 .hs .wc-noday-chip { min-height: 32px; padding: 0 4px; }
 .hs .wc-noday-open { font-size: 14px; }
