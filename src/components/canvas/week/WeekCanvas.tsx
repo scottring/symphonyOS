@@ -251,7 +251,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const showDone = prefs.done
   // The desk and tablet draw the strip on the left (Scott's wireframe,
   // 2026-10-25): the week's own list, its routines and the month above. The
-  // days then hold what happens on each day; routines live in the strip.
+  // days hold what happens on each day, routines included.
   const stripMode = !phone
   const [drag, setDrag] = useState<Drag | null>(null)
   const [overDay, setOverDay] = useState<string | null>(null)
@@ -454,9 +454,11 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // day's order (the top two are the priority). A row Symphony is proposing or
   // pointing at stays in sight. The rest wait behind "+N more".
   const dayLists = (day: CanvasDay) => {
-    // With the strip, a routine lives in its Routines tab; one Symphony is
-    // proposing to change stays on its day, where the change shows.
-    const all = day.items.filter((it) => (showDone || !it.completed) && !(stripMode && it.kind === 'routine' && !it.proposed))
+    // A routine on a day shows on that day (2026-10-26: dragging one onto
+    // Monday left the grid unchanged); the strip's Routines tab is the
+    // week's overview of them. Every-day and weekday ones were already
+    // lifted into the rhythm line before the days came here.
+    const all = day.items.filter((it) => showDone || !it.completed)
     const fold = foldDay([
       ...day.events.map(() => ({ event: true, it: null })),
       ...all.map((it) => ({ event: false, pinned: !!it.proposed || pointedTask(it.task?.id), it })),

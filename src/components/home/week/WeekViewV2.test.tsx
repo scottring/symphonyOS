@@ -488,10 +488,11 @@ describe('WeekViewV2 journal spread', () => {
   it('a due routine with Show in Today on is a Sunday entry, untimed', () => {
     const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
-    // A day's own routines are under that day in the strip (2026-10-25), once.
-    expect(within(screen.getByTestId('journal-day-2026-09-13')).queryByText('Water houseplants')).toBeNull()
+    // A day's own routine is on that day and under it in the strip's
+    // Routines tab (2026-10-26: a drop onto a day must show there).
+    expect(within(screen.getByTestId('journal-day-2026-09-13')).getByText('Water houseplants')).toBeInTheDocument()
     expect(routinesOn('Sunday, September 13').getByText('Water houseplants')).toBeInTheDocument()
-    expect(screen.getAllByText('Water houseplants')).toHaveLength(1)
+    expect(screen.getAllByText('Water houseplants')).toHaveLength(2)
   })
 
   describe('on a narrow screen', () => {
@@ -647,7 +648,8 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     expect(screen.getByText(/Every-day routines are on/)).toHaveTextContent('5:45p Home from school')
     turnOn('Show daily routines in each day')
     routinesTab()
-    expect(screen.getAllByText('Home from school')).toHaveLength(4)
+    // Four in the days, four in the Routines tab under each day.
+    expect(screen.getAllByText('Home from school')).toHaveLength(8)
   })
 })
 

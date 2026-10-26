@@ -443,13 +443,15 @@ describe('WeekCanvas — calendar first', () => {
     expect(screen.getByRole('list', { name: 'Across these days' }).querySelector('li')).toHaveClass('has-bar')
   })
 
-  it('a routine on a day lives in the Routines tab under its day, done from there, and drags to another day', () => {
+  // 2026-10-26: a routine on a day shows on that day too (Scott dragged one
+  // onto Monday and it was nowhere on the grid); the tab is its overview.
+  it('a routine on a day shows on its day and in the Routines tab under its day, done from there, and drags to another day', () => {
     const d = days()
     const piano = { id: 'routine-r2-day1', kind: 'routine' as const, title: 'Piano', completed: false, routineId: 'r2' }
     d[1].items = [piano]
     const w = writers()
     render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w} />)
-    expect(within(screen.getByTestId('journal-day-2026-10-04')).queryByText('Piano')).toBeNull()
+    expect(within(screen.getByTestId('journal-day-2026-10-04')).getByText('Piano')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /Routines/ }))
     const group = within(screen.getByRole('region', { name: 'Sunday, October 4 routines' }))
     fireEvent.click(group.getByRole('button', { name: 'Done: Piano' }))
@@ -759,11 +761,13 @@ describe('WeekCanvas — drag to order within a day', () => {
     const w = orderWriters()
     const walk = { id: 'routine-r9', kind: 'routine' as const, title: 'Walk Jax', time: new Date(2026, 9, 7, 7), completed: false, routineId: 'r9' }
     render(<WeekCanvas weekStart={weekStart} days={withDay([walk as never, ...[A, B].map(asItem)])} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
-    // The routine is the strip's (2026-10-25): the day shows the two tasks.
-    expect(within(wedCol()).queryByText('Walk Jax')).toBeNull()
+    // The routine shows on its day (2026-10-26) beside the two tasks.
+    expect(within(wedCol()).getByText('Walk Jax')).toBeInTheDocument()
     const events = within(within(wedCol()).getByRole('list', { name: 'Wednesday events' })).getAllByRole('button')
     expect(events.map((b) => b.textContent)).toEqual(['9aDentist', '12pLunch with Sam'])
     for (const b of events) expect(b.closest('[draggable="true"]')).toBeNull()
+    // The routine takes one of the day's two places; open the day to reach Bravo.
+    fireEvent.click(within(wedCol()).getByRole('button', { name: /\+1 more/ }))
     layOut()
     dropAt(wedCol(), lift('Bravo'), 5)
     expect(w.reorderTask).toHaveBeenCalledWith(B, [A, B], 0)
