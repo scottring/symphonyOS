@@ -229,6 +229,9 @@ createRoot(document.getElementById('root')!).render(
                   grown-up can open /kid/<member id>?layout=trail|list. */}
               <Route path="/kid" element={<Suspense fallback={null}><KidKiosk /></Suspense>} />
               <Route path="/kid/:memberId" element={<Suspense fallback={null}><KidKiosk /></Suspense>} />
+              {/* The plural is the natural thing to type on a tablet; it
+                  opened an empty Today (Scott, 2026-10-27). */}
+              <Route path="/kids" element={<Navigate to="/kid" replace />} />
               {import.meta.env.DEV && <Route path="/kid-preview" element={<Suspense fallback={null}><KidKioskPreview /></Suspense>} />}
               {/* /jobs and /us retired (pare-down 2026-09-01): the job pipeline
                   moved out of Symphony (the vault owns job search) and the Us
