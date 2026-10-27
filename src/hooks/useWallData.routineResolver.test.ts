@@ -182,6 +182,16 @@ describe('useWallData — resolveRoutine adoption (Task 8b)', () => {
     expect(names).toContain('On-Timeline Control')
   })
 
+  it('a routine switched off the kiosk (show_on_kiosk: false) does NOT reach the wall; its sibling does', async () => {
+    ROUTINES = [
+      createMockRoutine({ name: 'Off the kiosk', context: 'family', show_on_kiosk: false }),
+      createMockRoutine({ name: 'On the kiosk', context: 'family' }),
+    ]
+    const names = routineNamesOnWall(await fetchDays())
+    expect(names).not.toContain('Off the kiosk')
+    expect(names).toContain('On the kiosk')
+  })
+
   // The companion to the Step-still-reaches-the-wall test above, phrased as
   // the actual consumer scenario a fix-round review found missing: a kid's
   // assigned collection Step (the exact shape the wall board's downstream

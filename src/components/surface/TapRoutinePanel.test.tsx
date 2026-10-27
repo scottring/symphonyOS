@@ -183,6 +183,28 @@ describe('TapRoutinePanel', () => {
     await waitFor(() => expect(onShowOnTodayChange).toHaveBeenCalledWith(false))
   })
 
+  it('Kiosk is a switch beside Off, and takes the routine off the kitchen kiosk', async () => {
+    const onShowOnKioskChange = vi.fn()
+    render(
+      <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+        onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} onShowOnKioskChange={onShowOnKioskChange} viewedDate={TUE} />,
+    )
+    const sw = screen.getByRole('switch', { name: 'Kiosk' })
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(sw)
+    await waitFor(() => expect(onShowOnKioskChange).toHaveBeenCalledWith(false))
+  })
+
+  it('says what a routine off the kiosk still does', () => {
+    render(
+      <TapRoutinePanel routine={{ ...routine, show_on_kiosk: false }} onClose={vi.fn()} onNotesChange={vi.fn()}
+        onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnKioskChange={vi.fn()} viewedDate={TUE} />,
+    )
+    expect(screen.getByRole('switch', { name: 'Kiosk' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByText(/Still runs, and still on Today and the week/)).toBeInTheDocument()
+    expect(screen.getByText('Hidden from the kitchen kiosk (Kiosk off)')).toBeInTheDocument()
+  })
+
   it('says what an Off routine still does', () => {
     render(
       <TapRoutinePanel routine={{ ...routine, show_on_timeline: false }} onClose={vi.fn()} onNotesChange={vi.fn()}

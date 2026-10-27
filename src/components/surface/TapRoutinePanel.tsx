@@ -66,6 +66,10 @@ interface TapRoutinePanelProps {
    *  provided, and only while the routine is Active — "off Today" says nothing
    *  about a routine that is resting off everything. */
   onShowOnTodayChange?: (next: boolean) => unknown
+  /** The Kiosk switch: take the routine off the kitchen kiosk and the kids'
+   *  tablets without stopping it (writes show_on_kiosk). Rendered only when
+   *  provided, and only while the routine is Active. */
+  onShowOnKioskChange?: (next: boolean) => unknown
   /** The day "Where it shows" and "Hide for today" are about. Defaults to today. */
   viewedDate?: Date
   /** The occurrence the panel was opened from (a day on Week or Routines).
@@ -134,7 +138,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   // this routine running at all (Active/Resting), and does a running routine
   // want a row on Today. A bedtime routine everybody knows by heart is still
   // real — it just doesn't need reading back to you (Scott, 2026-09-07).
-  const { active: onTimeline, off } = routineSwitches(routine)
+  const { active: onTimeline, off, kioskOff } = routineSwitches(routine)
 
   // Where it shows, for the day being viewed — live against the schedule
   // draft while it is open.
@@ -195,6 +199,15 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
     if (!fn) return
     if (props.unsaved) { fn(!next); return }
     await run(next ? `Turn "${routine.name}" off` : `Show "${routine.name}" in Today and planning`,
+      () => write(() => fn(!next)),
+      { ids: [routine.id], undo: () => write(() => fn(next)) })
+  }
+
+  const setKioskOff = async (next: boolean) => {
+    const fn = props.onShowOnKioskChange
+    if (!fn) return
+    if (props.unsaved) { fn(!next); return }
+    await run(next ? `Take "${routine.name}" off the kiosk` : `Show "${routine.name}" on the kiosk`,
       () => write(() => fn(!next)),
       { ids: [routine.id], undo: () => write(() => fn(next)) })
   }
@@ -483,6 +496,39 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
                 <span
                   className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
                     off ? 'translate-x-[22px]' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+
+          {/* Kiosk — the one surface Off leaves alone (Scott, 2026-10-27: the
+              panel said where it shows but gave no way off the kiosk). */}
+          {onTimeline && props.onShowOnKioskChange && (
+            <div className="routine-hide-control">
+              <div className="routine-hide-control-text">
+                <span className="routine-hide-control-title">
+                  {ROUTINE_HIDE_LABELS.kiosk}{kioskOff ? ' — hidden from the kitchen kiosk' : ''}
+                </span>
+                <span className="routine-hide-control-hint">
+                  {kioskOff
+                    ? 'Still runs, and still on Today and the week. Turn Kiosk back on to show it there again.'
+                    : 'On the kitchen kiosk and the kids’ tablets when it’s due.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!kioskOff}
+                aria-label="Kiosk"
+                onClick={() => { void setKioskOff(!kioskOff) }}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  !kioskOff ? 'bg-primary-600' : 'bg-neutral-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    !kioskOff ? 'translate-x-[22px]' : 'translate-x-0.5'
                   }`}
                 />
               </button>

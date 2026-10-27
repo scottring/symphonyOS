@@ -102,6 +102,8 @@ export interface Routine {
   image_url?: string | null // per-exercise image (fidelity B); null in v1
   raw_input: string | null // Original natural language input
   show_on_timeline: boolean // Whether to display on Today view (default true)
+  /** The Kiosk switch: false keeps it off the kitchen kiosk and the kids' tablets. Default true. */
+  show_on_kiosk?: boolean
   pin_to_timeline?: boolean // Always show on Today even when "hide daily routines" is on (tracked obligations, e.g. PT exercises)
   /** Daily quantity goal — "read 20 minutes" = 20/'minutes'. Both null = plain checkbox step. */
   target_amount?: number | null

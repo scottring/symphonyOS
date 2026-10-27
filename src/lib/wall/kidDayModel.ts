@@ -295,6 +295,7 @@ export function buildMemberDayModel(input: {
   const { collections: rawCollections, standalone } = groupRoutineSteps(routines)
   for (const r of standalone) {
     if (!routineOwners(r).includes(member.id)) continue
+    if (r.show_on_kiosk === false) continue
     const resolution = resolveRoutine(
       { ...r, show_on_timeline: true },
       { date, member: [member.id], prefs: { hideRoutines: false, layers: FAMILY_LAYER } },
@@ -317,6 +318,7 @@ export function buildMemberDayModel(input: {
   const collections: KidCollection[] = []
   for (const c of rawCollections) {
     if (!routineOwners(c).includes(member.id)) continue
+    if (c.show_on_kiosk === false) continue
     if (isRestingOn(c, date)) continue
     if (!matchesRecurrenceForDate(c, date, null)) continue
     const applicableSteps = c.steps.filter((s) => s.visibility === 'active' && stepAppliesOnDate(s, date))

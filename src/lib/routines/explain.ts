@@ -37,7 +37,10 @@ export const ROUTINE_HIDE_LABELS = {
   today: 'Hide for today',
   rest: 'Rest until…',
   off: 'Off',
+  kiosk: 'Kiosk',
 } as const
+
+const KIOSK_OFF_REASON = 'Hidden from the kitchen kiosk (Kiosk off)'
 
 export type ExplainSurface = 'today' | 'week' | 'kiosk'
 
@@ -268,7 +271,13 @@ function explainKiosk(r: Routine, ctx: ExplainCtx, today: SurfaceExplanation): S
     if (privateOwnerName(ctx.parent, members) !== false) {
       return { ...base, shows: false, rung: 'private', reason: `Inside ${ctx.parent.name}, which is private — never on the shared kiosk` }
     }
+    if (ctx.parent.show_on_kiosk === false) {
+      return { ...base, shows: false, rung: 'kiosk-off', reason: `Inside ${ctx.parent.name}, which is off the kitchen kiosk` }
+    }
   }
+  // The Kiosk switch: the routine's own choice to stay off the wall and the
+  // kids' tablets. Said before the day's rule, like Off is on Today.
+  if (r.show_on_kiosk === false) return { ...base, shows: false, rung: 'kiosk-off', reason: KIOSK_OFF_REASON }
 
   const steps = ctx.steps ?? []
   if (steps.length > 0) {

@@ -346,6 +346,7 @@ export type RoutineHideReason =
   | 'not-theirs'     // rung 5 — the selected member isn't an owner
   | 'in-collection'  // rung 6 — it's a step; the collection renders it
   | 'everyday'       // rung 7 — swept by "hide daily routines"
+  | 'kiosk-off'      // the kiosk only — show_on_kiosk === false (resolveRoutineOnWall)
 
 export interface RoutinePrefs {
   /** The "hide daily routines" toggle (rung 7). */
@@ -502,6 +503,7 @@ export function resolveRoutineOnWall(
   date: Date,
   lastCompletedAt?: Date | null,
 ): RoutineResolution {
+  if (routine.show_on_kiosk === false) return { shows: false, reason: 'kiosk-off', owners: routineOwners(routine) }
   return resolveRoutine(
     { ...routine, show_on_timeline: true, parent_routine_id: null },
     { date, prefs: { hideRoutines: false, layers: WALL_LAYERS }, lastCompletedAt: lastCompletedAt ?? null },
@@ -516,10 +518,11 @@ export function resolveRoutineOnWall(
  *   placedToday takes a main-list row on a due day without a time: a tracked
  *               obligation or a rule that names its days (see dayPlan.ts)
  */
-export function routineSwitches(routine: Routine): { active: boolean; off: boolean; placedToday: boolean } {
+export function routineSwitches(routine: Routine): { active: boolean; off: boolean; kioskOff: boolean; placedToday: boolean } {
   return {
     active: routine.visibility === 'active',
     off: routine.show_on_timeline === false,
+    kioskOff: routine.show_on_kiosk === false,
     placedToday: isTimelineObligation(routine) || isPinnedToTimeline(routine) || isDayBoundRoutine(routine),
   }
 }
@@ -528,4 +531,9 @@ export function routineSwitches(routine: Routine): { active: boolean; off: boole
  *  shown again. Lives here so writers elsewhere never spell the column. */
 export function offSwitchPatch(off: boolean): { show_on_timeline: boolean } {
   return { show_on_timeline: !off }
+}
+
+/** The write that takes a routine off the kitchen kiosk and the kids' tablets, or puts it back. */
+export function kioskSwitchPatch(off: boolean): { show_on_kiosk: boolean } {
+  return { show_on_kiosk: !off }
 }

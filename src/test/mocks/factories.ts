@@ -203,6 +203,7 @@ export function createMockRoutine(overrides: Partial<Routine> = {}): Routine {
     visibility: 'active',
     paused_until: null,
     show_on_timeline: true,
+    show_on_kiosk: true,
     scope: 'individual',
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',

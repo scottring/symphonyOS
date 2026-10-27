@@ -99,6 +99,14 @@ describe('buildMemberDayModel', () => {
     expect(model.bands.anytime.map((r) => r.id)).toEqual([hidden.id])
   })
 
+  it('hides a routine switched off the kiosk, and a collection switched off the kiosk', () => {
+    const off = routine({ show_on_kiosk: false })
+    const parent = routine({ name: 'Morning Steps', visibility: 'reference', show_on_kiosk: false })
+    const step = routine({ name: 'Brush teeth', parent_routine_id: parent.id })
+    const model = build([off, parent, step])
+    expect(model.isEmpty).toBe(true)
+  })
+
   it('hides resting and not-today routines', () => {
     const resting = routine({ visibility: 'reference' })
     const notToday = routine({ recurrence_pattern: { type: 'weekly', days: ['mon'] } })

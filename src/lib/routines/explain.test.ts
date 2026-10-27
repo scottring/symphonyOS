@@ -123,6 +123,21 @@ describe('explainRoutine — Kiosk', () => {
     expect(e.kiosk).toMatchObject({ shows: true, rung: 'shows', reason: 'On the kitchen kiosk at 7:00 AM' })
   })
 
+  it('Kiosk off hides it from the kiosk only — Today and the week keep it', () => {
+    const e = explainRoutine(r({ show_on_kiosk: false, time_of_day: '07:00' }), ctx)
+    expect(e.kiosk).toMatchObject({ shows: false, rung: 'kiosk-off', reason: 'Hidden from the kitchen kiosk (Kiosk off)' })
+    expect(e.today.shows).toBe(true)
+    expect(e.week.shows).toBe(true)
+    expect(e.state).toBe('running')
+  })
+
+  it('a Step rides its collection’s Kiosk switch', () => {
+    const parent = r({ id: 'p', name: 'Morning Steps', show_on_kiosk: false })
+    const step = r({ id: 's', parent_routine_id: 'p' })
+    const e = explainRoutine(step, { ...ctx, parent })
+    expect(e.kiosk).toMatchObject({ shows: false, rung: 'kiosk-off', reason: 'Inside Morning Steps, which is off the kitchen kiosk' })
+  })
+
   it('a Personal routine is private — never on the shared kiosk, even assigned to a kid', () => {
     const e = explainRoutine(r({ context: 'personal', scope: 'individual', assigned_to: 'scott' }), ctx)
     expect(e.kiosk).toMatchObject({ shows: false, rung: 'private', reason: 'Private to Scott — never on the shared kiosk' })
@@ -163,8 +178,8 @@ describe('helpers', () => {
     expect(daysText([6])).toBe('Sat')
   })
 
-  it('labels the three strengths once', () => {
-    expect(Object.values(ROUTINE_HIDE_LABELS)).toEqual(['Hide for today', 'Rest until…', 'Off'])
+  it('labels the three strengths and the Kiosk switch once', () => {
+    expect(Object.values(ROUTINE_HIDE_LABELS)).toEqual(['Hide for today', 'Rest until…', 'Off', 'Kiosk'])
   })
 
   it('summarizes every surface in one line', () => {

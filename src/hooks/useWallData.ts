@@ -504,8 +504,11 @@ export function useWallData(): UseWallDataReturn {
         //    instead. KidDayView only reads days[].items for plain assigned
         //    tasks, filtering out
         //    routine-type items, so it no longer depends on this override.)
+        //  The Kiosk switch (2026-10-27) is the one honoured here: off the
+        //  kiosk means off the wall and the kids' tablets.
         const dayRoutines = routines.filter(
           (r) =>
+            r.show_on_kiosk !== false &&
             resolveRoutine(
               { ...r, show_on_timeline: true, parent_routine_id: null },
               {
