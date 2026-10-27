@@ -33,6 +33,7 @@ const baseTask: TimelineItem = {
 function renderRail(overrides: Partial<TimelineItem> = {}) {
   const value = {
     onToggleTask: vi.fn(),
+    onPushTask: vi.fn(),
     onStartMeeting: vi.fn(),
     onSkipRoutine: vi.fn(),
     onOpenProject: vi.fn(),
@@ -87,11 +88,11 @@ describe('RowActionRail', () => {
   })
 
   describe('the verb slot', () => {
-    // Today, trimmed (2026-10-14): a task row is tick, drag and tap — its day
-    // and time change in the item panel.
-    it('is empty on an open task — no Reschedule button', () => {
+    // Today, trimmed (2026-10-14) took Reschedule off the row; Snooze came
+    // back on its own (2026-10-27). The full reschedule stays in the panel.
+    it('holds Snooze — and only Snooze — for an open task', () => {
       const { container } = renderRail({ type: 'task' })
-      expect(slots(container)[VERB].querySelector('button')).toBeNull()
+      expect(slots(container)[VERB].querySelector('[aria-label="Snooze"]')).toBeTruthy()
       expect(container.querySelector('[aria-label="Reschedule"]')).toBeNull()
     })
 

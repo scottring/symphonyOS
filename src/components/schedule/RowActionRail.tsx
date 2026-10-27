@@ -6,6 +6,7 @@ import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { ContextPicker } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { RoutineMoveButton } from './RoutineMoveButton'
+import { SnoozeButton } from './SnoozeButton'
 import { RAIL, RAIL_SLOT, RAIL_WHO } from './todayRowGrid'
 
 interface RowActionRailProps {
@@ -103,15 +104,16 @@ function StartMeetingButton({ item }: { item: TimelineItem }) {
  * down the page lined up. Reserve the shape and the columns hold.
  *
  * Slot order is fixed: assignee | context | verb | spare. At most one verb
- * exists per row type — a routine moves or skips this occurrence, a timed
- * event starts — so they share one slot without ever competing for it.
+ * exists per row type — a task snoozes, a routine moves or skips this
+ * occurrence, a timed event starts — so they share one slot without ever
+ * competing for it.
  *
- * Today, trimmed (2026-10-14): a task row is tick, drag and tap. Its
- * Reschedule button and the row ⋯ menu are gone — every job they did lives in
- * the item panel (TapContextPanel / TapEventPanel). The verb cell is empty on a
- * task, and the last cell stays as a reserved spacer: RoutineCollectionRow
- * draws the same four cells, so the people column still lines up down the
- * page.
+ * Today, trimmed (2026-10-14) took the task's Reschedule button and the row ⋯
+ * menu away; their jobs live in the item panel (TapContextPanel /
+ * TapEventPanel). Snooze came back on its own (2026-10-27) — the one move you
+ * make from the list without opening anything. The last cell stays as a
+ * reserved spacer: RoutineCollectionRow draws the same four cells, so the
+ * people column still lines up down the page.
  *
  * The order reads WHO -> WHAT KIND -> DO IT -> MORE: identity and
  * classification first, because "is this mine?" is the question you ask of a
@@ -134,12 +136,14 @@ export function RowActionRail({
   assignedToAll,
   assigned = true,
 }: RowActionRailProps) {
+  const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
   const isLive = !item.completed && !item.skipped
 
   const verb =
-    isRoutine && isLive ? <RoutineMoveButton item={item} />
+    isTask && isLive ? <SnoozeButton item={item} />
+    : isRoutine && isLive ? <RoutineMoveButton item={item} />
     : isEvent && isLive && !item.allDay ? <StartMeetingButton item={item} />
     : null
 
