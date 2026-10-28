@@ -17,6 +17,12 @@
  *   • Routines: "Morning reset" collection + kid-assigned trash night
  *   • Meals: this week's dinner plan + 3 recipes
  *   • Lists: family groceries + a trip packing list
+ *   • Kitchen wall (film-ready): per-kid Morning / Home-from-school / Bedtime
+ *     collections (daily, so every day has the out-the-door, home and bedtime
+ *     screens), a few steps pre-ticked, needed-today items, homework, school
+ *     papers + notices (what school mail produces), kid/partner timed family
+ *     tasks, a dinner every night with a cue line, and scratchpad stickies.
+ *     Wall rehearsal steps: docs/demo/film-the-wall.md
  *
  * DATES ARE RELATIVE TO RUN DAY — run it the morning of the demo and Today
  * is always populated. IDEMPOTENT: full wipe + reseed, safe to re-run.
@@ -86,6 +92,10 @@ async function main() {
 
   // ── 1. WIPE (FK-safe order) ────────────────────────────────────────────
   console.log('· wiping old demo data')
+  die('wipe routine ticks')(await db.from('actionable_instances').delete().eq('user_id', DEMO_USER))
+  die('wipe notices')(await db.from('notices').delete().eq('user_id', DEMO_USER))
+  die('wipe scratchpad')(await db.from('scratchpad_notes').delete().eq('user_id', DEMO_USER))
+  die('wipe math')(await db.from('kid_math_problems').delete().eq('user_id', DEMO_USER))
   die('wipe tasks')(await db.from('tasks').delete().eq('user_id', DEMO_USER))
   die('wipe list_items')(await db.from('list_items').delete().eq('user_id', DEMO_USER))
   die('wipe lists')(await db.from('lists').delete().eq('user_id', DEMO_USER))
@@ -108,11 +118,13 @@ async function main() {
   if (!selfRows.length) { console.error('✗ no self family_members row for demo user'); process.exit(1) }
   const alexId = selfRows[0].id
   die('rename self → Alex')(await db.from('family_members')
-    .update({ name: 'Alex', initials: 'A', color: 'blue', display_order: 0 }).eq('id', alexId))
+    .update({ name: 'Alex', initials: 'A', color: 'blue', display_order: 0, role_label: 'parent' }).eq('id', alexId))
+  // role_label matters: the wall treats anyone not 'parent' (and not a full
+  // user) as a kid — without it Edith gets an empty kid column.
   const fam = die('insert family')(await db.from('family_members').insert([
-    { user_id: DEMO_USER, name: 'Edith', initials: 'E', color: 'purple', is_full_user: false, display_order: 1, member_type: 'core' },
-    { user_id: DEMO_USER, name: 'Liam', initials: 'L', color: 'green', is_full_user: false, display_order: 2, member_type: 'core' },
-    { user_id: DEMO_USER, name: 'Mia', initials: 'M', color: 'orange', is_full_user: false, display_order: 3, member_type: 'core' },
+    { user_id: DEMO_USER, name: 'Edith', initials: 'E', color: 'purple', is_full_user: false, display_order: 1, member_type: 'core', role_label: 'parent' },
+    { user_id: DEMO_USER, name: 'Liam', initials: 'L', color: 'green', is_full_user: false, display_order: 2, member_type: 'core', role_label: 'child' },
+    { user_id: DEMO_USER, name: 'Mia', initials: 'M', color: 'orange', is_full_user: false, display_order: 3, member_type: 'core', role_label: 'child' },
   ]).select('id,name'))
   const member = Object.fromEntries(fam.map(f => [f.name, f.id])); member.Alex = alexId
 
@@ -136,7 +148,7 @@ async function main() {
       ],
     },
     { user_id: DEMO_USER, name: 'Website relaunch', status: 'in_progress', context: 'work', scope: 'individual', notes: 'Launch window: first week of next month. Copy freeze this Friday.' },
-    { user_id: DEMO_USER, name: 'Cabin weekend — Labor Day', status: 'in_progress', type: 'trip', context: 'family', scope: 'compound', notes: 'Lake cabin, 3 nights. Dogs allowed. Check-in after 3pm.' },
+    { user_id: DEMO_USER, name: 'Cabin weekend', status: 'in_progress', type: 'trip', context: 'family', scope: 'compound', notes: 'Lake cabin, 3 nights. Dogs allowed. Check-in after 3pm.' },
   ]).select('id,name'))
   const project = Object.fromEntries(projects.map(p => [p.name, p.id]))
 
@@ -184,7 +196,7 @@ async function main() {
     m({ title: 'Test-ride bikes at two shops, set budget', source_id: pick['Bikes bought, family riding weekly'], scheduled_for: thisMonthDay(27) }),
     m({ title: 'First full-family Saturday ride', source_id: pick['Bikes bought, family riding weekly'], scheduled_for: nextMonthDay(8) }),
     m({ title: 'Order the new dishwasher', project_id: project['Kitchen renovation'], scheduled_for: nextMonthDay(4) }),
-    m({ title: 'Book the lake cabin', project_id: project['Cabin weekend — Labor Day'], scheduled_for: nextMonthDay(12) }),
+    m({ title: 'Book the lake cabin', project_id: project['Cabin weekend'], scheduled_for: nextMonthDay(12) }),
   ]))
 
   // ── 8. TODAY + TOMORROW (timed, rich context) ──────────────────────────
@@ -283,28 +295,132 @@ async function main() {
     { user_id: DEMO_USER, week_start: weekStart, starts_on: weekStart },
     { onConflict: 'user_id,week_start' },
   ).select('id'))
-  die('meal entries')(await db.from('meal_plan_entries').insert([
-    { meal_plan_id: plan[0].id, day_of_week: 1, slot: 'dinner', recipe_id: recipe['Sheet-pan chicken fajitas'] },
-    { meal_plan_id: plan[0].id, day_of_week: 2, slot: 'dinner', ad_hoc_title: 'Leftovers night' },
-    { meal_plan_id: plan[0].id, day_of_week: 3, slot: 'dinner', recipe_id: recipe['Miso-glazed salmon + rice'] },
-    { meal_plan_id: plan[0].id, day_of_week: 4, slot: 'dinner', ad_hoc_title: 'Breakfast for dinner' },
-    { meal_plan_id: plan[0].id, day_of_week: 5, slot: 'dinner', recipe_id: recipe['Friday pizza night'] },
-  ]))
+  // Every night has a dinner (the wall shows "No dinner planned" otherwise),
+  // and TONIGHT is always a real recipe so "Start cooking" works on camera.
+  // notes → the dinner card's cue line (first sentence).
+  const dinners = {
+    0: { recipe_id: recipe['Miso-glazed salmon + rice'], notes: 'Start the rice by 6. Mia does the cucumbers.' },
+    1: { recipe_id: recipe['Sheet-pan chicken fajitas'], notes: 'Liam sets the table; Mia picks the music.' },
+    2: { ad_hoc_title: 'Leftovers night', notes: 'Everything in the fridge comes out at 6:15.' },
+    3: { recipe_id: recipe['Miso-glazed salmon + rice'], notes: 'Start the rice by 6. Mia does the cucumbers.' },
+    4: { ad_hoc_title: 'Breakfast for dinner', notes: 'Pancakes — Liam flips.' },
+    5: { recipe_id: recipe['Friday pizza night'], notes: 'Oven on at 5:30 so the steel is hot.' },
+    6: { ad_hoc_title: 'Grill night', notes: 'Burgers and corn if it is dry out.' },
+  }
+  const dow = today.getDay()
+  if (!dinners[dow].recipe_id) dinners[dow] = { recipe_id: recipe['Sheet-pan chicken fajitas'], notes: 'Liam sets the table; Mia picks the music.' }
+  die('meal entries')(await db.from('meal_plan_entries').insert(
+    Object.entries(dinners).map(([d, e]) => ({ meal_plan_id: plan[0].id, day_of_week: Number(d), slot: 'dinner', ...e })),
+  ))
 
   // ── 12. LISTS ──────────────────────────────────────────────────────────
   const lists = die('lists')(await db.from('lists').insert([
     { user_id: DEMO_USER, title: 'Groceries', category: 'shopping', visibility: 'family', sort_order: 0 },
-    { user_id: DEMO_USER, title: 'Cabin packing list', category: 'travel', visibility: 'family', sort_order: 1, project_id: project['Cabin weekend — Labor Day'] },
+    { user_id: DEMO_USER, title: 'Cabin packing list', category: 'travel', visibility: 'family', sort_order: 1 },
   ]).select('id,title'))
   const list = Object.fromEntries(lists.map(l => [l.title, l.id]))
   die('list items')(await db.from('list_items').insert([
     ...['Chicken thighs', 'Bell peppers', 'Tortillas', 'White miso', 'Salmon', 'Pizza dough', 'Mozzarella', 'Pineapple (Mia)'].map((text, i) =>
-      ({ user_id: DEMO_USER, list_id: list['Groceries'], text, sort_order: i, is_checked: false })),
+      ({ user_id: DEMO_USER, list_id: list['Groceries'], text, sort_order: i, completed: false })),
     ...[['Sleeping bags', false], ['Headlamps', true], ['S\'mores kit', false], ['Rain jackets', false], ['Card games', true]].map(([text, done], i) =>
-      ({ user_id: DEMO_USER, list_id: list['Cabin packing list'], text, sort_order: i, is_checked: done })),
+      ({ user_id: DEMO_USER, list_id: list['Cabin packing list'], text, sort_order: i, completed: done, completed_at: done ? new Date().toISOString() : null })),
   ]))
 
-  // ── 13. PROFILE SAFETY ─────────────────────────────────────────────────
+  // ── 13. KITCHEN WALL (film-ready) ──────────────────────────────────────
+  // The wall's screens hang off each kid's routine COLLECTIONS: one starting
+  // before 11:00 = the out-the-door screen, 15:00–17:59 = home from school,
+  // 19:00+ = bedtime. One collection per kid (not one shared) so ticks are
+  // per kid. Daily on purpose: a film day can fall on any weekday.
+  console.log('· kitchen wall: kid collections, school items, stickies')
+  const ymd = (off = 0) => {
+    const d = new Date(today); d.setDate(d.getDate() + off)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  const fam1 = { user_id: DEMO_USER, recurrence_pattern: { type: 'daily' }, context: 'family', scope: 'compound', show_on_timeline: false }
+  const stepIds = {} // `${kid}:${step}` → routine id, for pre-ticks
+  async function collection(kid, name, start, steps) {
+    const parent = die(`${kid} ${name}`)(await db.from('routines').insert({
+      ...fam1, name, time_of_day: `${start}:00`, assigned_to: member[kid],
+    }).select('id'))
+    const rows = die(`${kid} ${name} steps`)(await db.from('routines').insert(steps.map(([title, time, who], i) => ({
+      ...fam1, name: title, parent_routine_id: parent[0].id, step_order: i, time_of_day: `${time}:00`,
+      ...(who ? { assigned_to: member[who] } : {}),
+    }))).select('id,name'))
+    for (const r of rows) stepIds[`${kid}:${r.name}`] = r.id
+  }
+  for (const kid of ['Liam', 'Mia']) {
+    await collection(kid, 'Morning', '07:00', [
+      ['Get dressed', '07:00'],
+      ['Make your bed', '07:05'],
+      ['Breakfast', '07:15'],
+      // a grown-up step inside the kids' collection → the "grown-ups" line
+      ...(kid === 'Mia' ? [['Pack lunches', '07:20', 'Alex']] : []),
+      ['Brush teeth', '07:30'],
+      ['Backpack packed', '07:35'],
+      ['Shoes and jacket on', '07:45'],
+    ])
+    await collection(kid, 'Home from school', '15:30', [
+      ['Unpack your folder', '15:30'],
+      ['Snack', '15:40'],
+      ['Homework', '15:50'],
+      ['Reading — 20 minutes', '16:20'],
+    ])
+    await collection(kid, 'Bedtime', '19:30', [
+      ['Bath or shower', '19:30'],
+      ['Pajamas on', '19:45'],
+      ['Brush teeth', '19:55'],
+      ['Read together', '20:05'],
+      ['Lights out', '20:15'],
+    ])
+  }
+  // A few morning steps already done, so the board shows progress on camera.
+  die('pre-ticks')(await db.from('actionable_instances').insert(
+    ['Liam:Get dressed', 'Liam:Make your bed', 'Mia:Get dressed'].map((k) => ({
+      user_id: DEMO_USER, entity_type: 'routine', entity_id: stepIds[k], date: ymd(0),
+      status: 'completed', completed_at: new Date().toISOString(),
+    })),
+  ))
+
+  // What school mail would have produced: homework, papers, notices, and
+  // things needed today. Same shape the school-digest function writes.
+  const schoolRow = (row) => ({
+    user_id: DEMO_USER, completed: false, bucket: 'timed', context: 'family', scope: 'compound',
+    is_all_day: true, scheduled_for: allDay(Number(row._off)), needed_on: ymd(Number(row._off)),
+    ...Object.fromEntries(Object.entries(row).filter(([k]) => k !== '_off')),
+  })
+  die('school items')(await db.from('tasks').insert([
+    schoolRow({ _off: 0, title: 'Library book back', category: 'task', assigned_to: member.Liam }),
+    schoolRow({ _off: 0, title: 'Show-and-tell: something from fall', category: 'task', assigned_to: member.Mia }),
+    schoolRow({ _off: 1, title: 'Math worksheet — page 42', category: 'homework', assigned_to: member.Liam, notes: 'From Ms. Alvarez\'s Monday email.' }),
+    schoolRow({ _off: 1, title: 'Spelling words — list 6', category: 'homework', assigned_to: member.Mia }),
+    schoolRow({ _off: 2, title: 'Field trip permission slip — aquarium', category: 'paper', assigned_to: member.Mia, held_by: null }),
+    schoolRow({ _off: 2, title: 'Picture day order form', category: 'paper', assigned_to: member.Liam, held_by: member.Edith }),
+  ]))
+  die('notices')(await db.from('notices').insert([
+    { user_id: DEMO_USER, family_member_id: null, text: 'Early dismissal Friday at 12:30.', sender_label: 'Lakeside Elementary', received_on: ymd(-1) },
+    { user_id: DEMO_USER, family_member_id: member.Liam, text: 'Picture day is next Tuesday — wear the blue shirt.', sender_label: 'Ms. Alvarez', received_on: ymd(-2) },
+    { user_id: DEMO_USER, family_member_id: member.Mia, text: 'Bring a water bottle every day this week (field days).', sender_label: 'Lakeside Elementary', received_on: ymd(0) },
+  ]))
+
+  // Family timed rows for the people on the wall (only context 'family'
+  // reaches the wall; Work/Personal stay private, as they should).
+  const f = (row) => ({ user_id: DEMO_USER, completed: false, is_fun: false, is_all_day: false, bucket: 'timed', context: 'family', scope: 'compound', ...row })
+  die('family day')(await db.from('tasks').insert([
+    f({ title: 'Piano lesson', scheduled_for: at(0, 16, 30), estimated_duration: 45, assigned_to: member.Liam }),
+    f({ title: 'Soccer practice', scheduled_for: at(0, 17, 0), estimated_duration: 60, assigned_to_all: [member.Mia, member.Edith] }),
+    f({ title: 'Pick up Mia from soccer', scheduled_for: at(0, 18, 0), estimated_duration: 15, assigned_to: member.Alex }),
+    f({ title: 'Swim lesson', scheduled_for: at(1, 16, 0), estimated_duration: 45, assigned_to: member.Mia }),
+    f({ title: 'Book club', scheduled_for: at(1, 19, 30), estimated_duration: 90, assigned_to: member.Edith }),
+  ]))
+
+  // Scratchpad stickies for the quiet screen.
+  die('scratchpad')(await db.from('scratchpad_notes').insert([
+    { user_id: DEMO_USER, body: 'Thanksgiving — Grandma\'s or ours?', kind: 'talk', author_member_id: member.Edith },
+    { user_id: DEMO_USER, body: 'Out of AA batteries', kind: 'note', author_member_id: member.Alex },
+    { user_id: DEMO_USER, body: 'Can I try swim team?', kind: 'talk', author_member_id: member.Mia },
+  ]))
+
+  // ── 14. PROFILE SAFETY ─────────────────────────────────────────────────
   await db.from('user_profiles').update({ onboarding_completed_at: new Date().toISOString() }).eq('user_id', DEMO_USER)
 
   console.log('\n✓ Demo world seeded. Pre-flight the browser per docs/demo/demo-script.md')
