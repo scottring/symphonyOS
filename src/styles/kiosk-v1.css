@@ -370,6 +370,11 @@
 .is-dark .kw-paper.is-late small:first-of-type { color: #E0A959; }
 .is-v1 .kw-paper .kw-paper-who { font-weight: 600; color: var(--kw-ink); }
 .is-v1 .kw-side-title { margin: calc(12 * var(--p)) 0 calc(6 * var(--p)); }
+/* The dinner's name is the way in: a button that keeps its heading's type. */
+.is-v1 .kw-dinner-tap { all: unset; cursor: pointer; display: inline; font: inherit; color: inherit; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: .14em; text-decoration-thickness: .06em; }
+.is-v1 .kw-dinner-tap:active { opacity: .7; }
+.is-v1 .kw-rest-dinner { margin-top: calc(36 * var(--p)); }
+.is-v1 .kw-rest-dinner .kw-side-title { margin-top: calc(6 * var(--p)); }
 
 /* ---- Dinner ----------------------------------------------------------- */
 .is-v1 .kw-photo { display: block; flex: none; height: calc(300 * var(--p)); padding: 0; border: 0; border-radius: calc(22 * var(--p)); overflow: hidden; background: var(--kw-surface); }

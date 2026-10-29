@@ -161,6 +161,23 @@ const namesOf = (ids: string[] | undefined, members: FamilyMember[]) =>
   (ids ?? []).map((id) => members.find((m) => m.id === id)?.name).filter((n): n is string => !!n)
 const byOf = (r: WallTodayRow, members: FamilyMember[]) => r.sub ?? (namesOf(r.owners, members).join(' & ') || null)
 
+/** Tapping the dinner itself goes straight to the recipe, else straight to
+ *  cooking step by step (Scott, 2026-10-29: no stop at the servings card). */
+const dinnerTap = (p: KioskHomeV1Props): (() => void) | undefined =>
+  p.dinner?.hasRecipe ? p.onOpenRecipe : p.dinner?.key ? p.onStartCooking : undefined
+
+/** The dinner's name as one tap into it, or plain text when there is nothing to open. */
+function DinnerTitle({ p, className }: { p: KioskHomeV1Props; className: string }) {
+  const d = p.dinner!
+  const tap = dinnerTap(p)
+  if (!tap) return <h2 className={className}>{d.title}</h2>
+  return (
+    <h2 className={className}>
+      <button type="button" className="kw-dinner-tap" onClick={tap} aria-label={`${d.title}: ${d.hasRecipe ? 'open the recipe' : 'start cooking'}`}>{d.title}</button>
+    </h2>
+  )
+}
+
 /** A step's picture, from the words in it; a plain circle-check otherwise.
  *  Order matters: "Dirty clothes in the hamper" is laundry, not dressing;
  *  "Clear the breakfast dishes" is clearing, not eating; "Bag packed:
@@ -518,14 +535,24 @@ function Rest(p: KioskHomeV1Props) {
   const [hero, ...rest] = p.restLine.split(' · ')
   const lede = rest.join(' · ') || p.restSub
   const today = p.weekend.rows.filter(stillOnToday)
-  // Five timeline rows fit beside the lead, tomorrow's included.
-  const todayMax = p.weekend.tomorrow.length ? 4 : 5
-  const tomorrow = p.weekend.tomorrow.slice(0, Math.max(1, 5 - Math.min(today.length, todayMax)))
+  // Five timeline rows fit beside the lead, all of them today's. Tomorrow
+  // only steps in once today has nothing left on the clock (Scott,
+  // 2026-10-29: the main screen is for today).
+  const todayMax = 5
+  const tomorrow = today.length ? [] : p.weekend.tomorrow.slice(0, 3)
+  const d = p.dinner
   const lead = (
     <>
       <p className="kw-eyebrow">Today</p>
       <h2 className={`kw-hero ${hero.length > 30 ? 'is-long' : ''}`}>{hero}</h2>
       {lede && <p className="kw-lede is-muted">{lede}</p>}
+      {d && (
+        <div className="kw-rest-dinner" role="group" aria-label="Tonight's dinner">
+          <p className="kw-eyebrow">{d.timeLabel ?? 'Dinner tonight'}</p>
+          <DinnerTitle p={p} className="kw-lede kw-side-title" />
+          {d.cue && <p className="kw-meta">{d.cue}</p>}
+        </div>
+      )}
       {p.notes.length > 0 && (
         <ul className="kw-notes" aria-label="Notes for the house">
           {p.notes.slice(0, 2).map((n, i) => (
@@ -561,7 +588,7 @@ function DinnerSide({ p, after }: { p: KioskHomeV1Props; after: WallTodayRow[] }
       <p className="kw-eyebrow">{d?.timeLabel ?? 'Dinner'}</p>
       {d ? (
         <>
-          <p className="kw-lede kw-side-title">{d.title}</p>
+          <DinnerTitle p={p} className="kw-lede kw-side-title" />
           {d.cue && <p className="kw-meta">{d.cue}</p>}
           {(d.key || d.hasRecipe) && (
             <div className="kw-acts">
@@ -615,7 +642,7 @@ function Dinner(p: KioskHomeV1Props) {
         </button>
       )}
       <p className="kw-eyebrow">{d.timeLabel ?? 'Tonight'}</p>
-      <h2 className={`kw-serif kw-dinner-title ${d.imageUrl ? '' : 'is-big'}`}>{d.title}</h2>
+      <DinnerTitle p={p} className={`kw-serif kw-dinner-title ${d.imageUrl ? '' : 'is-big'}`} />
       {d.minutes && <p className="kw-sub">{d.minutes} minutes to make{d.ingredients.length ? ` · ${d.ingredients.length} ingredients` : ''}</p>}
       {d.cue && <p className="kw-meta kw-cue">{d.cue}</p>}
       <div className="kw-acts is-under">

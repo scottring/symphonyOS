@@ -115,6 +115,42 @@ describe('the wall, version 1', () => {
     for (const name of ['Groceries', 'Recipes', 'Call', 'Notes']) expect(screen.queryByRole('button', { name })).toBeNull()
   })
 
+  const tacos = { key: 'r1', title: 'Tacos', imageUrl: null, timeLabel: 'Dinner at 6:30', at: null, minutes: 25, cue: null, ingredients: ['beef'], source: { recipeId: 'r1' }, hasRecipe: true, baseServes: 4 }
+
+  it('rest: tonight\'s dinner sits under the lead, and its name opens the recipe in one tap', () => {
+    const p = props({ pick: { screen: 'rest', title: 'A quiet afternoon', dark: false }, dinner: tacos })
+    render(<KioskHomeV1 {...p} />)
+    const group = screen.getByRole('group', { name: "Tonight's dinner" })
+    expect(within(group).getByText('Dinner at 6:30')).toBeInTheDocument()
+    fireEvent.click(within(group).getByRole('button', { name: 'Tacos: open the recipe' }))
+    expect(p.onOpenRecipe).toHaveBeenCalled()
+    expect(p.onStartCooking).not.toHaveBeenCalled()
+  })
+
+  it('rest: the side column is today\'s; tomorrow only shows once nothing is left today', () => {
+    const row = { id: 'dent', kind: 'event' as const, time: '3:30p', end: null, title: 'Dentist', sub: null, owners: [], past: false, now: false }
+    const tmrw = { id: 't1', kind: 'event' as const, time: '9:00a', end: null, title: 'Soccer', sub: null, owners: [], past: false, now: false }
+    const { unmount } = render(<KioskHomeV1 {...props({ pick: { screen: 'rest', title: 'A quiet afternoon', dark: false }, weekend: { rows: [row], anytime: [], tomorrow: [tmrw], tomorrowLabel: 'Friday' } })} />)
+    expect(screen.queryByText('Tomorrow')).toBeNull()
+    expect(screen.queryByText('Soccer')).toBeNull()
+    unmount()
+    render(<KioskHomeV1 {...props({ pick: { screen: 'rest', title: 'A quiet afternoon', dark: false }, weekend: { rows: [], anytime: [], tomorrow: [tmrw], tomorrowLabel: 'Friday' } })} />)
+    expect(screen.getByText('Tomorrow')).toBeInTheDocument()
+    expect(screen.getByText('Soccer')).toBeInTheDocument()
+  })
+
+  it('dinner and after school: the dinner\'s name is the way in — recipe when there is one, else straight to cooking', () => {
+    const p = props({ pick: { screen: 'dinner', title: 'Dinner', dark: false }, dinner: { ...tacos, hasRecipe: false } })
+    const { unmount } = render(<KioskHomeV1 {...p} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Tacos: start cooking' }))
+    expect(p.onStartCooking).toHaveBeenCalled()
+    unmount()
+    const q = props({ pick: { screen: 'home', title: 'Home from school', dark: false }, dinner: tacos })
+    render(<KioskHomeV1 {...q} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Tacos: open the recipe' }))
+    expect(q.onOpenRecipe).toHaveBeenCalled()
+  })
+
   it('rest: a task past its time but not done stays on the rest of today; a past event does not', () => {
     const base = { end: null, sub: null, owners: [], now: false }
     const rows = [
