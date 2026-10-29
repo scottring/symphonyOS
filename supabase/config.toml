@@ -270,6 +270,10 @@ verify_jwt = false
 [functions.school-digest]
 verify_jwt = false
 
+# Called by Puzzle Trail's server with the shared secret, not a JWT.
+[functions.wall-app-done]
+verify_jwt = false
+
 # Internal: authenticated via x-capture-secret shared secret, not JWT.
 [functions.extract-capture]
 verify_jwt = false
