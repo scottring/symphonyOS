@@ -301,3 +301,59 @@ describe('papers on the board', () => {
     expect(onOpenKid).toHaveBeenCalledWith(ella)
   })
 })
+
+// Scott, 2026-10-29: "it should show the homework/GAL work/etc. due to be
+// worked on this day or week".
+describe('school work on the board', () => {
+  const task = (id: string, title: string, done = false) => ({ entityType: 'task' as const, id, title, done, timeOfDay: null, target: null })
+  const work = (kid: 'e' | 'k') => ({
+    today: [
+      { row: task('retest', 'Unit 3 math retest review sheet'), note: 'today' },
+      { row: step(`puz-${kid}`, 'Puzzle Trail: 1 round', '18:45', undefined, kid === 'e'), note: '6:45' },
+    ],
+    week: [{ id: 'u4', title: 'Study for Unit 4 math test', due: 'Nov 5' }],
+  })
+  const withWork = (over: Partial<KioskHomeV1Props> = {}) => {
+    const base = props()
+    return props({
+      pick: { screen: 'rest', title: 'Today', dark: false },
+      now: new Date(2026, 9, 29, 11, 0),
+      kids: base.kids.map((k) => ({ ...k, work: work(k.member.id as 'e' | 'k') })),
+      ...over,
+    })
+  }
+
+  it('rest: one row per piece of work across the kids, a face per kid that ticks it; homework due this week below', () => {
+    const p = withWork()
+    render(<KioskHomeV1 {...p} />)
+    const box = screen.getByRole('region', { name: 'School work' })
+    const rows = within(box).getAllByRole('listitem')
+    expect(rows.map((r) => r.textContent)).toEqual([
+      'Unit 3 math retest review sheettodayEK', // both kids' sheet is one row
+      'Puzzle Trail: 1 round6:45K', // Ella's is done: a tick, not her face
+      'Nov 5Study for Unit 4 math testEKElla & Kaleb',
+    ])
+    expect(within(box).getByRole('button', { name: 'Ella: Puzzle Trail: 1 round' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(box).getByRole('button', { name: 'Kaleb: Unit 3 math retest review sheet' }))
+    expect(p.onTick).toHaveBeenCalledWith(kaleb, expect.objectContaining({ id: 'retest' }))
+  })
+
+  it('rest: the side column leaves out what school work already shows', () => {
+    const row = (id: string, title: string) => ({ id, kind: 'routine' as const, time: '6:45p', end: null, title, sub: null, owners: [], past: false, now: false })
+    render(<KioskHomeV1 {...withWork({ weekend: { rows: [row('routine-puz-k', 'Puzzle Trail: 1 round'), row('routine-soccer', 'Soccer')], anytime: [], tomorrow: [], tomorrowLabel: 'Friday' } })} />)
+    const side = screen.getByRole('complementary', { name: 'The rest of today' })
+    expect(within(side).queryByText('Puzzle Trail: 1 round')).toBeNull()
+    expect(within(side).getByText('Soccer')).toBeInTheDocument()
+  })
+
+  it('home from school: each kid’s homework due this week, one line under their list', () => {
+    render(<KioskHomeV1 {...withWork({ pick: { screen: 'home', title: 'Home', dark: false } })} />)
+    const ellas = screen.getByRole('region', { name: 'Ella after school' })
+    expect(within(ellas).getByText('Study for Unit 4 math test · Nov 5')).toBeInTheDocument()
+  })
+
+  it('shows nothing when no kid has school work', () => {
+    render(<KioskHomeV1 {...props({ pick: { screen: 'rest', title: 'Today', dark: false } })} />)
+    expect(screen.queryByRole('region', { name: 'School work' })).toBeNull()
+  })
+})

@@ -55,7 +55,7 @@ import { talkUsesBand } from '@/lib/wall/wallTalk'
 import { localYmd } from '@/lib/cadence/config'
 import { WallConversation, WallTalkLead, WallTalkStage, type WallTalkWeek } from './WallTalk'
 import { KioskHome } from './KioskHome'
-import { KioskHomeV1, type KioskHomeV1Props } from './KioskHomeV1'
+import { KioskHomeV1, hasSchoolWork, type KioskHomeV1Props } from './KioskHomeV1'
 import {
   BedtimeStage, CookingStage, DepartureStage, DinnerStage, GroceriesStage, HeldColumn, type KioskDinner,
 } from './KioskStages'
@@ -547,8 +547,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
           {stage.kind === 'agenda'
             ? <span className="kw-grow ka-band"><AgendaViews view={stage.view} onView={(view) => dispatch({ type: 'OPEN', stage: { kind: 'agenda', view } })} /></span>
             // Stickies ride the band on every Home moment but the quiet one,
-            // which lays them out large in its lead.
-            : stage.kind === 'home' && v1.pick.screen !== 'rest' && !moreOpen
+            // which lays them out large in its lead, unless the kids' school
+            // work takes that room.
+            : stage.kind === 'home' && (v1.pick.screen !== 'rest' || hasSchoolWork(v1.kids)) && !moreOpen
               ? <span className="kw-grow kw-band-stickies"><StickyStrip notes={v1.notes} onOpen={v1.onNotes} /></span>
               : <span className="kw-grow" />}
           {W && <span className="kw-wx" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}

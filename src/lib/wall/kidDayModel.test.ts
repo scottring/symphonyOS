@@ -353,8 +353,8 @@ describe('homework + notices', () => {
       task({ id: 'h-done', title: 'Done', category: 'homework', completed: true }),
     ])
     expect(model.homework).toEqual([
-      { id: 'h-late', title: 'Blue sheet', due: 'Late', late: true, notes: 'Permission slip, $12' },
-      { id: 'h-undated', title: 'Reading log', due: null, late: false, notes: null },
+      { id: 'h-late', title: 'Blue sheet', due: 'Late', late: true, notes: 'Permission slip, $12', dueOn: new Date('2026-08-28T00:00:00') },
+      { id: 'h-undated', title: 'Reading log', due: null, late: false, notes: null, dueOn: null },
     ])
     expect(model.isEmpty).toBe(false)
   })

@@ -176,6 +176,76 @@ export function afterSchoolRows(model: MemberDayModel): KidRow[] {
   return out
 }
 
+/** School work, by name. No bare "practice": soccer practice is not school
+ *  work. GAL is the gifted-and-advanced practice (Puzzle Trail). */
+const SCHOOLWORK = /\b(math|maths|reading|read|homework|spelling|study|studying|worksheet|fluency|fundations|puzzle|gal)\b/i
+
+/** A piece of a kid's school work: its row (ticked where it stands) and the
+ *  one word that says when ("today", "for tomorrow", "late", "6:45"). */
+export interface KidWorkRow { row: KidRow; note: string | null }
+/** Homework due later this week: not today's to do, but on the wall so it
+ *  gets started ("Unit 4 math test · Thu"). */
+export interface KidWorkAhead { id: string; title: string; due: string }
+export interface KidSchoolWork { today: KidWorkRow[]; week: KidWorkAhead[] }
+
+const hhmmMinutes = (t: string | null) => {
+  const m = t?.match(/^(\d{1,2}):(\d{2})/)
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null
+}
+const clockNote = (t: string | null) => {
+  const min = hhmmMinutes(t)
+  if (min == null) return null
+  const h = Math.floor(min / 60) % 12 || 12
+  return `${h}:${String(min % 60).padStart(2, '0')}`
+}
+
+/** The home-from-school routine: the collection that starts between 3 and 6. */
+export function afterSchoolCollection(model: MemberDayModel) {
+  return model.collections.find((c) => { const m = hhmmMinutes(c.timeOfDay); return m != null && m >= 15 * 60 && m < 18 * 60 })
+}
+
+/**
+ * A kid's school work for the wall (Scott, 2026-10-29: "the homework/GAL
+ * work/etc. due to be worked on this day or week"). Today: homework due by
+ * the next school day (or late, or undated), the reading target, and the
+ * day's practice by name — loose routines (Puzzle Trail at 6:45) and the
+ * home-from-school routine's steps; never the morning's "Bag packed:
+ * homework folder" or bedtime's "Own reading". This week: open homework due
+ * in the seven days after tomorrow.
+ */
+export function kidSchoolWork(model: MemberDayModel, now: Date): KidSchoolWork {
+  const today: KidWorkRow[] = []
+  const seen = new Set<string>()
+  const add = (row: KidRow, note: string | null) => {
+    const key = `${row.entityType}:${row.id}`
+    if (seen.has(key)) return
+    seen.add(key)
+    today.push({ row, note })
+  }
+  const soon = (h: MemberDayModel['homework'][number]) => h.late || h.due === null || h.due === 'Today' || h.due === 'Tomorrow'
+  for (const h of model.homework) {
+    if (!soon(h)) continue
+    add({ entityType: 'task', id: h.id, title: h.title, done: false, timeOfDay: null, target: null },
+      h.late ? 'late' : h.due === 'Today' ? 'today' : h.due === 'Tomorrow' ? 'for tomorrow' : null)
+  }
+  if (model.reading) add(model.reading, model.reading.target ? `${model.reading.target.amount} min` : null)
+  const loose = Object.values(model.bands).flat().filter((r) => r.app || SCHOOLWORK.test(r.title))
+  const steps = (afterSchoolCollection(model)?.rows ?? []).filter((r) => SCHOOLWORK.test(r.title))
+  for (const r of [...steps, ...loose]) add(r, clockNote(r.timeOfDay))
+
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const from = new Date(start); from.setDate(from.getDate() + 2)
+  const until = new Date(start); until.setDate(until.getDate() + 8)
+  const week = model.homework
+    .filter((h) => {
+      if (soon(h) || !h.dueOn) return false
+      const due = new Date(h.dueOn.getFullYear(), h.dueOn.getMonth(), h.dueOn.getDate())
+      return due >= from && due < until
+    })
+    .map((h) => ({ id: h.id, title: h.title, due: h.due as string }))
+  return { today, week }
+}
+
 /** Out the door (spec 2026-10-20): a paper a parent has, due today and not
  *  yet in the backpack, joins that kid's bag line — a plain fact, the last
  *  chance before school. */

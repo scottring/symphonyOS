@@ -8,14 +8,16 @@
 //   out-the-door   full stage: the time and what's left · the grown-ups'
 //                  line · each kid's checklist (done steps fold to one line;
 //                  the step's icon is its check)
-//   rest           the next landmark, large · dinner · notes for the house ·
-//                  the rest of today and tomorrow beside it
-//   home           each kid's after-school steps · dinner and what's next
+//   rest           the next landmark, large · the kids' school work · dinner ·
+//                  notes for the house · the rest of today and tomorrow beside it
+//   home           each kid's after-school steps and the week's homework ·
+//                  dinner and what's next
 //   dinner         tonight's dinner · the question of the day beside it
 //   bedtime        steps × kids · lights out as a ring · tomorrow
 //   night          tomorrow's one time, large · who has what · the first
 //                  thing, the rest of tomorrow and the talk-abouts beside it
-//   weekend        what's on now · sometime today · the rest of the day
+//   weekend        what's on now · sometime today · the rest of the day and
+//                  the kids' school work beside it
 //
 // Calmer screens (Scott, 2026-10-14): nothing stacked at the foot of the
 // screen. The lead group sits centred in its column, with at most one row of
@@ -29,11 +31,11 @@
 import { createElement, useState, type ReactNode } from 'react'
 import {
   Check, ChevronRight, ShoppingCart, BookOpen, ChefHat, MessageSquare, Shirt, ShoppingBasket, BedDouble,
-  Smile, Utensils, Sparkles, Backpack, Footprints, CircleCheck, Folder, Calculator, ShowerHead, BookOpenText, type LucideIcon,
+  Smile, Utensils, Sparkles, Backpack, Footprints, CircleCheck, Folder, Calculator, ShowerHead, BookOpenText, Puzzle, PencilLine, type LucideIcon,
 } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { KidRow } from '@/lib/wall/kidDayModel'
-import { stillOnToday, type WallTodayRow } from '@/lib/wall/wallMomentsModel'
+import { stillOnToday, type WallTodayRow, type KidSchoolWork } from '@/lib/wall/wallMomentsModel'
 import type { BedtimeGrid } from '@/lib/wall/activity/kioskRoutines'
 import { minutesOf, type DayAnchors, type KioskScreenPick } from '@/lib/wall/activity/kioskScreen'
 import { Photo, type KioskDinner } from './KioskStages'
@@ -49,6 +51,9 @@ export interface V1Kid {
   after: KidRow[]
   /** School papers (spec 2026-10-20): read-only here; the kid's page acts on them. */
   papers?: V1Paper[]
+  /** School work (Scott, 2026-10-29): today's homework and practice, and
+   *  homework due later this week. */
+  work?: KidSchoolWork
 }
 
 export interface V1Paper { id: string; title: string; due: string | null; late: boolean; heldByName: string | null; done: boolean }
@@ -195,6 +200,8 @@ const STEP_ICONS: [RegExp, LucideIcon][] = [
   [/\b(shoes?|jacket|coat|boots)\b/i, Footprints],
   [/\b(folder)\b/i, Folder],
   [/\b(math|maths)\b/i, Calculator],
+  [/\b(puzzle|gal)\b/i, Puzzle],
+  [/\b(homework|worksheet|spelling|study|test)\b/i, PencilLine],
 ]
 export function stepIcon(title: string): LucideIcon {
   return STEP_ICONS.find(([re]) => re.test(title))?.[1] ?? CircleCheck
@@ -353,6 +360,101 @@ function KidHead({ kid, meta, count, onOpen }: { kid: FamilyMember; meta?: strin
       <span className="kw-grow"><b>{kid.name}</b>{meta && <small>{meta}</small>}</span>
       <span className="kw-meta">{count}</span>
     </button>
+  )
+}
+
+// ─── School work ─────────────────────────────────────────────────────────
+
+const workKey = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+/** The kids' school work, from p.kids[].work (Scott, 2026-10-29: "the
+ *  homework/GAL work/etc. due to be worked on this day or week"). One row
+ *  per piece of work across the kids, so the sheet both kids have is one
+ *  row; a face per kid is that kid's check (sage with a tick once done).
+ *  Rows everyone has finished sink to the end. Homework due later this week
+ *  follows, one quiet line each, read-only. */
+function SchoolWork({ p, max, weekMax }: { p: KioskHomeV1Props; max: number; weekMax: number }) {
+  const kids = p.kids.filter((k) => k.work && (k.work.today.length > 0 || k.work.week.length > 0)).slice(0, 3)
+  if (!kids.length) return null
+  const rows: { key: string; title: string; note: string | null; cells: (KidRow | null)[] }[] = []
+  kids.forEach((k, ki) => k.work!.today.forEach(({ row, note }) => {
+    const key = `${workKey(row.title)}|${note ?? ''}`
+    let r = rows.find((x) => x.key === key && !x.cells[ki])
+    if (!r) { r = { key, title: row.title, note, cells: kids.map(() => null) }; rows.push(r) }
+    r.cells[ki] = row
+  }))
+  const allDone = (r: (typeof rows)[number]) => r.cells.every((c) => !c || c.done)
+  const shown = [...rows.filter((r) => !allDone(r)), ...rows.filter(allDone)].slice(0, max)
+  const week: { id: string; title: string; due: string; who: FamilyMember[] }[] = []
+  for (const k of kids) {
+    for (const w of k.work!.week) {
+      const at = week.find((x) => x.id === w.id || (workKey(x.title) === workKey(w.title) && x.due === w.due))
+      if (at) at.who.push(k.member)
+      else week.push({ ...w, who: [k.member] })
+    }
+  }
+  const ahead = week.slice(0, weekMax)
+  if (!shown.length && !ahead.length) return null
+  return (
+    <section className="kw-work" aria-label="School work">
+      {shown.length > 0 && (
+        <>
+          <p className="kw-eyebrow">School work today</p>
+          <ul className="kw-work-list">
+            {shown.map((r) => (
+              <li key={r.key} className={`kw-work-row ${allDone(r) ? 'is-done' : ''}`}>
+                <span className="kw-work-i" aria-hidden="true">{createElement(stepIcon(r.title))}</span>
+                <span className="kw-work-t"><span>{r.title}</span>{r.note && <small className={r.note === 'late' ? 'is-late' : ''}>{r.note}</small>}</span>
+                <span className="kw-work-who">
+                  {r.cells.map((c, i) => {
+                    const k = kids[i]
+                    if (!c) return <span key={k.member.id} className="kw-work-na" aria-hidden="true" />
+                    return (
+                      <button key={k.member.id} type="button" className={`kw-work-ck ${c.done ? 'is-done' : ''}`}
+                        aria-pressed={c.done} aria-label={`${k.member.name}: ${r.title}`} onClick={() => p.onTick(k.member, c)}>
+                        {c.done ? <span className="kw-work-tick"><Check aria-hidden="true" /></span> : <Face member={k.member} size="md" />}
+                      </button>
+                    )
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {ahead.length > 0 && (
+        <>
+          <p className={`kw-eyebrow ${shown.length ? 'kw-work-lab' : ''}`}>Due this week</p>
+          <ul className="kw-work-week">
+            {ahead.map((w) => (
+              <li key={w.id}>
+                <span className="kw-work-due">{w.due}</span>
+                <span className="kw-work-wt">{w.title}</span>
+                <span className="kw-work-faces">{w.who.map((m) => <Face key={m.id} member={m} size="xs" />)}</span>
+                <span className="sr-only">{w.who.map((m) => m.name).join(' & ')}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  )
+}
+
+/** Whether any kid has school work to show: the quiet screen then makes
+ *  room (a smaller landmark; its notes ride the top band instead). */
+export const hasSchoolWork = (kids: V1Kid[]) => kids.some((k) => !!k.work && (k.work.today.length > 0 || k.work.week.length > 0))
+
+/** The ids the school work already shows, as the day list writes them
+ *  (`task-…`, `routine-…`), so the side column says each thing once. */
+const workIds = (p: KioskHomeV1Props) => new Set(p.kids.flatMap((k) => (k.work?.today ?? []).map(({ row }) => `${row.entityType}-${row.id}`)))
+
+/** A kid's homework due later this week, one line under their after-school list. */
+function KidWeek({ kid }: { kid: V1Kid }) {
+  const week = kid.work?.week ?? []
+  if (!week.length) return null
+  return (
+    <p className="kw-kid-week"><b>This week</b> {week.slice(0, 2).map((w) => `${w.title} · ${w.due}`).join(' · ')}</p>
   )
 }
 
@@ -534,7 +636,9 @@ function OutTheDoor(p: KioskHomeV1Props) {
 function Rest(p: KioskHomeV1Props) {
   const [hero, ...rest] = p.restLine.split(' · ')
   const lede = rest.join(' · ') || p.restSub
-  const today = p.weekend.rows.filter(stillOnToday)
+  const shownAsWork = workIds(p)
+  const today = p.weekend.rows.filter((r) => stillOnToday(r) && !shownAsWork.has(r.id))
+  const hasWork = hasSchoolWork(p.kids)
   // Five timeline rows fit beside the lead, all of them today's. Tomorrow
   // only steps in once today has nothing left on the clock (Scott,
   // 2026-10-29: the main screen is for today).
@@ -544,8 +648,9 @@ function Rest(p: KioskHomeV1Props) {
   const lead = (
     <>
       <p className="kw-eyebrow">Today</p>
-      <h2 className={`kw-hero ${hero.length > 30 ? 'is-long' : ''}`}>{hero}</h2>
+      <h2 className={`kw-hero ${hasWork ? 'is-work' : hero.length > 30 ? 'is-long' : ''}`}>{hero}</h2>
       {lede && <p className="kw-lede is-muted">{lede}</p>}
+      <SchoolWork p={p} max={4} weekMax={2} />
       {d && (
         <div className="kw-rest-dinner" role="group" aria-label="Tonight's dinner">
           <p className="kw-eyebrow">{d.timeLabel ?? 'Dinner tonight'}</p>
@@ -553,7 +658,7 @@ function Rest(p: KioskHomeV1Props) {
           {d.cue && <p className="kw-meta">{d.cue}</p>}
         </div>
       )}
-      {p.notes.length > 0 && (
+      {p.notes.length > 0 && !hasWork && (
         <ul className="kw-notes" aria-label="Notes for the house">
           {p.notes.slice(0, 2).map((n, i) => (
             <li key={n.id} className="kw-note" style={{ ['--tilt' as string]: `${[-1.5, 1][i]}deg` }}>
@@ -618,6 +723,7 @@ function HomeFromSchool(p: KioskHomeV1Props) {
               <KidChecklist kid={k.member} steps={rows} max={p.math ? 4 : 5} onTick={(r) => p.onTick(k.member, r)} />
               <PaperChips kid={k.member} papers={k.papers} onOpen={() => p.onOpenKid(k.member)} />
               <MathButton p={p} member={k.member} />
+              <KidWeek kid={k} />
             </section>
           )
         })}
@@ -786,7 +892,8 @@ function Night(p: KioskHomeV1Props) {
 function Weekend(p: KioskHomeV1Props) {
   const rows = p.weekend.rows
   const lead0 = rows.find((r) => r.now && !r.past) ?? rows.find((r) => !r.past) ?? null
-  const later = rows.filter((r) => stillOnToday(r) && r !== lead0)
+  const shownAsWork = workIds(p)
+  const later = rows.filter((r) => stillOnToday(r) && r !== lead0 && !shownAsWork.has(r.id))
   const until = lead0?.endsAt ? new Date(lead0.endsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '') : null
   // One row of supporting detail: three of the day's anytime things.
   const anytime = p.weekend.anytime.slice(0, 3)
@@ -820,12 +927,16 @@ function Weekend(p: KioskHomeV1Props) {
       )}
     </>
   )
+  // School work takes the side column's foot from tomorrow's preview: the
+  // lead has no room for it beside sometime-today (Scott, 2026-10-29).
+  const work = hasSchoolWork(p.kids)
   const side = (
     <>
       <p className="kw-eyebrow kw-side-lab">Later today</p>
-      <TodayRows rows={later} p={p} max={p.weekend.tomorrow.length ? 3 : 5} />
+      <TodayRows rows={later} p={p} max={work || p.weekend.tomorrow.length ? 3 : 5} />
       {later.length === 0 && <p className="kw-quiet">Nothing else on the calendar.</p>}
-      {p.weekend.tomorrow.length > 0 && (
+      {work && <SchoolWork p={p} max={2} weekMax={2} />}
+      {!work && p.weekend.tomorrow.length > 0 && (
         <>
           <p className="kw-eyebrow kw-side-lab is-gap">Tomorrow · {p.weekend.tomorrowLabel}</p>
           {p.weekend.tomorrow.slice(0, Math.max(1, 4 - Math.min(3, later.length))).map((r) => <Tl key={r.id} t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} />)}

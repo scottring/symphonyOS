@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { wallTodayRows, stillOnToday, specialsWeek, checklistFor, afterSchoolRows, bagWithPapers } from './wallMomentsModel'
+import { wallTodayRows, stillOnToday, specialsWeek, checklistFor, afterSchoolRows, bagWithPapers, kidSchoolWork } from './wallMomentsModel'
 import { taskToTimelineItem, type TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { MemberDayModel } from './kidDayModel'
@@ -155,5 +155,49 @@ describe('bagWithPapers', () => {
   })
   it('not when nobody has it, it is done, or it is not due today', () => {
     expect(bagWithPapers([], [p({ heldBy: null }), p({ done: true }), p({ due: 'Thu' })])).toEqual([])
+  })
+})
+
+describe('kidSchoolWork', () => {
+  const row = (id: string, title: string, timeOfDay: string | null = null, o: object = {}) => ({ entityType: 'routine' as const, id, title, done: false, timeOfDay, target: null, ...o })
+  const now = new Date(2026, 9, 29, 11) // a Thursday
+  const day = (d: number) => new Date(2026, 9, d)
+  const model = {
+    homework: [
+      { id: 'late', title: 'Spelling sheet', due: 'Late', late: true, notes: null, dueOn: day(27) },
+      { id: 'today', title: 'Math retest review', due: 'Today', late: false, notes: null, dueOn: day(29) },
+      { id: 'fri', title: 'Reading log', due: 'Tomorrow', late: false, notes: null, dueOn: day(30) },
+      { id: 'u4', title: 'Study for Unit 4 math test', due: 'Nov 5', late: false, notes: null, dueOn: new Date(2026, 10, 5) },
+      { id: 'far', title: 'Science fair board', due: 'Nov 12', late: false, notes: null, dueOn: new Date(2026, 10, 12) },
+    ],
+    reading: null,
+    bands: {
+      morning: [], afternoon: [row('soccer', 'Soccer practice', '16:00')],
+      evening: [row('gal', 'Puzzle Trail: 1 round', '18:45')], anytime: [row('app', 'Typing club', null, { app: { url: 'x' } })],
+    },
+    collections: [
+      { id: 'am', title: 'School morning', timeOfDay: '06:45', rows: [row('bag', 'Bag packed: homework folder')] },
+      { id: 'home', title: 'Home from school', timeOfDay: '17:45', rows: [row('folder', 'Empty take-home folder'), row('read', 'Reading, 20 minutes')] },
+      { id: 'bed', title: 'Bedtime', timeOfDay: '19:30', rows: [row('own', 'Own reading or Yoto')] },
+    ],
+  } as unknown as MemberDayModel
+
+  it("today: homework due by tomorrow or late, the home-from-school routine's reading and math, and loose practice like Puzzle Trail", () => {
+    const { today } = kidSchoolWork(model, now)
+    expect(today.map((w) => [w.row.title, w.note])).toEqual([
+      ['Spelling sheet', 'late'], ['Math retest review', 'today'], ['Reading log', 'for tomorrow'],
+      ['Reading, 20 minutes', null], ['Puzzle Trail: 1 round', '6:45'], ['Typing club', null],
+    ])
+  })
+
+  it('never the bag step, bedtime reading, or soccer practice', () => {
+    const titles = kidSchoolWork(model, now).today.map((w) => w.row.title)
+    expect(titles).not.toContain('Bag packed: homework folder')
+    expect(titles).not.toContain('Own reading or Yoto')
+    expect(titles).not.toContain('Soccer practice')
+  })
+
+  it('this week: homework due in the seven days after tomorrow, nothing further out', () => {
+    expect(kidSchoolWork(model, now).week).toEqual([{ id: 'u4', title: 'Study for Unit 4 math test', due: 'Nov 5' }])
   })
 })

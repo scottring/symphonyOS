@@ -314,6 +314,16 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         { entityType: 'routine' as const, id: `folder-${i}`, title: 'Take-home folder', done: i === 0, timeOfDay: '17:45', target: null },
         { entityType: 'routine' as const, id: `math-${i}`, title: i ? 'Reading, 20 minutes' : 'Math sheet', done: false, timeOfDay: '17:45', target: null },
       ],
+      // School work: the sheet both kids have, each kid's own practice, and
+      // the test both study for this week.
+      work: {
+        today: [
+          { row: { entityType: 'task' as const, id: 'retest', title: 'Unit 3 math retest review sheet', done: false, timeOfDay: null, target: null }, note: 'today' },
+          { row: { entityType: 'routine' as const, id: `read-${i}`, title: 'Reading, 20 minutes', done: i === 0, timeOfDay: null, target: null }, note: null },
+          { row: { entityType: 'routine' as const, id: `gal-${i}`, title: 'Puzzle Trail: 1 round', done: false, timeOfDay: '18:45', target: null }, note: '6:45' },
+        ],
+        week: [{ id: 'u4', title: 'Study for Unit 4 math test', due: 'Thu' }],
+      },
       papers: i ? [{ id: 'pp-k', title: 'Pink health form', due: 'Thu', late: false, heldByName: null, done: false }]
         : [{ id: 'pp-e', title: 'Field trip slip + $12', due: 'Today', late: false, heldByName: 'Iris', done: false }],
       morning: v1Screen === 'out-the-door' ? otdMorning(i, k.id) : [

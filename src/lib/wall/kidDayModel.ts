@@ -90,6 +90,8 @@ export interface KidHomeworkRow {
   late: boolean
   /** Supporting detail (what the form is, the $12), or null. */
   notes: string | null
+  /** The due day itself, for "due this week" (the label alone can't say). */
+  dueOn?: Date | null
 }
 
 /** A row of the "From school" card. Information, never work. */
@@ -389,7 +391,7 @@ export function buildMemberDayModel(input: {
   const mine = homeworkTasks.filter((t) => !t.completed && t.category !== 'paper' && homeworkOwners(t, rosterIds).includes(member.id))
   const homework: KidHomeworkRow[] = sortHomework(mine, now).map((t) => {
     const due = homeworkDue(t.neededOn, now)
-    return { id: t.id, title: t.title, due: due.label, late: due.late, notes: t.notes?.trim() || null }
+    return { id: t.id, title: t.title, due: due.label, late: due.late, notes: t.notes?.trim() || null, dueOn: t.neededOn ?? null }
   })
 
   // Papers: this kid's, open or done today (then gone); "Not ours" never.

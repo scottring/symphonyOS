@@ -105,7 +105,7 @@ import { saveGroceryLines, type GroceryLine } from '@/lib/wall/activity/groceryP
 import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines';
 import { isIngredientLine } from '@/lib/wall/activity/cookingModel';
 import { wallMoment } from '@/lib/wall/wallMoment';
-import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, type WallTodayRow, bagWithPapers } from '@/lib/wall/wallMomentsModel';
+import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, afterSchoolCollection, kidSchoolWork, type WallTodayRow, bagWithPapers } from '@/lib/wall/wallMomentsModel';
 import { agendaDays, agendaDay, agendaWeekend, type AgendaRow } from '@/lib/wall/wallAgenda';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
 import { memberShape } from '@/lib/wall/memberPageModel';
@@ -866,23 +866,31 @@ export function WallV2Shell() {
       ),
     };
     const hhmm = (min: number) => `${Math.floor(min / 60) % 12 || 12}:${String(min % 60).padStart(2, '0')}`;
-    const kids = kidModels.map(({ member, model }) => ({
-      member,
-      special: model.school?.special ?? null,
-      tomorrowSpecial: model.school?.tomorrowSpecial ?? null,
-      // A paper a parent has, due today, rides in the bag line (spec 2026-10-20).
-      bag: bagWithPapers(model.needed.filter((n) => !n.tomorrow).map((n) => n.title), model.papers),
-      papers: model.papers.map((pp) => ({ id: pp.id, title: pp.title, due: pp.due, late: pp.late, heldByName: pp.heldBy ? memberName(pp.heldBy) ?? null : null, done: pp.done })),
-      morning: model.collections.find((c) => (minutesOf(c.timeOfDay) ?? 24 * 60) < 11 * 60)?.rows ?? [],
-      // After school is the home-from-school routine itself (its steps for
-      // the day: folder, then math or reading), plus homework due. Not the
-      // old name match, which pulled in "Bag packed: homework folder" from
-      // the morning and "Own reading" from bedtime.
-      after: [
-        ...afterSchoolRows(model).filter((r) => r.entityType === 'task'),
-        ...(model.collections.find((c) => { const m = minutesOf(c.timeOfDay); return m != null && m >= 15 * 60 && m < 18 * 60; })?.rows ?? []),
-      ],
-    }));
+    const kids = kidModels.map(({ member, model }) => {
+      const work = kidSchoolWork(model, previewAt ?? now);
+      const homeRows = afterSchoolCollection(model)?.rows ?? [];
+      return {
+        member,
+        special: model.school?.special ?? null,
+        tomorrowSpecial: model.school?.tomorrowSpecial ?? null,
+        // A paper a parent has, due today, rides in the bag line (spec 2026-10-20).
+        bag: bagWithPapers(model.needed.filter((n) => !n.tomorrow).map((n) => n.title), model.papers),
+        papers: model.papers.map((pp) => ({ id: pp.id, title: pp.title, due: pp.due, late: pp.late, heldByName: pp.heldBy ? memberName(pp.heldBy) ?? null : null, done: pp.done })),
+        morning: model.collections.find((c) => (minutesOf(c.timeOfDay) ?? 24 * 60) < 11 * 60)?.rows ?? [],
+        // After school is the home-from-school routine itself (its steps for
+        // the day: folder, then math or reading), plus homework due. Not the
+        // old name match, which pulled in "Bag packed: homework folder" from
+        // the morning and "Own reading" from bedtime. The day's practice that
+        // stands on its own (Puzzle Trail at 6:45, Scott 2026-10-29) joins it.
+        after: [
+          ...afterSchoolRows(model).filter((r) => r.entityType === 'task'),
+          ...homeRows,
+          ...work.today.map((w) => w.row).filter((r) => r.entityType === 'routine' && !homeRows.some((h) => h.id === r.id)),
+        ],
+        // School work, today and this week: the rest of the day's screens.
+        work,
+        };
+    });
     // The day's landmarks come from the routines (the wall's day list leaves
     // most-days routines out by design, 2026-09-07), events from the calendar.
     const t = (previewAt ?? now).getHours() * 60 + (previewAt ?? now).getMinutes();

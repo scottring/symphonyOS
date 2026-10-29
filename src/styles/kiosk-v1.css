@@ -615,3 +615,33 @@
 .is-v1 .kw-sticky-new .kw-btn.is-quiet { color: var(--kw-note-ink); border-color: color-mix(in srgb, var(--kw-note-ink) 30%, transparent); }
 .is-v1 .kw-sticky-new .kw-btn:disabled { opacity: .45; }
 .is-v1 .kw-sticky-err { margin: 0; font-size: calc(24 * var(--p)); font-weight: 600; color: #a23b16; }
+
+/* School work (Scott, 2026-10-29): one row per piece of work across the
+   kids; a face per kid is that kid's check. Due this week follows, quiet. */
+.is-v1 .kw-hero.is-work { font-size: calc(84 * var(--p)); }
+.is-v1 .kw-hero.is-work + .kw-lede, .is-v1 .kw-hero.is-work + .kw-sub { margin-top: calc(12 * var(--p)); font-size: calc(40 * var(--p)); }
+.is-v1 .kw-hero.is-work ~ .kw-anytime-head { margin-top: calc(28 * var(--p)); }
+.is-v1 .kw-hero.is-work ~ .kw-rest-dinner { margin-top: calc(24 * var(--p)); }
+.is-v1 .kw-work { margin-top: calc(28 * var(--p)); padding-top: calc(18 * var(--p)); border-top: 1px solid var(--kw-line); flex: none; }
+.is-v1 .kw-work-list, .is-v1 .kw-work-week { margin: calc(6 * var(--p)) 0 0; padding: 0; list-style: none; }
+.is-v1 .kw-work-row { display: grid; grid-template-columns: calc(44 * var(--p)) minmax(0, 1fr) auto; align-items: center; column-gap: calc(18 * var(--p)); min-height: calc(68 * var(--p)); }
+.is-v1 .kw-work-i { display: grid; place-items: center; color: var(--kw-muted); }
+.is-v1 .kw-work-i svg { width: calc(32 * var(--p)); height: calc(32 * var(--p)); stroke-width: 1.7; }
+.is-v1 .kw-work-t { display: flex; align-items: baseline; gap: calc(14 * var(--p)); min-width: 0; font-size: calc(30 * var(--p)); font-weight: 600; }
+.is-v1 .kw-work-t > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.is-v1 .kw-work-t small { flex: none; font-size: calc(24 * var(--p)); font-weight: 400; color: var(--kw-muted); }
+.is-v1 .kw-work-t small.is-late { color: var(--kw-now); font-weight: 600; }
+.is-v1 .kw-work-row.is-done .kw-work-t { color: var(--kw-muted); font-weight: 400; }
+.is-v1 .kw-work-who { display: flex; gap: calc(10 * var(--p)); }
+.is-v1 .kw-work-ck { display: grid; place-items: center; width: calc(68 * var(--p)); height: calc(68 * var(--p)); padding: 0; border: 0; border-radius: 999px; background: none; }
+.is-v1 .kw-work-ck:active { background: var(--kw-sym-tint); }
+.is-v1 .kw-work-tick { display: grid; place-items: center; width: calc(52 * var(--p)); height: calc(52 * var(--p)); border-radius: 999px; background: var(--kw-done); color: var(--kw-on-done); }
+.is-v1 .kw-work-tick svg { width: calc(28 * var(--p)); height: calc(28 * var(--p)); stroke-width: 2.4; }
+.is-v1 .kw-work-na { width: calc(68 * var(--p)); }
+.is-v1 .kw-work-lab { margin-top: calc(18 * var(--p)); }
+.is-v1 .kw-work-week li { display: grid; grid-template-columns: calc(110 * var(--p)) minmax(0, 1fr) auto; align-items: center; column-gap: calc(18 * var(--p)); min-height: calc(56 * var(--p)); font-size: calc(26 * var(--p)); }
+.is-v1 .kw-work-due { color: var(--kw-muted); }
+.is-v1 .kw-work-wt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.is-v1 .kw-work-faces { display: flex; gap: calc(6 * var(--p)); }
+.is-v1 .kw-kid-week { margin: calc(4 * var(--p)) 0 0; font-size: calc(24 * var(--p)); color: var(--kw-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.is-v1 .kw-kid-week b { margin-right: calc(8 * var(--p)); font-weight: 600; color: var(--kw-ink); }
