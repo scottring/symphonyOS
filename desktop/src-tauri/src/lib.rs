@@ -1,4 +1,9 @@
-use serde::Deserialize;
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use serde::{Deserialize, Serialize};
+use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use tauri::menu::{
     AboutMetadata, CheckMenuItemBuilder, Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder,
 };
@@ -223,6 +228,44 @@ fn global_quick_add(app: &AppHandle) {
     }
     show_main(app);
     let _ = app.emit_to("main", "shell:quick-add-global", !was_front);
+}
+
+// Shape read by requestDesktopScreenshot (src/lib/desktop.ts) — keep in sync.
+// `image` is a base64 JPEG; neither field set means you pressed Esc.
+#[derive(Serialize, Clone)]
+struct ScreenshotResult {
+    image: Option<String>,
+    error: Option<String>,
+}
+
+static SCREENSHOT_RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// ⌘K's Screenshot tile: get out of the way, let macOS's own crosshair pick a
+/// region of whatever is behind, then come back with the picture. The first
+/// use asks for Screen Recording permission (System Settings → Privacy &
+/// Security), and Symphony has to be reopened once it is granted; until then
+/// the shot shows only the desktop.
+fn take_screenshot(app: &AppHandle) -> ScreenshotResult {
+    let _ = app.hide();
+    // Let the window finish leaving before the crosshair appears over it.
+    std::thread::sleep(Duration::from_millis(250));
+    let path = std::env::temp_dir().join(format!("symphony-shot-{}.jpg", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+    // -i region (Space switches to a window), -x no shutter sound.
+    let status = Command::new("/usr/sbin/screencapture")
+        .args(["-i", "-x", "-t", "jpg"])
+        .arg(&path)
+        .status();
+    let result = match status {
+        Err(e) => ScreenshotResult { image: None, error: Some(format!("screencapture failed: {e}")) },
+        // Esc leaves no file behind.
+        Ok(_) => match std::fs::read(&path) {
+            Ok(bytes) => ScreenshotResult { image: Some(STANDARD.encode(bytes)), error: None },
+            Err(_) => ScreenshotResult { image: None, error: None },
+        },
+    };
+    let _ = std::fs::remove_file(&path);
+    result
 }
 
 // Shape emitted by the web bridge (src/desktop/trayPayload.ts) — keep in sync.
@@ -473,6 +516,22 @@ pub fn run() {
             let hide_handle = app.handle().clone();
             app.listen_any("shell:hide-app", move |_| {
                 let _ = hide_handle.hide();
+            });
+            // ⌘K's Screenshot tile. Ack at once so the page knows this shell
+            // can do it; the picture follows when the crosshair is done.
+            let shot_handle = app.handle().clone();
+            app.listen_any("shell:screenshot", move |_| {
+                let app = shot_handle.clone();
+                let _ = app.emit_to("main", "shell:screenshot-started", ());
+                if SCREENSHOT_RUNNING.swap(true, Ordering::SeqCst) {
+                    return;
+                }
+                std::thread::spawn(move || {
+                    let result = take_screenshot(&app);
+                    show_main(&app);
+                    let _ = app.emit_to("main", "shell:screenshot-result", result);
+                    SCREENSHOT_RUNNING.store(false, Ordering::SeqCst);
+                });
             });
             // The page asks AppKit to print (see PRINT_BRIDGE_JS).
             let print_handle = app.handle().clone();

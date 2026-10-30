@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
-import { Sparkles, Camera, NotebookPen, StickyNote, Mic, FileText } from 'lucide-react'
+import { Sparkles, Camera, NotebookPen, StickyNote, Mic, FileText, Scan } from 'lucide-react'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields, allDayFromParse } from '@/lib/quickInputParser'
@@ -15,6 +15,7 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
 import { MOBILE_TAB_BAR_HEIGHT } from '@/shell/mobileChrome'
 import { TaskKindBadge } from '@/components/task/TaskKindBadge'
+import { isDesktopShell, requestDesktopScreenshot } from '@/lib/desktop'
 import type { RecurrencePattern } from '@/types/actionable'
 
 interface QuickCaptureProps {
@@ -120,15 +121,43 @@ export function QuickCapture({
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [showCamera, setShowCamera] = useState(false)
   const cameraSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+  // The picture being sent, shown small while it goes (photo, screenshot,
+  // paste or drop — one path for all of them).
+  const [shotPreview, setShotPreview] = useState<string | null>(null)
+  useEffect(() => () => { if (shotPreview) URL.revokeObjectURL(shotPreview) }, [shotPreview])
   const handlePhotoPicked = async (file: Blob | undefined) => {
     if (!file) return
+    setShotHint(false)
     const named = file instanceof File ? file : new File([file], 'camera.jpg', { type: 'image/jpeg' })
+    setShotPreview(URL.createObjectURL(named))
     const ok = await photo.captureFromFile(named, null)
     if (ok) {
       // Fire-and-forget: the enriched item lands in the inbox via realtime.
-      setTimeout(() => { photo.reset(); handleClose() }, 1600)
+      setTimeout(() => { photo.reset(); setShotPreview(null); handleClose() }, 1600)
     }
   }
+
+  // Screenshot: the Mac app hides, macOS's crosshair picks a region, and the
+  // picture comes back here. A browser (or an older Mac app) can't do that, so
+  // the tile says how to paste one instead.
+  const [shotHint, setShotHint] = useState(false)
+  const showScreenshot = isDesktopShell()
+    || (typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches)
+  const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
+  const handleScreenshot = async () => {
+    setShotHint(false)
+    const shot = await requestDesktopScreenshot()
+    if (shot.status === 'ok') void handlePhotoPicked(shot.file)
+    else if (shot.status === 'unsupported') setShotHint(true)
+    else if (shot.status === 'error') showToast(`Couldn’t take the screenshot: ${shot.message}`, 'error')
+    inputRef.current?.focus()
+  }
+
+  // Paste or drop an image anywhere in the box. A clipboard that also carries
+  // text (a copied spreadsheet cell, a web page) is a text paste.
+  const imageFrom = (data: DataTransfer | null) =>
+    Array.from(data?.files ?? []).find((f) => f.type.startsWith('image/'))
+  const [dragOver, setDragOver] = useState(false)
 
   // Parser context — memoized so useQuickParse's parse memo stays stable
   // ⌘K can act on a recurrence (series / routine), so it opts in.
@@ -168,6 +197,7 @@ export function QuickCapture({
     setTimeout(() => {
       setTitle('')
       resetOverrides()
+      setShotHint(false)
       setIsClosing(false)
       if (onClose) {
         onClose()
@@ -424,8 +454,25 @@ export function QuickCapture({
             onKeyDown={(e) => {
               if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); handleClose() }
             }}
+            onPaste={(e) => {
+              if (e.clipboardData.types.includes('text/plain')) return
+              const image = imageFrom(e.clipboardData)
+              if (image) { e.preventDefault(); void handlePhotoPicked(image) }
+            }}
+            onDragOver={(e) => {
+              if (!e.dataTransfer.types.includes('Files')) return
+              e.preventDefault()
+              setDragOver(true)
+            }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false) }}
+            onDrop={(e) => {
+              setDragOver(false)
+              const image = imageFrom(e.dataTransfer)
+              if (image) { e.preventDefault(); void handlePhotoPicked(image) }
+            }}
             className={`
               bg-bg-elevated shadow-xl
+              ${dragOver ? 'ring-2 ring-primary-500 ring-offset-2' : ''}
               w-full md:w-1/2 md:max-w-lg
               rounded-t-3xl md:rounded-2xl
               p-6
@@ -512,18 +559,40 @@ export function QuickCapture({
 
               {/* Syntax teaching hint — shown until the parser has something to preview */}
               {!showPreview && !title.trim() && (
-                <p className="text-xs text-neutral-400 px-1">
-                  Dates, times, and types are understood as you type — try
-                  {' '}<span className="text-neutral-500">"pay camp deposit friday"</span>,
-                  {' '}<span className="text-neutral-500">"event: dentist thu 2pm 45m"</span>, or
-                  {' '}<span className="text-neutral-500">"#porch buy lumber"</span>
+                <p
+                  className="text-xs text-neutral-400 px-1 -mt-1.5"
+                  title={'Try "pay camp deposit friday", "event: dentist thu 2pm 45m", or "#porch buy lumber"'}
+                >
+                  Dates, times and types are understood as you type.
                 </p>
               )}
 
-              {/* Photo capture — live camera (Continuity Camera lists the
-                  iPhone as a device on macOS); file picker as fallback. */}
-              {!title.trim() && (
-                <div>
+              {/* The picture on its way — a photo, screenshot, paste or drop. */}
+              {photo.status !== 'idle' && (
+                <div
+                  role="status"
+                  className={`flex items-center gap-3 rounded-xl border p-2.5 ${
+                    photo.status === 'error' ? 'border-red-100 bg-red-50' : 'border-primary-100 bg-primary-50'
+                  }`}
+                >
+                  {shotPreview && (
+                    <img src={shotPreview} alt="" className="w-[72px] h-12 shrink-0 rounded-md border border-neutral-200 object-cover" />
+                  )}
+                  <p className={`text-sm leading-snug ${photo.status === 'error' ? 'text-red-700' : 'text-primary-700'}`}>
+                    {photo.status === 'error'
+                      ? `Couldn’t send that picture: ${photo.error}`
+                      : photo.status === 'working' ? 'Sending it…' : 'Reading it now'}
+                    {photo.status !== 'error' && (
+                      <span className="block text-xs text-neutral-500">It lands in your Inbox with a name and notes.</span>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {/* Capture from a picture: one row of tiles (Scott, 2026-10-30).
+                  The longer descriptions live in each tile's tooltip. */}
+              {!title.trim() && photo.status !== 'working' && photo.status !== 'started' && (
+                <div className="space-y-2">
                   <input
                     ref={photoInputRef}
                     type="file"
@@ -534,43 +603,44 @@ export function QuickCapture({
                       e.target.value = ''
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => (cameraSupported ? setShowCamera(true) : photoInputRef.current?.click())}
-                    disabled={photo.status === 'working'}
-                    className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600 hover:bg-neutral-100 disabled:opacity-60 transition-colors"
-                  >
-                    <Camera className="w-4 h-4 shrink-0 text-primary-600" />
-                    <span className="flex-1 text-left">
-                      {photo.status === 'working'
-                        ? 'Uploading photo…'
-                        : photo.status === 'started'
-                        ? 'On it — the analyzed item will appear in your inbox'
-                        : photo.status === 'error'
-                        ? `Photo capture failed: ${photo.error}`
-                        : 'Snap a photo of a thing — AI identifies it and files it'}
-                    </span>
-                  </button>
-                  {onPlanFromPaper && (
-                    <button
-                      type="button"
-                      onClick={() => { handleClose(); onPlanFromPaper() }}
-                      className="mt-2 w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600 hover:bg-neutral-100 transition-colors"
-                    >
-                      <NotebookPen className="w-4 h-4 shrink-0 text-primary-600" />
-                      <span className="flex-1 text-left">Plan from paper — photograph your written plan</span>
-                    </button>
-                  )}
-                  {onSchoolPaper && (
-                    <button
-                      type="button"
-                      onClick={() => { handleClose(); onSchoolPaper() }}
-                      className="mt-2 w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600 hover:bg-neutral-100 transition-colors"
-                    >
-                      <FileText className="w-4 h-4 shrink-0 text-primary-600" />
-                      <span className="flex-1 text-left">School paper — a slip or form for the kitchen wall</span>
-                    </button>
-                  )}
+                  <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Capture from</p>
+                  <div className="flex gap-2">
+                    <CaptureTile
+                      icon={Camera}
+                      label="Photo"
+                      title="Snap a photo of a thing — AI identifies it and files it"
+                      onClick={() => (cameraSupported ? setShowCamera(true) : photoInputRef.current?.click())}
+                    />
+                    {showScreenshot && (
+                      <CaptureTile
+                        icon={Scan}
+                        label="Screenshot"
+                        title="Drag over part of your screen — AI reads it and files it"
+                        onClick={() => void handleScreenshot()}
+                      />
+                    )}
+                    {onPlanFromPaper && (
+                      <CaptureTile
+                        icon={NotebookPen}
+                        label="Plan from paper"
+                        title="Photograph your written plan"
+                        onClick={() => { handleClose(); onPlanFromPaper() }}
+                      />
+                    )}
+                    {onSchoolPaper && (
+                      <CaptureTile
+                        icon={FileText}
+                        label="School paper"
+                        title="A slip or form for the kitchen wall"
+                        onClick={() => { handleClose(); onSchoolPaper() }}
+                      />
+                    )}
+                  </div>
+                  <p className="text-center text-xs text-neutral-400">
+                    {shotHint
+                      ? <>Take one with <kbd className="px-1 py-0.5 bg-neutral-100 text-neutral-500 rounded font-mono">{isMac ? '⌃⇧⌘4' : 'Win+Shift+S'}</kbd>, then press <kbd className="px-1 py-0.5 bg-neutral-100 text-neutral-500 rounded font-mono">{isMac ? '⌘V' : 'Ctrl+V'}</kbd> here</>
+                      : 'or paste or drop an image'}
+                  </p>
                 </div>
               )}
 
@@ -790,5 +860,27 @@ export function QuickCapture({
         </div>
       )}
     </>
+  )
+}
+
+function CaptureTile({ icon: Icon, label, title, onClick }: {
+  icon: typeof Camera
+  label: string
+  title: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="flex-1 min-w-0 flex flex-col items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50
+                 px-1.5 pt-3 pb-2.5 text-center text-[12.5px] leading-tight text-neutral-600
+                 hover:bg-neutral-100 active:bg-neutral-200 transition-colors
+                 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+    >
+      <Icon className="w-5 h-5 shrink-0 text-primary-600" aria-hidden="true" />
+      {label}
+    </button>
   )
 }

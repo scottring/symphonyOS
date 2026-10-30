@@ -24,6 +24,14 @@ launch — never bundle the frontend here.
 - Menu-bar extra: today's remaining count + task list, live via Supabase
   realtime → web bridge → tray
 - Launch at Login (Symphony menu), close-to-hide, Dock reopen
+- **⌘K → Screenshot** (2026-10-30): Symphony hides, macOS's own crosshair
+  (`screencapture -i`) picks a region — Space switches to a window, Esc cancels
+  — and the picture comes back into the box, which files it like a photo. The
+  first shot asks for **Screen Recording** permission (System Settings →
+  Privacy & Security); reopen Symphony after granting it, or shots show only
+  the desktop. Because this build is unsigned, macOS may drop that permission
+  after each rebuild — re-grant it there. In a browser or a shell built before
+  this, the tile tells you to paste a ⌃⇧⌘4 shot instead.
 
 ## Why `dragDropEnabled: false`
 
@@ -49,7 +57,9 @@ behavior. See "Known limitations" below.
 
 Event contract (see `src/lib/desktop.ts` and `src/desktop/` in the web repo):
 `shell:navigate`, `shell:quick-capture`, `shell:quick-add-global`,
-`shell:hide-app`, `shell:tray-update`. The remote origin is granted event access in
+`shell:hide-app`, `shell:tray-update`, `shell:screenshot` (answered by
+`shell:screenshot-started` at once, then `shell:screenshot-result` with a base64
+JPEG). The remote origin is granted event access in
 `src-tauri/capabilities/remote.json`; the site CSP allows Tauri IPC
 (`ipc:` in connect-src, vercel.json).
 
