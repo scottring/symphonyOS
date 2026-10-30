@@ -86,6 +86,14 @@ export function parseClockText(text: string): ClockText | null {
   return { hours: Math.floor(a / 60), minutes: a % 60, duration }
 }
 
+/** A start and an optional end, typed in two fields. The end is read as the
+ *  first such time after the start ("6pm" to "9:15" is 9:15 PM). */
+export function parseStartEnd(start: string, end: string): ClockText | null {
+  if (!end.trim()) return parseClockText(start)
+  if (!start.trim() || /-|–|—|\bto\b/i.test(start)) return null
+  return parseClockText(`${start} - ${end}`)
+}
+
 /** The first 12-hour reading of `side` that comes after `after`. */
 function nextAfter(side: Side, after: number): number {
   const am = at(side, 'am')
@@ -95,7 +103,7 @@ function nextAfter(side: Side, after: number): number {
   return am
 }
 
-const clock = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+export const clock = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
 /** "6:00 PM", or "6:00 – 9:15 PM" for a range — what a timed row says, and
  *  what the time field starts out holding. */

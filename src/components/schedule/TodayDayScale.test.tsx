@@ -90,4 +90,28 @@ describe('TodayDayScale', () => {
     expect(got).toEqual(payload)
     expect([when.getHours(), when.getMinutes()]).toEqual([14, 0])
   })
+
+  // Scott, 2026-10-30: "why can't I drag to resize in The Day grid?"
+  it('drags a task’s bottom edge to a new end, in quarter hours', () => {
+    const onResize = vi.fn()
+    renderScale([
+      item({ id: 'task-movie', title: 'Movie', startTime: at(18) }),
+      item({ id: 'routine-r1', type: 'routine', title: 'Meds', startTime: at(20) }),
+    ], { onResize })
+    const handles = screen.getAllByTestId('scale-resize')
+    expect(handles).toHaveLength(1) // a routine has no length of its own
+    // 48px an hour: from the half hour a bare time gets, down 2h50m of pointer.
+    fireEvent.pointerDown(handles[0], { clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(handles[0], { clientY: 100 + 48 * 2.75 + 3, pointerId: 1 })
+    expect(screen.getByRole('button', { name: /^Movie, 6:00 PM to 9:15 PM/ })).toHaveTextContent('6:00–9:15 · Movie')
+    fireEvent.pointerUp(handles[0], { clientY: 100 + 48 * 2.75 + 3, pointerId: 1 })
+    expect(onResize).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-movie' }), at(21, 15))
+  })
+
+  it('offers no edge on a read-only event', () => {
+    renderScale([
+      item({ id: 'event-shared', type: 'event', title: 'Shared', startTime: at(9), endTime: at(10) }),
+    ], { onResize: vi.fn(), isReadOnlyEvent: () => true })
+    expect(screen.queryByTestId('scale-resize')).toBeNull()
+  })
 })

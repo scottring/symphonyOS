@@ -3,7 +3,7 @@ import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember, FamilyMemberColor } from '@/types/family'
 import { FAMILY_COLORS } from '@/types/family'
-import { buildDayScale, timeAtOffset, type DayScale, type ScaleBlock } from '@/lib/today/dayScale'
+import { buildDayScale, timeAtOffset, MIN_BLOCK, type DayScale, type ScaleBlock } from '@/lib/today/dayScale'
 import { SCALE_DROP_ID, refusalFor } from '@/lib/today/todayDrop'
 import { dragPointerY } from '@/lib/today/dragPointer'
 import { isPlanDrag, readPlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
@@ -71,14 +71,53 @@ interface BlockProps {
   onSelect: (id: string) => void
   /** Ticks it off (or back on). Unset: no check — events have none. */
   onToggleDone?: () => void
+  /** A new end, from dragging the bottom edge. Unset: it cannot be resized
+   *  (a routine has no length of its own; a read-only event cannot change). */
+  onResize?: (end: Date) => void
 }
+
+/** Lengths snap to the quarter hour, as drops do, and never go below one. */
+const SNAP_MINUTES = 15
 
 /** Every thing on the day is drawn one way (Scott, 2026-10-07: three styles
  *  side by side "looks stupid"): "9:00–10:15 · Boxing" and who carries it.
  *  A task or routine leads with the same check "For today" has (Scott,
  *  2026-10-17); an event has none. A click on the rest opens its details. */
-function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selected, upNext, past, refused, mark, onSelect, onToggleDone }: BlockProps) {
+function ScaleItem({ item, start, end: savedEnd, hasEnd: savedHasEnd, block, pxPerHour, people, selected, upNext, past, refused, mark, onSelect, onToggleDone, onResize }: BlockProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: refused })
+  // Dragging the bottom edge (Scott, 2026-10-30): the block follows the
+  // pointer in quarter hours and the new end is written on release.
+  const [resize, setResize] = useState<{ y: number; minutes: number; to: number } | null>(null)
+  const resizeTo = resize?.to ?? null
+  const lengthAt = (from: { y: number; minutes: number }, clientY: number) => {
+    const raw = from.minutes + ((clientY - from.y) / pxPerHour) * 60
+    return Math.max(SNAP_MINUTES, Math.round(raw / SNAP_MINUTES) * SNAP_MINUTES)
+  }
+  const resizeHandle = onResize && !refused ? {
+    onPointerDown: (e: React.PointerEvent) => {
+      e.stopPropagation()
+      e.preventDefault()
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+      const minutes = Math.round((savedEnd.getTime() - start.getTime()) / 60_000)
+      setResize({ y: e.clientY, minutes, to: minutes })
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (resize) setResize({ ...resize, to: lengthAt(resize, e.clientY) })
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      if (!resize) return
+      const minutes = lengthAt(resize, e.clientY)
+      setResize(null)
+      if (minutes !== resize.minutes || !savedHasEnd) onResize(new Date(start.getTime() + minutes * 60_000))
+    },
+    onPointerCancel: () => setResize(null),
+    // The press is not picking the block up (the drag sensors listen for
+    // these on the wrapper).
+    onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+    onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+  } : null
+  const end = resizeTo !== null ? new Date(start.getTime() + resizeTo * 60_000) : savedEnd
+  const hasEnd = resizeTo !== null || savedHasEnd
   const isEvent = item.type === 'event'
   // How far away it is, drawn above it as the time it takes to get there.
   const travel = useTravelTime(item, { enabled: isEvent && !item.completed && !past })
@@ -87,7 +126,7 @@ function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selecte
   const lanes = block.lanes
   const pos = {
     top: block.top,
-    height: block.height,
+    height: resizeTo !== null ? Math.max(MIN_BLOCK, (resizeTo / 60) * pxPerHour) : block.height,
     left: `calc(var(--scale-gutter) + (100% - var(--scale-gutter)) * ${block.lane / lanes})`,
     width: `calc((100% - var(--scale-gutter)) / ${lanes} - ${lanes > 1 ? 6 : 0}px)`,
   }
@@ -115,6 +154,7 @@ function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selecte
           past && !upNext ? 'is-past' : '',
           selected ? 'is-selected' : '',
           isDragging ? 'is-dragging' : '',
+          resizeTo !== null ? 'is-resizing' : '',
           mark ? `is-preview is-${mark.tone}` : '',
           mark?.struck ? 'is-struck' : '',
         ].filter(Boolean).join(' ')}
@@ -139,6 +179,9 @@ function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selecte
         </button>
         {people.length > 0 && (
           <span className="today-scale-people">{people.slice(0, 3).map((m) => <MiniAvatar key={m.id} member={m} />)}</span>
+        )}
+        {resizeHandle && (
+          <span className="today-scale-resize" aria-hidden="true" data-testid="scale-resize" {...resizeHandle} />
         )}
       </div>
     </>
@@ -186,6 +229,7 @@ export function TodayDayScale({
   markOf,
   proposed = [],
   showOpenTime = true,
+  onResize,
 }: {
   /** The day's timed rows (a group's children ride with their parent). */
   items: TimelineItem[]
@@ -213,6 +257,8 @@ export function TodayDayScale({
   proposed?: readonly ProposedRow[]
   /** Missing or incomplete calendars cannot establish available time. */
   showOpenTime?: boolean
+  /** A new end for a task or event, from dragging its bottom edge. */
+  onResize?: (item: TimelineItem, end: Date) => void
 }) {
   // When each thing runs. An all-day "Dinner: …" event sits at its meal's
   // hour (effectiveStartTime), for the half hour a bare time gets.
@@ -335,6 +381,7 @@ export function TodayDayScale({
             mark={markOf?.(item)}
             onSelect={onSelect}
             onToggleDone={onToggleDone && (item.type === 'task' || item.type === 'routine') ? () => onToggleDone(item) : undefined}
+            onResize={onResize && (item.type === 'task' || item.type === 'event') && !item.isSubtask && !markOf?.(item) ? (to) => onResize(item, to) : undefined}
           />
         )
       })}

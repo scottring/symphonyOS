@@ -108,7 +108,7 @@ import { discussionItems } from '@/lib/discussionItems'
 import { PrintableDayList } from './PrintableDayList'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { daySentence, type DaySentenceItem } from '@/lib/today/daySentence'
-import { effectiveStartTime } from '@/lib/timeUtils'
+import { effectiveStartTime, formatTimeLong } from '@/lib/timeUtils'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PlanTalkChip } from './PlanTalkChip'
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
@@ -1506,6 +1506,26 @@ export function TodayView({
                 }
               }}
               onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }) }}
+              // Dragging a block's bottom edge: a task's length (with Undo,
+              // as a move has), an event's end.
+              onResize={(item, end) => {
+                const start = item.startTime
+                if (!start) return
+                if (item.type === 'task' && item.originalTask) {
+                  const t = item.originalTask
+                  void writeMoveAndRegisterUndo(
+                    onUpdateTask,
+                    t.id,
+                    { estimatedDuration: Math.round((end.getTime() - start.getTime()) / 60_000) },
+                    { estimatedDuration: t.estimatedDuration },
+                    `“${t.title}” now ends at ${formatTimeLong(end)}`,
+                    ctx.onRegisterUndo,
+                  )
+                } else if (item.type === 'event' && item.originalEvent) {
+                  const ev = item.originalEvent
+                  void ctx.onUpdateEvent?.(ev.google_event_id || ev.id, { startTime: start, endTime: end })
+                }
+              }}
               fromHour={canHideEarlier && hideEarlier ? earlierCutoff : null}
               handleRef={scaleRef}
             />

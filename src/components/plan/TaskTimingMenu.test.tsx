@@ -55,7 +55,7 @@ describe('TaskTimingMenu', () => {
   it('sets a time on the day it already has, and goes back to any time', () => {
     const onUpdateTask = show(task())
     fireEvent.click(screen.getByRole('button', { name: /Choose a week or a day/ }))
-    fireEvent.change(screen.getByLabelText(/A time…/), { target: { value: '4pm' } })
+    fireEvent.change(screen.getByLabelText('Starts'), { target: { value: '4pm' } })
     fireEvent.click(screen.getByRole('button', { name: 'Set 4:00 PM' }))
     expect(onUpdateTask).toHaveBeenCalledWith('t1', { bucket: 'timed', scheduledFor: new Date(2026, 8, 22, 16, 0), isAllDay: false })
 
@@ -68,27 +68,27 @@ describe('TaskTimingMenu', () => {
 
   // Scott, 2026-10-30: "6-915pm" could not be set from the detail pane — the
   // native time field never took a value in the desktop app, and had no end.
-  it('sets a range typed the way it is said, and opens on the time it has', () => {
+  it('sets a start and an end, and opens on the time it has', () => {
     const onUpdateTask = show(task({ scheduledFor: new Date(2026, 8, 22, 18, 0), isAllDay: false }))
     fireEvent.click(screen.getByRole('button', { name: /Choose a week or a day/ }))
-    const field = screen.getByLabelText(/Change the time/)
-    expect(field).toHaveValue('6:00 PM')
-    fireEvent.change(field, { target: { value: '6-915pm' } })
+    expect(screen.getByLabelText('Starts')).toHaveValue('6:00 PM')
+    expect(screen.getByLabelText('Ends')).toHaveValue('')
+    fireEvent.change(screen.getByLabelText('Ends'), { target: { value: '915' } })
     fireEvent.click(screen.getByRole('button', { name: 'Set 6:00 – 9:15 PM' }))
     expect(onUpdateTask).toHaveBeenCalledWith('t1', {
       bucket: 'timed', scheduledFor: new Date(2026, 8, 22, 18, 0), isAllDay: false, estimatedDuration: 195,
     })
   })
 
-  it('states the range on the trigger and saves with Enter', () => {
+  it('states the range on the trigger, opens on both ends, and saves with Enter', () => {
     const onUpdateTask = show(task({ scheduledFor: new Date(2026, 8, 22, 18, 0), isAllDay: false, estimatedDuration: 195 }))
     const trigger = screen.getByRole('button', { name: /Choose a week or a day/ })
     expect(trigger).toHaveTextContent('6:00 – 9:15 PM')
     fireEvent.click(trigger)
-    const field = screen.getByLabelText(/Change the time/)
-    expect(field).toHaveValue('6:00 – 9:15 PM')
-    fireEvent.change(field, { target: { value: '7pm' } })
-    fireEvent.keyDown(field, { key: 'Enter' })
+    expect(screen.getByLabelText('Ends')).toHaveValue('9:15 PM')
+    fireEvent.change(screen.getByLabelText('Starts'), { target: { value: '7pm' } })
+    fireEvent.change(screen.getByLabelText('Ends'), { target: { value: '' } })
+    fireEvent.keyDown(screen.getByLabelText('Starts'), { key: 'Enter' })
     expect(onUpdateTask).toHaveBeenCalledWith('t1', expect.objectContaining({
       scheduledFor: new Date(2026, 8, 22, 19, 0), estimatedDuration: undefined,
     }))
@@ -97,7 +97,7 @@ describe('TaskTimingMenu', () => {
   it('says when it cannot read the time, and offers no Set', () => {
     show(task())
     fireEvent.click(screen.getByRole('button', { name: /Choose a week or a day/ }))
-    fireEvent.change(screen.getByLabelText(/A time…/), { target: { value: 'after dinner' } })
+    fireEvent.change(screen.getByLabelText('Starts'), { target: { value: 'after dinner' } })
     expect(screen.queryByRole('button', { name: /^Set / })).toBeNull()
     expect(screen.getByText(/Try 6pm/)).toBeInTheDocument()
   })
@@ -105,6 +105,6 @@ describe('TaskTimingMenu', () => {
   it('offers no time until a day is chosen', () => {
     show(task({ scheduledFor: undefined, isAllDay: undefined }))
     fireEvent.click(screen.getByRole('button', { name: /Choose a week or a day/ }))
-    expect(screen.queryByLabelText(/A time…/)).toBeNull()
+    expect(screen.queryByLabelText('Starts')).toBeNull()
   })
 })

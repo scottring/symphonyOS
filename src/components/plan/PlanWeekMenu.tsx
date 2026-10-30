@@ -23,7 +23,7 @@
 // The listed weeks are the weeks of `periodStart`'s MONTH. A season goal is
 // anchored on its first month and reaches the rest through "Another week…";
 // listing a season's thirteen weeks would be a menu nobody can read.
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarRange } from 'lucide-react'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
@@ -34,7 +34,7 @@ import { densityScale, type DayDensity } from '@/lib/planning/dayDensity'
 import { DayDensityTiles, WeekendChoices, type DayChoice, type WeekendChoice } from './DayDensityTiles'
 import { weekendRangeLabel } from '@/lib/planning/weekend'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
-import { parseClockText, clockLabel, type ClockText } from '@/lib/planning/clockText'
+import { parseStartEnd, clockLabel, clock, type ClockText } from '@/lib/planning/clockText'
 
 /** "Oct 4 – 10" for a week anchor, matching the listed weeks' labels. */
 function weekLabel(start: Date): string {
@@ -116,8 +116,9 @@ export function PlanWeekMenu({
 
   const [otherWeek, setOtherWeek] = useState('')
   const [dayValue, setDayValue] = useState('')
-  const [timeValue, setTimeValue] = useState('')
-  const parsedTime = timeValue.trim() ? parseClockText(timeValue) : null
+  const [startValue, setStartValue] = useState('')
+  const [endValue, setEndValue] = useState('')
+  const parsedTime = startValue.trim() ? parseStartEnd(startValue, endValue) : null
   const weekStartsOn = readCadenceConfig().weekStartsOn
   const weeks = weeksOfMonth(periodStart, weekStartsOn)
   // Two different labels. The list of weeks belongs to `periodStart`'s MONTH
@@ -186,7 +187,11 @@ export function PlanWeekMenu({
         onClick={() => {
           // The time field opens holding the time the row already has, so
           // changing it is an edit rather than starting over.
-          if (!open) setTimeValue(timing?.day && timing.timed ? clockLabel(timing.day, timing.duration) : '')
+          if (!open) {
+            const timed = timing?.day && timing.timed ? timing.day : null
+            setStartValue(timed ? clock(timed) : '')
+            setEndValue(timed && timing?.duration ? clock(new Date(timed.getTime() + timing.duration * 60_000)) : '')
+          }
           setOpen((v) => !v)
         }}
         className={`plan-timing-trigger inline-flex max-w-full items-center gap-1 rounded-md border transition-colors ${
@@ -288,27 +293,30 @@ export function PlanWeekMenu({
               </button>
             )}
           </div>
-          {/* A time on the chosen day. The same field on the Today row and in
-              the detail pane, so a time is set one way everywhere. Typed, not
-              a native time field: WebKit's never took a value in the desktop
-              app (clockText.ts). */}
-          {onPickTime && timing?.day && (
+          {/* A time on the chosen day: a start, and an end if it has one.
+              The same fields on Week's rows and in the detail pane, so a
+              time is set one way everywhere. Typed, not native time fields:
+              WebKit's never took a value in the desktop app (clockText.ts). */}
+          {onPickTime && timing?.day && (() => {
+            const save = (e: KeyboardEvent) => {
+              if (e.key === 'Enter' && parsedTime) { e.preventDefault(); setOpen(false); onPickTime(parsedTime) }
+            }
+            const field = 'mt-1 w-full rounded-md border border-neutral-200 px-2 py-1 text-sm'
+            return (
             <div className="px-3 py-1.5" role="group" aria-label="Time">
-              <label className="block text-sm text-neutral-700">
-                {timing.timed ? 'Change the time' : 'A time…'}
-                <input
-                  type="text"
-                  inputMode="text"
-                  autoComplete="off"
-                  placeholder="6pm, or 6–9:15pm"
-                  value={timeValue}
-                  onChange={(e) => setTimeValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && parsedTime) { e.preventDefault(); setOpen(false); onPickTime(parsedTime) }
-                  }}
-                  className="mt-1 w-full rounded-md border border-neutral-200 px-2 py-1 text-sm"
-                />
-              </label>
+              <p className="text-sm text-neutral-700">{timing.timed ? 'Change the time' : 'A time…'}</p>
+              <div className="mt-1 flex items-end gap-2">
+                <label className="block flex-1 text-xs text-neutral-500">
+                  Starts
+                  <input type="text" autoComplete="off" placeholder="6pm" value={startValue}
+                    onChange={(e) => setStartValue(e.target.value)} onKeyDown={save} className={field} />
+                </label>
+                <label className="block flex-1 text-xs text-neutral-500">
+                  Ends
+                  <input type="text" autoComplete="off" placeholder="optional" value={endValue}
+                    onChange={(e) => setEndValue(e.target.value)} onKeyDown={save} className={field} />
+                </label>
+              </div>
               {parsedTime && (
                 <button
                   type="button"
@@ -318,8 +326,8 @@ export function PlanWeekMenu({
                   Set {clockOf(parsedTime)}
                 </button>
               )}
-              {timeValue.trim() && !parsedTime && (
-                <p className="mt-1 text-xs text-neutral-400">Try 6pm, 18:30, or 6–9:15pm.</p>
+              {(startValue.trim() || endValue.trim()) && !parsedTime && (
+                <p className="mt-1 text-xs text-neutral-400">Try 6pm, 6:30, or 18:30.</p>
               )}
               {timing.timed && (
                 <button type="button" role="menuitem" className={`${itemClass} mt-1 -mx-3 w-[calc(100%+1.5rem)]`} onClick={choose(() => onPickTime(null))}>
@@ -328,7 +336,8 @@ export function PlanWeekMenu({
                 </button>
               )}
             </div>
-          )}
+            )
+          })()}
           {(onClearWeek || onRemoveDay || onPickDay) && <div className="my-1 border-t border-neutral-100" />}
           {/* What a removal leaves behind, said HERE rather than after the
               fact — the consequence is never a surprise (requirement 6). The

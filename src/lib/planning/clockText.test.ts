@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseClockText, clockLabel } from './clockText'
+import { parseClockText, parseStartEnd, clockLabel } from './clockText'
 
 describe('parseClockText', () => {
   it.each([
@@ -43,5 +43,19 @@ describe('clockLabel', () => {
   it('reads back what it writes', () => {
     const r = parseClockText(clockLabel(new Date(2026, 9, 30, 18, 0), 195))
     expect(r).toEqual({ hours: 18, minutes: 0, duration: 195 })
+  })
+})
+
+describe('parseStartEnd', () => {
+  it('reads the end as the first such time after the start', () => {
+    expect(parseStartEnd('6pm', '9:15')).toEqual({ hours: 18, minutes: 0, duration: 195 })
+    expect(parseStartEnd('6:00 PM', '9:15 PM')).toEqual({ hours: 18, minutes: 0, duration: 195 })
+    expect(parseStartEnd('11am', '1')).toEqual({ hours: 11, minutes: 0, duration: 120 })
+  })
+
+  it('is a single time with no end, and nothing without a start', () => {
+    expect(parseStartEnd('6pm', '')).toEqual({ hours: 18, minutes: 0 })
+    expect(parseStartEnd('', '9pm')).toBeNull()
+    expect(parseStartEnd('6pm', 'later')).toBeNull()
   })
 })
