@@ -34,6 +34,7 @@ import { densityScale, type DayDensity } from '@/lib/planning/dayDensity'
 import { DayDensityTiles, WeekendChoices, type DayChoice, type WeekendChoice } from './DayDensityTiles'
 import { weekendRangeLabel } from '@/lib/planning/weekend'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
+import { parseClockText, clockLabel, type ClockText } from '@/lib/planning/clockText'
 
 /** "Oct 4 – 10" for a week anchor, matching the listed weeks' labels. */
 function weekLabel(start: Date): string {
@@ -45,10 +46,9 @@ function weekLabel(start: Date): string {
     : `${month(start)} ${start.getDate()} – ${month(end)} ${end.getDate()}`
 }
 
-/** "4:00 PM" for an <input type="time"> value. */
-function clockOf(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  return new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+/** "6:00 – 9:15 PM" for what the time field understood. */
+function clockOf(t: ClockText): string {
+  return clockLabel(new Date(2000, 0, 1, t.hours, t.minutes), t.duration)
 }
 
 export function PlanWeekMenu({
@@ -105,7 +105,7 @@ export function PlanWeekMenu({
   /** A time on the chosen day, or null for "any time". Offered only once a
    *  day is chosen: the one place to set a time, wherever the control sits
    *  (Scott, 2026-10-30: the detail pane had no consistent way to). */
-  onPickTime?: (time: { hours: number; minutes: number } | null) => void
+  onPickTime?: (time: ClockText | null) => void
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -117,6 +117,7 @@ export function PlanWeekMenu({
   const [otherWeek, setOtherWeek] = useState('')
   const [dayValue, setDayValue] = useState('')
   const [timeValue, setTimeValue] = useState('')
+  const parsedTime = timeValue.trim() ? parseClockText(timeValue) : null
   const weekStartsOn = readCadenceConfig().weekStartsOn
   const weeks = weeksOfMonth(periodStart, weekStartsOn)
   // Two different labels. The list of weeks belongs to `periodStart`'s MONTH
@@ -182,7 +183,12 @@ export function PlanWeekMenu({
         aria-label={`Choose a week or a day for ${title}. ${timing ? timingDescription(timing, monthLabel) : 'No timing shown'}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          // The time field opens holding the time the row already has, so
+          // changing it is an edit rather than starting over.
+          if (!open) setTimeValue(timing?.day && timing.timed ? clockLabel(timing.day, timing.duration) : '')
+          setOpen((v) => !v)
+        }}
         className={`plan-timing-trigger inline-flex max-w-full items-center gap-1 rounded-md border transition-colors ${
           chosen
             ? 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100'
@@ -283,26 +289,37 @@ export function PlanWeekMenu({
             )}
           </div>
           {/* A time on the chosen day. The same field on the Today row and in
-              the detail pane, so a time is set one way everywhere. */}
+              the detail pane, so a time is set one way everywhere. Typed, not
+              a native time field: WebKit's never took a value in the desktop
+              app (clockText.ts). */}
           {onPickTime && timing?.day && (
             <div className="px-3 py-1.5" role="group" aria-label="Time">
               <label className="block text-sm text-neutral-700">
                 {timing.timed ? 'Change the time' : 'A time…'}
                 <input
-                  type="time"
+                  type="text"
+                  inputMode="text"
+                  autoComplete="off"
+                  placeholder="6pm, or 6–9:15pm"
                   value={timeValue}
                   onChange={(e) => setTimeValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && parsedTime) { e.preventDefault(); setOpen(false); onPickTime(parsedTime) }
+                  }}
                   className="mt-1 w-full rounded-md border border-neutral-200 px-2 py-1 text-sm"
                 />
               </label>
-              {timeValue && (
+              {parsedTime && (
                 <button
                   type="button"
                   className="mt-1.5 w-full rounded-md bg-primary-50 px-2 py-1 text-sm font-semibold text-primary-700"
-                  onClick={choose(() => { const [h, m] = timeValue.split(':').map(Number); onPickTime({ hours: h, minutes: m }) })}
+                  onClick={choose(() => onPickTime(parsedTime))}
                 >
-                  Set {clockOf(timeValue)}
+                  Set {clockOf(parsedTime)}
                 </button>
+              )}
+              {timeValue.trim() && !parsedTime && (
+                <p className="mt-1 text-xs text-neutral-400">Try 6pm, 18:30, or 6–9:15pm.</p>
               )}
               {timing.timed && (
                 <button type="button" role="menuitem" className={`${itemClass} mt-1 -mx-3 w-[calc(100%+1.5rem)]`} onClick={choose(() => onPickTime(null))}>

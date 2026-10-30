@@ -111,7 +111,11 @@ export function taskToTimelineItem(task: Task, goalLabel?: string): TimelineItem
     type: 'task',
     title: task.title,
     startTime: task.scheduledFor || null,
-    endTime: null, // Tasks don't have duration/end time
+    // A timed task with a length ends when it says ("6–9:15pm"), so the
+    // day draws it that long; otherwise it is a moment.
+    endTime: task.scheduledFor && !task.isAllDay && task.estimatedDuration
+      ? new Date(task.scheduledFor.getTime() + task.estimatedDuration * 60_000)
+      : null,
     completed: task.completed,
     isWaiting: task.isWaiting,
     waitingFor: task.waitingFor,

@@ -24,6 +24,7 @@ import { openCommitment } from '@/lib/placement/model'
 import { readCadenceConfig, weekStartAnchor, localYmd } from '@/lib/cadence/config'
 import { formatWeekRange, formatWeekRangeShort } from '@/lib/dateHelpers'
 import { weekendRangeLabel, inTaskWeekend } from './weekend'
+import { clockLabel } from './clockText'
 
 export interface TaskTiming {
   /** The day this task is scheduled for, if any. */
@@ -40,6 +41,8 @@ export interface TaskTiming {
   /** The Saturday of a flexible weekend ("either day"), when one is chosen.
    *  It survives choosing one of its two days (flexible-weekend.md). */
   weekend?: Date | null
+  /** How long a timed day runs, in minutes, when it has an end. */
+  duration?: number | null
 }
 
 const anchorOf = (d: Date) => weekStartAnchor(d, readCadenceConfig().weekStartsOn)
@@ -82,14 +85,16 @@ export function committedWeekOf(
  *
  * The week comes from `committedWeekOf`, which `taskWhen` also uses.
  */
-export function taskTiming(task: Pick<Task, 'scheduledFor' | 'isAllDay' | 'commitments' | 'bucket' | 'weekStart'> & Partial<Pick<Task, 'weekendStart'>>): TaskTiming {
+export function taskTiming(task: Pick<Task, 'scheduledFor' | 'isAllDay' | 'commitments' | 'bucket' | 'weekStart'> & Partial<Pick<Task, 'weekendStart' | 'estimatedDuration'>>): TaskTiming {
   const day = task.scheduledFor ?? null
+  const timed = !!day && task.isAllDay !== true
   return {
     day,
-    timed: !!day && task.isAllDay !== true,
+    timed,
     week: committedWeekOf(task),
     weekOfDay: day ? anchorOf(day) : null,
     weekend: task.weekendStart ?? null,
+    ...(timed && task.estimatedDuration ? { duration: task.estimatedDuration } : {}),
   }
 }
 
@@ -156,7 +161,7 @@ const offWeek = (t: TaskTiming) => !!t.day && !!t.week && !dayIsInCommittedWeek(
 export function timingLabel(t: TaskTiming, opts: { relativeTo?: Date } = {}): string {
   // A weekend says so until a day is chosen — never silently "Saturday".
   if (!t.day && t.weekend) return `Weekend · ${weekendRangeLabel(t.weekend)} · either day`
-  const time = t.day && t.timed ? t.day.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null
+  const time = t.day && t.timed ? clockLabel(t.day, t.duration) : null
   const still = offWeek(t) ? ` · still on ${formatWeekRangeShort(t.week!)}` : ''
   // On the day's own page the date is the page's title: the row says only
   // the part of the answer the page doesn't (walkthrough 2026-10-02, #25:

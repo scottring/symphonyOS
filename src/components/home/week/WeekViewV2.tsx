@@ -15,6 +15,7 @@ import {
 } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
+import { timeOnDay } from '@/lib/planning/clockText'
 import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
 import { timingRemoval } from '@/lib/planning/planActions'
 import { placementOf } from '@/lib/planning/placement'
@@ -698,11 +699,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         onPickWeek={(weekStart) => { void onUpdateTask(task.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
         onClearWeek={hasTiming(t) ? () => removeTiming('all') : undefined}
         onRemoveDay={t.day ? () => removeTiming('day') : undefined}
-        onPickTime={t.day ? (time) => {
-          const at = new Date(t.day!)
-          at.setHours(time?.hours ?? 0, time?.minutes ?? 0, 0, 0)
-          void onUpdateTask(task.id, { bucket: 'timed', scheduledFor: at, isAllDay: !time })
-        } : undefined}
+        onPickTime={t.day ? (time) => { void onUpdateTask(task.id, timeOnDay(t.day!, time)) } : undefined}
         onPickDay={(date) => {
           void (async () => {
             if ((await onUpdateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true })) === false) return
