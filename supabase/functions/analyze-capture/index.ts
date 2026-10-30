@@ -11,6 +11,8 @@ import { parseReminders, reminderRows } from '../_shared/captureReminders.ts'
 import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
+// Written by the web (usePhotoCapture) and iOS (PhotoCaptureService) clients.
+const PLACEHOLDER_TITLES = ['Analyzing photo…', 'Reading screenshot…', 'Reading image…']
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -155,6 +157,10 @@ Deno.serve(async (req) => {
       capture_meta: { status: 'failed', storage_path: storagePath, error: message.slice(0, 300) },
       updated_at: new Date().toISOString(),
     }).eq('id', taskId)
+    // A placeholder title ("Analyzing photo…") reads as still working forever;
+    // say it stopped. A title the person has since typed over is left alone.
+    await db.from('tasks').update({ title: 'Couldn’t read this picture — try it again from Add' })
+      .eq('id', taskId).in('title', PLACEHOLDER_TITLES)
     return json({ error: message }, status)
   }
 

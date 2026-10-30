@@ -38,7 +38,7 @@ describe('⌘K capture tiles', () => {
     m.requestDesktopScreenshot.mockResolvedValue({ status: 'ok', file })
     const { user } = render(<QuickCapture onAdd={vi.fn()} isOpen showFab={false} />)
     await user.click(screen.getByRole('button', { name: 'Screenshot' }))
-    await waitFor(() => expect(m.captureFromFile).toHaveBeenCalledWith(file, null))
+    await waitFor(() => expect(m.captureFromFile).toHaveBeenCalledWith(file, null, 'screenshot'))
   })
 
   it('pressing Esc in the crosshair sends nothing', async () => {
@@ -64,7 +64,7 @@ describe('⌘K capture tiles', () => {
     fireEvent.paste(screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"'), {
       clipboardData: { types: ['Files'], files: [file] },
     })
-    expect(m.captureFromFile).toHaveBeenCalledWith(file, null)
+    expect(m.captureFromFile).toHaveBeenCalledWith(file, null, 'image')
   })
 
   it('a paste that also carries text stays a text paste', () => {
@@ -79,6 +79,6 @@ describe('⌘K capture tiles', () => {
     render(<QuickCapture onAdd={vi.fn()} isOpen showFab={false} />)
     const file = shot()
     fireEvent.drop(screen.getByTestId('quick-capture-sheet'), { dataTransfer: { types: ['Files'], files: [file] } })
-    expect(m.captureFromFile).toHaveBeenCalledWith(file, null)
+    expect(m.captureFromFile).toHaveBeenCalledWith(file, null, 'image')
   })
 })

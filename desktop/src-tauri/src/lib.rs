@@ -1,5 +1,7 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use objc2::msg_send;
+use objc2::runtime::AnyObject;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -240,15 +242,40 @@ struct ScreenshotResult {
 
 static SCREENSHOT_RUNNING: AtomicBool = AtomicBool::new(false);
 
+/// Matches AppKit's default animation, which `animator` uses.
+const FADE_MS: u64 = 250;
+
+/// Animate the main window's opacity with AppKit's own animator (smooth,
+/// on the compositor). Tauri has no opacity API, so this talks to the
+/// NSWindow directly; AppKit wants it on the main thread.
+fn fade_main(app: &AppHandle, alpha: f64) {
+    let Some(win) = app.get_webview_window("main") else { return };
+    let target = win.clone();
+    let _ = win.run_on_main_thread(move || {
+        let Ok(ptr) = target.ns_window() else { return };
+        let Some(window) = (unsafe { (ptr as *const AnyObject).as_ref() }) else { return };
+        unsafe {
+            let animator: *const AnyObject = msg_send![window, animator];
+            if let Some(animator) = animator.as_ref() {
+                let _: () = msg_send![animator, setAlphaValue: alpha];
+            }
+        }
+    });
+}
+
 /// ⌘K's Screenshot tile: get out of the way, let macOS's own crosshair pick a
 /// region of whatever is behind, then come back with the picture. The first
 /// use asks for Screen Recording permission (System Settings → Privacy &
 /// Security), and Symphony has to be reopened once it is granted; until then
 /// the shot shows only the desktop.
 fn take_screenshot(app: &AppHandle) -> ScreenshotResult {
+    // Fade out rather than vanish, then hide so the app behind is the
+    // frontmost one under the crosshair. The window stays transparent while
+    // hidden and fades back in when the shot is done (see the listener).
+    fade_main(app, 0.0);
+    std::thread::sleep(Duration::from_millis(FADE_MS));
     let _ = app.hide();
-    // Let the window finish leaving before the crosshair appears over it.
-    std::thread::sleep(Duration::from_millis(250));
+    std::thread::sleep(Duration::from_millis(60));
     let path = std::env::temp_dir().join(format!("symphony-shot-{}.jpg", std::process::id()));
     let _ = std::fs::remove_file(&path);
     // -i region (Space switches to a window), -x no shutter sound.
@@ -529,6 +556,7 @@ pub fn run() {
                 std::thread::spawn(move || {
                     let result = take_screenshot(&app);
                     show_main(&app);
+                    fade_main(&app, 1.0);
                     let _ = app.emit_to("main", "shell:screenshot-result", result);
                     SCREENSHOT_RUNNING.store(false, Ordering::SeqCst);
                 });

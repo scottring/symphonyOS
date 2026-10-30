@@ -42,7 +42,7 @@ describe('service-authoritative funding',()=>{
   })
   it('refuses requests whose liability cannot be bounded',async()=>{
     const f=fixture()
-    for(const body of [{model:'x'},{model:'x',max_tokens:3,stream:true},{model:'x',max_tokens:3,messages:[{type:'image',source:'x'}]},{model:'x',max_tokens:3,tools:[{type:'web_search_20260209'}]}])
+    for(const body of [{model:'x'},{model:'x',max_tokens:3,stream:true},{model:'x',max_tokens:3,messages:[{type:'image_url',image_url:'x'}]},{model:'x',max_tokens:3,messages:[{role:'user',content:[{type:'image',source:{type:'url',url:'x'}},{type:'document',source:'x'}]}]},{model:'x',max_tokens:3,tools:[{type:'web_search_20260209'}]}])
       await expect(f.fetch('https://provider.test',{body:JSON.stringify(body)})).rejects.toMatchObject({status:503})
     await expect(guardedAiFetch(f.db,'workspace-voice',f.transport,{model:'gpt-realtime',minutes:2},{userId:'u',db:f.db})('https://provider.test',init)).rejects.toMatchObject({status:503})
     expect(f.transport).not.toHaveBeenCalled()
@@ -51,6 +51,17 @@ describe('service-authoritative funding',()=>{
     expect(textBudget(init)?.input).toBeGreaterThan(init.body.length)
     expect(textBudget({body:'{"model":"text-embedding-3-small","input":"hi"}'})?.output).toBe(0)
     expect(textBudget({body:'{"model":"x","max_tokens":-1}'})).toBeNull()
+  })
+  // ⌘K photos and screenshots (Scott, 2026-10-30): refused as unbounded until now.
+  it('funds each Anthropic image at its visual-token ceiling, not its base64 size',()=>{
+    const text=textBudget(init)!.input
+    const withImage=(source:unknown)=>({body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2048,messages:[{role:'user',content:[{type:'image',source},{type:'text',text:'Hello'}]}]})})
+    const url=textBudget(withImage({type:'url',url:'https://x.test/a.jpg'}))
+    const base64=textBudget(withImage({type:'base64',media_type:'image/jpeg',data:'A'.repeat(400_000)}))
+    expect(url?.input).toBeGreaterThanOrEqual(text+4_784)
+    expect(base64?.input).toBeLessThan(text+4_784+200)
+    const two=JSON.parse(withImage({type:'url',url:'u'}).body);two.messages[0].content.unshift({type:'image',source:{type:'url',url:'v'}})
+    expect(textBudget({body:JSON.stringify(two)})!.input).toBeGreaterThanOrEqual(text+2*4_784)
   })
   it('reads both vendor usage formats',()=>{
     expect(usageOf({usage:{prompt_tokens:3,completion_tokens:2}},'gpt-4o-mini')).toEqual({model:'gpt-4o-mini',inputTokens:3,outputTokens:2,minutes:0})

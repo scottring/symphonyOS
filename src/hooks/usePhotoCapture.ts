@@ -4,6 +4,14 @@ import type { TaskContext } from '@/types/task'
 import { scopeForDomain } from '@/lib/scope'
 
 export type PhotoCaptureStatus = 'idle' | 'working' | 'started' | 'error'
+/** What the picture is, so the Inbox placeholder names it truthfully. */
+export type CaptureKind = 'photo' | 'screenshot' | 'image'
+
+const PLACEHOLDER_TITLE: Record<CaptureKind, string> = {
+  photo: 'Analyzing photo…',
+  screenshot: 'Reading screenshot…',
+  image: 'Reading image…',
+}
 
 /** Longest side of the uploaded JPEG — plenty for vision, kind to egress. */
 const MAX_DIMENSION = 1600
@@ -40,7 +48,7 @@ export function usePhotoCapture() {
   const [status, setStatus] = useState<PhotoCaptureStatus>('idle')
   const [error, setError] = useState<string | null>(null)
 
-  const captureFromFile = useCallback(async (file: File, context?: TaskContext | null): Promise<boolean> => {
+  const captureFromFile = useCallback(async (file: File, context?: TaskContext | null, kind: CaptureKind = 'photo'): Promise<boolean> => {
     setStatus('working')
     setError(null)
     try {
@@ -59,7 +67,7 @@ export function usePhotoCapture() {
       const { error: insertErr } = await supabase.from('tasks').insert({
         id: taskId,
         user_id: user.id,
-        title: 'Analyzing photo…',
+        title: PLACEHOLDER_TITLE[kind],
         bucket: 'inbox',
         context: context ?? null,
         // Same rule as addTask: a family photo-capture has to be readable by
@@ -71,9 +79,9 @@ export function usePhotoCapture() {
       })
       if (insertErr) throw new Error(insertErr.message)
 
-      // Fire-and-forget: the function updates the task server-side and realtime
-      // brings it back. Await so a hard failure can surface, but the UI treats
-      // 'started' as done.
+      // The function updates the task server-side and realtime brings it back.
+      // A refusal (no AI allowance, unreadable image) is said here, in the box,
+      // rather than left as a placeholder that looks like it is still working.
       const { error: fnErr } = await supabase.functions.invoke('analyze-capture', {
         body: {
           taskId,
@@ -85,7 +93,10 @@ export function usePhotoCapture() {
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
       })
-      if (fnErr) console.error('analyze-capture invoke failed (task stays pending):', fnErr)
+      if (fnErr) {
+        const detail = await (fnErr as { context?: Response }).context?.json?.().catch(() => null) as { error?: string } | null
+        throw new Error(detail?.error ?? fnErr.message)
+      }
 
       setStatus('started')
       return true

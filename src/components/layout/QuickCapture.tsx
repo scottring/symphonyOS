@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
 import { Sparkles, Camera, NotebookPen, StickyNote, Mic, FileText, Scan } from 'lucide-react'
-import { usePhotoCapture } from '@/hooks/usePhotoCapture'
+import { usePhotoCapture, type CaptureKind } from '@/hooks/usePhotoCapture'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields, allDayFromParse } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
@@ -125,12 +125,12 @@ export function QuickCapture({
   // paste or drop — one path for all of them).
   const [shotPreview, setShotPreview] = useState<string | null>(null)
   useEffect(() => () => { if (shotPreview) URL.revokeObjectURL(shotPreview) }, [shotPreview])
-  const handlePhotoPicked = async (file: Blob | undefined) => {
+  const handlePhotoPicked = async (file: Blob | undefined, kind: CaptureKind = 'photo') => {
     if (!file) return
     setShotHint(false)
     const named = file instanceof File ? file : new File([file], 'camera.jpg', { type: 'image/jpeg' })
     setShotPreview(URL.createObjectURL(named))
-    const ok = await photo.captureFromFile(named, null)
+    const ok = await photo.captureFromFile(named, null, kind)
     if (ok) {
       // Fire-and-forget: the enriched item lands in the inbox via realtime.
       setTimeout(() => { photo.reset(); setShotPreview(null); handleClose() }, 1600)
@@ -147,7 +147,7 @@ export function QuickCapture({
   const handleScreenshot = async () => {
     setShotHint(false)
     const shot = await requestDesktopScreenshot()
-    if (shot.status === 'ok') void handlePhotoPicked(shot.file)
+    if (shot.status === 'ok') void handlePhotoPicked(shot.file, 'screenshot')
     else if (shot.status === 'unsupported') setShotHint(true)
     else if (shot.status === 'error') showToast(`Couldn’t take the screenshot: ${shot.message}`, 'error')
     inputRef.current?.focus()
@@ -457,7 +457,7 @@ export function QuickCapture({
             onPaste={(e) => {
               if (e.clipboardData.types.includes('text/plain')) return
               const image = imageFrom(e.clipboardData)
-              if (image) { e.preventDefault(); void handlePhotoPicked(image) }
+              if (image) { e.preventDefault(); void handlePhotoPicked(image, 'image') }
             }}
             onDragOver={(e) => {
               if (!e.dataTransfer.types.includes('Files')) return
@@ -468,7 +468,7 @@ export function QuickCapture({
             onDrop={(e) => {
               setDragOver(false)
               const image = imageFrom(e.dataTransfer)
-              if (image) { e.preventDefault(); void handlePhotoPicked(image) }
+              if (image) { e.preventDefault(); void handlePhotoPicked(image, 'image') }
             }}
             className={`
               bg-bg-elevated shadow-xl
@@ -580,7 +580,7 @@ export function QuickCapture({
                   )}
                   <p className={`text-sm leading-snug ${photo.status === 'error' ? 'text-red-700' : 'text-primary-700'}`}>
                     {photo.status === 'error'
-                      ? `Couldn’t send that picture: ${photo.error}`
+                      ? `Couldn’t read that picture: ${photo.error}`
                       : photo.status === 'working' ? 'Sending it…' : 'Reading it now'}
                     {photo.status !== 'error' && (
                       <span className="block text-xs text-neutral-500">It lands in your Inbox with a name and notes.</span>
