@@ -2,10 +2,11 @@
   "mountain-town-daytime": {
     "width": 2172,
     "height": 724,
-    "skyline": 0.6346,
-    "bytes": 280358,
+    "skyline": 0.3171,
+    "bytes": 101872,
     "src": "mountain-town-daytime.webp",
-    "veil": "mountain-town-daytime-veil.webp"
+    "veil": "mountain-town-daytime-veil.webp",
+    "source": "scripts/scenery/woodblock_mountain_overlook.py \u2014 one picture for every light"
   },
   "urban-daytime": {
     "width": 2171,
@@ -38,22 +39,6 @@
     "bytes": 252668,
     "src": "farm-daytime.webp",
     "veil": "farm-daytime-veil.webp"
-  },
-  "mountain-town-dusk-dawn": {
-    "width": 2172,
-    "height": 724,
-    "skyline": 0.6309,
-    "bytes": 241214,
-    "src": "mountain-town-dusk-dawn.webp",
-    "veil": "mountain-town-dusk-dawn-veil.webp"
-  },
-  "mountain-town-nighttime": {
-    "width": 2172,
-    "height": 724,
-    "skyline": 0.6318,
-    "bytes": 227100,
-    "src": "mountain-town-nighttime.webp",
-    "veil": "mountain-town-nighttime-veil.webp"
   },
   "urban-dusk-dawn": {
     "width": 2172,

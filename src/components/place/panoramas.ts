@@ -44,10 +44,6 @@ import woodblock_small_city_nighttime from '@/assets/scenery/woodblock/small-cit
 import woodblock_small_city_nighttime_veil from '@/assets/scenery/woodblock/small-city-nighttime-veil.webp'
 import woodblock_mountain_town_daytime from '@/assets/scenery/woodblock/mountain-town-daytime.webp'
 import woodblock_mountain_town_daytime_veil from '@/assets/scenery/woodblock/mountain-town-daytime-veil.webp'
-import woodblock_mountain_town_dusk_dawn from '@/assets/scenery/woodblock/mountain-town-dusk-dawn.webp'
-import woodblock_mountain_town_dusk_dawn_veil from '@/assets/scenery/woodblock/mountain-town-dusk-dawn-veil.webp'
-import woodblock_mountain_town_nighttime from '@/assets/scenery/woodblock/mountain-town-nighttime.webp'
-import woodblock_mountain_town_nighttime_veil from '@/assets/scenery/woodblock/mountain-town-nighttime-veil.webp'
 import woodblock_cabin_daytime from '@/assets/scenery/woodblock/cabin-daytime.webp'
 import woodblock_cabin_daytime_veil from '@/assets/scenery/woodblock/cabin-daytime-veil.webp'
 import woodblock_cabin_dusk_dawn from '@/assets/scenery/woodblock/cabin-dusk-dawn.webp'
@@ -107,6 +103,8 @@ export const PANORAMAS: Record<PlaceId, Record<SceneryLighting, Panorama>> = {
 // the land, with matching veils (skyline: scripts/scenery/woodblock-manifest.json).
 // They stand under the same place-tinted CSS sky as the painted art; keep
 // their transparent padding (the veil and skyline are measured against it).
+const MOUNTAIN_OVERLOOK: Panorama = { src: woodblock_mountain_town_daytime, veil: woodblock_mountain_town_daytime_veil, skyline: 0.3171 }
+
 export const WOODBLOCK: Record<PlaceId, Record<SceneryLighting, Panorama>> = {
   'urban': {
     'daytime': { src: woodblock_urban_daytime, veil: woodblock_urban_daytime_veil, skyline: 0.6705 },
@@ -118,10 +116,14 @@ export const WOODBLOCK: Record<PlaceId, Record<SceneryLighting, Panorama>> = {
     'dusk-dawn': { src: woodblock_small_city_dusk_dawn, veil: woodblock_small_city_dusk_dawn_veil, skyline: 0.6641 },
     'nighttime': { src: woodblock_small_city_nighttime, veil: woodblock_small_city_nighttime_veil, skyline: 0.6643 },
   },
+  // Scott's mountain-overlook print (2026-10-30), one picture for every
+  // light — it has no dusk or night version. Cut by
+  // scripts/scenery/woodblock_mountain_overlook.py; it stands taller than
+  // the other woodblock places, so its skyline sits higher.
   'mountain-town': {
-    'daytime': { src: woodblock_mountain_town_daytime, veil: woodblock_mountain_town_daytime_veil, skyline: 0.6346 },
-    'dusk-dawn': { src: woodblock_mountain_town_dusk_dawn, veil: woodblock_mountain_town_dusk_dawn_veil, skyline: 0.6309 },
-    'nighttime': { src: woodblock_mountain_town_nighttime, veil: woodblock_mountain_town_nighttime_veil, skyline: 0.6318 },
+    'daytime': MOUNTAIN_OVERLOOK,
+    'dusk-dawn': MOUNTAIN_OVERLOOK,
+    'nighttime': MOUNTAIN_OVERLOOK,
   },
   'cabin': {
     'daytime': { src: woodblock_cabin_daytime, veil: woodblock_cabin_daytime_veil, skyline: 0.668 },

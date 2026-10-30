@@ -12,10 +12,18 @@ describe('scenery style resolution', () => {
         expect(art).toBe(WOODBLOCK[id][light])
         expect(art.src).not.toBe(PANORAMAS[id][light].src)
         expect(art.veil).not.toBe(art.src)
-        expect(art.skyline).toBeGreaterThan(0.6)
+        // The mountain overlook (2026-10-30) stands taller than the cut
+        // prints, so its skyline sits higher in the band.
+        expect(art.skyline).toBeGreaterThan(id === 'mountain-town' ? 0.3 : 0.6)
         expect(art.skyline).toBeLessThan(0.7)
       }
     }
+  })
+
+  it('shows the mountain overlook in every light', () => {
+    const day = sceneryArt('woodblock', 'mountain-town', 'daytime')
+    expect(sceneryArt('woodblock', 'mountain-town', 'dusk-dawn')).toBe(day)
+    expect(sceneryArt('woodblock', 'mountain-town', 'nighttime')).toBe(day)
   })
 
   it('leaves the painted style exactly as it was', () => {
