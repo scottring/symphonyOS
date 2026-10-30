@@ -21,19 +21,57 @@
 // is the half that doesn't depend on the model complying.
 // ════════════════════════════════════════════════════════════════
 
-/** Per-message ceiling on server-tool calls. Search bills per use, so
- *  this is the cost stop as well as a runaway-loop stop. */
-export const WEB_MAX_USES = 5
+/** Per-request ceilings on server-tool calls. Search bills per use and every
+ *  result and fetched page is input tokens, so these are the cost bound the
+ *  spend guard funds (aiBudget.ts) as well as a runaway-loop stop. Three
+ *  searches cover "local stores, then Amazon" (Scott, 2026-10-30). */
+export const WEB_SEARCH_MAX_USES = 3
+export const WEB_FETCH_MAX_USES = 2
+export const WEB_FETCH_MAX_CONTENT_TOKENS = 10_000
 
-export const WEB_TOOLS = [
-  { type: 'web_search_20260209', name: 'web_search', max_uses: WEB_MAX_USES },
-  {
-    type: 'web_fetch_20260209',
-    name: 'web_fetch',
-    max_uses: WEB_MAX_USES,
-    citations: { enabled: true },
-  },
-] as const
+/** Where "near me" means: city, state and country only, never the street. */
+export interface WebLocation {
+  city: string
+  region?: string
+  country?: string
+  timezone?: string
+}
+
+export function webTools(location: WebLocation | null) {
+  return [
+    {
+      type: 'web_search_20260209',
+      name: 'web_search',
+      max_uses: WEB_SEARCH_MAX_USES,
+      ...(location ? { user_location: { type: 'approximate', ...location } } : {}),
+    },
+    {
+      type: 'web_fetch_20260209',
+      name: 'web_fetch',
+      max_uses: WEB_FETCH_MAX_USES,
+      max_content_tokens: WEB_FETCH_MAX_CONTENT_TOKENS,
+      citations: { enabled: true },
+    },
+  ] as const
+}
+
+export const WEB_TOOLS = webTools(null)
+
+const COUNTRY_CODES: Record<string, string> = { usa: 'US', 'united states': 'US', us: 'US', canada: 'CA', uk: 'GB', 'united kingdom': 'GB' }
+
+/** The person's saved home address ("…, Baltimore, MD 21211, USA") reduced
+ *  to the city-level location search accepts. Null when it can't be read. */
+export function webLocationFromHome(address: string | null | undefined, timezone: string | null | undefined): WebLocation | null {
+  const parts = (address ?? '').split(',').map((p) => p.trim()).filter(Boolean)
+  if (parts.length < 3) return null
+  const [city, regionZip, countryRaw] = parts.slice(-3)
+  const region = regionZip.replace(/\s*\d[\d-]*$/, '').trim()
+  const country = COUNTRY_CODES[countryRaw.toLowerCase()] ?? (/^[A-Z]{2}$/.test(countryRaw) ? countryRaw : undefined)
+  if (!city || /\d/.test(city)) return null
+  let zone: string | undefined
+  try { if (timezone) { new Intl.DateTimeFormat('en-US', { timeZone: timezone }); zone = timezone } } catch { /* unknown zone */ }
+  return { city, ...(region ? { region } : {}), ...(country ? { country } : {}), ...(zone ? { timezone: zone } : {}) }
+}
 
 /** Names of the server tools, for recognising their blocks in a response. */
 export const WEB_TOOL_NAMES: ReadonlySet<string> = new Set(WEB_TOOLS.map((t) => t.name))

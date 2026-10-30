@@ -33,6 +33,10 @@ const MAX_CONTEXT = 300
 // must never produce. Headroom, still confined to a single host by
 // allowed_domains.
 const MAX_USES = 8
+// Each read's page text, capped so the spend guard can fund the request
+// (aiBudget.ts refuses a page read with no size bound, 2026-10-30). A recipe or
+// listing page fits well inside it.
+const MAX_PAGE_TOKENS = 12_000
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,7 +102,7 @@ async function callWithFetch(url: string, prompt: string, apiKey: string, transp
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 1500,
-        tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: MAX_USES, allowed_domains: [hostOf(url)] }],
+        tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: MAX_USES, max_content_tokens: MAX_PAGE_TOKENS, allowed_domains: [hostOf(url)] }],
         messages,
         // The _20260209 tools filter by running code server-side; a follow-up
         // request in the same turn must name the container or Anthropic 400s.

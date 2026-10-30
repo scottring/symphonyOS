@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { guardedAiFetch, guardedAiFetchFor, modelOf, usageOf } from './aiUsage'
-import { textBudget } from './aiBudget'
+import { searchFeeTokens, textBudget } from './aiBudget'
 const init = { method:'POST', body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2048,messages:[{role:'user',content:'Hello'}]}) }
 const reply = (usage:unknown={input_tokens:10,output_tokens:20},status=200)=>new Response(JSON.stringify({usage}),{status,headers:{'content-type':'application/json'}})
 function fixture(decision:unknown={allowed:true,reservation_id:'r'}) {
@@ -42,7 +42,7 @@ describe('service-authoritative funding',()=>{
   })
   it('refuses requests whose liability cannot be bounded',async()=>{
     const f=fixture()
-    for(const body of [{model:'x'},{model:'x',max_tokens:3,stream:true},{model:'x',max_tokens:3,messages:[{type:'image_url',image_url:'x'}]},{model:'x',max_tokens:3,messages:[{role:'user',content:[{type:'image',source:{type:'url',url:'x'}},{type:'document',source:'x'}]}]},{model:'x',max_tokens:3,tools:[{type:'web_search_20260209'}]}])
+    for(const body of [{model:'x'},{model:'x',max_tokens:3,stream:true},{model:'x',max_tokens:3,messages:[{type:'image_url',image_url:'x'}]},{model:'x',max_tokens:3,messages:[{role:'user',content:[{type:'image',source:{type:'url',url:'x'}},{type:'document',source:'x'}]}]},{model:'x',max_tokens:3,tools:[{type:'web_search_20260209'}]},{model:'x',max_tokens:3,tools:[{type:'web_fetch_20260209',max_uses:2}]},{model:'x',max_tokens:3,tools:[{type:'web_search_20260209',max_uses:50}]},{model:'x',max_tokens:3,tools:[{type:'code_execution_20260521',name:'code_execution'}]}])
       await expect(f.fetch('https://provider.test',{body:JSON.stringify(body)})).rejects.toMatchObject({status:503})
     await expect(guardedAiFetch(f.db,'workspace-voice',f.transport,{model:'gpt-realtime',minutes:2},{userId:'u',db:f.db})('https://provider.test',init)).rejects.toMatchObject({status:503})
     expect(f.transport).not.toHaveBeenCalled()
@@ -62,6 +62,23 @@ describe('service-authoritative funding',()=>{
     expect(base64?.input).toBeLessThan(text+4_784+200)
     const two=JSON.parse(withImage({type:'url',url:'u'}).body);two.messages[0].content.unshift({type:'image',source:{type:'url',url:'v'}})
     expect(textBudget({body:JSON.stringify(two)})!.input).toBeGreaterThanOrEqual(text+2*4_784)
+  })
+  // The assistant's web search (Scott, 2026-10-30): "check local availability, and possibly amazon".
+  it('funds declared web tools at their caps, and keeps earlier web results as plain text',()=>{
+    const base={model:'claude-sonnet-4-6',max_tokens:2048,messages:[{role:'user',content:'Lloyd pan near me?'}]}
+    const plain=textBudget({body:JSON.stringify(base)})!.input
+    const web=textBudget({body:JSON.stringify({...base,tools:[{name:'symphony_list_tasks',input_schema:{type:'object'}},{type:'web_search_20260209',name:'web_search',max_uses:3},{type:'web_fetch_20260209',name:'web_fetch',max_uses:2,max_content_tokens:10_000}]})})!.input
+    expect(web-plain).toBeGreaterThanOrEqual(3*(10_000+3_334)+2*11_000)
+    expect(web-plain).toBeLessThan(3*(10_000+3_334)+2*11_000+1_000)
+    const history={...base,messages:[...base.messages,{role:'assistant',content:[{type:'server_tool_use',name:'web_fetch',input:{url:'https://x.test/a.pdf'}},{type:'web_fetch_tool_result',content:{type:'web_fetch_result',content:{type:'document',source:{type:'base64',media_type:'application/pdf',data:'A'.repeat(5_000)}}}}]}]}
+    expect(textBudget({body:JSON.stringify(history)})!.input).toBeGreaterThan(plain+5_000)
+    const filtered={...base,messages:[...base.messages,{role:'assistant',content:[{type:'server_tool_use',name:'bash_code_execution',input:{command:'filter'}},{type:'bash_code_execution_tool_result',content:{type:'bash_code_execution_result',stdout:'ok'}}]}]}
+    expect(textBudget({body:JSON.stringify(filtered)})).not.toBeNull()
+  })
+  it('charges each search its 1¢ fee as input tokens at the model’s price',()=>{
+    expect(searchFeeTokens('claude-sonnet-4-6')).toBe(3_334)
+    expect(searchFeeTokens('some-new-model')).toBe(10_000)
+    expect(usageOf({model:'claude-sonnet-4-6',usage:{input_tokens:100,output_tokens:5,server_tool_use:{web_search_requests:2}}},null)).toMatchObject({inputTokens:100+2*3_334,outputTokens:5})
   })
   it('reads both vendor usage formats',()=>{
     expect(usageOf({usage:{prompt_tokens:3,completion_tokens:2}},'gpt-4o-mini')).toEqual({model:'gpt-4o-mini',inputTokens:3,outputTokens:2,minutes:0})

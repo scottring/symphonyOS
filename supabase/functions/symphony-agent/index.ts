@@ -19,7 +19,8 @@ import { buildDraftPayload, clampMaxResults } from '../_shared/gmail-tools.ts'
 import { assembleContext } from '../_shared/context-graph/assemble.ts'
 import { renderBundleForPrompt } from '../_shared/context-graph/build.ts'
 import {
-  WEB_TOOLS,
+  webTools,
+  webLocationFromHome,
   WEB_PROMPT_SECTION,
   isWebBlock,
   toolsForTurn,
@@ -1334,6 +1335,7 @@ async function callAnthropic(
   canShow = false,
   surface: Surface | null = null,
   repairingProposal = false,
+  web: readonly unknown[] = [],
 ): Promise<{ content: AnthropicBlock[]; stop_reason: string; containerId: string | null }> {
   // Symphony's own tools first (minus the destructive ones once the web has
   // been read), then Anthropic's server-side web tools. The cache breakpoint
@@ -1342,7 +1344,7 @@ async function callAnthropic(
   // Pointing at the page needs a client that sends what is on it.
   // On the wall, only the family-layer tools (wallMode.ts); desktop unchanged.
   const symphonyTools = toolsForTurn(toolsForSurface(TOOLS, surface), webTouched).filter((t) => (canShow || t.name !== SHOW_TOOL.name) && (!repairingProposal || proposalRepairToolAllowed(t.name)))
-  const tools: unknown[] = [...symphonyTools, ...(Deno.env.get('SYMPHONY_ENABLE_HOSTED_WEB') === '1' && !repairingProposal && surface !== 'onboarding' && surface !== 'onboarding_activity' ? WEB_TOOLS : [])]
+  const tools: unknown[] = [...symphonyTools, ...(repairingProposal ? [] : web)]
   const res = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -1353,7 +1355,7 @@ async function callAnthropic(
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 2048,
-      system: [{ type: 'text', text: systemForSurface(SYSTEM_PROMPT, surface) + (Deno.env.get('SYMPHONY_ENABLE_HOSTED_WEB') === '1' ? '' : '\nThis beta supports text planning using Symphony data. Hosted web search and page/PDF analysis are unavailable. If a request needs current web information, say that plainly; never claim you searched or verified it.'), cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: systemForSurface(SYSTEM_PROMPT, surface) + (web.length ? '' : '\nThis beta supports text planning using Symphony data. Hosted web search and page/PDF analysis are unavailable. If a request needs current web information, say that plainly; never claim you searched or verified it.'), cache_control: { type: 'ephemeral' } }],
       tools: tools.map((t, i) =>
         i === tools.length - 1
           ? { ...(t as Record<string, unknown>), cache_control: { type: 'ephemeral' } }
@@ -1418,6 +1420,14 @@ Deno.serve(async (req) => {
   // Every tool reads and writes through this client. On the wall it is fenced
   // to the household's family layer; elsewhere it IS the user's client.
   const tdb = wall ? fenceDb(db, await loadWallFence(db, user.id, display)) : db
+  // Web search and page reading: the desktop and phone assistant only — not
+  // the kitchen wall (kids, a shared display) or onboarding. "Near me" is the
+  // saved home address reduced to its city; the street never leaves here.
+  let web: readonly unknown[] = []
+  if (Deno.env.get('SYMPHONY_ENABLE_HOSTED_WEB') === '1' && surface === null) {
+    const { data: home } = await db.from('user_profiles').select('home_location, home_timezone').eq('user_id', user.id).maybeSingle()
+    web = webTools(webLocationFromHome(home?.home_location as string | null, home?.home_timezone as string | null))
+  }
   // The wall never accepts personal page/item/session context, even though
   // item assembly now also uses the caller's RLS-scoped client.
   const workspaceContext = wall ? undefined : body.workspaceContext
@@ -1575,7 +1585,7 @@ Deno.serve(async (req) => {
         let turn = 0
         for (; turn < MAX_TURNS; turn++) {
           const callStarted = Date.now()
-          const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface, trace.proposalRepairs > 0)
+          const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface, trace.proposalRepairs > 0, web)
           trace.providerCalls++
           trace.providerMs += Date.now() - callStarted
           const { content, stop_reason } = res

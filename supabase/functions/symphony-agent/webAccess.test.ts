@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   WEB_TOOLS,
-  WEB_MAX_USES,
+  WEB_SEARCH_MAX_USES,
+  WEB_FETCH_MAX_USES,
+  webTools,
+  webLocationFromHome,
   WEB_PROMPT_SECTION,
   DESTRUCTIVE_TOOL_NAMES,
   isWebBlock,
@@ -26,8 +29,15 @@ describe('WEB_TOOLS', () => {
     ])
   })
 
-  it('caps server-tool calls per message — search bills per use', () => {
-    for (const tool of WEB_TOOLS) expect(tool.max_uses).toBe(WEB_MAX_USES)
+  it('caps server-tool calls and fetched page size per request — the spend guard funds these bounds', () => {
+    expect(WEB_TOOLS[0].max_uses).toBe(WEB_SEARCH_MAX_USES)
+    expect(WEB_TOOLS[1]).toMatchObject({ max_uses: WEB_FETCH_MAX_USES, max_content_tokens: 10_000 })
+  })
+
+  it('searches near home when a location is known, and sends no location otherwise', () => {
+    const near = webTools({ city: 'Baltimore', region: 'MD', country: 'US', timezone: 'America/New_York' })
+    expect(near[0]).toMatchObject({ user_location: { type: 'approximate', city: 'Baltimore', region: 'MD', country: 'US', timezone: 'America/New_York' } })
+    expect('user_location' in WEB_TOOLS[0]).toBe(false)
   })
 
   it('turns on citations for fetched pages so replies can name the source', () => {
@@ -114,5 +124,18 @@ describe('WEB_PROMPT_SECTION', () => {
     expect(WEB_PROMPT_SECTION).toMatch(/delete tools are withheld/)
     expect(WEB_PROMPT_SECTION).toMatch(/asking again in a new message/)
     expect(WEB_PROMPT_SECTION).toMatch(/Do NOT quietly substitute/)
+  })
+})
+
+describe('webLocationFromHome', () => {
+  it('keeps the city, state and country of a saved address and drops the street and zip', () => {
+    expect(webLocationFromHome('3400 Roland Ave, Baltimore, MD 21211, USA', 'America/New_York'))
+      .toEqual({ city: 'Baltimore', region: 'MD', country: 'US', timezone: 'America/New_York' })
+  })
+  it('gives nothing it cannot read safely', () => {
+    expect(webLocationFromHome('Baltimore', null)).toBeNull()
+    expect(webLocationFromHome(null, null)).toBeNull()
+    expect(webLocationFromHome('12 Main St, 21211, USA', null)).toBeNull()
+    expect(webLocationFromHome('1 Rue X, Paris, Île-de-France, France', 'Not/AZone')).toEqual({ city: 'Paris', region: 'Île-de-France' })
   })
 })

@@ -1,4 +1,4 @@
-import { serviceBudgetControl, textBudget, type BudgetControl } from './aiBudget.ts'
+import { searchFeeTokens, serviceBudgetControl, textBudget, type BudgetControl } from './aiBudget.ts'
 /** Provider-call admission with a conservative monetary hold. No local fallback: a
  * missing migration/configuration or failed reservation means no paid call. */
 /** Every interactive paid route (the caller is a signed-in person). Must match
@@ -41,7 +41,10 @@ export function usageOf(body: unknown, fallbackModel: string | null): AiUsageRec
   if (!model) return null
   // Charge cached reads at the full input rate and cache creation at 2x.
   // This intentionally overestimates cache discounts; it never omits them.
+  // Each web search's 1¢ fee rides along as the input tokens that cost 1¢.
+  const tools = u.server_tool_use && typeof u.server_tool_use === 'object' ? u.server_tool_use as Record<string, unknown> : {}
   const input = n(u.input_tokens ?? u.prompt_tokens) + 2*n(u.cache_creation_input_tokens) + n(u.cache_read_input_tokens)
+    + n(tools.web_search_requests) * searchFeeTokens(model)
   const output = n(u.output_tokens ?? u.completion_tokens)
   if (!input && !output) return null
   return { model, inputTokens: input, outputTokens: output, minutes: 0 }

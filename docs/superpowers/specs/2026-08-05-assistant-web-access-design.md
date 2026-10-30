@@ -1,7 +1,7 @@
 # Assistant web access — design
 
 **Date:** 2026-08-05
-**Status:** approved, built
+**Status:** approved, built; switched on 2026-10-30 (see "Funding and scope, 2026-10-30")
 **Surface:** `supabase/functions/symphony-agent/` (the single backend behind
 `useSymphonyAssistant` → `Shell`, `ShellLayout`, `AssistDrawer`, ⌘K)
 
@@ -129,3 +129,22 @@ create/update/list retained, caller's array not mutated.
 Web search is roughly $10 per 1,000 searches plus tokens, capped at 5 per
 message. At single-user volume this stays in the same cents-per-day territory as
 the rest of the agent (see `symphony_agent_model_billing`).
+
+## Funding and scope, 2026-10-30
+
+Beta prep (October) left this off: the spend guard (`_shared/aiBudget.ts`)
+refused any request declaring `web_search`, because the hosted tool's charge
+had no bound. Scott asked for it back ("could you check local availability,
+and possibly amazon?"). Now:
+
+- **Caps per provider request:** 3 searches, 2 page reads of at most 10,000
+  tokens each (`webAccess.ts`). The guard holds each search at its 1¢ fee
+  (as the input tokens that cost 1¢ on the model) plus 10,000 tokens of
+  results, and each read at its cap plus 1,000; settlement charges what the
+  provider reports, with `server_tool_use.web_search_requests` adding the fee.
+- **Where:** the desktop and phone assistant only. Not the kitchen wall (a
+  shared display kids talk to) or onboarding.
+- **Near me:** the saved home address reduced to city, state and country, as
+  search's approximate `user_location`. The street never leaves the function.
+- **Kill switch:** the `SYMPHONY_ENABLE_HOSTED_WEB` secret; unset, the
+  assistant says plainly that it cannot search.
