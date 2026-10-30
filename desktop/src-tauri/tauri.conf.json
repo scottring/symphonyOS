@@ -30,6 +30,10 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
+    "macOS": {
+      "signingIdentity": "Apple Development: Scott Kaufman (RU5HV4QYQQ)",
+      "hardenedRuntime": false
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -29,8 +29,7 @@ launch — never bundle the frontend here.
   — and the picture comes back into the box, which files it like a photo. The
   first shot asks for **Screen Recording** permission (System Settings →
   Privacy & Security); reopen Symphony after granting it, or shots show only
-  the desktop. Because this build is unsigned, macOS may drop that permission
-  after each rebuild — re-grant it there. In a browser or a shell built before
+  the desktop. In a browser or a shell built before
   this, the tile tells you to paste a ⌃⇧⌘4 shot instead.
 
 ## Why `dragDropEnabled: false`
@@ -107,4 +106,9 @@ eager teardown back in.)
   it changes where auth completes — a product call, not a bug fix.
 - Tray icon is the colored app icon, not a monochrome template icon.
 - No native notifications, no dock badge (deferred).
-- Unsigned build — personal use on this machine.
+- Signed with Scott's Apple Development certificate (`bundle.macOS.signingIdentity`,
+  hardened runtime off, not notarized) — personal use on this machine. The
+  stable signature is what lets macOS keep Screen Recording / camera / mic
+  permission across rebuilds; an ad-hoc build gets a new identity every time
+  and macOS asks again (2026-10-30). Someone else building needs their own
+  identity there, or to remove the key for an ad-hoc build.
