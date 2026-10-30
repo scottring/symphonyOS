@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
 import { Sparkles, Camera, NotebookPen, StickyNote, Mic, FileText, Scan } from 'lucide-react'
-import { usePhotoCapture, type CaptureKind } from '@/hooks/usePhotoCapture'
+import { usePhotoCapture, type CaptureKind, type CaptureEvent, type PhotoCaptureResult } from '@/hooks/usePhotoCapture'
+import { formatEventWhen, matchMembers } from '@/lib/capture/captureEvents'
+import type { DomainId } from '@/lib/domains'
+import { DOMAINS } from '@/lib/domains'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields, allDayFromParse } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
@@ -77,6 +80,14 @@ interface QuickCaptureProps {
   /** Post the text to the kitchen wall's scratchpad instead — a note or a
    *  thing to talk about. Resolves true once it is saved. */
   onAddToScratchpad?: (text: string, kind: 'note' | 'talk') => Promise<boolean>
+  /** Put the events read off a picture on the calendar and retire its Inbox
+   *  row. Each event carries the household members it names. Resolves true
+   *  once they are saved; on false the picture stays in the Inbox. */
+  onAddCaptureEvents?: (
+    capture: PhotoCaptureResult,
+    events: Array<CaptureEvent & { assignedMemberIds: string[] }>,
+    context: DomainId | null,
+  ) => Promise<boolean>
 }
 
 export function QuickCapture({
@@ -99,6 +110,7 @@ export function QuickCapture({
   onSchoolPaper,
   confirmsAfterWrite = false,
   onAddToScratchpad,
+  onAddCaptureEvents,
 }: QuickCaptureProps) {
   // Support both controlled and uncontrolled modes
   const [internalIsOpen, setInternalIsOpen] = useState(false)
@@ -125,22 +137,47 @@ export function QuickCapture({
   // paste or drop — one path for all of them).
   const [shotPreview, setShotPreview] = useState<string | null>(null)
   useEffect(() => () => { if (shotPreview) URL.revokeObjectURL(shotPreview) }, [shotPreview])
+  // Events read off the picture, offered before anything is put on a calendar.
+  const [found, setFound] = useState<{ result: PhotoCaptureResult; kind: CaptureKind; skipped: Set<number>; area: DomainId | null } | null>(null)
+  const [addingEvents, setAddingEvents] = useState(false)
+  const [shotHint, setShotHint] = useState(false)
   const handlePhotoPicked = async (file: Blob | undefined, kind: CaptureKind = 'photo') => {
     if (!file) return
     setShotHint(false)
     const named = file instanceof File ? file : new File([file], 'camera.jpg', { type: 'image/jpeg' })
     setShotPreview(URL.createObjectURL(named))
-    const ok = await photo.captureFromFile(named, null, kind)
-    if (ok) {
-      // Fire-and-forget: the enriched item lands in the inbox via realtime.
+    const result = await photo.captureFromFile(named, null, kind)
+    if (result?.events.length && onAddCaptureEvents) {
+      // Scheduled things wait here as a card to approve (Scott, 2026-10-30).
+      // A named household member files them under Family until changed.
+      const namesSomeone = result.events.some((e) => matchMembers(e.who, familyMembers).length > 0)
+      setFound({ result, kind, skipped: new Set(), area: namesSomeone ? 'family' : null })
+    } else if (result) {
+      // Nothing scheduled: the enriched item lands in the inbox via realtime.
       setTimeout(() => { photo.reset(); setShotPreview(null); handleClose() }, 1600)
     }
+  }
+
+  const chosenEvents = found ? found.result.events.filter((_, i) => !found.skipped.has(i)) : []
+  const handleAddEvents = async () => {
+    if (!found || !onAddCaptureEvents || !chosenEvents.length) return
+    setAddingEvents(true)
+    const ok = await onAddCaptureEvents(
+      found.result,
+      chosenEvents.map((e) => ({ ...e, assignedMemberIds: matchMembers(e.who, familyMembers) })),
+      found.area,
+    )
+    setAddingEvents(false)
+    if (ok) { photo.reset(); setShotPreview(null); handleClose() }
+  }
+  const handleKeepInInbox = () => {
+    showToast('In your Inbox', 'success')
+    photo.reset(); setShotPreview(null); handleClose()
   }
 
   // Screenshot: the Mac app hides, macOS's crosshair picks a region, and the
   // picture comes back here. A browser (or an older Mac app) can't do that, so
   // the tile says how to paste one instead.
-  const [shotHint, setShotHint] = useState(false)
   const showScreenshot = isDesktopShell()
     || (typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches)
   const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
@@ -198,6 +235,7 @@ export function QuickCapture({
       setTitle('')
       resetOverrides()
       setShotHint(false)
+      setFound(null)
       setIsClosing(false)
       if (onClose) {
         onClose()
@@ -520,7 +558,89 @@ export function QuickCapture({
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {found && (
+              <div className="space-y-4">
+                <div role="group" aria-label="Events from this picture" className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 space-y-2">
+                  <div className="flex items-center gap-3">
+                    {shotPreview && (
+                      <img src={shotPreview} alt="" className="w-[72px] h-12 shrink-0 rounded-md border border-neutral-200 object-cover" />
+                    )}
+                    <p className="text-sm font-medium text-neutral-800">
+                      From this {found.kind === 'image' ? 'picture' : found.kind} — {found.result.events.length} {found.result.events.length === 1 ? 'event' : 'events'}
+                    </p>
+                  </div>
+                  <ul className="divide-y divide-neutral-200">
+                    {found.result.events.map((e, i) => {
+                      const who = matchMembers(e.who, familyMembers)
+                        .map((id) => familyMembers.find((m) => m.id === id)?.name)
+                        .filter(Boolean)
+                        .join(', ')
+                      return (
+                        <li key={i}>
+                          <label className="flex items-start gap-3 py-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!found.skipped.has(i)}
+                              onChange={() => setFound((f) => {
+                                if (!f) return f
+                                const skipped = new Set(f.skipped)
+                                if (skipped.has(i)) skipped.delete(i); else skipped.add(i)
+                                return { ...f, skipped }
+                              })}
+                              className="mt-0.5 h-4 w-4 rounded border-neutral-300 accent-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="min-w-0">
+                              <span className="block text-sm text-neutral-800">{e.title}</span>
+                              <span className="block text-xs text-neutral-500">
+                                {formatEventWhen(e)}{who ? ` · ${who}` : ''}
+                              </span>
+                            </span>
+                          </label>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <div role="group" aria-label="Calendar" className="flex items-center gap-1.5 flex-wrap pt-1">
+                    <span className="text-xs text-neutral-400 mr-1">Calendar</span>
+                    {DOMAINS.map(({ id, label, icon: Icon, color }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={found.area === id}
+                        onClick={() => setFound((f) => (f ? { ...f, area: f.area === id ? null : id } : f))}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+                          found.area === id ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" style={{ color }} />{label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-neutral-500">
+                    The printed details, links and the {found.kind === 'image' ? 'picture' : found.kind} go on each event.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleKeepInInbox}
+                    className="flex-1 touch-target py-3 rounded-xl border border-neutral-200 text-neutral-600 font-medium hover:bg-neutral-50 transition-colors"
+                  >
+                    Just put it in my Inbox
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleAddEvents()}
+                    disabled={!chosenEvents.length || addingEvents}
+                    className="flex-1 touch-target py-3 rounded-xl bg-primary-500 text-white font-medium hover:bg-primary-600 active:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {addingEvents ? 'Adding…' : `Add ${chosenEvents.length} ${chosenEvents.length === 1 ? 'event' : 'events'}`}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4" hidden={!!found}>
               <div className="relative">
                 <input
                   ref={inputRef}

@@ -638,6 +638,7 @@ function ShellLayoutInner({ children }: Props) {
           onAskSymphony={(text) => { stayInSymphony(); openAssistant({ message: text, autoSend: true }) }}
           onTalk={voiceEnabled ? startTalking : undefined}
           onAddToScratchpad={user ? async (text, kind) => addScratchpadNote(user.id, text, kind, await ownMemberId(user.id)) : undefined}
+          onAddCaptureEvents={chrome.onAddCaptureEvents}
         />
       )}
 

@@ -8,6 +8,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { parseCaptureFacets, reachFromFacets, type CaptureLink } from '../_shared/captureReach.ts'
 import { parseReminders, reminderRows } from '../_shared/captureReminders.ts'
+import { parseCaptureEvents } from '../_shared/captureEvents.ts'
 import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
@@ -30,6 +31,8 @@ interface AnalysisResult {
   facets: unknown
   /** Raw timed instructions; validated by parseReminders. */
   reminders: unknown
+  /** Raw scheduled events; validated by parseCaptureEvents. */
+  events: unknown
 }
 
 function buildPrompt(openTasks: { id: string; title: string }[], today: string | null): string {
@@ -53,8 +56,13 @@ Analyze the photo and respond with ONLY a JSON object (no markdown fences, no pr
   ],
   "reminders": [ things the photo tells the user to DO at a specific time other than the main appointment, each:
     {"title":"verb first, e.g. 'Call to confirm jury service'","when":"YYYY-MM-DDTHH:MM local time, or YYYY-MM-DD when no time is given","phone":"number to call, if any","url":"site to visit, if any"}
+  ],
+  "events": [ things that HAPPEN at a set time the user would put on a calendar — each flight leg, appointment, reservation, class, game, show, stay. Each:
+    {"title":"short calendar title, e.g. 'Flight BWI → BOS (WN 2742)'","start":"YYYY-MM-DDTHH:MM as printed, or YYYY-MM-DD for an all-day event","end":"same format, or null when not printed","start_zone":"IANA time zone of where it starts, e.g. 'America/New_York', or null","end_zone":"IANA zone of where it ends (a flight lands somewhere else), or null","location":"where it starts, e.g. 'BWI — Baltimore', or null","who":["names of the people it is for, exactly as printed"],"details":"one or two short lines of printed details: confirmation number, flight number, seat — never invented","url":"the site to manage it, if printed"}
   ]
 }
+
+Events: one per leg or occurrence; a round trip is two flights. Never an event for a deadline or a to-do (those are reminders), and never invent a time. Use [] when nothing is scheduled.
 
 Reminders: only instructions with timing — "call after 5 PM the night before", "complete the form within 10 days of receipt", "RSVP by Oct 12", "bring forms two days before". Work the date out from the dates printed in the photo${today ? ` (today is ${today})` : ''}; "after 5 PM" means 17:00. Never a reminder for the appointment itself — that is a datetime facet. Use [] when the photo gives no timed instruction.
 
@@ -78,6 +86,7 @@ function parseAnalysis(text: string): AnalysisResult {
     suggested_task_id: typeof parsed.suggested_task_id === 'string' ? parsed.suggested_task_id : null,
     facets: parsed.facets,
     reminders: parsed.reminders,
+    events: parsed.events,
   }
 }
 
@@ -262,7 +271,10 @@ Deno.serve(async (req) => {
       if (attachErr) console.error('attachments insert failed:', attachErr.message)
     }
 
-    return json({ ok: true, title: analysis.title, suggested_task_id: suggestedId, reminders: remindersAdded })
+    // Scheduled things go back to the box as a card to approve; nothing is
+    // put on a calendar until the person says so.
+    const events = parseCaptureEvents(analysis.events, timeZone ?? 'UTC')
+    return json({ ok: true, title: analysis.title, suggested_task_id: suggestedId, reminders: remindersAdded, events, links: reach.links ?? [] })
   } catch (e) {
     if (e instanceof AiUsageError) {
       // Nothing was read: record the failure so the card is not stuck pending,

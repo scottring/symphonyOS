@@ -32,15 +32,25 @@ describe('usePhotoCapture', () => {
     expect(result.current.status).toBe('started')
   })
 
+  it('hands back the events the reading found, for the box to offer', async () => {
+    const event = { title: 'Flight BWI → BOS', start: '2026-12-04T22:10:00.000Z', end: null, allDay: false, location: null, who: ['Iris Leviner'], details: null }
+    m.invoke.mockResolvedValue({ data: { ok: true, events: [event], links: [{ url: 'https://southwest.com', title: 'Manage' }] }, error: null } as never)
+    const { result } = renderHook(() => usePhotoCapture())
+    let out: Awaited<ReturnType<typeof result.current.captureFromFile>> = null
+    await act(async () => { out = await result.current.captureFromFile(file(), null, 'screenshot') })
+    expect(out).toMatchObject({ events: [event], links: [{ url: 'https://southwest.com' }] })
+    expect((out as unknown as { taskId: string }).taskId).toBe(m.insert.mock.calls[0][0].id)
+  })
+
   // 2026-10-30: the spend controls refused every image and the box still said
   // "Reading it now" while the Inbox row sat at "Analyzing photo…".
   it('a refused reading is said in the box, with the server’s reason', async () => {
     const reason = 'AI is unavailable while its usage controls are not ready.'
     m.invoke.mockResolvedValue({ error: { message: 'non-2xx', context: new Response(JSON.stringify({ error: reason })) } })
     const { result } = renderHook(() => usePhotoCapture())
-    let ok = true
+    let ok: unknown = 'unset'
     await act(async () => { ok = await result.current.captureFromFile(file(), null) })
-    expect(ok).toBe(false)
+    expect(ok).toBeNull()
     expect(result.current.status).toBe('error')
     expect(result.current.error).toBe(reason)
   })

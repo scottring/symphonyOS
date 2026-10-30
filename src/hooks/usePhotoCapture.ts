@@ -7,6 +7,26 @@ export type PhotoCaptureStatus = 'idle' | 'working' | 'started' | 'error'
 /** What the picture is, so the Inbox placeholder names it truthfully. */
 export type CaptureKind = 'photo' | 'screenshot' | 'image'
 
+/** A scheduled thing read off the picture (analyze-capture's captureEvents). */
+export interface CaptureEvent {
+  title: string
+  /** UTC instant, or YYYY-MM-DD for an all-day event. */
+  start: string
+  end: string | null
+  allDay: boolean
+  location: string | null
+  who: string[]
+  details: string | null
+}
+
+export interface PhotoCaptureResult {
+  /** The Inbox row the picture became. */
+  taskId: string
+  storagePath: string
+  events: CaptureEvent[]
+  links: { url: string; title?: string }[]
+}
+
 const PLACEHOLDER_TITLE: Record<CaptureKind, string> = {
   photo: 'Analyzing photo…',
   screenshot: 'Reading screenshot…',
@@ -48,7 +68,7 @@ export function usePhotoCapture() {
   const [status, setStatus] = useState<PhotoCaptureStatus>('idle')
   const [error, setError] = useState<string | null>(null)
 
-  const captureFromFile = useCallback(async (file: File, context?: TaskContext | null, kind: CaptureKind = 'photo'): Promise<boolean> => {
+  const captureFromFile = useCallback(async (file: File, context?: TaskContext | null, kind: CaptureKind = 'photo'): Promise<PhotoCaptureResult | null> => {
     setStatus('working')
     setError(null)
     try {
@@ -82,7 +102,7 @@ export function usePhotoCapture() {
       // The function updates the task server-side and realtime brings it back.
       // A refusal (no AI allowance, unreadable image) is said here, in the box,
       // rather than left as a placeholder that looks like it is still working.
-      const { error: fnErr } = await supabase.functions.invoke('analyze-capture', {
+      const { data, error: fnErr } = await supabase.functions.invoke('analyze-capture', {
         body: {
           taskId,
           storagePath,
@@ -99,11 +119,17 @@ export function usePhotoCapture() {
       }
 
       setStatus('started')
-      return true
+      const reply = (data ?? {}) as { events?: CaptureEvent[]; links?: PhotoCaptureResult['links'] }
+      return {
+        taskId,
+        storagePath,
+        events: Array.isArray(reply.events) ? reply.events : [],
+        links: Array.isArray(reply.links) ? reply.links.filter((l) => typeof l?.url === 'string') : [],
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setStatus('error')
-      return false
+      return null
     }
   }, [])
 

@@ -34,6 +34,9 @@ import { audienceLabel, captureConfirmation, contextLabel, hiddenByView } from '
 import type { TaskContext } from '@/types/task';
 import { useDesktopBridge } from '@/desktop/useDesktopBridge';
 import type { PinnableEntityType } from '@/types/pin';
+import { supabase } from '@/lib/supabase';
+import type { CaptureEvent, PhotoCaptureResult } from '@/hooks/usePhotoCapture';
+import { addCaptureEvents, type CaptureEventsDb } from '@/lib/capture/addCaptureEvents';
 
 interface QuickAddRichData {
   title: string;
@@ -56,7 +59,7 @@ interface QuickAddNoteData {
 }
 
 export function useShellChrome() {
-  const { tasks, addTask, pushTask } = useSupabaseTasks();
+  const { tasks, addTask, pushTask, deleteTask } = useSupabaseTasks();
   // Mac shell (desktop/): native menu nav, ⌘N capture, tray feed. No-op in browsers.
   useDesktopBridge(tasks);
   const { projects } = useProjects();
@@ -238,6 +241,50 @@ export function useShellChrome() {
     [addTask, addRoutine, isConnected, createEvent, fetchEvents, defaultCalendarId, getCalendarForDomain, getDomainForCalendar, getCurrentUserMember, showToast, showCaptureConfirmation, layers, navigate],
   );
 
+  // ⌘K's event card (Scott, 2026-10-30): the events read off a screenshot go
+  // on the calendar — each carrying the printed details, the links and the
+  // picture — and the Inbox row the picture became is removed. If any event
+  // fails, the row stays so nothing read off the picture is lost.
+  const onAddCaptureEvents = useCallback(
+    async (
+      capture: PhotoCaptureResult,
+      events: Array<CaptureEvent & { assignedMemberIds: string[] }>,
+      context: TaskContext | null,
+    ): Promise<boolean> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+      const target = getCalendarForDomain(context);
+      const { added, failed } = await addCaptureEvents(capture, events, context, {
+        db: supabase as unknown as CaptureEventsDb,
+        userId: user.id,
+        calendarId: isConnected ? (target?.calendarId ?? null) : undefined,
+        createEvent,
+        addTask: (title, start, opts) => addTask(title, undefined, undefined, start, {
+          ...opts,
+          assignedTo: opts.assignedTo ?? getCurrentUserMember()?.id,
+        }),
+        deleteTask,
+      });
+      if (!added) {
+        showToast('Couldn’t add the events — the picture is still in your Inbox', 'error', 8000);
+        return false;
+      }
+      if (isConnected) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const weekLater = new Date(today);
+        weekLater.setDate(weekLater.getDate() + 7);
+        void fetchEvents(today, weekLater);
+      }
+      const count = `${added} ${added === 1 ? 'event' : 'events'}`;
+      const where = isConnected ? (target?.calendarName ?? 'your primary calendar') : 'Symphony';
+      if (failed) showToast(`Added ${count} to ${where}; ${failed} didn’t save — the picture is still in your Inbox`, 'warning', 8000);
+      else showToast(`${count[0].toUpperCase()}${count.slice(1)} added to ${where}`, 'success');
+      return true;
+    },
+    [getCalendarForDomain, isConnected, createEvent, addTask, getCurrentUserMember, fetchEvents, deleteTask, showToast],
+  );
+
   const onQuickAddNote = useCallback(
     async (data: QuickAddNoteData) => {
       let topicId: string | undefined;
@@ -331,6 +378,7 @@ export function useShellChrome() {
     // QuickCapture
     onQuickAdd,
     onQuickAddRich,
+    onAddCaptureEvents,
     eventCalendarName,
     onQuickAddNote,
     quickAddProjects,
