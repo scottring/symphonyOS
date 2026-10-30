@@ -45,10 +45,16 @@ function weekLabel(start: Date): string {
     : `${month(start)} ${start.getDate()} – ${month(end)} ${end.getDate()}`
 }
 
+/** "4:00 PM" for an <input type="time"> value. */
+function clockOf(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
 export function PlanWeekMenu({
   title, periodStart, periodLabel, currentWeekStart, timing, onPickWeek, onClearWeek, onRemoveDay, onPickDay,
   dayChoices, dayChoicesLabel, size = 'md',
-  weekends, onPickWeekend, onPickWeekendDay, labelRelativeTo,
+  weekends, onPickWeekend, onPickWeekendDay, labelRelativeTo, onPickTime,
 }: {
   title: string
   /** Any day inside the period whose weeks should be offered — the month being
@@ -96,6 +102,10 @@ export function PlanWeekMenu({
   /** The day the page itself is about (Today): a row dated that day says only
    *  "Any time" or its time. Other pages leave it unset. */
   labelRelativeTo?: Date
+  /** A time on the chosen day, or null for "any time". Offered only once a
+   *  day is chosen: the one place to set a time, wherever the control sits
+   *  (Scott, 2026-10-30: the detail pane had no consistent way to). */
+  onPickTime?: (time: { hours: number; minutes: number } | null) => void
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -106,6 +116,7 @@ export function PlanWeekMenu({
 
   const [otherWeek, setOtherWeek] = useState('')
   const [dayValue, setDayValue] = useState('')
+  const [timeValue, setTimeValue] = useState('')
   const weekStartsOn = readCadenceConfig().weekStartsOn
   const weeks = weeksOfMonth(periodStart, weekStartsOn)
   // Two different labels. The list of weeks belongs to `periodStart`'s MONTH
@@ -271,6 +282,36 @@ export function PlanWeekMenu({
               </button>
             )}
           </div>
+          {/* A time on the chosen day. The same field on the Today row and in
+              the detail pane, so a time is set one way everywhere. */}
+          {onPickTime && timing?.day && (
+            <div className="px-3 py-1.5" role="group" aria-label="Time">
+              <label className="block text-sm text-neutral-700">
+                {timing.timed ? 'Change the time' : 'A time…'}
+                <input
+                  type="time"
+                  value={timeValue}
+                  onChange={(e) => setTimeValue(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-neutral-200 px-2 py-1 text-sm"
+                />
+              </label>
+              {timeValue && (
+                <button
+                  type="button"
+                  className="mt-1.5 w-full rounded-md bg-primary-50 px-2 py-1 text-sm font-semibold text-primary-700"
+                  onClick={choose(() => { const [h, m] = timeValue.split(':').map(Number); onPickTime({ hours: h, minutes: m }) })}
+                >
+                  Set {clockOf(timeValue)}
+                </button>
+              )}
+              {timing.timed && (
+                <button type="button" role="menuitem" className={`${itemClass} mt-1 -mx-3 w-[calc(100%+1.5rem)]`} onClick={choose(() => onPickTime(null))}>
+                  Any time that day
+                  <span className="block text-xs text-neutral-400">Keeps {timing.day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}; drops the time.</span>
+                </button>
+              )}
+            </div>
+          )}
           {(onClearWeek || onRemoveDay || onPickDay) && <div className="my-1 border-t border-neutral-100" />}
           {/* What a removal leaves behind, said HERE rather than after the
               fact — the consequence is never a surprise (requirement 6). The

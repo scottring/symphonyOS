@@ -51,4 +51,24 @@ describe('TaskTimingMenu', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(toastSpy).not.toHaveBeenCalled()
   })
+
+  it('sets a time on the day it already has, and goes back to any time', () => {
+    const onUpdateTask = show(task())
+    fireEvent.click(screen.getByRole('button', { name: /Choose a week or a day/ }))
+    fireEvent.change(screen.getByLabelText(/A time…/), { target: { value: '16:00' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Set 4:00 PM' }))
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { bucket: 'timed', scheduledFor: new Date(2026, 8, 22, 16, 0), isAllDay: false })
+
+    onUpdateTask.mockClear()
+    show(task({ scheduledFor: new Date(2026, 8, 22, 16, 0), isAllDay: false }), onUpdateTask)
+    fireEvent.click(screen.getAllByRole('button', { name: /Choose a week or a day/ })[1])
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Any time that day/ }))
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { bucket: 'timed', scheduledFor: new Date(2026, 8, 22, 0, 0), isAllDay: true })
+  })
+
+  it('offers no time until a day is chosen', () => {
+    show(task({ scheduledFor: undefined, isAllDay: undefined }))
+    fireEvent.click(screen.getByRole('button', { name: /Choose a week or a day/ }))
+    expect(screen.queryByLabelText(/A time…/)).toBeNull()
+  })
 })

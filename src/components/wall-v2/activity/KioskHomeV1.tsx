@@ -633,6 +633,27 @@ function OutTheDoor(p: KioskHomeV1Props) {
 
 /** A quiet stretch (Main.dc.html): the next landmark, large; the rest of
  *  today and tomorrow in the side column. */
+/** One row of the day's anytime things, with the count of the rest. The
+ *  weekend screen keeps the heading even when there are none; the quiet
+ *  weekday screen says nothing rather than "Nothing else today". */
+function Anytime({ p, always }: { p: KioskHomeV1Props; always?: boolean }) {
+  const all = p.weekend.anytime
+  if (!all.length && !always) return null
+  const shown = all.slice(0, 3)
+  return (
+    <>
+      <div className="kw-anytime-head"><span className="kw-eyebrow">Sometime today</span><span className="kw-meta">{all.length ? `${all.length} to do` : 'Nothing else today'}</span></div>
+      {shown.length > 0 && (
+        <ul className="kw-anytime" aria-label="Sometime today">
+          {shown.map((a) => (
+            <li key={a.title}><span className="kw-anytime-dot" aria-hidden="true" /><span>{a.title}{a.owners.length > 0 && <small>{namesOf(a.owners, p.members).join(' & ')}</small>}</span></li>
+          ))}
+        </ul>
+      )}
+    </>
+  )
+}
+
 function Rest(p: KioskHomeV1Props) {
   const [hero, ...rest] = p.restLine.split(' · ')
   const lede = rest.join(' · ') || p.restSub
@@ -667,6 +688,10 @@ function Rest(p: KioskHomeV1Props) {
           ))}
         </ul>
       )}
+      {/* The day's things with no clock — a form to return, a routine that
+          runs sometime today (Scott, 2026-10-30: the picture-day form was on
+          Today's list and nowhere on the wall). */}
+      <Anytime p={p} />
     </>
   )
   const side = (
@@ -895,8 +920,6 @@ function Weekend(p: KioskHomeV1Props) {
   const shownAsWork = workIds(p)
   const later = rows.filter((r) => stillOnToday(r) && r !== lead0 && !shownAsWork.has(r.id))
   const until = lead0?.endsAt ? new Date(lead0.endsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '') : null
-  // One row of supporting detail: three of the day's anytime things.
-  const anytime = p.weekend.anytime.slice(0, 3)
   const lead = (
     <>
       {lead0 ? (
@@ -917,14 +940,7 @@ function Weekend(p: KioskHomeV1Props) {
           <p className="kw-sub">Nothing on the clock today.</p>
         </>
       )}
-      <div className="kw-anytime-head"><span className="kw-eyebrow">Sometime today</span><span className="kw-meta">{p.weekend.anytime.length ? `${p.weekend.anytime.length} to do` : 'Nothing else today'}</span></div>
-      {anytime.length > 0 && (
-        <ul className="kw-anytime" aria-label="Sometime today">
-          {anytime.map((a) => (
-            <li key={a.title}><span className="kw-anytime-dot" aria-hidden="true" /><span>{a.title}{a.owners.length > 0 && <small>{namesOf(a.owners, p.members).join(' & ')}</small>}</span></li>
-          ))}
-        </ul>
-      )}
+      <Anytime p={p} always />
     </>
   )
   // School work takes the side column's foot from tomorrow's preview: the

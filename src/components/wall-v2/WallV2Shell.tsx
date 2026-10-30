@@ -95,8 +95,6 @@ import type { WallVoice } from './activity/KioskTellSymphony';
 import type { KioskV1Data } from './activity/KioskCanvas';
 import { dayAnchors, heldScreen, kioskScreen, minutesOf, sceneChoices, type SceneHold } from '@/lib/wall/activity/kioskScreen';
 import { nextCommitment } from '@/lib/wall/activity/kioskCompose';
-import { boardOwnersOf } from './wallGantt';
-import { HOUSEHOLD_ID } from './wallEventAttribution';
 import { addGroceries, addInboxTask, addScratch } from '@/lib/wall/voice/wallVoiceActions';
 import { wallSnapshot } from '@/lib/wall/voice/wallSnapshot';
 import type { KioskDinner } from './activity/KioskStages';
@@ -105,7 +103,7 @@ import { saveGroceryLines, type GroceryLine } from '@/lib/wall/activity/groceryP
 import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines';
 import { isIngredientLine } from '@/lib/wall/activity/cookingModel';
 import { wallMoment } from '@/lib/wall/wallMoment';
-import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, afterSchoolCollection, kidSchoolWork, type WallTodayRow, bagWithPapers } from '@/lib/wall/wallMomentsModel';
+import { wallTodayRows, wallAnytimeRows, specialsWeek, checklistFor, afterSchoolRows, afterSchoolCollection, kidSchoolWork, type WallTodayRow, bagWithPapers } from '@/lib/wall/wallMomentsModel';
 import { agendaDays, agendaDay, agendaWeekend, type AgendaRow } from '@/lib/wall/wallAgenda';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
 import { memberShape } from '@/lib/wall/memberPageModel';
@@ -913,10 +911,7 @@ export function WallV2Shell() {
     const tomorrowStart = tomorrowData ? new Date(tomorrowData.date) : null;
     tomorrowStart?.setHours(0, 0, 0, 0);
     const weekdayName = tomorrowDay.toLocaleDateString('en-US', { weekday: 'long' });
-    const anytime = Object.values(todayItems).flat()
-      .filter((it) => it.type === 'routine' && !it.startTime && !it.completed && it.originalRoutine?.parent_routine_id == null)
-      .reduce<{ title: string; owners: string[] }[]>((acc, it) => (acc.some((a) => a.title === it.title) ? acc : [...acc, { title: it.title, owners: boardOwnersOf(it, wallData.familyMembers).filter((id) => id !== HOUSEHOLD_ID) }]), [])
-      .slice(0, 8);
+    const anytime = wallAnytimeRows(todayItems, wallData.familyMembers).slice(0, 8);
     return {
       pick, scenes, anchors, kids, restLine, restSub, next,
       notes: scratchRows.filter((r) => r.kind === 'note').map((r) => ({ id: r.key, text: r.text, by: r.authorMemberId ? memberName(r.authorMemberId) ?? null : null })),

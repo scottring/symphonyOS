@@ -74,6 +74,12 @@ export function TaskTimingMenu({ task, onUpdateTask, periodStart, fallbackWeekSt
       onClearWeek={hasTiming(t) ? () => removeTiming('all') : undefined}
       onRemoveDay={t.day ? () => removeTiming('day') : undefined}
       onPickDay={(date) => { void onUpdateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true }) }}
+      // The time rides on the same day: set it, or go back to any time.
+      onPickTime={t.day ? (time) => {
+        const at = new Date(t.day!)
+        at.setHours(time?.hours ?? 0, time?.minutes ?? 0, 0, 0)
+        void onUpdateTask(task.id, { bucket: 'timed', scheduledFor: at, isAllDay: !time })
+      } : undefined}
     />
   )
 }

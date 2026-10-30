@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { wallTodayRows, stillOnToday, specialsWeek, checklistFor, afterSchoolRows, bagWithPapers, kidSchoolWork } from './wallMomentsModel'
+import { wallTodayRows, wallAnytimeRows, stillOnToday, specialsWeek, checklistFor, afterSchoolRows, bagWithPapers, kidSchoolWork } from './wallMomentsModel'
 import { taskToTimelineItem, type TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { MemberDayModel } from './kidDayModel'
@@ -199,5 +199,23 @@ describe('kidSchoolWork', () => {
 
   it('this week: homework due in the seven days after tomorrow, nothing further out', () => {
     expect(kidSchoolWork(model, now).week).toEqual([{ id: 'u4', title: 'Study for Unit 4 math test', due: 'Nov 5' }])
+  })
+})
+
+describe('wallAnytimeRows', () => {
+  it('lists untimed routines and untimed tasks due today, merging a title two kids carry', () => {
+    const rows = wallAnytimeRows({
+      morning: [
+        item({ id: 'task-1', type: 'task', title: 'Return picture day order form', assignedTo: members[1].id }),
+        item({ id: 'task-2', type: 'task', title: 'Return picture day order form', assignedTo: members[2].id }),
+        item({ id: 'task-3', type: 'task', title: 'Call the plumber', startTime: at(14).toISOString() }),
+        item({ id: 'task-4', type: 'task', title: 'Done already', completed: true }),
+        item({ id: 'task-5', type: 'task', title: 'A step', isSubtask: true, parentTaskId: '1' }),
+        item({ id: 'routine-1', type: 'routine', title: 'Water the plants' }),
+        item({ id: 'event-1', type: 'event', title: 'Picnic', allDay: true }),
+      ],
+    } as Record<string, TimelineItem[]>, members)
+    expect(rows.map((r) => r.title)).toEqual(['Return picture day order form', 'Water the plants'])
+    expect(rows[0].owners).toEqual([members[1].id, members[2].id])
   })
 })

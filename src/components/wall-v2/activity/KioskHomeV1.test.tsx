@@ -195,6 +195,16 @@ describe('the wall, version 1', () => {
     }
   })
 
+  it('rest: the day’s anytime things sit under the lead; none, and the block is silent', () => {
+    const anytime = [{ title: 'Return picture day order form', owners: [] }]
+    const { unmount } = render(<KioskHomeV1 {...props({ pick: { screen: 'rest', title: 'A quiet morning', dark: false }, weekend: { rows: [], anytime, tomorrow: [], tomorrowLabel: 'Saturday' } })} />)
+    expect(screen.getByRole('list', { name: 'Sometime today' })).toHaveTextContent('Return picture day order form')
+    expect(screen.getByText('1 to do')).toBeInTheDocument()
+    unmount()
+    render(<KioskHomeV1 {...props({ pick: { screen: 'rest', title: 'A quiet morning', dark: false }, weekend: { rows: [], anytime: [], tomorrow: [], tomorrowLabel: 'Saturday' } })} />)
+    expect(screen.queryByText('Sometime today')).toBeNull()
+  })
+
   it('weekend: one row of sometime-today under the lead, with the count of the rest', () => {
     const anytime = ['Bikes', 'Garden', 'Library', 'Laundry', 'Cards'].map((title) => ({ title, owners: [] }))
     render(<KioskHomeV1 {...props({ pick: { screen: 'weekend', title: 'Saturday', dark: false }, weekend: { rows: [], anytime, tomorrow: [], tomorrowLabel: 'Sunday' } })} />)

@@ -96,6 +96,33 @@ export function wallTodayRows(items: Record<string, TimelineItem[]>, members: Fa
   return rows.sort((a, b) => a.at - b.at).map(({ at: _at, ...r }) => r)
 }
 
+export interface WallAnytimeRow { title: string; owners: string[] }
+
+/**
+ * The day's things with no clock: a routine that runs sometime today, and a
+ * task due today with no time (Scott, 2026-10-30: "Return picture day order
+ * form" sat on Today's "For today" list and never reached the wall, so it was
+ * missed). One row per title; a thing two kids each carry names them both.
+ */
+export function wallAnytimeRows(items: Record<string, TimelineItem[]>, members: FamilyMember[]): WallAnytimeRow[] {
+  const all = Object.values(items).flat()
+  const ids = new Set(all.map((it) => it.id))
+  const out: WallAnytimeRow[] = []
+  for (const it of all) {
+    if (it.completed || (it.startTime && !it.allDay)) continue
+    if (it.type === 'routine') {
+      if (it.startTime || it.originalRoutine?.parent_routine_id != null) continue
+    } else if (it.type === 'task') {
+      if (it.isSubtask && it.parentTaskId && ids.has(`task-${it.parentTaskId}`)) continue
+    } else continue
+    const owners = boardOwnersOf(it, members).filter((id) => id !== HOUSEHOLD_ID)
+    const same = out.find((a) => a.title === it.title)
+    if (same) { for (const o of owners) if (!same.owners.includes(o)) same.owners.push(o) }
+    else out.push({ title: it.title, owners })
+  }
+  return out
+}
+
 export interface SpecialsDay {
   key: string
   day: string
