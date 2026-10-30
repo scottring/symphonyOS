@@ -8,7 +8,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { parseCaptureFacets, reachFromFacets, type CaptureLink } from '../_shared/captureReach.ts'
 import { parseReminders, reminderRows } from '../_shared/captureReminders.ts'
-import { parseCaptureEvents } from '../_shared/captureEvents.ts'
+import { markExisting, parseCaptureEvents, type CachedCalendarEvent } from '../_shared/captureEvents.ts'
 import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
@@ -273,7 +273,19 @@ Deno.serve(async (req) => {
 
     // Scheduled things go back to the box as a card to approve; nothing is
     // put on a calendar until the person says so.
-    const events = parseCaptureEvents(analysis.events, timeZone ?? 'UTC')
+    let events = parseCaptureEvents(analysis.events, timeZone ?? 'UTC')
+    // Mark what is already on a calendar (Gmail adds flights by itself), from
+    // the person's own cached events — best effort: a range never opened in
+    // Symphony may not be cached, and then nothing is marked.
+    if (events.length) {
+      const times = events.map((e) => Date.parse(e.allDay ? `${e.start}T00:00:00Z` : e.start)).filter(Number.isFinite)
+      const from = new Date(Math.min(...times) - 86_400_000).toISOString()
+      const to = new Date(Math.max(...times) + 86_400_000).toISOString()
+      const { data: cached } = await db.from('calendar_events')
+        .select('title, start_time, all_day, calendar_name')
+        .eq('user_id', user.id).gte('start_time', from).lte('start_time', to).limit(200)
+      events = markExisting(events, (cached ?? []) as CachedCalendarEvent[])
+    }
     return json({ ok: true, title: analysis.title, suggested_task_id: suggestedId, reminders: remindersAdded, events, links: reach.links ?? [] })
   } catch (e) {
     if (e instanceof AiUsageError) {

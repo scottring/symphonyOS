@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCaptureEvents } from './captureEvents'
+import { markExisting, parseCaptureEvents } from './captureEvents'
 
 // Scott's Southwest screenshot, 2026-10-30, as the vision call should read it.
 const flights = [
@@ -35,5 +35,29 @@ describe('parseCaptureEvents', () => {
     expect(out).toHaveLength(1)
     expect(out[0]).toMatchObject({ title: 'Backwards', end: null })
     expect(parseCaptureEvents(null, 'UTC')).toEqual([])
+  })
+})
+
+describe('markExisting', () => {
+  // The cache rows Scott's calendar held on 2026-10-30.
+  const cached = [
+    { title: 'Flight to Boston (WN 2742)', start_time: '2026-12-04T22:10:00+00:00', calendar_name: 'smkaufman@gmail.com' },
+    { title: 'Grampappa', start_time: '2026-12-04T21:00:00+00:00', calendar_name: 'Family' },
+    { title: 'Flight to Baltimore (WN 1717)', start_time: '2026-12-07T16:20:00+00:00', calendar_name: 'smkaufman@gmail.com' },
+  ]
+  it('finds flights Gmail already added, by time and flight number', () => {
+    const [out, back] = markExisting(parseCaptureEvents(flights, 'America/New_York'), cached)
+    expect(out.existing).toEqual({ title: 'Flight to Boston (WN 2742)', calendarName: 'smkaufman@gmail.com' })
+    expect(back.existing?.title).toBe('Flight to Baltimore (WN 1717)')
+  })
+  it('leaves alone a different thing at the same time, and the same thing at another time', () => {
+    const [dinner] = markExisting(parseCaptureEvents([{ title: 'Dinner at Tio Pepe', start: '2026-12-04T17:10' }], 'America/New_York'), cached)
+    expect(dinner.existing).toBeNull()
+    const [later] = markExisting(parseCaptureEvents([{ title: 'Flight WN 2742', start: '2026-12-05T17:10' }], 'America/New_York'), cached)
+    expect(later.existing).toBeNull()
+  })
+  it('matches an all-day event by its day', () => {
+    const [stay] = markExisting(parseCaptureEvents([{ title: 'Marriott Boston stay', start: '2026-12-04' }], 'UTC'), [{ title: 'Boston Marriott', start_time: '2026-12-04T00:00:00+00:00', all_day: true }])
+    expect(stay.existing?.title).toBe('Boston Marriott')
   })
 })

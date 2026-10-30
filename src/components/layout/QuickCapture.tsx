@@ -151,7 +151,9 @@ export function QuickCapture({
       // Scheduled things wait here as a card to approve (Scott, 2026-10-30).
       // A named household member files them under Family until changed.
       const namesSomeone = result.events.some((e) => matchMembers(e.who, familyMembers).length > 0)
-      setFound({ result, kind, skipped: new Set(), area: namesSomeone ? 'family' : null })
+      // Already on a calendar (Gmail adds flights itself) starts unticked.
+      const skipped = new Set(result.events.flatMap((e, i) => (e.existing ? [i] : [])))
+      setFound({ result, kind, skipped, area: namesSomeone ? 'family' : null })
     } else if (result) {
       // Nothing scheduled: the enriched item lands in the inbox via realtime.
       setTimeout(() => { photo.reset(); setShotPreview(null); handleClose() }, 1600)
@@ -594,6 +596,11 @@ export function QuickCapture({
                               <span className="block text-xs text-neutral-500">
                                 {formatEventWhen(e)}{who ? ` · ${who}` : ''}
                               </span>
+                              {e.existing && (
+                                <span className="block text-xs text-amber-700">
+                                  Already on {e.existing.calendarName ?? 'your calendar'} as “{e.existing.title}”
+                                </span>
+                              )}
                             </span>
                           </label>
                         </li>

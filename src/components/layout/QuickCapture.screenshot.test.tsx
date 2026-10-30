@@ -132,3 +132,22 @@ describe('⌘K event card', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 })
+
+// Scott, 2026-10-30: each flight landed twice — Gmail had already added them.
+describe('⌘K event card — already on a calendar', () => {
+  it('starts an event that is already on a calendar unticked and says where', async () => {
+    const legs = [
+      { title: 'Flight BWI → BOS', start: new Date(2026, 11, 4, 17, 10).toISOString(), end: null, allDay: false, location: null, who: [], details: null, existing: { title: 'Flight to Boston (WN 2742)', calendarName: 'smkaufman@gmail.com' } },
+      { title: 'Hotel', start: '2026-12-04', end: null, allDay: true, location: null, who: [], details: null, existing: null },
+    ]
+    m.requestDesktopScreenshot.mockResolvedValue({ status: 'ok', file: shot() })
+    m.captureFromFile.mockResolvedValue({ taskId: 't1', storagePath: 'p', events: legs, links: [] })
+    const { user } = render(<QuickCapture onAdd={vi.fn()} isOpen showFab={false} onAddCaptureEvents={vi.fn(async () => true)} />)
+    await user.click(screen.getByRole('button', { name: 'Screenshot' }))
+    expect(await screen.findByText('Already on smkaufman@gmail.com as “Flight to Boston (WN 2742)”')).toBeInTheDocument()
+    const [flight, hotel] = screen.getAllByRole('checkbox')
+    expect(flight).not.toBeChecked()
+    expect(hotel).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Add 1 event' })).toBeEnabled()
+  })
+})

@@ -21,6 +21,17 @@ export interface CaptureEvent {
   who: string[]
   /** Short printed details: confirmation number, flight number, seat. */
   details: string | null
+  /** The same thing already on one of the person's calendars (Gmail adds
+   *  flights by itself), so the card can offer it unticked. */
+  existing: { title: string; calendarName: string | null } | null
+}
+
+/** A cached calendar row (calendar_events, the person's own via RLS). */
+export interface CachedCalendarEvent {
+  title: string | null
+  start_time: string
+  all_day?: boolean | null
+  calendar_name?: string | null
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/
@@ -67,7 +78,34 @@ export function parseCaptureEvents(raw: unknown, fallbackZone: string): CaptureE
       location: str(o.location)?.slice(0, 300) ?? null,
       who,
       details: details ? details.slice(0, 1000) : null,
+      existing: null,
     })
   }
   return out.slice(0, MAX_EVENTS)
+}
+
+const STOP = new Set(['with', 'from', 'your', 'this', 'that', 'the'])
+function tokens(title: string): Set<string> {
+  return new Set(title.toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/)
+    .filter((w) => (/^\d{3,}$/.test(w) || (w.length >= 4 && !/\d/.test(w))) && !STOP.has(w)))
+}
+
+/** Scott, 2026-10-30: each flight landed twice — Gmail had already put them
+ *  on his calendar. A cached event at the same time (within 15 minutes, or
+ *  the same day for all-day) sharing a number like a flight's or a word of
+ *  four letters or more is taken to be the same thing. */
+export function markExisting(events: CaptureEvent[], cached: CachedCalendarEvent[]): CaptureEvent[] {
+  return events.map((e) => {
+    const mine = tokens(e.title)
+    const match = cached.find((c) => {
+      if (!c.title) return false
+      const sameTime = e.allDay
+        ? c.start_time.slice(0, 10) === e.start
+        : !c.all_day && Math.abs(Date.parse(c.start_time) - Date.parse(e.start)) <= 15 * 60_000
+      if (!sameTime) return false
+      for (const t of tokens(c.title)) if (mine.has(t)) return true
+      return false
+    })
+    return match ? { ...e, existing: { title: match.title as string, calendarName: match.calendar_name ?? null } } : e
+  })
 }

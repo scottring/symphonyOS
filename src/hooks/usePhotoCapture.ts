@@ -17,6 +17,8 @@ export interface CaptureEvent {
   location: string | null
   who: string[]
   details: string | null
+  /** Already on one of the person's calendars (an older function sends none). */
+  existing?: { title: string; calendarName: string | null } | null
 }
 
 export interface PhotoCaptureResult {
