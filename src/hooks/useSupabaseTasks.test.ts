@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { isFocused } from '@/lib/placement/model'
 import { localYmd } from '@/lib/cadence/config'
@@ -606,6 +606,10 @@ describe('useSupabaseTasks', () => {
     })
 
     it('deferring to tomorrow removes today’s choice while keeping history and month commitments', async () => {
+      // Mid-month, so tomorrow stays in this month (on the 31st it failed:
+      // tomorrow's month commitment is next month's).
+      vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 14, 10))
+      onTestFinished(() => { vi.useRealTimers() })
       const today = new Date(); today.setHours(0, 0, 0, 0)
       const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
       const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
