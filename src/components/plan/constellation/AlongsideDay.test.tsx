@@ -86,3 +86,20 @@ it('draws the shared compact list: on-day rows marked, done rows behind a reveal
  fireEvent.click(screen.getByRole('button',{name:'Complete Choose picnic spot'}))
  expect(complete).toHaveBeenCalledWith('same-id')
 })
+
+// Scott, 2026-10-31: the toggle sat apart, at the page's top right. It lives
+// in the strip now, and the hidden strip keeps a tab that opens it again.
+it('keeps the show/hide toggle inside the This week strip',()=>{
+ window.matchMedia=vi.fn().mockReturnValue({matches:false})
+ const {container}=render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ const strip=container.querySelector('#ad-week') as HTMLElement
+ expect(strip).toContainElement(screen.getByRole('button',{name:'Hide this week'}))
+ fireEvent.click(screen.getByRole('button',{name:'Hide this week'}))
+ const show=screen.getByRole('button',{name:'Show this week'})
+ expect(strip).toBeVisible()
+ expect(strip).toContainElement(show)
+ expect(show).toHaveTextContent('This week')
+ expect(screen.queryByRole('button',{name:/^Add Choose picnic spot to/})).toBeNull()
+ fireEvent.click(show)
+ expect(screen.getByRole('button',{name:/^Add Choose picnic spot to/})).toBeVisible()
+})

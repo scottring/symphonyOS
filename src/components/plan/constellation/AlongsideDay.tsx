@@ -8,6 +8,7 @@
 // strip with an Undo that puts the fields back.
 import { useRef, useState, useMemo, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -102,23 +103,28 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
   return (
     <AlongsideContext.Provider value={workspaceControls}>
       <section className="ad-shell">
-        {!weekView && (
-          <div className="ad-nav" role="group" aria-label="Today view" data-explain="week-toggle" data-explain-label="Show or hide This week">
-            <button aria-expanded={showChoices} disabled={!!companion.open} aria-controls="ad-week" onClick={() => setOpen((v) => !v)}>
-              {companion.open ? 'Weekly choices return when details close' : open ? 'Hide this week' : 'Show this week'}
-            </button>
-          </div>
-        )}
         <p role="status" className="ad-status">{message}</p>
-        <div className={`ad-layout ${showChoices && !weekView ? 'ad-open' : ''}`}>
+        <div className={`ad-layout ${weekView ? '' : showChoices ? 'ad-open' : companion.open ? '' : 'ad-folded'}`}>
           <div className="ad-day"
             onDragOver={(e) => { if (e.dataTransfer.types.includes(WEEK_ACTION_MIME)) e.preventDefault() }}
             onDropCapture={(e) => { const id = e.dataTransfer.getData(WEEK_ACTION_MIME); if (id) { e.preventDefault(); e.stopPropagation(); void place(id) } }}>
             {children}
           </div>
           {!weekView && (
-            <aside id="ad-week" className="ad-week cw-column" hidden={!showChoices} data-explain="this-week" data-explain-label="This week: tasks to give a day">
-              <h2>This week</h2>
+            // The strip holds its own toggle (Scott, 2026-10-31: the button sat
+            // apart from it, at the page's top right). Hidden, it folds to a
+            // slim tab that opens it again; details take its place entirely.
+            <aside id="ad-week" className={`ad-week cw-column${showChoices ? '' : ' is-folded'}`} hidden={!!companion.open} data-explain="this-week" data-explain-label="This week: tasks to give a day">
+              <div className="ad-week-head">
+                {showChoices && <h2>This week</h2>}
+                <button type="button" className="ad-week-toggle" aria-expanded={showChoices} aria-controls="ad-week-body"
+                  aria-label={showChoices ? 'Hide this week' : 'Show this week'} title={showChoices ? 'Hide this week' : 'Show this week'}
+                  data-explain="week-toggle" data-explain-label="Show or hide This week" onClick={() => setOpen((v) => !v)}>
+                  {showChoices ? <PanelLeftClose size={16} aria-hidden="true" />
+                    : <><PanelLeftOpen size={16} aria-hidden="true" /><span className="ad-week-tab">This week</span></>}
+                </button>
+              </div>
+              {showChoices && <div id="ad-week-body">
               <p className="ad-week-hint">Drag onto the day, or press + to plan it for {dayWord}. Its connections stay with it.</p>
               {loading ? <p>Loading this week’s tasks…</p>
                 : error ? <p role="alert">Could not load this week. <button onClick={retry}>Retry</button></p>
@@ -134,6 +140,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
                     busyKey={pending} disabled={!!pending} />
                   <button type="button" className="canvas-link cw-open" onClick={() => navigate(`/week?view=alongside&start=${localYmd(week)}`)}>Open week {weekNo} →</button>
                 </>}
+              </div>}
             </aside>
           )}
         </div>

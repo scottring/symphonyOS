@@ -3,17 +3,23 @@
    page's own gutters set the bounds, so this wrapper adds none of its own,
    and it wears only Symphony's theme tokens. */
 .ad-shell { position: relative; color: var(--color-neutral-800); }
-.ad-nav { position: absolute; z-index: 2; top: 10px; right: 2.5rem; display: flex; gap: 12px; align-items: center; font-size: 12px; }
-@media (min-width: 1024px) { .ad-nav { right: 3.5rem; } }
-.ad-nav button { border: 1px solid var(--color-neutral-300); background: var(--color-bg-elevated); border-radius: var(--radius-full); padding: 6px 12px; color: var(--color-neutral-700); }
-.ad-nav button:disabled { opacity: .65; cursor: default; }
 .ad-status { font-size: 13px; color: var(--color-primary-700); margin: 0 2.5rem 10px; }
 .ad-status:empty { display: none; }
 .ad-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
 /* The week on the left, as on every horizon (Scott's wireframe, 2026-10-25). */
 .ad-open { grid-template-columns: 280px minmax(0, 1fr); }
-.ad-open > aside.ad-week { order: -1; margin-left: 2.5rem; margin-top: 64px; }
-@media (min-width: 1024px) { .ad-open > aside.ad-week { margin-left: 3.5rem; } }
+.ad-open > aside.ad-week, .ad-folded > aside.ad-week { order: -1; margin-left: 2.5rem; margin-top: 64px; }
+@media (min-width: 1024px) { .ad-open > aside.ad-week, .ad-folded > aside.ad-week { margin-left: 3.5rem; } }
+/* Hidden, the strip folds to a slim tab at the same place (2026-10-31). */
+.ad-folded { grid-template-columns: auto minmax(0, 1fr); }
+.ad-folded > aside.ad-week { width: 40px; }
+.ad-week-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ad-week-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 32px; min-height: 32px; margin: -4px -6px -4px 0; border-radius: var(--radius-md); color: var(--color-neutral-500); }
+.ad-week-toggle:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.ad-layout aside.ad-week.is-folded { padding: 8px 3px; }
+.ad-week.is-folded .ad-week-head { justify-content: center; }
+.ad-week.is-folded .ad-week-toggle { flex-direction: column; margin: 0; padding: 6px 0 10px; width: 32px; }
+.ad-week-tab { writing-mode: vertical-rl; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: var(--color-neutral-700); }
 .ad-day { min-width: 0; }
 .ad-layout aside { background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: var(--radius-xl); align-self: start; }
 .ad-layout aside h2 { font-family: var(--font-family-display); font-size: 24px; color: var(--color-neutral-900); }
@@ -21,8 +27,13 @@
 .ad-shell button:focus-visible, .ad-shell a:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 3px; }
 @media (max-width: 1000px) { .ad-open { grid-template-columns: 240px minmax(0, 1fr); } }
 @media (max-width: 767px) {
-  .ad-nav { position: static; padding: 8px 16px 0; }
   .ad-status { margin: 0 16px 10px; }
   .ad-open { grid-template-columns: 1fr; }
-  .ad-open > aside.ad-week { order: 0; margin: 0 16px; }
+  /* The strip stays where its toggle was tapped: above the day (2026-10-31). */
+  .ad-open > aside.ad-week { margin: 0 16px; }
+  .ad-folded { grid-template-columns: 1fr; }
+  .ad-folded > aside.ad-week { width: auto; margin: 0 16px; }
+  .ad-week.is-folded .ad-week-head { justify-content: flex-start; }
+  .ad-week.is-folded .ad-week-toggle { flex-direction: row; width: auto; padding: 4px 10px; min-height: 44px; }
+  .ad-week-tab { writing-mode: horizontal-tb; }
 }
