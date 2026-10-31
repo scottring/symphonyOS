@@ -85,6 +85,8 @@ export function checklistSlots(today: Date, weekStartsOn: WeekStart, seasons: Se
   }
 }
 
+export type SessionRow = { horizon: string; period_token: string; notes?: { savedAt?: string; periodReview?: { at?: string } } | null }
+
 /** Each horizon's two steps, from the household's planning_sessions rows. */
 export function checklistRows(slots: Record<ChecklistLevel, ChecklistSlots>, rows: readonly SessionRow[]): Record<ChecklistLevel, ChecklistRow> {
   const on = (s: Slot) => rows.filter((r) => r.horizon === s.horizon && r.period_token === s.token)
