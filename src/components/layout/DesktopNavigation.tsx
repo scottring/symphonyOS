@@ -2,7 +2,7 @@ import { connectedDestination } from '@/lib/planning/connectedDestination'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, Inbox, Menu, MessageSquare, Search, UserRound } from 'lucide-react'
+import { ChevronDown, Inbox, MessageSquare, Search, UserRound } from 'lucide-react'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { HOME_ROUTE } from '@/apps/overview/route'
 import { appRegistry } from '@/shell/appRegistry'
@@ -78,10 +78,21 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     <BackButton />
     {leadRef && <div ref={leadRef} className="page-navigation-lead" />}
     </div>
-    {/* The menu sits immediately left of the horizon rail, in the bar's
-        centre (Scott, 2026-10-03). */}
+    {/* The rail sits in the bar's centre; "More" closes it, a word like the
+        rail's own, just right of Routines (Scott, 2026-10-31). Before that a
+        ☰ opened the rail (2026-10-03). */}
     <div className="page-navigation-mid">
-    {menu('more', <Menu size={18} aria-hidden="true" />, <div className="page-navigation-more">
+    {/* Inbox opens the rail, just before Today (Scott, 2026-10-17): the
+        captures not yet planned come before the smallest horizon. */}
+    <NavLink to={connectedDestination('/inbox', search)} className="page-navigation-icon" title="Inbox"
+      aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}>
+      <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}
+    </NavLink>
+    {centerRef && <div ref={centerRef} className="page-navigation-center" />}
+    <NavLink to={connectedDestination(ROUTINES_ROUTE, search)} className={({ isActive }) => `page-navigation-routines${isActive ? ' is-current' : ''}`}>
+      Routines
+    </NavLink>
+    {menu('more', 'More', <div className="page-navigation-more">
       <div className="page-navigation-groups">
         {groups.map(([group, items]) => <div key={group} role="group" aria-labelledby={`navigation-group-${group}`} className="page-navigation-group">
           <h3 id={`navigation-group-${group}`}>{group}</h3>
@@ -101,17 +112,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         <button onClick={() => { setOpen(null); setDialog({ kind: 'help', from: trigger.current }) }}>Help</button>
       </div>
     </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)),
-      { ariaLabel: 'More', chevron: false, className: 'is-hamburger' })}
-    {/* Inbox opens the rail, just before Today (Scott, 2026-10-17): the
-        captures not yet planned come before the smallest horizon. */}
-    <NavLink to={connectedDestination('/inbox', search)} className="page-navigation-icon" title="Inbox"
-      aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}>
-      <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}
-    </NavLink>
-    {centerRef && <div ref={centerRef} className="page-navigation-center" />}
-    <NavLink to={connectedDestination(ROUTINES_ROUTE, search)} className={({ isActive }) => `page-navigation-routines${isActive ? ' is-current' : ''}`}>
-      Routines
-    </NavLink>
+      { className: 'is-more' })}
     </div>
     <div className="page-navigation-utilities">
       {auxiliaryControls}

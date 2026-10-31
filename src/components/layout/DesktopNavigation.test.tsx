@@ -6,16 +6,20 @@ import { DesktopNavigation } from './DesktopNavigation'
 describe('DesktopNavigation — one bar on every page (2026-09-29)', () => {
   // Scott, 2026-10-03: the menu immediately left of the rail, in the centre.
   // Scott, 2026-10-17: Inbox moves to the rail's left, just before Today.
-  it('the menu, then Inbox, just before the rail, and Routines after it; Discussions, search and the account at the right — no Add', () => {
+  // Scott, 2026-10-31: the menu moves to the rail's end, right of Routines.
+  it('Inbox just before the rail, then Routines and the menu after it; Discussions, search and the account at the right — no Add', () => {
     render(<MemoryRouter initialEntries={['/week']}>
       <DesktopNavigation inboxCount={3} discussionsUnread={1} onSearch={vi.fn()} onSignOut={vi.fn()} paused={false} controlsRef={() => {}} centerRef={() => {}} />
     </MemoryRouter>)
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
     const mid = nav.querySelector('.page-navigation-mid') as HTMLElement
     expect(mid).toContainElement(screen.getByRole('button', { name: 'More' }))
-    // Routines closes the rail (2026-10-24), right after the horizons.
-    expect(mid.lastElementChild).toBe(within(mid).getByRole('link', { name: 'Routines' }))
-    expect(mid.lastElementChild?.previousElementSibling?.className).toBe('page-navigation-center')
+    // Routines follows the horizons (2026-10-24); the menu closes the rail.
+    expect(mid.lastElementChild).toContainElement(screen.getByRole('button', { name: 'More' }))
+    const routines = within(mid).getByRole('link', { name: 'Routines' })
+    expect(routines.nextElementSibling).toBe(mid.lastElementChild)
+    expect(routines.previousElementSibling?.className).toBe('page-navigation-center')
+    expect(mid.firstElementChild).toBe(within(mid).getByRole('link', { name: 'Inbox, 3 items' }))
     expect(nav.querySelector('.page-navigation-left')).not.toContainElement(screen.getByRole('button', { name: 'More' }))
     const inbox = within(mid).getByRole('link', { name: 'Inbox, 3 items' })
     expect(inbox.textContent).toBe('3')

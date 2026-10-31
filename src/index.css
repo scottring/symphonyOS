@@ -2268,6 +2268,8 @@ html.desktop-shell a {
   box-shadow: 0 8px 24px #2323220f; padding: 8px;
 }
 .page-navigation-utilities .page-navigation-popover { left: auto; right: 0; }
+/* "More" closes the rail (2026-10-31): its wide menu opens leftward. */
+.page-navigation-menu.is-more .page-navigation-popover { left: auto; right: 0; }
 .page-navigation-popover button { display: flex; width: 100%; padding: 9px 12px; text-align: left; }
 .page-navigation-popover button:hover { background: var(--color-neutral-50); }
 .page-navigation-popover p { padding: 8px 12px; font-size: 12px; max-width: 250px; overflow-wrap: anywhere; }
@@ -2412,14 +2414,13 @@ html.desktop-shell a {
 }
 /* A count sits ON its icon's corner as a small pill (Scott, 2026-09-30: a
    bare "1" floating right of Inbox read as part of the search icon). */
-.page-navigation-icon .navigation-count,
-.page-navigation-menu.is-hamburger > button .navigation-count {
+.page-navigation-icon .navigation-count {
   position: absolute; top: 2px; right: 1px; margin: 0; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px;
   display: grid; place-items: center; font-size: 10px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums;
   color: #fff; background: var(--color-primary-600); box-shadow: 0 0 0 2px var(--color-bg-base);
 }
-.page-navigation-menu.is-hamburger > button, .page-navigation-menu.is-account > button { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 9px; color: var(--color-neutral-600); }
-.page-navigation-menu.is-hamburger > button:hover, .page-navigation-menu.is-account > button:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.page-navigation-menu.is-account > button { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 9px; color: var(--color-neutral-600); }
+.page-navigation-menu.is-account > button:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 /* Icon segmented controls: the plan views, Journal / Schedule. */
 .pv2-seg.is-icons button { display: inline-grid; place-items: center; width: 34px; height: 28px; padding: 0; }
 .icon-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--color-neutral-100); }
@@ -2457,6 +2458,9 @@ html.desktop-shell a {
 .page-navigation-routines.is-current { color: var(--color-primary-700); font-weight: 600; }
 .page-navigation-routines.is-current:hover { background: none; }
 .page-navigation-routines.is-current::after { content: ""; position: absolute; left: var(--rail-pad); right: var(--rail-pad); bottom: 0; height: 2px; border-radius: 2px; background: currentColor; }
+/* More sits after Routines, set the same way, its chevron saying it opens. */
+.page-navigation-menu.is-more > button { gap: 3px; padding: 7px 10px 7px 14px; border-radius: 8px; font-size: 13.5px; color: var(--color-neutral-600); white-space: nowrap; }
+.page-navigation-menu.is-more > button:hover, .page-navigation-menu.is-more > button[aria-expanded="true"] { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 
 .plan-range-control { display: flex; align-items: center; font-size: 12px; color: var(--color-neutral-500); }
 .plan-range-control select { background: transparent; padding: 6px 4px; max-width: 130px; }
