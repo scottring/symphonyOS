@@ -11,7 +11,8 @@ import { seasonToken, type Seasons } from '@/lib/cadence/seasons'
 import { localYmd, weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { deckWeekUrl } from '@/lib/planning/deck'
-import { periodBounds } from '@/lib/planning/periodPage'
+import { periodBounds, type PeriodBounds } from '@/lib/planning/periodPage'
+import { REVIEW_WINDOW_DAYS, reviewTarget } from '@/lib/planning/periodReview'
 
 export type ChecklistLevel = 'year' | 'season' | 'month' | 'week'
 
@@ -23,10 +24,12 @@ export interface ChecklistStep {
   dates?: string
   to: string
 }
-export interface ChecklistRow { review: ChecklistStep; plan: ChecklistStep }
+/** Which step the period's own page has due now (its one button), if any. */
+export type DueStep = 'review' | 'plan'
+export interface ChecklistRow { review: ChecklistStep; plan: ChecklistStep; due?: DueStep }
 
 interface Slot { horizon: SessionHorizon; token: string; word: string; dates?: string; to: string }
-export interface ChecklistSlots { review: Slot; plan: Slot }
+export interface ChecklistSlots { review: Slot; plan: Slot; due?: DueStep }
 
 const md = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const weekDates = (start: Date) => {
@@ -45,27 +48,42 @@ export function checklistSlots(today: Date, weekStartsOn: WeekStart, seasons: Se
     horizon: 'weekly', token: weekToken(start), word: `week ${weekOfYear(start, weekStartsOn)}`, dates: weekDates(start),
     to: review ? deckWeekUrl(week) : '/week?view=alongside&plan=1',
   })
-  const month = periodBounds('month', today, seasons), lastMonth = periodBounds('month', month.prev, seasons)
-  const season = periodBounds('season', today, seasons), lastSeason = periodBounds('season', season.prev, seasons)
+  const month = periodBounds('month', today, seasons)
+  const season = periodBounds('season', today, seasons)
   const year = today.getFullYear()
+  // Month, Season and Year say what their own page's one button says
+  // (reviewed design, 2026-10-20). Under way: last period reviewed, this one
+  // planned, and planning is due until it is. In the period's last days
+  // (REVIEW_WINDOW_DAYS): this period reviewed, the next one planned, and the
+  // review is due — "Review October" walks on into planning November. Year is
+  // reference: its plan is due only Jan 1–14.
+  const closing = (b: PeriodBounds, days: number) => reviewTarget(b, today, days) === 'this'
+  const path = { monthly: '/month', seasonal: '/season', annual: '/year' } as const
+  const slot = (horizon: keyof typeof path, start: Date, token: string, label: string, step: 'review' | 'plan'): Slot => ({
+    horizon, token, word: word(label), to: `${path[horizon]}?start=${localYmd(start)}&${step}=1`,
+  })
+  const monthClosing = closing(month, REVIEW_WINDOW_DAYS.month)
+  const monthPrev = periodBounds('month', month.prev, seasons), monthNext = periodBounds('month', month.next, seasons)
+  const seasonClosing = closing(season, REVIEW_WINDOW_DAYS.season)
+  const seasonPrev = periodBounds('season', season.prev, seasons), seasonNext = periodBounds('season', season.next, seasons)
+  const yearClosing = closing(periodBounds('year', today, seasons), REVIEW_WINDOW_DAYS.year)
+  const yearWindow = today.getMonth() === 0 && today.getDate() <= 14
+  const monthSlot = (b: PeriodBounds, step: 'review' | 'plan') => slot('monthly', b.start, monthToken(b.start), b.label, step)
+  const seasonSlot = (b: PeriodBounds, step: 'review' | 'plan') => slot('seasonal', b.start, seasonToken(b.start, seasons), b.label, step)
+  const yearSlot = (y: number, step: 'review' | 'plan') => slot('annual', new Date(y, 0, 1), yearToken(y), String(y), step)
   return {
     week: { review: weekSlot(lastWeek, true), plan: weekSlot(week, false) },
-    month: {
-      review: { horizon: 'monthly', token: monthToken(lastMonth.start), word: word(lastMonth.label), to: `/month?start=${localYmd(lastMonth.start)}&review=1` },
-      plan: { horizon: 'monthly', token: monthToken(month.start), word: word(month.label), to: '/month?plan=1' },
-    },
-    season: {
-      review: { horizon: 'seasonal', token: seasonToken(lastSeason.start, seasons), word: word(lastSeason.label), to: `/season?start=${localYmd(lastSeason.start)}&review=1` },
-      plan: { horizon: 'seasonal', token: seasonToken(season.start, seasons), word: word(season.label), to: '/season?plan=1' },
-    },
-    year: {
-      review: { horizon: 'annual', token: yearToken(year - 1), word: String(year - 1), to: `/year?start=${year - 1}-01-01&review=1` },
-      plan: { horizon: 'annual', token: yearToken(year), word: String(year), to: '/year?plan=1' },
-    },
+    month: monthClosing
+      ? { review: monthSlot(month, 'review'), plan: monthSlot(monthNext, 'plan'), due: 'review' }
+      : { review: monthSlot(monthPrev, 'review'), plan: monthSlot(month, 'plan'), due: 'plan' },
+    season: seasonClosing
+      ? { review: seasonSlot(season, 'review'), plan: seasonSlot(seasonNext, 'plan'), due: 'review' }
+      : { review: seasonSlot(seasonPrev, 'review'), plan: seasonSlot(season, 'plan'), due: 'plan' },
+    year: yearClosing
+      ? { review: yearSlot(year, 'review'), plan: yearSlot(year + 1, 'plan'), due: 'review' }
+      : { review: yearSlot(year - 1, 'review'), plan: yearSlot(year, 'plan'), ...(yearWindow ? { due: 'plan' as const } : {}) },
   }
 }
-
-export type SessionRow = { horizon: string; period_token: string; notes?: { savedAt?: string; periodReview?: { at?: string } } | null }
 
 /** Each horizon's two steps, from the household's planning_sessions rows. */
 export function checklistRows(slots: Record<ChecklistLevel, ChecklistSlots>, rows: readonly SessionRow[]): Record<ChecklistLevel, ChecklistRow> {
@@ -76,6 +94,7 @@ export function checklistRows(slots: Record<ChecklistLevel, ChecklistSlots>, row
   const row = (x: ChecklistSlots): ChecklistRow => ({
     review: step(x.review, on(x.review).some((r) => !!r.notes?.periodReview?.at), 'Review'),
     plan: step(x.plan, on(x.plan).some((r) => !!r.notes?.savedAt), 'Plan'),
+    ...(x.due ? { due: x.due } : {}),
   })
   return { year: row(slots.year), season: row(slots.season), month: row(slots.month), week: row(slots.week) }
 }

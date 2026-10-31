@@ -40,7 +40,7 @@ import { weekListTasks } from '@/lib/planning/weekList'
 import { linkedLine } from '@/lib/week/monthLinks'
 import { useCadenceChecklist } from '@/hooks/useCadenceChecklist'
 import type { ChecklistRow } from '@/lib/home/cadenceChecklist'
-import { count, numberWord, type BearingsFacts, type LevelFacts } from '@/lib/home/bearings'
+import { count, numberWord, type BearingsFacts, type LevelFacts, type PeriodDue } from '@/lib/home/bearings'
 import type { Task } from '@/types/task'
 import type { InboxRow } from '@/lib/discussions/inbox'
 
@@ -54,7 +54,8 @@ export interface Rung {
   name: string
   /** "Reference · four intentions", "Not planned yet · three waiting". */
   status: string
-  /** The rung asks for attention (an unplanned week). */
+  /** The rung asks for attention: an unplanned week, or a month, season or
+   *  year whose own page has its review or plan due. */
   attention: boolean
   /** One line from its list, to recognise it by. */
   sample: string | null
@@ -245,6 +246,28 @@ export function useHomeBearings(now: Date): HomeBearings {
   }, [dayData])
   const allDay = useMemo(() => (dayData?.grouped.allday ?? []).map((item) => item.title), [dayData])
 
+  // The card's period steps: a month's, season's or year's due step (the
+  // checklist's), only inside its window — the review in the period's last
+  // days, the plan in its first (a month's 7, a season's 14, the year's
+  // Jan 1–14) — so an unwritten season doesn't ask all season.
+  const due = useMemo(() => {
+    const out: PeriodDue[] = []
+    const after = (label: string) => label.replace(/^\S+\s/, '')
+    const year = periodBounds('year', today, seasons)
+    const each: [PeriodDue['level'], ChecklistRow | undefined, { start: Date; end: Date }, number][] = [
+      ['year', checklist.rows?.year, year, 14], ['season', checklist.rows?.season, season, 14], ['month', checklist.rows?.month, month, 7],
+    ]
+    for (const [lvl, row, b, planDays] of each) {
+      if (!row?.due || row[row.due].done) continue
+      if (row.due === 'review') {
+        out.push({ level: lvl, step: 'review', name: after(row.review.label), next: after(row.plan.label), daysLeft: Math.round((b.end.getTime() - today.getTime()) / DAY), to: row.review.to })
+      } else if (Math.round((today.getTime() - b.start.getTime()) / DAY) < planDays) {
+        out.push({ level: lvl, step: 'plan', name: after(row.plan.label), to: row.plan.to })
+      }
+    }
+    return out
+  }, [checklist.rows, today, seasons, season, month])
+
   const facts: BearingsFacts = {
     now,
     weekStart: localYmd(weekStart),
@@ -255,6 +278,7 @@ export function useHomeBearings(now: Date): HomeBearings {
     inbox,
     todayChosen: chosenTasks.length,
     eventsAhead: timed.filter((e) => e.end > now).length,
+    due,
   }
 
   const firstOpen = (list: Task[]) => list.find((t) => !t.completed)?.title ?? null
@@ -266,19 +290,22 @@ export function useHomeBearings(now: Date): HomeBearings {
     days: Math.round((end.getTime() - start.getTime()) / DAY),
   })
   const year = periodBounds('year', today, seasons)
+  // Month, Season and Year ask for attention when their own page's one
+  // button is due and not yet done (the checklist's `due` step).
+  const owed = (row?: ChecklistRow) => !!row?.due && !row[row.due].done
   const rungs: Rung[] = [
     {
-      level: 'year', name: String(today.getFullYear()), to: '/year', attention: false, steps: checklist.rows?.year, through: through(year.start, year.end),
+      level: 'year', name: String(today.getFullYear()), to: '/year', attention: owed(checklist.rows?.year), steps: checklist.rows?.year, through: through(year.start, year.end),
       status: yearGoals.length ? `Reference · ${words(yearGoals.length)} ${yearGoals.length === 1 ? 'goal' : 'goals'}` : 'Nothing written yet',
       sample: yearGoals[0]?.name ?? null,
     },
     {
-      level: 'season', name: seasonFacts.name, to: '/season', attention: false, steps: checklist.rows?.season, through: through(season.start, season.end),
+      level: 'season', name: seasonFacts.name, to: '/season', attention: owed(checklist.rows?.season), steps: checklist.rows?.season, through: through(season.start, season.end),
       status: seasonFacts.open ? `Brainstorm · ${lines(seasonFacts.open)}` : 'Nothing yet — a season can stay unwritten',
       sample: firstOpen(seasonFacts.lines),
     },
     {
-      level: 'month', name: monthFacts.name, to: '/month', attention: false, steps: checklist.rows?.month, through: through(month.start, month.end),
+      level: 'month', name: monthFacts.name, to: '/month', attention: owed(checklist.rows?.month), steps: checklist.rows?.month, through: through(month.start, month.end),
       // Planned or not is the checklist's to say, under the name.
       status: monthFacts.open ? capital(lines(monthFacts.open)) : 'Nothing yet',
       sample: firstOpen(monthFacts.lines),

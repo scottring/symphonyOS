@@ -93,3 +93,32 @@ describe('the day in a sentence', () => {
     expect(inTime(at(9), at(12))).toBe('in 3 hours')
   })
 })
+
+// Scott, 2026-10-31: Home nudged the week but never the month, season or year.
+describe('a month, season or year with a step due', () => {
+  it('asks top down, before the week: the review in its last days walks on into the next', () => {
+    const steps = nextSteps(facts({
+      week: { planned: false, open: 2, done: 0 },
+      due: [
+        { level: 'season', step: 'plan', name: 'Fall', to: '/season?start=2026-09-22&plan=1' },
+        { level: 'month', step: 'review', name: 'October', next: 'November', daysLeft: 1, to: '/month?start=2026-10-01&review=1' },
+      ],
+    }))
+    expect(steps.map((s) => s.id).slice(0, 3)).toEqual(['due-season', 'due-month', 'plan-week'])
+    expect(steps[0]).toMatchObject({ title: 'Fall hasn’t been planned yet.', action: { label: 'Plan Fall', to: '/season?start=2026-09-22&plan=1' } })
+    expect(steps[1]).toMatchObject({ title: 'October ends today.', body: 'Look back at it, then plan November.', action: { label: 'Review October' } })
+    expect(nextSteps(facts({ due: [{ level: 'month', step: 'review', name: 'October', next: 'November', daysLeft: 3, to: '/m' }] }))[0].title).toBe('October ends in three days.')
+  })
+
+  it('a month due to plan replaces "has nothing on it yet"', () => {
+    const ids = nextSteps(facts({ month: level('November', { open: 0, planned: false }), due: [{ level: 'month', step: 'plan', name: 'November', to: '/m' }] })).map((s) => s.id)
+    expect(ids).toContain('due-month')
+    expect(ids).not.toContain('plan-month')
+  })
+
+  it('set aside, the next step shows', () => {
+    const f = facts({ due: [{ level: 'month', step: 'plan', name: 'November', to: '/m' }], week: { planned: false, open: 0, done: 0 } })
+    expect(chooseNextStep(f, new Set(['due-month'])).id).toBe('plan-week')
+  })
+})
+

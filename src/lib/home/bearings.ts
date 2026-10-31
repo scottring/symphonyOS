@@ -30,6 +30,22 @@ export function lookBackPath(level: 'month' | 'season', f: Pick<LevelFacts, 'rev
   return f.reviewStart ? `/${level}?start=${f.reviewStart}&review=1` : `/${level}`
 }
 
+/** A month, season or year whose own page has its review or plan due, inside
+ *  that step's window (Scott, 2026-10-31: Home nudged the week, never the
+ *  month). The review is due in the period's last days; the plan in its
+ *  first days while unplanned. */
+export interface PeriodDue {
+  level: 'year' | 'season' | 'month'
+  step: 'review' | 'plan'
+  /** The period the step is for: "October" (review), "November" (plan). */
+  name: string
+  /** After a review, the period it walks on into planning: "November". */
+  next?: string
+  /** Days left in the reviewed period, today included. */
+  daysLeft?: number
+  to: string
+}
+
 export interface BearingsFacts {
   now: Date
   /** Days of the household week still ahead, today included (7 on its first day). */
@@ -44,9 +60,11 @@ export interface BearingsFacts {
   todayChosen: number
   /** Timed events today that have not ended yet. */
   eventsAhead: number
+  /** Year, season, month — top down — with a step due now. */
+  due?: PeriodDue[]
 }
 
-export type NextStepId = 'plan-week' | 'look-back-month' | 'look-back-season' | 'plan-month' | 'sort-inbox' | 'choose-today' | 'do-today'
+export type NextStepId = 'due-year' | 'due-season' | 'due-month' | 'plan-week' | 'look-back-month' | 'look-back-season' | 'plan-month' | 'sort-inbox' | 'choose-today' | 'do-today'
 
 export interface NextStep {
   id: NextStepId
@@ -84,6 +102,28 @@ export function nextSteps(f: BearingsFacts): NextStep[] {
   const out: NextStep[] = []
   const evening = f.now.getHours() >= 20
 
+  // Top down, before the week: planning the week chooses from the month.
+  for (const d of f.due ?? []) {
+    if (d.step === 'review') {
+      out.push({
+        id: `due-${d.level}`,
+        title: !d.daysLeft || d.daysLeft <= 1 ? `${d.name} ends today.` : `${d.name} ends in ${numberWord(d.daysLeft)} days.`,
+        body: d.next ? `Look back at it, then plan ${d.next}.` : 'Look back at it.',
+        action: { label: `Review ${d.name}`, to: d.to },
+      })
+    } else {
+      out.push({
+        id: `due-${d.level}`,
+        title: `${d.name} hasn’t been planned yet.`,
+        body: d.level === 'month' ? `${f.season.name}’s list sits beside you while you choose.`
+          : d.level === 'season' ? 'The year sits beside you while you choose.'
+          : 'The year is reference for the seasons under it.',
+        action: { label: `Plan ${d.name}`, to: d.to },
+      })
+    }
+  }
+  const monthDue = (f.due ?? []).some((d) => d.level === 'month')
+
   if (!f.week.planned && f.weekDaysLeft >= 3) {
     const waiting = f.week.open ? ` ${capital(count(f.week.open, 'thing'))} ${f.week.open === 1 ? 'is' : 'are'} waiting for a day.` : ''
     out.push({
@@ -109,7 +149,7 @@ export function nextSteps(f: BearingsFacts): NextStep[] {
       action: { label: 'Look back', to: lookBackPath('season', f.season) },
     })
   }
-  if (!f.month.planned && f.month.open === 0) {
+  if (!monthDue && !f.month.planned && f.month.open === 0) {
     out.push({
       id: 'plan-month',
       title: `${f.month.name} has nothing on it yet.`,
