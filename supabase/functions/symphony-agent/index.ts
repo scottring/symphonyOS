@@ -3,7 +3,7 @@ import { claimsPreparedCard, PROPOSAL_REPAIR, PROPOSAL_FAILURE, proposalReply, p
 import { planSaved } from './planSaved.ts'
 import { onboardingCardAllowed } from './onboardingMode.ts'
 import { activitySetFromInput } from './onboardingActivities.ts'
-import { guardedAiFetch } from '../_shared/aiUsage.ts'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 import { ACCOUNT_GROUNDING_RULES, ASSISTANT_PERSONALITY, RESULT_LANGUAGE_RULES } from '../_shared/assistantExperience.ts'
 import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
@@ -1763,7 +1763,10 @@ Deno.serve(async (req) => {
         // The writes so far travel with the error: a turn cut off after a
         // save is 'unverified', never silently 'nothing happened'.
         const outcome = summarizeTurn(writes, shown, 'error')
-        send({ type: 'error', message: err instanceof Error ? err.message : 'Agent failed', outcome, requestId })
+        // A refused allowance carries its code and reset, so the chat can say
+        // so plainly instead of "couldn't reach Symphony".
+        const allowance = err instanceof AiUsageError ? { code: err.code, ...(err.retryAt ? { retry_at: err.retryAt } : {}) } : {}
+        send({ type: 'error', message: err instanceof Error ? err.message : 'Agent failed', outcome, requestId, ...allowance })
         logTurn(outcome.state, err instanceof Error ? err.message : 'Agent failed')
       } finally {
         controller.close()

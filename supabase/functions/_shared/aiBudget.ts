@@ -8,6 +8,8 @@ type RpcDb = { rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:un
 export type BudgetControl = { userId:string; db:RpcDb }
 /** Most visual tokens one image can cost on any current Claude model. */
 const IMAGE_TOKEN_CEILING=4_784
+/** UTF-8 bytes per token that ordinary text and IDs stay above. */
+const BYTES_PER_TOKEN_BOUND=2
 /** Input tokens held for one search's results (dynamic filtering trims them;
  *  the settlement charges what actually came back). */
 const SEARCH_RESULT_TOKENS=10_000
@@ -71,8 +73,14 @@ export function textBudget(init?:RequestInit):{input:number;output:number;model:
     const toolText=body.tools===undefined ? 0 : new TextEncoder().encode(JSON.stringify(body.tools)).length
     const output=body.max_tokens??body.max_output_tokens??body.max_completion_tokens??(body.model.startsWith('text-embedding-')?0:null)
     if(!Number.isSafeInteger(output)||output<0||output>1_000_000) return null
-    // UTF-8 bytes exceed text token count; include protocol/schema overhead.
-    const input=new TextEncoder().encode(serialized).length+toolText+4096+images*IMAGE_TOKEN_CEILING+web
+    // Text runs about 3–4 UTF-8 bytes per token, and IDs and other dense
+    // strings nearer 2, so half the byte count still bounds the tokens; the
+    // reservation doubles it again for a cache write. Holding one token per
+    // byte (until 2026-10-31) held about eight times a cached chat's cost
+    // and refused replies with a quarter of the day's allowance still unspent.
+    // Plus protocol/schema overhead.
+    const textTokens=Math.ceil((new TextEncoder().encode(serialized).length+toolText)/BYTES_PER_TOKEN_BOUND)
+    const input=textTokens+4096+images*IMAGE_TOKEN_CEILING+web
     return input<=4_000_000?{input,output,model:body.model}:null
   } catch {return null}
 }

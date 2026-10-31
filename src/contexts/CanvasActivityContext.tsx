@@ -23,6 +23,7 @@ import { describeChanges, diffSnapshots, type CanvasChange, type Snapshot } from
 import { toolSavingLabel } from '@/lib/canvas/toolLabels'
 import { changeCardNote, type ChangeCardNote, type ChangeSet } from '@/lib/canvas/changeCard'
 import type { ApplyResult } from '@/lib/canvas/applyChangeSet'
+import { allowanceReceipt, isAllowanceCode } from '@/lib/aiAllowance'
 
 export type SaveState = 'listening' | 'working' | 'saving' | 'saved' | 'partial' | 'failed' | 'answered' | 'unverified'
 
@@ -112,7 +113,7 @@ export interface CanvasActivity {
   turnStarted: (text: string, retry: boolean) => void
   toolUsed: (name: string) => void
   toolResult: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
-  turnEnded: (turn: { didWrite: boolean; error: string | null; text: string; requestId?: string }) => void
+  turnEnded: (turn: { didWrite: boolean; error: string | null; errorCode?: string; text: string; requestId?: string }) => void
   /** Run a manual command with the same save states and Undo as conversation. */
   run: (label: string, command: () => Promise<boolean | void | string | undefined>, options?: CommandOptions) => Promise<boolean>
   undo: () => Promise<'undone' | 'none' | 'failed'>
@@ -263,14 +264,18 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   // After a writing turn ends, the refetched rows arrive as a new snapshot.
   useEffect(() => { if (turnRef.current?.awaitingDiff && turnRef.current.ended) finishDiff() }, [snapshot, finishDiff])
 
-  const turnEnded = useCallback((ended: { didWrite: boolean; error: string | null; text: string; requestId?: string }) => {
+  const turnEnded = useCallback((ended: { didWrite: boolean; error: string | null; errorCode?: string; text: string; requestId?: string }) => {
     const turn = turnRef.current
     if (!turn) return
     turn.ended = { error: ended.error, text: ended.text }
     if (ended.requestId) setReceipt((r) => r && r.key === turn.key ? { ...r, requestId: ended.requestId } : r)
     if (!ended.didWrite && !turn.wrote) {
       setReceipt((r) => r && r.key === turn.key
-        ? { ...r, state: ended.error ? 'failed' : 'answered', undoable: !!undoRef.current, summary: ended.error ? "Couldn't reach Symphony. Nothing changed." : '', canRetry: !!ended.error && !!retryRef.current }
+        // The allowance is not a connection failure, and retrying can't help
+        // until it resets.
+        ? isAllowanceCode(ended.errorCode)
+          ? { ...r, state: 'failed', undoable: !!undoRef.current, summary: allowanceReceipt(ended.errorCode), canRetry: false }
+          : { ...r, state: ended.error ? 'failed' : 'answered', undoable: !!undoRef.current, summary: ended.error ? "Couldn't reach Symphony. Nothing changed." : '', canRetry: !!ended.error && !!retryRef.current }
         : r)
       return
     }

@@ -19,7 +19,7 @@ describe('service-authoritative funding',()=>{
     const f=fixture();f.transport.mockImplementation(async()=>{expect(f.rpc).toHaveBeenCalledTimes(1);return reply({input_tokens:10,output_tokens:20,cache_creation_input_tokens:30,cache_read_input_tokens:40})})
     const r=await f.fetch('https://provider.test',init)
     expect(f.rpc).toHaveBeenNthCalledWith(1,'reserve_ai_budget',expect.objectContaining({p_user:'u',p_model:'claude-sonnet-4-6',p_output:2048}))
-    expect(f.rpc).toHaveBeenNthCalledWith(2,'settle_ai_budget',{p_id:'r',p_user:'u',p_input:110,p_output:20})
+    expect(f.rpc).toHaveBeenNthCalledWith(2,'settle_ai_budget',{p_id:'r',p_user:'u',p_input:74,p_output:20})
     expect((await r.json()).usage.output_tokens).toBe(20)
   })
   it('keeps uncertain provider attempts charged and reserves again before retry',async()=>{
@@ -47,6 +47,11 @@ describe('service-authoritative funding',()=>{
     await expect(guardedAiFetch(f.db,'workspace-voice',f.transport,{model:'gpt-realtime',minutes:2},{userId:'u',db:f.db})('https://provider.test',init)).rejects.toMatchObject({status:503})
     expect(f.transport).not.toHaveBeenCalled()
   })
+  it('holds text at half a token per UTF-8 byte, plus fixed overhead',()=>{
+    const body=(text:string)=>JSON.stringify({model:'claude-sonnet-4-6',max_tokens:3000,messages:[{role:'user',content:text}]})
+    const small=textBudget({body:body('')})!.input, big=textBudget({body:body('x'.repeat(80_000))})!.input
+    expect(big-small).toBe(40_000)
+  })
   it('bounds UTF-8 input and explicit output, including zero-output embeddings',()=>{
     expect(textBudget(init)?.input).toBeGreaterThan(init.body.length)
     expect(textBudget({body:'{"model":"text-embedding-3-small","input":"hi"}'})?.output).toBe(0)
@@ -71,7 +76,8 @@ describe('service-authoritative funding',()=>{
     expect(web-plain).toBeGreaterThanOrEqual(3*(10_000+3_334)+2*11_000)
     expect(web-plain).toBeLessThan(3*(10_000+3_334)+2*11_000+1_000)
     const history={...base,messages:[...base.messages,{role:'assistant',content:[{type:'server_tool_use',name:'web_fetch',input:{url:'https://x.test/a.pdf'}},{type:'web_fetch_tool_result',content:{type:'web_fetch_result',content:{type:'document',source:{type:'base64',media_type:'application/pdf',data:'A'.repeat(5_000)}}}}]}]}
-    expect(textBudget({body:JSON.stringify(history)})!.input).toBeGreaterThan(plain+5_000)
+    // Held as text at its full size: half a token per byte, like all text.
+    expect(textBudget({body:JSON.stringify(history)})!.input).toBeGreaterThan(plain+2_500)
     const filtered={...base,messages:[...base.messages,{role:'assistant',content:[{type:'server_tool_use',name:'bash_code_execution',input:{command:'filter'}},{type:'bash_code_execution_tool_result',content:{type:'bash_code_execution_result',stdout:'ok'}}]}]}
     expect(textBudget({body:JSON.stringify(filtered)})).not.toBeNull()
   })
@@ -79,6 +85,22 @@ describe('service-authoritative funding',()=>{
     expect(searchFeeTokens('claude-sonnet-4-6')).toBe(3_334)
     expect(searchFeeTokens('some-new-model')).toBe(10_000)
     expect(usageOf({model:'claude-sonnet-4-6',usage:{input_tokens:100,output_tokens:5,server_tool_use:{web_search_requests:2}}},null)).toMatchObject({inputTokens:100+2*3_334,outputTokens:5})
+  })
+  it('charges cached tokens at their real rates: reads 0.1x, 5-minute writes 1.25x, 1-hour and unsplit writes 2x',()=>{
+    const usage=(u:Record<string,unknown>)=>usageOf({model:'claude-sonnet-4-6',usage:{input_tokens:100,output_tokens:10,...u}},null)!.inputTokens
+    expect(usage({cache_read_input_tokens:16_000})).toBe(100+1_600)
+    expect(usage({cache_read_input_tokens:40})).toBe(100+4) // exact, no float drift to 5
+    expect(usage({cache_creation_input_tokens:16_000,cache_creation:{ephemeral_5m_input_tokens:16_000,ephemeral_1h_input_tokens:0}})).toBe(100+20_000)
+    expect(usage({cache_creation_input_tokens:1_000,cache_creation:{ephemeral_5m_input_tokens:0,ephemeral_1h_input_tokens:1_000}})).toBe(100+2_000)
+    expect(usage({cache_creation_input_tokens:1_000})).toBe(100+2_000)
+    // A split larger than the total never charges more than was written.
+    expect(usage({cache_creation_input_tokens:100,cache_creation:{ephemeral_5m_input_tokens:500}})).toBe(100+125)
+    expect(usage({cache_read_input_tokens:1})).toBe(101) // rounds up, never down
+  })
+  it('prices a cached meal-chat reply near its real cost, not ten times it',()=>{
+    // 2026-10-31: a ~16k-token cached prompt was ledgered at ~5¢ a reply.
+    const u=usageOf({model:'claude-sonnet-4-6',usage:{input_tokens:300,output_tokens:150,cache_read_input_tokens:16_000}},null)!
+    expect(u.inputTokens).toBe(1_900)
   })
   it('reads both vendor usage formats',()=>{
     expect(usageOf({usage:{prompt_tokens:3,completion_tokens:2}},'gpt-4o-mini')).toEqual({model:'gpt-4o-mini',inputTokens:3,outputTokens:2,minutes:0})

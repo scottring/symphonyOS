@@ -87,6 +87,24 @@ describe('CanvasActivityProvider', () => {
     expect(screen.getByTestId('state').textContent).toBe('answered|||')
   })
 
+  // 2026-10-31: a refused allowance read "Couldn't reach Symphony", sending
+  // Scott after a connection problem that wasn't there.
+  it('says the AI allowance is used up, not that Symphony was unreachable, and offers no retry', async () => {
+    let api!: CanvasActivity
+    render(<Harness initial={[]} after={[]} writers={{}} onReady={(a) => { api = a }} retryTurn={() => {}} />)
+    act(() => api.turnStarted('Move tonight’s dinner to 5pm', false))
+    act(() => api.turnEnded({ didWrite: false, error: "Today's AI allowance is used up.", errorCode: 'ai_daily_limit', text: '' }))
+    expect(screen.getByTestId('state').textContent).toBe("failed|Today's AI allowance is used up. Nothing changed.||")
+  })
+
+  it('still calls a dropped connection a connection failure', async () => {
+    let api!: CanvasActivity
+    render(<Harness initial={[]} after={[]} writers={{}} onReady={(a) => { api = a }} retryTurn={() => {}} />)
+    act(() => api.turnStarted('Move tonight’s dinner to 5pm', false))
+    act(() => api.turnEnded({ didWrite: false, error: 'Connection dropped', text: '' }))
+    expect(screen.getByTestId('state').textContent).toMatch(/^failed\|Couldn't reach Symphony\. Nothing changed\./)
+  })
+
   it('runs manual commands with saved/failed states, Undo and Retry', async () => {
     let api!: CanvasActivity
     render(<Harness initial={[]} after={[]} writers={{}} onReady={(a) => { api = a }} />)

@@ -287,6 +287,17 @@ describe('useMealPlannerChat', () => {
     expect(result.current.toolActivity).toBeNull()
   })
 
+  it('says the allowance is used up plainly, without "something went wrong" or UTC', async () => {
+    vi.stubGlobal('fetch', fetchResolvedWith([frame({ type: 'error', message: 'The AI allowance for this day has been reached. It resets at 2026-11-01T00:00:00.000Z (UTC).', code: 'ai_daily_limit', retry_at: '2099-11-01T00:00:00.000Z' })]))
+
+    const { result } = renderHook(() => useMealPlannerChat(weekStart))
+    await act(async () => { await result.current.send('hi') })
+    await waitFor(() => expect(result.current.busy).toBe(false))
+
+    expect(result.current.messages[1].content).toMatch(/^Today's AI allowance is used up\. It resets .+\. You can still change your plans directly\.$/)
+    expect(result.current.messages[1].content).not.toMatch(/UTC|went wrong/)
+  })
+
   it('appends an error-prefixed assistant message when the request itself throws', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network dropped'))))
 

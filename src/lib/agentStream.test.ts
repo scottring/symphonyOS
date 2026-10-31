@@ -75,6 +75,27 @@ describe('streamSymphonyAgent request', () => {
     const body = JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)
     expect(body.changeCard).toEqual(changeCard)
   })
+
+  it('turns an in-stream allowance refusal into the plain message, in local time, with its code', async () => {
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({ data: { session: { access_token: 't' } }, error: null } as never)
+    const ev = { type: 'error', message: 'The AI allowance for this day has been reached. It resets at 2026-11-01T00:00:00.000Z (UTC).', code: 'ai_daily_limit', retry_at: '2099-11-01T00:00:00.000Z' }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(`data: ${JSON.stringify(ev)}\n\n`)))
+    const onError = vi.fn()
+    await streamSymphonyAgent([{ role: 'user', content: 'move dinner' }], { onError })
+    const [message, , , code] = onError.mock.calls[0]
+    expect(code).toBe('ai_daily_limit')
+    expect(message).toMatch(/^Today's AI allowance is used up\. It resets /)
+    expect(message).not.toMatch(/UTC/)
+  })
+
+  it('passes any other error through unchanged and without a code', async () => {
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({ data: { session: { access_token: 't' } }, error: null } as never)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('data: {"type":"error","message":"Agent failed"}\n\n')))
+    const onError = vi.fn()
+    await streamSymphonyAgent([{ role: 'user', content: 'x' }], { onError })
+    expect(onError.mock.calls[0][0]).toBe('Agent failed')
+    expect(onError.mock.calls[0][3]).toBeUndefined()
+  })
 })
 
 describe('describeRefusal', () => {

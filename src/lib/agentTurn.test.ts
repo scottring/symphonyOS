@@ -125,6 +125,14 @@ describe('runAgentTurn outcome', () => {
     vi.mocked(streamSymphonyAgent).mockImplementation(async () => { throw new Error('boom') })
     expect((await runAgentTurn([])).outcome.state).toBe('failed')
   })
+  it('an allowance refusal is the reply itself, not wrapped in "something went wrong"', async () => {
+    const plain = "Today's AI allowance is used up. It resets at 8:00 PM. You can still change your plans directly."
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h: StreamHandlers) => { h.onError?.(plain, undefined, undefined, 'ai_daily_limit') })
+    const r = await runAgentTurn([])
+    expect(r.text).toBe(plain)
+    expect(r.errorCode).toBe('ai_daily_limit')
+    expect(r.outcome.state).toBe('failed')
+  })
   it('an error event that carries the writes so far keeps them', async () => {
     vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h: StreamHandlers) => {
       h.onTool?.('symphony_create_task')

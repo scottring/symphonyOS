@@ -41,7 +41,7 @@ export interface AssistantTurnObserver {
   proposal?: (items: AgentProposalItem[]) => void
   changeSet?: (set: ChangeSet) => void
   point?: (p: { dates: string[]; taskIds: string[] }) => void
-  end?: (turn: { turnId: string; didWrite: boolean; error: string | null; text: string; requestId?: string }) => void
+  end?: (turn: { turnId: string; didWrite: boolean; error: string | null; errorCode?: string; text: string; requestId?: string }) => void
   /** The change card's state to tell this turn (read once per turn). */
   changeCard?: () => ChangeCardNote | undefined
 }
@@ -290,7 +290,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     const assistantSources: AgentSourceNote[] | undefined = turn.sources
 
     if (turn.didWrite) onMutate?.()
-    if (!localTurn) turnObserver?.end?.({ turnId, didWrite: turn.didWrite, error: turn.error, text: turn.text, ...(turn.requestId ? { requestId: turn.requestId } : {}) })
+    if (!localTurn) turnObserver?.end?.({ turnId, didWrite: turn.didWrite, error: turn.error, ...(turn.errorCode ? { errorCode: turn.errorCode } : {}), text: turn.text, ...(turn.requestId ? { requestId: turn.requestId } : {}) })
     await persistTurn([
       ...messages,
       userMsg,

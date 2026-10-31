@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
+import { allowanceMessage, isAllowanceCode } from '@/lib/aiAllowance'
 
 export interface ChatMsg {
   role: 'user' | 'assistant'
@@ -14,7 +15,7 @@ export interface ChatMsg {
  *    {type:'text', text}  — a complete text block from the current turn.
  *    {type:'tool', name}  — a tool call is about to run.
  *    {type:'done', reply} — the authoritative final assistant reply. No sessionId.
- *    {type:'error', message}
+ *    {type:'error', message, code?, retry_at?}
  *  Unlike the (delta-streamed) symphony-agent function, `text` here is the
  *  FULL text of the block that turn produced, not an incremental delta —
  *  the edge fn does one non-streaming Anthropic call per tool-loop turn.
@@ -26,6 +27,9 @@ interface SseEvent {
   name?: string
   reply?: string
   message?: string
+  /** On an allowance refusal: 'ai_daily_limit' | 'ai_monthly_limit', and when it resets. */
+  code?: string
+  retry_at?: string
 }
 
 /**
@@ -209,7 +213,12 @@ export function useMealPlannerChat(weekStart: Date, windowStart: Date = weekStar
             // wrong" on the next visit.
             if (reply) void persist('assistant', reply)
           } else if (evt.type === 'error') {
-            patchLastMessage({ content: `Something went wrong: ${evt.message ?? 'unknown error'}`, pending: false })
+            patchLastMessage({
+              content: isAllowanceCode(evt.code)
+                ? allowanceMessage(evt.code, typeof evt.retry_at === 'string' ? evt.retry_at : null)
+                : `Something went wrong: ${evt.message ?? 'unknown error'}`,
+              pending: false,
+            })
           }
         }
       }

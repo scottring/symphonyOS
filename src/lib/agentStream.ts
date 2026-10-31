@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { explainContext } from '@/lib/explain/pageGuides'
 import { parseSteps } from '@/lib/explain/steps'
 import { requestShow } from '@/lib/explain/showSignal'
+import { allowanceMessage, isAllowanceCode } from '@/lib/aiAllowance'
 
 export interface AgentSourceNote { id: string; title: string; vaultPath?: string }
 
@@ -34,7 +35,7 @@ export type AgentStreamEvent =
   | { type: 'point'; dates: string[]; taskIds: string[] }
   | { type: 'show'; steps: unknown }
   | { type: 'done'; reply: string; sessionId: string | null; sources?: AgentSourceNote[]; outcome?: unknown; requestId?: string }
-  | { type: 'error'; message: string; outcome?: unknown; requestId?: string }
+  | { type: 'error'; message: string; outcome?: unknown; requestId?: string; code?: string; retry_at?: string }
 
 /**
  * Parse a growing SSE buffer. Returns the complete events found and the
@@ -115,7 +116,8 @@ export interface StreamHandlers {
   onSession?: (sessionId: string) => void
   onDone?: (reply: string, sessionId: string | null, sources?: AgentSourceNote[], outcome?: TurnOutcome, requestId?: string) => void
   /** `outcome` carries the writes made before the failure, when the server got that far. */
-  onError?: (message: string, outcome?: TurnOutcome, requestId?: string) => void
+  /** `code` is set for an AI allowance refusal ('ai_daily_limit' | 'ai_monthly_limit'); its message is then already the plain one. */
+  onError?: (message: string, outcome?: TurnOutcome, requestId?: string, code?: string) => void
   attachment?: AttachmentMeta
   /** The caller's own family-member id, so the agent can assign personal
    *  routines to them (otherwise they're unassigned and the Today "my tasks"
@@ -241,7 +243,11 @@ export async function streamSymphonyAgent(
       else if (ev.type === 'point') handlers.onPoint?.({ dates: Array.isArray(ev.dates) ? ev.dates : [], taskIds: Array.isArray(ev.taskIds) ? ev.taskIds : [] })
       else if (ev.type === 'session') handlers.onSession?.(ev.sessionId)
       else if (ev.type === 'done') handlers.onDone?.(ev.reply, ev.sessionId, ev.sources, parseTurnOutcome(ev.outcome), typeof ev.requestId === 'string' ? ev.requestId : undefined)
-      else if (ev.type === 'error') handlers.onError?.(ev.message, parseTurnOutcome(ev.outcome), typeof ev.requestId === 'string' ? ev.requestId : undefined)
+      else if (ev.type === 'error') {
+        const requestId = typeof ev.requestId === 'string' ? ev.requestId : undefined
+        if (isAllowanceCode(ev.code)) handlers.onError?.(allowanceMessage(ev.code, typeof ev.retry_at === 'string' ? ev.retry_at : null), parseTurnOutcome(ev.outcome), requestId, ev.code)
+        else handlers.onError?.(ev.message, parseTurnOutcome(ev.outcome), requestId)
+      }
     }
   }
 }

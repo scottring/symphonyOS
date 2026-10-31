@@ -39,15 +39,33 @@ export function usageOf(body: unknown, fallbackModel: string | null): AiUsageRec
   const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : 0)
   const model = typeof b.model === 'string' ? b.model : fallbackModel
   if (!model) return null
-  // Charge cached reads at the full input rate and cache creation at 2x.
-  // This intentionally overestimates cache discounts; it never omits them.
+  // The ledger prices input-equivalent tokens, so cached tokens are folded in
+  // at what Anthropic charges for them: a cache read at 0.1x the input rate
+  // (0.1x on Sonnet and Haiku, less on Opus 5.5 and Fable, so never under), a
+  // five-minute cache write at 1.25x, a one-hour write at 2x, and a write the
+  // reply doesn't break down at 2x. Until 2026-10-31 reads were charged at the
+  // full rate, which put a cached chat at about ten times its real cost and
+  // ran the household's daily allowance out by mid-afternoon.
   // Each web search's 1¢ fee rides along as the input tokens that cost 1¢.
   const tools = u.server_tool_use && typeof u.server_tool_use === 'object' ? u.server_tool_use as Record<string, unknown> : {}
-  const input = n(u.input_tokens ?? u.prompt_tokens) + 2*n(u.cache_creation_input_tokens) + n(u.cache_read_input_tokens)
+  const input = n(u.input_tokens ?? u.prompt_tokens) + cachedInputTokens(u)
     + n(tools.web_search_requests) * searchFeeTokens(model)
   const output = n(u.output_tokens ?? u.completion_tokens)
   if (!input && !output) return null
   return { model, inputTokens: input, outputTokens: output, minutes: 0 }
+}
+
+/** Cache reads and writes as input-equivalent tokens, rounded up. Worked in
+ *  twentieths so the multipliers stay exact (0.1 = 2/20, 1.25 = 25/20). */
+function cachedInputTokens(u: Record<string, unknown>): number {
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : 0)
+  const read = n(u.cache_read_input_tokens)
+  const written = n(u.cache_creation_input_tokens)
+  const split = u.cache_creation && typeof u.cache_creation === 'object' ? u.cache_creation as Record<string, unknown> : {}
+  const fiveMinute = Math.min(n(split.ephemeral_5m_input_tokens), written)
+  const oneHour = Math.min(n(split.ephemeral_1h_input_tokens), written - fiveMinute)
+  const unsplit = written - fiveMinute - oneHour
+  return Math.ceil((2*read + 25*fiveMinute + 40*(oneHour + unsplit)) / 20)
 }
 
 export class AiUsageError extends Error {

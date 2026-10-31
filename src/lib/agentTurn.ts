@@ -74,6 +74,8 @@ export interface AgentTurnResult {
   didWrite: boolean
   /** The raw stream failure, when there was one. */
   error: string | null
+  /** Set when the failure was the AI allowance, not the connection. */
+  errorCode?: string
   /** The server's verdict on what the turn did. Never absent: a stream that
    *  failed without one is 'unverified'. */
   outcome: TurnOutcome
@@ -96,6 +98,7 @@ export async function runAgentTurn(
   let sources: AgentSourceNote[] | undefined
   let didWrite = false
   let streamError: string | null = null
+  let errorCode: string | undefined
   let outcome: TurnOutcome | undefined
   let requestId: string | undefined
   // Set on a tool event, cleared on the next text delta. A tool call sits
@@ -136,8 +139,9 @@ export async function runAgentTurn(
           handlers.onSources?.(replySources)
         }
       },
-      onError: (message, serverOutcome, serverRequestId) => {
+      onError: (message, serverOutcome, serverRequestId, code) => {
         streamError = message
+        if (code) errorCode = code
         if (serverOutcome) outcome = serverOutcome
         if (serverRequestId) requestId = serverRequestId
         handlers.onError?.(message)
@@ -164,7 +168,10 @@ export async function runAgentTurn(
   if (text.length === 0) {
     text = !streamError && outcome?.state === 'proposed'
       ? 'The updated plan is ready to review. Nothing is saved until you approve.'
-      : !streamError && outcome?.say?.trim() ? outcome.say : streamError
+      : !streamError && outcome?.say?.trim() ? outcome.say
+      // The allowance message is already the whole, plain answer.
+      : streamError && errorCode ? streamError
+      : streamError
       ? `Something went wrong on my end (${streamError}). Please try that again.`
       : 'Something went wrong on my end — please try that again.'
     handlers.onFallbackText?.(text)
@@ -176,5 +183,5 @@ export async function runAgentTurn(
   const fallback: TurnOutcome = streamError
     ? (didWrite ? UNKNOWN_OUTCOME : { state: 'failed', writes: [], say: 'Nothing saved.' })
     : didWrite ? UNKNOWN_OUTCOME : { state: 'answered', writes: [], say: 'Nothing was changed.' }
-  return { text, sources, didWrite, error: streamError, outcome: outcome ?? fallback, ...(requestId ? { requestId } : {}) }
+  return { text, sources, didWrite, error: streamError, ...(errorCode ? { errorCode } : {}), outcome: outcome ?? fallback, ...(requestId ? { requestId } : {}) }
 }
