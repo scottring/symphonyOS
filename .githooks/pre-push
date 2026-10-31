@@ -8,7 +8,7 @@
 #
 # - Only enforces for pushes whose target ref is refs/heads/main. Feature/WIP
 #   branch pushes (preview deploys) are never blocked.
-# - tsc --noEmit is BLOCKING (a type error fails the Vercel build anyway; catch
+# - The build's typecheck (tsc -b) is BLOCKING (a type error fails the Vercel build anyway; catch
 #   it here in seconds instead of after a wasted deploy).
 # - Unit tests run and report. They are NON-blocking until the suite is green:
 #   set BLOCK_ON_TESTS=1 below once the 4 known-failing tests are fixed.
@@ -40,8 +40,11 @@ echo "▶ pre-push: pushing to main (this auto-deploys to production) — runnin
 
 # stdin here is the push ref list (already consumed above); redirect from
 # /dev/null so tsc/vitest don't inherit it and get killed mid-run in the hook.
-echo "▶ typecheck: npx tsc --noEmit"
-if ! npx tsc --noEmit < /dev/null; then
+# The build's own typecheck (package.json "build"). The root tsconfig only
+# holds project references, so a bare `tsc --noEmit` checked no app code and
+# passed a broken build (2026-10-31: a deleted type reached Vercel).
+echo "▶ typecheck: npx tsc -b tsconfig.app.json tsconfig.node.json"
+if ! npx tsc -b tsconfig.app.json tsconfig.node.json < /dev/null; then
   echo "✖ Type errors — push to main BLOCKED (would fail the Vercel build)."
   echo "  Fix the errors above, or push to a feature branch instead."
   exit 1
