@@ -1,7 +1,6 @@
 // src/components/plan/v2/WeekMenu.tsx
 //
-// The Week header's ⋯: what isn't due (planning again, early, a review never
-// done — WeekV2's), then its four view choices (useWeekViewPrefs, remembered
+// The Week header's ⋯: what isn't due (planning again — WeekV2's), then its four view choices (useWeekViewPrefs, remembered
 // on this device) in the shared PageMenu.
 
 import { useWeekViewPrefs, type WeekViewPref } from '@/hooks/useWeekViewPrefs'

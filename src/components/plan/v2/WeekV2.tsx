@@ -109,7 +109,6 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   })
   const reviewWord = weekPhrase(weekStart)
   const nextWeek = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
-  const nextSession = usePlanningSession('weekly', weekToken(nextWeek))
 
   // The week's planned mark — the record "I’m happy with this week" wrote,
   // which Home's checklist reads. Written now by finishing the full deck.
@@ -156,19 +155,18 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   // which opens on Looking back at last week. Planned: no button. Its last
   // day, until reviewed: "Review this week" — the deck on next week, which
   // looks back at this one and records its review. Reviewed: no button. The
-  // rest waits in ⋯; nothing while the deck is open.
+  // rest waits in ⋯ ("Plan this week again"); nothing while the deck is open.
+  // ⋯ once also offered "Review last week" and "Plan next week early"
+  // (removed 2026-10-31): the first opened the same deck as Plan this week,
+  // and the second could never open (deckWeekAllowed lets next week's deck
+  // open only on this week's last day, when "Review this week" is it).
   type Offer = { id: string; label: string; due: boolean; run: () => void }
-  const settled = !session.loading && !nextSession.loading && !thisReview.loading && !lastReview.loading
+  const settled = !session.loading && !thisReview.loading && !lastReview.loading
   const planned = !session.error && !!session.saved
-  const nextPlanned = !nextSession.error && !!nextSession.saved
-  const nextWord = isCurrent ? 'next week' : weekPhrase(nextWeek)
   const offers: Offer[] = deckMode || !deck || !settled ? [] : [
     ...(target === 'this' && isCurrent && !thisReview.error && !thisReview.reviewed
       ? [{ id: 'review', label: `Review ${reviewWord}`, due: true, run: () => setMode('plan', nextWeek) }] : []),
-    ...(target === 'previous' && deck.available && !lastReview.error && !lastReview.reviewed
-      ? [{ id: 'review-last', label: 'Review last week', due: false, run: () => setMode('review') }] : []),
     ...(plannable ? [{ id: 'plan', label: planned ? `Plan ${reviewWord} again` : `Plan ${reviewWord}`, due: !planned, run: () => setMode('plan') }] : []),
-    ...(!nextPlanned && isCurrent ? [{ id: 'plan-next', label: target === 'this' ? `Plan ${nextWord}` : `Plan ${nextWord} early`, due: false, run: () => setMode('plan', nextWeek) }] : []),
   ]
   const primary = offers.find((o) => o.due) ?? null
   // The fact line: this week's count and bar, when it was planned, and

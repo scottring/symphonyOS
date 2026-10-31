@@ -192,6 +192,9 @@ export function HomeHeader(props: HomeHeaderProps) {
         role="menu"
         aria-label="Days on screen"
         ref={menuRef}
+        // Safari does not focus a pressed button: without this the press
+        // blurs to the page and onBlur closes the menu before the click.
+        tabIndex={-1}
         onKeyDown={(e) => {
           if (e.key === 'Escape') { e.preventDefault(); closeMenu(true); return }
           if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
@@ -202,7 +205,7 @@ export function HomeHeader(props: HomeHeaderProps) {
           items[next]?.focus()
         }}
         onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && e.relatedTarget !== menuButtonRef.current) setMenuOpen(false) }}
-        className="absolute left-0 top-full z-30 mt-1 flex min-w-40 flex-col rounded-md border border-neutral-200 bg-bg-elevated py-1 font-sans shadow-lg"
+        className="absolute left-0 top-full z-30 mt-1 flex min-w-40 flex-col rounded-md outline-none border border-neutral-200 bg-bg-elevated py-1 font-sans shadow-lg"
       >
         {PRESETS.map((p) => (
           <button

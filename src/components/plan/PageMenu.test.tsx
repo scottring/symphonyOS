@@ -21,6 +21,21 @@ describe('PageMenu', () => {
     expect(screen.getByRole('menuitemcheckbox', { name: 'Show done' })).toHaveFocus()
   })
 
+  // Safari (the iPad, the Mac app) does not focus a pressed button: focus goes
+  // to the nearest focusable ancestor, else the page, whose blur closed the
+  // menu before the click landed (every item did nothing, 2026-10-31). The
+  // menu itself takes that focus, so a press inside keeps it open.
+  it('a press inside keeps it open where buttons take no focus (Safari)', () => {
+    const { tick } = setup()
+    const menu = screen.getByRole('menu')
+    expect(menu).toHaveAttribute('tabindex', '-1')
+    const item = screen.getByRole('menuitemcheckbox', { name: 'Show done' })
+    fireEvent.blur(item, { relatedTarget: menu })
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    fireEvent.click(item)
+    expect(tick).toHaveBeenCalled()
+  })
+
   it('a tick keeps the menu open; an action closes it', () => {
     const { tick, act } = setup()
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Show done' }))

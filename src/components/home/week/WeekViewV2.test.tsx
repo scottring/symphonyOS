@@ -1144,35 +1144,6 @@ describe('WeekViewV2 — the deck', () => {
     expect(props().stripDays.map((d) => !!(d as { past?: boolean }).past)).toEqual([true, true, true, false, false, false, false])
   })
 
-  // I4: one record of last week's review — finishing the deck takes its
-  // review out of ⋯ without a reload.
-  const weekMenu = () => {
-    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
-    return within(screen.getByRole('menu', { name: 'Week options' })).queryAllByRole('menuitem').map((i) => i.textContent)
-  }
-  it('after finishing the deck, ⋯ no longer offers last week’s review, without a reload', async () => {
-    open('?review=1', [createMockTask({ id: 'a', title: 'Fix the gate', scheduledFor: new Date(2026, 9, 12), isAllDay: true, updatedAt: recent })])
-    await act(async () => { await props().onFinish() })
-    await waitFor(() => expect(screen.queryByTestId('deck')).toBeNull())
-    expect(weekMenu()).not.toContain('Review last week')
-  })
-
-  it('Review last week, in ⋯, sets review=1 on the viewed week', () => {
-    open('', [])
-    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Review last week' }))
-    const q = new URLSearchParams(window.location.search)
-    expect(q.get('review')).toBe('1')
-    expect(q.get('date')).toBeNull()
-    expect(screen.getByTestId('deck')).toHaveAttribute('data-mode', 'full')
-  })
-
-  it('once last week is reviewed, ⋯ offers no review of it', () => {
-    periodReview.reviewed = { at: new Date(2026, 9, 16, 17) } // Friday
-    open('', [])
-    expect(weekMenu()).not.toContain('Review last week')
-  })
-
   it('next week on this week’s last day: planning it stays on that week', () => {
     vi.setSystemTime(new Date(2026, 9, 23, 18))
     const next = new Date(2026, 9, 24)

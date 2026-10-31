@@ -170,28 +170,23 @@ describe('WeekV2 header — the fact line', () => {
     expect(document.querySelector('.wk-facts')?.textContent).toBe('4 of 16 done · planned Sunday · Today: Kaleb’s baseball')
   })
 
-  it('last week’s review, never done, waits in ⋯ and opens the deck here', () => {
+  // ⋯ no longer offers "Review last week" (it opened the same deck as Plan
+  // this week) or "Plan next week early" (that deck never opened mid-week).
+  it('⋯ offers no review of last week and no early plan of next week', () => {
     session.saved = { authorId: 'me', at: new Date(2026, 8, 27, 18) }
-    renderAt('/week', { deck: makeDeck() })
-    expect(screen.queryByRole('button', { name: /^Review/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Review last week' }))
-    expect(where().get('review')).toBe('1')
-    expect(screen.getByRole('region', { name: 'Plan this week' })).toBeTruthy()
-    cleanup()
-    review.reviewed = { at: new Date(2026, 8, 26, 17), authorId: 'me', wentWell: '', didnt: '' }
     renderAt('/week', { deck: makeDeck() })
     fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
     expect(screen.queryByRole('menuitem', { name: 'Review last week' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /^Plan next week/ })).toBeNull()
   })
 
-  it('planned, mid-week: no button; planning again and next week early wait in ⋯', () => {
+  it('planned, mid-week: no button; planning again waits in ⋯', () => {
     session.saved = { authorId: 'me', at: new Date(2026, 8, 27, 18) }
     renderAt('/week', { deck: makeDeck() })
     expect(document.querySelectorAll('.pv2-btn')).toHaveLength(0)
     fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
     const items = within(screen.getByRole('menu', { name: 'Week options' })).getAllByRole('menuitem').map((i) => i.textContent)
-    expect(items.filter((t) => /^(Plan|Review) /.test(t ?? ''))).toEqual(['Review last week', 'Plan this week again'])
+    expect(items.filter((t) => /^(Plan|Review) /.test(t ?? ''))).toEqual(['Plan this week again'])
   })
 
   it('on the desk it is the masthead’s subline', () => {
@@ -291,21 +286,20 @@ describe('WeekV2 — Review opens the deck', () => {
     expect(document.querySelectorAll('.pv2-btn')).toHaveLength(0)
   })
 
-  // Last week's review waits in ⋯ once this week is planned.
-  it('early in the week, last week’s review opens the deck here; finishing records it and returns to the week', async () => {
+  it('planning again opens the deck here; finishing records last week’s review and returns to the week', async () => {
     session.saved = { authorId: 'me', at: new Date(2026, 8, 27, 18) }
     const deck = makeDeck()
     renderAt('/week', { deck })
     expect(screen.queryByRole('button', { name: 'Review this week' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Review last week' }))
-    expect(where().get('review')).toBe('1')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Plan this week again' }))
+    expect(where().get('plan')).toBe('1')
     expect(where().get('date')).toBeNull()
     await finishPlanning()
     await vi.waitFor(() => expect(review.finish).toHaveBeenCalledWith({ wentWell: '', didnt: '' }))
     expect(deck.onFinish).toHaveBeenCalledTimes(1)
     expect(await screen.findByText('The days')).toBeTruthy()
-    expect(where().get('review')).toBeNull()
+    expect(where().get('plan')).toBeNull()
   })
 
   // Calm pass 2: the full deck's end is the week's planning, so it marks the

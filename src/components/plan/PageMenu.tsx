@@ -56,9 +56,11 @@ export function PageMenu({ label, choices, talk }: { label: string; choices: Pag
         <span aria-hidden="true">⋯</span>
       </button>
       {open && (
-        <div id={menuId} role="menu" aria-label={label} className="wk-menu"
+        <div id={menuId} role="menu" aria-label={label} className="wk-menu" tabIndex={-1}
           // Focus leaving the menu (and not to its own button) closes it, as
-          // the range menu does.
+          // the range menu does. tabIndex -1: Safari (the iPad, the Mac app)
+          // does not focus a pressed button, so focus would fall to the page
+          // on press and close the menu before the click; it lands here instead.
           onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && e.relatedTarget !== buttonRef.current) setOpen(false) }}
           onKeyDown={(e) => {
             if (e.key === 'Escape') { e.preventDefault(); close(true); return }
