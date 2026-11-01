@@ -1669,7 +1669,7 @@ Deno.serve(async (req) => {
                     ? { error: 'Could not read the tasks, routines and goals to check this list. Try again.' }
                     : resolveRefs(parsed.set, (tasksRead.data ?? []).map(t => ({...t, ...(t.scheduled_for ? {placement:{date:local(t.scheduled_for).date, ...(!t.is_all_day ? {time:local(t.scheduled_for).time} : {})}} : {})})), membersRead.data ?? [], routinesRead.data ?? [], planRead, areasRead.data ?? [])
                   // In a guided step the card keeps to what the step may write.
-                  const resolved = guide && !('error' in checked) ? stepCard(checked.set, guide.writes) : { ...checked, leftOut: [] as string[] }
+                  const resolved = guide && !('error' in checked) ? stepCard(checked.set, guide) : { ...checked, leftOut: [] as string[] }
                   if ('error' in resolved) result = JSON.stringify({ error: resolved.error })
                   else {
                     send({ type: 'change_set', set: resolved.set })

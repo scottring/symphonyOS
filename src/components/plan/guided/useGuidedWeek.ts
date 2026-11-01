@@ -124,7 +124,8 @@ export function useGuidedWeek({ weekStart, isCurrent, tasks, choose, onFinish, o
         aboveTitles: aboveLines.map((l) => l.title),
         guide: {
           level: 'week', stepId: step.id, stepTitle, writes: step.writes, aboveLines,
-          // Life areas come with Stage 3; until then the card's area is the space.
+          // The week files tasks under no life area: none are sent, so the
+          // guide neither sets area_id nor asks about an area (guidePromptBlock).
           areas: [],
           counts: { label: 'tasks on this week', n: count, of: WEEK_COUNT_OF },
         },

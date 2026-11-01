@@ -1,0 +1,102 @@
+{
+  "id": "guide-no-areas-clear-adds",
+  "title": "Week choose step with no life areas: clear adds under the month's line carry no question",
+  "surface": "desktop",
+  "page": "week",
+  "today": "2026-11-02",
+  "weekStart": "2026-11-01",
+  "guided": true,
+  "sessionContext": {
+    "horizon": "weekly",
+    "periodLabel": "Week 45",
+    "stepId": "choose",
+    "stepTitle": "Choose this week's tasks",
+    "guide": {
+      "level": "week",
+      "stepId": "choose",
+      "stepTitle": "Choose this week's tasks",
+      "writes": [
+        "commit",
+        "place"
+      ],
+      "aboveLines": [
+        {
+          "id": "11111111-0000-4000-8000-000000000002",
+          "title": "Finish the GW application"
+        }
+      ],
+      "areas": [],
+      "counts": {
+        "label": "This week",
+        "n": 0,
+        "of": "15"
+      }
+    }
+  },
+  "start": {
+    "members": [
+      {
+        "id": "m-a",
+        "name": "Alex"
+      }
+    ],
+    "tasks": [],
+    "routines": []
+  },
+  "steps": [
+    {
+      "say": "Draft the GW essay and request the GW transcript",
+      "expect": {
+        "outcome": [
+          "proposed"
+        ],
+        "tools": [
+          {
+            "name": "symphony_propose_changes",
+            "input": {
+              "title": "2 tasks for Week 45",
+              "ops": [
+                {
+                  "op": "add",
+                  "title": "Draft the GW essay"
+                },
+                {
+                  "op": "add",
+                  "title": "Request the GW transcript"
+                }
+              ]
+            }
+          }
+        ],
+        "card": {
+          "ops": 2,
+          "contains": [
+            {
+              "op": "add",
+              "title": "Draft the GW essay"
+            },
+            {
+              "op": "add",
+              "title": "Request the GW transcript"
+            }
+          ],
+          "questions": 0
+        },
+        "records": {
+          "created": []
+        }
+      },
+      "forbid": {
+        "tools": [
+          "symphony_create_task",
+          "symphony_update_task",
+          "symphony_propose_plan_items"
+        ],
+        "records": {
+          "created": "any"
+        }
+      },
+      "note": "Week sends no life areas, so the guide must not ask which area either add belongs in; both plainly serve the month's one line (goal_id may be set; the contract store has no month list to check it against). A question on either row fails. Title wording may vary; run with a looser contains if the model rewords."
+    }
+  ]
+}

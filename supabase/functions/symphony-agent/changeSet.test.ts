@@ -513,13 +513,13 @@ describe('plan ops: resolving', () => {
     expect(r.set.ops[0].periodLabel).toBe('Holidays')
     expect(refused({ op: 'plan_add', level: 'season', period_start: '2026-12-01', title: 'x' }, custom)).toContain('2026-11-20 (Holidays)')
   })
-  it('refuses a parent at the wrong level, unseen, let go, or in another life area', () => {
+  it('refuses a parent at the wrong level, unseen, let go, or in another space', () => {
     expect(refused({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: GOAL })).toContain('A month goal serves a season goal')
     expect(refused({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: MONTH2 })).toContain('is not a season goal')
     expect(refused({ op: 'plan_add', level: 'season', period_start: '2026-12-01', title: 'x', parent_id: SEASON })).toContain('A season goal serves a year goal')
     expect(refused({ op: 'plan_add', level: 'season', period_start: '2026-12-01', title: 'x', parent_id: ARCHIVED })).toContain('was let go')
     expect(refused({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: A })).toContain(`No goal ${A}`)
-    expect(refused({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: SEASON, context: 'work' })).toContain('different life area')
+    expect(refused({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: SEASON, context: 'work' })).toContain('is in a different space (personal)')
   })
   it('carries a month goal to the next month (CARRY) or further on (MOVE), with what Symphony saw', () => {
     expect(one({ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-11-01' })).toMatchObject({

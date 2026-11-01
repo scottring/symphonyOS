@@ -521,7 +521,7 @@ function resolvePlanOp(op: ChangeOp, refs: PlanRefs, tasks: Map<string, PlanTask
       if (!years.includes(pGoal.year)) return { error: `"${pGoal.name}" is a ${pGoal.year} goal; ${label(level, start)} is in ${years.join('–')}. Choose a year goal for that year, or leave parent_id out.` }
       parent = { title: pGoal.name, context: pGoal.context }
     }
-    if (next.context && parent.context && parent.context !== next.context) return { error: `"${parent.title}" is in a different life area (${parent.context}); ask which they mean` }
+    if (next.context && parent.context && parent.context !== next.context) return { error: `"${parent.title}" is in a different space (${parent.context}); ask which they mean` }
     if (!next.context && isContext(parent.context)) next.context = parent.context
     next.parentTitle = parent.title
     return { op: next }

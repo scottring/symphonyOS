@@ -96,7 +96,8 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
         horizon: 'daily', periodLabel, stepId: step.id, stepTitle,
         guide: {
           level: 'day', stepId: step.id, stepTitle, writes: step.writes, aboveLines: [],
-          // Life areas come with Stage 3; until then the card's area is the space.
+          // The day files tasks under no life area: none are sent, so the
+          // guide neither sets area_id nor asks about an area (guidePromptBlock).
           areas: [],
           counts: { label: `tasks on ${dayWord}`, n: count, of: DAY_COUNT_OF },
         },
