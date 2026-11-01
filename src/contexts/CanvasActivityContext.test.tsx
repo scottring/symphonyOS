@@ -328,6 +328,28 @@ describe('change sets', () => {
     expect(activity().changeSet).toBeNull()
   })
 
+  it('approving a card of questions only writes nothing, keeps the last Undo, and tells the next turn nothing new', async () => {
+    const undo = vi.fn(async () => true)
+    const applyChanges = vi.fn(async () => ({ ok: true as const, ids: ['a'], undo }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'approved' })
+    const receipt = activity().receipt
+    act(() => activity().setChangeSet({ key: 'q', title: '1 change', ops: [{ key: 'q:0', op: 'add' as const, title: "Mia's dentist", question: 'Which day?' }] }))
+    const onResult = vi.fn()
+    let ok: boolean | undefined
+    await act(async () => { ok = await activity().approveChangeSet(onResult) })
+    expect(ok).toBe(false)
+    expect(onResult).toHaveBeenCalledWith('questions')
+    expect(applyChanges).toHaveBeenCalledTimes(1)
+    expect(activity().receipt).toBe(receipt)
+    expect(activity().changeSet).toMatchObject({ key: 'q', state: 'proposed' })
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending', title: '1 change' })
+    await act(async () => { await activity().undo() })
+    expect(undo).toHaveBeenCalledTimes(1)
+  })
+
   it('tells the next turn the last card was dismissed; a new proposal replaces the note', () => {
     const { activity } = mountActivity({})
     act(() => activity().setChangeSet(set('s1')))

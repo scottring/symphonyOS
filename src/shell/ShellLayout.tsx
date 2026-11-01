@@ -1,6 +1,6 @@
 import { createReviewedWriter, applyReviewedChange } from '@/lib/canvas/reviewedChange'
 import { makeChoiceWriters } from '@/lib/choices/applyDeps'
-import {resolveConversationAction} from '@/lib/conversationActions';
+import {approveWaitingCard, resolveConversationAction} from '@/lib/conversationActions';
 import { connectedDestination, defaultPlanningDestination } from '@/lib/planning/connectedDestination';
 import { useCadenceConfig } from '@/lib/cadence/config';
 import { useGoals } from '@/hooks/useGoals';
@@ -297,7 +297,7 @@ function ShellLayoutInner({ children }: Props) {
   // A guided planning session on the page (GuidedSessionContext): its step
   // goes with every turn, its header tops the conversation, its own thread.
   const guided = useGuidedSession();
-  const approveConversationCard = async () => { const a = canvasRef.current; if (!a?.changeSet) return 'none' as const; let outcome: 'saved' | 'partial' | 'failed' = 'failed'; await a.approveChangeSet(state => { outcome = state; }); return outcome; };
+  const approveConversationCard = () => approveWaitingCard(canvasRef.current);
   const assistant = useSymphonyAssistant({ resolveAction: text => resolveConversationAction(text, approveConversationCard, async () => (await canvasRef.current?.undo()) ?? 'none'), persistKey: 'symphony_rail', onPlanSaved: (saved) => {
     void refetch();
     window.dispatchEvent(new Event('symphony-plan-updated'));
@@ -314,7 +314,7 @@ function ShellLayoutInner({ children }: Props) {
   const workspaceTalkEnabled = false;
   const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace && workspaceTalkEnabled);
   const voiceEnabled = workspaceTalkEnabled && connectedWorkspace && voiceAccess;
-  const voice = useWorkspaceVoice(screenContext, assistant.sendTurn, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null, async () => { const a = canvasRef.current; if (!a?.changeSet) return 'none'; let outcome: 'saved' | 'partial' | 'failed' = 'failed'; await a.approveChangeSet(state => { outcome = state; }); return outcome; }, async () => (await canvasRef.current?.undo()) ?? 'none');
+  const voice = useWorkspaceVoice(screenContext, assistant.sendTurn, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null, approveConversationCard, async () => (await canvasRef.current?.undo()) ?? 'none');
   // Talk to Symphony from anywhere (Scott, 2026-10-14: one front door — ⌘K
   // adds, searches, asks, or talks). Starting closes the box; the conversation
   // carries on in the bar at the page's foot. Already talking: your turn.

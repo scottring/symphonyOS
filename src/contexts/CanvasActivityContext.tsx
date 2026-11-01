@@ -126,7 +126,9 @@ export interface CanvasActivity {
   changeSet: PendingChangeSet | null
   setChangeSet: (set: ChangeSet) => void
   dismissChangeSet: () => void
-  approveChangeSet: (onResult?: (state: 'saved' | 'partial' | 'failed') => void) => Promise<boolean>
+  /** 'questions': every row waits on an answer, so nothing was tried: no
+   *  receipt, the last Undo kept, nothing told to the next turn. */
+  approveChangeSet: (onResult?: (state: 'saved' | 'partial' | 'failed' | 'questions') => void) => Promise<boolean>
   /** For the next turn: the pending card (every turn while it waits), or
    *  what became of the last one (approved or dismissed), told once. */
   takeChangeCard: () => ChangeCardNote | undefined
@@ -381,10 +383,11 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     return cur ? changeCardNote(cur, 'pending') : undefined
   }, [])
   const approvingRef = useRef(false)
-  const approveChangeSet = useCallback(async (onResult?: (state: 'saved' | 'partial' | 'failed') => void) => {
+  const approveChangeSet = useCallback(async (onResult?: (state: 'saved' | 'partial' | 'failed' | 'questions') => void) => {
     const set = changeSet
     if (set?.state === 'partial' && !set.recoverable) { onResult?.('partial'); return false }
     if (approvingRef.current || !set || set.state === 'saving' || !applyChanges) return false
+    if (!toApply(set.ops).length) { onResult?.('questions'); return false }
     approvingRef.current = true
     try {
     setPending({ ...set, state: 'saving', message: undefined })

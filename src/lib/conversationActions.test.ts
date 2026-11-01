@@ -17,6 +17,12 @@ describe('shared conversation actions',()=>{
  })
 })
 
+it('a card of questions only: "go ahead" is not an approval here; it goes to Symphony',async()=>{
+ expect(await resolveConversationAction('go ahead',async()=>'questions',async()=>'none')).toBeNull()
+ // Undo is unaffected.
+ expect((await resolveConversationAction('Undo',async()=>'questions',async()=>'undone'))?.text).toBe('Undone.')
+})
+
 it.each(['Approve these changes.','Approve the changes','Save these changes.'])('accepts a clear complete approval phrase: %s',async text=>{
  const approve=vi.fn(async()=>'saved' as const)
  expect((await resolveConversationAction(text,approve,async()=>'none'))?.text).toBe('Saved.')

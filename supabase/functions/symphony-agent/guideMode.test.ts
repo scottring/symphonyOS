@@ -296,6 +296,14 @@ describe('an add\'s month goal (goal_id) is checked through what the person can 
     expect('error' in resolveRefs(add(), [], [], [], undefined)).toBe(true)
     expect('error' in resolveRefs(add(), [], [], [], plan({ commitments: [{ level: 'season', period_start: '2026-09-01', status: 'open' }] }))).toBe(true)
   })
+  it('only an open goal on this month\'s list or a later one', () => {
+    const on = (period_start: string, status = 'open') => resolveRefs(add(), [], [], [], plan({ commitments: [{ level: 'month', period_start, status }] }))
+    expect('error' in on('2026-11-01')).toBe(false)
+    expect('error' in on('2026-12-01')).toBe(false)
+    expect('error' in on('2026-10-01')).toBe(true)
+    expect('error' in on('2026-11-01', 'carried')).toBe(true)
+    expect('error' in on('2026-11-01', 'removed')).toBe(true)
+  })
   it('refuses a goal in another space', () => {
     const r = resolveRefs(add({ context: 'family' }), [], [], [], plan())
     expect('error' in r && r.error).toMatch(/different space/)

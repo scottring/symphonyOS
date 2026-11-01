@@ -16,7 +16,8 @@ export type AskResult=string|{text:string;outcome?:TurnOutcome}|undefined
 /** One connection owned by the shell, shared by its desktop and phone panes.
  *  Tap to talk: Talk opens the mic for the person's turn, Done sends it
  *  (RealtimeTransport `turns: 'tap'`); their words show as they speak. */
-export type ApproveCard=()=>Promise<'saved'|'none'|'failed'|'partial'>
+/** 'questions': the card's rows all wait on an answer; nothing was saved. */
+export type ApproveCard=()=>Promise<'saved'|'none'|'failed'|'partial'|'questions'>
 export type UndoChange=()=>Promise<'undone'|'none'|'failed'>
 const UNDO=/^\s*undo(?: (?:that|it|the last change))?[.!]*\s*$/i
 
@@ -104,6 +105,7 @@ export function createWorkspaceVoiceToolHandler(
      try {
       const got=await fn()
       if(got==='none')return null
+      if(got==='questions')return 'questions' as const
       if(got==='partial')return {reply:'Only part was saved. Check the card before trying again.',outcome:{state:'partial',say:'Some changes stayed saved. Check the card before trying again.'}}
       return got==='saved'?{reply:'Saved.',outcome:{state:'saved',say:'Saved.'}}:{reply:"Couldn't save it.",outcome:{state:'failed',say:'Not saved. The card on screen says why.'}}
      } catch { return {reply:'The save could not be confirmed. Check the card.',outcome:{state:'unverified',say:'The save could not be confirmed. Check the card.'}} }
@@ -122,12 +124,15 @@ export function createWorkspaceVoiceToolHandler(
     }
     if(name==='undo_last_change')return undo()
     if(name==='approve_card'){
-     return (await approve())??{reply:'No card is waiting.',outcome:{state:'answered',say:'There is no card to approve right now.'}}
+     const r=await approve()
+     if(r==='questions')return {reply:'Every row on the card has a question. Answer them first; nothing was saved.',outcome:{state:'answered',say:'Every row on the card still has a question. Nothing was saved.'}}
+     return r??{reply:'No card is waiting.',outcome:{state:'answered',say:'There is no card to approve right now.'}}
     }
     if(name==='ask_symphony'){
      if(typeof data.request!=='string'||!data.request.trim()||data.request.length>5000)return {error:'Invalid request'}
      if(UNDO.test(data.request))return undo()
-     if(isConversationApproval(data.request)){const r=await approve();if(r)return r}
+     // Only questions on the card: "go ahead" may be an answer, so it goes to Symphony.
+     if(isConversationApproval(data.request)){const r=await approve();if(r&&r!=='questions')return r}
      if(busy.current)return {error:'A save is still running. Wait for it to finish.'}
      busy.current=true;setWorking(true)
      try{

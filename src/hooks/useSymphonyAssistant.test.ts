@@ -587,6 +587,38 @@ it('preserves the actual canvas Undo through shared conversation approval and Un
 })
 
 
+it('a typed "go ahead" with only questions on the card goes to Symphony; nothing saves and the last Undo stays',async()=>{
+ const {resolveConversationAction,approveWaitingCard}=await import('../lib/conversationActions')
+ const undoWrite=vi.fn(async()=>true),apply=vi.fn(async()=>({ok:true as const,summary:'Saved',undo:undoWrite,ids:['new-task']}))
+ const sent:unknown[]=[]
+ vi.mocked(streamSymphonyAgent).mockImplementation(async(messages,h)=>{sent.push(messages);h.onText?.('Which day?');h.onDone?.('Which day?',null)})
+ const wrapper=({children}:{children:React.ReactNode})=>createElement(CanvasActivityProvider,{
+  snapshot:{tasks:[],goals:[]},writers:{deleteTask:vi.fn(),updateTask:vi.fn(),deleteGoal:vi.fn(),updateGoal:vi.fn()},
+  refetch:vi.fn(),applyChanges:apply,children,
+ } as CanvasActivityProviderProps)
+ const {result}=renderHook(()=>{
+  const activity=useCanvasActivity()
+  const assistant=useSymphonyAssistant({persistKey:'symphony_rail',
+   resolveAction:text=>resolveConversationAction(text,()=>approveWaitingCard(activity),activity.undo),
+   turnObserver:{start:({text,retry})=>activity.turnStarted(text,retry),end:activity.turnEnded,changeCard:activity.takeChangeCard},
+  })
+  return {activity,assistant}
+ },{wrapper})
+ act(()=>result.current.activity.setChangeSet({key:'first',title:'Call mom',ops:[{key:'mom',op:'add',title:'Talk to my mom about dinner tonight'}]}))
+ await act(async()=>{await result.current.assistant.sendTurn('Approve')})
+ expect(apply).toHaveBeenCalledTimes(1)
+ act(()=>result.current.activity.setChangeSet({key:'asking',title:'1 change',ops:[{key:'q',op:'add',title:"Mia's dentist",question:'Which day?'}]}))
+ await act(async()=>{await result.current.assistant.sendTurn('go ahead')})
+ expect(apply).toHaveBeenCalledTimes(1)
+ expect(sent).toHaveLength(1)
+ expect((sent[0] as {content:unknown}[]).at(-1)?.content).toBe('go ahead')
+ expect(result.current.activity.changeSet).toMatchObject({key:'asking',state:'proposed'})
+ expect(result.current.activity.receipt?.undoable).toBe(true)
+ await act(async()=>{await result.current.assistant.sendTurn('Undo')})
+ expect(undoWrite).toHaveBeenCalledTimes(1)
+})
+
+
 it('retains the full conversation after a save failure and retries it with the next turn',async()=>{
  vi.mocked(streamSymphonyAgent).mockImplementation(async(_messages,h)=>{h.onText?.('On the card.');h.onDone?.('On the card.',null)})
  const {result}=renderHook(()=>useSymphonyAssistant({persistKey:'symphony_rail'}))

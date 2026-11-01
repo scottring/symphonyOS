@@ -84,6 +84,15 @@ describe('spoken approve',()=>{
   expect((await tool('approve_card',{})) as {outcome:{state:string}}).toMatchObject({outcome:{state:'answered'}})
   expect(await tool('ask_symphony',{request:'approve'})).toEqual({reply:'Nothing to approve.'})
  })
+ it('with only questions on the card, approve_card says so and "go ahead" goes to the assistant',async()=>{
+  const approveCard=vi.fn(async()=>'questions' as const);const ask=vi.fn(async()=>'Which day?')
+  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a',approveCard))
+  await act(()=>result.current.start())
+  const tool=mocks.instances[0].deps.handleTool
+  expect((await tool('approve_card',{})) as {reply:string;outcome:{state:string}}).toMatchObject({reply:expect.stringMatching(/question/),outcome:{state:'answered'}})
+  expect(await tool('ask_symphony',{request:'go ahead'})).toEqual({reply:'Which day?'})
+  expect(ask).toHaveBeenCalledWith('go ahead')
+ })
  it('a failed approve is reported as failed, never as saved',async()=>{
   const {result}=renderHook(()=>useWorkspaceVoice(context,vi.fn(),vi.fn(),true,'a',async()=>'failed' as const))
   await act(()=>result.current.start())

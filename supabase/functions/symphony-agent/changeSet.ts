@@ -579,8 +579,10 @@ function withMonthGoal(op: ChangeOp, plan: PlanRefs | undefined, tasks: Map<stri
   if (op.op !== 'add' || !op.goalId) return { op }
   if (!plan) return { error: 'Could not read the Month list to check this list. Try again.' }
   const goal = tasks.get(op.goalId)
-  if (!goal || !goal.commitments.some((c) => c.level === 'month' && c.status !== 'removed')) {
-    return { error: `No month goal ${op.goalId} that this person can see. Use a month goal's id (symphony_read_plan), or leave goal_id out.` }
+  // Open on this month's list or a later one: not a past month, not let go.
+  const thisMonth = `${plan.today.slice(0, 7)}-01`
+  if (!goal || !goal.commitments.some((c) => c.level === 'month' && c.status === 'open' && c.period_start >= thisMonth)) {
+    return { error: `No open goal ${op.goalId} on this month's list or a later one that this person can see. Use such a month goal's id (symphony_read_plan), or leave goal_id out.` }
   }
   if (goal.completed) return { error: `"${goal.title}" is already done; leave goal_id out or choose another month goal` }
   if (op.context && isContext(goal.context) && goal.context !== op.context) return { error: `"${goal.title}" is in a different space (${goal.context}); ask which they mean` }
