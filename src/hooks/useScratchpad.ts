@@ -6,7 +6,7 @@
 // note jotted on a phone or by the other parent lands on the wall, and owns
 // every write. Each write reports success so the wall can flash a failure.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { scopeForDomain } from '@/lib/scope'
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
@@ -17,11 +17,19 @@ import {
 } from '@/lib/wall/scratchpad'
 
 const COLUMNS = 'id, body, kind, author_member_id, status, resolution, sent_to_member_id, created_at, resolved_at, expires_at'
+// setTimeout's longest wait (~24.8 days); a later end is waited for again.
+const LONGEST_WAIT = 2_147_483_647
 
 export function useScratchpad(userId: string | null) {
   const [notes, setNotes] = useState<ScratchpadNote[]>([])
+  // The kitchen wall stays up for days without reloading, so the soonest
+  // end among the notes loaded reloads the list at that moment.
+  const ending = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reloadAtEnd = useRef<() => void>(() => {})
+  const stopWaiting = () => { if (ending.current) { clearTimeout(ending.current); ending.current = null } }
 
   const load = useCallback(async () => {
+    stopWaiting()
     if (!userId) { setNotes([]); return }
     const now = new Date()
     const since = new Date(now.getTime() - DONE_WINDOW_DAYS * 86_400_000).toISOString()
@@ -38,7 +46,15 @@ export function useScratchpad(userId: string | null) {
     const live = (data as (DbScratchpadNote & { expires_at?: string | null })[])
       .filter((r) => !r.expires_at || new Date(r.expires_at).getTime() > now.getTime())
     setNotes(live.map(dbToScratchpadNote))
+    const ends = live.flatMap((r) => r.expires_at ? [new Date(r.expires_at).getTime()] : [])
+    stopWaiting()
+    if (ends.length > 0) {
+      ending.current = setTimeout(() => { ending.current = null; reloadAtEnd.current() },
+        Math.min(LONGEST_WAIT, Math.max(0, Math.min(...ends) - Date.now())))
+    }
   }, [userId])
+  useEffect(() => { reloadAtEnd.current = () => { void load() } }, [load])
+  useEffect(() => () => stopWaiting(), [])
 
   useEffect(() => {
     void load()

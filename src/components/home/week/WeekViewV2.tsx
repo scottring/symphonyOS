@@ -868,17 +868,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
   }, [])
   const canvasWriters = useMemo<WeekCanvasWriters>(() => {
     const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    // Every canvas write goes through here: the activity strip's receipt and
-    // Undo, then — when it saved — word to a listening session.
+    // A placement (a task or routine given a day or a when, an add) goes
+    // through here: the activity strip's receipt and Undo, then — when it
+    // saved — word to a listening session. Ticking done, taking a day off,
+    // reordering, deleting and moving an event are not choosing, and run
+    // through the activity alone.
     const run: typeof activity.run = async (label, command, options) => {
       const ok = await activity.run(label, command, options)
       if (ok) canvasWriteListener.current?.()
       return ok
     }
-    const write = (label: string, t: Task, patch: Partial<Task>, previous?: Partial<Task>) => {
+    const write = (label: string, t: Task, patch: Partial<Task>, previous?: Partial<Task>, placing = true) => {
       // The way back is exactly what the write changed.
       const before = previous ?? Object.fromEntries(Object.keys(patch).map((k) => [k, t[k as keyof Task]])) as Partial<Task>
-      void run(label, async () => (await onUpdateTask(t.id, patch)) as boolean | void, {
+      void (placing ? run : activity.run)(label, async () => (await onUpdateTask(t.id, patch)) as boolean | void, {
         ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) },
       })
     }
@@ -892,10 +895,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
         // A timed task keeps its time on the new day.
         write(`Move “${t.title}” to ${short(day)}`, t, { scheduledFor: at, isAllDay: false, bucket: 'timed' })
       },
-      unplaceTask: (t) => { const { updates, previous } = timingRemoval(t, 'day'); write(`Back to still to place: “${t.title}”`, t, updates, previous) },
+      unplaceTask: (t) => { const { updates, previous } = timingRemoval(t, 'day'); write(`Back to still to place: “${t.title}”`, t, updates, previous, false) },
       toggleTask: (t) => {
         const was = t.completed
-        void run(was ? `Reopen “${t.title}”` : `Done: “${t.title}”`, () => toggleTask(t.id), {
+        void activity.run(was ? `Reopen “${t.title}”` : `Done: “${t.title}”`, () => toggleTask(t.id), {
           ids: [t.id], undo: async () => { await onUpdateTask(t.id, { completed: was }) },
         })
       },
@@ -903,7 +906,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         if (!it.routineId) return
         const id = it.routineId
         const done = !it.completed
-        void run(done ? `Done: “${it.title}”` : `Reopen “${it.title}”`,
+        void activity.run(done ? `Done: “${it.title}”` : `Reopen “${it.title}”`,
           async () => { await (done ? markDone('routine', id, day) : undoDone('routine', id, day)) },
           { ids: [id], undo: async () => { await (done ? undoDone('routine', id, day) : markDone('routine', id, day)) } })
       },
@@ -933,7 +936,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       },
       // Delete from No day yet, with Undo: the same row back (restoreDeleted).
       deleteTask: (t) => {
-        void run(`Delete “${t.title}”`, async () => { await deleteTask(t.id); return true }, {
+        void activity.run(`Delete “${t.title}”`, async () => { await deleteTask(t.id); return true }, {
           ids: [t.id], undo: () => restoreDeleted(addTask, t),
         })
       },
@@ -973,7 +976,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         if (writes.length === 0) return
         const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))
         const up = toIndex < orderedIds.indexOf(t.id)
-        void run(`Move “${t.title}” ${up ? 'up' : 'down'}`, () => writeOrders(writes), {
+        void activity.run(`Move “${t.title}” ${up ? 'up' : 'down'}`, () => writeOrders(writes), {
           ids: writes.map((w) => w.id), undo: async () => { await writeOrders(before) },
         })
       },
@@ -991,7 +994,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           const length = ev.end ? ev.end.getTime() - ev.time.getTime() : 30 * 60_000
           const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), ev.time.getHours(), ev.time.getMinutes())
           const was = { startTime: ev.time, endTime: new Date(ev.time.getTime() + length) }
-          void run(`Move “${ev.title}” to ${short(day)}`,
+          void activity.run(`Move “${ev.title}” to ${short(day)}`,
             async () => { await onUpdateEvent(eventId, { startTime: start, endTime: new Date(start.getTime() + length) }) },
             { ids: [ev.id], undo: async () => { await onUpdateEvent(eventId, was) } })
         },

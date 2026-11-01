@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useMealWeekParam } from '@/hooks/useMealWeekParam'
 import { ShoppingBasket, MessageCircle, SlidersHorizontal } from 'lucide-react'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { showToast } from '@/hooks/useToast'
@@ -10,7 +10,7 @@ import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { useMobile } from '@/hooks/useMobile'
 import { formatDateMonthDay, dayLabelFor, dateForDayOfWeek, activeDayRange } from '@/lib/weekHelpers'
 import { useCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
-import { storageFor, weekOffsetFor, windowWeeks } from '@/lib/mealWeek'
+import { storageFor, windowWeeks } from '@/lib/mealWeek'
 import { WeekGrid } from './WeekGrid'
 import { WeekRangePopover } from './WeekRangePopover'
 import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
@@ -49,8 +49,8 @@ export function PlanPage() {
   // the Week page does; meals stay stored by Sunday week (mealWeek.ts).
   const { config: { weekStartsOn } } = useCadenceConfig()
   // Opened on a given week (?week=, Planning the week's "Open the meal plan").
-  const [params] = useSearchParams()
-  const [weekOffset, setWeekOffset] = useState(() => weekOffsetFor(params.get('week'), new Date(), weekStartsOn))
+  const initialWeek = useMealWeekParam(weekStartsOn)
+  const [weekOffset, setWeekOffset] = useState(initialWeek)
   const weekStart = useMemo(() => addWeeks(weekStartAnchor(new Date(), weekStartsOn), weekOffset), [weekStartsOn, weekOffset])
   // The chat plans one stored Sunday week: the one holding most of these days.
   const chatWeek = useMemo(() => {

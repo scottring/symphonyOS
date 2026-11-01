@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 
 // The read the hook makes, recorded; the rows it gets back.
-const db = vi.hoisted(() => ({ ors: [] as string[], rows: [] as Record<string, unknown>[] }))
+const db = vi.hoisted(() => ({ ors: [] as string[], rows: [] as Record<string, unknown>[], loads: 0 }))
 vi.mock('@/lib/supabase', () => {
   const query = () => {
     const chain: Record<string, unknown> = {
-      select: () => chain,
+      select: () => { db.loads++; return chain },
       or: (f: string) => { db.ors.push(f); return chain },
       order: () => chain,
       limit: () => Promise.resolve({ data: db.rows, error: null }),
@@ -31,7 +31,7 @@ const row = (id: string, expires_at: string | null) => ({
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-09T12:00:00Z'))
-  db.ors = []; db.rows = []
+  db.ors = []; db.rows = []; db.loads = 0
 })
 afterEach(() => { vi.useRealTimers() })
 
@@ -47,5 +47,26 @@ describe('useScratchpad — notes that last a while', () => {
     db.rows = [row('kept', null), row('later', '2026-11-15T05:00:00Z'), row('gone', '2026-11-08T05:00:00Z')]
     const { result } = renderHook(() => useScratchpad('me'))
     await waitFor(() => expect(result.current.notes.map((n) => n.id)).toEqual(['kept', 'later']))
+  })
+
+  // The kitchen wall stays up for days without reloading: a note leaves at
+  // its end without anyone touching the wall.
+  it('a note leaves the wall at its end, with no other reload', async () => {
+    vi.useRealTimers(); vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] }); vi.setSystemTime(new Date('2026-11-07T23:00:00Z'))
+    db.rows = [row('kept', null), row('week', '2026-11-08T05:00:00Z'), row('later', '2026-11-15T05:00:00Z')]
+    const { result, unmount } = renderHook(() => useScratchpad('me'))
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(result.current.notes.map((n) => n.id)).toEqual(['kept', 'week', 'later'])
+    const before = db.loads
+    await act(async () => { await vi.advanceTimersByTimeAsync(6 * 3_600_000 - 1_000) })
+    expect(db.loads).toBe(before)
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+    expect(db.loads).toBe(before + 1)
+    expect(result.current.notes.map((n) => n.id)).toEqual(['kept', 'later'])
+    // The next end waits for its own moment; leaving the wall stops waiting.
+    const after = db.loads
+    unmount()
+    await act(async () => { await vi.advanceTimersByTimeAsync(8 * 86_400_000) })
+    expect(db.loads).toBe(after)
   })
 })

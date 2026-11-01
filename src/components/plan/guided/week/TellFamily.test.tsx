@@ -59,4 +59,26 @@ describe('TellFamily — step 7, the wall for the week', () => {
     expect(screen.getByRole('list', { name: 'This week’s Family items' })).toHaveTextContent('Fix the gateBook the vet')
     expect(box()).toHaveValue('')
   })
+
+  it('a line over 500 characters is not cut: Post waits, and says why', () => {
+    render(<Held />)
+    fireEvent.change(box(), { target: { value: `Grandma visits\n${'x'.repeat(501)}` } })
+    expect(screen.getByRole('status')).toHaveTextContent('A line is over 500 characters')
+    expect(screen.getByRole('button', { name: 'Post to the wall' })).toBeDisabled()
+    fireEvent.change(box(), { target: { value: `Grandma visits\n${'x'.repeat(500)}` } })
+    expect(screen.queryByText('A line is over 500 characters')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Post to the wall' })).toBeEnabled()
+  })
+
+  it('not knowing who wrote it still posts, and says so in the log', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    wall.me.mockImplementationOnce(async () => { throw new Error('offline') })
+    render(<Held />)
+    fireEvent.change(box(), { target: { value: 'Grandma visits' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Post to the wall' })) })
+    expect(wall.add).toHaveBeenCalledWith('me', 'Grandma visits', 'note', null, nextWeek)
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('who wrote it'), expect.any(Error))
+    expect(screen.getByRole('status')).toHaveTextContent('Posted 1 note')
+    log.mockRestore()
+  })
 })

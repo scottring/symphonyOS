@@ -9,6 +9,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { addScratchpadNote, ownMemberId } from '@/lib/wall/addScratchpadNote'
 
 const notes = (n: number) => `${n} ${n === 1 ? 'note' : 'notes'}`
+/** The wall's longest note (addScratchpadNote keeps 500 characters). */
+const LONGEST = 500
 
 export function TellFamily({ weekStart, familyItems, draft, onDraft }: {
   weekStart: Date
@@ -24,13 +26,20 @@ export function TellFamily({ weekStart, familyItems, draft, onDraft }: {
   const [result, setResult] = useState<{ posted: number; failed: number } | null>(null)
   const text = draft ?? ''
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  // Posted exactly as written, so a line too long for the wall waits rather
+  // than being cut.
+  const tooLong = lines.some((l) => l.length > LONGEST)
 
   const post = async () => {
-    if (!user?.id || lines.length === 0) return
+    if (!user?.id || lines.length === 0 || tooLong) return
     setPosting(true); setResult(null)
     // The wall keeps a note until the week is over: the next week's start.
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
-    const author = await ownMemberId(user.id).catch(() => null)
+    // Not knowing who wrote it does not stop the notes: they post unsigned.
+    const author = await ownMemberId(user.id).catch((e: unknown) => {
+      console.error('[tell the family] could not tell who wrote it:', e)
+      return null
+    })
     const left: string[] = []
     let posted = 0
     for (const line of lines) {
@@ -56,9 +65,10 @@ export function TellFamily({ weekStart, familyItems, draft, onDraft }: {
       onChange={(e) => { setResult(null); onDraft(e.target.value || null) }} />
     <p className="gw-row-note">Each line is its own note on the wall, until the week is over.</p>
     <div className="gw-save">
+      {tooLong && <p className="choose-status is-failed" role="status">A line is over {LONGEST} characters</p>}
       {result && result.failed === 0 && <p className="choose-status" role="status">Posted {notes(result.posted)}</p>}
       {result && result.failed > 0 && <p className="choose-status is-failed" role="alert">Posted {notes(result.posted)}. {result.failed} didn’t post. Try again.</p>}
-      <button type="button" className="deck-btn" disabled={posting || lines.length === 0 || !user?.id} onClick={() => { void post() }}>{posting ? 'Posting…' : 'Post to the wall'}</button>
+      <button type="button" className="deck-btn" disabled={posting || lines.length === 0 || tooLong || !user?.id} onClick={() => { void post() }}>{posting ? 'Posting…' : 'Post to the wall'}</button>
     </div>
   </div>
 }

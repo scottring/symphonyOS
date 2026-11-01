@@ -981,8 +981,8 @@ describe('WeekViewV2 — the deck', () => {
 
   // Ledger ruling (Task 8/10): a write saved on the page while planning counts
   // as applied — the session hears of each canvas write that saved.
-  it('each write the week canvas saves is told to a listening session; one that failed is not', async () => {
-    const gate = createMockTask({ id: 'gate', title: 'Fix the gate', bucket: 'week', weekStart: sat, updatedAt: recent })
+  it('each placement the week canvas saves is told to a listening session; other writes and failures are not', async () => {
+    const gate = createMockTask({ id: 'gate', title: 'Fix the gate', context: 'family', bucket: 'week', weekStart: sat, updatedAt: recent })
     const onUpdateTask = vi.fn(async () => true as boolean)
     open('?plan=1', [gate], { onUpdateTask })
     const heard = vi.fn()
@@ -991,14 +991,24 @@ describe('WeekViewV2 — the deck', () => {
     await act(async () => { writers.placeTask(gate, new Date(2026, 9, 19)); await new Promise((r) => setTimeout(r, 0)) })
     expect(onUpdateTask).toHaveBeenCalledWith('gate', expect.anything())
     expect(heard).toHaveBeenCalledTimes(1)
+    // Only placing counts: ticking done, taking a day off, reordering are not choosing.
+    await act(async () => {
+      writers.toggleTask(gate); writers.unplaceTask(gate); writers.deleteTask?.(gate)
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(onUpdateTask).toHaveBeenCalledTimes(2)
+    expect(heard).toHaveBeenCalledTimes(1)
+    // A when given in No day yet is a placement too.
+    await act(async () => { writers.triageTask?.(gate, 'this-month'); await new Promise((r) => setTimeout(r, 0)) })
+    expect(heard).toHaveBeenCalledTimes(2)
     onUpdateTask.mockImplementation(async () => false)
     await act(async () => { writers.placeTask(gate, new Date(2026, 9, 20)); await new Promise((r) => setTimeout(r, 0)) })
-    expect(heard).toHaveBeenCalledTimes(1)
+    expect(heard).toHaveBeenCalledTimes(2)
     // Stopped, nothing more is heard.
     stop()
     onUpdateTask.mockImplementation(async () => true)
     await act(async () => { writers.placeTask(gate, new Date(2026, 9, 21)); await new Promise((r) => setTimeout(r, 0)) })
-    expect(heard).toHaveBeenCalledTimes(1)
+    expect(heard).toHaveBeenCalledTimes(2)
   })
 
   it('Weekly ops is handed the routines the page shows: the space filter applies', () => {
