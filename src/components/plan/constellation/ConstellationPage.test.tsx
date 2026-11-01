@@ -5,8 +5,10 @@ import {ConstellationPage} from './ConstellationPage'
 import {ConversationWalkContext} from '@/components/canvas/conversationWalk'
 const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),updateTaskOrders:vi.fn(),redraw:(()=>{}) as ()=>void,tasks:[] as any[],goals:[] as any[]}))
 const activity=vi.hoisted(()=>({calls:[] as {label:string;ok:boolean;opts:any}[],proposals:[] as any[],changeSet:null as any,setProposalState:vi.fn(),removeProposal:vi.fn()}))
+const lifeAreas=vi.hoisted(()=>({list:[] as any[]}))
 const launcher=vi.hoisted(()=>({openAssistant:vi.fn()}))
 const selection=vi.hoisted(()=>({setSelection:vi.fn()}))
+vi.mock('@/hooks/useLifeAreas',()=>({useLifeAreas:()=>({areas:lifeAreas.list,loading:false})}))
 vi.mock('@/contexts/GoalsContext',()=>({GoalsProvider:({children}:any)=>children,useGoalsContext:()=>({goals:api.goals,loading:false,...api})}))
 vi.mock('@/contexts/CanvasActivityContext',()=>({
  useCanvasActivity:()=>({proposals:activity.proposals,changeSet:activity.changeSet,setProposalState:activity.setProposalState,removeProposal:activity.removeProposal,
@@ -87,7 +89,7 @@ const at=(d:Date)=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(d)}
 const pastLookingBack=async()=>{fireEvent.click(screen.getByRole('button',{name:/^On to /}));await screen.findByRole('radiogroup',{name:'View'})}
 const REVIEWED={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
 beforeEach(()=>{
- vi.clearAllMocks();review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
+ vi.clearAllMocks();review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
  HTMLElement.prototype.scrollIntoView=vi.fn()
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
@@ -1414,5 +1416,29 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
   open()
   expect(tag('Together')).toHaveTextContent(/^Fall · 3$/)
   expect(row('Health').querySelector('.plan-item-below')).toBeNull()
+ })
+})
+
+describe('grouped by life area',()=>{
+ const A=(id:string,name:string,sortOrder:number)=>({id,name,context:'personal',mine:true,sortOrder})
+ const heads=()=>Array.from(document.querySelectorAll('.plan-area-head')).map(h=>h.textContent)
+ it('draws no headings when there are no life areas',()=>{
+  open()
+  expect(heads()).toEqual([])
+  expect(titles('2026 goals')).toEqual(['Together','Health'])
+ })
+ it('gathers year goals under their area, No area last; an area the viewer cannot see falls under No area',()=>{
+  lifeAreas.list=[A('a2','Money',1),A('a1','Family',0),A('a3','Fun',2)]
+  api.goals=[{id:'g1',name:'Save',year:2026,status:'active',context:'personal',areaId:'a2'},{id:'g2',name:'Plain',year:2026,status:'active',context:'personal',areaId:''},{id:'g3',name:'Dinners',year:2026,status:'active',context:'personal',areaId:'a1'},{id:'g4',name:'Hidden one',year:2026,status:'active',context:'personal',areaId:'not-mine'}]
+  open()
+  expect(heads()).toEqual(['Family','Money','No area'])
+  expect(titles('2026 goals')).toEqual(['Dinners','Save','Plain','Hidden one'])
+ })
+ it('gathers a month\'s lines by their task area',()=>{
+  lifeAreas.list=[A('a1','Health',0)]
+  api.tasks=[{id:'t1',title:'Loose',bucket:'month',context:'personal',areaId:null},{id:'t2',title:'Run',bucket:'month',context:'personal',areaId:'a1'}]
+  month()
+  expect(heads()).toEqual(['Health','No area'])
+  expect(titles('October goals')).toEqual(['Run','Loose'])
  })
 })

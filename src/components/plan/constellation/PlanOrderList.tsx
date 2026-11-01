@@ -63,9 +63,11 @@ export interface PlanOrderListProps<T> {
   onReorder: (id: string, orderedIds: string[], toIndex: number) => void
   /** Rows drawn after the lines, inside the list and always shown (pending ones). */
   tail?: ReactNode
+  /** A group's plain name (a life area), drawn above its first line. Items must already be in group order; omit for an ungrouped list. */
+  headingOf?: (t: T) => string | null
 }
 
-export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinnedOf, renderRow, onReorder, tail }: PlanOrderListProps<T>) {
+export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinnedOf, renderRow, onReorder, tail, headingOf }: PlanOrderListProps<T>) {
   const coarse = useMediaQuery('(pointer: coarse)')
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: MOUSE_MOVE }),
@@ -162,7 +164,13 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinn
 
   return <DndContext sensors={sensors} onDragStart={onTouchStart} onDragMove={onTouchMove} onDragEnd={onTouchEnd} onDragCancel={endDrag}>
     <ul ref={listRef} className={`plan-items plan-goal-list${dragId ? ' is-ordering' : ''}`} aria-label={label} {...listDrop}>
-      {shown.map(row)}
+      {headingOf
+        ? shown.map((t, i) => {
+          const h = headingOf(t)
+          return [h !== null && (i === 0 || headingOf(shown[i - 1]) !== h)
+            ? <li key={`area:${h}`} className="plan-area-head" role="presentation">{h}</li> : null, row(t)]
+        })
+        : shown.map(row)}
       {tail}
     </ul>
     <FoldToggle toggle={toggle} />

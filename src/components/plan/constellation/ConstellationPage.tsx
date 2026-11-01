@@ -75,6 +75,8 @@ import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { compareSortOrder, nextTaskSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
 import { PlanOrderList, type RowOrder } from './PlanOrderList'
+import { useLifeAreas } from '@/hooks/useLifeAreas'
+import { groupByArea } from '@/lib/guide/byArea'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { aboveOf, periodMoves } from './horizonPanel'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
@@ -147,6 +149,7 @@ function Inner() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const area = useAddArea()
+  const { areas: lifeAreas } = useLifeAreas()
   const { getRoutinesForDate } = useRoutines()
   // The shell's "How this page works", or the page's own ask where it offers none.
   const shellHelp = usePageHelp()
@@ -512,7 +515,15 @@ function Inner() {
   const openNodes = inOrder(levelNodes.filter(isOpen))
   const doneNodes = levelNodes.filter(isDone)
   const movedNodes = levelNodes.filter((n) => !isDone(n) && !!movedLabel(n))
-  const items = showDone ? [...openNodes, ...movedNodes, ...doneNodes] : openNodes
+  const listed = showDone ? [...openNodes, ...movedNodes, ...doneNodes] : openNodes
+  // With life areas, the lines gather under their area's name ("No area" last).
+  // A year goal's areaId is '' when it has none; areas the viewer cannot see
+  // are not in lifeAreas, so their lines fall under "No area".
+  const nodeArea = (n: PlanNode) => n.goal ? n.goal.areaId : n.task?.areaId
+  const areaGroups = lifeAreas.length ? groupByArea(listed.map((n) => ({ n, areaId: nodeArea(n) })), lifeAreas) : null
+  const items = areaGroups ? areaGroups.flatMap((g) => g.items.map((x) => x.n)) : listed
+  const areaNameOf = new Map(lifeAreas.map((a) => [a.id, a.name]))
+  const headingOf = areaGroups ? (n: PlanNode) => areaNameOf.get(nodeArea(n) ?? '') ?? 'No area' : undefined
   // "5 done, 1 moved on · Taxes, Picnic…": what is no longer open, in one line.
   const folded = [...doneNodes, ...movedNodes]
   const doneLine = `${[doneNodes.length ? `${doneNodes.length} done` : '', movedNodes.length ? `${movedNodes.length} moved on` : ''].filter(Boolean).join(', ')} · ${folded.slice(0, 2).map((n) => n.title).join(', ')}${folded.length > 2 ? '…' : ''}`
@@ -1083,7 +1094,7 @@ function Inner() {
           routinesNote={level === 2 ? 'Weekly routines are on the Week; every-day ones on Today.' : 'Monthly routines are on each month.'} />
         <div className={`hs-main plan-horizon-body${preview.next.length ? ' has-next' : ''}`}>
         <section className={`plan-list plan-card${linkOver === '' ? ' is-link-over' : ''}`} {...listDrop} data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
-          <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items}
+          <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items} headingOf={headingOf}
             keyOf={(n) => n.key} titleOf={(n) => n.title}
             // Only an open line orders; done and moved-on lines keep their place.
             orderIdOf={(n) => isOpen(n) ? n.id : null}
