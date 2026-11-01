@@ -1,6 +1,7 @@
 // A period's review by hand (periodReview.ts): two short notes and when it was
 // finished, kept as `notes.periodReview` on that period's planning_sessions row —
-// the same row usePlanningSession reads, under the same RLS. It never writes
+// the same row usePlanningSession reads. Per person: reads are filtered to the
+// signed-in person's own row, so a partner's review is not mine. It never writes
 // `savedAt`, so a review never marks the period planned; the row's other notes
 // (a week's plan) are read first and kept.
 
@@ -13,7 +14,7 @@ export type ReviewNotes = { wentWell: string; didnt: string }
 export type Reviewed = ReviewNotes & { at: Date; authorId: string }
 type Row = { author_id: string; notes?: { periodReview?: { wentWell?: string; didnt?: string; at?: string } } | null }
 
-/** The latest finished review of the period, by anyone in the household. */
+/** The latest finished review among the rows given (the caller passes only its own). */
 export function latestReview(rows: readonly Row[]): Reviewed | null {
   let best: Reviewed | null = null
   for (const r of rows) {
@@ -36,15 +37,16 @@ export function usePeriodReview(horizon: SessionHorizon, token: string) {
   const load = useCallback(async () => {
     const req = ++latest.current
     if (!token) { setLoading(false); return }
+    if (!user?.id) return
     setLoading(true)
     setError(null)
     const { data, error: readError } = await supabase.from('planning_sessions')
-      .select('author_id, notes').eq('horizon', horizon).eq('period_token', token)
+      .select('author_id, notes').eq('author_id', user.id).eq('horizon', horizon).eq('period_token', token)
     if (req !== latest.current) return
     if (readError) { setError(readError.message); setLoading(false); return }
-    const rows = (data ?? []) as Row[]
+    const rows = ((data ?? []) as Row[]).filter((r) => r.author_id === user.id)
     setReviewed(latestReview(rows))
-    const own = latestReview(rows.filter((r) => r.author_id === user?.id))
+    const own = latestReview(rows)
     setMine(own ? { wentWell: own.wentWell, didnt: own.didnt } : null)
     setLoading(false)
   }, [horizon, token, user?.id])

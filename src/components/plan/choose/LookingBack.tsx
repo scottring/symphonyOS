@@ -25,7 +25,7 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, alsoDone
   /** Saves the two notes (the period's review), then moves on. False: it didn't save. */
   onContinue: (notes: ReviewNotes) => Promise<boolean>
   onLeave: () => void
-  /** Already reviewed: when, and by whom ("Reviewed Oct 17 by you"). */
+  /** Already reviewed: when ("Reviewed Oct 17"); reviews are per person. */
   reviewed?: string | null
 }) {
   const hasTotal = outOf !== undefined && outOf >= done && outOf > 0

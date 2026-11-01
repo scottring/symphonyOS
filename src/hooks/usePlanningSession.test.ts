@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 
 const rows: Array<Record<string, unknown>> = []
+const eqCalls: Array<[string, unknown]> = []
 const upsert = vi.fn(async () => ({ error: null }))
 let ownRow: { notes: Record<string, unknown> } | null = null
 let orderImpl: () => Promise<{ data: unknown[]; error: null }> = async () => ({ data: rows, error: null })
@@ -10,7 +11,7 @@ vi.mock('@/lib/supabase', () => ({
     from: () => ({
       // Reads: .eq().eq().order() for the page; .eq() x3 .maybeSingle() for a save's own row.
       select: () => {
-        const chain = { eq: () => chain, order: () => orderImpl(), maybeSingle: async () => ({ data: ownRow, error: null }) }
+        const chain = { eq: (c: string, v: unknown) => { eqCalls.push([c, v]); return chain }, order: () => orderImpl(), maybeSingle: async () => ({ data: ownRow, error: null }) }
         return chain
       },
       upsert,
@@ -23,7 +24,18 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: authUser }) }))
 import { usePlanningSession, monthToken, weekToken, yearToken } from './usePlanningSession'
 
 describe('usePlanningSession', () => {
-  beforeEach(() => { authUser = { id: 'u1' }; rows.length = 0; ownRow = null; upsert.mockClear(); orderImpl = async () => ({ data: rows, error: null }) })
+  beforeEach(() => { eqCalls.length = 0; authUser = { id: 'u1' }; rows.length = 0; ownRow = null; upsert.mockClear(); orderImpl = async () => ({ data: rows, error: null }) })
+
+  it('is planned per person: a partner\'s saved row does not mark my period planned, and the read is mine', async () => {
+    rows.push({ author_id: 'u2', updated_at: '2026-10-02T09:00:00Z', notes: { wentWell: 'x', savedAt: '2026-10-02T09:00:00Z' } })
+    rows.push({ author_id: 'u1', updated_at: '2026-10-01T09:00:00Z', notes: { wentWell: 'mine' } })
+    orderImpl = async () => ({ data: rows.filter((r) => eqCalls.some(([c, v]) => c === 'author_id' && v === r.author_id)), error: null })
+    const { result } = renderHook(() => usePlanningSession('weekly', '2026-10-4'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(eqCalls).toContainEqual(['author_id', 'u1'])
+    expect(result.current.saved).toBeNull()
+  })
+
 
   it('builds the month token the cadence code uses', () => {
     expect(monthToken(new Date(2026, 9, 1))).toBe('2026-10')

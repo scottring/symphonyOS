@@ -4,15 +4,16 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 let rows: Array<Record<string, unknown>> = []
 let ownRow: { notes: Record<string, unknown> } | null = null
 let ownError: { message: string } | null = null
+const eqCalls: Array<[string, unknown]> = []
 const upsert = vi.fn(async () => ({ error: null }))
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
       select: () => {
-        // Two .eq() for the period's rows; a third and .maybeSingle() for my own.
+        // Three .eq() (author, horizon, period) for my rows; .maybeSingle() after them for my own row.
         let eqs = 0
         const chain = {
-          eq: () => { eqs++; return eqs === 2 ? Object.assign(Promise.resolve({ data: rows, error: null }), chain) : chain },
+          eq: (c: string, v: unknown) => { eqCalls.push([c, v]); eqs++; return eqs === 3 ? Object.assign(Promise.resolve({ data: rows, error: null }), chain) : chain },
           maybeSingle: async () => ({ data: ownRow, error: ownError }),
         }
         return chain
@@ -37,7 +38,16 @@ describe('latestReview', () => {
 })
 
 describe('usePeriodReview', () => {
-  beforeEach(() => { rows = []; ownRow = null; ownError = null; upsert.mockClear() })
+  beforeEach(() => { eqCalls.length = 0; rows = []; ownRow = null; ownError = null; upsert.mockClear() })
+
+  it('is per person: the read is filtered to my rows, so a partner\'s review is not mine to see', async () => {
+    rows = [{ author_id: 'u2', notes: { periodReview: { wentWell: 'x', didnt: '', at: '2026-10-30T10:00:00Z' } } }]
+    const { result } = renderHook(() => usePeriodReview('monthly', '2026-10'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(eqCalls).toContainEqual(['author_id', 'u1'])
+    // Defence in depth: even if a partner's row came back, it is not "reviewed".
+    expect(result.current.reviewed).toBeNull()
+  })
 
   it('finishing keeps the row\'s plan notes and never marks the period planned', async () => {
     ownRow = { notes: { wentWell: 'plan note', focus: 'Rest', savedAt: '2026-10-02T09:00:00Z' } }

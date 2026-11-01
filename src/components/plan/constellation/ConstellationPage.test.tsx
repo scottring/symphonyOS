@@ -965,13 +965,13 @@ describe('reviewing: Looking back, then plan',()=>{
    expect(screen.queryByRole('button',{name:/^Review /})).toBeNull()
   }finally{vi.useRealTimers()}
  })
- it('says who reviewed it already, and keeps what they wrote',()=>{
+ it('says it was reviewed already, and keeps what they wrote',()=>{
   review.prevReviewed={wentWell:'Cabin booked',didnt:'',at:new Date(2026,9,31),authorId:'u2'}
   review.mine={wentWell:'Cabin booked',didnt:''}
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,12))
   try{
    open('/month?view=constellation&horizon=2&start=2026-11-09&plan=1')
-   expect(screen.getByText('Reviewed Oct 31 by Iris')).toBeInTheDocument()
+   expect(screen.getByText('Reviewed Oct 31')).toBeInTheDocument()
    expect(screen.getByRole('textbox',{name:'What went well'})).toHaveValue('Cabin booked')
   }finally{vi.useRealTimers();review.prevReviewed=null;review.mine=null}
  })

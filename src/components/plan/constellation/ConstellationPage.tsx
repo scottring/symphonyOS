@@ -1052,7 +1052,7 @@ function Inner() {
       : planning && choose && !looked ? <section className="deck choose-flow plan-choose" aria-label={`Plan ${periodWord}`} key={`look:${periodKey}`}>
           <LookingBack kicker={`Review ${prevWord} · then plan ${periodWord}`} periodWord={prevWordCap} done={prevDone} outOf={prevAll} alsoDone={prevAlso} notDone={choose.carriedCount}
             initial={prevReview.mine}
-            reviewed={prevReview.reviewed ? `Reviewed ${prevReview.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} by ${byWhom(prevReview.reviewed.authorId)}` : null}
+            reviewed={prevReview.reviewed ? `Reviewed ${prevReview.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null}
             nextLabel={level > 0 ? `On to ${aboveWord} goals → ${periodWord}` : `On to ${periodWord}`}
             onLeave={() => setMode(null)}
             onContinue={async (notes) => { const ok = await prevReview.finish(notes); if (ok) setLookedKey(periodKey); return ok }} />

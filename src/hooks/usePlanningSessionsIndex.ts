@@ -1,17 +1,16 @@
 // src/hooks/usePlanningSessionsIndex.ts
 //
-// "Which periods has the household already planned" — read once for
-// `planningNudge` (src/lib/planning/nudges.ts). RLS on `planning_sessions`
-// already scopes the select to the caller's household, so an unfiltered read
-// is the household's own rows, the same trust boundary `usePlanningSession`
-// relies on.
+// "Which periods have I already planned" — read once for `planningNudge`
+// (src/lib/planning/nudges.ts). Per person: the select is filtered to the
+// signed-in person's own rows (RLS is author-only too; this is defence in
+// depth), so a partner's plan never counts as mine.
 //
 // Re-fetches on `visibilitychange`, mirroring `useFirstWeekSignals` — saving a
 // session happens on another route (the wizard), so the count can go stale
 // while Today stays mounted in another tab.
 
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { completedCadenceTokens } from '@/lib/assistant/cadenceDue'
 
 function hasSavedAt(savedAt: unknown): boolean {
@@ -44,9 +43,13 @@ export function usePlanningSessionsIndex(): PlanningSessionsIndex {
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    const { data: auth } = await getAuthUser()
+    const uid = auth.user?.id
+    if (!uid) { setLoading(false); return }
     const { data, error: err } = await supabase
       .from('planning_sessions')
       .select('horizon, period_token, savedAt:notes->>savedAt, wentWell:notes->>wentWell, didnt:notes->>didnt')
+      .eq('author_id', uid)
     if (err) {
       setError(err.message)
       // Unknown is not "never planned" — don't flash the first-use nudge on

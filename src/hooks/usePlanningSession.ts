@@ -1,7 +1,7 @@
 // "Planned <date>" and the look-back notes. One row per author per period
-// (UNIQUE author_id, horizon, period_token); household members can read each
-// other's rows (existing RLS), so a period planned by either peer reads as
-// planned for both. A row is SAVED only when notes.savedAt is set — the old
+// (UNIQUE author_id, horizon, period_token). "Planned" is per person: reads are
+// filtered to the signed-in person's own row (RLS is author-only too, this is
+// defence in depth), so a partner's plan never marks my period planned. A row is SAVED only when notes.savedAt is set — the old
 // wizard created rows on open (cadenceDue.ts), and those must not count.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -54,7 +54,7 @@ export function usePlanningSession(horizon: SessionHorizon, token: string) {
     const { data, error: readError } = await shareInFlight(
       `planning_sessions:${user.id}|${horizon}|${token}`,
       async () => await supabase.from('planning_sessions')
-        .select('author_id, updated_at, notes').eq('horizon', horizon).eq('period_token', token)
+        .select('author_id, updated_at, notes').eq('author_id', user.id).eq('horizon', horizon).eq('period_token', token)
         .order('updated_at', { ascending: false }),
     )
     if (req !== latest.current) return
