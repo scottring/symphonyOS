@@ -662,9 +662,15 @@ function GuidePanel() {
 // ?date=, and moving the day writes ?date= from the URL as it last rendered.
 function DatedPage({ first, render: page, spy }: { first: Date; render: (d: Date, change: (d: Date) => void) => React.ReactNode; spy: (d: Date) => void }) {
   const [params, setParams] = useSearchParams()
-  const [own, setViewed] = useState(first)
+  // The viewed day is its own state, moved by a ?date= that appears or
+  // changes and NOT by one that goes away (HomeViewContainer's contract).
+  const [viewed, setViewed] = useState(first)
+  const [seen, setSeen] = useState<string | null>(null)
   const raw = params.get('date')
-  const viewed = raw ? new Date(Number(raw.slice(0, 4)), Number(raw.slice(5, 7)) - 1, Number(raw.slice(8, 10))) : own
+  if (raw !== seen) {
+    setSeen(raw)
+    if (raw) setViewed(new Date(Number(raw.slice(0, 4)), Number(raw.slice(5, 7)) - 1, Number(raw.slice(8, 10))))
+  }
   const change = (next: Date) => {
     spy(next)
     setViewed(next)
@@ -751,7 +757,9 @@ describe('TodayView — the Day session', () => {
     expect(search().get('date')).toBe(localYmd(at(0, 1)))
     await user.click(screen.getByRole('button', { name: 'Leave' }))
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
-    expect(screen.getByRole('heading', { level: 1, name: at(0).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })).toBeInTheDocument()
+    // Today keeps its clean URL: no ?date= naming it.
+    expect(search().get('date')).toBeNull()
+    await vi.waitFor(() => expect(screen.getByRole('heading', { level: 1, name: at(0).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })).toBeInTheDocument())
   })
 
   it('a task dragged onto the day while on Pick marks the day planned', async () => {

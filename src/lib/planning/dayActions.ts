@@ -16,8 +16,8 @@ export interface DayActions {
   undone: (t: Task) => Promise<boolean>
   /** Off `from`, onto this week (the week containing now) with no day. */
   backToWeek: (t: Task, from: Date) => Promise<boolean>
-  /** Back exactly as `before` was: its day and time, its focus, its week and
-   *  month commitments. The Undo of a choice. */
+  /** Back exactly as `before` was: its day and time, its weekend window, its
+   *  focus, its week and month commitments. The Undo of a choice. */
   restore: (before: Task) => Promise<boolean>
 }
 
@@ -29,12 +29,12 @@ export function onThisWeek(t: Task, now: Date, weekStartsOn: WeekStart): boolean
 
 export function makeDayActions(deps: {
   plan: PlanActions
-  /** The page's (gated) task writer; false means it did not save. */
-  updateTask: (id: string, updates: Partial<Task>) => Promise<unknown> | void
+  /** The page's (gated) task writer; false means it did not save. A page
+   *  without one cannot restore anything. */
+  updateTask: ((id: string, updates: Partial<Task>) => Promise<unknown> | void) | undefined
   toggle: (taskId: string) => unknown
 }): DayActions {
   const { plan } = deps
-  const saved = async (r: Promise<unknown> | void) => (await r) !== false
   return {
     place: (t, day, time) => {
       if (!time) return plan.chooseTaskDay(t.id, day)
@@ -51,11 +51,16 @@ export function makeDayActions(deps: {
       if (!onThisWeek(t, new Date(), readCadenceConfig().weekStartsOn)) await plan.commitTask(t.id, 'week')
       return true
     },
-    restore: (before) => saved(deps.updateTask(before.id, {
-      scheduledFor: before.scheduledFor ?? undefined,
-      ...(before.scheduledFor ? { isAllDay: before.isAllDay ?? true } : {}),
-      focus: focusSnapshot(before),
-      commitments: bootstrapCommitments(before),
-    })),
+    restore: async (before) => {
+      if (!deps.updateTask) return false
+      const result = await deps.updateTask(before.id, {
+        scheduledFor: before.scheduledFor ?? undefined,
+        ...(before.scheduledFor ? { isAllDay: before.isAllDay ?? true } : {}),
+        weekendStart: before.weekendStart,
+        focus: focusSnapshot(before),
+        commitments: bootstrapCommitments(before),
+      })
+      return result !== false
+    },
   }
 }

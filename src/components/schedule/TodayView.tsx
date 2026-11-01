@@ -667,16 +667,30 @@ export function TodayView({
     if (localYmd(viewedDate) !== targetKey) movedFrom.current = localYmd(viewedDate)
     setDayParams(sessionUrl)
   }
+  // Back to today is a clean URL (no ?date= naming today), and a ?date=
+  // that goes away does not move the page: so the URL is written first and
+  // the day moved once the session has closed (returnTo, below).
+  const returnTo = useRef<Date | null>(null)
   const closeDaySession = () => {
     const back = movedFrom.current
     movedFrom.current = null
+    const goBack = !!back && localYmd(viewedDate) === targetKey
+    const backIsToday = goBack && back === localYmd(new Date())
+    if (backIsToday) returnTo.current = new Date(new Date().setHours(0, 0, 0, 0))
     setDayParams((prev) => {
       const p = new URLSearchParams(prev)
       p.delete('plan')
-      if (back && localYmd(viewedDate) === targetKey) p.set('date', back)
+      if (backIsToday) p.delete('date')
+      else if (goBack) p.set('date', back!)
       return p
     })
   }
+  useEffect(() => {
+    if (planOpen || !returnTo.current) return
+    const today = returnTo.current
+    returnTo.current = null
+    onDateChange(today)
+  }, [planOpen, onDateChange])
   // Review today is retired: its link opens the session.
   useEffect(() => {
     if (dayParams.get('review') !== '1') return
@@ -693,7 +707,8 @@ export function TodayView({
   const movedFor = useRef<string | null>(null)
   const viewedKeyNow = localYmd(viewedDate)
   useEffect(() => {
-    if (!planOpen) { movedFor.current = null; return }
+    // Closed by any route (Leave, Done, Back, a link): it moved nothing.
+    if (!planOpen) { movedFor.current = null; movedFrom.current = null; return }
     if (movedFor.current === targetKey) return
     movedFor.current = targetKey
     if (viewedKeyNow === targetKey) return
@@ -737,7 +752,7 @@ export function TodayView({
   // The page's own writers, each given the day it acts on.
   const dayActions = useMemo(() => makeDayActions({
     plan: planActions,
-    updateTask: (id, u) => ctx.onUpdateTask?.(id, u),
+    updateTask: ctx.onUpdateTask,
     toggle: onToggleTask,
   }), [planActions, ctx, onToggleTask])
   // Done planning: the day is stamped planned (the existing savedAt).

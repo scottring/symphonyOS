@@ -61,6 +61,22 @@ describe('makeDayActions', () => {
     })
   })
 
+  it('Undo brings back a weekend window the pick took away', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 10, 3, 9))
+    const before = createMockTask({ id: 't', title: 'Clean the garage', bucket: 'week', weekStart: new Date(2026, 10, 1), weekendStart: new Date(2026, 10, 7), scheduledFor: undefined, isAllDay: undefined })
+    const w = world(before, new Date(2026, 10, 3, 9))
+    await w.actions.place(before, new Date(2026, 10, 3))
+    expect(w.task.weekendStart).toBeUndefined()
+    await w.actions.restore(before)
+    expect(w.task.weekendStart).toEqual(new Date(2026, 10, 7))
+  })
+
+  it('restore says it did not save when there is no task writer', async () => {
+    const plan = makePlanActions({ findTask: () => undefined, updateTask: vi.fn(), pushTask: vi.fn(), setRoutinePlanned: vi.fn(async () => true), rescheduleRoutine: vi.fn(async () => null) })
+    const actions = makeDayActions({ plan, updateTask: undefined, toggle: vi.fn() })
+    expect(await actions.restore(createMockTask({ id: 't' }))).toBe(false)
+  })
+
   describe('"Back to this week" across a week boundary', () => {
     it('Sunday-start: on Sunday morning yesterday was last week; it lands on this week, and Undo takes that week off again', async () => {
       const SUN = new Date(2026, 10, 1, 9), SAT = new Date(2026, 9, 31)
