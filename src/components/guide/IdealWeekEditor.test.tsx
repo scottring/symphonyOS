@@ -120,6 +120,27 @@ describe('IdealWeekEditor', () => {
     expect(goal).toHaveValue('')
   })
 
+  it('a press inside the new row with no next focus named (Safari) keeps the row open; the first press outside adds it', () => {
+    const onChange = vi.fn()
+    render(<IdealWeekEditor value={{ blocks: [] }} goals={goals} onChange={onChange} />)
+    const hours = screen.getByLabelText('Hours for new block')
+    const goal = screen.getByLabelText('Goal for new block')
+    fireEvent.change(screen.getByLabelText('Label for new block'), { target: { value: 'Training' } })
+    fireEvent.change(hours, { target: { value: '3h' } })
+    fireEvent.pointerDown(goal)
+    fireEvent.blur(hours)
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.change(goal, { target: { value: 'g2' } })
+    fireEvent.pointerDown(goal)
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.pointerDown(document.body)
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange.mock.calls[0][0].blocks).toEqual([expect.objectContaining({ label: 'Training', hours: 3, goalId: 'g2' })])
+    // Done watching: another press outside adds nothing more.
+    fireEvent.pointerDown(document.body)
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
   it('an unreadable amount stops saying so as soon as it is retyped', () => {
     render(<IdealWeekEditor value={week} goals={goals} onChange={vi.fn()} />)
     const hours = screen.getByLabelText('Hours for Sleep')

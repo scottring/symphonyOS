@@ -151,6 +151,33 @@ describe('Google fetchers', () => {
     expect(events.map((e) => e.google_event_id)).toEqual(['e1'])
   })
 
+  it('follows nextPageToken, so a long range is not cut at one page', async () => {
+    const item = (id: string) => ({ id, summary: id, start: { date: '2026-09-10' }, end: { date: '2026-09-11' } })
+    const pages: Record<string, unknown> = {
+      '': { items: [item('a1'), item('a2')], nextPageToken: 'p2' },
+      p2: { items: [item('b1')], nextPageToken: 'p3' },
+      p3: { items: [item('c1')] },
+    }
+    const fetchImpl = vi.fn(async (u: string) => new Response(JSON.stringify(pages[new URL(u).searchParams.get('pageToken') ?? ''])))
+    const events = await fetchGoogleEvents('tok', calendar, 'u1', { start: '2026-09-01T00:00:00.000Z', end: '2026-12-01T00:00:00.000Z' }, fetchImpl as unknown as typeof fetch)
+    expect(events.map((e) => e.google_event_id)).toEqual(['a1', 'a2', 'b1', 'c1'])
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
+    const second = new URL(fetchImpl.mock.calls[1][0] as string)
+    expect(second.searchParams.get('pageToken')).toBe('p2')
+    expect(second.searchParams.get('timeMin')).toBe('2026-09-01T00:00:00.000Z')
+  })
+
+  it('stops after ten pages, and says so in the log', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    let n = 0
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ items: [{ id: `e${++n}`, summary: 'X', start: { date: '2026-09-10' }, end: { date: '2026-09-11' } }], nextPageToken: `p${n}` })))
+    const events = await fetchGoogleEvents('tok', calendar, 'u1', { start: '2026-09-01T00:00:00.000Z', end: '2026-12-01T00:00:00.000Z' }, fetchImpl as unknown as typeof fetch)
+    expect(fetchImpl).toHaveBeenCalledTimes(10)
+    expect(events).toHaveLength(10)
+    expect(warn).toHaveBeenCalledWith('Calendar Scott: stopped after 10 pages')
+    warn.mockRestore()
+  })
+
   it('an API error on one calendar yields no events for it, not a thrown request', async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: { message: 'Not Found' } }), { status: 404 }))
     const events = await fetchGoogleEvents(

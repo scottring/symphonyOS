@@ -24,7 +24,7 @@ export function WildCards({ value, onChange }: {
     if (next.has(id)) next.delete(id); else next.add(id)
     onChange(WILD_CARDS.map((c) => c.id).filter((c) => next.has(c)))
   }
-  return <div className="gw-body guide-wild">
+  return <div className="guide-wild">
     <div role="group" aria-label="Wild cards" className="guide-energy-levels">
       {WILD_CARDS.map((c) => <label key={c.id} className="guide-areas-chip guide-wild-card" data-checked={on.has(c.id) || undefined}>
         <input type="checkbox" checked={on.has(c.id)} onChange={() => toggle(c.id)} />

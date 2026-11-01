@@ -62,6 +62,7 @@ const atStep=(current:string)=>{notesStore.notes={guide:{current,done:[],skipped
 const place=vi.hoisted(()=>({setPlace:vi.fn()}))
 vi.mock('@/hooks/usePlace',async(importOriginal)=>({...await importOriginal<any>(),usePlace:()=>({place:'cabin',setPlace:place.setPlace})}))
 vi.mock('@/hooks/useDayLoadEvents',()=>({useDayLoadEvents:()=>({events:[],available:true,loading:false,failed:false,range:{start:0,end:Number.MAX_SAFE_INTEGER}})}))
+vi.mock('@/hooks/useSeasonEvents',()=>({useSeasonEvents:()=>({events:[],available:true,loading:false,failed:false,range:{start:0,end:Number.MAX_SAFE_INTEGER}})}))
 
 // Year, Season and Month, one page shape (2026-10-13): the period's goals as
 // one plain list, the level above folded into one line, an optional "For"
@@ -1362,9 +1363,9 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(api.addTask).toHaveBeenCalledWith('Sleep by eleven',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',seasonStart:FALL,goalId:'other'}))
   expect(plannedMarks()).toHaveLength(1)
  })
- it('Ideal week: blocks typed here save into the season’s notes, a goal block naming one of Fall’s goals',async()=>{
+ it('Ideal week: blocks typed here save into the season’s notes, a goal block naming one of Fall’s open goals',async()=>{
   inSession()
-  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'}]
+  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'d',title:'Paint the porch',bucket:'quarter',completed:true}]
   atStep('ideal-week')
   season('&plan=1')
   expect(screen.getByText(/of 168h left/)).toBeInTheDocument()

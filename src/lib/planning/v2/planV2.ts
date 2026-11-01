@@ -111,7 +111,7 @@ const SPECIALS = /^specials?\s*[—–:-]/i
 /** All-day series that come round every week or more often ("Trash day"):
  *  the rhythm of the week, not a date in it. A monthly or yearly series
  *  (tuition due, a birthday) stays. */
-function weeklySeries(events: readonly CalendarEvent[]): Set<string> {
+export function weeklySeries(events: readonly CalendarEvent[]): Set<string> {
   const days = new Map<string, number[]>()
   for (const e of events) {
     const series = e.recurring_event_id ?? e.recurringEventId

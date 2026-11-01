@@ -132,6 +132,9 @@ async function fetchGooglePrimaryOnly(accessToken: string, fetchImpl: typeof fet
   return { ...normalizeGoogleCalendar({ id, accessRole: 'owner', primary: true }), calendarListMissing: true }
 }
 
+/** Pages of 100 read per calendar before stopping. */
+const MAX_PAGES = 10
+
 export async function fetchGoogleEvents(
   accessToken: string,
   calendar: NormalizedCalendar,
@@ -146,20 +149,30 @@ export async function fetchGoogleEvents(
   url.searchParams.set('orderBy', 'startTime')
   url.searchParams.set('maxResults', '100')
 
-  try {
-    const res = await fetchImpl(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } })
-    const data = await res.json()
-    if (data.error) {
-      console.error(`Error fetching calendar ${calendar.id}:`, data.error)
-      return []
+  // A long range (a season) runs past one page of 100: follow nextPageToken,
+  // at most MAX_PAGES pages. A page that fails keeps what came before it.
+  const items: GoogleCalendarEvent[] = []
+  let pageToken: string | undefined
+  for (let page = 0; page < MAX_PAGES; page++) {
+    if (pageToken) url.searchParams.set('pageToken', pageToken)
+    try {
+      const res = await fetchImpl(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } })
+      const data = await res.json()
+      if (data.error) {
+        console.error(`Error fetching calendar ${calendar.id}:`, data.error)
+        break
+      }
+      items.push(...((data.items || []) as GoogleCalendarEvent[]))
+      pageToken = typeof data.nextPageToken === 'string' && data.nextPageToken ? data.nextPageToken : undefined
+    } catch (err) {
+      console.error(`Error fetching calendar ${calendar.id}:`, err)
+      break
     }
-    const items = (data.items || []) as GoogleCalendarEvent[]
-    console.log(`Calendar ${calendar.summary || calendar.id}: ${items.length} events found`)
-    return items.map((event) => normalizeGoogleEvent(event, calendar, userId))
-  } catch (err) {
-    console.error(`Error fetching calendar ${calendar.id}:`, err)
-    return []
+    if (!pageToken) break
+    if (page === MAX_PAGES - 1) console.warn(`Calendar ${calendar.summary || calendar.id}: stopped after ${MAX_PAGES} pages`)
   }
+  console.log(`Calendar ${calendar.summary || calendar.id}: ${items.length} events found`)
+  return items.map((event) => normalizeGoogleEvent(event, calendar, userId))
 }
 
 /** The account's email: Google's primary calendar id IS the account address. */

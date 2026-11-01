@@ -14,28 +14,31 @@ import { useNoteSave } from './useNoteSave'
 type Patch = (p: NotesPatch) => Promise<boolean>
 const EMPTY_WEEK: IdealWeek = { blocks: [] }
 const NO_CARDS: string[] = []
-const Failed = ({ on }: { on: boolean }) => on ? <p className="choose-status is-failed" role="alert">Didn’t save. Try again.</p> : null
+const Failed = ({ on, retry }: { on: boolean; retry: () => void }) => on
+  ? <p className="choose-status is-failed" role="alert">Didn’t save. <button type="button" className="canvas-link" onClick={retry}>Try again</button></p>
+  : null
 
 export function SeasonEnergy({ value, patch }: { value?: GuideNotes['energy']; patch: Patch }) {
   const note = useNoteSave(value, (energy) => patch({ energy }))
   return <div className="gw-body">
     <EnergyNote value={note.value} onChange={note.set} />
-    <Failed on={note.failed} />
+    <Failed on={note.failed} retry={note.retry} />
   </div>
 }
 
+/** `goals`: the season's open goals, the ones a block can be for. */
 export function SeasonIdealWeek({ value, goals, patch }: { value?: IdealWeek; goals: IdealWeekGoal[]; patch: Patch }) {
   const note = useNoteSave(value ?? EMPTY_WEEK, (idealWeek) => patch({ idealWeek }))
   return <div className="gw-body">
     <IdealWeekEditor value={note.value} goals={goals} onChange={note.set} />
-    <Failed on={note.failed} />
+    <Failed on={note.failed} retry={note.retry} />
   </div>
 }
 
 export function SeasonWildCards({ value, patch }: { value?: string[]; patch: Patch }) {
   const note = useNoteSave(value ?? NO_CARDS, (wildCards) => patch({ wildCards }))
-  return <>
+  return <div className="gw-body">
     <WildCards value={note.value} onChange={note.set} />
-    <Failed on={note.failed} />
-  </>
+    <Failed on={note.failed} retry={note.retry} />
+  </div>
 }

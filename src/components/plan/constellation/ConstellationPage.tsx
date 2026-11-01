@@ -1080,8 +1080,10 @@ function Inner() {
           { ids: [task.id], undo: async () => (await updateTask(task.id, before)) !== false })
       }} />
   }
-  // The season's goals, for the ideal week's goal blocks.
+  // The season's goals, for the ideal week: its blocks name them (any goal
+  // of the season), and a new block can be for an open one.
   const seasonGoals = level === 1 ? levelNodes.map((n) => ({ id: n.id, title: n.title })) : []
+  const openSeasonGoals = level === 1 ? openNodes.map((n) => ({ id: n.id, title: n.title })) : []
   const sessionBodies = (t: PeriodSessionTools) => level === 2 ? {
     'fresh-start': <FreshStart monthWord={periodWord} value={t.notes.scenery} patch={t.patch} />,
     'look-back': lookBackBody(t),
@@ -1097,7 +1099,7 @@ function Inner() {
     calendar: <SeasonCalendar date={bounds.start} seasons={seasons} />,
     energy: <SeasonEnergy value={t.notes.energy} patch={t.patch} />,
     'by-area': chooseBody(t),
-    'ideal-week': <SeasonIdealWeek value={t.notes.idealWeek} goals={seasonGoals} patch={t.patch} />,
+    'ideal-week': <SeasonIdealWeek value={t.notes.idealWeek} goals={openSeasonGoals} patch={t.patch} />,
     'wild-cards': <SeasonWildCards value={t.notes.wildCards} patch={t.patch} />,
   } : {
     'look-back': lookBackBody(t),

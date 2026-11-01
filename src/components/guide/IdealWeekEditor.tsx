@@ -3,7 +3,7 @@
 // number is typed. A change is committed on Enter or when a field loses focus,
 // never per keystroke.
 
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { formatHours, parseDuration, type IdealWeek } from '@/lib/guide/idealWeek'
 import { IdealWeekBar, IdealWeekLeft, type IdealWeekGoal } from './IdealWeekSection'
@@ -53,12 +53,44 @@ function BlockFields({ initial, goals, onCommit, onRemove, fresh }: {
   // A block already there saves as each field is left. The new row waits
   // until focus leaves the row: a goal or a "when" picked after the hours
   // lands on the new block, and leaving one half-typed field wipes nothing.
+  // Where the next focus is not named (Safari does not focus a select or a
+  // button it is clicked on), a press inside the row counts as staying in
+  // it, and the row commits on the first press or focus outside it.
+  const row = useRef<HTMLLIElement>(null)
+  const pressedInside = useRef(false)
+  const latestCommit = useRef(commit)
+  useEffect(() => { latestCommit.current = commit })
+  const stopWatching = useRef<(() => void) | null>(null)
+  useEffect(() => () => stopWatching.current?.(), [])
+  const commitOnLeavingRow = () => {
+    if (stopWatching.current) return
+    const outside = (e: Event) => {
+      if (row.current?.contains(e.target as Node | null)) return
+      stopWatching.current?.()
+      latestCommit.current()
+    }
+    document.addEventListener('pointerdown', outside, true)
+    document.addEventListener('focusin', outside, true)
+    stopWatching.current = () => {
+      document.removeEventListener('pointerdown', outside, true)
+      document.removeEventListener('focusin', outside, true)
+      stopWatching.current = null
+    }
+  }
   const leave = (e: React.FocusEvent<HTMLElement>) => {
-    if (fresh && e.currentTarget.closest('li')?.contains(e.relatedTarget as Node | null)) return
+    if (!fresh) { commit(); return }
+    if (row.current?.contains(e.relatedTarget as Node | null)) return
+    if (pressedInside.current) { commitOnLeavingRow(); return }
+    stopWatching.current?.()
     commit()
   }
+  const pressed = () => {
+    if (!fresh) return
+    pressedInside.current = true
+    setTimeout(() => { pressedInside.current = false }, 0)
+  }
   return (
-    <li className="guide-iw-edit-row" data-fresh={fresh || undefined}>
+    <li ref={row} className="guide-iw-edit-row" data-fresh={fresh || undefined} onPointerDown={pressed}>
       <input type="text" className="guide-iw-in guide-iw-in-label" aria-label={`Label for ${name}`} placeholder="Label"
         value={label} onChange={e => setLabel(e.target.value)} onBlur={leave} onKeyDown={enterBlurs} />
       <input type="text" inputMode="decimal" className="guide-iw-in guide-iw-in-hours" aria-label={`Hours for ${name}`} placeholder="Hours per week"
