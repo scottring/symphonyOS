@@ -962,13 +962,21 @@ describe('reviewing: the session’s look back',()=>{
    fireEvent.click(screen.getByRole('button',{name:'Review October'}))
    expect(screen.getByTestId('where').textContent).toContain('plan=1')
    expect(screen.getByTestId('where').textContent).toContain('start=2026-11-01')
-   expect(screen.getByText(/Planning November · step 1 of 6/)).toBeInTheDocument()
-   fireEvent.click(screen.getByRole('button',{name:/Look back at last month/}))
-   await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Go to this step'}))})
+   expect(screen.getByText(/Planning November · step 2 of 6/)).toBeInTheDocument()
    const look=within(screen.getByRole('article',{name:'Looking back at October'}))
    fireEvent.change(look.getByRole('textbox',{name:'What went well'}),{target:{value:'Cabin booked'}})
    await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Save notes'}))})
    expect(review.finish).toHaveBeenCalledWith({wentWell:'Cabin booked',didnt:''})
+  }finally{vi.useRealTimers()}
+ })
+ it('Review October opens on the look back even when the session was left further on',()=>{
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,12))
+  try{
+   atStep('by-area')
+   month()
+   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
+   expect(screen.getByText(/Planning November · step 2 of 6/)).toBeInTheDocument()
+   expect(screen.getByTestId('where').textContent).not.toContain('step=')
   }finally{vi.useRealTimers()}
  })
  it('under way, the page offers last period’s review until it is done; a coming period offers none',()=>{
@@ -1085,6 +1093,9 @@ describe('Done planning October (spec 2026-11-01)',()=>{
   atStep('upkeep-fun')
   month()
   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
+  expect(screen.getByText(/Planning November · step 2 of 6/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:/Maintenance and fun/}))
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Go to this step'}))})
   expect(screen.getByText(/Planning November · step 6 of 6/)).toBeInTheDocument()
   await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Done planning November'}))})
   expect(review.finish).toHaveBeenCalledWith({wentWell:'',didnt:''})
@@ -1408,6 +1419,25 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
  const plannedMarks=()=>notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)
  const inSession=()=>{at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})}
  const year=()=>open('/year?view=constellation&start=2026-10-09&plan=1')
+ const everyday=()=>open('/year?view=constellation&start=2026-10-09')
+ it('the everyday Year page shows the vision and the landscape only once saved; Edit opens the session on that step',()=>{
+  inSession()
+  everyday()
+  expect(screen.queryByRole('region',{name:'Vision'})).toBeNull()
+  expect(screen.queryByRole('region',{name:'Landscape'})).toBeNull()
+  cleanup()
+  notesStore.notes={vision:{tenYears:'A slow morning by the lake'},landscape:[{month:3,text:'a\nb\nc'}]}
+  everyday()
+  const vision=within(screen.getByRole('region',{name:'Vision'}))
+  expect(vision.getByText('A slow morning by the lake')).toBeInTheDocument()
+  expect(vision.queryByRole('textbox')).toBeNull()
+  const land=within(screen.getByRole('region',{name:'Landscape'}))
+  expect(land.getByText('Crowded')).toBeInTheDocument()
+  expect(vision.getByRole('link',{name:'Edit'}).getAttribute('href')).toMatch(/plan=1&step=vision/)
+  fireEvent.click(land.getByRole('link',{name:'Edit'}))
+  expect(screen.getByRole('region',{name:'Planning 2026'})).toBeInTheDocument()
+  expect(screen.getByText(/Planning 2026 · step 3 of 7/)).toBeInTheDocument()
+ })
  it('seven steps, the page beside them',()=>{
   inSession()
   year()

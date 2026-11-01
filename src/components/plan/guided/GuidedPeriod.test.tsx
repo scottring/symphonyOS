@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, act, waitFor } from '@testing-library/react'
 import { useEffect } from 'react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { GuidedSessionProvider, useGuidedSession, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 
 // The person's notes row for the month, in memory: what usePlanningNotes reads
@@ -35,8 +36,9 @@ function Shell() {
 const panel = () => within(screen.getByTestId('guide-panel'))
 const guideSteps = () => store.patches.map((x) => (x.p.guide as { current?: string } | undefined)?.current)
 
+function Where() { return <output data-testid="where">{useLocation().search}</output> }
 const write = vi.fn(async () => true)
-const setup = (over: Partial<Parameters<typeof GuidedPeriod>[0]> = {}) => {
+const setup = (over: Partial<Parameters<typeof GuidedPeriod>[0]> = {}, url = '/plan?plan=1') => {
   const props = {
     level: 'month' as const, token: '2026-11', periodLabel: 'November',
     page: <section aria-label="The month">November goals</section>,
@@ -57,7 +59,7 @@ const setup = (over: Partial<Parameters<typeof GuidedPeriod>[0]> = {}) => {
     areas: [{ id: 'a1', name: 'Home', context: 'family' as const }],
     ...over,
   }
-  render(<GuidedSessionProvider><GuidedPeriod {...props} /><Shell /></GuidedSessionProvider>)
+  render(<MemoryRouter initialEntries={[url]}><GuidedSessionProvider><GuidedPeriod {...props} /><Shell /><Where /></GuidedSessionProvider></MemoryRouter>)
   return props
 }
 
@@ -176,12 +178,12 @@ describe('GuidedPeriod — Month, Season and Year while planning', () => {
   })
 
   it('planned before the session opened, the session line says so quietly; planned during it, it does not', () => {
-    const { unmount } = render(<GuidedSessionProvider><GuidedPeriod level="month" token="2026-11" periodLabel="November" page={null} bodies={() => ({})}
-      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} plannedAt={new Date(2026, 9, 3)} /></GuidedSessionProvider>)
+    const { unmount } = render(<MemoryRouter><GuidedSessionProvider><GuidedPeriod level="month" token="2026-11" periodLabel="November" page={null} bodies={() => ({})}
+      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} plannedAt={new Date(2026, 9, 3)} /></GuidedSessionProvider></MemoryRouter>)
     expect(screen.getByText('November was planned Oct 3. You can still change it.')).toBeInTheDocument()
     unmount()
-    render(<GuidedSessionProvider><GuidedPeriod level="month" token="2026-11" periodLabel="November" page={null} bodies={() => ({})}
-      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} plannedAt={new Date(Date.now() + 1000)} /></GuidedSessionProvider>)
+    render(<MemoryRouter><GuidedSessionProvider><GuidedPeriod level="month" token="2026-11" periodLabel="November" page={null} bodies={() => ({})}
+      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} plannedAt={new Date(Date.now() + 1000)} /></GuidedSessionProvider></MemoryRouter>)
     expect(screen.queryByText(/was planned/)).toBeNull()
   })
 
@@ -204,18 +206,40 @@ describe('GuidedPeriod — Month, Season and Year while planning', () => {
       }
     }
     store.notes = { guide: { current: 'from-year', done: ['look-back'], skipped: [] } }
-    const first = render(<GuidedSessionProvider><GuidedPeriod level="season" token="2026-fall" periodLabel="Fall" page={null} bodies={bodies}
-      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} onPlanned={onPlanned} /><Shell /></GuidedSessionProvider>)
+    const first = render(<MemoryRouter><GuidedSessionProvider><GuidedPeriod level="season" token="2026-fall" periodLabel="Fall" page={null} bodies={bodies}
+      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} onPlanned={onPlanned} /><Shell /></GuidedSessionProvider></MemoryRouter>)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Bring it into Fall' })) })
     expect(pick).toHaveBeenCalled()
     expect(store.patches.some((x) => (x.p.guide as { plannedAt?: string } | undefined)?.plannedAt)).toBe(false)
     expect(onPlanned).not.toHaveBeenCalled()
     first.unmount()
     store.notes = { guide: { current: 'by-area', done: ['look-back', 'from-year', 'calendar', 'energy'], skipped: [] } }
-    render(<GuidedSessionProvider><GuidedPeriod level="season" token="2026-fall" periodLabel="Fall" page={null} bodies={bodies}
-      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} onPlanned={onPlanned} /><Shell /></GuidedSessionProvider>)
+    render(<MemoryRouter><GuidedSessionProvider><GuidedPeriod level="season" token="2026-fall" periodLabel="Fall" page={null} bodies={bodies}
+      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} onPlanned={onPlanned} /><Shell /></GuidedSessionProvider></MemoryRouter>)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add a Fall goal' })) })
     await waitFor(() => expect(onPlanned).toHaveBeenCalledTimes(1))
     expect(store.patches.filter((x) => (x.p.guide as { plannedAt?: string } | undefined)?.plannedAt)).toHaveLength(1)
+  })
+})
+
+describe('GuidedPeriod — ?step= opens the session on a step', () => {
+  it('a valid step id opens on it once, and leaves the URL', async () => {
+    setup({}, '/plan?plan=1&step=look-back')
+    store.notes = {}
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('?plan=1'))
+    expect(screen.getByText(/Planning November · step 2 of 6/)).toBeInTheDocument()
+    expect(guideSteps()).toContain('look-back')
+  })
+
+  it('an id that is not a step of this level is ignored (and cleared)', async () => {
+    setup({}, '/plan?plan=1&step=nonsense')
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('?plan=1'))
+    expect(screen.getByText(/Planning November · step 1 of 6/)).toBeInTheDocument()
+    expect(store.patches).toHaveLength(0)
+  })
+
+  it('Year: step=landscape opens the landscape step', async () => {
+    setup({ level: 'year', token: '2027', periodLabel: '2027' }, '/plan?plan=1&step=landscape')
+    await waitFor(() => expect(screen.getByText(/Planning 2027 · step 3 of 7/)).toBeInTheDocument())
   })
 })

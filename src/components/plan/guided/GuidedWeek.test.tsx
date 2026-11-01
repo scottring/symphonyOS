@@ -293,7 +293,7 @@ describe('GuidedWeek — the Week page while planning', () => {
 })
 
 describe('useGuidedWeek — planned once something is applied at Choose', () => {
-  const wrapper = ({ children }: { children: ReactNode }) => <GuidedSessionProvider>{children}</GuidedSessionProvider>
+  const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter><GuidedSessionProvider>{children}</GuidedSessionProvider></MemoryRouter>
   const hook = (choose: WeekChoose, onPlanned = vi.fn()) => renderHook(() => useGuidedWeek({
     weekStart, isCurrent: true, tasks: [], choose, onFinish: async () => true, onClose: vi.fn(), onPlanned,
   }), { wrapper })
@@ -352,5 +352,28 @@ describe('useGuidedWeek — planned once something is applied at Choose', () => 
     const { result } = hook(makeChoose())
     await act(async () => { await result.current.choose.lines[0].verbs[0].run() })
     expect(store.patches).toEqual([])
+  })
+})
+
+describe('GuidedWeek — ?step= opens the session on a step', () => {
+  it('a valid step id opens on it once, and leaves the URL', async () => {
+    open('/week?plan=1&step=calendar')
+    await waitFor(() => expect(where().get('step')).toBeNull())
+    expect(where().get('plan')).toBe('1')
+    expect(screen.getByText(/Planning the week · step 3 of 7/)).toBeInTheDocument()
+  })
+
+  it('step=look-back (Review this week) moves a session left further on back to the look back', async () => {
+    store.notes = { guide: { current: 'inbox', done: ['look-back'], skipped: [] } }
+    open('/week?plan=1&step=look-back')
+    await waitFor(() => expect(where().get('step')).toBeNull())
+    expect(screen.getByText(/Planning the week · step 1 of 7/)).toBeInTheDocument()
+  })
+
+  it('an id that is not a step of this level is ignored', async () => {
+    open('/week?plan=1&step=vision')
+    await waitFor(() => expect(where().get('step')).toBeNull())
+    expect(screen.getByText(/Planning the week · step 1 of 7/)).toBeInTheDocument()
+    expect(store.patches).toHaveLength(0)
   })
 })

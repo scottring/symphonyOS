@@ -798,6 +798,13 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
   })
 
+  it('?review=1 opens on the look back even when the session was left further on', async () => {
+    dayNotes.notes = { guide: { current: 'energy', done: [], skipped: [] } }
+    renderAt(10, { url: '/?review=1' })
+    await vi.waitFor(() => expect(screen.getByText(/Planning today · step 1 of 5/)).toBeInTheDocument())
+    expect(search().get('step')).toBeNull()
+  })
+
   it('a bare ?plan=1 in the evening takes the page to tomorrow', async () => {
     renderAt(18, { url: '/?plan=1', dated: true })
     await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())

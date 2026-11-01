@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, act, waitFor } from '@testing-library/react'
 import { useEffect } from 'react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { createMockTask } from '@/test/mocks/factories'
 import { GuidedSessionProvider, useGuidedSession, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import type { DayPictureItem } from './DayRows'
@@ -55,7 +56,8 @@ function Shell() {
 const panel = () => within(screen.getByTestId('guide-panel'))
 const rail = () => within(screen.getByRole('group', { name: 'Steps in this session' }))
 
-function open(over: Partial<Parameters<typeof GuidedDay>[0]> = {}) {
+function Where() { return <output data-testid="where">{useLocation().search}</output> }
+function open(over: Partial<Parameters<typeof GuidedDay>[0]> = {}, url = '/today?plan=1') {
   const props = {
     target: MON, lookBackOn: SUN, isTomorrow: false,
     canvas: <section aria-label="The day itself">the page</section>,
@@ -64,7 +66,7 @@ function open(over: Partial<Parameters<typeof GuidedDay>[0]> = {}) {
     onFinish: vi.fn(async () => { store.order.push('planned'); return true }), onClose: vi.fn(), onPlanned: vi.fn(),
     ...over,
   }
-  const view = render(<GuidedSessionProvider><GuidedDay {...props} /><Shell /></GuidedSessionProvider>)
+  const view = render(<MemoryRouter initialEntries={[url]}><GuidedSessionProvider><GuidedDay {...props} /><Shell /><Where /></GuidedSessionProvider></MemoryRouter>)
   return { ...view, props }
 }
 const plannedPatches = () => store.patches.filter((x) => (x.p.guide as { plannedAt?: string } | undefined)?.plannedAt)
@@ -208,5 +210,20 @@ describe('GuidedDay — Today while planning the day', () => {
     expect(props.onClose).toHaveBeenCalled()
     expect(store.patches).toEqual([])
     expect(review.finish).not.toHaveBeenCalled()
+  })
+})
+
+describe('GuidedDay — ?step= opens the session on a step', () => {
+  it('a valid step id opens on it once, and leaves the URL', async () => {
+    open({}, '/today?plan=1&step=energy')
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('?plan=1'))
+    expect(screen.getByText(/Planning today · step 3 of 5/)).toBeInTheDocument()
+  })
+
+  it('an id that is not a step of this level is ignored', async () => {
+    open({}, '/today?plan=1&step=vision')
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('?plan=1'))
+    expect(screen.getByText(/Planning today · step 1 of 5/)).toBeInTheDocument()
+    expect(store.patches).toHaveLength(0)
   })
 })

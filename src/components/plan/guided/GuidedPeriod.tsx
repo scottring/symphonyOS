@@ -17,6 +17,7 @@
 
 import { createElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
+import { useOpenOnStep } from '@/hooks/useOpenOnStep'
 import { usePlanningNotes, type NotesPatch, type PlanningNotes } from '@/hooks/usePlanningNotes'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import { HORIZON_OF, choosingStep, stepsFor } from '@/lib/guide/steps'
@@ -79,6 +80,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   const steps = stepsFor(level)
   const CHOOSING = choosingStep(level).id
   const { progress, loading, saveError, next, skip, jump, markPlanned, finish, setThreadId } = useGuidedProgress(level, token)
+  useOpenOnStep(level, loading, jump)
   const { notes, patch } = usePlanningNotes(HORIZON_OF[level], token)
   const [lookDraft, setLookDraft] = useState<ReviewNotes | null>(null)
 

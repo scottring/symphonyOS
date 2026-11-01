@@ -696,7 +696,7 @@ export function TodayView({
     if (dayParams.get('review') !== '1') return
     setDayParams((prev) => {
       const p = new URLSearchParams(prev)
-      p.delete('review'); p.set('plan', '1')
+      p.delete('review'); p.set('plan', '1'); p.set('step', 'look-back')
       return p
     }, { replace: true })
   }, [dayParams, setDayParams])

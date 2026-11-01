@@ -132,10 +132,11 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   const planNotes = usePlanningNotes('weekly', weekToken(weekStart))
   const [, setParams] = useSearchParams()
   const deckMode = deck?.mode ?? null
-  const setMode = (mode: 'review' | 'plan' | 'place' | null, week?: Date) => setParams((prev) => {
+  const setMode = (mode: 'review' | 'plan' | 'place' | null, week?: Date, step?: string) => setParams((prev) => {
     const p = new URLSearchParams(prev)
-    p.delete('review'); p.delete('plan'); p.delete('place')
+    p.delete('review'); p.delete('plan'); p.delete('place'); p.delete('step')
     if (mode) p.set(mode, '1')
+    if (mode && step) p.set('step', step)
     if (week) { p.set('date', localYmd(week)); p.set('start', localYmd(week)) }
     return p
   })
@@ -196,7 +197,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   const planned = !session.error && !!session.saved
   const offers: Offer[] = deckMode || !deck || !settled ? [] : [
     ...(target === 'this' && isCurrent && !thisReview.error && !thisReview.reviewed
-      ? [{ id: 'review', label: `Review ${reviewWord}`, due: true, run: () => setMode('plan', nextWeek) }] : []),
+      ? [{ id: 'review', label: `Review ${reviewWord}`, due: true, run: () => setMode('plan', nextWeek, 'look-back') }] : []),
     ...(plannable ? [{ id: 'plan', label: planned ? `Plan ${reviewWord} again` : `Plan ${reviewWord}`, due: !planned, run: () => setMode('plan') }] : []),
   ]
   const primary = offers.find((o) => o.due) ?? null

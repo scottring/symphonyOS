@@ -12,6 +12,7 @@
 import { createElement, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Task } from '@/types/task'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
+import { useOpenOnStep } from '@/hooks/useOpenOnStep'
 import { stepsFor, type GuideStep } from '@/lib/guide/steps'
 import { isLastStep } from '@/lib/guide/progress'
 import { weekToken } from '@/hooks/usePlanningSession'
@@ -67,6 +68,7 @@ export function useGuidedWeek({ weekStart, isCurrent, tasks, choose, onFinish, o
 }) {
   const token = weekToken(weekStart)
   const { progress, loading, saveError, next, skip, jump, markPlanned, finish, setThreadId } = useGuidedProgress('week', token)
+  useOpenOnStep('week', loading, jump)
   const steps = stepsFor('week')
   const monthWord = choose.monthWord
   const count = useMemo(() => weekCount(tasks, weekStart, isCurrent), [tasks, weekStart, isCurrent])

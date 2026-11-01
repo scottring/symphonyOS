@@ -1172,6 +1172,9 @@ describe('WeekViewV2 — the deck', () => {
     render(page(<Page />))
     fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
     expect(screen.getByTestId('deck')).toHaveAttribute('data-mode', 'full')
+    // It opens on the look back (?step=look-back), not where the session was left.
+    expect(within(screen.getByTestId('guide-panel')).getByText('Look back at last week')).toBeInTheDocument()
+    for (let i = 0; i < 6; i++) await act(async () => { fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Next step' })) })
     expect(document.querySelector('.pv2-week')).toHaveAttribute('data-week', '2026-10-24')
     expect(props().choose.loose.map((c) => [c.key, c.planned.label])).toEqual([['b', 'Last week']])
     await act(async () => { await props().onFinish() })

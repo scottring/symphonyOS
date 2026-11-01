@@ -9,6 +9,7 @@
 
 import { createElement, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
+import { useOpenOnStep } from '@/hooks/useOpenOnStep'
 import { stepsFor } from '@/lib/guide/steps'
 import { isLastStep } from '@/lib/guide/progress'
 import { DAY_COUNT_OF, dayStepTitle } from '@/lib/guide/dayTarget'
@@ -36,6 +37,7 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
 }) {
   const token = dayToken(target)
   const { progress, loading, saveError, next, skip, jump, markPlanned, finish, setThreadId } = useGuidedProgress('day', token)
+  useOpenOnStep('day', loading, jump)
   const steps = stepsFor('day')
   const dayWord = isTomorrow ? 'tomorrow' : 'today'
 

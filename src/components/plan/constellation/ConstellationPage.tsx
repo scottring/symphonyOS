@@ -114,6 +114,8 @@ import { FromYear } from '@/components/plan/guided/season/FromYear'
 import { SeasonCalendar } from '@/components/plan/guided/season/SeasonCalendar'
 import { SeasonEnergy, SeasonIdealWeek, SeasonWildCards } from '@/components/plan/guided/season/SeasonNotes'
 import { IdealWeekSection } from '@/components/guide/IdealWeekSection'
+import { YearVisionSection } from '@/components/guide/YearVisionSection'
+import { YearLandscapeSection } from '@/components/guide/YearLandscapeSection'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { YearVision } from '@/components/plan/guided/year/Vision'
 import { YearLandscape } from '@/components/plan/guided/year/Landscape'
@@ -222,6 +224,17 @@ function Inner() {
   // a session: while one runs it holds the notes, and leaving it reads them
   // afresh.
   const seasonNotes = usePlanningNotes('seasonal', level === 1 && !planning ? sessionToken : '')
+  // The year's notes, for its everyday page (the vision and the landscape),
+  // read the same way.
+  const yearNotes = usePlanningNotes('annual', level === 0 && !planning ? sessionToken : '')
+  // "Edit" on one of them: the year's session, opened on that step (only on a
+  // year not yet over, as ?plan=1 itself).
+  const editStep = (step: string) => {
+    if (!plannable) return undefined
+    const q = new URLSearchParams(params)
+    q.delete('review'); q.delete('focus'); q.set('plan', '1'); q.set('step', step)
+    return `${pathname}?${q.toString()}`
+  }
   const markPlanned = async (): Promise<boolean> => {
     const mine = planSession.mine
     const ok = await planSession.save({ wentWell: mine?.wentWell ?? '', didnt: mine?.didnt ?? '', ...(mine?.focus ? { focus: mine.focus } : {}) })
@@ -1290,6 +1303,13 @@ function Inner() {
     {level === 1 && !planning && !!seasonNotes.notes.idealWeek?.blocks.length && <div className="plan-card plan-ideal-week">
       <IdealWeekSection value={seasonNotes.notes.idealWeek} goals={seasonGoals} />
     </div>}
+    {/* The year's vision and landscape, made in its session (read-only here). */}
+    {level === 0 && !planning && (!!yearNotes.notes.vision?.tenYears?.trim() || !!yearNotes.notes.vision?.success?.trim()) && <div className="plan-card plan-year-vision">
+      <YearVisionSection value={yearNotes.notes.vision} yearWord={periodWord} editTo={editStep('vision')} />
+    </div>}
+    {level === 0 && !planning && !!yearNotes.notes.landscape?.some((x) => x.text.trim()) && <div className="plan-card plan-year-landscape">
+      <YearLandscapeSection value={yearNotes.notes.landscape} editTo={editStep('landscape')} />
+    </div>}
     {preview.next.length > 0 && <section className="plan-list plan-next-list" aria-label={`${nextWord}, proposed`}>
       <p className="plan-next-list-title">{nextWord}</p>
       <ul className="plan-items plan-goal-list" aria-label={`${nextWord} goals`}>
@@ -1329,7 +1349,7 @@ function Inner() {
       : !dataReady ? null
       // Reviewing a period is the first card of planning the one after it
       // (spec 2026-10-19): Review October opens Plan November on Looking back.
-      : reviewing ? <Navigate replace to={`${pathname}?${(() => { const q = new URLSearchParams(params); q.delete('review'); q.delete('focus'); q.set('plan', '1'); q.set('start', localYmd(bounds.next)); return q.toString() })()}`} />
+      : reviewing ? <Navigate replace to={`${pathname}?${(() => { const q = new URLSearchParams(params); q.delete('review'); q.delete('focus'); q.set('plan', '1'); q.set('step', 'look-back'); q.set('start', localYmd(bounds.next)); return q.toString() })()}`} />
       // Planning: the guided session on this page, the rail where the strip
       // stands and the period's list beside it.
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
