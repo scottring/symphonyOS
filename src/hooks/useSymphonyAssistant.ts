@@ -76,7 +76,9 @@ type ThreadTarget = { entityType: string; entityId: string; onThread?: (id: stri
 type PendingSwitch =
   | { kind: 'reset' }
   | { kind: 'fresh' }
-  | { kind: 'open'; entityType: string; entityId: string; onThread?: (id: string) => void }
+  // fresh: "New" was pressed after the open was asked for — the session's
+  // thread target, with an empty conversation instead of the saved one.
+  | { kind: 'open'; entityType: string; entityId: string; onThread?: (id: string) => void; fresh?: boolean }
 
 /** The newest saved conversation for an entity — mine only. Throws when it
  *  cannot be read. */
@@ -270,10 +272,24 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
    *  under the same entity (the newest, so it is what reopens next time).
    *  With no thread open, the same as resetSession. */
   const newThread = useCallback(() => {
-    if (sending.current) { pending.current = { kind: 'fresh' }; return }
+    if (sending.current) {
+      // A session asked to open meanwhile stays the target: New only means
+      // its conversation starts empty.
+      const queued = pending.current
+      pending.current = queued?.kind === 'open' ? { ...queued, fresh: true } : { kind: 'fresh' }
+      return
+    }
     const thread = threadRef.current
     openRequest.current += 1
     threadRef.current = thread ? { ...thread, unread: false } : null
+    clearPane()
+  }, [clearPane])
+
+  /** Target an entity's thread with an empty conversation: the next turn is
+   *  saved as a new row under it. */
+  const startFreshThread = useCallback((entityType: string, entityId: string, onThread?: (id: string) => void) => {
+    openRequest.current += 1
+    threadRef.current = { entityType, entityId, onThread, unread: false }
     clearPane()
   }, [clearPane])
 
@@ -291,7 +307,9 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       const row = await readThread(entityType, entityId)
       // Replaced meanwhile (reset, another thread, a loaded conversation) or
       // already talking: that turn's save looks again (unread) instead.
-      if (request !== openRequest.current || sending.current) return
+      // A turn already saved into the thread (its own look found or made
+      // the row): what it saved stands.
+      if (request !== openRequest.current || sending.current || !thread.unread) return
       thread.unread = false
       if (!row) return
       setMessages(hydrateMessages(row.messages, row.id))
@@ -309,118 +327,126 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     if ((!text.trim() && !attachment) || sending.current) return
     sending.current = true
     setLoading(true)
-    // Resolve approval/Undo before starting a planner turn: turnStarted clears
-    // the prior Undo receipt. These actions own their existing canvas receipt.
-    const localTurn = attachment ? null : await resolveAction?.(text)
-    const turnId = opts?.turnId ?? crypto.randomUUID()
-    const retry = !!opts?.retry
-    // A retry tells the same card again: it was taken for the first try.
-    const changeCard = localTurn ? undefined : retry && lastTurn.current?.turnId === turnId ? lastTurn.current.changeCard : turnObserver?.changeCard?.()
-    lastTurn.current = { text, turnId, changeCard }
-    if (!localTurn) turnObserver?.start?.({ text: text.trim(), turnId, retry })
+    try {
+      // Resolve approval/Undo before starting a planner turn: turnStarted clears
+      // the prior Undo receipt. These actions own their existing canvas receipt.
+      const localTurn = attachment ? null : await resolveAction?.(text)
+      const turnId = opts?.turnId ?? crypto.randomUUID()
+      const retry = !!opts?.retry
+      // A retry tells the same card again: it was taken for the first try.
+      const changeCard = localTurn ? undefined : retry && lastTurn.current?.turnId === turnId ? lastTurn.current.changeCard : turnObserver?.changeCard?.()
+      lastTurn.current = { text, turnId, changeCard }
+      if (!localTurn) turnObserver?.start?.({ text: text.trim(), turnId, retry })
 
-    // Build the content for this turn: blocks array if there's an attachment, plain string otherwise.
-    const content: AgentApiMessage['content'] = attachment
-      ? [
-          { type: 'text' as const, text: text.trim() || 'Set this up.' },
-          attachment.fileType === 'application/pdf'
-            ? { type: 'document' as const, source: { type: 'url' as const, url: attachment.url } }
-            : { type: 'image' as const, source: { type: 'url' as const, url: attachment.url } },
-        ]
-      : text.trim()
+      // Build the content for this turn: blocks array if there's an attachment, plain string otherwise.
+      const content: AgentApiMessage['content'] = attachment
+        ? [
+            { type: 'text' as const, text: text.trim() || 'Set this up.' },
+            attachment.fileType === 'application/pdf'
+              ? { type: 'document' as const, source: { type: 'url' as const, url: attachment.url } }
+              : { type: 'image' as const, source: { type: 'url' as const, url: attachment.url } },
+          ]
+        : text.trim()
 
-    // Build the API history from prior turns + this one (before the placeholder).
-    // Prior turns are displayed ChatMessages whose .content is always a string — safe to filter/map.
-    const apiMessages: AgentApiMessage[] = [
-      ...messages
-        .filter((m) => m.content.trim().length > 0)
-        .map((m) => ({ role: m.role, content: m.content })),
-      { role: 'user' as const, content },
-    ]
+      // Build the API history from prior turns + this one (before the placeholder).
+      // Prior turns are displayed ChatMessages whose .content is always a string — safe to filter/map.
+      const apiMessages: AgentApiMessage[] = [
+        ...messages
+          .filter((m) => m.content.trim().length > 0)
+          .map((m) => ({ role: m.role, content: m.content })),
+        { role: 'user' as const, content },
+      ]
 
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text.trim() || (attachment ? attachment.fileName : ''),
-      timestamp: new Date(),
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: text.trim() || (attachment ? attachment.fileName : ''),
+        timestamp: new Date(),
+      }
+      const assistantId = crypto.randomUUID()
+      setMessages((prev) => [
+        ...prev,
+        userMsg,
+        { id: assistantId, role: 'assistant', content: '', timestamp: new Date() },
+      ])
+      setLoading(true)
+      setError(null)
+      setToolActivity([])
+
+      // Pass attachment metadata to the edge function so the agent can call
+      // symphony_attach_source to register the uploaded PDF on the project.
+      const attachmentMeta = attachment
+        ? {
+            storagePath: attachment.storagePath,
+            fileName: attachment.fileName,
+            fileType: attachment.fileType,
+            fileSize: attachment.fileSize,
+          }
+        : undefined
+
+      let pendingCard: ChangeSet | undefined
+      let pendingProposals: AgentProposalItem[] | undefined
+      const turn = localTurn ?? await runAgentTurn(apiMessages, {
+        surface,
+        onTool: (name) => { setToolActivity((prev) => [...prev, name]); turnObserver?.tool?.(name) },
+        onToolResult: (result) => turnObserver?.toolResult?.(result),
+        onProposal: (items) => { pendingProposals = items },
+        onChangeSet: (set) => { pendingCard = set },
+        // Beta: no live page pointing while the conversation is running.
+        turnId,
+        onReplyFallback: (reply) => {
+          setMessages((prev) => prev.map((m) =>
+            m.id === assistantId && m.content.length === 0 ? { ...m, content: reply } : m))
+        },
+        onSources: (sources) => {
+          setMessages((prev) => prev.map((m) =>
+            m.id === assistantId ? { ...m, sources } : m))
+        },
+        onError: (message) => setError(message),
+        onFallbackText: (text) => {
+          setMessages((prev) => prev.map((m) =>
+            m.id === assistantId && m.content.length === 0 ? { ...m, content: text } : m))
+        },
+        attachment: attachmentMeta,
+        currentMemberId: getCurrentUserMember()?.id,
+        taskContext,
+        sessionContext,
+        workspaceContext,
+        changeCard,
+        onWorkspace,
+        onPlanSaved,
+      })
+
+      if (!turn.error && !['failed', 'unverified'].includes(turn.outcome.state)) {
+        if (pendingCard) turnObserver?.changeSet?.(pendingCard)
+        if (pendingProposals) turnObserver?.proposal?.(pendingProposals)
+      }
+      setMessages(prev => prev.map(m => m.id === assistantId ? {...m, content:turn.text, sources:turn.sources} : m))
+      const assistantSources: AgentSourceNote[] | undefined = turn.sources
+
+      if (turn.didWrite) onMutate?.()
+      if (!localTurn) turnObserver?.end?.({ turnId, didWrite: turn.didWrite, error: turn.error, ...(turn.errorCode ? { errorCode: turn.errorCode } : {}), text: turn.text, ...(turn.requestId ? { requestId: turn.requestId } : {}) })
+      await persistTurn([
+        ...messages,
+        userMsg,
+        { id: assistantId, role: 'assistant', content: turn.text, sources: assistantSources, timestamp: new Date() },
+      ])
+      return { text: turn.text, outcome: turn.outcome, error: turn.error }
+    } finally {
+      // Even when the turn throws: a stuck flag would block every later turn
+      // and every switch queued behind this one.
+      setLoading(false)
+      sending.current = false
+      const next = pending.current
+      pending.current = null
+      if (next?.kind === 'reset') resetSession()
+      else if (next?.kind === 'fresh') newThread()
+      else if (next?.kind === 'open') {
+        if (next.fresh) startFreshThread(next.entityType, next.entityId, next.onThread)
+        else void openThread(next.entityType, next.entityId, next.onThread)
+      }
     }
-    const assistantId = crypto.randomUUID()
-    setMessages((prev) => [
-      ...prev,
-      userMsg,
-      { id: assistantId, role: 'assistant', content: '', timestamp: new Date() },
-    ])
-    setLoading(true)
-    setError(null)
-    setToolActivity([])
-
-    // Pass attachment metadata to the edge function so the agent can call
-    // symphony_attach_source to register the uploaded PDF on the project.
-    const attachmentMeta = attachment
-      ? {
-          storagePath: attachment.storagePath,
-          fileName: attachment.fileName,
-          fileType: attachment.fileType,
-          fileSize: attachment.fileSize,
-        }
-      : undefined
-
-    let pendingCard: ChangeSet | undefined
-    let pendingProposals: AgentProposalItem[] | undefined
-    const turn = localTurn ?? await runAgentTurn(apiMessages, {
-      surface,
-      onTool: (name) => { setToolActivity((prev) => [...prev, name]); turnObserver?.tool?.(name) },
-      onToolResult: (result) => turnObserver?.toolResult?.(result),
-      onProposal: (items) => { pendingProposals = items },
-      onChangeSet: (set) => { pendingCard = set },
-      // Beta: no live page pointing while the conversation is running.
-      turnId,
-      onReplyFallback: (reply) => {
-        setMessages((prev) => prev.map((m) =>
-          m.id === assistantId && m.content.length === 0 ? { ...m, content: reply } : m))
-      },
-      onSources: (sources) => {
-        setMessages((prev) => prev.map((m) =>
-          m.id === assistantId ? { ...m, sources } : m))
-      },
-      onError: (message) => setError(message),
-      onFallbackText: (text) => {
-        setMessages((prev) => prev.map((m) =>
-          m.id === assistantId && m.content.length === 0 ? { ...m, content: text } : m))
-      },
-      attachment: attachmentMeta,
-      currentMemberId: getCurrentUserMember()?.id,
-      taskContext,
-      sessionContext,
-      workspaceContext,
-      changeCard,
-      onWorkspace,
-      onPlanSaved,
-    })
-
-    if (!turn.error && !['failed', 'unverified'].includes(turn.outcome.state)) {
-      if (pendingCard) turnObserver?.changeSet?.(pendingCard)
-      if (pendingProposals) turnObserver?.proposal?.(pendingProposals)
-    }
-    setMessages(prev => prev.map(m => m.id === assistantId ? {...m, content:turn.text, sources:turn.sources} : m))
-    const assistantSources: AgentSourceNote[] | undefined = turn.sources
-
-    if (turn.didWrite) onMutate?.()
-    if (!localTurn) turnObserver?.end?.({ turnId, didWrite: turn.didWrite, error: turn.error, ...(turn.errorCode ? { errorCode: turn.errorCode } : {}), text: turn.text, ...(turn.requestId ? { requestId: turn.requestId } : {}) })
-    await persistTurn([
-      ...messages,
-      userMsg,
-      { id: assistantId, role: 'assistant', content: turn.text, sources: assistantSources, timestamp: new Date() },
-    ])
-    setLoading(false)
-    sending.current = false
-    const next = pending.current
-    pending.current = null
-    if (next?.kind === 'reset') resetSession()
-    else if (next?.kind === 'fresh') newThread()
-    else if (next?.kind === 'open') void openThread(next.entityType, next.entityId, next.onThread)
-    return { text: turn.text, outcome: turn.outcome, error: turn.error }
-  }, [surface, resolveAction, onPlanSaved, onWorkspace, workspaceContext, messages, onMutate, taskContext, sessionContext, getCurrentUserMember, persistTurn, turnObserver, resetSession, newThread, openThread])
+  }, [surface, resolveAction, onPlanSaved, onWorkspace, workspaceContext, messages, onMutate, taskContext, sessionContext, getCurrentUserMember, persistTurn, turnObserver, resetSession, newThread, openThread, startFreshThread])
 
   const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment, opts?: { turnId?: string; retry?: boolean }) => (await sendTurn(text, attachment, opts))?.text, [sendTurn])
 

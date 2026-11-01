@@ -402,6 +402,47 @@ describe('useSymphonyAssistant', () => {
       expect(onThread).toHaveBeenCalledWith('planning-row')
     })
 
+    it('a session opened mid-turn, then New: the session stays the target, starting empty', async () => {
+      db.sessionsRows = [planningRow()]
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onText?.('ok'); h.onDone?.('ok', null) })
+      const onThread = vi.fn()
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      const held = heldTurn()
+      let turn: Promise<unknown> | undefined
+      act(() => { turn = result.current.sendMessage('on the rail') })
+      await waitFor(() => expect(held.finish).toBeDefined())
+      act(() => { void result.current.openThread('planning_session', 'weekly:2026-11-1', onThread) })
+      act(() => result.current.newThread())
+      await act(async () => { held.finish!(); await turn })
+      expect(db.inserted[0]).toMatchObject({ entity_type: 'symphony_rail' })
+      expect(result.current.messages).toEqual([])
+      db.nextId = 'p2'
+      await act(async () => { await result.current.sendMessage('start the session fresh') })
+      expect(db.inserted).toHaveLength(2)
+      expect(db.inserted[1]).toMatchObject({ entity_type: 'planning_session', entity_id: 'weekly:2026-11-1' })
+      expect(db.updated.some((u) => u.id === 'p1')).toBe(false)
+      expect(onThread).toHaveBeenCalledWith('p2')
+    })
+
+    it('a turn that throws still ends: loading clears, the queued reset applies, and the next turn runs', async () => {
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onText?.('ok'); h.onDone?.('ok', null) })
+      const failing: { reject?: (e: Error) => void } = {}
+      const resolveAction = vi.fn()
+        .mockImplementationOnce(() => new Promise((_resolve, reject) => { failing.reject = reject }))
+        .mockResolvedValue(null)
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail', resolveAction }))
+      await act(async () => { await result.current.openThread('planning_session', 'weekly:2026-11-1') })
+      let turn: Promise<unknown> | undefined
+      act(() => { turn = result.current.sendMessage('approve') })
+      await waitFor(() => expect(failing.reject).toBeDefined())
+      act(() => result.current.resetSession())
+      await act(async () => { failing.reject!(new Error('boom')); await expect(turn).rejects.toThrow('boom') })
+      expect(result.current.loading).toBe(false)
+      await act(async () => { await result.current.sendMessage('next one') })
+      expect(db.inserted).toHaveLength(1)
+      expect(db.inserted[0]).toMatchObject({ entity_type: 'symphony_rail' })
+    })
+
     it('newThread starts a fresh row under the same session, which becomes its thread', async () => {
       db.sessionsRows = [planningRow()]
       vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onText?.('ok'); h.onDone?.('ok', null) })
