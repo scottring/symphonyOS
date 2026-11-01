@@ -20,6 +20,15 @@ describe('guide progress', () => {
     expect(p.current).toBe('read-month')
   })
 
+  it('goNext clears a prior skip and skipStep clears a prior done', () => {
+    const a = goNext({ current: 'look-back', done: [], skipped: ['look-back'] }, 'week')
+    expect(a.skipped).toEqual([])
+    expect(a.done).toEqual(['look-back'])
+    const b = skipStep({ current: 'look-back', done: ['look-back'], skipped: [] }, 'week')
+    expect(b.done).toEqual([])
+    expect(b.skipped).toEqual(['look-back'])
+  })
+
   it('goNext on the last step stays put', () => {
     const last = stepsFor('day').at(-1)!.id
     const p = goNext({ current: last, done: [], skipped: [] }, 'day')

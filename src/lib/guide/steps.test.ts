@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { GUIDE_STEPS, choosingStep, stepsFor, type GuideLevel } from './steps'
+import { GUIDE_STEPS, HORIZON_OF, choosingStep, stepsFor, type GuideLevel } from './steps'
 
 const LEVELS: GuideLevel[] = ['day', 'week', 'month', 'season', 'year']
 
@@ -28,6 +28,21 @@ describe('guide step catalog', () => {
     expect(choosingStep('month').id).toBe('by-area')
     expect(choosingStep('season').id).toBe('by-area')
     expect(choosingStep('year').id).toBe('brain-dump')
+  })
+
+  it('every more is 2-3 sentences with no digits (the guide never supplies specifics)', () => {
+    for (const level of LEVELS) {
+      for (const s of GUIDE_STEPS[level]) {
+        const sentences = s.more.split(/[.!?]+\s*/).filter(x => x.trim())
+        expect(sentences.length, `${level}/${s.id}`).toBeGreaterThanOrEqual(2)
+        expect(sentences.length, `${level}/${s.id}`).toBeLessThanOrEqual(3)
+        expect(/\d/.test(s.more), `${level}/${s.id}`).toBe(false)
+      }
+    }
+  })
+
+  it('maps levels to horizons', () => {
+    expect(HORIZON_OF).toEqual({ day: 'daily', week: 'weekly', month: 'monthly', season: 'seasonal', year: 'annual' })
   })
 
   it('has no emojis in copy', () => {
