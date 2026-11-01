@@ -7,7 +7,7 @@
 // and looks back on today (dayTarget). Mounted only while it runs, so its
 // notes are read only then.
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import type { TodayChoice, TodayReview } from '@/lib/planning/chooseToday'
 import { DAY_COUNT_OF, dayCount, dayStepTitle } from '@/lib/guide/dayTarget'
@@ -22,10 +22,11 @@ import { EnergyNote } from '@/components/guide/EnergyNote'
 import { useGuidedDay } from '../useGuidedDay'
 import { DayLookBack } from './DayLookBack'
 import { DayPick } from './DayPick'
-import { DayPicture, type DayActions, type DayPictureItem } from './DayRows'
+import { DayPicture, type DayPictureItem } from './DayRows'
+import type { DayActions } from '@/lib/planning/dayActions'
 import '@/components/guide/guide.css'
 
-export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, lookBack, choice, actions, goalLabel, onFinish, onClose, onPlanned }: {
+export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, routinesHidden, lookBack, choice, actions, goalLabel, listenPlacements, onFinish, onClose, onPlanned }: {
   /** The day being planned (dayTarget). */
   target: Date
   lookBackOn: Date
@@ -35,6 +36,8 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, lo
   /** The day being planned as the page shows it, under its filters: the
    *  calendar step's picture, Habits' routines and the count. */
   dayItems: readonly DayPictureItem[]
+  /** The page's "hide routines" is on: Habits says so rather than "none". */
+  routinesHidden?: boolean
   /** What the day looked back on held (buildTodayReview). */
   lookBack: TodayReview
   /** This week → the day being planned (buildTodayChoice). */
@@ -42,6 +45,10 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, lo
   /** The page's writers, each taking the day it acts on. */
   actions: DayActions
   goalLabel: (t: Task) => string | undefined
+  /** Placements saved on the page itself (a task dragged onto the day):
+   *  on the pick step they mark the day planned, as a pick does. Returns the
+   *  unsubscribe. */
+  listenPlacements?: (listener: () => void) => () => void
   /** The page's closing write (the day stamped planned); false keeps the
    *  session open. */
   onFinish: () => Promise<boolean>
@@ -63,6 +70,8 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, lo
     return onFinish()
   }
   const guided = useGuidedDay({ target, isTomorrow, count, actions, onFinish: closeDay, onClose, onPlanned })
+  const { markPlannedOnce } = guided
+  useEffect(() => listenPlacements?.(() => { void markPlannedOnce() }), [listenPlacements, markPlannedOnce])
 
   const dayWord = isTomorrow ? 'tomorrow' : 'today'
   const dayLabel = target.toLocaleDateString('en-US', { weekday: 'long' })
@@ -77,7 +86,8 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, lo
     pick: <DayPick count={count} isTomorrow={isTomorrow} target={target} choice={choice}
       skip={new Set(lookBack.open.map((t) => t.id))} actions={guided.actions} />,
     habits: <div className="gw-body">
-      {routines.length === 0 ? <p className="choose-empty">No routines on {dayWord}.</p>
+      {routinesHidden ? <p className="choose-empty">Routines are hidden on this page.</p>
+        : routines.length === 0 ? <p className="choose-empty">No routines on {dayWord}.</p>
         : <ul className="gw-days" aria-label={`Routines ${dayWord}`}>
           {routines.map((r) => <li key={r.key}><b>{r.time ?? ''}</b><span>{r.title}</span></li>)}
         </ul>}

@@ -3,7 +3,8 @@ import { render, screen, fireEvent, within, act, waitFor } from '@testing-librar
 import { useEffect } from 'react'
 import { createMockTask } from '@/test/mocks/factories'
 import { GuidedSessionProvider, useGuidedSession, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
-import type { DayActions, DayPictureItem } from './DayRows'
+import type { DayPictureItem } from './DayRows'
+import type { DayActions } from '@/lib/planning/dayActions'
 
 // The person's notes row for the day, in memory (the real merge is
 // usePlanningNotes' own test).
@@ -41,8 +42,8 @@ const dayItems: DayPictureItem[] = [
   { key: 'task-b', time: '2pm', title: 'Call the bank', kind: 'task' },
 ]
 const actions = (): DayActions => ({
-  place: vi.fn(async () => true), unplace: vi.fn(async () => true), done: vi.fn(async () => true),
-  undone: vi.fn(async () => true), backToWeek: vi.fn(async () => true),
+  place: vi.fn(async () => true), done: vi.fn(async () => true),
+  undone: vi.fn(async () => true), backToWeek: vi.fn(async () => true), restore: vi.fn(async () => true),
 })
 
 const shell = { reg: null as GuidedSessionRegistration | null }
@@ -134,6 +135,35 @@ describe('GuidedDay — Today while planning the day', () => {
     await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Undo: Inventory all documents' })) })
     await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Today: Inventory all documents' })) })
     expect(plannedPatches()).toHaveLength(1)
+  })
+
+  it('Done on a row in Pick counts as applied too (one rule with the Week)', async () => {
+    store.notes = { guide: { current: 'pick', done: [], skipped: [] } }
+    const { props } = open()
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Done: Inventory all documents' })) })
+    expect(props.actions.done).toHaveBeenCalledWith(inv)
+    await waitFor(() => expect(plannedPatches()).toHaveLength(1))
+  })
+
+  it('a placement saved on the page itself (a drag onto the day) marks it on the pick step only', async () => {
+    store.notes = { guide: { current: 'energy', done: [], skipped: [] } }
+    const listening = { fn: null as null | (() => void) }
+    const stop = vi.fn()
+    const view = open({ listenPlacements: (fn) => { listening.fn = fn; return stop } })
+    await act(async () => { listening.fn?.() })
+    expect(plannedPatches()).toHaveLength(0)
+    fireEvent.click(rail().getByRole('button', { name: /Pick 3 to 5/ }))
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Go to this step' })) })
+    await act(async () => { listening.fn?.() })
+    await waitFor(() => expect(plannedPatches()).toHaveLength(1))
+    view.unmount()
+    expect(stop).toHaveBeenCalled()
+  })
+
+  it('Habits says so when the page hides routines', () => {
+    store.notes = { guide: { current: 'habits', done: [], skipped: [] } }
+    open({ routinesHidden: true, dayItems: dayItems.filter((i) => i.kind !== 'routine') })
+    expect(rail().getByText('Routines are hidden on this page.')).toBeInTheDocument()
   })
 
   it('a pick on another step, or one that did not save, marks nothing', async () => {

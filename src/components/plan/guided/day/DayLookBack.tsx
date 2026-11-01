@@ -43,8 +43,9 @@ export function DayLookBack({ isTomorrow, target, lookBackOn, lookBack, actions,
     { label: 'Back to this week', d: 'week' as const, run: () => actions.backToWeek(t, lookBackOn) },
     { label: 'Done', d: 'done' as const, run: () => actions.done(t) },
   ]
-  // Moved on, it goes back on the day it was on; done, it is open again.
-  const undo = (t: Task) => (d: DayDecision) => d === 'done' ? () => actions.undone(t) : () => actions.place(t, lookBackOn)
+  // Done, it is open again; moved on, it goes back exactly as it was (its
+  // day, its focus, its week).
+  const undo = (t: Task) => (d: DayDecision, before: Task) => d === 'done' ? () => actions.undone(t) : () => actions.restore(before)
 
   const saved = review.mine?.wentWell ?? ''
   const win = draft ?? saved

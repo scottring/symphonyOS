@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, afterEach, onTestFinished } from 'vitest'
-import { act } from 'react'
+import { act, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { localYmd } from '@/lib/cadence/config'
+import { PLAN_MIME } from '@/lib/planning/planDrag'
+import { createMockTask } from '@/test/mocks/factories'
+import type { Task } from '@/types/task'
 import { ALL_LAYERS } from '@/lib/domains'
 import { screen, fireEvent, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
@@ -653,10 +658,32 @@ function GuidePanel() {
   const reg = useGuidedSession()
   return reg ? <div data-testid="guide-panel">{reg.header}</div> : null
 }
+// The day page's parent, as HomeViewContainer is: the viewed day follows
+// ?date=, and moving the day writes ?date= from the URL as it last rendered.
+function DatedPage({ first, render: page, spy }: { first: Date; render: (d: Date, change: (d: Date) => void) => React.ReactNode; spy: (d: Date) => void }) {
+  const [params, setParams] = useSearchParams()
+  const [own, setViewed] = useState(first)
+  const raw = params.get('date')
+  const viewed = raw ? new Date(Number(raw.slice(0, 4)), Number(raw.slice(5, 7)) - 1, Number(raw.slice(8, 10))) : own
+  const change = (next: Date) => {
+    spy(next)
+    setViewed(next)
+    const isToday = localYmd(next) === localYmd(new Date())
+    setParams((prev) => {
+      if (isToday && !prev.get('date')) return prev
+      const out = new URLSearchParams(prev)
+      if (isToday) out.delete('date')
+      else out.set('date', localYmd(next))
+      return out
+    }, { replace: true })
+  }
+  return <>{page(viewed, change)}</>
+}
 describe('TodayView — the Day session', () => {
   afterEach(() => { mockUseMobile.mockReturnValue(true); vi.useRealTimers(); window.history.replaceState({}, '', '/'); daySession.saved = null; daySession.reviewed = null; daySession.save.mockClear(); dayNotes.notes = {}; dayNotes.patches = [] })
   const at = (hour: number, days = 0) => new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + days, hour, 0)
-  const renderAt = (hour: number, { url = '/', viewed = at(hour) }: { url?: string; viewed?: Date } = {}) => {
+  type At = { url?: string; viewed?: Date; tasks?: Task[]; selectedAssignees?: string[]; ctx?: Record<string, unknown>; dated?: boolean }
+  const renderAt = (hour: number, { url = '/', viewed = at(hour), tasks = [], selectedAssignees, ctx = {}, dated = false }: At = {}) => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(at(hour))
     window.history.replaceState({}, '', url)
@@ -665,16 +692,19 @@ describe('TodayView — the Day session', () => {
     document.body.appendChild(host)
     onTestFinished(() => host.remove())
     const onDateChange = vi.fn()
+    const page = (viewedDate: Date, change: (d: Date) => void) => (
+      <TodayView
+        tasks={tasks} events={[]} routines={[]} dateInstances={[]} selectedAssignees={selectedAssignees}
+        selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
+        onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
+        viewedDate={viewedDate} onDateChange={change} projects={[]}
+      />
+    )
     const view = render(
       <DesktopControlsContext.Provider value={host}>
         <GuidedSessionProvider>
-          <ScheduleActionsProvider value={ctxValue as never}>
-            <TodayView
-              tasks={[]} events={[]} routines={[]} dateInstances={[]}
-              selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
-              onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
-              viewedDate={viewed} onDateChange={onDateChange} projects={[]}
-            />
+          <ScheduleActionsProvider value={{ ...ctxValue, ...ctx } as never}>
+            {dated ? <DatedPage first={viewed} render={page} spy={onDateChange} /> : page(viewed, onDateChange)}
           </ScheduleActionsProvider>
           <GuidePanel />
         </GuidedSessionProvider>
@@ -700,16 +730,49 @@ describe('TodayView — the Day session', () => {
   })
 
   it('from 4 pm it offers Plan tomorrow, which takes the page to tomorrow; there is no Review today', async () => {
-    const { user, onDateChange } = renderAt(17)
+    const { user } = renderAt(17)
     await openOverflow(user)
     expect(screen.queryByRole('button', { name: /End of day review/i })).not.toBeInTheDocument()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
-    expect(onDateChange).toHaveBeenCalledWith(at(0, 1))
+    // One URL write: the session and its day; the page's parent moves the day.
     expect(search().get('plan')).toBe('1')
+    expect(search().get('date')).toBe(localYmd(at(0, 1)))
     // Today's page does not run tomorrow's session over today.
     expect(screen.queryByRole('region', { name: /Planning/ })).not.toBeInTheDocument()
+  })
+
+  it('with the real date-writing parent, one tap on Plan tomorrow opens tomorrow’s session; Leave goes back to today', async () => {
+    const { user } = renderAt(17, { dated: true })
+    await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
+    await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())
+    expect(search().get('plan')).toBe('1')
+    expect(search().get('date')).toBe(localYmd(at(0, 1)))
+    await user.click(screen.getByRole('button', { name: 'Leave' }))
+    await vi.waitFor(() => expect(search().get('plan')).toBeNull())
+    expect(screen.getByRole('heading', { level: 1, name: at(0).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })).toBeInTheDocument()
+  })
+
+  it('a task dragged onto the day while on Pick marks the day planned', async () => {
+    dayNotes.notes = { guide: { current: 'pick', done: [], skipped: [] } }
+    const w = createMockTask({ id: 'w', title: 'Wash the car', bucket: 'week' })
+    renderAt(10, { url: '/?plan=1', tasks: [w], ctx: { onUpdateTask: vi.fn(async () => true) } })
+    const payload = JSON.stringify({ kind: 'task', id: 'w', date: localYmd(at(0)), title: 'Wash the car' })
+    const dataTransfer = { types: [PLAN_MIME], getData: (k: string) => (k === PLAN_MIME ? payload : ''), dropEffect: 'move' }
+    await act(async () => { fireEvent.drop(document.querySelector('.daybook-agenda')!, { dataTransfer }) })
+    await vi.waitFor(() => expect(dayNotes.patches.some((p) => (p.guide as { plannedAt?: string } | undefined)?.plannedAt)).toBe(true))
+  })
+
+  it('the look back follows the page’s people filter', () => {
+    const y = at(0, -1)
+    const mine = createMockTask({ id: 'm', title: 'Email Dana', bucket: 'timed', scheduledFor: y, isAllDay: true, assignedTo: 'me' })
+    const hers = createMockTask({ id: 'h', title: 'Call the school', bucket: 'timed', scheduledFor: y, isAllDay: true, assignedTo: 'iris' })
+    renderAt(10, { url: '/?plan=1', tasks: [mine, hers], selectedAssignees: ['me'] })
+    const rail = within(screen.getByRole('group', { name: 'Steps in this session' }))
+    expect(rail.getByText('Email Dana')).toBeInTheDocument()
+    expect(rail.queryByText('Call the school')).toBeNull()
+    expect(rail.getByText('Yesterday · 0 of 1 done')).toBeInTheDocument()
   })
 
   it('on tomorrow’s page in the evening the session plans tomorrow and looks back at today', () => {
@@ -727,9 +790,10 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
   })
 
-  it('a bare ?plan=1 in the evening takes the page to tomorrow', () => {
-    const { onDateChange } = renderAt(18, { url: '/?plan=1' })
-    expect(onDateChange).toHaveBeenCalledWith(at(0, 1))
+  it('a bare ?plan=1 in the evening takes the page to tomorrow', async () => {
+    renderAt(18, { url: '/?plan=1', dated: true })
+    await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())
+    expect(search().get('date')).toBe(localYmd(at(0, 1)))
   })
 
   // One button at most, only the one that's due (reviewed design, 2026-10-20).

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { createMockTask } from '@/test/mocks/factories'
-import type { DayActions } from './DayRows'
+import type { DayActions } from '@/lib/planning/dayActions'
 import { DayPick } from './DayPick'
 
 const actions = (): DayActions => ({
-  place: vi.fn(async () => true), unplace: vi.fn(async () => true), done: vi.fn(async () => true),
-  undone: vi.fn(async () => true), backToWeek: vi.fn(async () => true),
+  place: vi.fn(async () => true), done: vi.fn(async () => true),
+  undone: vi.fn(async () => true), backToWeek: vi.fn(async () => true), restore: vi.fn(async () => true),
 })
 const MON = new Date(2026, 10, 2), TUE = new Date(2026, 10, 3)
 const helmet = createMockTask({ id: 'h', title: 'Buy Ella a helmet' })
@@ -42,7 +42,7 @@ describe('DayPick', () => {
     const picked = within(screen.getByRole('region', { name: 'Picked for tomorrow' }))
     expect(picked.getByText('Inventory all documents')).toBeInTheDocument()
     fireEvent.click(picked.getByRole('button', { name: 'Undo: Inventory all documents' }))
-    await waitFor(() => expect(a.unplace).toHaveBeenCalledWith(inv, TUE))
+    await waitFor(() => expect(a.restore).toHaveBeenCalledWith(inv))
     expect(screen.queryByRole('region', { name: 'Picked for tomorrow' })).toBeNull()
   })
 

@@ -41,8 +41,9 @@ export function DayPick({ count, isTomorrow, target, choice, skip, actions }: {
     { label: `Not ${targetWord.toLowerCase()}`, d: 'not' as const, run: async () => true },
     { label: 'Done', d: 'done' as const, run: () => actions.done(t) },
   ]
-  const undo = (t: Task) => (d: DayDecision) =>
-    d === 'target' ? () => actions.unplace(t, target) : d === 'done' ? () => actions.undone(t) : async () => true
+  // A pick goes back exactly as it was (a missed day's date included).
+  const undo = (t: Task) => (d: DayDecision, before: Task) =>
+    d === 'target' ? () => actions.restore(before) : d === 'done' ? () => actions.undone(t) : async () => true
   const row = (t: Task, where?: string) => <DayTaskRow key={t.id} task={t} where={where} choices={choices(t)} undo={undo(t)}
     decisions={decisions} targetWord={targetWord} dayLabel={dayLabel} atTime={(time) => actions.place(t, target, time)} />
 

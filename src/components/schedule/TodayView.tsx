@@ -53,15 +53,14 @@ import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { GuidedDay } from '@/components/plan/guided/day/GuidedDay'
-import type { DayActions, DayPictureItem } from '@/components/plan/guided/day/DayRows'
+import type { DayPictureItem } from '@/components/plan/guided/day/DayRows'
+import { makeDayActions } from '@/lib/planning/dayActions'
 import { dayTarget } from '@/lib/guide/dayTarget'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
 import { buildTodayChoice, buildTodayReview, goalOf } from '@/lib/planning/chooseToday'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { dayToken, usePlanningSession } from '@/hooks/usePlanningSession'
-import { openCommitment as openCommitmentOf } from '@/lib/placement/model'
-import { bootstrapCommitments as bootstrapOf } from '@/lib/placement/intentions'
 import { SECTIONS_ORDER } from '@/lib/today/types'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
@@ -458,9 +457,19 @@ export function TodayView({
     const match = makeAssigneeFilter(selectedAssignees ?? [])
     return comingUp(tasks.filter((t) => match(t.assignedTo, t.assignedToAll)), viewedDate)
   }, [tasks, selectedAssignees, viewedDate])
+  // A placement saved on the page itself (a task dragged onto the day or a
+  // time on it): the Day session hears it, and on its pick step it counts
+  // as a pick.
+  const placementListener = useRef<(() => void) | null>(null)
+  const listenPlacements = useCallback((listener: () => void) => {
+    placementListener.current = listener
+    return () => { if (placementListener.current === listener) placementListener.current = null }
+  }, [])
+  const notePlaced = useCallback(() => { placementListener.current?.() }, [])
   const [agendaDropOver, setAgendaDropOver] = useState(false)
   const agendaDrop = planDropHandlers((payload) => {
     void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })
+      .then((ok) => { if (ok === true && payload.kind === 'task') notePlaced() })
   }, setAgendaDropOver)
 
   // The week/month lists for the header dropdowns — separate from the daily
@@ -643,21 +652,31 @@ export function TodayView({
   const headerLine = headerSentence || planTalk ? <>{headerSentence}{headerSentence && planTalk && ' '}{planTalk}</> : null
 
   // ── Opening the Day session, and what it reads from the page.
+  // The session and its day are ONE URL write (?plan=1&date=…): the page's
+  // parent moves the day from ?date=. Two writes in one tick would each start
+  // from the URL as last rendered, and the second would drop the first.
+  // The day the session moved the page from, to go back to when it closes.
+  const movedFrom = useRef<string | null>(null)
+  const sessionUrl = (prev: URLSearchParams) => {
+    const p = new URLSearchParams(prev)
+    p.delete('review'); p.set('plan', '1')
+    if (localYmd(viewedDate) !== targetKey || p.has('date')) p.set('date', targetKey)
+    return p
+  }
   const openDaySession = () => {
+    if (localYmd(viewedDate) !== targetKey) movedFrom.current = localYmd(viewedDate)
+    setDayParams(sessionUrl)
+  }
+  const closeDaySession = () => {
+    const back = movedFrom.current
+    movedFrom.current = null
     setDayParams((prev) => {
       const p = new URLSearchParams(prev)
-      p.delete('review'); p.set('plan', '1')
-      // A ?date= the page was opened on would hold it on that day.
-      if (p.has('date')) p.set('date', targetKey)
+      p.delete('plan')
+      if (back && localYmd(viewedDate) === targetKey) p.set('date', back)
       return p
     })
-    if (localYmd(viewedDate) !== targetKey) onDateChange(day.target)
   }
-  const closeDaySession = () => setDayParams((prev) => {
-    const p = new URLSearchParams(prev)
-    p.delete('plan')
-    return p
-  })
   // Review today is retired: its link opens the session.
   useEffect(() => {
     if (dayParams.get('review') !== '1') return
@@ -668,17 +687,23 @@ export function TodayView({
     }, { replace: true })
   }, [dayParams, setDayParams])
   // Opened on another day than the one it plans (a link, a reload in the
-  // evening): the page goes to that day, once per opening. Moving off it
-  // afterwards is the reader's choice; the session waits on its day.
+  // evening): the page goes to that day, once per opening, by the same one
+  // URL write. Moving off it afterwards is the reader's choice; the session
+  // waits on its day.
   const movedFor = useRef<string | null>(null)
+  const viewedKeyNow = localYmd(viewedDate)
   useEffect(() => {
     if (!planOpen) { movedFor.current = null; return }
     if (movedFor.current === targetKey) return
     movedFor.current = targetKey
-    if (localYmd(viewedDate) === targetKey) return
-    if (dayParams.get('date')) setDayParams((prev) => { const p = new URLSearchParams(prev); p.set('date', targetKey); return p }, { replace: true })
-    onDateChange(day.target)
-  }, [planOpen, targetKey, viewedDate, dayParams, setDayParams, onDateChange, day.target])
+    if (viewedKeyNow === targetKey) return
+    if (movedFrom.current === null) movedFrom.current = viewedKeyNow
+    setDayParams((prev) => {
+      const p = new URLSearchParams(prev)
+      p.set('date', targetKey)
+      return p
+    }, { replace: true })
+  }, [planOpen, targetKey, viewedKeyNow, setDayParams])
 
   // The day being planned is recorded planned, as every horizon's planning
   // is, so its button can step aside (reviewed design, 2026-10-20).
@@ -696,7 +721,10 @@ export function TodayView({
     carried: data.dayPlan.carried.flatMap((e) => (e.kind === 'task' && e.task ? [e.task] : [])),
     allTasks: tasks, today: viewedDate, userId, monthWord: monthWordToday,
   }), [data.dayPlan, tasks, viewedDate, userId, monthWordToday])
-  const lookBack = useMemo(() => buildTodayReview({ allTasks: tasks, today: day.lookBackOn, userId }), [tasks, day.lookBackOn, userId])
+  // The day before, through the page's filters: `tasks` arrives filtered to
+  // the reader's spaces; the people filter is applied as the chooser's is.
+  const lookBack = useMemo(() => buildTodayReview({ allTasks: tasks, today: day.lookBackOn, userId, match: makeAssigneeFilter(selectedAssignees ?? []) }),
+    [tasks, day.lookBackOn, userId, selectedAssignees])
   // The day as this page shows it, under its filters: the session's count
   // and pictures read exactly what is drawn.
   const dayPicture = useMemo<DayPictureItem[]>(() => SECTIONS_ORDER.flatMap((sec) => data.grouped[sec] ?? [])
@@ -707,22 +735,11 @@ export function TodayView({
       time: i.startTime && !i.allDay ? i.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(':00', '').replace(' ', '').toLowerCase() : undefined,
     })), [data.grouped])
   // The page's own writers, each given the day it acts on.
-  const dayActions = useMemo<DayActions>(() => ({
-    place: (t, on, time) => {
-      if (!time) return planActions.chooseTaskDay(t.id, on)
-      const [h, min] = time.split(':').map(Number)
-      return planActions.timeTask(t.id, new Date(on.getFullYear(), on.getMonth(), on.getDate(), h, min))
-    },
-    unplace: async (t, on) => { await planActions.unchooseTask(t.id, on); return true },
-    done: async (t) => { await onToggleTask(t.id); return true },
-    undone: async (t) => { await onToggleTask(t.id); return true },
-    // Off the day, onto the week with no day: a row the week never held is put on it.
-    backToWeek: async (t, from) => {
-      await planActions.unchooseTask(t.id, from)
-      if (!openCommitmentOf({ commitments: bootstrapOf(t) }, 'week')) await planActions.commitTask(t.id, 'week')
-      return true
-    },
-  }), [planActions, onToggleTask])
+  const dayActions = useMemo(() => makeDayActions({
+    plan: planActions,
+    updateTask: (id, u) => ctx.onUpdateTask?.(id, u),
+    toggle: onToggleTask,
+  }), [planActions, ctx, onToggleTask])
   // Done planning: the day is stamped planned (the existing savedAt).
   const finishDay = async () => {
     if (!(await dayPlan.save({ wentWell: dayPlan.mine?.wentWell ?? '', didnt: dayPlan.mine?.didnt ?? '' }))) showToast(`Couldn’t mark ${dayWord} planned — try again.`, 'error', 5000)
@@ -858,7 +875,7 @@ export function TodayView({
             // a cancelled domain gate (the row is Unsorted, the DomainGate
             // dialog is up) writes nothing, so writeMoveAndRegisterUndo skips
             // the "Moved · Undo" toast for a move that didn't happen.
-            await writeMoveAndRegisterUndo(
+            const moved = await writeMoveAndRegisterUndo(
               onUpdateTask,
               taskId,
               { bucket: 'timed', scheduledFor: intent.when, isAllDay: false },
@@ -866,6 +883,7 @@ export function TodayView({
               `Moved "${before?.title}"`,
               ctx.onRegisterUndo,
             )
+            if (moved) notePlaced()
           } else if (intent.itemId.startsWith('routine-collection-')) {
             // The whole routine moves for this day: a one-day time on the
             // routine itself, never on each step.
@@ -904,7 +922,7 @@ export function TodayView({
           const wasTimed = tasks.find((t) => t.id === allDayId)
           // A cancelled domain gate writes nothing — writeMoveAndRegisterUndo
           // skips the "Moved · Undo" toast for a move that didn't happen.
-          await writeMoveAndRegisterUndo(
+          const madeAllDay = await writeMoveAndRegisterUndo(
             onUpdateTask,
             allDayId,
             { bucket: 'timed', scheduledFor: midnight, isAllDay: true },
@@ -912,6 +930,7 @@ export function TodayView({
             `Moved "${wasTimed?.title}" to For today`,
             ctx.onRegisterUndo,
           )
+          if (madeAllDay) notePlaced()
           break
         }
 
@@ -965,7 +984,7 @@ export function TodayView({
         }
       }
     }
-  }, [ctx, onUpdateTask, onPushRoutine, onGroupItems, onNotify, viewedDate, data.grouped])
+  }, [ctx, onUpdateTask, onPushRoutine, onGroupItems, onNotify, viewedDate, data.grouped, notePlaced])
 
   // ── Handler stubs ─────────────────────────────────────────────────────────────
   const handleSelectItem = useCallback((id: string | null) => {
@@ -1217,7 +1236,8 @@ export function TodayView({
   const inDaySession = (page: ReactNode) => !sessionShown ? page : (
     <div className="px-4 md:px-0">
       <GuidedDay key={targetKey} target={day.target} lookBackOn={day.lookBackOn} isTomorrow={day.isTomorrow}
-        canvas={page} dayItems={dayPicture} lookBack={lookBack} choice={todayChoice} actions={dayActions}
+        canvas={page} dayItems={dayPicture} routinesHidden={hideRoutines} lookBack={lookBack} choice={todayChoice} actions={dayActions}
+        listenPlacements={listenPlacements}
         goalLabel={(t) => (goalOf(t, tasksById) ? `${monthWordToday} goal` : undefined)}
         onFinish={finishDay}
         onClose={() => { closeDaySession(); reloadShownNotes() }}
@@ -1602,7 +1622,7 @@ export function TodayView({
                   onCompleteRoutine(slot === null ? routineId : `${routineId}#${slot}`, !item.completed)
                 }
               }}
-              onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }) }}
+              onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }).then((ok) => { if (ok === true && payload.kind === 'task') notePlaced() }) }}
               // Dragging a block's bottom edge: a task's length (with Undo,
               // as a move has), an event's end.
               onResize={(item, end) => {

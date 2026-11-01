@@ -17,17 +17,7 @@ export interface DayChoice { label: string; d: DayDecision; run: () => Promise<b
 
 export interface DayPictureItem { key: string; time?: string; title: string; kind: 'event' | 'task' | 'routine' }
 
-/** The page's writers for a day; each takes the day it acts on. */
-export interface DayActions {
-  /** On `day`, all day; with `time` ("14:30"), at that time on it. */
-  place: (t: Task, day: Date, time?: string) => Promise<boolean>
-  /** Off `day`; its week and month lists stay. */
-  unplace: (t: Task, day: Date) => Promise<boolean>
-  done: (t: Task) => Promise<boolean>
-  undone: (t: Task) => Promise<boolean>
-  /** Off `from`, onto this week with no day. */
-  backToWeek: (t: Task, from: Date) => Promise<boolean>
-}
+export type { DayActions } from '@/lib/planning/dayActions'
 
 function stampFor(d: DayDecision, targetWord: string, dayLabel: string): ReactNode {
   const cls = 'choose-stamp-mini'
@@ -42,7 +32,8 @@ export function DayTaskRow({ task, where, choices, undo, decisions, targetWord, 
   /** "Was Sunday", "November goal" */
   where?: string
   choices: DayChoice[]
-  undo: (d: DayDecision) => () => Promise<boolean>
+  /** The Undo of decision `d`; `before` is the task as it was when chosen. */
+  undo: (d: DayDecision, before: Task) => () => Promise<boolean>
   decisions: DayDecisions
   /** "Today" / "Tomorrow": the day being planned, for its stamp. */
   targetWord: string
@@ -50,10 +41,11 @@ export function DayTaskRow({ task, where, choices, undo, decisions, targetWord, 
   dayLabel: string
   atTime?: (time: string) => Promise<boolean>
 }) {
-  const { decisionOf, pending, failed, act } = decisions
+  const { decided, pending, failed, act } = decisions
   const [timing, setTiming] = useState(false)
   const [time, setTime] = useState('')
-  const d = decisionOf(task.id)
+  const entry = decided.find((x) => x.task.id === task.id)
+  const d = entry?.d
   const busy = pending !== null
   return <li className="choose-row" aria-label={task.title}>
     <div className="choose-row-main">
@@ -63,7 +55,7 @@ export function DayTaskRow({ task, where, choices, undo, decisions, targetWord, 
       <span className="choose-row-acts" role="group" aria-label={`Plan ${task.title}`}>
         {d
           ? <button type="button" className="choose-verb is-quiet" disabled={busy} aria-label={`Undo: ${task.title}`}
-              onClick={() => { void act(task, null, undo(d)) }}>Undo</button>
+              onClick={() => { void act(task, null, undo(d, entry!.task)) }}>Undo</button>
           : <>
               {choices.map((c) => <button key={c.label} type="button" className={`choose-verb${c.go ? '' : ' is-quiet'}`} disabled={busy}
                 aria-label={`${c.label}: ${task.title}`} onClick={() => { void act(task, c.d, c.run) }}>{c.label}</button>)}

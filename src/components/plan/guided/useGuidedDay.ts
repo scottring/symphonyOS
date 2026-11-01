@@ -3,8 +3,9 @@
 // conversation, its own thread, the step on every turn). The Week's
 // (useGuidedWeek) one level down.
 //
-// Planned (per person) once anything is applied at the pick step: a pick
-// that saves, or a change card's Apply, whichever comes first.
+// Planned (per person) once anything is applied at the pick step: a pick or
+// a Done that saves, a placement saved on the page itself, or a change
+// card's Apply, whichever comes first.
 
 import { createElement, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
@@ -14,7 +15,7 @@ import { DAY_COUNT_OF, dayStepTitle } from '@/lib/guide/dayTarget'
 import { dayToken } from '@/hooks/usePlanningSession'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
-import type { DayActions } from './day/DayRows'
+import type { DayActions } from '@/lib/planning/dayActions'
 
 const CHOOSING = stepsFor('day').find((s) => s.choosing)!.id
 
@@ -52,14 +53,16 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
     else planning.current = false
   }, [loading, markPlanned])
 
-  const reported = useMemo<DayActions>(() => ({
-    ...actions,
-    place: async (...a: Parameters<DayActions['place']>) => {
-      const ok = await actions.place(...a)
+  // The same rule as the Week's (reportingChoose): a choice that saved on the
+  // pick step — put on the day, or marked done — counts as applied.
+  const reported = useMemo<DayActions>(() => {
+    const report = <A extends unknown[]>(run: (...a: A) => Promise<boolean>) => async (...a: A) => {
+      const ok = await run(...a)
       if (ok) void markPlannedOnce()
       return ok
-    },
-  }), [actions, markPlannedOnce])
+    }
+    return { ...actions, place: report(actions.place), done: report(actions.done) }
+  }, [actions, markPlannedOnce])
 
   // Done planning the day: the closing writes, then the session's own
   // finish, then back to the page. A failed closing write keeps it open.

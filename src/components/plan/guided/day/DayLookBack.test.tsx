@@ -2,12 +2,12 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 import { createMockTask } from '@/test/mocks/factories'
-import type { DayActions } from './DayRows'
+import type { DayActions } from '@/lib/planning/dayActions'
 import { DayLookBack } from './DayLookBack'
 
 const actions = (): DayActions => ({
-  place: vi.fn(async () => true), unplace: vi.fn(async () => true), done: vi.fn(async () => true),
-  undone: vi.fn(async () => true), backToWeek: vi.fn(async () => true),
+  place: vi.fn(async () => true), done: vi.fn(async () => true),
+  undone: vi.fn(async () => true), backToWeek: vi.fn(async () => true), restore: vi.fn(async () => true),
 })
 const SUN = new Date(2026, 10, 1), MON = new Date(2026, 10, 2), TUE = new Date(2026, 10, 3)
 const open = createMockTask({ id: 'c', title: 'Sign kids up for Coppermine' })
@@ -31,9 +31,9 @@ describe('DayLookBack', () => {
     expect(row.getAllByRole('button').map((b) => b.textContent)).toEqual(['Today', 'Back to this week', 'Done'])
     fireEvent.click(row.getByRole('button', { name: 'Back to this week: Sign kids up for Coppermine' }))
     await waitFor(() => expect(a.backToWeek).toHaveBeenCalledWith(open, SUN))
-    // Stamped, with Undo: it goes back on the day it was on.
+    // Stamped, with Undo: it goes back exactly as it was before the choice.
     fireEvent.click(screen.getByRole('button', { name: 'Undo: Sign kids up for Coppermine' }))
-    await waitFor(() => expect(a.place).toHaveBeenCalledWith(open, SUN))
+    await waitFor(() => expect(a.restore).toHaveBeenCalledWith(open))
     fireEvent.click(screen.getByRole('button', { name: 'Today: Sign kids up for Coppermine' }))
     await waitFor(() => expect(a.place).toHaveBeenLastCalledWith(open, MON))
   })
@@ -45,7 +45,7 @@ describe('DayLookBack', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tomorrow: Sign kids up for Coppermine' }))
     await waitFor(() => expect(a.place).toHaveBeenCalledWith(open, TUE))
     fireEvent.click(screen.getByRole('button', { name: 'Undo: Sign kids up for Coppermine' }))
-    await waitFor(() => expect(a.place).toHaveBeenLastCalledWith(open, MON))
+    await waitFor(() => expect(a.restore).toHaveBeenCalledWith(open))
     expect(screen.getByLabelText('A win today')).toBeInTheDocument()
   })
 

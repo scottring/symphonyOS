@@ -19,10 +19,10 @@ export function useDayDecisions() {
     const ok = await run().catch(() => false)
     setPending(null)
     if (!ok) { setFailed(t.id); return false }
+    // The task as it was when chosen is kept: its Undo puts that back.
     setDecided((xs) => [...xs.filter((x) => x.task.id !== t.id), ...(d ? [{ task: t, d }] : [])])
     return true
   }, [])
-  const decisionOf = (id: string) => decided.find((x) => x.task.id === id)?.d
-  return { decided, decisionOf, pending, failed, act }
+  return { decided, pending, failed, act }
 }
 export type DayDecisions = ReturnType<typeof useDayDecisions>

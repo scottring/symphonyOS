@@ -31,4 +31,12 @@ describe('buildTodayReview', () => {
     expect(r.open.map((t) => t.id)).toEqual(['a'])
     expect(r.done.map((t) => t.id)).toEqual(['b'])
   })
+  it('follows the page’s people filter: only what the filter shows is looked back on, and counted', () => {
+    const mine = task({ id: 'm', title: 'Mine', scheduledFor: new Date(2026, 9, 19), bucket: 'timed', assignedTo: 'me' })
+    const hers = task({ id: 'h', title: 'Hers', scheduledFor: new Date(2026, 9, 19), bucket: 'timed', assignedTo: 'iris' })
+    const hersDone = task({ id: 'hd', title: 'Hers done', scheduledFor: new Date(2026, 9, 19), bucket: 'timed', assignedTo: 'iris', completed: true })
+    const r = buildTodayReview({ allTasks: [mine, hers, hersDone], today: MON, match: (to) => to === 'me' })
+    expect(r.open.map((t) => t.id)).toEqual(['m'])
+    expect(r.done).toEqual([])
+  })
 })

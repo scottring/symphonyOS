@@ -86,7 +86,13 @@ export interface TodayReview {
 }
 
 /** Today → tomorrow: what today held, open and done. */
-export function buildTodayReview(input: { allTasks: readonly Task[]; today: Date; userId?: string | null }): TodayReview {
+export function buildTodayReview(input: {
+  allTasks: readonly Task[]
+  today: Date
+  userId?: string | null
+  /** The page's people filter (makeAssigneeFilter): only what it shows. */
+  match?: (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
+}): TodayReview {
   const day = localYmd(input.today)
   const flat: Task[] = []
   for (const t of input.allTasks) { flat.push(t); for (const s of t.subtasks ?? []) flat.push(s) }
@@ -95,6 +101,7 @@ export function buildTodayReview(input: { allTasks: readonly Task[]; today: Date
   const done: Task[] = []
   for (const t of flat) {
     if (seen.has(t.id) || t.isGoal) continue
+    if (input.match && !input.match(t.assignedTo, t.assignedToAll)) continue
     const dated = !!t.scheduledFor && localYmd(t.scheduledFor) === day
     const chosen = !!input.userId && isFocused(t, input.userId, day)
     if (!dated && !chosen) continue

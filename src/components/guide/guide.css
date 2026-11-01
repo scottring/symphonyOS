@@ -166,7 +166,6 @@
 .gw-choose .choose-place { flex-direction: column; gap: 2px; padding: 8px 10px; }
 .gw-choose .choose-place-title { font-size: 15px; }
 .gw-choose .choose-place-from { max-width: none; text-align: left; }
-/* Night: the deck's light primary button, in the rail too. */
 /* The Day session's step bodies (guided/day): the choose rows, compact in the rail. */
 .gd-look .choose-row-main, .gd-pick .choose-row-main { padding: 8px 10px; gap: 6px; }
 .gd-look .choose-row-title, .gd-pick .choose-row-title { flex-basis: 100%; font-size: 15px; }
@@ -182,6 +181,7 @@
 .gd-layout > .guide-session-page { flex-basis: 380px; }
 [data-scenery-lighting='nighttime'] .gd-pick .choose-today-goal { color: var(--color-primary-300); }
 
+/* Night: the deck's light primary button, in the rail too. */
 [data-scenery-lighting='nighttime'] .gw-body .deck-btn.is-primary { background: var(--color-primary-300); border-color: var(--color-primary-300); color: var(--color-bg-elevated); }
 /* Looking back, compact: the deck card flattened into the rail. */
 .choose-look.is-compact { width: 100%; gap: 8px; }
