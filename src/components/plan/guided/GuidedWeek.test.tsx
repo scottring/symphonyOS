@@ -3,7 +3,8 @@ import { render, screen, fireEvent, within, act, renderHook, waitFor } from '@te
 import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom'
 import { useEffect, type ReactNode } from 'react'
 import { deckModeOf } from '@/lib/planning/deck'
-import { createMockTask } from '@/test/mocks/factories'
+import { createMockTask, createMockRoutine } from '@/test/mocks/factories'
+import type { RecurrencePattern } from '@/types/actionable'
 import { GuidedSessionProvider, useGuidedSession, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 
 // The person's notes row for the week, in memory: what usePlanningNotes reads
@@ -36,6 +37,9 @@ vi.mock('@/hooks/usePeriodReview', () => ({ usePeriodReview: () => review }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'me' } }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [] }) }))
 vi.mock('@/contexts/CanvasActivityContext', () => ({ useCanvasActivity: () => ({ changeSet: null, receipt: null }) }))
+vi.mock('@/hooks/usePlannedDinners', () => ({ usePlannedDinners: () => new Map([['2026-09-28', { dateKey: '2026-09-28', title: 'Tacos' }]]) }))
+const wall = vi.hoisted(() => ({ add: vi.fn(async (..._a: unknown[]) => true) }))
+vi.mock('@/lib/wall/addScratchpadNote', () => ({ addScratchpadNote: wall.add, ownMemberId: async () => 'member-me' }))
 
 import { WeekV2, type WeekDeck } from '@/components/plan/v2/WeekV2'
 import { useGuidedWeek } from './useGuidedWeek'
@@ -89,6 +93,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 29, 12)) // Tuesday
   store.notes = {}; store.patches = []; store.order = []; store.fail = false
   shell.reg = null
+  wall.add.mockClear(); session.reload.mockClear()
   canvas.mockClear()
   session.save.mockReset(); session.save.mockImplementation(async () => { store.order.push('planned'); return true })
   review.finish.mockReset(); review.finish.mockImplementation(async () => { store.order.push('review'); return true })
@@ -159,6 +164,66 @@ describe('GuidedWeek — the Week page while planning', () => {
     await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
     await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'This week: Book the vet' })) })
     expect(deck.actions.keepThisWeek).toHaveBeenCalledWith(deck.cards[0])
+  })
+
+  it('the last three steps show their bodies: choose with the count, weekly ops, tell the family', async () => {
+    store.notes = { guide: { current: 'choose', done: [], skipped: [] } }
+    const dog = createMockRoutine({ id: 'dog', name: 'Walk the dog', time_of_day: '07:00:00', recurrence_pattern: { type: 'daily' } as RecurrencePattern })
+    const deck = makeDeck({
+      tasks: [onWeek('a'), onWeek('gate', { title: 'Fix the gate', context: 'family' }), onWeek('board', { title: 'Board deck', context: 'work' })],
+      routines: [dog],
+    })
+    open('/week?plan=1', deck)
+    const rail = () => within(screen.getByRole('group', { name: 'Steps in this session' }))
+    // 5 · Choose: the session's count (the same as the bar's), and a choice
+    // that saves marks the week planned.
+    expect(rail().getByText('That’s 3 of about 15.')).toBeInTheDocument()
+    expect(screen.getByText('3 of about 15 on this week')).toBeInTheDocument()
+    fireEvent.click(rail().getByRole('button', { name: /Get the house ready/ }))
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'This week: Get the house ready' })) })
+    expect(deck.choose.lines[0].verbs[0].run).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(store.patches.filter((x) => (x.p.guide as { plannedAt?: string } | undefined)?.plannedAt)).toHaveLength(1))
+    // 6 · Weekly ops: dinners, routines, the weekend note on the same row.
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    expect(rail().getByText('Tacos')).toBeInTheDocument()
+    expect(rail().getByRole('link', { name: 'Open the meal plan' })).toHaveAttribute('href', '/meals/plan?week=2026-09-27')
+    expect(rail().getByText('7a Walk the dog')).toBeInTheDocument()
+    fireEvent.change(rail().getByLabelText('What the weekend is for'), { target: { value: 'The lake' } })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Save weekend note' })) })
+    expect(store.patches.at(-1)?.p).toEqual({ weekend: 'The lake' })
+    expect(store.notes.weekend).toBe('The lake')
+    // 7 · Tell the family: the week's Family items for reference; only what
+    // is typed is posted, kept until the week is over.
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    expect(rail().getByRole('list', { name: 'This week’s Family items' })).toHaveTextContent('Fix the gate')
+    expect(rail().queryByText('Board deck')).toBeNull()
+    fireEvent.change(rail().getByLabelText('What should the family know?'), { target: { value: 'Grandma Thursday' } })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Post to the wall' })) })
+    expect(wall.add).toHaveBeenCalledWith('me', 'Grandma Thursday', 'note', 'member-me', new Date(2026, 9, 4))
+    expect(rail().getByRole('status')).toHaveTextContent('Posted 1 note')
+  })
+
+  it('a write saved on the page itself marks the week planned on the choosing step, and only there', async () => {
+    store.notes = { guide: { current: 'inbox', done: [], skipped: [] } }
+    const listening = { fn: null as null | (() => void) }
+    const stop = vi.fn()
+    const deck = makeDeck({ listenCanvasWrites: (fn) => { listening.fn = fn; return stop } })
+    const view = open('/week?plan=1', deck)
+    const plannedPatches = () => store.patches.filter((x) => (x.p.guide as { plannedAt?: string } | undefined)?.plannedAt)
+    // Dragged onto a day while clearing the inbox: not planned.
+    await act(async () => { listening.fn?.() })
+    expect(plannedPatches()).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: /Choose this week/ }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Go to this step' })) })
+    await act(async () => { listening.fn?.() })
+    await waitFor(() => expect(plannedPatches()).toHaveLength(1))
+    expect(session.reload).toHaveBeenCalled()
+    // Once per session.
+    await act(async () => { listening.fn?.() })
+    expect(plannedPatches()).toHaveLength(1)
+    // Leaving the session stops listening.
+    view.unmount()
+    expect(stop).toHaveBeenCalled()
   })
 
   it('notes typed in Look back and not saved survive going on and coming back, marked not saved', async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dateAtPosition, positionOf, storageFor, windowWeeks } from './mealWeek'
+import { dateAtPosition, positionOf, storageFor, weekOffsetFor, windowWeeks } from './mealWeek'
 import { toIsoDate } from './weekHelpers'
 
 const SAT = new Date(2026, 9, 24) // Saturday Oct 24
@@ -40,5 +40,25 @@ describe('mealWeek', () => {
   it('a Monday week anchors on the Sunday before it', () => {
     expect(windowWeeks(MON)).toEqual({ weeks: ['2026-10-25', '2026-11-01'], anchor: '2026-10-25' })
     expect(storageFor(MON, 6)).toEqual({ weekStart: '2026-11-01', dayOfWeek: 0 })
+  })
+})
+
+describe('weekOffsetFor — the Meals page opened on a given week (?week=)', () => {
+  const today = new Date(2026, 10, 4, 15) // Wednesday Nov 4
+  it('counts whole weeks from this week to the week holding that date', () => {
+    expect(weekOffsetFor('2026-11-01', today, 0)).toBe(0)
+    expect(weekOffsetFor('2026-11-08', today, 0)).toBe(1)
+    expect(weekOffsetFor('2026-11-14', today, 0)).toBe(1)
+    expect(weekOffsetFor('2026-10-25', today, 0)).toBe(-1)
+    // A Saturday week: Sat Oct 31 – Fri Nov 6 is this week; Sat Nov 7 is next.
+    expect(weekOffsetFor('2026-11-07', today, 6)).toBe(1)
+    expect(weekOffsetFor('2026-11-06', today, 6)).toBe(0)
+  })
+  it('across the clocks changing (Nov 1, 2026 in the US) still whole weeks', () => {
+    expect(weekOffsetFor('2026-11-29', new Date(2026, 9, 28), 0)).toBe(5)
+  })
+  it('no week, or nonsense, is this week', () => {
+    expect(weekOffsetFor(null, today, 0)).toBe(0)
+    expect(weekOffsetFor('soon', today, 0)).toBe(0)
   })
 })

@@ -979,6 +979,35 @@ describe('WeekViewV2 — the deck', () => {
     expect(props().aged).toBe(0)
   })
 
+  // Ledger ruling (Task 8/10): a write saved on the page while planning counts
+  // as applied — the session hears of each canvas write that saved.
+  it('each write the week canvas saves is told to a listening session; one that failed is not', async () => {
+    const gate = createMockTask({ id: 'gate', title: 'Fix the gate', bucket: 'week', weekStart: sat, updatedAt: recent })
+    const onUpdateTask = vi.fn(async () => true as boolean)
+    open('?plan=1', [gate], { onUpdateTask })
+    const heard = vi.fn()
+    const stop = (deckMock.deck as unknown as { listenCanvasWrites: (fn: () => void) => () => void }).listenCanvasWrites(heard)
+    const writers = ((deckMock.guided as unknown as { canvas: React.ReactElement<{ writers: import('@/components/canvas/week/WeekCanvas').WeekCanvasWriters }> }).canvas).props.writers
+    await act(async () => { writers.placeTask(gate, new Date(2026, 9, 19)); await new Promise((r) => setTimeout(r, 0)) })
+    expect(onUpdateTask).toHaveBeenCalledWith('gate', expect.anything())
+    expect(heard).toHaveBeenCalledTimes(1)
+    onUpdateTask.mockImplementation(async () => false)
+    await act(async () => { writers.placeTask(gate, new Date(2026, 9, 20)); await new Promise((r) => setTimeout(r, 0)) })
+    expect(heard).toHaveBeenCalledTimes(1)
+    // Stopped, nothing more is heard.
+    stop()
+    onUpdateTask.mockImplementation(async () => true)
+    await act(async () => { writers.placeTask(gate, new Date(2026, 9, 21)); await new Promise((r) => setTimeout(r, 0)) })
+    expect(heard).toHaveBeenCalledTimes(1)
+  })
+
+  it('Weekly ops is handed the routines the page shows: the space filter applies', () => {
+    const swim = createMockRoutine({ id: 'swim', name: 'Swim', context: 'family', recurrence_pattern: { type: 'daily' } as RecurrencePattern })
+    const standup = createMockRoutine({ id: 'standup', name: 'Standup', context: 'work', recurrence_pattern: { type: 'daily' } as RecurrencePattern })
+    open('?plan=1', [], { layers: familyOnly, routines: [swim, standup] })
+    expect((deckMock.deck as unknown as { routines: { id: string }[] }).routines.map((r) => r.id)).toEqual(['swim'])
+  })
+
   // Review Focus 2: last week, the strip's order and its weekend follow weekStartsOn.
   it('in a Saturday week, last week starts the Saturday before and the strip runs Sat → Fri', () => {
     const tasks = [

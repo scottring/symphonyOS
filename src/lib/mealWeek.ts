@@ -11,6 +11,7 @@
 // Sunday start a position is the day of the week, exactly as before.
 
 import { sundayOfWeek, toIsoDate } from '@/lib/weekHelpers'
+import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 
 const addDays = (d: Date, n: number) => {
   const next = new Date(d)
@@ -46,4 +47,17 @@ export function positionOf(windowStart: Date, weekStart: string, dayOfWeek: numb
 export function windowWeeks(windowStart: Date): { weeks: string[]; anchor: string } {
   const weeks = [...new Set(Array.from({ length: 7 }, (_, i) => storageFor(windowStart, i).weekStart))]
   return { weeks, anchor: storageFor(windowStart, 3).weekStart }
+}
+
+/** The Meals page opened on a given week (`/meals/plan?week=YYYY-MM-DD`, as
+ *  Planning the week links it): whole weeks from this week to the week that
+ *  holds that date, on the household's week start. No date, or one that does
+ *  not read, is this week (0). */
+export function weekOffsetFor(ymd: string | null, today: Date, weekStartsOn: WeekStart): number {
+  const m = ymd ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd) : null
+  if (!m) return 0
+  const target = weekStartAnchor(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])), weekStartsOn)
+  const here = weekStartAnchor(today, weekStartsOn)
+  // Rounded: a week across the clocks changing is an hour short or long.
+  return Math.round((target.getTime() - here.getTime()) / (7 * 86_400_000))
 }

@@ -20,7 +20,7 @@
 // steps rail where the strip stands, the week beside it, the step's header
 // in the conversation. "Place them" (?place=1) opens Give them a day.
 
-import { useContext, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
@@ -35,12 +35,16 @@ import { WeekLookBack } from '@/components/plan/guided/week/WeekLookBack'
 import { ReadMonth } from '@/components/plan/guided/week/ReadMonth'
 import { CalendarCheck } from '@/components/plan/guided/week/CalendarCheck'
 import { InboxStep } from '@/components/plan/guided/week/InboxStep'
+import { ChooseStep } from '@/components/plan/guided/week/ChooseStep'
+import { WeeklyOps } from '@/components/plan/guided/week/WeeklyOps'
+import { TellFamily } from '@/components/plan/guided/week/TellFamily'
+import type { Routine } from '@/types/actionable'
 import type { ClashEvent } from '@/lib/guide/clashes'
 import type { FamilyMember } from '@/types/family'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import type { DeckCard, DeckMode } from '@/lib/planning/deck'
 import type { DeckActions } from '@/components/home/week/useDeckActions'
-import { REVIEW_WINDOW_DAYS, reviewTarget, weekPhrase } from '@/lib/planning/periodReview'
+import { REVIEW_WINDOW_DAYS, reviewTarget, weekPhrase, weekReviewState } from '@/lib/planning/periodReview'
 import { showToast } from '@/hooks/useToast'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
 import { WeekMenu } from './WeekMenu'
@@ -87,6 +91,12 @@ export interface WeekDeck {
   events?: readonly ClashEvent[]
   /** Who a loose end can be handed to: the household, but not the viewer. */
   handOffTo?: readonly FamilyMember[]
+  /** The routines the page shows under its filters (Weekly ops lists them by day). */
+  routines?: readonly Routine[]
+  /** Hear of each write the week canvas saves (a drag onto a day, an add):
+   *  on the choosing step it marks the week planned, as a Choose verb does.
+   *  Returns the way to stop listening. */
+  listenCanvasWrites?: (listener: () => void) => () => void
 }
 
 export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
@@ -254,6 +264,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
 
 const NO_TASKS: readonly Task[] = []
 const NOBODY: readonly FamilyMember[] = []
+const NO_ROUTINES: readonly Routine[] = []
 
 /** Planning the week (spec 2026-11-01): the guided session on this page.
  *  Mounted only while it runs, so its notes are read only then. */
@@ -272,17 +283,32 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   // Look back's notes as typed, kept here so they outlive its step's body
   // (only the current step's body is drawn): nothing is lost on Next.
   const [lookDraft, setLookDraft] = useState<ReviewNotes | null>(null)
+  const [weekendDraft, setWeekendDraft] = useState<string | null>(null)
+  const [familyDraft, setFamilyDraft] = useState<string | null>(null)
+  // A write saved on the page itself (a task dragged onto a day) counts as
+  // applied too: on the choosing step it marks the week planned, once.
+  const { markPlannedOnce } = guided
+  const listen = deck.listenCanvasWrites
+  useEffect(() => listen?.(() => { void markPlannedOnce() }), [listen, markPlannedOnce])
+  // Tell the family's reference list: the week's open Family items, from the
+  // page's own scoped list.
+  const tasks = deck.tasks ?? NO_TASKS
+  const familyItems = useMemo(() => tasks.filter((t) => t.context === 'family' && !t.completed
+    && weekReviewState(t, weekStart, { isCurrent }) !== undefined), [tasks, weekStart, isCurrent])
   // Where the session is comes first: no flash of step one before a resume.
   if (guided.loading) return null
   const choose = deck.choose
-  // What each step shows inside the rail (Choose, Weekly ops and Tell the
-  // family come with Task 10).
+  // What each step shows inside the rail. Choose binds the session's own
+  // Choose (its verbs mark the week planned); the earlier steps the page's.
   const bodies = {
     'look-back': <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
       notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} members={deck.handOffTo ?? NOBODY} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
     'read-month': <ReadMonth monthWord={choose.monthWord} lines={choose.lines} doneLines={choose.doneLines} />,
     calendar: <CalendarCheck weekStart={weekStart} events={deck.events ?? []} />,
     inbox: <InboxStep cards={deck.cards.filter((c) => c.source === 'inbox')} actions={deck.actions} />,
+    choose: <ChooseStep count={guided.count} choose={guided.choose} days={deck.stripDays} />,
+    ops: <WeeklyOps weekStart={weekStart} routines={deck.routines ?? NO_ROUTINES} draft={weekendDraft} onDraft={setWeekendDraft} />,
+    family: <TellFamily weekStart={weekStart} familyItems={familyItems} draft={familyDraft} onDraft={setFamilyDraft} />,
   }
   return <GuidedWeek canvas={canvas} bodies={bodies} count={guided.count} monthWord={guided.monthWord}
     progress={guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }} onLeave={onClose} />

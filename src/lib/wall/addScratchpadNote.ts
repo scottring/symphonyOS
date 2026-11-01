@@ -1,6 +1,8 @@
 // One write for a new scratchpad note, shared by the wall and the app's Add
 // box (Scott, 2026-10-07: "post scratchpad notes from our phones/desktops/web").
-// Every note is household-shared by RLS; nothing to scope here.
+// Every note is household-shared by RLS; nothing to scope here. A note given
+// an end (Planning the week's "Tell the family": until the week is over)
+// leaves the wall at that moment; without one it stays until it is sorted.
 import { supabase } from '@/lib/supabase'
 import type { ScratchpadKind } from './scratchpad'
 
@@ -9,11 +11,13 @@ export async function addScratchpadNote(
   body: string,
   kind: ScratchpadKind,
   authorMemberId: string | null,
+  expiresAt?: Date,
 ): Promise<boolean> {
   const text = body.trim()
   if (!text) return false
   const { error } = await supabase.from('scratchpad_notes').insert({
     user_id: userId, body: text.slice(0, 500), kind, author_member_id: authorMemberId,
+    ...(expiresAt ? { expires_at: expiresAt.toISOString() } : {}),
   })
   if (error) { console.error('[scratchpad] add failed:', error.message); return false }
   return true

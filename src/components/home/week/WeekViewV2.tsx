@@ -28,6 +28,7 @@ import { useWeekDragDrop } from './useWeekDragDrop'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { resolveRoutineEligible } from '@/lib/routineUtils'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { buildWeekRoutineItems } from './weekRoutineItems'
 import { useDayChoices } from '@/hooks/useDayChoices'
@@ -858,12 +859,26 @@ export function WeekViewV2(props: WeekViewV2Props) {
       }),
     }
   }, [planLines, planMonth, tasks, weekAnchor, weekIsCurrent])
+  // A guided session listening for the canvas's saved writes (WeekV2's
+  // session marks the week planned when one lands on its choosing step).
+  const canvasWriteListener = useRef<(() => void) | null>(null)
+  const listenCanvasWrites = useCallback((listener: () => void) => {
+    canvasWriteListener.current = listener
+    return () => { if (canvasWriteListener.current === listener) canvasWriteListener.current = null }
+  }, [])
   const canvasWriters = useMemo<WeekCanvasWriters>(() => {
     const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    // Every canvas write goes through here: the activity strip's receipt and
+    // Undo, then — when it saved — word to a listening session.
+    const run: typeof activity.run = async (label, command, options) => {
+      const ok = await activity.run(label, command, options)
+      if (ok) canvasWriteListener.current?.()
+      return ok
+    }
     const write = (label: string, t: Task, patch: Partial<Task>, previous?: Partial<Task>) => {
       // The way back is exactly what the write changed.
       const before = previous ?? Object.fromEntries(Object.keys(patch).map((k) => [k, t[k as keyof Task]])) as Partial<Task>
-      void activity.run(label, async () => (await onUpdateTask(t.id, patch)) as boolean | void, {
+      void run(label, async () => (await onUpdateTask(t.id, patch)) as boolean | void, {
         ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) },
       })
     }
@@ -880,7 +895,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       unplaceTask: (t) => { const { updates, previous } = timingRemoval(t, 'day'); write(`Back to still to place: “${t.title}”`, t, updates, previous) },
       toggleTask: (t) => {
         const was = t.completed
-        void activity.run(was ? `Reopen “${t.title}”` : `Done: “${t.title}”`, () => toggleTask(t.id), {
+        void run(was ? `Reopen “${t.title}”` : `Done: “${t.title}”`, () => toggleTask(t.id), {
           ids: [t.id], undo: async () => { await onUpdateTask(t.id, { completed: was }) },
         })
       },
@@ -888,19 +903,19 @@ export function WeekViewV2(props: WeekViewV2Props) {
         if (!it.routineId) return
         const id = it.routineId
         const done = !it.completed
-        void activity.run(done ? `Done: “${it.title}”` : `Reopen “${it.title}”`,
+        void run(done ? `Done: “${it.title}”` : `Reopen “${it.title}”`,
           async () => { await (done ? markDone('routine', id, day) : undoDone('routine', id, day)) },
           { ids: [id], undo: async () => { await (done ? undoDone('routine', id, day) : markDone('routine', id, day)) } })
       },
       placeRoutine: (r, day) => {
-        void activity.run(`Give “${r.title}” ${short(day)}`, () => setPlanned('routine', r.id, atMidnight(day), true), {
+        void run(`Give “${r.title}” ${short(day)}`, () => setPlanned('routine', r.id, atMidnight(day), true), {
           ids: [r.id], undo: () => setPlanned('routine', r.id, atMidnight(day), false),
         })
       },
       moveRoutine: (it, fromKey, day) => {
         if (!it.routineId) return
         const opts: { ids: string[]; undo?: () => Promise<boolean | void> } = { ids: [it.routineId] }
-        void activity.run(`Move “${it.title}” to ${short(day)}`, async () => {
+        void run(`Move “${it.title}” to ${short(day)}`, async () => {
           const r = await moveRoutineToDay(it.routineId!, fromKey, localYmd(day), it.title, false)
           if (r.undo) { const undo = r.undo; opts.undo = async () => { await undo() } }
           return r.ok
@@ -911,14 +926,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
       // copied, the same row keeps its month), and onto a day when dropped on one.
       pullLine: (t, day) => {
         const was = { ...timingRemoval(t, 'day').previous, commitments: liveCommitments({ commitments: bootstrapCommitments(t) }) }
-        void activity.run(day ? `Give “${t.title}” ${short(day)}` : `Bring “${t.title}” onto this week`, async () => {
+        void run(day ? `Give “${t.title}” ${short(day)}` : `Bring “${t.title}” onto this week`, async () => {
           if (!(await keepForward(t.id, { weekStart: weekAnchor }))) return false
           return day ? (await onUpdateTask(t.id, lineDropUpdates(t, { kind: 'day', at: atMidnight(day) }))) !== false : true
         }, { ids: [t.id], undo: async () => { await onUpdateTask(t.id, was) } })
       },
       // Delete from No day yet, with Undo: the same row back (restoreDeleted).
       deleteTask: (t) => {
-        void activity.run(`Delete “${t.title}”`, async () => { await deleteTask(t.id); return true }, {
+        void run(`Delete “${t.title}”`, async () => { await deleteTask(t.id); return true }, {
           ids: [t.id], undo: () => restoreDeleted(addTask, t),
         })
       },
@@ -929,7 +944,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         const at = landing.kind === 'day' ? (parse.hasTime && parse.date ? parse.date : atMidnight(landing.date)) : undefined
         const people = parse.people
         const where = landing.kind === 'day' ? short(landing.date) : 'this week'
-        const ok = await activity.run(`Add “${parse.title}” to ${where}`, async () => !!(await addTask(parse.title, parse.quick.contactId, parse.quick.projectId, at, {
+        const ok = await run(`Add “${parse.title}” to ${where}`, async () => !!(await addTask(parse.title, parse.quick.contactId, parse.quick.projectId, at, {
           id, assignedTo: people[0] ?? meId ?? undefined, assignedToAll: people.length > 1 ? people : undefined,
           location: parse.location, context: parse.quick.context,
           ...(at ? { isAllDay: !parse.hasTime } : { bucket: 'week' as const, weekStart: weekAnchor }),
@@ -937,12 +952,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
         if (ok && !layers.has(parse.quick.context ?? 'unsorted')) showToast('Added, but hidden by your current view', 'warning', 8000)
         return ok !== false
       },
-      foreignDrop: (day, payload) => { void planActions.drop(payload, { type: 'day', day }) },
+      foreignDrop: (day, payload) => { void planActions.drop(payload, { type: 'day', day }).then((ok) => { if (ok === true) canvasWriteListener.current?.() }) },
       // No day yet triage: the Inbox's when-vocabulary, through the same gated
       // writes (applyTriageWhen); Undo puts back where the task was.
       triageTask: (t, when) => {
         const before = placementOf(t)
-        void activity.run(`${describeTriageWhen(when)}: “${t.title}”`, () => applyTriageWhen(when, t.id, {
+        void run(`${describeTriageWhen(when)}: “${t.title}”`, () => applyTriageWhen(when, t.id, {
           onPushTask: gated.pushTask, onSetBucket: gated.setBucket ?? ((id, bucket) => onUpdateTask(id, { bucket })),
           onFocus: (id, day) => onUpdateTask(id, { plannedOn: day }),
         }), { ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) } })
@@ -958,13 +973,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
         if (writes.length === 0) return
         const before = writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))
         const up = toIndex < orderedIds.indexOf(t.id)
-        void activity.run(`Move “${t.title}” ${up ? 'up' : 'down'}`, () => writeOrders(writes), {
+        void run(`Move “${t.title}” ${up ? 'up' : 'down'}`, () => writeOrders(writes), {
           ids: writes.map((w) => w.id), undo: async () => { await writeOrders(before) },
         })
       },
       scheduleTask: (t, at, isAllDay) => {
         const before = placementOf(t)
-        void activity.run(`Give “${t.title}” ${short(at)}`, () => gated.pushTask(t.id, isAllDay ? atMidnight(at) : at) as Promise<boolean | void>, {
+        void run(`Give “${t.title}” ${short(at)}`, () => gated.pushTask(t.id, isAllDay ? atMidnight(at) : at) as Promise<boolean | void>, {
           ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) },
         })
       },
@@ -976,7 +991,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           const length = ev.end ? ev.end.getTime() - ev.time.getTime() : 30 * 60_000
           const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), ev.time.getHours(), ev.time.getMinutes())
           const was = { startTime: ev.time, endTime: new Date(ev.time.getTime() + length) }
-          void activity.run(`Move “${ev.title}” to ${short(day)}`,
+          void run(`Move “${ev.title}” to ${short(day)}`,
             async () => { await onUpdateEvent(eventId, { startTime: start, endTime: new Date(start.getTime() + length) }) },
             { ids: [ev.id], undo: async () => { await onUpdateEvent(eventId, was) } })
         },
@@ -1144,6 +1159,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const clashEvents = useMemo(() => eventItems.flatMap((i) => i.startTime && i.endTime
     ? [{ id: i.id, title: i.title, start: i.startTime, end: i.endTime, ...(i.location ? { place: i.location } : {}) }] : []), [eventItems])
   const handOffTo = useMemo(() => familyMembers.filter((m) => m.id !== meId), [familyMembers, meId])
+  // Weekly ops lists the routines the page shows: the same space filter and
+  // people lens (the ladder without its one-day rung; the step asks each day).
+  const opsRoutines = useMemo(() => routines.filter((r) => resolveRoutineEligible(r, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }).shows),
+    [routines, selectedAssignees, layers])
   const deck: WeekDeck = {
     mode: deckMode, available: deckAvailable,
     cards: deckCards, doneLastWeek, plannedLastWeek, alsoDoneLastWeek, doneThisWeek, onThisWeek, aged, actions: deckActions, stripDays,
@@ -1166,6 +1185,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
     tasks: deckTasks,
     events: clashEvents,
     handOffTo,
+    routines: opsRoutines,
+    listenCanvasWrites,
   }
 
   return (

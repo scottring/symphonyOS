@@ -1,7 +1,8 @@
 // src/hooks/useScratchpad.ts
 //
 // The wall's scratchpad notes (see src/lib/wall/scratchpad.ts). Loads the open
-// notes plus the last week's sorted ones, follows the table over realtime so a
+// notes plus the last week's sorted ones (never one whose end has passed: a
+// "Tell the family" note lasts its week), follows the table over realtime so a
 // note jotted on a phone or by the other parent lands on the wall, and owns
 // every write. Each write reports success so the wall can flash a failure.
 
@@ -15,23 +16,28 @@ import {
   type DbScratchpadNote, type ScratchpadKind, type ScratchpadNote,
 } from '@/lib/wall/scratchpad'
 
-const COLUMNS = 'id, body, kind, author_member_id, status, resolution, sent_to_member_id, created_at, resolved_at'
+const COLUMNS = 'id, body, kind, author_member_id, status, resolution, sent_to_member_id, created_at, resolved_at, expires_at'
 
 export function useScratchpad(userId: string | null) {
   const [notes, setNotes] = useState<ScratchpadNote[]>([])
 
   const load = useCallback(async () => {
     if (!userId) { setNotes([]); return }
-    const since = new Date(Date.now() - DONE_WINDOW_DAYS * 86_400_000).toISOString()
+    const now = new Date()
+    const since = new Date(now.getTime() - DONE_WINDOW_DAYS * 86_400_000).toISOString()
     // RLS shares the household's notes; no user filter here.
     const { data, error } = await supabase
       .from('scratchpad_notes')
       .select(COLUMNS)
       .or(`status.eq.open,resolved_at.gte.${since}`)
+      .or(`expires_at.is.null,expires_at.gt.${now.toISOString()}`)
       .order('created_at', { ascending: false })
       .limit(200)
     if (error) { console.error('[scratchpad] load failed:', error.message); return }
-    setNotes((data as DbScratchpadNote[]).map(dbToScratchpadNote))
+    // The same rule again on what came back, by this device's clock.
+    const live = (data as (DbScratchpadNote & { expires_at?: string | null })[])
+      .filter((r) => !r.expires_at || new Date(r.expires_at).getTime() > now.getTime())
+    setNotes(live.map(dbToScratchpadNote))
   }, [userId])
 
   useEffect(() => {

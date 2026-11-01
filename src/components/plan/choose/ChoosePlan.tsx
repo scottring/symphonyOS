@@ -70,10 +70,14 @@ export interface ChoosePlanProps {
   primary: { label: string; run: () => void | Promise<void>; busy?: boolean }
   /** "October was planned Oct 2 by you. You can still change it." */
   planned?: ReactNode
-  /** The kicker over the cards: "October goals → this week". */
+  /** The kicker over the cards: "October goals → this week". Not shown when compact. */
   kicker: string
-  onLeave: () => void
+  /** Not shown when compact: the session around it has its own Leave. */
+  onLeave?: () => void
   loading?: boolean
+  /** Inside a guided session's steps rail: the goals as one list (All at
+   *  once), without the kicker, the view switch or Leave. */
+  compact?: boolean
 }
 
 type Decision = 'here' | 'stay' | 'done'
@@ -277,21 +281,22 @@ export function ChoosePlan(p: ChoosePlanProps) {
   const current = at < p.lines.length ? p.lines[at] : null
   const last = at === cards - 1
   const primaryBtn = <button type="button" className="deck-btn is-primary" disabled={p.primary.busy} onClick={() => { void p.primary.run() }}>{p.primary.busy ? 'Saving…' : p.primary.label}</button>
+  const view = p.compact ? 'all' : p.view
 
-  return <div className="choose" data-view={p.view}>
-    <div className="choose-top">
+  return <div className={`choose${p.compact ? ' is-compact' : ''}`} data-view={view}>
+    {!p.compact && <div className="choose-top">
       <span className="deck-kicker">{p.kicker}</span>
       <span className="choose-top-right">
         <span className="choose-switch" role="radiogroup" aria-label="View">
           {(['one', 'all'] as const).map((v) => <button key={v} type="button" role="radio" aria-checked={p.view === v}
             className={`choose-switch-btn${p.view === v ? ' is-on' : ''}`} onClick={() => p.onViewChange(v)}>{v === 'one' ? 'One at a time' : 'All at once'}</button>)}
         </span>
-        <button type="button" className="choose-leave" onClick={p.onLeave}>Leave</button>
+        {p.onLeave && <button type="button" className="choose-leave" onClick={p.onLeave}>Leave</button>}
       </span>
-    </div>
+    </div>}
     {p.planned && <p className="choose-was">{p.planned}</p>}
 
-    {p.loading ? <p className="plan-status" role="status">Loading…</p> : p.view === 'one' ? <>
+    {p.loading ? <p className="plan-status" role="status">Loading…</p> : view === 'one' ? <>
       <p className="choose-count">{current ? `${at + 1} of ${p.lines.length}` : p.lines.length ? `After the ${p.lines.length} ${above} goals` : ''}</p>
       <div className="deck-stack choose-stack" ref={cardRef}>
         <div className="deck-ghost is-far" /><div className="deck-ghost" />
