@@ -1,6 +1,6 @@
 import {render,screen,fireEvent,waitFor,within,cleanup,createEvent,act} from '@testing-library/react'
 import {MemoryRouter,Routes,Route,useLocation} from 'react-router-dom'
-import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest'
+import {afterEach,beforeEach,describe,it,expect,onTestFinished,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
 import {ConversationWalkContext} from '@/components/canvas/conversationWalk'
 const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),updateTaskOrders:vi.fn(),redraw:(()=>{}) as ()=>void,tasks:[] as any[],goals:[] as any[]}))
@@ -156,6 +156,8 @@ describe('one plain list',()=>{
   expect(screen.queryByText(/\d+ month goals?/)).toBeNull()
  })
  it('Month names the season goal it is for and tags what it has this week',()=>{
+  // October's page with "this week" in October; on the real clock it broke on Nov 1.
+  at(new Date(2026,9,20,9)); onTestFinished(()=>{vi.useRealTimers()})
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s'},{id:'x',title:'Taxes',bucket:'month'},
    {id:'w',title:'Book the shelter',bucket:'week',sourceId:'m'}]
   month()
@@ -1013,6 +1015,8 @@ describe('a line moved on is not open here (2026-10-17)',()=>{
 
 describe('I’m happy with October (2026-10-17)',()=>{
  it('the plan flow marks the period planned; the header says when, not asks',async()=>{
+  // October still to come, so it is planned, not reviewed (broke on Nov 1).
+  at(new Date(2026,9,17,9)); onTestFinished(()=>{vi.useRealTimers()})
   plan.saved=null
   month('&plan=1')
   await pastLookingBack()
