@@ -8,7 +8,8 @@
 // out), or when every meaningful word of one is in the other ("Get fit",
 // "Get fit this year"). A number or amount ("10k", "$401k", "2027") never
 // counts as shared: "Save $10k" and "Run a 10k" are different goals, and a
-// title with one is never held by another.
+// title with one is never held by another. The same title twice is always a
+// pair, numbers and all (lowercased, punctuation and spacing aside).
 
 const STOP = new Set([
   'a', 'an', 'the', 'and', 'or', 'but', 'nor', 'so', 'yet',
@@ -28,7 +29,12 @@ export function meaningfulWords(title: string): string[] {
 /** A number or amount: in the title, never a match. */
 const isNumber = (word: string) => /\d/.test(word)
 
+/** The title as words: lowercased, punctuation and extra spaces gone. */
+const normalTitle = (title: string) => title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ')
+
 function overlap(a: { title: string }, b: { title: string }): boolean {
+  const na = normalTitle(a.title)
+  if (na && na === normalTitle(b.title)) return true
   const wa = meaningfulWords(a.title), wb = meaningfulWords(b.title)
   if (!wa.length || !wb.length) return false
   const matches = (w: string, other: ReadonlySet<string>) => !isNumber(w) && other.has(w)

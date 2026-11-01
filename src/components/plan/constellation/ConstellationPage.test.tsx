@@ -1464,9 +1464,17 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   api.updateGoal.mockResolvedValue(false)
   atStep('look-back')
   year()
+  api.deleteTask.mockResolvedValue(true)
   await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Someday: Learn to sail'}))})
   expect(lastRun().ok).toBe(false)
   expect(api.deleteTask).toHaveBeenCalledWith(api.addTask.mock.calls[0][4].id)
+  // Taken back: nothing changed, the receipt's usual words.
+  expect(lastRun().opts.failureSummary).toBeUndefined()
+  // A Someday line that would not go back says so in the receipt.
+  api.deleteTask.mockResolvedValue(false)
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Someday: Learn to sail'}))})
+  expect(lastRun().ok).toBe(false)
+  expect(lastRun().opts).toMatchObject({failureState:'partial',failureSummary:'Didn’t put “Learn to sail” away. Its line is still on Someday.'})
  })
  it('Picture 5–10 years out saves the vision into the year’s notes, in Scott’s words',async()=>{
   inSession()

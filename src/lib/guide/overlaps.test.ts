@@ -28,6 +28,15 @@ describe('findOverlaps — goals that may say the same thing (precision over rec
     expect(pairs(a, b)).toEqual([['a', 'b']])
   })
 
+  it.each([
+    ['Run a 10k', 'run a 10K'],
+    ['Max the 401k', 'Max the 401k'],
+    ['Read 12 books', 'Read  12 books.'],
+    ['Save $10k', 'Save $10k'],
+  ])('pairs the same title twice, numbers and all: “%s” / “%s”', (a, b) => {
+    expect(pairs(a, b)).toEqual([['a', 'b']])
+  })
+
   it('a number never counts as a shared word, nor makes one title hold the other', () => {
     expect(pairs('Run a 10k', 'Run a 10k in May')).toEqual([])
   })

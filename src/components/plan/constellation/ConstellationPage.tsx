@@ -318,7 +318,7 @@ function Inner() {
   const pageWrote = () => { for (const l of [...pageWriteListeners.current]) l() }
 
   // ---- Writes ---------------------------------------------------------------
-  type Opts = { ids?: string[]; undo?: () => Promise<boolean | void>; retry?: () => void }
+  type Opts = { ids?: string[]; undo?: () => Promise<boolean | void>; retry?: () => void; failureState?: 'failed' | 'partial'; failureSummary?: string }
   const act = (label: string, command: () => Promise<unknown>, opts?: Opts) =>
     activity.run(label, async () => {
       const result = await command()
@@ -1011,16 +1011,21 @@ function Inner() {
   // has no strategy, which stays on the archived goal) and the goal is put
   // away (archived, never deleted). Undo takes both back, and says so when
   // the Someday line would not go; a goal that could not be put away takes
-  // its Someday line back too.
+  // its Someday line back too, and the receipt says when that line stayed
+  // (the options are read once the command has run).
   const goalToSomeday = (node: PlanNode): Promise<boolean> => {
     const g = node.goal!
     const id = crypto.randomUUID()
     const status = g.status
+    const opts: Opts = { ids: [id, g.id], undo: async () => (await deleteTask(id)) && (await updateGoal(g.id, { status })) !== false }
     return act(`${describeTriageWhen('someday')}: “${g.name}”`, async () => {
       if (!(await addTask(g.name, undefined, undefined, undefined, { id, bucket: 'someday', context: g.context ?? null, ...(g.areaId ? { areaId: g.areaId } : {}), ...(g.notes ? { notes: g.notes } : {}) }))) return false
-      if ((await updateGoal(g.id, { status: 'archived' })) === false) { await deleteTask(id); return false }
+      if ((await updateGoal(g.id, { status: 'archived' })) === false) {
+        if (!(await deleteTask(id))) Object.assign(opts, { failureState: 'partial', failureSummary: `Didn’t put “${g.name}” away. Its line is still on Someday.` })
+        return false
+      }
       return true
-    }, { ids: [id, g.id], undo: async () => (await deleteTask(id)) && (await updateGoal(g.id, { status })) !== false })
+    }, opts)
   }
   // Brain dump: a year goal in a life area (its space the area's), or in none
   // (the space the page adds in).
