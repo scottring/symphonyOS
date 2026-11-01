@@ -228,6 +228,7 @@ describe('useSymphonyAssistant', () => {
   describe('persistence (persistKey)', () => {
     beforeEach(() => {
       db.sessionsRows = []
+      db.failRead = false
       db.nextId = 'sess-1'
       db.inserted = []
       db.updated = []
@@ -287,7 +288,7 @@ describe('useSymphonyAssistant', () => {
 
     it('openThread reopens the newest saved thread for that entity', async () => {
       const row = (id: string, entity_id: string, content: string, updated_at: string) => ({
-        id, title: content, entity_type: 'planning_session', entity_id, mode: 'chat',
+        id, title: content, user_id: 'u1', entity_type: 'planning_session', entity_id, mode: 'chat',
         messages: [{ role: 'user', content, timestamp: updated_at }, { role: 'assistant', content: `re: ${content}`, timestamp: updated_at }],
         created_at: updated_at, updated_at,
       })
@@ -331,13 +332,120 @@ describe('useSymphonyAssistant', () => {
     })
 
     it('a reset while a thread is still loading keeps the rail empty', async () => {
-      db.sessionsRows = [{ id: 'p1', title: 't', entity_type: 'planning_session', entity_id: 'weekly:2026-11-1', mode: 'chat', messages: [{ role: 'user', content: 'Sunday talk' }], created_at: '2026-11-01T10:00:00Z', updated_at: '2026-11-01T10:00:00Z' }]
+      db.sessionsRows = [{ id: 'p1', title: 't', user_id: 'u1', entity_type: 'planning_session', entity_id: 'weekly:2026-11-1', mode: 'chat', messages: [{ role: 'user', content: 'Sunday talk' }], created_at: '2026-11-01T10:00:00Z', updated_at: '2026-11-01T10:00:00Z' }]
       const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
       let opening: Promise<void> | undefined
       act(() => { opening = result.current.openThread('planning_session', 'weekly:2026-11-1'); result.current.resetSession() })
       await act(async () => { await opening })
       expect(result.current.messages).toEqual([])
       expect(result.current.activeSessionId).toBeNull()
+    })
+
+    const planningRow = (id = 'p1', user_id = 'u1') => ({
+      id, title: 'Sunday talk', user_id, entity_type: 'planning_session', entity_id: 'weekly:2026-11-1', mode: 'chat',
+      messages: [{ role: 'user', content: 'Sunday talk' }, { role: 'assistant', content: 'noted' }],
+      created_at: '2026-11-01T10:00:00Z', updated_at: '2026-11-01T10:00:00Z',
+    })
+    /** A turn that waits until `finish()`. */
+    function heldTurn() {
+      const held: { finish?: () => void } = {}
+      vi.mocked(streamSymphonyAgent).mockImplementationOnce(async (_messages, h) => {
+        await new Promise<void>((resolve) => { held.finish = resolve })
+        h.onText?.('ok'); h.onDone?.('ok', null)
+      })
+      return held
+    }
+
+    it('openThread reads only my own rows', async () => {
+      db.sessionsRows = [planningRow('theirs', 'u2')]
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      await act(async () => { await result.current.openThread('planning_session', 'weekly:2026-11-1') })
+      expect(result.current.messages).toEqual([])
+      expect(result.current.activeSessionId).toBeNull()
+    })
+
+    it('leaving mid-turn: the turn is saved to the session, then the reset applies and the next send is a rail conversation', async () => {
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onText?.('ok'); h.onDone?.('ok', null) })
+      db.nextId = 'planning-row'
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      await act(async () => { await result.current.openThread('planning_session', 'weekly:2026-11-1') })
+      const held = heldTurn()
+      let turn: Promise<unknown> | undefined
+      act(() => { turn = result.current.sendMessage('in the session') })
+      await waitFor(() => expect(held.finish).toBeDefined())
+      act(() => result.current.resetSession())
+      await act(async () => { held.finish!(); await turn })
+      expect(db.inserted[0]).toMatchObject({ entity_type: 'planning_session', entity_id: 'weekly:2026-11-1' })
+      expect(result.current.messages).toEqual([])
+      db.nextId = 'rail-row'
+      await act(async () => { await result.current.sendMessage('back on the rail') })
+      expect(db.inserted).toHaveLength(2)
+      expect(db.inserted[1]).toMatchObject({ entity_type: 'symphony_rail', entity_id: null })
+      expect(db.updated.some((u) => u.id === 'planning-row')).toBe(false)
+    })
+
+    it('entering mid-turn: the rail turn is saved to the rail, then the session thread opens for the next send', async () => {
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onText?.('ok'); h.onDone?.('ok', null) })
+      const onThread = vi.fn()
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      const held = heldTurn()
+      let turn: Promise<unknown> | undefined
+      act(() => { turn = result.current.sendMessage('on the rail') })
+      await waitFor(() => expect(held.finish).toBeDefined())
+      act(() => { void result.current.openThread('planning_session', 'weekly:2026-11-1', onThread) })
+      await act(async () => { held.finish!(); await turn })
+      expect(db.inserted[0]).toMatchObject({ entity_type: 'symphony_rail' })
+      await waitFor(() => expect(result.current.messages).toEqual([]))
+      db.nextId = 'planning-row'
+      await act(async () => { await result.current.sendMessage('now planning') })
+      expect(db.inserted[1]).toMatchObject({ entity_type: 'planning_session', entity_id: 'weekly:2026-11-1' })
+      expect(onThread).toHaveBeenCalledWith('planning-row')
+    })
+
+    it('newThread starts a fresh row under the same session, which becomes its thread', async () => {
+      db.sessionsRows = [planningRow()]
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onText?.('ok'); h.onDone?.('ok', null) })
+      const onThread = vi.fn()
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      await act(async () => { await result.current.openThread('planning_session', 'weekly:2026-11-1', onThread) })
+      expect(result.current.activeSessionId).toBe('p1')
+      act(() => result.current.newThread())
+      expect(result.current.messages).toEqual([])
+      db.nextId = 'p2'
+      await act(async () => { await result.current.sendMessage('start over') })
+      expect(db.inserted).toHaveLength(1)
+      expect(db.inserted[0]).toMatchObject({ entity_type: 'planning_session', entity_id: 'weekly:2026-11-1' })
+      expect(db.updated).toHaveLength(0)
+      expect(onThread).toHaveBeenLastCalledWith('p2')
+    })
+
+    it('a failed thread read is retried before the first save, so the turn joins the saved thread', async () => {
+      db.sessionsRows = [planningRow()]
+      db.failRead = true
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onText?.('ok'); h.onDone?.('ok', null) })
+      const onThread = vi.fn()
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      await act(async () => { await result.current.openThread('planning_session', 'weekly:2026-11-1', onThread) })
+      expect(result.current.error).toContain('could not be loaded')
+      db.failRead = false
+      await act(async () => { await result.current.sendMessage('carry on') })
+      expect(db.inserted).toHaveLength(0)
+      expect(db.updated[0].id).toBe('p1')
+      expect((db.updated[0].patch.messages as Array<{ content: string }>).map((m) => m.content)).toEqual(['Sunday talk', 'noted', 'carry on', 'ok'])
+      expect(result.current.messages.map((m) => m.content)).toEqual(['Sunday talk', 'noted', 'carry on', 'ok'])
+      expect(result.current.activeSessionId).toBe('p1')
+      expect(onThread).toHaveBeenCalledWith('p1')
+    })
+
+    it('while the thread still cannot be read, nothing is inserted and the save says so', async () => {
+      db.failRead = true
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onText?.('ok'); h.onDone?.('ok', null) })
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      await act(async () => { await result.current.openThread('planning_session', 'weekly:2026-11-1') })
+      await act(async () => { await result.current.sendMessage('carry on') })
+      expect(db.inserted).toHaveLength(0)
+      expect(result.current.error).toContain('could not be saved')
+      db.failRead = false
     })
 
     it('does not touch chat_sessions without persistKey', async () => {

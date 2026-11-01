@@ -359,6 +359,8 @@ function ShellLayoutInner({ children }: Props) {
     void assistant.sendMessage(text, attachment);
   };
   const resetConversation = () => { voice.stop(); setConversationDraft(''); assistant.resetSession(); };
+  // Inside a guided session, New is a fresh thread for that same session.
+  const newSessionThread = () => { voice.stop(); setConversationDraft(''); assistant.newThread(); };
 
   const [walk, setWalk] = useState<ConversationWalk | null>(null);
   // "What is this page?" beside the walk, on pages Symphony can explain.
@@ -506,8 +508,10 @@ function ShellLayoutInner({ children }: Props) {
     error={assistant.error} messages={assistant.messages} walk={!guided && conversationStripPath(location.pathname) ? walk : null}
     header={guided?.header}
     onSend={sendConversation} busy={assistant.loading} voice={stripVoice} onClose={onClose}
-    history={{ sessions: assistant.sessions, loading: assistant.sessionsLoading, activeSessionId: assistant.activeSessionId,
+    // A session keeps to its own thread: no older conversations to switch to.
+    history={guided ? undefined : { sessions: assistant.sessions, loading: assistant.sessionsLoading, activeSessionId: assistant.activeSessionId,
       onLoad: (session) => { voice.stop(); assistant.loadSession(session); }, onDelete: assistant.deleteSession, onNew: resetConversation }}
+    onNewChat={guided ? newSessionThread : undefined}
     toolActivity={assistant.toolActivity} onSourceClick={setActiveNoteId}
     emptyHint={conversationContext.entityContext ? `Ask about ${conversationContext.entityContext.name}` : undefined} />;
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };

@@ -80,6 +80,8 @@ interface Props {
   emptyHint?: string
   /** Panel: a guided session's step header, above the thread. */
   header?: ReactNode
+  /** Panel: New without the history menu (a guided session's own thread). */
+  onNewChat?: () => void
 }
 
 const STATE_LABEL: Record<CanvasReceipt['state'], string> = {
@@ -148,8 +150,9 @@ function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = fal
   </div>
 }
 
-export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, panel = false, onClose, messages, walk, right = 0, draft: externalDraft, onDraftChange, error, history, toolActivity, onSourceClick, emptyHint, header }: Props) {
+export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, panel = false, onClose, messages, walk, right = 0, draft: externalDraft, onDraftChange, error, history, toolActivity, onSourceClick, emptyHint, header, onNewChat }: Props) {
   const { receipt, undo, retry, dismiss, proposals, changeSet } = useCanvasActivity()
+  const newChat = onNewChat ?? history?.onNew
   const selection = useSelectionOptional()
   const [localDraft, setLocalDraft] = useState('')
   const draft = externalDraft ?? localDraft
@@ -198,10 +201,10 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
   return (
     <section className={`canvas-strip${compact ? ' is-compact' : ''}${docked ? ' is-docked' : ''}${panel ? ' is-panel' : ''}${chatOnly ? ' is-chat' : ''}${voice.active && !chatOnly ? ' is-listening' : ''}`} aria-label={chatOnly ? "Chat with Symphony" : "Conversation with Symphony"}
       style={docked ? { right } : undefined}>
-      {panel && (onClose || history) && <header className={`conversation-panel-header${onClose ? '' : ' is-tools-only'}`}>
+      {panel && (onClose || history || onNewChat) && <header className={`conversation-panel-header${onClose ? '' : ' is-tools-only'}`}>
         {onClose && <h2>{chatOnly ? "Chat with Symphony" : "Conversation"}</h2>}
         <div className="conversation-panel-tools">
-          {history?.onNew && !!messages?.length && <button type="button" className="canvas-icon" aria-label="New chat" title="New chat" onClick={history.onNew}><Plus size={17} aria-hidden="true" /></button>}
+          {newChat && !!messages?.length && <button type="button" className="canvas-icon" aria-label="New chat" title="New chat" onClick={newChat}><Plus size={17} aria-hidden="true" /></button>}
           {history && <ChatHistoryMenu {...history} />}
           {onClose && <button type="button" className="canvas-icon" aria-label="Close conversation" onClick={onClose}><X size={20} /></button>}
         </div>

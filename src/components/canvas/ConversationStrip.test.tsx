@@ -89,6 +89,14 @@ describe('conversation panel', () => {
     expect(screen.queryByTestId('step-header')).not.toBeInTheDocument()
   })
 
+  it('offers New without the history menu when given onNewChat', () => {
+    const onNewChat = vi.fn()
+    render(<ConversationStrip chatOnly panel onNewChat={onNewChat} messages={[msg('1', 'user', 'First ask')]} onSend={vi.fn()} busy={false} voice={voice} />)
+    expect(screen.queryByRole('button', { name: 'Chat history' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(onNewChat).toHaveBeenCalledTimes(1)
+  })
+
   it('shows the whole history and keeps voice activity outside the scrolling history', () => {
     render(<ConversationStrip panel messages={[msg('1', 'user', 'First ask'), msg('2', 'assistant', 'First answer'), msg('3', 'user', 'Second ask')]} onSend={vi.fn()} busy={false} voice={{ ...voice, active: true, status: 'live', turn: 'listening' }} />)
     expect(screen.getByText('First answer')).toBeInTheDocument()

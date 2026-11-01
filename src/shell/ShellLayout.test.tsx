@@ -78,11 +78,12 @@ vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ routines: [], dele
 const assistantState = vi.hoisted(() => ({
   observer: null as null | import('@/hooks/useSymphonyAssistant').AssistantTurnObserver, sendMessage: vi.fn(),
   options: undefined as undefined | import('@/hooks/useSymphonyAssistant').UseSymphonyAssistantOptions,
-  openThread: vi.fn(async (..._args: unknown[]) => {}), resetSession: vi.fn(),
+  openThread: vi.fn(async (..._args: unknown[]) => {}), resetSession: vi.fn(), newThread: vi.fn(),
+  messages: [] as import('@/types/chat').ChatMessage[],
 }))
 vi.mock('@/hooks/useSymphonyAssistant', () => ({
   useSymphonyAssistant: (options?: import('@/hooks/useSymphonyAssistant').UseSymphonyAssistantOptions) => (assistantState.observer = options?.turnObserver ?? null, assistantState.options = options, {
-    messages: [], loading: false, error: null, sendMessage: assistantState.sendMessage, resetSession: assistantState.resetSession, openThread: assistantState.openThread,
+    messages: assistantState.messages, loading: false, error: null, sendMessage: assistantState.sendMessage, resetSession: assistantState.resetSession, openThread: assistantState.openThread, newThread: assistantState.newThread,
     toolActivity: [], sessions: [], sessionsLoading: false, loadSession: vi.fn(),
     deleteSession: vi.fn(), activeSessionId: null,
   }),
@@ -613,8 +614,30 @@ describe('A guided planning session in the shell', () => {
     return <div data-testid="app-content" />
   }
   const at = (node: ReactNode) => <MemoryRouter initialEntries={['/week']}><DomainProvider><DomainGateProvider><ShellLayout>{node}</ShellLayout></DomainGateProvider></DomainProvider></MemoryRouter>
-  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; aiState.hidden = true; assistantState.openThread.mockClear(); assistantState.resetSession.mockClear(); onThread.mockClear() })
-  afterEach(() => { mobileState.isMobile = false; aiState.hidden = true })
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; aiState.hidden = true; assistantState.openThread.mockClear(); assistantState.resetSession.mockClear(); assistantState.newThread.mockClear(); onThread.mockClear() })
+  afterEach(() => { mobileState.isMobile = false; aiState.hidden = true; assistantState.messages = [] })
+
+  it('inside a session, New starts a fresh thread for that session and the history menu is gone', () => {
+    assistantState.messages = [{ id: 'm1', role: 'user', content: 'Sunday talk', timestamp: new Date() }]
+    aiState.hidden = false
+    const view = render(at(<GuidedPage stepId="inbox" on={false} />))
+    // Everyday: the history menu, and New goes back to an everyday conversation.
+    expect(screen.getByRole('button', { name: 'Chat history' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(assistantState.resetSession).toHaveBeenCalledTimes(1)
+    expect(assistantState.newThread).not.toHaveBeenCalled()
+
+    view.rerender(at(<GuidedPage stepId="inbox" />))
+    expect(screen.queryByRole('button', { name: 'Chat history' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(assistantState.newThread).toHaveBeenCalledTimes(1)
+    expect(assistantState.resetSession).toHaveBeenCalledTimes(1)
+
+    // Leaving is its own reset, back to the everyday thread.
+    view.rerender(at(<GuidedPage stepId="inbox" on={false} />))
+    expect(assistantState.resetSession).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'Chat history' })).toBeInTheDocument()
+  })
 
   it('desktop: opens the panel once with the step header, reopens the session thread, and restores on leaving', () => {
     const view = render(at(<GuidedPage stepId="look-back" on={false} />))

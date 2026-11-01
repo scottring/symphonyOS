@@ -72,6 +72,30 @@ function hydrateMessages(raw: unknown, sessionId: string): ChatMessage[] {
   }))
 }
 
+type ThreadTarget = { entityType: string; entityId: string; onThread?: (id: string) => void; unread?: boolean }
+type PendingSwitch =
+  | { kind: 'reset' }
+  | { kind: 'fresh' }
+  | { kind: 'open'; entityType: string; entityId: string; onThread?: (id: string) => void }
+
+/** The newest saved conversation for an entity — mine only. Throws when it
+ *  cannot be read. */
+async function readThread(entityType: string, entityId: string): Promise<{ id: string; messages: unknown } | null> {
+  const { data: { user } } = await getAuthUser()
+  if (!user) throw new Error('Not signed in')
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .select('id, messages')
+    .eq('user_id', user.id)
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId)
+    .eq('mode', 'chat')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+  if (error) throw error
+  return (data?.[0] as { id: string; messages: unknown } | undefined) ?? null
+}
+
 /**
  * Right-rail assistant scoped to Symphony. Talks to the `symphony-agent`
  * edge function, which runs an Anthropic tool-use loop over the user's own
@@ -99,10 +123,15 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   const sessionIdRef = useRef<string | null>(null)
   // A thread opened by entity (openThread): a new conversation is saved under
   // it instead of persistKey, and its row id is reported once it exists.
-  const threadRef = useRef<{ entityType: string; entityId: string; onThread?: (id: string) => void } | null>(null)
+  // `unread` while its saved row has not been read yet: the first save looks
+  // again before inserting, so a failed read never quietly starts a second thread.
+  const threadRef = useRef<ThreadTarget | null>(null)
   // Bumped by anything that changes the conversation, so a thread still
   // loading does not land over what replaced it.
   const openRequest = useRef(0)
+  // A reset, new thread or open asked for while a turn runs: applied when the
+  // turn ends, so the turn is saved where it began (latest request wins).
+  const pending = useRef<PendingSwitch | null>(null)
   const { getCurrentUserMember } = useFamilyMembers()
 
   // Recent persisted conversations for the history dropdown.
@@ -170,6 +199,26 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       } else {
         const { data: { user } } = await getAuthUser()
         if (!user) return
+        if (thread?.unread) {
+          // Its saved row could not be read on opening: look once more, so
+          // this turn joins that thread rather than starting a second one.
+          // A failed read throws: nothing is saved and the next turn retries.
+          const row = await readThread(thread.entityType, thread.entityId)
+          thread.unread = false
+          if (row) {
+            const earlier = hydrateMessages(row.messages, row.id)
+            const { error: saveError } = await supabase
+              .from('chat_sessions')
+              .update({ messages: serializeMessages([...earlier, ...finalMessages]), updated_at: new Date().toISOString() })
+              .eq('id', row.id)
+            if (saveError) { thread.unread = true; throw saveError }
+            sessionIdRef.current = row.id
+            setActiveSessionId(row.id)
+            setMessages((prev) => [...earlier, ...prev])
+            thread.onThread?.(row.id)
+            return
+          }
+        }
         const title = stored.find((m) => m.role === 'user')?.content.slice(0, 80) ?? 'Chat'
         const entityType = thread ? thread.entityType : persistKey!
         const entityId = thread ? thread.entityId : persistEntityId ?? null
@@ -200,6 +249,59 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       setError('Your plan changes are separate, but this conversation could not be saved. Keep this page open; your next message will retry saving the conversation.')
     }
   }, [persistKey, persistEntityId])
+
+  const clearPane = useCallback(() => {
+    setMessages([])
+    setError(null)
+    setToolActivity([])
+    sessionIdRef.current = null
+    setActiveSessionId(null)
+  }, [])
+
+  /** Back to an empty everyday conversation (persistKey). */
+  const resetSession = useCallback(() => {
+    if (sending.current) { pending.current = { kind: 'reset' }; return }
+    openRequest.current += 1
+    threadRef.current = null
+    clearPane()
+  }, [clearPane])
+
+  /** "New" inside an opened thread: an empty conversation saved as a new row
+   *  under the same entity (the newest, so it is what reopens next time).
+   *  With no thread open, the same as resetSession. */
+  const newThread = useCallback(() => {
+    if (sending.current) { pending.current = { kind: 'fresh' }; return }
+    const thread = threadRef.current
+    openRequest.current += 1
+    threadRef.current = thread ? { ...thread, unread: false } : null
+    clearPane()
+  }, [clearPane])
+
+  /** Open the conversation saved for one entity (a planning session's
+   *  thread): my newest chat_sessions row with that entity_type/entity_id,
+   *  or, when there is none yet, an empty conversation whose first turn is
+   *  saved under it. `onThread` hears the row's id once it is known. */
+  const openThread = useCallback(async (entityType: string, entityId: string, onThread?: (id: string) => void) => {
+    if (sending.current) { pending.current = { kind: 'open', entityType, entityId, onThread }; return }
+    const request = ++openRequest.current
+    const thread: ThreadTarget = { entityType, entityId, onThread, unread: true }
+    threadRef.current = thread
+    clearPane()
+    try {
+      const row = await readThread(entityType, entityId)
+      // Replaced meanwhile (reset, another thread, a loaded conversation) or
+      // already talking: that turn's save looks again (unread) instead.
+      if (request !== openRequest.current || sending.current) return
+      thread.unread = false
+      if (!row) return
+      setMessages(hydrateMessages(row.messages, row.id))
+      sessionIdRef.current = row.id
+      setActiveSessionId(row.id)
+      onThread?.(row.id)
+    } catch {
+      if (request === openRequest.current) setError('This session\'s earlier conversation could not be loaded. Your plan is unchanged.')
+    }
+  }, [clearPane])
 
   /** One turn, with the server's verdict on what it did (turnOutcome.ts).
    *  Voice reads the outcome; the typed bar reads the text. */
@@ -312,8 +414,13 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     ])
     setLoading(false)
     sending.current = false
+    const next = pending.current
+    pending.current = null
+    if (next?.kind === 'reset') resetSession()
+    else if (next?.kind === 'fresh') newThread()
+    else if (next?.kind === 'open') void openThread(next.entityType, next.entityId, next.onThread)
     return { text: turn.text, outcome: turn.outcome, error: turn.error }
-  }, [surface, resolveAction, onPlanSaved, onWorkspace, workspaceContext, messages, onMutate, taskContext, sessionContext, getCurrentUserMember, persistTurn, turnObserver])
+  }, [surface, resolveAction, onPlanSaved, onWorkspace, workspaceContext, messages, onMutate, taskContext, sessionContext, getCurrentUserMember, persistTurn, turnObserver, resetSession, newThread, openThread])
 
   const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment, opts?: { turnId?: string; retry?: boolean }) => (await sendTurn(text, attachment, opts))?.text, [sendTurn])
 
@@ -323,54 +430,6 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     if (!last || sending.current) return
     return sendMessage(last.text, undefined, { turnId: last.turnId, retry: true })
   }, [sendMessage])
-
-  const resetSession = useCallback(() => {
-    if (sending.current) return
-    openRequest.current += 1
-    threadRef.current = null
-    setMessages([])
-    setError(null)
-    setToolActivity([])
-    sessionIdRef.current = null
-    setActiveSessionId(null)
-  }, [])
-
-  /** Open the conversation saved for one entity (a planning session's
-   *  thread): the newest chat_sessions row with that entity_type/entity_id,
-   *  or, when there is none yet, an empty conversation whose first turn is
-   *  saved under it. `onThread` hears the row's id once it is known. */
-  const openThread = useCallback(async (entityType: string, entityId: string, onThread?: (id: string) => void) => {
-    if (sending.current) return
-    const request = ++openRequest.current
-    threadRef.current = { entityType, entityId, onThread }
-    setMessages([])
-    setError(null)
-    setToolActivity([])
-    sessionIdRef.current = null
-    setActiveSessionId(null)
-    try {
-      const { data, error: readError } = await supabase
-        .from('chat_sessions')
-        .select('id, messages')
-        .eq('entity_type', entityType)
-        .eq('entity_id', entityId)
-        .eq('mode', 'chat')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-      if (readError) throw readError
-      // Replaced meanwhile (reset, another thread, a loaded conversation) or
-      // already talking: the new turn starts the thread instead.
-      if (request !== openRequest.current || sending.current) return
-      const row = data?.[0]
-      if (!row) return
-      setMessages(hydrateMessages(row.messages, row.id))
-      sessionIdRef.current = row.id
-      setActiveSessionId(row.id)
-      onThread?.(row.id)
-    } catch {
-      if (request === openRequest.current) setError('This session\'s earlier conversation could not be loaded. Your plan is unchanged.')
-    }
-  }, [])
 
   /** Restore a persisted conversation into the pane. */
   const loadSession = useCallback((session: ChatSession) => {
@@ -395,7 +454,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   }, [resetSession])
 
   return {
-    messages, loading, error, toolActivity, sendMessage, sendTurn, retryLast, resetSession, openThread,
+    messages, loading, error, toolActivity, sendMessage, sendTurn, retryLast, resetSession, newThread, openThread,
     sessions, sessionsLoading, sessionsError, reloadSessions, activeSessionId, loadSession, deleteSession,
   }
 }
