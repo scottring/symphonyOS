@@ -303,12 +303,9 @@ describe('agent wiring', () => {
     expect(src).toContain('ask ONE short question')
     expect(src).toContain('Just this week, or from now on?')
   })
-  it('runs Plan my day and Review my day as talks that end in one card (Today stage)', () => {
-    expect(src).toContain('- "Plan my day" (the Today page\'s morning chip): call symphony_read_week')
-    expect(src).toContain('never invent a time they did not give')
-    expect(src).toContain('- "Review my day" (the evening chip): call symphony_read_week')
-    expect(src).toContain('done for what they finished')
-    expect(src).toContain('No row-by-row questionnaire')
+  it('no longer carries the Plan my day / Review my day chip prompts (the Day session replaced them)', () => {
+    expect(src).not.toContain('"Plan my day" (the Today page')
+    expect(src).not.toContain('"Review my day" (the evening chip)')
     expect(src).toContain('- "What came in from email (…)?" (Today\'s new-from-email line)')
   })
   it('sends routine changes to the card, this week or from now on, and never deletes one', () => {

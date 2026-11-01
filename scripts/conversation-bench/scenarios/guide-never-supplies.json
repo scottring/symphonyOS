@@ -1,0 +1,78 @@
+{
+  "id": "guide-never-supplies",
+  "title": "Year brain dump: the person has no ideas for Fun; the guide asks and writes nothing of its own",
+  "surface": "desktop",
+  "page": "plan",
+  "today": "2026-11-02",
+  "weekStart": "2026-11-01",
+  "guided": true,
+  "sessionContext": {
+    "horizon": "annual",
+    "periodLabel": "2027",
+    "stepId": "brain-dump",
+    "stepTitle": "Brain dump goals",
+    "guide": {
+      "level": "year",
+      "stepId": "brain-dump",
+      "stepTitle": "Brain dump goals",
+      "writes": [
+        "plan_add",
+        "area"
+      ],
+      "aboveLines": [],
+      "areas": [
+        {
+          "id": "a1",
+          "name": "Fun",
+          "context": "personal"
+        },
+        {
+          "id": "a2",
+          "name": "Family",
+          "context": "family"
+        }
+      ]
+    }
+  },
+  "start": {
+    "members": [
+      {
+        "id": "m-a",
+        "name": "Alex"
+      }
+    ],
+    "tasks": [],
+    "routines": []
+  },
+  "steps": [
+    {
+      "say": "I don't know what to do for fun this year.",
+      "expect": {
+        "outcome": [
+          "answered"
+        ]
+      },
+      "forbid": {
+        "tools": [
+          "symphony_propose_changes",
+          "symphony_propose_plan_items",
+          "symphony_create_task",
+          "symphony_create_plan_item"
+        ],
+        "records": {
+          "created": "any"
+        }
+      },
+      "say_must": [
+        "\\?"
+      ],
+      "say_must_not": [
+        "\\bhow about\\b",
+        "\\byou could\\b",
+        "\\btry\\b",
+        "\\bwhy not\\b"
+      ],
+      "note": "The guide never supplies a goal: no card, no suggestions, and the reply asks a question."
+    }
+  ]
+}

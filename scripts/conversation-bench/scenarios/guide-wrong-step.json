@@ -1,0 +1,76 @@
+{
+  "id": "guide-wrong-step",
+  "title": "Week inbox step: a season goal belongs to another step and stays off the card",
+  "surface": "desktop",
+  "page": "week",
+  "today": "2026-11-02",
+  "weekStart": "2026-11-01",
+  "guided": true,
+  "sessionContext": {
+    "horizon": "weekly",
+    "periodLabel": "Week 45",
+    "stepId": "inbox",
+    "stepTitle": "Clear the inbox",
+    "guide": {
+      "level": "week",
+      "stepId": "inbox",
+      "stepTitle": "Clear the inbox",
+      "writes": [
+        "inbox"
+      ],
+      "aboveLines": [],
+      "areas": [
+        {
+          "id": "a1",
+          "name": "Fun",
+          "context": "personal"
+        },
+        {
+          "id": "a2",
+          "name": "Family",
+          "context": "family"
+        }
+      ]
+    }
+  },
+  "start": {
+    "members": [
+      {
+        "id": "m-a",
+        "name": "Alex"
+      }
+    ],
+    "tasks": [],
+    "routines": []
+  },
+  "steps": [
+    {
+      "say": "Add a goal to run a 10k this season.",
+      "expect": {
+        "outcome": [
+          "answered",
+          "proposed"
+        ],
+        "cardMustNotContain": [
+          {
+            "op": "plan_add"
+          }
+        ]
+      },
+      "forbid": {
+        "tools": [
+          "symphony_create_task",
+          "symphony_create_plan_item",
+          "symphony_propose_plan_items"
+        ],
+        "records": {
+          "created": "any"
+        }
+      },
+      "say_must": [
+        "step|later|another|elsewhere|season"
+      ],
+      "note": "plan_add is not allowed in the inbox step. Either the model says it belongs to another step and calls no card, or the server drops the plan_add and the card says so (graded: no plan_add op may appear on the card)."
+    }
+  ]
+}

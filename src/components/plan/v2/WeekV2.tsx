@@ -10,8 +10,7 @@
 // one button, only the one that's due (reviewed design, 2026-10-20), and a ⋯
 // menu (WeekMenu). On the desk they fold into HomeHeader's masthead; on a phone
 // they are the page's own row. "Help me plan the rest of my week" lives in the
-// Chat bar (WeekViewV2 still hands it the walk); a phone, which has no bar,
-// gets "Talk it through" in the ⋯ menu instead. There is no "I’m happy with
+// Chat bar (WeekViewV2 still hands it the walk). There is no "I’m happy with
 // this week": finishing the full deck marks the week planned.
 //
 // It is chrome AROUND the existing week: the canvas, drag and drop and
@@ -24,7 +23,6 @@ import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
-import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
 import { usePeriodReview, type ReviewNotes } from '@/hooks/usePeriodReview'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
@@ -101,7 +99,7 @@ export interface WeekDeck {
   listenCanvasWrites?: (listener: () => void) => () => void
 }
 
-export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
+export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   weekStart: Date
   isCurrent: boolean
   /** The week at rest: WeekViewV2's canvas. A guided session asks for it
@@ -110,14 +108,10 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   /** Today's first item, for the fact line ("Today: …"); null when there is
    *  none, the week is not this one, or it has not loaded. */
   today?: string | null
-  /** Starts the planning conversation (the walk the Chat bar carries). Offered
-   *  in the ⋯ menu on phones only, which have no Chat bar. */
-  talk?: () => void
   /** The deck for Review, Plan and Place them (WeekViewV2). */
   deck?: WeekDeck
 }) {
   const session = usePlanningSession('weekly', weekToken(weekStart))
-  const phoneTalk = useMediaQuery('(max-width: 767px)') ? talk : undefined
   // Early in a week, the review on offer is last week's, until it is done.
   const lastWeek = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7)
   // One record of it: the page's when it passes one (an empty token reads
@@ -222,7 +216,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   const controls = (
     <>
       {primary && <button type="button" className="pv2-btn wk-plan" onClick={primary.run} data-explain="plan-deck" data-explain-label={primary.label}>{primary.label}</button>}
-      <WeekMenu talk={phoneTalk} offers={offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run }))} />
+      <WeekMenu offers={offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run }))} />
     </>
   )
   // HomeHeader's masthead, when it offers a place for the header (desktop
@@ -254,11 +248,9 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
       )}
       {endsToday && !primary && (
         // The week's last day: nothing left in it to plan, so say so and
-        // point at planning the next one by talking.
+        // point at the next week's Plan button.
         <div className="pv2-saved pv2-endsweek" role="note">
-          <span className="pv2-saved-text"><b>Week {weekNo} ends today.</b> {phoneTalk
-            ? <>Use “Talk it through” under ⋯ to talk through the week ahead.</>
-            : <>Open Chat to talk through the week ahead.</>}</span>
+          <span className="pv2-saved-text"><b>Week {weekNo} ends today.</b> Use Plan on next week to plan the week ahead.</span>
         </div>
       )}
       {deckMode && deck

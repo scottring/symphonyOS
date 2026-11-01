@@ -283,7 +283,7 @@ describe('TodayView', () => {
       ],
     } as never)
     // A two-day-old commitment is NOT drawn on the page, and no line points at
-    // it: leftovers are named by "Plan my day", which ends in one change card.
+    // it: leftovers are handled in the Day planning session, which ends in one change card.
     expect(screen.queryByText('Overdue task title')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Carried over' })).toBeNull()
     fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
@@ -569,7 +569,7 @@ describe('TodayView: slipped work stays off the page', () => {
 
   it('draws neither carried nor slipped rows, and no scoreboard', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1), mk('s', 'slipped thing', 200)] } as never)
-    // Leftovers are named by "Plan my day" (the change card), not by a line
+    // Leftovers are handled in the Day planning session (the change card), not by a line
     // or a drawer on the page (spec 2026-10-14).
     expect(screen.queryByText('carried thing')).toBeNull()
     expect(screen.queryByText('slipped thing')).toBeNull()

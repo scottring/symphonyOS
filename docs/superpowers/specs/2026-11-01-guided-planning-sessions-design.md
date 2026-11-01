@@ -19,6 +19,7 @@ me", Plan my day / Review my day, Help me plan the week) are retired.
 
 ### Deviations from this spec (rulings recorded while building)
 
+- **Day session replaces Review my day:** there is no evening chip; "Plan tomorrow" from 4 pm is the evening entry.
 - **Unfinished-session closing writes happen at the next session's Look back**,
   not at rollover: `useWeekRollover` does not handle leftovers.
 - **"Gone" is "Let go"** everywhere (Inbox included). It moves the item to

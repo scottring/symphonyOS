@@ -134,9 +134,8 @@ describe('WeekV2 header — one primary button and the ⋯ menu', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
-  it('“Talk it through” is offered only where the page has one (phones)', () => {
-    const talk = vi.fn()
-    renderWeek({ deck: makeDeck(), talk })
+  it('the ⋯ menu has no “Talk it through” (planning is the guided session)', () => {
+    renderWeek({ deck: makeDeck() })
     fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
     expect(screen.queryByRole('menuitem', { name: 'Talk it through' })).toBeNull()
   })
@@ -227,12 +226,13 @@ describe('WeekV2 header — the fact line', () => {
 describe('WeekV2 — the last day', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null })
 
-  it('on its last day the nudge points at Chat, with no Plan and no mark', () => {
+  it('on its last day the nudge points at next week’s Plan, with no Plan and no mark', () => {
     vi.setSystemTime(new Date(2026, 9, 3, 12))
     renderWeek({ canvas: <section aria-label="The days">canvas</section> })
     expect(screen.getByRole('region', { name: 'The days' })).toBeTruthy()
     expect(screen.getByText(/ends today/)).toBeTruthy()
-    expect(screen.getByText(/Open Chat to talk through the week ahead/)).toBeTruthy()
+    expect(screen.getByText(/Use Plan on next week to plan the week ahead/)).toBeTruthy()
+    expect(screen.queryByText(/Open Chat/)).toBeNull()
     expect(screen.queryByRole('button', { name: /^Plan / })).toBeNull()
     expect(screen.queryByRole('button', { name: 'I’m happy with this week' })).toBeNull()
   })

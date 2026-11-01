@@ -29,10 +29,18 @@ export function gradeTurn(step, got) {
         if (index < 0) findings.push(`missing card operation: ${JSON.stringify(expected)}`)
         else remaining.splice(index, 1)
       }
+      if (card.questions !== undefined) {
+        const asked = got.changeSet.ops.filter(op => typeof op.question === 'string' && op.question.trim()).length
+        if (asked !== card.questions) findings.push(`${asked} rows carry a question; expected ${card.questions}`)
+      }
       for (const forbidden of card.excludes ?? []) {
         if (got.changeSet.ops.some(op => subset(op, forbidden))) findings.push(`forbidden card operation: ${JSON.stringify(forbidden)}`)
       }
     }
+  }
+  // Guide mode: a card is optional, but if one is shown none of these ops may be on it.
+  for (const forbidden of step.expect?.cardMustNotContain ?? []) {
+    if ((got.changeSet?.ops ?? []).some(op => subset(op, forbidden))) findings.push(`forbidden card operation: ${JSON.stringify(forbidden)}`)
   }
   for (const re of step.say_must ?? []) if (!new RegExp(re, 'i').test(got.reply ?? '')) findings.push(`reply must match /${re}/`)
   for (const re of step.say_must_not ?? []) if (new RegExp(re, 'i').test(got.reply ?? '')) findings.push(`reply must not match /${re}/`)

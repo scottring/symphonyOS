@@ -39,4 +39,13 @@ describe('live transaction grading', () => {
     expect(summarizeRun([{ status: 'passed' }, { status: 'failed' }]).status).toBe('failed')
     expect(summarizeRun([{ status: 'passed' }]).status).toBe('passed')
   })
+  it('grades guide-mode cards: questions on rows and ops that must stay off', () => {
+    const asked = { expect: { outcome: ['proposed'], card: { ops: 2, questions: 1 } } }
+    const ops = [{ op: 'add', title: 'A', question: 'Which day?' }, { op: 'add', title: 'B' }]
+    expect(gradeTurn(asked, { outcome: { state: 'proposed' }, changeSet: { ops } })).toEqual([])
+    expect(gradeTurn(asked, { outcome: { state: 'proposed' }, changeSet: { ops: [ops[1], ops[1]] } })).not.toEqual([])
+    const off = { expect: { outcome: ['answered', 'proposed'], cardMustNotContain: [{ op: 'plan_add' }] } }
+    expect(gradeTurn(off, { outcome: { state: 'answered' } })).toEqual([])
+    expect(gradeTurn(off, { outcome: { state: 'proposed' }, changeSet: { ops: [{ op: 'plan_add', title: 'Run a 10k' }] } })).not.toEqual([])
+  })
 })

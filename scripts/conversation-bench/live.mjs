@@ -115,7 +115,7 @@ for (const [i, step] of scenario.steps.entries()) {
     blocked = true; continue
   }
   history.push({ role: 'user', content: step.say })
-  const got = await turn(token, history, crypto.randomUUID(), { ...(scenario.surface === 'wall' ? { surface: 'wall' } : {}), workspaceContext: { page: scenario.page, date: scenario.today, layers: ['family'], selectedId: scenario.selectedId ?? null, items: [], truncated: true }, ...(pendingCard ? { changeCard: pendingCard } : {}) })
+  const got = await turn(token, history, crypto.randomUUID(), { ...(scenario.surface === 'wall' ? { surface: 'wall' } : {}), ...(scenario.sessionContext ? { sessionContext: scenario.sessionContext } : {}), workspaceContext: { page: scenario.page, date: scenario.today, layers: ['family'], selectedId: scenario.selectedId ?? null, items: [], truncated: true }, ...(pendingCard ? { changeCard: pendingCard } : {}) })
   if (got.changeSet) pendingCard = { state: 'pending', title: got.changeSet.title, ops: got.changeSet.ops.map(o => ({ op: o.op, title: o.title, where: o.date ?? '' })), at: new Date().toISOString() }
   history.push({ role: 'assistant', content: got.reply })
   const findings = [...gradeTurn(step, got), ...gradeScenarioRecords(step, await observe(), before)]

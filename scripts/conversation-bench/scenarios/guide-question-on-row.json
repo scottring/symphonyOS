@@ -1,0 +1,118 @@
+{
+  "id": "guide-question-on-row",
+  "title": "Week choose step: one vague item gets a question on its row, the clear one does not",
+  "surface": "desktop",
+  "page": "week",
+  "today": "2026-11-02",
+  "weekStart": "2026-11-01",
+  "guided": true,
+  "sessionContext": {
+    "horizon": "weekly",
+    "periodLabel": "Week 45",
+    "stepId": "choose",
+    "stepTitle": "Choose this week's tasks",
+    "guide": {
+      "level": "week",
+      "stepId": "choose",
+      "stepTitle": "Choose this week's tasks",
+      "writes": [
+        "commit",
+        "place"
+      ],
+      "aboveLines": [
+        {
+          "id": "11111111-0000-4000-8000-000000000001",
+          "title": "Get the kids to appointments"
+        },
+        {
+          "id": "11111111-0000-4000-8000-000000000002",
+          "title": "Finish the GW application"
+        }
+      ],
+      "areas": [
+        {
+          "id": "a1",
+          "name": "Fun",
+          "context": "personal"
+        },
+        {
+          "id": "a2",
+          "name": "Family",
+          "context": "family"
+        }
+      ],
+      "counts": {
+        "label": "This week",
+        "n": 0,
+        "of": "15"
+      }
+    }
+  },
+  "start": {
+    "members": [
+      {
+        "id": "m-a",
+        "name": "Alex"
+      }
+    ],
+    "tasks": [],
+    "routines": []
+  },
+  "steps": [
+    {
+      "say": "Mia's dentist, finish the GW application",
+      "expect": {
+        "outcome": [
+          "proposed"
+        ],
+        "tools": [
+          {
+            "name": "symphony_propose_changes",
+            "input": {
+              "title": "2 tasks for Week 45",
+              "ops": [
+                {
+                  "op": "add",
+                  "title": "Mia's dentist",
+                  "question": "Is this booking the appointment, or going to it? Which day?"
+                },
+                {
+                  "op": "add",
+                  "title": "Finish the GW application"
+                }
+              ]
+            }
+          }
+        ],
+        "card": {
+          "ops": 2,
+          "contains": [
+            {
+              "op": "add",
+              "title": "Mia's dentist"
+            },
+            {
+              "op": "add",
+              "title": "Finish the GW application"
+            }
+          ],
+          "questions": 1
+        },
+        "records": {
+          "created": []
+        }
+      },
+      "forbid": {
+        "tools": [
+          "symphony_create_task",
+          "symphony_update_task",
+          "symphony_propose_plan_items"
+        ],
+        "records": {
+          "created": "any"
+        }
+      },
+      "note": "Exactly one of the two rows carries a question (booking vs going / which day); the other is clear. Nothing saves before Apply. Title wording may vary; run with a looser contains if the model rewords."
+    }
+  ]
+}

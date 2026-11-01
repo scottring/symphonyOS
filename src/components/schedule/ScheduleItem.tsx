@@ -28,7 +28,7 @@ interface ScheduleItemProps {
   selected?: boolean
   /**
    * @deprecated Today, trimmed (2026-10-14): the hover bulk-select checkbox is
-   * gone — several things at once is something you say ("Plan my day"). These
+   * gone — several things at once is something you do in the Day planning session. These
    * four are accepted and ignored until TodaySectionList stops passing them.
    */
   bulkSelectable?: boolean

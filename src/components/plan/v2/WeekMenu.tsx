@@ -13,10 +13,10 @@ const CHOICES: { pref: WeekViewPref; label: string; hint?: string }[] = [
   { pref: 'dailyInDays', label: 'Show daily routines in each day' },
 ]
 
-export function WeekMenu({ talk, offers = [] }: { talk?: () => void; offers?: PageMenuChoice[] } = {}) {
+export function WeekMenu({ offers = [] }: { offers?: PageMenuChoice[] } = {}) {
   const prefs = useWeekViewPrefs()
   return (
-    <PageMenu label="Week options" talk={talk}
+    <PageMenu label="Week options"
       choices={[...offers, ...CHOICES.map((c) => ({ id: c.pref, label: c.label, hint: c.hint, checked: prefs[c.pref], onSelect: () => prefs.set(c.pref, !prefs[c.pref]) }))]} />
   )
 }

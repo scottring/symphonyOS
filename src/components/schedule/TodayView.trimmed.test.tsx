@@ -1,5 +1,5 @@
-// "Today, trimmed" (spec 2026-10-14): the header sentence, the bar's walk
-// (Plan my day / Review my day), and a pending change card drawn dashed.
+// "Today, trimmed" (spec 2026-10-14): the header sentence, the guided Day session
+// (no Plan/Review my day chips), and a pending change card drawn dashed.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { screen, fireEvent, within, cleanup } from '@testing-library/react'
 import { ALL_LAYERS } from '@/lib/domains'

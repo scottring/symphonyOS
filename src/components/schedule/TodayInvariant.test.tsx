@@ -155,7 +155,7 @@ describe('Today invariant: the PAGE does not grow with the backlog', () => {
 
   it('the page menu does not grow with the backlog either', () => {
     // No line names the size and no drawer waits behind a door (Today,
-    // trimmed, 2026-10-14): leftovers are named by "Plan my day" in the bar,
+    // trimmed, 2026-10-14): leftovers are handled in the Day planning session,
     // and the ⋯ menu holds the same two entries at 5 items and at 500.
     renderToday(backlog(500))
     expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
