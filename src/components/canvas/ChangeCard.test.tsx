@@ -90,10 +90,13 @@ describe('ChangeCard: questions on rows', () => {
     expect(row).toHaveTextContent('Is this booking the appointment, or going to it?')
     expect(screen.getByText('Finish GW application').closest('li')).not.toHaveTextContent('booking')
     expect(screen.getByRole('button', { name: 'Apply 1' })).toBeEnabled()
+    expect(screen.getByText("Rows with a question aren't saved yet.")).toBeInTheDocument()
+    expect(screen.queryByText('Nothing is saved until you approve.')).toBeNull()
   })
   it('in chat the button reads Apply 1 too', () => {
     render(<ChangeCard chat set={asking} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Apply 1' })).toBeInTheDocument()
+    expect(screen.getByText("Rows with a question aren't saved yet.")).toBeInTheDocument()
   })
   it('a card of questions only has nothing to apply', () => {
     render(<ChangeCard set={pending({ ops: [asking.ops[1]] })} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)

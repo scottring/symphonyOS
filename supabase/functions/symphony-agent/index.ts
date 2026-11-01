@@ -9,7 +9,7 @@ import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
 import { PROPOSE_CHANGES_TOOL, changeCardNote, changeSetFromInput, resolveRefs } from './changeSet.ts'
-import { guideFromInput, sessionPromptBlock, stepCard } from './guideMode.ts'
+import { type GuideTurnContext, guideForTurn, guidePromptBlock, guideToolAllowed, sessionPromptBlock, stepCard, toolsForGuide } from './guideMode.ts'
 import { READ_WEEK_TOOL, local, readCalendarCoverage, shapeWeek, weekWindow } from './readWeek.ts'
 import { READ_PLAN_TOOL, loadPlanRefs, readPlan } from './readPlan.ts'
 import { PROPOSE_CHOICE_CHANGES_TOOL, READ_CHOICES_TOOL, choiceSetFromInput, loadChoiceRefs, readChoices, resolveChoiceRefs } from './choices.ts'
@@ -1337,6 +1337,7 @@ async function callAnthropic(
   surface: Surface | null = null,
   repairingProposal = false,
   web: readonly unknown[] = [],
+  guide: GuideTurnContext | null = null,
 ): Promise<{ content: AnthropicBlock[]; stop_reason: string; containerId: string | null }> {
   // Symphony's own tools first (minus the destructive ones once the web has
   // been read), then Anthropic's server-side web tools. The cache breakpoint
@@ -1344,8 +1345,9 @@ async function callAnthropic(
   // cover the whole list, whatever the fence removed.
   // Pointing at the page needs a client that sends what is on it.
   // On the wall, only the family-layer tools (wallMode.ts); desktop unchanged.
-  const symphonyTools = toolsForTurn(toolsForSurface(TOOLS, surface), webTouched).filter((t) => (canShow || t.name !== SHOW_TOOL.name) && (!repairingProposal || proposalRepairToolAllowed(t.name)))
-  const tools: unknown[] = [...symphonyTools, ...(repairingProposal ? [] : web)]
+  // In a guided planning step (guideMode.ts): reads and the change card only, no web.
+  const symphonyTools = toolsForGuide(toolsForTurn(toolsForSurface(TOOLS, surface), webTouched), guide).filter((t) => (canShow || t.name !== SHOW_TOOL.name) && (!repairingProposal || proposalRepairToolAllowed(t.name)))
+  const tools: unknown[] = [...symphonyTools, ...(repairingProposal || guide ? [] : web)]
   const res = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -1457,8 +1459,9 @@ Deno.serve(async (req) => {
       : null
   // A guided planning session (guideMode.ts): the step, what it may write, the
   // lines above and the life areas. Present = the guide's rules, and the
-  // change card is kept inside the step.
-  const guide = sessionContext ? guideFromInput((rawSessionContext as { guide?: unknown }).guide) : null
+  // change card is kept inside the step. Its tools are reads and the card only.
+  const guided = guideForTurn(rawSessionContext)
+  const guide = guided?.guide ?? null
   if (!Array.isArray(incoming) || incoming.length === 0) return json({ error: 'messages is required' }, 400)
 
   // Who's who: inject the household roster so names like "Iris" or "Kaleb"
@@ -1531,7 +1534,8 @@ Deno.serve(async (req) => {
   }
   // What became of the last change card (the history holds words, not tool calls).
   datePrefix += changeCardNote(body.changeCard)
-  if (sessionContext) datePrefix += sessionPromptBlock(sessionContext, guide)
+  if (guided) datePrefix += guidePromptBlock(guided.guide, guided.periodLabel)
+  else if (sessionContext) datePrefix += sessionPromptBlock(sessionContext)
   const convo: Array<{ role: string; content: unknown }> = incoming.map(
     (m: { role: string; content: unknown }, i: number) => {
       if (i !== 0) return { role: m.role, content: m.content }
@@ -1575,7 +1579,7 @@ Deno.serve(async (req) => {
         let turn = 0
         for (; turn < MAX_TURNS; turn++) {
           const callStarted = Date.now()
-          const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface, trace.proposalRepairs > 0, web)
+          const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface, trace.proposalRepairs > 0, web, guide)
           trace.providerCalls++
           trace.providerMs += Date.now() - callStarted
           const { content, stop_reason } = res
@@ -1603,6 +1607,9 @@ Deno.serve(async (req) => {
               } else if (!toolAllowed(block.name, surface)) {
                 // Never offered on the wall; refused even if named anyway.
                 result = `Error: ${block.name} is not available on the kitchen wall`
+              } else if (guide && !guideToolAllowed(block.name, guide)) {
+                // Never offered in a guided step; refused even if named anyway.
+                result = `Error: ${block.name} is not available in a guided planning step. Nothing is written directly and nothing is suggested: put what the person said on the change card (symphony_propose_changes), or ask.`
               } else if (block.name === SCRATCHPAD_TOOL.name) {
                 result = wall ? await addToScratchpad(tdb, user.id, block.input ?? {}) : `Error: unknown tool ${block.name}`
               } else if(block.name==='symphony_show_workspace') {
@@ -1641,8 +1648,9 @@ Deno.serve(async (req) => {
                   // Life areas the adds are filed under: absent = not visible to them.
                   const areaIds = [...new Set(parsed.set.ops.flatMap((o) => o.areaId ? [o.areaId] : []))]
                   // Goals on Month, Season and Year: the items and parents plan ops name.
-                  const planIds = [...new Set(parsed.set.ops.flatMap((o) => [o.itemId, o.parentId].filter((x): x is string => !!x)))]
-                  const hasPlanOps = parsed.set.ops.some((o) => o.op.startsWith('plan_'))
+                  // An add's goal_id is a month goal: read it the same way.
+                  const planIds = [...new Set(parsed.set.ops.flatMap((o) => [o.itemId, o.parentId, o.op === 'add' ? o.goalId : undefined].filter((x): x is string => !!x)))]
+                  const hasPlanOps = parsed.set.ops.some((o) => o.op.startsWith('plan_') || (o.op === 'add' && !!o.goalId))
                   // The wall's Approve has only the task writers so far
                   // (WallV2Shell): routine, done, merge, talk and goal changes
                   // are made in the app until the wall wires them in. Month,

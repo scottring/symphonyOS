@@ -21,7 +21,7 @@ import type { AgentProposalItem } from '@/lib/agentStream'
 import { WRITE_TOOLS } from '@/lib/agentTurn'
 import { describeChanges, diffSnapshots, type CanvasChange, type Snapshot } from '@/lib/canvas/changeSet'
 import { toolSavingLabel } from '@/lib/canvas/toolLabels'
-import { changeCardNote, toApply, type ChangeCardNote, type ChangeSet } from '@/lib/canvas/changeCard'
+import { changeCardNote, isQuestion, toApply, type ChangeCardNote, type ChangeSet } from '@/lib/canvas/changeCard'
 import type { ApplyResult } from '@/lib/canvas/applyChangeSet'
 import { allowanceReceipt, isAllowanceCode } from '@/lib/aiAllowance'
 
@@ -373,11 +373,12 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     setPending(null)
   }, [])
   const takeChangeCard = useCallback((): ChangeCardNote | undefined => {
-    const cur = pendingRef.current
-    if (cur) return changeCardNote(cur, 'pending')
+    // A decided card is told once, first. Only Apply with question rows leaves
+    // both a note and a card waiting (setChangeSet clears the note otherwise).
     const note = cardNoteRef.current
-    cardNoteRef.current = null
-    return note ?? undefined
+    if (note) { cardNoteRef.current = null; return note }
+    const cur = pendingRef.current
+    return cur ? changeCardNote(cur, 'pending') : undefined
   }, [])
   const approvingRef = useRef(false)
   const approveChangeSet = useCallback(async (onResult?: (state: 'saved' | 'partial' | 'failed') => void) => {
@@ -412,8 +413,11 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     if (ok) cardNoteRef.current = changeCardNote(set, 'approved')
     // Only touch the card if it is still the one that was saved; a newer set
     // that arrived meanwhile stays as it is.
+    // Rows with a question stay open, on their own, until they are answered.
+    const asked = set.ops.filter(isQuestion)
     setPending((cur) => cur && cur.key === set.key
-      ? (ok ? null : { ...cur, state: opts.failureState ?? 'failed', recoverable, message: failure ?? "Couldn't save. Nothing was changed. Try again." })
+      ? (ok ? (asked.length ? { ...cur, ops: asked, state: 'proposed', message: undefined, recoverable: undefined, replaced: false } : null)
+        : { ...cur, state: opts.failureState ?? 'failed', recoverable, message: failure ?? "Couldn't save. Nothing was changed. Try again." })
       : cur)
     return ok
     } finally { approvingRef.current = false }

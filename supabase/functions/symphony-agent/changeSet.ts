@@ -558,14 +558,33 @@ export type RoutineRef = { id: string; name: string; updated_at: string; parent_
 /** A life area the person can see (goal_areas, read through their RLS client). */
 export type AreaRef = { id: string; name: string; context: string | null }
 
+/** The space a life area belongs to. A legacy area with none is private to
+ *  its owner, so it counts as Personal: it never goes on a Family or Work item. */
+export const areaSpace = (a: { context: string | null }): RoutineContext => (isContext(a.context) ? a.context : 'personal')
+
 /** An add's life area: one they can see, in the space the op names (or, when
  *  it names none, the area's own space). */
 function withArea(op: ChangeOp, areas: Map<string, AreaRef>): { op: ChangeOp } | { error: string } {
   if (!op.areaId) return { op }
   const area = areas.get(op.areaId)
   if (!area) return { error: `No life area ${op.areaId} that this person can see. Use the ids of the life areas you were given.` }
-  if (op.context && isContext(area.context) && area.context !== op.context) return { error: `"${area.name}" is a ${area.context} area, not ${op.context}; ask which they mean` }
-  return { op: { ...op, areaName: area.name, ...(!op.context && isContext(area.context) ? { context: area.context } : {}) } }
+  const space = areaSpace(area)
+  if (op.context && space !== op.context) return { error: `"${area.name}" is a ${space} area, not ${op.context}; ask which they mean` }
+  return { op: { ...op, areaName: area.name, context: space } }
+}
+
+/** An add's month goal (goal_id): one they can see on a month list, in the
+ *  same space. The new task takes the goal's space when the op names none. */
+function withMonthGoal(op: ChangeOp, plan: PlanRefs | undefined, tasks: Map<string, PlanTaskRef>): { op: ChangeOp } | { error: string } {
+  if (op.op !== 'add' || !op.goalId) return { op }
+  if (!plan) return { error: 'Could not read the Month list to check this list. Try again.' }
+  const goal = tasks.get(op.goalId)
+  if (!goal || !goal.commitments.some((c) => c.level === 'month' && c.status !== 'removed')) {
+    return { error: `No month goal ${op.goalId} that this person can see. Use a month goal's id (symphony_read_plan), or leave goal_id out.` }
+  }
+  if (goal.completed) return { error: `"${goal.title}" is already done; leave goal_id out or choose another month goal` }
+  if (op.context && isContext(goal.context) && goal.context !== op.context) return { error: `"${goal.title}" is in a different space (${goal.context}); ask which they mean` }
+  return { op: { ...op, ...(!op.context && isContext(goal.context) ? { context: goal.context } : {}) } }
 }
 
 export function resolveRefs(
@@ -587,7 +606,9 @@ export function resolveRefs(
   for (const given of set.ops) {
     const filed = withArea(given, areaById)
     if ('error' in filed) return filed
-    const op = filed.op
+    const served = withMonthGoal(filed.op, plan, planTasks)
+    if ('error' in served) return served
+    const op = served.op
     if (op.op.startsWith('plan_')) {
       if (!plan) return { error: 'Could not read the Month, Season and Year lists to check this list. Try again.' }
       const r = resolvePlanOp(op, plan, planTasks, planGoals)

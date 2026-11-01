@@ -5,7 +5,7 @@
 // question on a row instead of guessing, and its change card is kept inside
 // the step: an op the step does not allow is dropped here and the card says so.
 
-import type { ChangeOp, ChangeOpKind, ChangeSet } from './changeSet.ts'
+import { areaSpace, type ChangeOp, type ChangeOpKind, type ChangeSet } from './changeSet.ts'
 
 export type GuideLevel = 'day' | 'week' | 'month' | 'season' | 'year'
 
@@ -88,6 +88,62 @@ export function guideFromInput(raw: unknown): GuideTurnContext | null {
   return { level: g.level as GuideLevel, stepId, stepTitle, writes, aboveLines, areas, ...(counts ? { counts } : {}) }
 }
 
+const LEVEL_OF: Record<string, GuideLevel> = { daily: 'day', weekly: 'week', monthly: 'month', seasonal: 'season', annual: 'year' }
+
+/** The guide for this turn, from the page's session context. A guide that is
+ *  sent but malformed still runs guide mode, as a step that writes nothing:
+ *  never the older suggest-only coaching, never the full tool set. */
+export function guideForTurn(rawSession: unknown): { guide: GuideTurnContext; periodLabel: string } | null {
+  if (!rawSession || typeof rawSession !== 'object') return null
+  const sc = rawSession as Record<string, unknown>
+  if (sc.guide === undefined || sc.guide === null) return null
+  const periodLabel = text(sc.periodLabel, 60) || 'this period'
+  const guide = guideFromInput(sc.guide) ?? {
+    level: LEVEL_OF[String(sc.horizon)] ?? 'week',
+    stepId: text(sc.stepId, 60) || 'step',
+    stepTitle: text(sc.stepTitle, 120) || 'this step',
+    writes: ['none'],
+    aboveLines: [],
+    areas: [],
+  }
+  return { guide, periodLabel }
+}
+
+/** What a guided turn may call: reads, pointing at the page, and the change
+ *  card. No direct writes and no suggestions: nothing writes without Apply,
+ *  and the guide never supplies. */
+export const GUIDE_READ_TOOLS: ReadonlySet<string> = new Set([
+  'symphony_read_week',
+  'symphony_read_plan',
+  'symphony_read_choices',
+  'symphony_list_intentions',
+  'symphony_list_tasks',
+  'symphony_list_routines',
+  'symphony_list_events',
+  'symphony_list_household_members',
+  'symphony_list_contacts',
+  'symphony_list_lists',
+  'symphony_get_list_items',
+  'symphony_get_meals',
+  'symphony_search_notes',
+  'symphony_daily_summary',
+  'symphony_point',
+  'symphony_show_on_page',
+])
+export const GUIDE_CARD_TOOL = 'symphony_propose_changes'
+
+/** May a guided turn run this tool? The change card only when the step writes something. */
+export function guideToolAllowed(name: string, guide: GuideTurnContext): boolean {
+  if (name === GUIDE_CARD_TOOL) return allowedKinds(guide.writes).length > 0
+  return GUIDE_READ_TOOLS.has(name)
+}
+
+/** The Symphony tools a guided turn is offered (all of them outside a guide). */
+export function toolsForGuide<T extends { name?: string }>(tools: readonly T[], guide: GuideTurnContext | null): readonly T[] {
+  if (!guide) return tools
+  return tools.filter((t) => !!t.name && guideToolAllowed(t.name, guide))
+}
+
 /** The ops this step's writes allow, in order, without repeats. */
 function allowedKinds(writes: StepWrite[]): ChangeOpKind[] {
   return [...new Set(writes.flatMap((w) => OPS_FOR_WRITE[w] ?? []))]
@@ -101,7 +157,8 @@ export function guidePromptBlock(g: GuideTurnContext, periodLabel: string): stri
       ' Every change goes on ONE change card (symphony_propose_changes), called again with the whole list so far after each answer. Write nothing directly.'
     : 'This step changes nothing on the change card: listen, ask and point things out. Do not call symphony_propose_changes, and write nothing.'
   const lines = g.aboveLines.map((l) => JSON.stringify({ id: l.id, title: l.title })).join(', ')
-  const areas = g.areas.map((a) => JSON.stringify({ id: a.id, name: a.name, space: a.context })).join(', ')
+  // A legacy area with no space is private to its owner: Personal.
+  const areas = g.areas.map((a) => JSON.stringify({ id: a.id, name: a.name, space: areaSpace(a) })).join(', ')
   return `\n(The user is INSIDE their guided ${g.level} planning session for ${periodLabel}, on step "${g.stepTitle}" (${g.stepId}).` +
     ' These rules for the session take precedence over the general planning rules above.' +
     ' You are their guide for this step: you sort what they say into the right place and you ask; you do not plan for them.' +
@@ -127,10 +184,9 @@ export interface SessionContextInput {
   bucket?: string; listTitles?: string[]; aboveTitles?: string[]; goalNames?: string[]
 }
 
-/** The session block of the first message: the guide's when the page runs a
- *  guided session, else the older planning-session coaching. */
-export function sessionPromptBlock(sc: SessionContextInput, guide: GuideTurnContext | null): string {
-  if (guide) return guidePromptBlock(guide, sc.periodLabel)
+/** The older planning-session coaching, for a session with no guide. A guided
+ *  turn gets guidePromptBlock instead (index.ts). */
+export function sessionPromptBlock(sc: SessionContextInput): string {
   const strList = (label: string, items?: string[]) =>
     items && items.length > 0 ? ` ${label}: ${items.map((t) => `"${t}"`).join(', ')}.` : ''
   return `\n(The user is INSIDE their ${sc.horizon} planning session — period ${sc.periodLabel},` +

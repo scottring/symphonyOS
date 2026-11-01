@@ -310,6 +310,24 @@ describe('change sets', () => {
     expect(activity().takeChangeCard()).toBeUndefined()
   })
 
+  it('Apply with question rows keeps the card open with only the questions; the next turn hears what saved', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: true as const, ids: ['new1'], undo: async () => true }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet({ key: 'q', title: '2 changes', ops: [
+      { key: 'q:0', op: 'add' as const, title: 'Finish GW application' },
+      { key: 'q:1', op: 'add' as const, title: "Mia's dentist", question: 'Booking it, or going?' },
+    ] }))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(activity().changeSet).toMatchObject({ key: 'q', state: 'proposed', ops: [{ key: 'q:1', question: 'Booking it, or going?' }] })
+    expect(activity().changeSet?.ops).toHaveLength(1)
+    expect(activity().receipt).toMatchObject({ state: 'saved' })
+    // First the saved card (its question row marked), then the open questions.
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'approved', ops: [{ title: 'Finish GW application' }, { title: "Mia's dentist", question: 'Booking it, or going?' }] })
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending', ops: [{ title: "Mia's dentist" }] })
+    act(() => activity().dismissChangeSet())
+    expect(activity().changeSet).toBeNull()
+  })
+
   it('tells the next turn the last card was dismissed; a new proposal replaces the note', () => {
     const { activity } = mountActivity({})
     act(() => activity().setChangeSet(set('s1')))

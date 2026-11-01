@@ -62,7 +62,7 @@ export function ChangeCard({ set, today, onApprove, onDismiss, chat = false, upd
         </button>
         {chat && onEdit && <button type="button" className="canvas-link" onClick={onEdit} disabled={saving || updating}>Make a change</button>}
         {chat && <button type="button" className="canvas-link change-card-discard" onClick={onDismiss} disabled={saving || updating}>Discard draft</button>}
-        <span className="change-card-note">{set.state === 'partial' ? (set.recoverable ? 'Your draft is kept. Checking will not duplicate it.' : 'Some changes are already saved. Ask for an updated draft before saving again.') : chat ? 'Changes appear in your plan after you save.' : 'Nothing is saved until you approve.'}</span>
+        <span className="change-card-note">{set.state === 'partial' ? (set.recoverable ? 'Your draft is kept. Checking will not duplicate it.' : 'Some changes are already saved. Ask for an updated draft before saving again.') : asking ? "Rows with a question aren't saved yet." : chat ? 'Changes appear in your plan after you save.' : 'Nothing is saved until you approve.'}</span>
         {!chat && <span className="change-card-note">Or say what to change.</span>}
       </footer>
     </section>
