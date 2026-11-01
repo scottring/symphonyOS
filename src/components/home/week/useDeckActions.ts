@@ -121,8 +121,10 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
 
       letGo: (c) => {
         const t = c.task
+        // The receipt says where it went when that is Someday.
+        const toSomeday = `Let go of “${t.title}” · it’s in Someday`
         if (c.source === 'inbox') {
-          return activity.run(`Let go of “${t.title}”`, async () => ok(await setBucket(t.id, 'someday')), { ids: [t.id], undo: undoFor(t) })
+          return activity.run(toSomeday, async () => ok(await setBucket(t.id, 'someday')), { ids: [t.id], undo: undoFor(t) })
         }
         // The week goes. A month or season still holding it keeps it on that
         // list; with nothing broader it would fall to the Inbox and be dealt
@@ -133,7 +135,7 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
         const off = timingRemoval(t, 'all')
         const broader = (off.updates.commitments ?? []).some((c) => c.status === 'open' && c.level !== 'week')
         const snapshot = (off.previous.commitments ?? []).length > 0
-        return activity.run(`Let go of “${t.title}”`,
+        return activity.run(broader ? `Let go of “${t.title}”` : toSomeday,
           async () => ok(broader ? await updateTask(t.id, off.updates) : await setBucket(t.id, 'someday')),
           { ids: [t.id], undo: snapshot ? async () => ok(await updateTask(t.id, off.previous)) : restorePlacement(t) })
       },

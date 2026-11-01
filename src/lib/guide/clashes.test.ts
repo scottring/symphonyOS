@@ -26,6 +26,16 @@ describe('findClashes', () => {
     expect(findClashes([ev('a', at(9), at(10), 'Home'), ev('b', at(10, 15), at(11), 'School')])).toEqual([])
   })
 
+  it('a clash is on the later one’s day: two crossing midnight are flagged on the morning', () => {
+    expect(findClashes([ev('late', at(23, 0, 2), at(0, 30, 3)), ev('early', at(0, 15, 3), at(1, 0, 3))]))
+      .toEqual([{ kind: 'overlap', a: 'late', b: 'early', day: '2026-11-03' }])
+  })
+
+  it('a timed span of a day or more is left out, as an all-day one is', () => {
+    expect(findClashes([ev('trip', at(8, 0, 2), at(8, 0, 4), 'Denver'), ev('dentist', at(9, 0, 3), at(10, 0, 3), 'Main St')])).toEqual([])
+    expect(findClashes([ev('day', at(0, 0, 2), at(0, 0, 3)), ev('dentist', at(9, 0, 2), at(10, 0, 2))])).toEqual([])
+  })
+
   it('days apart are nothing', () => {
     expect(findClashes([ev('a', at(9, 0, 2), at(10, 0, 2), 'Home'), ev('b', at(9, 30, 3), at(10, 0, 3), 'School')])).toEqual([])
   })

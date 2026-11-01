@@ -1,6 +1,6 @@
 // Planning the week, step 4 (spec 2026-11-01): clear the inbox. Each capture
 // gets one of three answers: This week, Later (next week, this month, next
-// month) or Gone (out of the way, in Someday: nothing here deletes). The
+// month) or Let go (out of the way, in Someday: nothing here deletes). The
 // captures are the page's own (its space filter and people lens), and every
 // answer saves through the deck's writers, with a receipt and Undo.
 
@@ -42,10 +42,10 @@ export function InboxStep({ cards, actions }: {
           <span className="gw-row-acts" role="group" aria-label={`File ${t}`}>
             <button type="button" className="choose-verb" disabled={busy} aria-label={`This week: ${t}`}
               onClick={() => { void run(c.key, () => actions.keepThisWeek(c)) }}>This week</button>
-            <button type="button" className="choose-verb is-quiet" aria-expanded={later === c.key} aria-label={`Later: ${t}`}
+            <button type="button" className="choose-verb is-quiet" disabled={busy} aria-expanded={later === c.key} aria-label={`Later: ${t}`}
               onClick={() => setLater(later === c.key ? null : c.key)}>Later ▸</button>
-            <button type="button" className="choose-verb is-quiet" disabled={busy} aria-label={`Gone: ${t}`}
-              onClick={() => { void run(c.key, () => actions.letGo(c)) }}>Gone</button>
+            <button type="button" className="choose-verb is-quiet" disabled={busy} aria-label={`Let go: ${t}`}
+              onClick={() => { void run(c.key, () => actions.letGo(c)) }}>Let go</button>
           </span>
           {later === c.key && <div className="choose-menu" role="group" aria-label={`Later: ${t}`}>
             {LATER.map((l) => <button key={l.when} type="button" className="choose-when" disabled={busy}

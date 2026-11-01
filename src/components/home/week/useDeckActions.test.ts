@@ -164,6 +164,7 @@ describe('useDeckActions', () => {
       ],
     }))
     await a.letGo(c)
+    expect(runs[0].label).toBe('Let go of “Fix gate”')
     const off = timingRemoval(c.task, 'all')
     expect(deps.updateTask).toHaveBeenCalledWith('t1', off.updates)
     expect(deps.gated.setBucket).not.toHaveBeenCalled()
@@ -178,6 +179,7 @@ describe('useDeckActions', () => {
     const c = card(source, { bucket: 'week', scheduledFor: new Date(2026, 9, 6), commitments })
     await a.letGo(c)
     expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', 'someday')
+    expect(runs[0].label).toBe('Let go of “Fix gate” · it’s in Someday')
     expect(deps.updateTask).not.toHaveBeenCalled()
     await runs[0].undo!()
     expect(deps.updateTask).toHaveBeenLastCalledWith('t1', timingRemoval(c.task, 'all').previous)
@@ -197,6 +199,8 @@ describe('useDeckActions', () => {
     const { deps, a } = setup()
     await a.letGo(card('inbox', { bucket: 'inbox' }))
     expect(deps.gated.setBucket).toHaveBeenCalledWith('t1', 'someday')
+    // The receipt says where it went.
+    expect(runs[0].label).toBe('Let go of “Fix gate” · it’s in Someday')
   })
 
   it('drain: one run, ungated onUpdateTask, undo restores', async () => {

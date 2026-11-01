@@ -20,13 +20,13 @@
 // steps rail where the strip stands, the week beside it, the step's header
 // in the conversation. "Place them" (?place=1) opens Give them a day.
 
-import { useContext, type ReactNode } from 'react'
+import { useContext, useState, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
-import { usePeriodReview } from '@/hooks/usePeriodReview'
+import { usePeriodReview, type ReviewNotes } from '@/hooks/usePeriodReview'
 import type { WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
 import { GiveThemADay } from '@/components/plan/choose/GiveThemADay'
 import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
@@ -269,13 +269,16 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   onPlanned: () => void
 }) {
   const guided = useGuidedWeek({ weekStart, isCurrent, tasks: deck.tasks ?? NO_TASKS, choose: deck.choose, onFinish, onClose, onPlanned })
+  // Look back's notes as typed, kept here so they outlive its step's body
+  // (only the current step's body is drawn): nothing is lost on Next.
+  const [lookDraft, setLookDraft] = useState<ReviewNotes | null>(null)
   // Where the session is comes first: no flash of step one before a resume.
   if (guided.loading) return null
   const choose = deck.choose
   // What each step shows inside the rail (Choose, Weekly ops and Tell the
   // family come with Task 10).
   const bodies = {
-    'look-back': <WeekLookBack review={lastReview} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
+    'look-back': <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
       notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} members={deck.handOffTo ?? NOBODY} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
     'read-month': <ReadMonth monthWord={choose.monthWord} lines={choose.lines} doneLines={choose.doneLines} />,
     calendar: <CalendarCheck weekStart={weekStart} events={deck.events ?? []} />,

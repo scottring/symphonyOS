@@ -163,8 +163,12 @@ export function useChooseWeek(d: ChooseWeekDeps) {
 
     // Looking back (the guided session's step 1): each of last week's not
     // done, with the four calls on it. Hand off is assignment through the
-    // gated update (its scope follows, as everywhere); Undo puts the people back.
+    // gated update; Undo puts the people back. Only a Family item is handed
+    // off: the update derives scope from the assignees, so assigning a
+    // Personal, Work or untagged one to someone else would share it with them
+    // (assignment is not permission).
     const handOff = (t: Task) => (to: FamilyMember) => {
+      if (t.context !== 'family') return Promise.resolve(false)
       const before: Partial<Task> = { assignedTo: t.assignedTo, assignedToAll: t.assignedToAll }
       return activity.run(`Hand “${t.title}” to ${to.name}`, async () => ok(await d.updateTask(t.id, { assignedTo: to.id, assignedToAll: [to.id] })),
         { ids: [t.id], undo: async () => ok(await d.updateTask(t.id, before)) })
@@ -174,6 +178,7 @@ export function useChooseWeek(d: ChooseWeekDeps) {
       return {
         key: t.id, title: t.title, note: n >= 1 ? `Carried ${n} ${n === 1 ? 'week' : 'weeks'}` : undefined,
         who: assigneesOf(t),
+        canHandOff: t.context === 'family',
         thisWeek: () => d.actions.keepThisWeek(card(t, 'last-week')),
         smaller: addUnder(t, `Add a smaller step under “${t.title}”`),
         handOff: handOff(t),

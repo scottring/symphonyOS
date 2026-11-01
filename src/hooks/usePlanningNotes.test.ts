@@ -30,6 +30,7 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 
 import { usePlanningNotes } from './usePlanningNotes'
 import { usePlanningSession } from './usePlanningSession'
+import { usePeriodReview } from './usePeriodReview'
 
 describe('usePlanningNotes', () => {
   beforeEach(() => { eqCalls.length = 0; ownRow = null; readError = null; readDelay = 0; upsert.mockClear() })
@@ -87,6 +88,18 @@ describe('usePlanningNotes', () => {
       await Promise.all([s.result.current.save({ wentWell: 'w2', didnt: 'd2' }), n.result.current.patch({ weekend: 'rest' })])
     })
     expect(ownRow!.notes).toMatchObject({ guide: { current: 'choose' }, wentWell: 'w2', weekend: 'rest' })
+  })
+
+  it('a review finished while a patch is in flight keeps both', async () => {
+    ownRow = { notes: {} }
+    const n = renderHook(() => usePlanningNotes('weekly', '2026-W44'))
+    const r = renderHook(() => usePeriodReview('weekly', '2026-W44'))
+    await waitFor(() => expect(n.result.current.loading || r.result.current.loading).toBe(false))
+    readDelay = 20
+    await act(async () => {
+      await Promise.all([n.result.current.patch({ weekend: 'rest' }), r.result.current.finish({ wentWell: 'w', didnt: 'd' })])
+    })
+    expect(ownRow!.notes).toMatchObject({ weekend: 'rest', periodReview: { wentWell: 'w', didnt: 'd' } })
   })
 
   it('an empty token resets notes to empty', async () => {

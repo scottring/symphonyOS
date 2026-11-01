@@ -9,17 +9,17 @@ const actions = () => ({ keepThisWeek: vi.fn(async () => true), later: vi.fn(asy
 const row = (title: string) => within(screen.getByRole('listitem', { name: title }))
 
 describe('InboxStep — step 4, clear the inbox', () => {
-  it('each capture offers This week, Later and Gone', async () => {
+  it('each capture offers This week, Later and Let go', async () => {
     const a = actions()
     const cards = [card('Book the vet'), card('Gutter quote')]
     render(<InboxStep cards={cards} actions={a} />)
     for (const t of ['Book the vet', 'Gutter quote']) {
-      expect(row(t).getAllByRole('button').map((b) => b.textContent)).toEqual(['This week', 'Later ▸', 'Gone'])
+      expect(row(t).getAllByRole('button').map((b) => b.textContent)).toEqual(['This week', 'Later ▸', 'Let go'])
     }
     expect(row('Book the vet').getByText('Captured Monday')).toBeInTheDocument()
     await act(async () => { fireEvent.click(row('Book the vet').getByRole('button', { name: 'This week: Book the vet' })) })
     expect(a.keepThisWeek).toHaveBeenCalledWith(cards[0])
-    await act(async () => { fireEvent.click(row('Gutter quote').getByRole('button', { name: 'Gone: Gutter quote' })) })
+    await act(async () => { fireEvent.click(row('Gutter quote').getByRole('button', { name: 'Let go: Gutter quote' })) })
     expect(a.letGo).toHaveBeenCalledWith(cards[1])
   })
 
@@ -36,8 +36,16 @@ describe('InboxStep — step 4, clear the inbox', () => {
 
   it('a write that did not save says so on its row', async () => {
     render(<InboxStep cards={[card('Book the vet')]} actions={{ ...actions(), letGo: vi.fn(async () => false) }} />)
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Gone: Book the vet' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Let go: Book the vet' })) })
     expect(screen.getByRole('alert')).toHaveTextContent('Didn’t save. Try again.')
+  })
+
+  it('while a capture saves, Later waits too', async () => {
+    let finish!: (ok: boolean) => void
+    render(<InboxStep cards={[card('Book the vet')]} actions={{ ...actions(), keepThisWeek: vi.fn(() => new Promise<boolean>((r) => { finish = r })) }} />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'This week: Book the vet' })) })
+    expect(screen.getByRole('button', { name: 'Later: Book the vet' })).toBeDisabled()
+    await act(async () => { finish(true) })
   })
 
   it('an empty inbox reads "Inbox is clear."', () => {

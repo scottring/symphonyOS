@@ -18,15 +18,15 @@ import { useChooseWeek } from './useChooseWeek'
 
 const weekAnchor = new Date(2026, 9, 25)
 const lastWeekStart = new Date(2026, 9, 18)
-const gate = createMockTask({ id: 'gate', title: 'Fix the gate', scheduledFor: new Date(2026, 9, 21), isAllDay: true, assignedTo: 'me' })
+const gate = createMockTask({ id: 'gate', title: 'Fix the gate', scheduledFor: new Date(2026, 9, 21), isAllDay: true, assignedTo: 'me', context: 'family' })
 
 describe('useChooseWeek — Look back’s loose ends', () => {
-  const setup = () => {
+  const setup = (pool = [gate]) => {
     const actions = { keepThisWeek: vi.fn(async () => true), letGo: vi.fn(async () => true), done: vi.fn(async () => true) } as unknown as DeckActions
     const updateTask = vi.fn(async () => true)
     const addTask = vi.fn(async () => 'new')
     const deps = {
-      lines: [], pool: [gate], weekAnchor, lastWeekStart, monthStart: new Date(2026, 9, 1), isCurrent: true,
+      lines: [], pool, weekAnchor, lastWeekStart, monthStart: new Date(2026, 9, 1), isCurrent: true,
       actions, keepForward: vi.fn(), dropCommitment: vi.fn(), updateTask, addTask, deleteTask: vi.fn(),
     }
     const { result } = renderHook(() => useChooseWeek(deps))
@@ -37,7 +37,7 @@ describe('useChooseWeek — Look back’s loose ends', () => {
     const { result, actions, updateTask, addTask } = setup()
     expect(result.current.notDoneLastWeek).toBe(1)
     const [end] = result.current.looseEnds
-    expect(end).toMatchObject({ key: 'gate', title: 'Fix the gate', who: ['me'] })
+    expect(end).toMatchObject({ key: 'gate', title: 'Fix the gate', who: ['me'], canHandOff: true })
     await act(async () => { await end.thisWeek() })
     expect(actions.keepThisWeek).toHaveBeenCalledWith(expect.objectContaining({ task: gate, source: 'last-week' }))
     await act(async () => { await end.drop() })
@@ -51,5 +51,11 @@ describe('useChooseWeek — Look back’s loose ends', () => {
     // Undo puts the people back as they were.
     await act(async () => { await runs.undo[0]() })
     expect(updateTask).toHaveBeenLastCalledWith('gate', { assignedTo: 'me', assignedToAll: undefined })
+  })
+
+  it('only a Family loose end can be handed off: assigning a Personal, Work or untagged one would share it', () => {
+    const own = (id: string, context?: 'personal' | 'work') => createMockTask({ id, title: id, scheduledFor: new Date(2026, 9, 21), isAllDay: true, context })
+    const { result } = setup([gate, own('doctor', 'personal'), own('deck', 'work'), own('untagged')])
+    expect(Object.fromEntries(result.current.looseEnds.map((e) => [e.key, e.canHandOff]))).toEqual({ gate: true, doctor: false, deck: false, untagged: false })
   })
 })

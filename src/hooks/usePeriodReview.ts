@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type { SessionHorizon } from '@/hooks/usePlanningSession'
+import { rowKey, serialized } from '@/hooks/usePlanningNotes'
 
 export type ReviewNotes = { wentWell: string; didnt: string }
 export type Reviewed = ReviewNotes & { at: Date; authorId: string }
@@ -54,22 +55,26 @@ export function usePeriodReview(horizon: SessionHorizon, token: string) {
   useEffect(() => { void load() }, [load])
 
   /** Finish the review. Reads this person's row first so a week's plan notes
-   *  on it survive; a failed read saves nothing rather than overwrite them. */
+   *  on it survive; a failed read saves nothing rather than overwrite them.
+   *  On the row's one chain (usePlanningNotes), after any patch in flight. */
   const finish = useCallback(async (notes: ReviewNotes): Promise<boolean> => {
     if (!user?.id || !token) return false
-    const { data: own, error: readError } = await supabase.from('planning_sessions')
-      .select('notes').eq('author_id', user.id).eq('horizon', horizon).eq('period_token', token).maybeSingle()
-    if (readError) return false
-    const at = new Date().toISOString()
-    const existing = ((own as { notes?: Record<string, unknown> } | null)?.notes ?? {}) as Record<string, unknown>
-    const { error: writeError } = await supabase.from('planning_sessions').upsert(
-      { author_id: user.id, horizon, period_token: token, notes: { ...existing, periodReview: { ...notes, at } }, updated_at: at },
-      { onConflict: 'author_id,horizon,period_token' },
-    )
-    if (writeError) return false
-    setReviewed({ ...notes, at: new Date(at), authorId: user.id })
-    setMine(notes)
-    return true
+    const uid = user.id
+    return serialized(rowKey(uid, horizon, token), async () => {
+      const { data: own, error: readError } = await supabase.from('planning_sessions')
+        .select('notes').eq('author_id', uid).eq('horizon', horizon).eq('period_token', token).maybeSingle()
+      if (readError) return false
+      const at = new Date().toISOString()
+      const existing = ((own as { notes?: Record<string, unknown> } | null)?.notes ?? {}) as Record<string, unknown>
+      const { error: writeError } = await supabase.from('planning_sessions').upsert(
+        { author_id: uid, horizon, period_token: token, notes: { ...existing, periodReview: { ...notes, at } }, updated_at: at },
+        { onConflict: 'author_id,horizon,period_token' },
+      )
+      if (writeError) return false
+      setReviewed({ ...notes, at: new Date(at), authorId: uid })
+      setMine(notes)
+      return true
+    })
   }, [user?.id, horizon, token])
 
   return { reviewed, mine, loading, error, reload: () => { void load() }, finish }

@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 
-export function LookingBack({ kicker, periodWord, done, outOf, notDone, alsoDone = [], initial, nextLabel, onContinue, onLeave, reviewed, compact = false }: {
+export function LookingBack({ kicker, periodWord, done, outOf, notDone, alsoDone = [], initial, nextLabel, onContinue, onLeave, reviewed, compact = false, value, onChange, unsaved = false }: {
   /** "Review last week · then plan this week" (not shown when compact) */
   kicker?: string
   /** "Last week", "September" */
@@ -32,14 +32,27 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, alsoDone
    *  Leave (the session has one), the button only saves and says so, and the
    *  not-done are dealt right below, not later. */
   compact?: boolean
+  /** The two notes held by the caller, so a draft outlives this card (the
+   *  guided session keeps it across steps). Without it the card holds them. */
+  value?: ReviewNotes
+  onChange?: (notes: ReviewNotes) => void
+  /** Compact only: what is typed differs from what is saved. */
+  unsaved?: boolean
 }) {
   const hasTotal = outOf !== undefined && outOf >= done && outOf > 0
-  const [wentWell, setWentWell] = useState(initial?.wentWell ?? '')
-  const [didnt, setDidnt] = useState(initial?.didnt ?? '')
+  const [ownWell, setOwnWell] = useState(initial?.wentWell ?? '')
+  const [ownDidnt, setOwnDidnt] = useState(initial?.didnt ?? '')
+  const wentWell = value ? value.wentWell : ownWell
+  const didnt = value ? value.didnt : ownDidnt
   const [showAlso, setShowAlso] = useState(false)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState(false)
   const [saved, setSaved] = useState(false)
+  const set = (n: ReviewNotes) => {
+    setSaved(false)
+    if (onChange) onChange(n)
+    else { setOwnWell(n.wentWell); setOwnDidnt(n.didnt) }
+  }
 
   const go = async () => {
     setSaving(true); setFailed(false); setSaved(false)
@@ -72,12 +85,13 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, alsoDone
         </div>}
         {reviewed && <p className="choose-fact">{reviewed}</p>}
         <label className="choose-place-label" htmlFor="look-well">What went well</label>
-        <textarea id="look-well" className="choose-textarea" rows={2} value={wentWell} onChange={(e) => { setWentWell(e.target.value); setSaved(false) }} />
+        <textarea id="look-well" className="choose-textarea" rows={2} value={wentWell} onChange={(e) => set({ wentWell: e.target.value, didnt })} />
         <label className="choose-place-label" htmlFor="look-didnt">What didn’t</label>
-        <textarea id="look-didnt" className="choose-textarea" rows={2} value={didnt} onChange={(e) => { setDidnt(e.target.value); setSaved(false) }} />
+        <textarea id="look-didnt" className="choose-textarea" rows={2} value={didnt} onChange={(e) => set({ wentWell, didnt: e.target.value })} />
         {!compact && notDone > 0 && <p className="choose-fact choose-look-next">The {notDone} not done come next, under their goal, marked “From {/^Last /.test(periodWord) ? periodWord.toLowerCase() : periodWord}, not done”.</p>}
         {failed && <p className="choose-status is-failed" role="alert">Didn’t save. Try again.</p>}
-        {compact && saved && <p className="choose-status" role="status">Saved.</p>}
+        {compact && (unsaved ? <p className="choose-status" role="status">Not saved yet</p>
+          : saved && <p className="choose-status" role="status">Saved.</p>)}
       </article>
     </div>
     <div className="choose-pager">

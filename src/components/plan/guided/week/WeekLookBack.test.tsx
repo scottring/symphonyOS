@@ -1,21 +1,29 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within, act } from '@testing-library/react'
+import { useState } from 'react'
 import { WeekLookBack, type LooseEnd } from './WeekLookBack'
 import type { FamilyMember } from '@/types/family'
+import type { ReviewNotes } from '@/hooks/usePeriodReview'
 
 const member = (id: string, name: string) => ({ id, name, initials: name[0], color: 'blue' }) as unknown as FamilyMember
 const iris = member('iris', 'Iris')
 
 const end = (title: string, over: Partial<LooseEnd> = {}): LooseEnd => ({
-  key: title, title, note: 'Not done', who: [],
+  key: title, title, note: 'Not done', who: [], canHandOff: true,
   thisWeek: vi.fn(async () => true), smaller: vi.fn(async () => true), handOff: vi.fn(async () => true),
   drop: vi.fn(async () => true), done: vi.fn(async () => true),
   ...over,
 })
-const review = () => ({ mine: null, reviewed: null, loading: false, finish: vi.fn(async () => true) })
-const setup = (over: Partial<Parameters<typeof WeekLookBack>[0]> = {}) => {
+const review = () => ({ mine: null as ReviewNotes | null, reviewed: null, loading: false, finish: vi.fn(async () => true) })
+type Props = Parameters<typeof WeekLookBack>[0]
+// The draft lives with the session (WeekSession); here, a stand-in for it.
+function WithDraft(p: Omit<Props, 'draft' | 'onDraft'>) {
+  const [draft, setDraft] = useState<ReviewNotes | null>(null)
+  return <WeekLookBack {...p} draft={draft} onDraft={setDraft} />
+}
+const setup = (over: Partial<Omit<Props, 'draft' | 'onDraft'>> = {}) => {
   const props = { review: review(), done: 3, outOf: 5, notDone: 2, looseEnds: [end('Fix the gate'), end('Call the bank')], members: [iris], aged: 0, onSeeAged: vi.fn(), ...over }
-  render(<WeekLookBack {...props} />)
+  render(<WithDraft {...props} />)
   return props
 }
 const row = (title: string) => within(screen.getByRole('listitem', { name: title }))
@@ -26,9 +34,11 @@ describe('WeekLookBack — step 1, look back at last week', () => {
     expect(screen.getByText(/of 5 done · 2 not done/)).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('What went well'), { target: { value: 'Shipped the deck' } })
     fireEvent.change(screen.getByLabelText('What didn’t'), { target: { value: 'Too many evenings out' } })
+    expect(screen.getByText('Not saved yet')).toBeInTheDocument()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save notes' })) })
     expect(p.review.finish).toHaveBeenCalledWith({ wentWell: 'Shipped the deck', didnt: 'Too many evenings out' })
     expect(screen.getByText('Saved.')).toBeInTheDocument()
+    expect(screen.queryByText('Not saved yet')).toBeNull()
   })
 
   it('opens on what was already said', () => {
@@ -67,6 +77,21 @@ describe('WeekLookBack — step 1, look back at last week', () => {
     setup({ looseEnds: [end('Fix the gate', { drop: vi.fn(async () => false) })] })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Drop: Fix the gate' })) })
     expect(row('Fix the gate').getByRole('alert')).toHaveTextContent('Didn’t save. Try again.')
+  })
+
+  it('a Personal or Work loose end is never handed off: assigning it would share it', () => {
+    setup({ looseEnds: [end('See the doctor', { canHandOff: false }), end('Fix the gate')] })
+    expect(screen.queryByRole('button', { name: 'Hand off: See the doctor' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Hand off: Fix the gate' })).toBeInTheDocument()
+  })
+
+  it('while a row saves, its other buttons wait too', async () => {
+    let finish!: (ok: boolean) => void
+    setup({ looseEnds: [end('Fix the gate', { thisWeek: vi.fn(() => new Promise<boolean>((r) => { finish = r })) })] })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'This week: Fix the gate' })) })
+    for (const v of ['Smaller', 'Hand off', 'Drop', 'Done']) expect(screen.getByRole('button', { name: `${v}: Fix the gate` })).toBeDisabled()
+    await act(async () => { finish(true) })
+    expect(screen.getByRole('button', { name: 'Smaller: Fix the gate' })).toBeEnabled()
   })
 
   it('with no one to hand to, Hand off is not offered', () => {

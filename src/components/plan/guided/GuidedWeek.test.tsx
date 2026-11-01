@@ -132,7 +132,7 @@ describe('GuidedWeek — the Week page while planning', () => {
   })
 
   it('the first four steps show their bodies inside the rail, from the page’s own lists', async () => {
-    const gate = { key: 'gate', title: 'Fix the gate', who: [], thisWeek: vi.fn(async () => true), smaller: vi.fn(async () => true), handOff: vi.fn(async () => true), drop: vi.fn(async () => true), done: vi.fn(async () => true) }
+    const gate = { key: 'gate', title: 'Fix the gate', who: [], canHandOff: true, thisWeek: vi.fn(async () => true), smaller: vi.fn(async () => true), handOff: vi.fn(async () => true), drop: vi.fn(async () => true), done: vi.fn(async () => true) }
     const vet = createMockTask({ id: 'vet', title: 'Book the vet', bucket: 'inbox' })
     const deck = makeDeck({
       aged: 2, doneLastWeek: 3, plannedLastWeek: 4,
@@ -159,6 +159,20 @@ describe('GuidedWeek — the Week page while planning', () => {
     await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
     await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'This week: Book the vet' })) })
     expect(deck.actions.keepThisWeek).toHaveBeenCalledWith(deck.cards[0])
+  })
+
+  it('notes typed in Look back and not saved survive going on and coming back, marked not saved', async () => {
+    open('/week?plan=1')
+    const rail = () => within(screen.getByRole('group', { name: 'Steps in this session' }))
+    fireEvent.change(rail().getByLabelText('What went well'), { target: { value: 'Rested' } })
+    expect(rail().getByText('Not saved yet')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    expect(rail().queryByLabelText('What went well')).toBeNull()
+    fireEvent.click(rail().getByRole('button', { name: /Look back at last week/ }))
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Go to this step' })) })
+    expect(rail().getByLabelText('What went well')).toHaveValue('Rested')
+    expect(rail().getByText('Not saved yet')).toBeInTheDocument()
+    expect(review.finish).not.toHaveBeenCalled()
   })
 
   it('the count reads "{n} of about 15": what is on this week, from the page’s own list', () => {

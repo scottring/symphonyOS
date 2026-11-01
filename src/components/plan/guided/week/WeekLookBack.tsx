@@ -19,6 +19,8 @@ export interface LooseEnd {
   note?: string
   /** Who has it now (household member ids). */
   who: readonly string[]
+  /** Only a Family item: assigning anything else would share it. */
+  canHandOff: boolean
   thisWeek: () => Promise<boolean>
   /** A smaller step under it, on this week. */
   smaller: (title: string) => Promise<boolean>
@@ -28,9 +30,13 @@ export interface LooseEnd {
   done: () => Promise<boolean>
 }
 
-export function WeekLookBack({ review, done, outOf, notDone, alsoDone, looseEnds, members, aged, onSeeAged }: {
+export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, alsoDone, looseEnds, members, aged, onSeeAged }: {
   /** Last week's review (usePeriodReview): what was said, and its save. */
   review: { mine: ReviewNotes | null; reviewed: Reviewed | null; loading: boolean; finish: (notes: ReviewNotes) => Promise<boolean> }
+  /** What is typed and not yet saved, kept by the session so it survives
+   *  going to another step and back; null when nothing is being typed. */
+  draft: ReviewNotes | null
+  onDraft: (notes: ReviewNotes | null) => void
   done: number
   outOf?: number
   notDone: number
@@ -55,12 +61,20 @@ export function WeekLookBack({ review, done, outOf, notDone, alsoDone, looseEnds
     return ok
   }
   const toggle = (key: string, what: 'smaller' | 'hand') => setOpen(open?.key === key && open.what === what ? null : { key, what })
+  const savedNotes = review.mine ?? { wentWell: '', didnt: '' }
+  const notes = draft ?? savedNotes
+  const unsaved = !!draft && (draft.wentWell.trim() !== savedNotes.wentWell || draft.didnt.trim() !== savedNotes.didnt)
+  const save = async (n: ReviewNotes) => {
+    const ok = await review.finish(n)
+    if (ok) onDraft(null)
+    return ok
+  }
   const reviewedOn = review.reviewed ? `Reviewed ${review.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
 
   return <div className="gw-body gw-look">
     {review.loading ? <p className="choose-status" role="status">Loading…</p>
       : <LookingBack compact periodWord="Last week" done={done} outOf={outOf} notDone={notDone} alsoDone={alsoDone}
-          initial={review.mine} reviewed={reviewedOn} nextLabel="Save notes" onContinue={review.finish} />}
+          value={notes} onChange={onDraft} unsaved={unsaved} reviewed={reviewedOn} nextLabel="Save notes" onContinue={save} />}
     {aged > 0 && <p className="choose-was">
       Moved {aged} untouched {aged === 1 ? 'thing' : 'things'} to Later · <button type="button" className="deck-link" onClick={onSeeAged}>See them</button>
     </p>}
@@ -77,9 +91,9 @@ export function WeekLookBack({ review, done, outOf, notDone, alsoDone, looseEnds
             {e.note && <span className="gw-row-note">{e.note}</span>}
             <span className="gw-row-acts" role="group" aria-label={`Decide ${e.title}`}>
               {verb('This week', e.thisWeek, false)}
-              <button type="button" className="choose-verb is-quiet" aria-expanded={open?.key === e.key && open.what === 'smaller'}
+              <button type="button" className="choose-verb is-quiet" disabled={busy} aria-expanded={open?.key === e.key && open.what === 'smaller'}
                 aria-label={`Smaller: ${e.title}`} onClick={() => toggle(e.key, 'smaller')}>Smaller</button>
-              {members.length > 0 && <button type="button" className="choose-verb is-quiet" aria-expanded={open?.key === e.key && open.what === 'hand'}
+              {e.canHandOff && members.length > 0 && <button type="button" className="choose-verb is-quiet" disabled={busy} aria-expanded={open?.key === e.key && open.what === 'hand'}
                 aria-label={`Hand off: ${e.title}`} onClick={() => toggle(e.key, 'hand')}>Hand off</button>}
               {verb('Drop', e.drop)}
               {verb('Done', e.done)}
