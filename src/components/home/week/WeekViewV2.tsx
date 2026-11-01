@@ -63,7 +63,7 @@ import { planV2Enabled, lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
-import { weekListTasks } from '@/lib/planning/weekList'
+import { weekListTasks, weekShownTasks } from '@/lib/planning/weekList'
 import { selectPeriodTasks } from '@/lib/planning/periodPage'
 import { monthsOfWeek } from '@/lib/planning/periodPlacement'
 import { readSeasons } from '@/lib/cadence/seasons'
@@ -89,7 +89,6 @@ import { doableBy } from '@/lib/planning/poolViews'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import { useDeckActions } from './useDeckActions'
-import { weekCount } from '@/components/plan/guided/useGuidedWeek'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
@@ -739,11 +738,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const activity = useCanvasActivity()
   const [people] = useAssigneeFilter()
   const lens = useMemo(() => planPeopleLens(people, meId), [people, meId])
+  const weekListed = useMemo(() => weekListTasks(tasks, weekAnchor, lens.scopeId, { isCurrent: weekIsCurrentFor(weekAnchor) }).filter(lens.keep), [tasks, weekAnchor, lens])
   const canvasWeekTasks = useMemo(() => {
     const end = weekAnchor.getTime() + 7 * 86_400_000
     const inWeekend = (t: Task) => !!t.weekendStart && !t.scheduledFor && t.weekendStart.getTime() >= weekAnchor.getTime() && t.weekendStart.getTime() < end
-    return weekListTasks(tasks, weekAnchor, lens.scopeId, { isCurrent: weekIsCurrentFor(weekAnchor) }).filter(lens.keep).filter((t) => !inWeekend(t))
-  }, [tasks, weekAnchor, lens])
+    return weekListed.filter((t) => !inWeekend(t))
+  }, [weekListed, weekAnchor])
+  // The week's count, and the guided session's "{n} of about 15": the tasks
+  // the page draws for this week (its list and its days), through exactly
+  // their filters.
+  const weekShown = useMemo(() => weekShownTasks({ listed: weekListed, drawn: drawnTasks, weekStart: weekAnchor }), [weekListed, drawnTasks, weekAnchor])
   const canvasMonths = useMemo(() => monthsOfWeek(weekAnchor).map((start) => ({
     name: start.toLocaleDateString('en-US', { month: 'long' }),
     rows: selectPeriodTasks(tasks, 'month', start, weekIsCurrentFor(weekAnchor) && start.getTime() === monthStartOf(new Date(weekAnchor.getTime() + 3 * 86_400_000)).getTime(), meId, readSeasons()),
@@ -1044,13 +1048,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
     () => deckTasks.filter((t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) !== undefined).length,
     [deckTasks, lastWeekStart],
   )
-  // This week's count for the header, the same way: done, out of everything on it.
+  // This week's count for the header: done, out of everything the page draws
+  // on it (weekShown). The guided session's "{n} of about 15" is onThisWeek.
   const doneThisWeek = useMemo(
-    () => deckTasks.filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) === 'done').length,
-    [deckTasks, weekAnchor, weekIsCurrent],
+    () => weekShown.filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) === 'done').length,
+    [weekShown, weekAnchor, weekIsCurrent],
   )
-  // The guided session's "{n} of about 15" is this same count (weekCount).
-  const onThisWeek = useMemo(() => weekCount(deckTasks, weekAnchor, weekIsCurrent), [deckTasks, weekAnchor, weekIsCurrent])
+  const onThisWeek = weekShown.length
   const alsoDoneLastWeek = useMemo(
     () => alsoDoneIn(deckTasks, lastWeekStart, weekAnchor, (t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) !== undefined),
     [deckTasks, lastWeekStart, weekAnchor],

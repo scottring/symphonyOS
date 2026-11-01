@@ -290,7 +290,7 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   // (only the current step's body is drawn): nothing is lost on Next. Done
   // planning the week saves what is still unsaved.
   const [lookDraft, setLookDraft] = useState<ReviewNotes | null>(null)
-  const guided = useGuidedWeek({ weekStart, isCurrent, tasks: deck.tasks ?? NO_TASKS, choose: deck.choose, onFinish: () => onFinish(lookDraft), onClose, onPlanned })
+  const guided = useGuidedWeek({ weekStart, count: deck.onThisWeek ?? 0, choose: deck.choose, onFinish: () => onFinish(lookDraft), onClose, onPlanned })
   const [weekendDraft, setWeekendDraft] = useState<string | null>(null)
   const [familyDraft, setFamilyDraft] = useState<string | null>(null)
   // A write saved on the page itself (a task dragged onto a day) counts as

@@ -30,6 +30,29 @@ export function weekListTasks(tasks: readonly Task[], weekStart: Date, meId: str
   return out.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
 }
 
+/**
+ * The tasks the Week draws for its week, each once: its list (`listed`:
+ * weekListTasks under the page's people scope and lens) and what its days
+ * show (`drawn`: the days' people filter) — a task dated in the week, or
+ * open in Sometime this weekend. The week's count ("N of about 15") is these,
+ * so the count covers exactly the rows drawn (spec: same filter for items and
+ * counts). A dated task only someone else carries is on its day, so it counts;
+ * an undated one the list leaves out is not drawn, so it does not. Goals are
+ * not tasks.
+ */
+export function weekShownTasks({ listed, drawn, weekStart }: { listed: readonly Task[]; drawn: readonly Task[]; weekStart: Date }): Task[] {
+  const first = localYmd(weekStart)
+  const last = localYmd(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6))
+  const inWeek = (d: Date | undefined) => !!d && localYmd(d) >= first && localYmd(d) <= last
+  const out = new Map<string, Task>()
+  for (const t of listed) if (!t.isGoal) out.set(t.id, t)
+  for (const t of drawn) {
+    if (t.isGoal || out.has(t.id)) continue
+    if (t.scheduledFor ? inWeek(t.scheduledFor) : (!t.completed && inWeek(t.weekendStart))) out.set(t.id, t)
+  }
+  return [...out.values()]
+}
+
 /** `dayLabel` is a real date ("Sat, Oct 3"), never a bare weekday: "kept from
  *  last week · Sat" read as either Saturday (Scott, 2026-09-28). `dayPassed`:
  *  the day came and went with the row still open. */

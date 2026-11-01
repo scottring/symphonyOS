@@ -2,21 +2,19 @@
 // week's count, and the session's registration with the shell (its step
 // header above the conversation, its own thread, the step on every turn).
 //
-// The count is worked out here, once, and handed to the frame and the steps
-// that show it, so two places never disagree. It counts exactly the tasks the
-// page shows under its filters (the deck's scoped list).
+// The count is the page's own (WeekViewV2's onThisWeek: the tasks it draws
+// for this week, under its filters), handed to the frame, the steps and the
+// guide, so no two places disagree.
 //
 // Planned (per person) once anything is applied at the choosing step: a
 // Choose verb or a change card's Apply, whichever comes first.
 
 import { createElement, useCallback, useEffect, useMemo, useRef } from 'react'
-import type { Task } from '@/types/task'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
 import { useOpenOnStep } from '@/hooks/useOpenOnStep'
 import { stepsFor, type GuideStep } from '@/lib/guide/steps'
 import { isLastStep } from '@/lib/guide/progress'
 import { weekToken } from '@/hooks/usePlanningSession'
-import { weekReviewState } from '@/lib/planning/periodReview'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
 import type { WeekChoose } from '@/components/home/week/useChooseWeek'
@@ -29,11 +27,6 @@ export const WEEK_COUNT_OF = 'about 15'
 /** "Read November": the one step titled by the month above. */
 export function weekStepTitle(s: GuideStep, monthWord: string): string {
   return s.id === 'read-month' ? `Read ${monthWord}` : s.title
-}
-
-/** Everything on the week, done or open — the week's count. */
-export function weekCount(tasks: readonly Task[], weekStart: Date, isCurrent: boolean): number {
-  return tasks.filter((t) => weekReviewState(t, weekStart, { isCurrent }) !== undefined).length
 }
 
 /** The same Choose, with every write that succeeds also reported to `applied`. */
@@ -53,11 +46,10 @@ export function reportingChoose(choose: WeekChoose, applied: () => void): WeekCh
 
 const CHOOSING = stepsFor('week').find((s) => s.choosing)!.id
 
-export function useGuidedWeek({ weekStart, isCurrent, tasks, choose, onFinish, onClose, onPlanned }: {
+export function useGuidedWeek({ weekStart, count, choose, onFinish, onClose, onPlanned }: {
   weekStart: Date
-  isCurrent: boolean
-  /** The page's scoped tasks (the deck's list): what the count covers. */
-  tasks: readonly Task[]
+  /** The week's count: the tasks the page draws on it (deck.onThisWeek). */
+  count: number
   choose: WeekChoose
   /** The week's closing writes; false keeps the session open. */
   onFinish: () => Promise<boolean>
@@ -71,7 +63,6 @@ export function useGuidedWeek({ weekStart, isCurrent, tasks, choose, onFinish, o
   useOpenOnStep('week', loading, jump)
   const steps = stepsFor('week')
   const monthWord = choose.monthWord
-  const count = useMemo(() => weekCount(tasks, weekStart, isCurrent), [tasks, weekStart, isCurrent])
 
   const latest = useRef({ progress, onFinish, onClose, onPlanned })
   useEffect(() => { latest.current = { progress, onFinish, onClose, onPlanned } })

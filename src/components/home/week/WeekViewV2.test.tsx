@@ -945,6 +945,38 @@ describe('WeekViewV2 — the deck', () => {
     expect(heard).toHaveBeenCalledTimes(2)
   })
 
+  // Final review 2026-11-01 (same filter for items and counts): "N of about
+  // 15" counts exactly the tasks the week draws, under the people filter.
+  describe('the week\'s count is the tasks the page draws', () => {
+    const mon = new Date(2026, 9, 19), tue = new Date(2026, 9, 20)
+    const onWeek = { bucket: 'week' as const, weekStart: sat, commitments: [{ level: 'week' as const, periodStart: sat, status: 'open' as const }] }
+    const tasks = () => [
+      createMockTask({ id: 'mine', title: 'Fix the gate', assignedTo: 'scott', ...onWeek, updatedAt: recent }),
+      createMockTask({ id: 'hersDated', title: 'Pot the ferns', assignedTo: 'iris', scheduledFor: tue, isAllDay: true, updatedAt: recent }),
+      createMockTask({ id: 'hersNoDay', title: 'Call the vet', assignedTo: 'iris', ...onWeek, updatedAt: recent }),
+      createMockTask({ id: 'shared', title: 'Clean the garage', scheduledFor: mon, isAllDay: true, updatedAt: recent }),
+      createMockTask({ id: 'later', title: 'Paint the fence', assignedTo: 'iris', bucket: 'month', updatedAt: recent }),
+    ]
+    const titles = ['Fix the gate', 'Pot the ferns', 'Call the vet', 'Clean the garage', 'Paint the fence']
+    const drawn = () => titles.filter((t) => screen.queryAllByText(t).length > 0)
+    const count = () => (deckMock.deck as unknown as { onThisWeek: number }).onThisWeek
+
+    it('everyone view: a dated task only Iris carries is on a day, so it counts; her undated one is not shown, so it does not', () => {
+      viewer.me = { id: 'scott' }
+      open('', tasks())
+      expect(drawn()).toEqual(['Fix the gate', 'Pot the ferns', 'Clean the garage'])
+      expect(count()).toBe(drawn().length)
+    })
+
+    it('with Iris chosen: the count is her rows the page draws', () => {
+      viewer.me = { id: 'scott' }
+      localStorage.setItem('symphony-assignee-filter-v2', JSON.stringify(['iris']))
+      open('', tasks(), { selectedAssignees: ['iris'] })
+      expect(drawn()).toEqual(['Pot the ferns', 'Call the vet'])
+      expect(count()).toBe(drawn().length)
+    })
+  })
+
   it('Weekly ops is handed the routines the page shows: the space filter applies', () => {
     const swim = createMockRoutine({ id: 'swim', name: 'Swim', context: 'family', recurrence_pattern: { type: 'daily' } as RecurrencePattern })
     const standup = createMockRoutine({ id: 'standup', name: 'Standup', context: 'work', recurrence_pattern: { type: 'daily' } as RecurrencePattern })

@@ -199,6 +199,7 @@ describe('GuidedWeek — the Week page while planning', () => {
     const dog = createMockRoutine({ id: 'dog', name: 'Walk the dog', time_of_day: '07:00:00', recurrence_pattern: { type: 'daily' } as RecurrencePattern })
     const deck = makeDeck({
       tasks: [onWeek('a'), onWeek('gate', { title: 'Fix the gate', context: 'family' }), onWeek('board', { title: 'Board deck', context: 'work' })],
+      onThisWeek: 3,
       routines: [dog],
     })
     open('/week?plan=1', deck)
@@ -268,9 +269,11 @@ describe('GuidedWeek — the Week page while planning', () => {
     expect(review.finish).not.toHaveBeenCalled()
   })
 
-  it('the count reads "{n} of about 15": what is on this week, from the page’s own list', () => {
-    const tasks = [onWeek('a'), onWeek('b', { completed: true }), createMockTask({ id: 'given', scheduledFor: new Date(2026, 8, 30), isAllDay: true }), createMockTask({ id: 'inbox', bucket: 'inbox' })]
-    open('/week?plan=1', makeDeck({ tasks }))
+  // The count is the page's own (WeekViewV2 counts the rows it draws), never
+  // worked out again here from a different list.
+  it('the count reads "{n} of about 15": the page’s own count of what it draws on this week', () => {
+    const tasks = [onWeek('a'), onWeek('b', { completed: true }), onWeek('c'), onWeek('d'), createMockTask({ id: 'inbox', bucket: 'inbox' })]
+    open('/week?plan=1', makeDeck({ tasks, onThisWeek: 3 }))
     expect(screen.getByText('3 of about 15 on this week')).toBeInTheDocument()
     expect(shell.reg?.sessionContext.guide.counts).toEqual({ label: 'tasks on this week', n: 3, of: 'about 15' })
   })
@@ -323,7 +326,7 @@ describe('GuidedWeek — the Week page while planning', () => {
 describe('useGuidedWeek — planned once something is applied at Choose', () => {
   const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter><GuidedSessionProvider>{children}</GuidedSessionProvider></MemoryRouter>
   const hook = (choose: WeekChoose, onPlanned = vi.fn()) => renderHook(() => useGuidedWeek({
-    weekStart, isCurrent: true, tasks: [], choose, onFinish: async () => true, onClose: vi.fn(), onPlanned,
+    weekStart, count: 0, choose, onFinish: async () => true, onClose: vi.fn(), onPlanned,
   }), { wrapper })
   const plannedPatches = () => store.patches.filter((x) => (x.p.guide as { plannedAt?: string }).plannedAt)
 
