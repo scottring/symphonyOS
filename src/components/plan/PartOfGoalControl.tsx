@@ -102,7 +102,7 @@ export function PartOfGoalControl({ task, tasks, choiceTasks, seasons, setGoalLi
       </button>}
       {open && (
         <div ref={menuRef} role="menu" aria-label="Part of which goal" className="absolute left-0 top-full z-50 mt-1 max-h-80 w-72 overflow-y-auto rounded-xl border border-neutral-200 bg-bg-elevated py-1 shadow-lg">
-          {groups.length === 0 && <p className="px-3 py-2 text-xs text-neutral-500">No open goals in the life areas shown. Name one on a month or season first.</p>}
+          {groups.length === 0 && <p className="px-3 py-2 text-xs text-neutral-500">No open goals in the spaces shown. Name one on a month or season first.</p>}
           {groups.map((g) => (
             <div key={g.label} role="group" aria-label={g.label}>
               <div className="px-3 pb-0.5 pt-2 text-[11px] font-medium uppercase tracking-wide text-neutral-400">{g.label}</div>

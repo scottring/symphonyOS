@@ -84,6 +84,8 @@ export interface DbGoalArea {
   user_id: string
   name: string
   sort_order: number
+  /** work | family | personal; null on legacy areas (treated as Personal). */
+  context?: string | null
   created_at: string
 }
 

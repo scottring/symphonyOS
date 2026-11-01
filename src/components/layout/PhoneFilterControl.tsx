@@ -97,7 +97,7 @@ export function PhoneFilterControl({
             <div className="mb-2 flex justify-center"><div className="h-1 w-10 rounded-full bg-neutral-300" /></div>
 
             <section aria-labelledby="phone-filter-areas">
-              <h3 id="phone-filter-areas" className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Life areas</h3>
+              <h3 id="phone-filter-areas" className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Spaces</h3>
               {LAYER_ROWS.map(({ id, label, color }) => {
                 const on = layers.has(id)
                 return (

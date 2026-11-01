@@ -24,7 +24,7 @@ export function useAddArea(): { area: TaskContext | undefined; picker: ReactNode
   const [stored, setStored] = useState<TaskContext | null>(read)
   const area = soleDomain ?? stored ?? undefined
   const picker = (
-    <span className="pv2-addarea" title="Life area for what you add">
+    <span className="pv2-addarea" title="Space for what you add">
       <ContextPicker size="sm" value={area ?? null} onChange={(c) => { setStored(c ?? null); write(c ?? null) }} />
     </span>
   )

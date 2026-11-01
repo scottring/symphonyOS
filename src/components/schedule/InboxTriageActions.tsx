@@ -144,8 +144,8 @@ export function InboxTriageActions({
               <CalendarPlus className="h-4 w-4 shrink-0" aria-hidden="true" />To calendar…
             </button>
           </div>
-          <p className={headingClass} aria-hidden="true">Life area</p>
-          <div role="group" aria-label="Life area" className="mx-2 mb-1 flex gap-1 rounded-full bg-neutral-50 p-1">
+          <p className={headingClass} aria-hidden="true">Space</p>
+          <div role="group" aria-label="Space" className="mx-2 mb-1 flex gap-1 rounded-full bg-neutral-50 p-1">
             {AREAS.map(({ label, value }) => {
               const on = area !== undefined && (area ?? null) === value
               return (

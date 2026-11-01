@@ -203,7 +203,7 @@ describe('TapContextPanel', () => {
       onAssigneesChange={vi.fn()}
     />)
     // Open the ContextPicker trigger, then click the 'Personal' option
-    fireEvent.click(screen.getByRole('button', { name: /life area/i }))
+    fireEvent.click(screen.getByRole('button', { name: /space/i }))
     fireEvent.click(screen.getByRole('button', { name: /personal/i }))
     expect(onContextChange).toHaveBeenCalledWith('personal')
   })

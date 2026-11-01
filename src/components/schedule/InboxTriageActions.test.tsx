@@ -72,7 +72,7 @@ describe('Inbox row triage', () => {
     expect(await screen.findByText('Sent to This Season')).toBeInTheDocument()
   })
 
-  it('sets the life area from More', () => {
+  it('sets the space from More', () => {
     const { actions } = renderInbox([capture('t1', 'Fix gate', { context: null })])
     // A row of chips now (2026-10-04), one of them marked.
     fireEvent.click(screen.getAllByRole('button', { name: /^More actions for/ })[0])
@@ -117,8 +117,8 @@ describe('Inbox bulk triage: areas first, real results, whole Undo', () => {
     fireEvent.click(within(bar()).getByRole('button', { name: 'Today' }))
     const dialog = screen.getByRole('dialog', { name: 'Where do these belong?' })
     // Only the unclassified rows are asked about; the Work row keeps its area.
-    expect(within(dialog).getByRole('group', { name: 'Life area for Buy stamps' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('group', { name: 'Life area for Call vet' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'Space for Buy stamps' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'Space for Call vet' })).toBeInTheDocument()
     expect(within(dialog).queryByText('Quarterly report')).toBeNull()
     expect(within(dialog).getByText(/1 already has one and keeps it/)).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Send to Today' })).toBeDisabled()
@@ -138,7 +138,7 @@ describe('Inbox bulk triage: areas first, real results, whole Undo', () => {
     fireEvent.click(within(bar()).getByRole('button', { name: 'This week' }))
     const dialog = screen.getByRole('dialog', { name: 'Where do these belong?' })
     fireEvent.click(within(within(dialog).getByRole('group', { name: 'Set all' })).getByRole('button', { name: 'Family' }))
-    fireEvent.click(within(within(dialog).getByRole('group', { name: 'Life area for Call vet' })).getByRole('button', { name: 'Personal' }))
+    fireEvent.click(within(within(dialog).getByRole('group', { name: 'Space for Call vet' })).getByRole('button', { name: 'Personal' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Send to This week' }))
     await waitFor(() => expect(screen.getByText('Sent 3 to This Week')).toBeInTheDocument())
     expect(actions.onUpdateTask).toHaveBeenCalledWith('u1', { context: 'family', bucket: 'week', scheduledFor: undefined })

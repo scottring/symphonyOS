@@ -57,7 +57,7 @@ export const PAGE_TOURS: Record<string, TourPart[]> = {
   // Inbox, Routines and Meals mark only their masthead and a few sections, so
   // their tours are short; the guide (pageGuides.ts) carries the rest.
   inbox: [
-    { target: 'page-title', title: 'Inbox', text: 'What you captured and have not decided about yet. Each row offers Today, This week and Someday; its ⋯ menu has more times, Send to a note or calendar, the Life area and Delete. List and Focus at the foot switch between every row and one at a time; Select acts on several together.' },
+    { target: 'page-title', title: 'Inbox', text: 'What you captured and have not decided about yet. Each row offers Today, This week and Someday; its ⋯ menu has more times, Send to a note or calendar, the Space and Delete. List and Focus at the foot switch between every row and one at a time; Select acts on several together.' },
     { target: 'region:Needs re-filing', title: 'Needs re-filing', text: 'Captures whose area does not match who can see them. Choose the right area to file each one.' },
     { target: 'region:Waiting on', title: 'Waiting on', text: 'Things you did your part on and are waiting to hear back about.' },
     { target: 'region:Expired', title: 'Expired', text: 'Older unfinished work, folded away until you open it.' },

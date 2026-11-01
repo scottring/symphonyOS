@@ -49,7 +49,7 @@ export function BulkAreaDialog({ destination, items, classifiedCount, onConfirm,
       >
         <h2 id="bulk-area-title" className="font-display text-lg text-neutral-900">Where do these belong?</h2>
         <p className="mt-1 text-sm text-neutral-500">
-          Before sending to {destination}, choose a life area for {items.length === 1 ? 'the unclassified item' : `the ${items.length} unclassified items`}.
+          Before sending to {destination}, choose a space for {items.length === 1 ? 'the unclassified item' : `the ${items.length} unclassified items`}.
           {classifiedCount > 0 && ` ${classifiedCount} already ${classifiedCount === 1 ? 'has' : 'have'} one and ${classifiedCount === 1 ? 'keeps it' : 'keep theirs'}.`}
         </p>
 
@@ -68,7 +68,7 @@ export function BulkAreaDialog({ destination, items, classifiedCount, onConfirm,
           {items.map((item) => (
             <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span className="w-full min-w-0 break-words text-sm text-neutral-800 sm:w-auto sm:flex-1 sm:truncate">{item.title}</span>
-              <span role="group" aria-label={`Life area for ${item.title}`} className="flex gap-1">
+              <span role="group" aria-label={`Space for ${item.title}`} className="flex gap-1">
                 {AREAS.map((a) => (
                   <button key={a.id} type="button" aria-pressed={areas.get(item.id) === a.id} onClick={() => setOne(item.id, a.id)}
                     className={chip(areas.get(item.id) === a.id)}>

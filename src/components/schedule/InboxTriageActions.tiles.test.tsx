@@ -19,9 +19,9 @@ describe('InboxTriageActions — one look for the whole menu', () => {
     }
   })
 
-  it('life area is one row of chips, the current one marked', () => {
+  it('space is one row of chips, the current one marked', () => {
     const p = open('family')
-    const areas = within(screen.getByRole('group', { name: 'Life area' }))
+    const areas = within(screen.getByRole('group', { name: 'Space' }))
     expect(areas.getByRole('menuitemradio', { name: 'Family' })).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(areas.getByRole('menuitemradio', { name: 'Work' }))
     expect(p.onSetArea).toHaveBeenCalledWith('work')

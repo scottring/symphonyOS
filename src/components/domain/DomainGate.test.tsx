@@ -48,7 +48,7 @@ describe('DomainGateProvider', () => {
     await user.click(screen.getByRole('button', { name: 'Ask' }))
     expect(screen.getByRole('dialog', { name: 'Which domain?' })).toBeInTheDocument()
     expect(screen.getByText('Call plumber')).toBeInTheDocument()
-    expect(screen.getByText(/needs a life area before it can be planned/)).toBeInTheDocument()
+    expect(screen.getByText(/needs a space before it can be planned/)).toBeInTheDocument()
     expect(screen.getByText(/Personal and Work stay private/)).toBeInTheDocument()
   })
 

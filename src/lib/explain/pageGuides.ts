@@ -47,7 +47,7 @@ export const PAGE_GUIDES: Record<string, string> = {
     'Open any item to see its notes, people, links and places, or to move it to another day.',
   inbox:
     'Inbox holds what you captured and have not decided about yet; the line under the title counts the items to triage. ' +
-    'Each row is one capture with Today, This week and Someday beside it; its ⋯ menu offers more times (a date, Next month, This season), Send to a note or to calendar, the Life area (Work, Family, Personal, Unsorted) and Delete. ' +
+    'Each row is one capture with Today, This week and Someday beside it; its ⋯ menu offers more times (a date, Next month, This season), Send to a note or to calendar, the Space (Work, Family, Personal, Unsorted) and Delete. ' +
     'List and Focus at the foot of the title switch between every row at once and one capture at a time; Select turns on checkboxes, and the bar that appears moves, files or deletes several together. ' +
     '"Needs re-filing" lists captures whose area does not match who can see them; "Waiting on" holds things you did your part on and are waiting to hear back about; "Expired" holds older unfinished work. ' +
     'Tap a row to open it. "Inbox zero" means nothing is waiting for a decision.',

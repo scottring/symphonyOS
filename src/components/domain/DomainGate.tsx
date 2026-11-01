@@ -51,7 +51,7 @@ export function DomainGateProvider({ children }: { children: ReactNode }) {
                 given (S2-19). The gate only guards a placement, so one
                 sentence covers every caller: why it asks, and what each
                 answer shares. The placement waits and lands once answered. */}
-            <p className="mt-1 mb-4 text-[13px] text-neutral-500">It needs a life area before it can be planned — then it goes where you chose. Family is shared with your household; Personal and Work stay private.</p>
+            <p className="mt-1 mb-4 text-[13px] text-neutral-500">It needs a space before it can be planned — then it goes where you chose. Family is shared with your household; Personal and Work stay private.</p>
             <DomainChooser onChoose={settle} />
             <button type="button" onClick={() => settle(null)} className="mt-4 text-xs text-neutral-500 hover:text-neutral-800">Cancel</button>
           </div>

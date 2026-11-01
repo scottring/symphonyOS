@@ -138,7 +138,7 @@ export function ContextPicker({ value, onChange, size = 'md', showLabel = false 
           onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
           aria-haspopup="menu"
           aria-expanded={isOpen}
-          aria-label={selectedContext ? `Life area: ${selectedContext.label}. Change` : 'Set life area'}
+          aria-label={selectedContext ? `Space: ${selectedContext.label}. Change` : 'Set space'}
           className={`-ml-1.5 inline-flex min-h-[30px] items-center gap-2 rounded-md px-1.5 text-[14px] transition-colors hover:bg-neutral-100 ${selectedContext ? 'text-neutral-800' : 'text-neutral-500 tag-needs-context'}`}
         >
           <span
@@ -156,7 +156,7 @@ export function ContextPicker({ value, onChange, size = 'md', showLabel = false 
           aria-label="Set context"
           // The tag names its life area on hover (walkthrough 2026-10-02: an
           // unlabeled mark in task details).
-          title={selectedContext ? `Life area: ${selectedContext.label}` : hasValue ? undefined : 'Untagged — tap to set Work / Family / Personal'}
+          title={selectedContext ? `Space: ${selectedContext.label}` : hasValue ? undefined : 'Untagged — tap to set Work / Family / Personal'}
         >
           <svg
             className={`${iconClass} transition-colors`}

@@ -219,7 +219,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         contextColor && (
           <span
             role="img"
-            aria-label={`Life area: ${CONTEXT_OPTIONS.find((o) => o.value === task.context)?.label ?? ''}`}
+            aria-label={`Space: ${CONTEXT_OPTIONS.find((o) => o.value === task.context)?.label ?? ''}`}
             title={CONTEXT_OPTIONS.find((o) => o.value === task.context)?.label}
             className="mt-2 h-2 w-2 shrink-0 rounded-full"
             style={{ background: contextColor }}

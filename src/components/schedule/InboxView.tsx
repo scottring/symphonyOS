@@ -976,7 +976,7 @@ export function InboxView({
           <label className="flex items-center gap-1 text-xs text-neutral-400">
             Area
             <select
-              aria-label="Life area for selected"
+              aria-label="Space for selected"
               value=""
               onChange={(e) => { const v = e.target.value; if (v) void handleBulkContext(v === 'unsorted' ? null : v as TaskContext) }}
               className="rounded-lg bg-neutral-800 px-1.5 py-1 text-sm text-white"
