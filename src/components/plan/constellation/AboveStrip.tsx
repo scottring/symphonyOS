@@ -8,6 +8,9 @@
 // under it, or onto the list to write something new under it; "→ Oct" does
 // the same without a drag. On Year the goals beside it are last year's open
 // ones, and "→ 2026" (or a drag) carries one into the year.
+//
+// The two tabs' contents are exported (AboveGoalList, StripRoutineList) so a
+// guided session's steps can show them while the rail stands where the strip does.
 
 import { useState, type DragEvent } from 'react'
 import { HorizonStrip, type StripTab } from '@/components/canvas/strip/HorizonStrip'
@@ -29,20 +32,14 @@ export interface AboveGoal {
 
 export interface StripRoutine { id: string; title: string; when: string; onOpen?: () => void }
 
-export function AboveStrip({ id, aboveLabel, goals, empty, hint, addLabel, onAddGoal, routines, routinesEmpty, routinesNote }: {
-  id: string
-  /** The tab: "Fall", "2026", "2025". */
+/** The strip's first tab: the goals above, each draggable, with "→ Oct". */
+export function AboveGoalList({ aboveLabel, goals, empty, hint, addLabel, onAddGoal }: {
   aboveLabel: string
   goals: AboveGoal[]
   empty: string
   hint: string
-  /** "+ Add a Fall goal"; absent where nothing is added (last year). */
   addLabel?: string
   onAddGoal?: (title: string) => Promise<boolean>
-  /** The routines at this pace; null draws no Routines tab. */
-  routines: StripRoutine[] | null
-  routinesEmpty?: string
-  routinesNote?: string
 }) {
   const [adding, setAdding] = useState(false)
   const drag = (g: AboveGoal) => (e: DragEvent) => {
@@ -50,7 +47,7 @@ export function AboveStrip({ id, aboveLabel, goals, empty, hint, addLabel, onAdd
     e.dataTransfer.setData('text/plain', g.title)
     e.dataTransfer.effectAllowed = 'link'
   }
-  const goalsTab = (
+  return (
     <>
       {goals.length === 0 ? <p className="hs-empty">{empty}</p> : <p className="hs-row-meta">{hint}</p>}
       <ul className="hs-list" aria-label={`${aboveLabel} goals`}>
@@ -70,24 +67,54 @@ export function AboveStrip({ id, aboveLabel, goals, empty, hint, addLabel, onAdd
         : <button type="button" className="hs-add" onClick={() => setAdding(true)}>{addLabel}</button>)}
     </>
   )
-  const tabs: StripTab[] = [{ id: 'above', label: aboveLabel, count: goals.length || undefined, content: goalsTab }]
+}
+
+/** The strip's Routines tab: the routines at this page's pace, with when each
+ *  falls in the period. Month's Maintenance and fun step shows it too. */
+export function StripRoutineList({ routines, empty, note, label }: {
+  routines: StripRoutine[]
+  empty?: string
+  note?: string
+  /** The list's accessible name, where it stands outside the strip's tab. */
+  label?: string
+}) {
+  return <>
+    {routines.length === 0 && <p className="hs-empty">{empty}</p>}
+    <ul className="hs-list" aria-label={label}>
+      {routines.map((r) => (
+        <li key={r.id} className="hs-row">
+          <span className="hs-row-body">
+            {r.onOpen ? <button type="button" className="hs-row-title" onClick={r.onOpen}>{r.title}</button> : <span className="hs-row-title">{r.title}</span>}
+            <span className="hs-row-meta">{r.when}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+    {note && <p className="hs-note">{note}</p>}
+  </>
+}
+
+export function AboveStrip({ id, aboveLabel, goals, empty, hint, addLabel, onAddGoal, routines, routinesEmpty, routinesNote }: {
+  id: string
+  /** The tab: "Fall", "2026", "2025". */
+  aboveLabel: string
+  goals: AboveGoal[]
+  empty: string
+  hint: string
+  /** "+ Add a Fall goal"; absent where nothing is added (last year). */
+  addLabel?: string
+  onAddGoal?: (title: string) => Promise<boolean>
+  /** The routines at this pace; null draws no Routines tab. */
+  routines: StripRoutine[] | null
+  routinesEmpty?: string
+  routinesNote?: string
+}) {
+  const tabs: StripTab[] = [{ id: 'above', label: aboveLabel, count: goals.length || undefined,
+    content: <AboveGoalList aboveLabel={aboveLabel} goals={goals} empty={empty} hint={hint} addLabel={addLabel} onAddGoal={onAddGoal} /> }]
   if (routines) {
     tabs.push({
       id: 'routines', label: 'Routines', count: routines.length || undefined,
-      content: <>
-        {routines.length === 0 && <p className="hs-empty">{routinesEmpty}</p>}
-        <ul className="hs-list">
-          {routines.map((r) => (
-            <li key={r.id} className="hs-row">
-              <span className="hs-row-body">
-                {r.onOpen ? <button type="button" className="hs-row-title" onClick={r.onOpen}>{r.title}</button> : <span className="hs-row-title">{r.title}</span>}
-                <span className="hs-row-meta">{r.when}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-        {routinesNote && <p className="hs-note">{routinesNote}</p>}
-      </>,
+      content: <StripRoutineList routines={routines} empty={routinesEmpty} note={routinesNote} />,
     })
   }
   return <HorizonStrip id={id} label={`${aboveLabel} strip`} railLabel={`${aboveLabel} · ${goals.length}`} tabs={tabs} />

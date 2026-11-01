@@ -19,7 +19,8 @@ import { weekReviewState } from '@/lib/planning/periodReview'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
 import type { WeekChoose } from '@/components/home/week/useChooseWeek'
-import type { ChooseItemView, ChooseLineView, ChooseVerb } from '@/components/plan/choose/ChoosePlan'
+import type { ChooseItemView, ChooseLineView } from '@/components/plan/choose/ChoosePlan'
+import { reporter, reportItem, reportLine } from './reporting'
 
 /** About fifteen tasks a week: stated, never enforced. */
 export const WEEK_COUNT_OF = 'about 15'
@@ -36,20 +37,9 @@ export function weekCount(tasks: readonly Task[], weekStart: Date, isCurrent: bo
 
 /** The same Choose, with every write that succeeds also reported to `applied`. */
 export function reportingChoose(choose: WeekChoose, applied: () => void): WeekChoose {
-  const wrap = <A extends unknown[]>(run: (...a: A) => Promise<boolean>) => async (...a: A) => {
-    const ok = await run(...a)
-    if (ok) applied()
-    return ok
-  }
-  const verb = (v: ChooseVerb): ChooseVerb => ({ ...v, run: wrap(v.run), ...(v.menu ? { menu: v.menu.map(verb) } : {}) })
-  const item = (x: ChooseItemView): ChooseItemView => ({
-    ...x, verbs: x.verbs.map(verb), children: x.children.map(item),
-    ...(x.onBreakDown ? { onBreakDown: wrap(x.onBreakDown) } : {}),
-  })
-  const line = (l: ChooseLineView): ChooseLineView => ({
-    ...l, verbs: l.verbs.map(verb), steps: l.steps.map(item),
-    ...(l.onAddStep ? { onAddStep: wrap(l.onAddStep) } : {}),
-  })
+  const wrap = reporter(applied)
+  const item = (x: ChooseItemView) => reportItem(x, wrap)
+  const line = (l: ChooseLineView) => reportLine(l, wrap)
   return {
     ...choose,
     lines: choose.lines.map(line),

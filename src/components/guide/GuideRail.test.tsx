@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { GuideRail } from './GuideRail'
 import { stepsFor } from '@/lib/guide/steps'
@@ -53,5 +53,40 @@ describe('GuideRail', () => {
     expect(screen.getByText(steps[4].why)).toBeInTheDocument()
     rerender(<GuideRail level="week" progress={{ ...p, current: steps[3].id }} bodies={bodies} onJump={() => {}} />)
     expect(screen.queryByText(steps[4].why)).toBeNull()
+  })
+
+  describe('on a phone (the steps are a row of chips)', () => {
+    const phone = (matches: boolean) => vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: matches && query === '(max-width: 760px)', media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    }) as MediaQueryList)
+    let scrolled: { el: Element; opts: unknown }[] = []
+    beforeEach(() => {
+      scrolled = []
+      Element.prototype.scrollIntoView = vi.fn(function (this: Element, opts?: unknown) { scrolled.push({ el: this, opts }) })
+    })
+    afterEach(() => { vi.restoreAllMocks() })
+
+    it('brings the current chip into view on arrival and when the step changes', () => {
+      phone(true)
+      const p = { current: steps[4].id, done: [], skipped: [] }
+      const { rerender } = render(<GuideRail level="week" progress={p} bodies={bodies} onJump={() => {}} />)
+      expect(scrolled).toHaveLength(1)
+      expect(scrolled[0].el).toHaveAttribute('data-state', 'current')
+      expect(scrolled[0].el).toHaveTextContent(steps[4].title)
+      expect(scrolled[0].opts).toEqual({ inline: 'nearest', block: 'nearest' })
+      rerender(<GuideRail level="week" progress={{ ...p, current: steps[5].id }} bodies={bodies} onJump={() => {}} />)
+      expect(scrolled).toHaveLength(2)
+      expect(scrolled[1].el).toHaveTextContent(steps[5].title)
+      // Nothing moved: no scroll.
+      rerender(<GuideRail level="week" progress={{ ...p, current: steps[5].id }} bodies={bodies} onJump={() => {}} />)
+      expect(scrolled).toHaveLength(2)
+    })
+
+    it('leaves the page alone on a desk, where the rail is a column', () => {
+      phone(false)
+      render(<GuideRail level="week" progress={{ current: steps[4].id, done: [], skipped: [] }} bodies={bodies} onJump={() => {}} />)
+      expect(scrolled).toHaveLength(0)
+    })
   })
 })

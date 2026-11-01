@@ -12,7 +12,7 @@
 // saves through the page's canvas activity (receipt and Undo); this view says
 // which one is saving, whether it failed, and stamps what was decided here.
 
-import { useRef, useState, type ReactNode } from 'react'
+import { Fragment, useRef, useState, type ReactNode } from 'react'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { Stamp } from '@/components/plan/v2/Stamp'
 import type { Planned } from '@/lib/planning/chooseFromAbove'
@@ -66,8 +66,9 @@ export interface ChoosePlanProps {
   onAddLoose: (title: string) => Promise<boolean>
   view: ChooseViewMode
   onViewChange: (v: ChooseViewMode) => void
-  /** The way on after the last card: "Give them a day", "I’m happy with October". */
-  primary: { label: string; run: () => void | Promise<void>; busy?: boolean }
+  /** The way on after the last card: "Give them a day". None inside a
+   *  session's step whose header holds the way on. */
+  primary?: { label: string; run: () => void | Promise<void>; busy?: boolean }
   /** "October was planned Oct 2 by you. You can still change it." */
   planned?: ReactNode
   /** The kicker over the cards: "October goals → this week". Not shown when compact. */
@@ -78,6 +79,9 @@ export interface ChoosePlanProps {
   /** Inside a guided session's steps rail: the goals as one list (All at
    *  once), without the kicker, the view switch or Leave. */
   compact?: boolean
+  /** All at once: the goals above gathered under a heading (a life area),
+   *  in the order given; a heading shows where the group changes. */
+  groupOf?: (line: ChooseLineView) => { key: string; heading: string }
 }
 
 type Decision = 'here' | 'stay' | 'done'
@@ -280,7 +284,7 @@ export function ChoosePlan(p: ChoosePlanProps) {
   const at = Math.min(index, cards - 1)
   const current = at < p.lines.length ? p.lines[at] : null
   const last = at === cards - 1
-  const primaryBtn = <button type="button" className="deck-btn is-primary" disabled={p.primary.busy} onClick={() => { void p.primary.run() }}>{p.primary.busy ? 'Saving…' : p.primary.label}</button>
+  const primaryBtn = p.primary ? <button type="button" className="deck-btn is-primary" disabled={p.primary.busy} onClick={() => { void p.primary?.run() }}>{p.primary.busy ? 'Saving…' : p.primary.label}</button> : null
   const view = p.compact ? 'all' : p.view
 
   return <div className={`choose${p.compact ? ' is-compact' : ''}`} data-view={view}>
@@ -319,16 +323,19 @@ export function ChoosePlan(p: ChoosePlanProps) {
       {above && (p.lines.length === 0
         ? <p className="choose-empty">{doneLines.length ? `Every ${above} goal is done.` : `Nothing open on ${above}.`}</p>
         : <ul className="choose-lines" aria-label={`${above} goals`}>
-          {p.lines.map((line) => {
+          {p.lines.map((line, i) => {
             const open = openLine === line.key
-            return <li key={line.key} className={`choose-line${open ? ' is-open' : ''}`}>
+            const group = p.groupOf?.(line)
+            const head = group && (i === 0 || p.groupOf!(p.lines[i - 1]).key !== group.key)
+              ? <li role="presentation" className="choose-area-head">{group.heading}</li> : null
+            return <Fragment key={line.key}>{head}<li className={`choose-line${open ? ' is-open' : ''}`}>
               <button type="button" className="choose-line-row" aria-expanded={open} onClick={() => setOpenLine(open ? null : line.key)}>
                 <span className="choose-line-title">{line.title}</span>
                 <span className="choose-counts">{line.counts}</span>
                 <span className="choose-chev" aria-hidden="true">{open ? '▾' : '▸'}</span>
               </button>
               {open && <div className="choose-line-body">{goalBody(line)}{stampFor(line.key, line.planned, true)}</div>}
-            </li>
+            </li></Fragment>
           })}
         </ul>)}
       {above && doneLines.length > 0 && <div className="choose-done">
@@ -341,7 +348,7 @@ export function ChoosePlan(p: ChoosePlanProps) {
         <h3 className="choose-loose-title">{looseTitle}</h3>
         {looseBody}
       </section>
-      <div className="choose-foot">{primaryBtn}</div>
+      {primaryBtn && <div className="choose-foot">{primaryBtn}</div>}
     </>}
   </div>
 }

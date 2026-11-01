@@ -130,6 +130,18 @@ describe('ChoosePlan — All at once', () => {
   })
 })
 
+describe('ChoosePlan — grouped by life area (Month by area)', () => {
+  it('heads each area once, in the order given; no way-on button when the session holds it', () => {
+    const area = (l: ChooseLineView) => l.key === 'D' ? { key: 'a2', heading: 'Home' } : { key: 'a1', heading: 'Health' }
+    const extra = goal({ key: 'R', title: 'Run three times a week' })
+    renderChoose({ compact: true, view: 'all', primary: undefined, lines: [goal(), extra, docs()], groupOf: area })
+    const list = screen.getByRole('list', { name: 'October goals' })
+    expect(Array.from(list.children).map((li) => li.classList.contains('choose-area-head') ? `# ${li.textContent}` : li.querySelector('.choose-line-title')?.textContent))
+      .toEqual(['# Health', 'Plan a winter vacation', 'Run three times a week', '# Home', 'Organize important family documents'])
+    expect(document.querySelector('.choose-foot')).toBeNull()
+  })
+})
+
 describe('GiveThemADay', () => {
   it('tap a thing, then a day; the day is stamped and the next one waits, already chosen', async () => {
     const placeA = vi.fn(async () => true)

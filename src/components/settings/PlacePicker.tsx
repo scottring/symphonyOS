@@ -2,7 +2,10 @@
 // and landscape in the chosen lighting; tapping one applies instantly
 // (scenery + accent re-tint, no reload) and syncs to your profile so it
 // follows you across devices. Show scenery and Lighting are device-local.
-import { PLACES } from '@/config/places'
+//
+// Compact (a month's Fresh start, guided planning): the places alone, with no
+// heading or display options, and `onPick` told of each place tapped.
+import { PLACES, type PlaceId } from '@/config/places'
 import { usePlace } from '@/hooks/usePlace'
 import { sceneryArt } from '@/components/place/panoramas'
 import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice, type SceneryScene, type SceneryStyle } from '@/hooks/useSceneryPreferences'
@@ -10,10 +13,49 @@ import { SectionHeading } from '@/components/layout/SectionHeading'
 
 const LIGHTING_LABEL = { 'daytime': 'Daytime', 'dusk-dawn': 'Dusk / Dawn', 'nighttime': 'Nighttime' } as const
 
-export function PlacePicker() {
+export function PlacePicker({ compact = false, onPick }: {
+  compact?: boolean
+  /** Told of each place tapped, after it is applied. */
+  onPick?: (place: PlaceId) => void
+} = {}) {
   const { place, setPlace } = usePlace()
   const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene } = useSceneryPreferences()
   const next = lightingChoice === 'auto' ? nextAutomaticChange() : null
+
+  const grid = (
+    <div className="place-theme-grid">
+      {PLACES.map((p) => {
+        const active = p.id === place
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => { setPlace(p.id); onPick?.(p.id) }}
+            aria-pressed={active}
+            className={`
+              relative p-3 rounded-2xl border-2 text-left transition-all
+              ${active
+                ? 'border-primary-500 bg-primary-50 shadow-md'
+                : 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm'}
+            `}
+          >
+            {/* The place's own sky and landscape, in the chosen light —
+                the same artwork and hue the page wears. */}
+            <span className="place-theme-preview" data-sky-place={p.id} data-scenery-lighting={sceneryLighting} aria-hidden="true">
+              <img src={sceneryArt(sceneryStyle, p.id, sceneryLighting).src} alt="" loading="lazy" />
+            </span>
+            <div className="flex items-center gap-1.5">
+              {/* The colour this place gives the app. */}
+              <span className="shrink-0 w-3 h-3 rounded-full" style={{ background: p.swatch }} aria-hidden="true" />
+              <span className="text-sm font-semibold text-neutral-800 leading-tight">{p.name}</span>
+            </div>
+            <p className="text-xs text-neutral-500 mt-0.5 leading-snug">{p.tagline}</p>
+          </button>
+        )
+      })}
+    </div>
+  )
+  if (compact) return <div className="place-picker-compact">{grid}</div>
 
   return (
     <section>
@@ -62,37 +104,7 @@ export function PlacePicker() {
         )}
         Scenery visibility, scene, style and lighting are saved on this device. Short windows always get the faint scene.
       </p>
-      <div className="place-theme-grid">
-        {PLACES.map((p) => {
-          const active = p.id === place
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setPlace(p.id)}
-              aria-pressed={active}
-              className={`
-                relative p-3 rounded-2xl border-2 text-left transition-all
-                ${active
-                  ? 'border-primary-500 bg-primary-50 shadow-md'
-                  : 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm'}
-              `}
-            >
-              {/* The place's own sky and landscape, in the chosen light —
-                  the same artwork and hue the page wears. */}
-              <span className="place-theme-preview" data-sky-place={p.id} data-scenery-lighting={sceneryLighting} aria-hidden="true">
-                <img src={sceneryArt(sceneryStyle, p.id, sceneryLighting).src} alt="" loading="lazy" />
-              </span>
-              <div className="flex items-center gap-1.5">
-                {/* The colour this place gives the app. */}
-                <span className="shrink-0 w-3 h-3 rounded-full" style={{ background: p.swatch }} aria-hidden="true" />
-                <span className="text-sm font-semibold text-neutral-800 leading-tight">{p.name}</span>
-              </div>
-              <p className="text-xs text-neutral-500 mt-0.5 leading-snug">{p.tagline}</p>
-            </button>
-          )
-        })}
-      </div>
+      {grid}
     </section>
   )
 }

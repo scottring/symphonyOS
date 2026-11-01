@@ -3,6 +3,7 @@ import {MemoryRouter,Routes,Route,useLocation} from 'react-router-dom'
 import {afterEach,beforeEach,describe,it,expect,onTestFinished,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
 import {ConversationWalkContext} from '@/components/canvas/conversationWalk'
+import {GuidedSessionProvider,useGuidedSession} from '@/contexts/GuidedSessionContext'
 const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),updateTaskOrders:vi.fn(),redraw:(()=>{}) as ()=>void,tasks:[] as any[],goals:[] as any[]}))
 const activity=vi.hoisted(()=>({calls:[] as {label:string;ok:boolean;opts:any}[],proposals:[] as any[],changeSet:null as any,setProposalState:vi.fn(),removeProposal:vi.fn()}))
 const lifeAreas=vi.hoisted(()=>({list:[] as any[]}))
@@ -49,6 +50,18 @@ vi.mock('@/lib/placement/model',async(importOriginal)=>({...await importOriginal
 const toast=vi.hoisted(()=>({showToast:vi.fn()}))
 vi.mock('@/hooks/useToast',async(importOriginal)=>({...await importOriginal<any>(),showToast:toast.showToast}))
 vi.mock('@/components/domain/DomainGate',()=>({useDomainGate:()=>({requireDomain:vi.fn().mockResolvedValue('personal')})}))
+// The guided session's notes row (usePlanningNotes), in memory: where the
+// session is, and what patch merged into it.
+const notesStore=vi.hoisted(()=>({notes:{} as Record<string,unknown>,patches:[] as {p:Record<string,unknown>;defaults?:Record<string,unknown>}[]}))
+vi.mock('@/hooks/usePlanningNotes',async()=>{const {useState,useCallback}=await import('react');return{usePlanningNotes:()=>{
+ const [notes,setNotes]=useState(notesStore.notes)
+ const patch=useCallback(async(p:Record<string,unknown>,defaults?:Record<string,unknown>)=>{notesStore.patches.push({p,defaults});notesStore.notes={...defaults,...notesStore.notes,...p};setNotes(notesStore.notes);return true},[])
+ return{notes,loading:false,error:null,patch,reload:()=>undefined}}}})
+/** Open the guided session on this step (where it was left). */
+const atStep=(current:string)=>{notesStore.notes={guide:{current,done:[],skipped:[]}}}
+const place=vi.hoisted(()=>({setPlace:vi.fn()}))
+vi.mock('@/hooks/usePlace',async(importOriginal)=>({...await importOriginal<any>(),usePlace:()=>({place:'cabin',setPlace:place.setPlace})}))
+vi.mock('@/hooks/useDayLoadEvents',()=>({useDayLoadEvents:()=>({events:[],available:true,loading:false,failed:false,range:{start:0,end:Number.MAX_SAFE_INTEGER}})}))
 
 // Year, Season and Month, one page shape (2026-10-13): the period's goals as
 // one plain list, the level above folded into one line, an optional "For"
@@ -56,12 +69,17 @@ vi.mock('@/components/domain/DomainGate',()=>({useDomainGate:()=>({requireDomain
 
 const GOALS=[{id:'g',name:'Together',year:2026,status:'active',context:'personal'},{id:'other',name:'Health',year:2026,status:'active',context:'personal'}]
 function Where(){const l=useLocation();return <output data-testid="where">{l.pathname+l.search}</output>}
+// The shell's side, standing in: a running session's step header, shown as
+// the shell shows it above the conversation.
+const shell={reg:null as ReturnType<typeof useGuidedSession>}
+function Shell(){const reg=useGuidedSession();shell.reg=reg;return reg?<div data-testid="guide-panel">{reg.header}</div>:null}
+const guidePanel=()=>within(screen.getByTestId('guide-panel'))
 function open(url='/year?view=constellation&start=2026-10-09'){
- render(<MemoryRouter initialEntries={[url]}><Routes>
+ render(<GuidedSessionProvider><MemoryRouter initialEntries={[url]}><Routes>
   {['/year','/season','/month'].map(p=><Route key={p} path={p} element={<><ConstellationPage/><Where/></>}/>)}
   <Route path="/week" element={<><p>Week page</p><Where/></>}/>
   <Route path="/getting-started" element={<Where/>}/>
- </Routes></MemoryRouter>)
+ </Routes></MemoryRouter><Shell/></GuidedSessionProvider>)
 }
 const season=(extra='')=>open('/season?view=constellation&horizon=1&start=2026-10-09'+extra)
 const month=(extra='')=>open('/month?view=constellation&horizon=2&start=2026-10-09'+extra)
@@ -85,11 +103,9 @@ const menu=()=>{
 }
 const choose=(name:string)=>{menu();fireEvent.click(screen.getByRole(/^Show done$/.test(name)?'menuitemcheckbox':'menuitem',{name}))}
 const at=(d:Date)=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(d)}
-/** Planning opens on Looking back (the period before's review); this moves past it to Choose. */
-const pastLookingBack=async()=>{fireEvent.click(screen.getByRole('button',{name:/^On to /}));await screen.findByRole('radiogroup',{name:'View'})}
 const REVIEWED={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
 beforeEach(()=>{
- vi.clearAllMocks();review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
+ vi.clearAllMocks();notesStore.notes={};notesStore.patches=[];shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
  HTMLElement.prototype.scrollIntoView=vi.fn()
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
@@ -655,16 +671,17 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   expect(within(head()).getAllByRole('button').map(b=>b.getAttribute('aria-label')??b.textContent)).toEqual(['Previous month','Next month','Plan October','Month options'])
  })
  // One button at most, only the one that's due (reviewed design, 2026-10-20).
- it('not planned yet: Plan {period}, even with last period unreviewed — its review is Plan’s first card; ⋯ holds the review too',()=>{
+ it('not planned yet: Plan {period}, even with last period unreviewed — its review is the session’s look back; ⋯ holds the review too',()=>{
   at(new Date(2026,9,17,12))
   month()
   expect(primaries()).toEqual(['Plan October'])
   expect(menu()).toContain('Review September')
   expect(menu()).not.toContain('Plan October')
   fireEvent.click(within(head()).getByRole('button',{name:'Plan October'}))
-  // Planning October opens on Looking back at September.
+  // Planning October is the guided session on this page.
   expect(screen.getByTestId('where').textContent).toContain('plan=1')
-  expect(screen.getByText('Review September · then plan October')).toBeInTheDocument()
+  expect(screen.getByText(/Planning October · step 1 of 6/)).toBeInTheDocument()
+  expect(screen.getByRole('button',{name:/Look back at last month/})).toBeInTheDocument()
  })
  it('Plan {period} while it is unplanned; ⋯ offers next month early',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
@@ -784,7 +801,8 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
   month()
-  expect(menu()).toEqual(['Plan November early','Show done','Start with a goal · guided introduction','Talk it through','How this page works'])
+  // No talk is due, so ⋯ offers none: planning is the Plan button's session.
+  expect(menu()).toEqual(['Plan November early','Show done','Start with a goal · guided introduction','How this page works'])
   // Show done: a tick, remembered on this device, and the list agrees.
   const done=screen.getByRole('menuitemcheckbox',{name:'Show done'})
   expect(done).toHaveAttribute('aria-checked','false')
@@ -868,22 +886,20 @@ describe('a pending change card, dashed on the list',()=>{
 describe('one conversation, at the foot (approved Season board, 2026-10-10)',()=>{
  beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,11,9))})
  afterEach(()=>{vi.useRealTimers()})
- it('hands its walk to the docked bar instead of showing its own',()=>{
+ // The "Plan this season with me" walk is gone (spec 2026-11-01): planning
+ // is the guided session the Plan button opens.
+ it('offers no walk of its own in the docked bar, nor in ⋯ without it',()=>{
   const setWalk=vi.fn()
   render(<ConversationWalkContext.Provider value={setWalk}><MemoryRouter initialEntries={['/season?view=constellation&horizon=1']}><Routes>
    <Route path="/season" element={<ConstellationPage/>}/>
   </Routes></MemoryRouter></ConversationWalkContext.Provider>)
   expect(screen.queryByRole('button',{name:/with me$/})).not.toBeInTheDocument()
-  expect(menu()).not.toContain('Talk it through')
-  expect(setWalk).toHaveBeenLastCalledWith({label:'Plan this season with me',message:expect.stringContaining('Fall 2026 across my year goals')})
+  expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({label:expect.stringMatching(/with me$/)}))
+  expect(setWalk).toHaveBeenLastCalledWith(null)
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Fall 2026')
- })
- it('without the bar, ⋯ offers Talk it through, naming a past period, and asks without supplying',()=>{
+  cleanup()
   open('/season?view=constellation&horizon=1&start=2025-10-01')
-  choose('Talk it through')
-  const message=launcher.openAssistant.mock.calls[0][0].message
-  expect(message).toContain('Fall 2025 across my year goals, one at a time')
-  expect(message).toContain("don't suggest season goals of your own")
+  expect(menu()).not.toContain('Talk it through')
  })
 })
 
@@ -904,22 +920,26 @@ describe('on schedule (spec 2026-10-14, "The schedule")',()=>{
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,9))
   expect(inBar('/month?view=constellation&horizon=2&start=2026-11-01')).toHaveBeenLastCalledWith({label:'Plan November',message:'Plan November.'})
   cleanup()
-  expect(inBar('/month?view=constellation&horizon=2&start=2026-12-01')).toHaveBeenLastCalledWith({label:'Plan December 2026 with me',message:expect.any(String)})
+  expect(inBar('/month?view=constellation&horizon=2&start=2026-12-01')).toHaveBeenLastCalledWith(null)
  })
- it('once November has a list, or the talk is put off, it is the usual walk',()=>{
+ it('once November has a list, or the talk is put off, the bar offers nothing',()=>{
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,9))
   api.tasks=[{id:'n',title:'Book the cabin',bucket:'month',monthStart:new Date(2026,10,1),createdAt:new Date(2026,9,1)}]
-  expect(inBar('/month?view=constellation&horizon=2')).toHaveBeenLastCalledWith({label:'Plan this month with me',message:expect.any(String)})
+  expect(inBar('/month?view=constellation&horizon=2')).toHaveBeenLastCalledWith(null)
   cleanup();api.tasks=[]
   localStorage.setItem('symphony.planTalk.dismissed',JSON.stringify({later:{},skipped:{'month:2026-11-01':true}}))
-  expect(inBar('/month?view=constellation&horizon=2')).toHaveBeenLastCalledWith({label:'Plan this month with me',message:expect.any(String)})
+  expect(inBar('/month?view=constellation&horizon=2')).toHaveBeenLastCalledWith(null)
+ })
+ it('while the session runs the talk steps aside: the session has its own conversation',()=>{
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,9))
+  expect(inBar('/month?view=constellation&horizon=2&start=2026-11-01&plan=1')).toHaveBeenLastCalledWith(null)
  })
  it('Year: from Dec 25, Plan 2027 while 2027 has no goals',()=>{
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,11,27,9))
   expect(inBar('/year?view=constellation')).toHaveBeenLastCalledWith({label:'Plan 2027',message:'Plan 2027.'})
   cleanup()
   api.goals=[...api.goals,{id:'n',name:'Run a half marathon',year:2027,status:'active',context:'personal'}]
-  expect(inBar('/year?view=constellation')).toHaveBeenLastCalledWith({label:'Plan this year with me',message:expect.any(String)})
+  expect(inBar('/year?view=constellation')).toHaveBeenLastCalledWith(null)
  })
  it('without the bar (phones) Talk it through sends the talk that is due',()=>{
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,9))
@@ -929,11 +949,11 @@ describe('on schedule (spec 2026-10-14, "The schedule")',()=>{
  })
 })
 
-// Reviewing is the first card of planning the period after it (spec
-// 2026-10-19): Looking back — the count, What went well, What didn't — saved
-// as that period's review, then the same Choose.
-describe('reviewing: Looking back, then plan',()=>{
- it('Review October opens Plan November on Looking back; its notes save as the review, then Choose follows',async()=>{
+// Reviewing is the look back of planning the period after it (spec
+// 2026-11-01): Review October opens the session for November, whose look
+// back saves October's review and deals what October left open.
+describe('reviewing: the session’s look back',()=>{
+ it('Review October opens planning November; its look back saves October’s review',async()=>{
   api.tasks=[{id:'a',title:'Book the cabin',bucket:'month'},{id:'b',title:'Pay taxes',bucket:'month',completed:true}]
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,12))
   try{
@@ -941,12 +961,13 @@ describe('reviewing: Looking back, then plan',()=>{
    fireEvent.click(screen.getByRole('button',{name:'Review October'}))
    expect(screen.getByTestId('where').textContent).toContain('plan=1')
    expect(screen.getByTestId('where').textContent).toContain('start=2026-11-01')
+   expect(screen.getByText(/Planning November · step 1 of 6/)).toBeInTheDocument()
+   fireEvent.click(screen.getByRole('button',{name:/Look back at last month/}))
+   await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Go to this step'}))})
    const look=within(screen.getByRole('article',{name:'Looking back at October'}))
-   expect(screen.getByText('Review October · then plan November')).toBeInTheDocument()
    fireEvent.change(look.getByRole('textbox',{name:'What went well'}),{target:{value:'Cabin booked'}})
-   fireEvent.click(screen.getByRole('button',{name:'On to Fall goals → November'}))
-   await waitFor(()=>expect(review.finish).toHaveBeenCalledWith({wentWell:'Cabin booked',didnt:''}))
-   expect(await screen.findByText('Fall goals → November')).toBeInTheDocument()
+   await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Save notes'}))})
+   expect(review.finish).toHaveBeenCalledWith({wentWell:'Cabin booked',didnt:''})
   }finally{vi.useRealTimers()}
  })
  it('under way, the page offers last period’s review until it is done; a coming period offers none',()=>{
@@ -957,7 +978,7 @@ describe('reviewing: Looking back, then plan',()=>{
    // Its review waits in ⋯ (Plan October, the button, opens on it too).
    choose('Review September')
    expect(screen.getByTestId('where').textContent).toContain('start=2026-10-01')
-   expect(screen.getByRole('article',{name:'Looking back at September'})).toBeInTheDocument()
+   expect(screen.getByRole('region',{name:'Planning October'})).toBeInTheDocument()
    cleanup();review.prevReviewed={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
    month()
    expect(screen.queryByRole('button',{name:/^Review /})).toBeNull()
@@ -972,19 +993,21 @@ describe('reviewing: Looking back, then plan',()=>{
   review.mine={wentWell:'Cabin booked',didnt:''}
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,12))
   try{
+   atStep('look-back')
    open('/month?view=constellation&horizon=2&start=2026-11-09&plan=1')
    expect(screen.getByText('Reviewed Oct 31')).toBeInTheDocument()
    expect(screen.getByRole('textbox',{name:'What went well'})).toHaveValue('Cabin booked')
   }finally{vi.useRealTimers();review.prevReviewed=null;review.mine=null}
  })
- it('Year: reviewing 2026 plans 2027, where an open 2026 goal can be brought in as a copy that remembers it',async()=>{
+ it('Year: reviewing 2026 plans 2027, where an open 2026 goal can be carried in as a copy that remembers it',async()=>{
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,11,28,12))
   try{
    open('/year?view=constellation&start=2026-10-09&review=1')
    expect(screen.getByTestId('where').textContent).toContain('start=2027-01-01')
-   fireEvent.click(screen.getByRole('button',{name:'On to 2027'}))
-   fireEvent.click(await screen.findByRole('button',{name:'2027: Together'}))
-   await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g'})))
+   const together=within(screen.getByRole('listitem',{name:'Together'}))
+   await act(async()=>{fireEvent.click(together.getByRole('button',{name:'Carry: Together'}))})
+   expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g'}))
+   expect(lastRun().label).toBe('Bring “Together” into 2027')
   }finally{vi.useRealTimers()}
  })
 })
@@ -1015,107 +1038,180 @@ describe('a line moved on is not open here (2026-10-17)',()=>{
  })
 })
 
-describe('I’m happy with October (2026-10-17)',()=>{
- it('the plan flow marks the period planned; the header says when, not asks',async()=>{
+describe('Done planning October (spec 2026-11-01)',()=>{
+ it('the session’s Done marks the period planned and offers the next horizon down; the header says when, not asks',async()=>{
   // October still to come, so it is planned, not reviewed (broke on Nov 1).
   at(new Date(2026,9,17,9)); onTestFinished(()=>{vi.useRealTimers()})
   plan.saved=null
+  atStep('upkeep-fun')
   month('&plan=1')
-  await pastLookingBack()
-  fireEvent.click(screen.getByRole('button',{name:'I’m happy with October'}))
-  await waitFor(()=>expect(plan.save).toHaveBeenCalledWith({wentWell:'',didnt:''}))
+  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Done planning October'}))})
+  expect(plan.save).toHaveBeenCalledWith({wentWell:'',didnt:''})
+  // The session finished and left; the way on is this week.
+  await waitFor(()=>expect(screen.getByTestId('where').textContent).not.toContain('plan=1'))
+  expect((notesStore.notes.guide as any).finishedAt).toEqual(expect.any(String))
+  expect(screen.getByRole('note')).toHaveTextContent('October is planned.')
+  fireEvent.click(screen.getByRole('button',{name:'Plan this week →'}))
+  expect(screen.getByText('Week page')).toBeInTheDocument()
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
   cleanup()
   plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
   try{
    month()
    expect(facts()).toMatch(/planned Oct 3$/)
-   expect(screen.queryByRole('button',{name:'I’m happy with October'})).toBeNull()
+   expect(screen.queryByRole('button',{name:/Done planning/})).toBeNull()
   }finally{plan.saved=null}
+ })
+ it('Done saves look back notes typed and not yet saved; a planned mark that fails keeps the session open',async()=>{
+  at(new Date(2026,9,17,9)); onTestFinished(()=>{vi.useRealTimers()})
+  atStep('look-back')
+  plan.save.mockResolvedValueOnce(false)
+  month('&plan=1')
+  fireEvent.change(screen.getByRole('textbox',{name:'What went well'}),{target:{value:'Gate fixed'}})
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:/Maintenance and fun/}))})
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Go to this step'}))})
+  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Done planning October'}))})
+  expect(review.finish).toHaveBeenCalledWith({wentWell:'Gate fixed',didnt:''})
+  expect(toast.showToast).toHaveBeenCalledWith('Couldn’t save that — try again.','error',5000)
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+  expect((notesStore.notes.guide as any).finishedAt).toBeUndefined()
  })
  it('a period already over is reviewed, not planned',()=>{
   open('/month?view=constellation&horizon=2&start=2025-03-09')
   expect(screen.getByRole('button',{name:'Review March'})).toBeInTheDocument()
-  expect(screen.queryByRole('button',{name:/I’m happy with/})).toBeNull()
+  expect(screen.queryByRole('region',{name:/^Planning /})).toBeNull()
  })
 })
 
-
-describe('planning by hand (2026-10-17)',()=>{
+describe('planning a month: the guided session (spec 2026-11-01)',()=>{
  const SEP=new Date(2026,8,1),OCT=new Date(2026,9,1)
- it('Month: Plan October lists Fall’s lines with their October steps, takes in September’s leftovers, adds a step under a line, then marks it planned',async()=>{
-  at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
-  localStorage.setItem('symphony-choose-view','all')
-  try{
-  api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},
-   {id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP},{id:'gone',title:'Pay taxes',bucket:'month',monthStart:SEP,completed:true},
-   {id:'a',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'}]
-  api.keepForward.mockResolvedValue('old');api.dropCommitment.mockResolvedValue(true)
-  month()
-  fireEvent.click(screen.getByRole('button',{name:'Plan October'}))
-  expect(screen.getByTestId('where').textContent).toContain('plan=1')
-  expect(facts()).toBeNull()
-  expect(screen.queryByRole('button',{name:'Review October'})).toBeNull()
-  await pastLookingBack()
-  const flow=within(screen.getByRole('region',{name:'Plan October'}))
-  expect(flow.getByText('Fall goals → October')).toBeInTheDocument()
-  // September's open line, with its own four verbs (the page's words: its
-  // October, Later, and Off September — nothing above holds it); the done
-  // one is not asked about.
-  const loose=within(flow.getByRole('region',{name:'Also in October'}))
-  expect(loose.getByText('Fix the gate')).toBeInTheDocument()
-  expect(loose.queryByText('Pay taxes')).toBeNull()
-  expect(within(loose.getByText('Fix the gate').closest('li')!).getAllByRole('button').map(b=>b.textContent)).toEqual(['October','Done','Later ▸','Off September'])
-  fireEvent.click(loose.getByRole('button',{name:'October: Fix the gate'}))
-  await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('old',{monthStart:OCT},SEP))
-  expect(lastRun().label).toBe('Move “Fix the gate” to October')
-  // Fall's line, folded with its counts; open, its October step says so.
-  const line=flow.getByRole('button',{name:/Get outside/})
-  expect(line).toHaveTextContent('1 in October')
-  fireEvent.click(line)
-  expect(flow.getByText('Hike Bear Mountain').closest('li')).toHaveTextContent('October')
-  fireEvent.click(flow.getByRole('button',{name:'Add a step in October under Get outside'}))
-  const field=flow.getByRole('textbox',{name:'A step in October under Get outside'})
-  fireEvent.change(field,{target:{value:'Rake leaves'}});fireEvent.submit(field.closest('form')!)
-  await waitFor(()=>expect(api.addTask).toHaveBeenCalledWith('Rake leaves',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT,sourceId:'s'})))
-  expect(lastRun().label).toBe('Add “Rake leaves” for “Get outside”')
-  fireEvent.click(screen.getByRole('button',{name:'I’m happy with October'}))
-  await waitFor(()=>expect(plan.save).toHaveBeenCalled())
-  // Planned, the way on is the week.
-  fireEvent.click(await screen.findByRole('button',{name:'Plan this week →'}))
-  expect(screen.getByText('Week page')).toBeInTheDocument()
-  expect(screen.getByTestId('where').textContent).toContain('plan=1')
-  }finally{vi.useRealTimers();review.prevReviewed=null;localStorage.removeItem('symphony-choose-view')}
- })
- // (This file stubs taskReviewState, so every row here reads as October; which
- // label a step wears is chooseFromAbove's own test.)
- it('Month: Back to Fall ends the October commitment on the same row, under its Fall line',async()=>{
-  at(new Date(2026,9,17,12))
-  try{
-  const FALL=new Date(2026,8,1)
-  api.tasks=[{id:'s',title:'Get the house in order',bucket:'quarter',goalId:'g',commitments:[{level:'season',periodStart:FALL,status:'open'}]},
-   {id:'p',title:'Paint the office',bucket:'quarter',sourceId:'s',commitments:[{level:'season',periodStart:FALL,status:'open'}]},
-   {id:'o',title:'Organize documents',bucket:'month',monthStart:OCT,sourceId:'s',commitments:[{level:'season',periodStart:FALL,status:'open'},{level:'month',periodStart:OCT,status:'open'}]}]
-  api.keepForward.mockResolvedValue('p');api.dropCommitment.mockResolvedValue(true)
-  localStorage.setItem('symphony-choose-view','all')
+ it('opens on the page itself: the steps rail where the strip stands, the list beside it, the step in the conversation',()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},{id:'a',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'}]
   month('&plan=1')
-  await pastLookingBack()
-  const flow=within(screen.getByRole('region',{name:'Plan October'}))
-  fireEvent.click(flow.getByRole('button',{name:/Get the house in order/}))
-  expect(flow.getByRole('list',{name:'Steps of Get the house in order'})).toHaveTextContent('Paint the office')
-  fireEvent.click(flow.getByRole('button',{name:'Not in October: Organize documents'}))
-  await waitFor(()=>expect(api.dropCommitment).toHaveBeenCalledWith('o','month',OCT))
-  // Already on Fall: nothing to put back first.
-  expect(api.keepForward).not.toHaveBeenCalled()
-  expect(lastRun().label).toBe('Back to Fall: “Organize documents”')
-  }finally{vi.useRealTimers();localStorage.removeItem('symphony-choose-view')}
+  const session=within(screen.getByRole('region',{name:'Planning October'}))
+  expect(session.getAllByRole('listitem').filter((li)=>li.classList.contains('guide-rail-item')).map((li)=>li.querySelector('.guide-rail-title')?.textContent))
+   .toEqual(['Fresh start','Look back at last month','Read the season list','Next 4–5 weeks','The month by area','Maintenance and fun'])
+   // The page's own list, without its strip.
+  expect(titles('October goals')).toEqual(['Hike Bear Mountain'])
+  expect(screen.queryByRole('region',{name:'Fall strip'})).toBeNull()
+  expect(document.querySelector('.hs-layout')).toBeNull()
+  expect(guidePanel().getByText('Fresh start')).toBeInTheDocument()
+  expect(shell.reg).toMatchObject({level:'month',token:'2026-10',threadKey:'monthly:2026-10'})
+  expect(shell.reg?.sessionContext.guide.aboveLines).toEqual([{id:'s',title:'Get outside'}])
  })
- it('Year: last year’s open goals can be brought in as a copy that remembers them',async()=>{
+ it('Fresh start changes the app’s scenery and keeps it as the month’s',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  month('&plan=1')
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:/Densely Urban/}))})
+  expect(place.setPlace).toHaveBeenCalledWith('urban')
+  expect(notesStore.patches.some((x)=>x.p.scenery==='urban')).toBe(true)
+ })
+ it('Look back: September’s open lines — carry, back to Fall, drop — each through the page’s writers',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  api.tasks=[{id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP},{id:'gone',title:'Pay taxes',bucket:'month',monthStart:SEP,completed:true},
+   {id:'up',title:'Clear the garage',bucket:'month',monthStart:SEP},{id:'drop',title:'Learn the banjo',bucket:'month',monthStart:SEP}]
+  api.keepForward.mockResolvedValue('x');api.dropCommitment.mockResolvedValue(true);api.setBucket.mockResolvedValue(true)
+  atStep('look-back')
+  month('&plan=1')
+  const open=within(screen.getByRole('list',{name:'Open from September'}))
+  expect(open.queryByText('Pay taxes')).toBeNull()
+  expect(within(open.getByRole('listitem',{name:'Fix the gate'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Carry','Back to Fall','Drop','Done'])
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Carry: Fix the gate'}))})
+  expect(api.keepForward).toHaveBeenCalledWith('old',{monthStart:OCT},SEP)
+  expect(lastRun().label).toBe('Move “Fix the gate” to October')
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Back to Fall: Clear the garage'}))})
+  // Fall never held it: put on Fall first, then off September.
+  expect(api.keepForward).toHaveBeenCalledWith('up',{seasonStart:SEP})
+  expect(api.dropCommitment).toHaveBeenCalledWith('up','month',SEP)
+  expect(lastRun().label).toBe('Back to Fall: “Clear the garage”')
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Drop: Learn the banjo'}))})
+  expect(api.setBucket.mock.calls[0].slice(0,2)).toEqual(['drop','someday'])
+  // Nothing on the look back marks the month planned.
+  expect(notesStore.patches.some((x)=>(x.p.guide as any)?.plannedAt)).toBe(false)
+ })
+ it('Read the season list and the next weeks only show; nothing there writes',()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},{id:'a',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'}]
+  atStep('read-season')
+  month('&plan=1')
+  const fall=within(screen.getByRole('list',{name:'Fall goals'}))
+  expect(fall.getByRole('listitem',{name:'Get outside'})).toHaveTextContent('Hike Bear Mountain')
+  expect(fall.queryAllByRole('button')).toHaveLength(0)
+  cleanup();atStep('next-weeks')
+  month('&plan=1')
+  expect(screen.getAllByRole('listitem',{name:/^Week of /}).map((li)=>li.getAttribute('aria-label'))).toEqual(['Week of Oct 11','Week of Oct 18','Week of Oct 25','Week of Nov 1','Week of Nov 8'])
+ })
+ it('The month by area: Fall’s lines grouped by life area, the guide told the areas; the first write that saves marks October planned',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Home',context:'family',mine:true,sortOrder:1}]
+  api.tasks=[{id:'s1',title:'Get outside',bucket:'quarter',goalId:'g',areaId:'h'},{id:'s2',title:'Get the house in order',bucket:'quarter',goalId:'g',areaId:'m'},
+   {id:'s3',title:'Sleep better',bucket:'quarter',goalId:'g',areaId:'h'},{id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP}]
+  api.keepForward.mockResolvedValue('old')
+  atStep('by-area')
+  month('&plan=1')
+  expect(shell.reg?.sessionContext.guide.areas).toEqual([{id:'h',name:'Health',context:'personal'},{id:'m',name:'Home',context:'family'}])
+  const lines=screen.getByRole('list',{name:'Fall goals'})
+  expect(Array.from(lines.children).map((li)=>li.classList.contains('choose-area-head')?`# ${li.textContent}`:li.querySelector('.choose-line-title')?.textContent))
+   .toEqual(['# Health','Get outside','Sleep better','# Home','Get the house in order'])
+  const loose=within(screen.getByRole('region',{name:'Also in October'}))
+  await act(async()=>{fireEvent.click(loose.getByRole('button',{name:'October: Fix the gate'}))})
+  expect(api.keepForward).toHaveBeenCalledWith('old',{monthStart:OCT},SEP)
+  const marks=notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)
+  expect(marks).toHaveLength(1)
+  expect(marks[0].defaults).toMatchObject({savedAt:expect.any(String)})
+ })
+ it('The month by area: a step added under a line, and a new line written on the page, count as applied',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'}]
+  atStep('by-area')
+  month('&plan=1')
+  fireEvent.click(screen.getByRole('button',{name:/Get outside/}))
+  fireEvent.click(screen.getByRole('button',{name:'Add a step in October under Get outside'}))
+  const field=screen.getByRole('textbox',{name:'A step in October under Get outside'})
+  fireEvent.change(field,{target:{value:'Rake leaves'}})
+  await act(async()=>{fireEvent.submit(field.closest('form')!)})
+  expect(api.addTask).toHaveBeenCalledWith('Rake leaves',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT,sourceId:'s'}))
+  expect(lastRun().label).toBe('Add “Rake leaves” for “Get outside”')
+  expect(notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)).toHaveLength(1)
+  // A line written on the page itself, in a fresh session at the same step.
+  cleanup();atStep('by-area')
+  month('&plan=1')
+  fireEvent.click(screen.getByRole('button',{name:/^Add an? October goal$/}))
+  const add=screen.getByRole('textbox',{name:'New October goal'})
+  fireEvent.change(add,{target:{value:'Paint the fence'}})
+  await act(async()=>{fireEvent.submit(add.closest('form')!)})
+  await waitFor(()=>expect(notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt).length).toBeGreaterThan(0))
+ })
+ it('Maintenance and fun: the monthly routines and the month’s fun lines; a fun line is added from what is typed',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  api.tasks=[{id:'f',title:'Ice skating downtown',bucket:'month',monthStart:OCT,isFun:true},{id:'w',title:'File the taxes',bucket:'month',monthStart:OCT}]
+  atStep('upkeep-fun')
+  month('&plan=1')
+  expect(within(screen.getByRole('list',{name:'Fun in October'})).getAllByRole('listitem').map((li)=>li.textContent)).toEqual(['Ice skating downtown'])
+  expect(screen.getByText('No monthly routines.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'+ Add something fun'}))
+  const field=screen.getByRole('textbox',{name:'Something fun in October'})
+  fireEvent.change(field,{target:{value:'Corn maze'}})
+  await act(async()=>{fireEvent.submit(field.closest('form')!)})
+  expect(api.addTask).toHaveBeenCalledWith('Corn maze',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT,isFun:true}))
+ })
+ it('Leave writes nothing and keeps where the session is',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  atStep('next-weeks')
+  month('&plan=1')
+  fireEvent.click(screen.getByRole('button',{name:'Leave'}))
+  expect(screen.getByTestId('where').textContent).not.toContain('plan=1')
+  expect(notesStore.patches).toHaveLength(0)
+  expect(plan.save).not.toHaveBeenCalled()
+  expect(document.querySelector('.hs-layout')).not.toBeNull()
+ })
+ it('Year: last year’s open goals can be brought in at the brain dump',async()=>{
   api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
+  atStep('brain-dump')
   open('/year?view=constellation&start=2026-10-09&plan=1')
-  await pastLookingBack()
-  expect(screen.queryByRole('heading',{name:/^From /})).toBeNull()
-  fireEvent.click(screen.getByRole('button',{name:'2026: Learn to sail'}))
-  await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old'})))
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'2026: Learn to sail'}))})
+  expect(api.addGoal).toHaveBeenCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old'}))
   expect(lastRun().label).toBe('Bring “Learn to sail” into 2026')
   fireEvent.click(screen.getByRole('button',{name:'Leave'}))
   expect(screen.getByTestId('where').textContent).not.toContain('plan=1')
@@ -1123,7 +1219,7 @@ describe('planning by hand (2026-10-17)',()=>{
  it('a period already over has no Plan, even asked for',()=>{
   open('/month?view=constellation&horizon=2&start=2025-03-09&plan=1')
   expect(screen.queryByRole('button',{name:'Plan March'})).toBeNull()
-  expect(screen.queryByRole('heading',{name:'Plan March'})).toBeNull()
+  expect(screen.queryByRole('region',{name:'Planning March'})).toBeNull()
  })
 })
 
@@ -1293,14 +1389,14 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
    {id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal',sortOrder:0}]
   liveGoals()
   // Into 2027, from reviewing 2026 (which plans 2027).
+  atStep('brain-dump')
   open('/year?view=constellation&start=2026-10-09&review=1')
-  await pastLookingBack()
   fireEvent.click(screen.getByRole('button',{name:'2027: Together'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g',sortOrder:5000})))
   cleanup()
   // Bring into 2026, while planning it.
+  atStep('brain-dump')
   open('/year?view=constellation&start=2026-10-09&plan=1')
-  await pastLookingBack()
   fireEvent.click(screen.getByRole('button',{name:'2026: Learn to sail'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenLastCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old',sortOrder:2000})))
  })
