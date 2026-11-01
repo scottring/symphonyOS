@@ -30,8 +30,12 @@ import './alongside.css'
 
 const WEEK_ACTION_MIME = 'application/x-symphony-week-action'
 
-export function AlongsideDay({ children, tasks, date, update, complete, loading, error, retry, weekView = false, onSelect }: {
+export function AlongsideDay({ children, tasks, date, update, complete, loading, error, retry, weekView = false, onSelect, stepAside = false }: {
   children: ReactNode
+  /** A session runs on the page (Today ?plan=1): the week steps aside and the
+   *  day is a plain page. The shell stays, so the day under it is never
+   *  remounted: a session's way back lives in the day page (walk, 2026-11-01). */
+  stepAside?: boolean
   tasks: Task[]
   date: Date
   update: (id: string, patch: Partial<Task>) => Promise<boolean | void>
@@ -51,7 +55,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
   const [pending, setPending] = useState<string | null>(null), [message, setMessage] = useState('')
   const companion = useSideColumnSlot()
   const showChoices = open && !companion.open
-  const workspaceControls = useMemo(() => weekView ? null : { showWeek: () => setOpen(true) }, [weekView])
+  const workspaceControls = useMemo(() => weekView || stepAside ? null : { showWeek: () => setOpen(true) }, [weekView, stepAside])
   const lock = useRef(false)
   const wso = readCadenceConfig().weekStartsOn
   const week = weekStartAnchor(date, wso)
@@ -104,13 +108,13 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
     <AlongsideContext.Provider value={workspaceControls}>
       <section className="ad-shell">
         <p role="status" className="ad-status">{message}</p>
-        <div className={`ad-layout ${weekView ? '' : showChoices ? 'ad-open' : companion.open ? '' : 'ad-folded'}`}>
+        <div className={`ad-layout ${weekView || stepAside ? '' : showChoices ? 'ad-open' : companion.open ? '' : 'ad-folded'}`}>
           <div className="ad-day"
             onDragOver={(e) => { if (e.dataTransfer.types.includes(WEEK_ACTION_MIME)) e.preventDefault() }}
-            onDropCapture={(e) => { const id = e.dataTransfer.getData(WEEK_ACTION_MIME); if (id) { e.preventDefault(); e.stopPropagation(); void place(id) } }}>
+            onDropCapture={stepAside ? undefined : (e) => { const id = e.dataTransfer.getData(WEEK_ACTION_MIME); if (id) { e.preventDefault(); e.stopPropagation(); void place(id) } }}>
             {children}
           </div>
-          {!weekView && (
+          {!weekView && !stepAside && (
             // The strip holds its own toggle (Scott, 2026-10-31: the button sat
             // apart from it, at the page's top right). Hidden, it folds to a
             // slim tab that opens it again; details take its place entirely.
