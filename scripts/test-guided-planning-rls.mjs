@@ -47,12 +47,19 @@ try {
   // 046 also creates goals/goal_actions that need tables we do not mirror; take only goal_areas.
   const g = readFileSync(file('../supabase/migrations/046_goals.sql'), 'utf8')
   psql(['-c', g.slice(g.indexOf('CREATE TABLE goal_areas'), g.indexOf('-- ====', g.indexOf('CREATE POLICY "Users can delete their own goal areas"')))])
+  // goals, reduced to the area link: live, goals_area_id_fkey is ON DELETE CASCADE (read 2026-11-01).
+  psql(['-c', `create table public.goals(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id), area_id uuid null, name text not null);
+    alter table public.goals add constraint goals_area_id_fkey foreign key (area_id) references public.goal_areas(id) on delete cascade;`])
   psql(['-c', `grant all on all tables in schema public to authenticated;`])
   if (!before) psql(['-f', file('../supabase/migrations/20261101130000_guided_planning.sql')])
   console.log(psql(['-f', file('../supabase/tests/104_guided_planning_privacy.test.sql')]) || 'SQL test passed')
   if (!before) {
+    const onDelete = () => psql(['-At', '-c', `select confdeltype from pg_constraint where conname = 'goals_area_id_fkey'`]).trim()
+    if (onDelete() !== 'n') throw new Error(`goals_area_id_fkey should be ON DELETE SET NULL, is ${onDelete()}`)
     psql(['-f', file('../supabase/migrations/rollback/20261101130000_guided_planning.down.sql')])
+    if (onDelete() !== 'c') throw new Error(`rollback should restore ON DELETE CASCADE, is ${onDelete()}`)
     psql(['-f', file('../supabase/migrations/20261101130000_guided_planning.sql')])
+    if (onDelete() !== 'n') throw new Error(`re-apply should set ON DELETE SET NULL, is ${onDelete()}`)
     console.log('rollback then re-apply: ok')
   }
 } catch (e) {

@@ -11,6 +11,7 @@ declare
   a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); hh uuid := gen_random_uuid();
   ar_personal uuid := gen_random_uuid(); ar_family uuid := gen_random_uuid(); ar_legacy uuid := gen_random_uuid();
   t uuid := gen_random_uuid(); ps uuid := gen_random_uuid();
+  g_a uuid := gen_random_uuid(); g_b uuid := gen_random_uuid();
 begin
   insert into auth.users (id, email, aud, role) values
     (a, '104-a@example.invalid', 'authenticated', 'authenticated'),
@@ -21,7 +22,9 @@ begin
   insert into public.planning_sessions (id, author_id, horizon, period_token, notes) values (ps, a, 'weekly', '2026-11-01', '{}');
   insert into public.goal_areas (id, user_id, name, context) values (ar_personal, a, '104 personal', 'personal'), (ar_family, a, '104 family', 'family'), (ar_legacy, a, '104 legacy', null);
   insert into public.tasks (id, user_id, title) values (t, a, '104 task');
-  insert into ids values ('a', a), ('b', b), ('ps', ps), ('personal', ar_personal), ('family', ar_family), ('legacy', ar_legacy), ('t', t);
+  -- A's year goal and B's (the partner's) both filed under A's Family area.
+  insert into public.goals (id, user_id, area_id, name) values (g_a, a, ar_family, '104 goal a'), (g_b, b, ar_family, '104 goal b');
+  insert into ids values ('a', a), ('b', b), ('ps', ps), ('personal', ar_personal), ('family', ar_family), ('legacy', ar_legacy), ('t', t), ('g_a', g_a), ('g_b', g_b);
 end $$;
 
 -- B cannot see or change A's session.
@@ -66,6 +69,9 @@ do $$ begin
   assert (select is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'scratchpad_notes' and column_name = 'expires_at') = 'YES', '12: expires_at missing or not nullable';
   delete from public.goal_areas where id = (select v from ids where k = 'family');
   assert (select area_id from public.tasks where id = (select v from ids where k = 't')) is null, '13: area delete did not null task area_id';
+  -- Removing an area keeps every goal filed under it, a partner's included, with no area.
+  assert (select count(*) from public.goals where id in (select v from ids where k in ('g_a', 'g_b'))) = 2, '14: area delete deleted its goals';
+  assert (select count(*) from public.goals where id in (select v from ids where k in ('g_a', 'g_b')) and area_id is null) = 2, '15: area delete did not null goals area_id';
 end $$;
 
 rollback;

@@ -34,3 +34,10 @@ create index if not exists tasks_area_id_idx on public.tasks(area_id) where area
 -- 4. Wall notes can expire.
 alter table public.scratchpad_notes
   add column if not exists expires_at timestamptz null;
+
+-- 5. Removing a life area keeps the goals filed under it, with no area. The
+--    046 link was ON DELETE CASCADE: removing an area deleted every year goal
+--    under it, a partner's goals under a Family area included.
+alter table public.goals drop constraint if exists goals_area_id_fkey;
+alter table public.goals add constraint goals_area_id_fkey
+  foreign key (area_id) references public.goal_areas(id) on delete set null;

@@ -60,7 +60,9 @@ function AreaRow({ area, onRename, onSetContext, onRemove }: {
       <SpaceChips label={`Space for ${area.name}`} value={area.context} onPick={c => onSetContext(area.id, c)} />
       {confirming ? (
         <span className="guide-areas-confirm">
-          <button type="button" className="guide-areas-link" onClick={() => { setConfirming(false); onRemove(area.id) }}>Remove {area.name}</button>
+          {/* Its goals and tasks are kept, filed under no area (the area link is ON DELETE SET NULL). */}
+          <span className="guide-areas-ask">Remove {area.name}? Its goals stay, with no area.</span>
+          <button type="button" className="guide-areas-link" onClick={() => { setConfirming(false); onRemove(area.id) }}>Remove</button>
           <button type="button" className="guide-areas-link" onClick={() => setConfirming(false)}>Keep</button>
         </span>
       ) : (

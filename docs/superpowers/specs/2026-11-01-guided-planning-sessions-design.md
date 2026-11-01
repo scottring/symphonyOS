@@ -40,6 +40,10 @@ me", Plan my day / Review my day, Help me plan the week) are retired.
   times, even as examples (the never-supply rule).
 - **Calendar paging:** `google-calendar-events` now follows `nextPageToken`
   (cap 10 pages); this needs the function deployed.
+- **Removing a life area keeps its goals:** the migration changes
+  `goals_area_id_fkey` from ON DELETE CASCADE to SET NULL (tasks already were),
+  so a removed area's goals, a partner's under a Family area included, stay
+  with no area. The remove confirm says so.
 
 ### Deploy order
 

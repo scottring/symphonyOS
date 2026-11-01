@@ -52,11 +52,12 @@ describe('AreasEditor', () => {
     expect(old).toHaveValue('Old')
   })
 
-  it('removes only after a second tap', () => {
+  it('removes only after a second tap, saying its goals stay', () => {
     const h = setup()
     fireEvent.click(screen.getByRole('button', { name: 'Remove Health' }))
     expect(h.onRemove).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Health' }))
+    expect(screen.getByText('Remove Health? Its goals stay, with no area.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
     expect(h.onRemove).toHaveBeenCalledWith('a1')
   })
 
