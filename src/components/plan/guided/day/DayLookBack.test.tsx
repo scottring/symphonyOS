@@ -30,7 +30,8 @@ describe('DayLookBack', () => {
     expect(row.getByText('November goal')).toBeInTheDocument()
     expect(row.getAllByRole('button').map((b) => b.textContent)).toEqual(['Today', 'Back to this week', 'Done'])
     fireEvent.click(row.getByRole('button', { name: 'Back to this week: Sign kids up for Coppermine' }))
-    await waitFor(() => expect(a.backToWeek).toHaveBeenCalledWith(open, SUN))
+    // Off the day looked back on, onto the week of the day being planned.
+    await waitFor(() => expect(a.backToWeek).toHaveBeenCalledWith(open, SUN, MON))
     // Stamped, with Undo: it goes back exactly as it was before the choice.
     fireEvent.click(screen.getByRole('button', { name: 'Undo: Sign kids up for Coppermine' }))
     await waitFor(() => expect(a.restore).toHaveBeenCalledWith(open))

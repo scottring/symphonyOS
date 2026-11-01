@@ -85,7 +85,7 @@ describe('makeDayActions', () => {
         commitments: [{ level: 'week', periodStart: new Date(2026, 9, 25), status: 'open' }] })
       const w = world(before, SUN)
       expect(onThisWeek(before, SUN, 0)).toBe(false)
-      expect(await w.actions.backToWeek(before, SAT)).toBe(true)
+      expect(await w.actions.backToWeek(before, SAT, SUN)).toBe(true)
       expect(w.task.scheduledFor).toBeUndefined()
       expect(weekOf(w.task)).toEqual(['2026-11-01'])
       await w.actions.restore(before)
@@ -100,8 +100,34 @@ describe('makeDayActions', () => {
         commitments: [{ level: 'week', periodStart: new Date(2026, 9, 24), status: 'open' }] })
       const w = world(before, SAT)
       expect(onThisWeek(before, SAT, 6)).toBe(false)
-      await w.actions.backToWeek(before, FRI)
+      await w.actions.backToWeek(before, FRI, SAT)
       expect(weekOf(w.task)).toEqual(['2026-10-31'])
+    })
+
+    // Final review 2026-11-01: planning tomorrow on a Saturday evening, with
+    // Sunday-start weeks, tomorrow is in next week.
+    it('Sunday-start, Saturday evening, planning tomorrow: it goes onto the week of tomorrow, not the one ending tonight', async () => {
+      const SAT_EVE = new Date(2026, 9, 31, 18), SAT = new Date(2026, 9, 31), SUN = new Date(2026, 10, 1)
+      vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(SAT_EVE); weekStartsOn(0)
+      const before = createMockTask({ id: 't', title: 'Fix the gate', bucket: 'timed', scheduledFor: SAT, isAllDay: true,
+        commitments: [{ level: 'week', periodStart: new Date(2026, 9, 25), status: 'open' }] })
+      const w = world(before, SAT_EVE)
+      expect(await w.actions.backToWeek(before, SAT, SUN)).toBe(true)
+      expect(w.task.scheduledFor).toBeUndefined()
+      expect(weekOf(w.task)).toEqual(['2026-11-01'])
+      await w.actions.restore(before)
+      expect(weekOf(w.task)).toEqual(['2026-10-25'])
+    })
+
+    it('Sunday-start, Saturday evening: already on next week, nothing more is written', async () => {
+      const SAT_EVE = new Date(2026, 9, 31, 18), SAT = new Date(2026, 9, 31), SUN = new Date(2026, 10, 1)
+      vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(SAT_EVE); weekStartsOn(0)
+      const before = createMockTask({ id: 't', title: 'Fix the gate', bucket: 'timed', scheduledFor: SAT, isAllDay: true,
+        commitments: [{ level: 'week', periodStart: new Date(2026, 10, 1), status: 'open' }] })
+      const w = world(before, SAT_EVE)
+      await w.actions.backToWeek(before, SAT, SUN)
+      expect(w.pushTask).not.toHaveBeenCalled()
+      expect(weekOf(w.task)).toEqual(['2026-11-01'])
     })
 
     it('already on this week: no second week is written', async () => {
@@ -111,7 +137,7 @@ describe('makeDayActions', () => {
         commitments: [{ level: 'week', periodStart: new Date(2026, 10, 1), status: 'open' }] })
       const w = world(before, TUE)
       expect(onThisWeek(before, TUE, 0)).toBe(true)
-      await w.actions.backToWeek(before, MON)
+      await w.actions.backToWeek(before, MON, TUE)
       expect(w.pushTask).not.toHaveBeenCalled()
       expect(weekOf(w.task)).toEqual(['2026-11-01'])
       expect(w.task.scheduledFor).toBeUndefined()

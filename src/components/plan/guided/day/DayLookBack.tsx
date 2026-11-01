@@ -40,7 +40,7 @@ export function DayLookBack({ isTomorrow, target, lookBackOn, lookBack, actions,
 
   const choices = (t: Task) => [
     { label: targetWord, d: 'target' as const, run: () => actions.place(t, target), go: true },
-    { label: 'Back to this week', d: 'week' as const, run: () => actions.backToWeek(t, lookBackOn) },
+    { label: 'Back to this week', d: 'week' as const, run: () => actions.backToWeek(t, lookBackOn, target) },
     { label: 'Done', d: 'done' as const, run: () => actions.done(t) },
   ]
   // Done, it is open again; moved on, it goes back exactly as it was (its

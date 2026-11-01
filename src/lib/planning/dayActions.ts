@@ -14,14 +14,16 @@ export interface DayActions {
   place: (t: Task, day: Date, time?: string) => Promise<boolean>
   done: (t: Task) => Promise<boolean>
   undone: (t: Task) => Promise<boolean>
-  /** Off `from`, onto this week (the week containing now) with no day. */
-  backToWeek: (t: Task, from: Date) => Promise<boolean>
+  /** Off `from`, onto the week containing `onto` (the day being planned),
+   *  with no day. Planning tomorrow on the last evening of a week, that is
+   *  next week, not the one ending tonight. */
+  backToWeek: (t: Task, from: Date, onto: Date) => Promise<boolean>
   /** Back exactly as `before` was: its day and time, its weekend window, its
    *  focus, its week and month commitments. The Undo of a choice. */
   restore: (before: Task) => Promise<boolean>
 }
 
-/** Open on the week that contains `now` — not merely on some week. */
+/** Open on the week that contains `now` (any day of it) — not merely on some week. */
 export function onThisWeek(t: Task, now: Date, weekStartsOn: WeekStart): boolean {
   const week = localYmd(weekStartAnchor(now, weekStartsOn))
   return bootstrapCommitments(t).some((c) => c.level === 'week' && c.status === 'open' && localYmd(c.periodStart) === week)
@@ -43,13 +45,21 @@ export function makeDayActions(deps: {
     },
     done: async (t) => { await deps.toggle(t.id); return true },
     undone: async (t) => { await deps.toggle(t.id); return true },
-    backToWeek: async (t, from) => {
+    backToWeek: async (t, from, onto) => {
       await plan.unchooseTask(t.id, from)
       // A week it is still open on from before (last week, at a boundary) is
-      // not this week: it is put on this one (the week setting's week, the
-      // same one the placement module stamps).
-      if (!onThisWeek(t, new Date(), readCadenceConfig().weekStartsOn)) await plan.commitTask(t.id, 'week')
-      return true
+      // not the week being planned: it is put on that one (the week setting's
+      // week). The week containing now goes the way every "this week" does;
+      // another week is stamped by its start.
+      const weekStartsOn = readCadenceConfig().weekStartsOn
+      if (onThisWeek(t, onto, weekStartsOn)) return true
+      const week = weekStartAnchor(onto, weekStartsOn)
+      if (localYmd(week) === localYmd(weekStartAnchor(new Date(), weekStartsOn))) {
+        await plan.commitTask(t.id, 'week')
+        return true
+      }
+      if (!deps.updateTask) return false
+      return (await deps.updateTask(t.id, { bucket: 'week', weekStart: week })) !== false
     },
     restore: async (before) => {
       if (!deps.updateTask) return false
