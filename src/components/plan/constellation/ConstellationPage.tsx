@@ -812,15 +812,7 @@ function Inner() {
   const prevB = periodBounds(PERIODS[level], bounds.prev, seasons)
   const prevWord = level === 0 ? String(year - 1) : periodWordOf(prevB)
   const thisYearGoals = level === 0 ? goals.filter((g) => g.year === year) : []
-  const carryLines: ReviewLine[] = !planning ? [] : level === 0
-    ? goalsOf(year - 1).filter((g) => yearGoalReviewState(g, thisYearGoals) === 'open').map((g) => {
-      const node: PlanNode = { key: `0:${g.id}`, id: g.id, title: g.name, level: 0, parent: null, goal: g }
-      return { key: node.key, title: g.name, state: 'open' as const, verbs: [
-        { label: String(year), run: () => carryGoal(node, year, `Bring “${g.name}” into ${year}`) },
-        { label: 'Done', run: () => setGoalStatus(node, 'completed', `Complete “${g.name}”`) },
-        { label: 'Let go', run: () => setGoalStatus(node, 'archived', `Let go of “${g.name}”`) },
-      ] }
-    })
+  const carryLines: ReviewLine[] = !planning || level === 0 ? []
     : (() => {
       const lvl = PERIODS[level] as 'season' | 'month'
       const prevCurrent = isCurrentPeriod(prevB, now)
@@ -903,8 +895,8 @@ function Inner() {
     return dropCommitment(t.id, lvl, from)
   }, { ids: [t.id], undo: restoreOf(t) })
   const choose = (() => {
-    if (!planning) return null
-    const lvl = PERIODS[level] as 'year' | 'season' | 'month'
+    if (!planning || level === 0) return null
+    const lvl = PERIODS[level] as 'season' | 'month'
     const startKey = lvl === 'month' ? 'monthStart' : 'seasonStart'
     const toggleOf = (t: Task) => async () => (await toggleTask(t.id)) !== false
     const done = (t: Task): ChooseVerb => ({ label: 'Done', quiet: true, role: 'done', run: () => act(`Complete “${t.title}”`, toggleOf(t), { ids: [t.id], undo: toggleOf(t) }) })
@@ -944,8 +936,8 @@ function Inner() {
       subtasks: visible.filter((t) => t.goalId === g.id && !t.sourceId && !t.goalTaskId && !t.parentTaskId),
     } as Task)
     const lineTasks: Task[] = level === 2 ? above.flatMap((n) => (n.task ? [n.task] : []))
-      : level === 1 ? above.flatMap((n) => (n.goal ? [goalLine(n.goal)] : [])) : []
-    const tree = lvl === 'year' ? null : buildChooseTree({
+      : above.flatMap((n) => (n.goal ? [goalLine(n.goal)] : []))
+    const tree = buildChooseTree({
       lines: lineTasks, pool: visible, level: lvl, periodStart: bounds.start, prevStart: prevB.start, isCurrent: current,
       hereWord: periodWord, lastWord: prevWord, aboveWord, aboveStart: level === 2 ? seasonB.start : undefined,
     })
@@ -967,7 +959,7 @@ function Inner() {
     }
     // What the period before left open and the tree did not already hold.
     const placed = new Set<string>()
-    for (const l of tree?.lines ?? []) {
+    for (const l of tree.lines) {
       placed.add(l.task.id)
       const walk = (ns: ChooseNode[]) => { for (const x of ns) { placed.add(x.task.id); walk(x.children) } }
       walk(l.steps)
@@ -977,12 +969,10 @@ function Inner() {
       verbs: c.verbs.map((v, i) => ({ label: v.label, run: v.run, menu: v.menu, role: i === 0 ? 'here' as const : v.label === 'Done' ? 'done' as const : 'other' as const })), children: [],
     }))
     const carriedIds = new Set(carried.map((c) => c.key))
-    const hereLoose: ChooseItemView[] = tree
-      ? tree.loose.filter((x) => x.source === 'here' && !carriedIds.has(x.task.id)).map(looseView)
-      : openNodes.map((n) => ({ key: n.key, title: n.title, planned: { kind: 'here' as const, label: periodWord }, verbs: verbsFor(n).map((v) => ({ label: v.label, run: v.run, menu: v.menu, role: v.label === 'Done' ? 'done' as const : 'other' as const })), children: [] }))
+    const hereLoose: ChooseItemView[] = tree.loose.filter((x) => x.source === 'here' && !carriedIds.has(x.task.id)).map(looseView)
     return {
-      lines: (tree?.lines ?? []).map(lineView),
-      doneLines: (tree?.doneLines ?? []).map(lineView),
+      lines: tree.lines.map(lineView),
+      doneLines: tree.doneLines.map(lineView),
       loose: [...carried, ...hereLoose],
       /** The period before's lines still open (Looking back's count). */
       carriedCount: carryLines.length,

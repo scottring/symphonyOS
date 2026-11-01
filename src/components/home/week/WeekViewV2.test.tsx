@@ -624,16 +624,15 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     expect(screen.queryByText(/Calendar clear/)).not.toBeInTheDocument()
   })
 
-  // Calm pass 2: the Chat bar carries the planning conversation; the page
-  // draws no entry of its own, and no wizard.
-  it('hands the planning conversation to the Chat bar, with no page entry and no wizard', () => {
+  // Planning is the guided session; the page offers no planning walk to the Chat bar.
+  it('offers no planning walk to the Chat bar, no page entry and no wizard', () => {
     const setWalk = vi.fn()
     render(
       <ConversationWalkContext.Provider value={setWalk}>
         <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />
       </ConversationWalkContext.Provider>,
     )
-    expect(setWalk).toHaveBeenCalledWith({ label: 'Help me plan the week', message: 'Help me plan the week.' })
+    expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: expect.any(String) }))
     expect(screen.queryByRole('button', { name: /^Help me plan/ })).toBeNull()
     expect(screen.queryByText(/Step \d of 8/)).toBeNull()
     expect(screen.queryByRole('region', { name: /Planning week/ })).toBeNull()
@@ -674,90 +673,25 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   })
 })
 
-// Task 12: the walk sits in the conversation bar on the current week. The
-// household's week starts on Saturday.
-describe('WeekViewV2 — Help me plan the rest of my week in the bar', () => {
+// The household's week starts on Saturday.
+describe('WeekViewV2 — the last day of the week', () => {
   beforeEach(() => {
     localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
     vi.useFakeTimers({ toFake: ['Date'] })
   })
   afterEach(() => { vi.useRealTimers(); localStorage.removeItem('symphony-cadence-config') })
 
-  const mount = (weekStart: Date, setWalk = vi.fn()) => {
-    render(
-      <ConversationWalkContext.Provider value={setWalk}>
-        <WeekViewV2 {...defaultProps} routines={[]} weekStart={weekStart} />
-      </ConversationWalkContext.Provider>,
-    )
-    return setWalk
-  }
-
-  it('offers "Help me plan the rest of my week" mid-week', () => {
-    vi.setSystemTime(new Date(2026, 9, 14, 9))
-    const setWalk = mount(new Date(2026, 9, 10))
-    expect(setWalk).toHaveBeenCalledWith({ label: 'Help me plan the rest of my week', message: 'Help me plan the rest of my week.' })
-  })
-
-  it('offers "Help me plan the week" on the week\'s first day', () => {
-    vi.setSystemTime(new Date(2026, 9, 10, 9))
-    const setWalk = mount(new Date(2026, 9, 10))
-    expect(setWalk).toHaveBeenCalledWith({ label: 'Help me plan the week', message: 'Help me plan the week.' })
-  })
-
-  // Calm pass 2: the page no longer draws the entry; the Chat bar has it.
-  // Fix round 1: phones have no Chat bar, so there the ⋯ menu carries
-  // "Talk it through", which starts the same walk. The desk has no such item.
-  it('on a phone, ⋯ "Talk it through" starts the walk mid-week; the desk has no such item', () => {
-    vi.setSystemTime(new Date(2026, 9, 14, 9))
-    mount(new Date(2026, 9, 10))
-    expect(screen.queryByRole('button', { name: 'Help me plan the rest of my week' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
-    expect(screen.queryByRole('menuitem', { name: 'Talk it through' })).toBeNull()
-    cleanup()
-    asPhone()
-    launcher.openAssistant.mockClear()
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
-    expect(screen.queryByRole('button', { name: 'Help me plan the rest of my week' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Talk it through' }))
-    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Help me plan the rest of my week.', autoSend: true })
-  })
-
-  it('offers nothing on a past week', () => {
-    vi.setSystemTime(new Date(2026, 9, 14, 9))
-    const setWalk = mount(new Date(2026, 9, 3))
-    expect(screen.queryByRole('button', { name: /^Help me plan (the rest of my|the) week$/ })).toBeNull()
-    expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: expect.any(String) }))
-  })
-
-  // Final review 2026-10-14 #4: Friday is the Saturday-start week's last day,
-  // when the household plans the next one.
-  it('on the week\'s last day offers planning the next week, by its start date', () => {
-    vi.setSystemTime(new Date(2026, 9, 16, 18))
-    const setWalk = mount(new Date(2026, 9, 10))
-    expect(setWalk).toHaveBeenCalledWith({ label: 'Help me plan week 43', message: 'Help me plan the week of Oct 17.' })
-    expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: 'Help me plan the rest of my week' }))
-  })
-
   // Reviewed design (2026-10-20): the last day's one button is Review this
-  // week, so the "ends today" note steps aside while it is due.
-  it('on the last day a phone offers Review this week, and talks through next week from ⋯', () => {
+  // week, so the "ends today" note steps aside while it is due. No walk
+  // menu item any more: planning is the guided session.
+  it('on the last day a phone offers Review this week and no Talk it through', () => {
     vi.setSystemTime(new Date(2026, 9, 16, 18))
     asPhone()
-    launcher.openAssistant.mockClear()
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
-    expect(screen.queryByRole('button', { name: 'Help me plan week 43' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Review this week' })).toBeInTheDocument()
     expect(screen.queryByText(/ends today/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Talk it through' }))
-    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Help me plan the week of Oct 17.', autoSend: true })
-  })
-
-  it('next week\'s page offers "Help me plan the week", naming its start', () => {
-    vi.setSystemTime(new Date(2026, 9, 14, 9))
-    const setWalk = mount(new Date(2026, 9, 17))
-    expect(setWalk).toHaveBeenCalledWith({ label: 'Help me plan the week', message: 'Help me plan the week of Oct 17.' })
+    expect(screen.queryByRole('menuitem', { name: 'Talk it through' })).toBeNull()
   })
 
   // GPT review 2026-10-25: "Today: …" repeated today's own column; the fact

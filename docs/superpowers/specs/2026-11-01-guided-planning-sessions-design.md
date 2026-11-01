@@ -11,6 +11,44 @@ flows) and the "two ways to plan" note in
 [the horizon strip](../../planning/2026-10-25-horizon-strip.md) (the strip stays;
 the ritual becomes this session).
 
+## Status (2026-11-01)
+
+Built on branch `claude/guided-planning-design`; **not deployed**. The old
+planning walks and flows (PlanWeekFlow, TodayFlow modes, "Plan this season with
+me", Plan my day / Review my day, Help me plan the week) are retired.
+
+### Deviations from this spec (rulings recorded while building)
+
+- **Unfinished-session closing writes happen at the next session's Look back**,
+  not at rollover: `useWeekRollover` does not handle leftovers.
+- **"Gone" is "Let go"** everywhere (Inbox included). It moves the item to
+  Someday and is undoable; it does not delete.
+- **Season look-back verbs:** Carry / Table (to Someday) / Let go (ends only the
+  season commitment; the goal stays on the year) / Done. Year look-back is Carry
+  / Table / Let go / Done too; Month matches.
+- **Marking a period planned:** only choosing-step applies count (placement
+  writes on the Week's choose step; Done on Day's choose step), not any write.
+- **Overlap rule (Year refine):** two goals pair only on 2+ shared meaningful
+  words or full containment; numbers never count. Fewer false pairs, a few
+  missed. "Keep both" is remembered in the year's notes.
+- **Ideal week and wild cards (Season):** stored in the season's planning notes;
+  the ideal-week type and hours helpers live in `src/lib/guide/idealWeek.ts`.
+- **Weekly ops copy** mentions bedtimes, but there is no bedtime control; the
+  guide sorts what Scott says.
+- **Explanations** (`more` copy) never name specific goals, tasks, people or
+  times, even as examples (the never-supply rule).
+- **Calendar paging:** `google-calendar-events` now follows `nextPageToken`
+  (cap 10 pages); this needs the function deployed.
+
+### Deploy order
+
+1. Apply migration `20261101130000_guided_planning.sql`.
+2. Deploy the `symphony-agent` and `google-calendar-events` edge functions.
+3. Then deploy the app.
+
+The app reads `expires_at` and `goal_areas.context`, and the function reads
+`goal_areas.context`; the app or function must not go first.
+
 ## Intent
 
 Symphony should walk Scott through Sarah Hart-Unger's nested goal-setting

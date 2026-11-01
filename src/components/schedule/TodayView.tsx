@@ -112,7 +112,6 @@ import { PrintableDayList } from './PrintableDayList'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { daySentence, type DaySentenceItem } from '@/lib/today/daySentence'
 import { effectiveStartTime, formatTimeLong } from '@/lib/timeUtils'
-import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PlanTalkChip } from './PlanTalkChip'
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
@@ -197,11 +196,6 @@ interface TodayViewProps {
 const FOCUS_SECTIONS: DaySection[] = ['allday', 'unscheduled']
 /** The timed day, drawn to scale (TodayDayScale). */
 const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
-
-/** The bar's walk on today's page (spec 2026-10-14): plan in the morning,
- *  review from 4 pm. Each ends in one change card. */
-const PLAN_WALK = { label: 'Plan my day', message: 'Plan my day.' }
-const REVIEW_WALK = { label: 'Review my day', message: 'Review my day.' }
 
 
 const HIDE_EARLIER_KEY = 'symphony-today-hide-earlier'
@@ -783,13 +777,6 @@ export function TodayView({
   ) : null
   const reloadShownNotes = shownNotes.reload
 
-  // ── Plan my day / Review my day: the bar's walk into a conversation that
-  // ends in one change card. Today's date only; phones offer it in the page.
-  const walk = data.isToday ? (nowForDisplay.getHours() < 16 ? PLAN_WALK : REVIEW_WALK) : null
-  const walkInBar = useConversationWalk(walk)
-  // A Day session is the one way to plan while it runs (no second walk).
-  const pageWalk = walk && !walkInBar && !sessionShown ? walk : null
-
   // ── A pending change card, drawn dashed on the day (todayPreview.ts).
   const { changeSet } = useCanvasActivity()
   const preview: TodayPreview = useMemo(() => todayPreview(changeSet, viewedDate), [changeSet, viewedDate])
@@ -1354,13 +1341,9 @@ export function TodayView({
       />
       {/* What the day's planning left: one quiet line under the title. */}
       <div className="px-4 md:px-0 empty:hidden">{dayLine}</div>
-      {/* Phones have no conversation bar: the page offers the same walk. */}
-      {(pageWalk || (dayFlowButton && !foldedControls)) && (
-        <div className="today-walk px-4 md:px-0">
-          {dayFlowButton && !foldedControls && dayFlowButton}
-          {pageWalk && <button type="button" className="pv2-btn" data-explain="plan-walk" data-explain-label={pageWalk.label}
-            onClick={() => openAssistant({ message: pageWalk.message, autoSend: true })}>{pageWalk.label}</button>}
-        </div>
+      {/* The Day session's door, when the controls are not folded. */}
+      {dayFlowButton && !foldedControls && (
+        <div className="today-walk px-4 md:px-0">{dayFlowButton}</div>
       )}
       {/* Notices sit under the heading on every destination (one page shape). */}
       <div className="px-4 md:px-0 empty:hidden"><CalendarReconnectBanner /></div>

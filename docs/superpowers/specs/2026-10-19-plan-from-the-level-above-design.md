@@ -1,3 +1,9 @@
+> **Superseded in part (2026-11-01)** by
+> [guided planning sessions](2026-11-01-guided-planning-sessions-design.md): what
+> the Plan button opens, Looking back as its own card, and the Today/Week planning
+> flows are now one guided session per horizon. The choose-from-the-level-above
+> idea survives as the session's choosing step. Read this document for background only.
+
 # Planning from the level above (2026-10-19)
 
 Scott, 2026-10-19, after the Week page's "where is the month?" and a mockup round

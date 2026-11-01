@@ -29,13 +29,15 @@ Every horizon page draws from a strip on its left: what that page plans from.
   Cross Keys", `horizonInput.ts` on top of `parseQuickInput`); the date decides
   where it lands, and the box says so before saving. Rule-based, not AI.
 
-## Two ways to plan, kept on purpose
+## One way to plan
 
-Scott, 2026-10-25: keep both.
-
-- **The Plan button** stays the ritual: look back at the period before, choose
-  from the level above, "I'm happy with October". The look-back lives only here.
-- **The strip** is for everyday adjustments, any time, without the ritual.
+Updated 2026-11-01 (guided planning sessions): the ritual is now the guided
+session the Plan button opens, on the real page, with the guide explaining each
+step. It replaces the earlier "two ways to plan" split (Plan button ritual vs
+everyday strip). The strip stays as it is, for everyday adjustments any time;
+it is no longer a second route to planning, and the old planning walks (Plan my
+day, Help me plan the week, Plan this season with me) are gone. See
+[the guided planning sessions spec](../superpowers/specs/2026-11-01-guided-planning-sessions-design.md).
 
 ## Not yet
 

@@ -1,7 +1,7 @@
 // "Today, trimmed" (spec 2026-10-14): the header sentence, the bar's walk
 // (Plan my day / Review my day), and a pending change card drawn dashed.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { screen, fireEvent, within } from '@testing-library/react'
+import { screen, fireEvent, within, cleanup } from '@testing-library/react'
 import { ALL_LAYERS } from '@/lib/domains'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
@@ -130,32 +130,17 @@ describe('Today, trimmed: removed controls', () => {
   })
 })
 
-describe('Today, trimmed: the walk', () => {
-  it('offers "Plan my day" in the bar before 4 pm', () => {
-    const sink = vi.fn()
-    renderView({}, sink)
-    expect(sink).toHaveBeenLastCalledWith({ label: 'Plan my day', message: 'Plan my day.' })
-    // In the bar, not also in the page.
-    expect(screen.queryByRole('button', { name: 'Plan my day' })).toBeNull()
-  })
-
-  it('offers "Review my day" from 4 pm', () => {
-    setClock(at(16))
-    const sink = vi.fn()
-    renderView({}, sink)
-    expect(sink).toHaveBeenLastCalledWith({ label: 'Review my day', message: 'Review my day.' })
-  })
-
-  it('offers nothing when another day is in view', () => {
-    const sink = vi.fn()
-    renderView({ viewedDate: new Date(2026, 9, 15) }, sink)
-    expect(sink).not.toHaveBeenCalledWith(expect.objectContaining({ label: expect.any(String) }))
-  })
-
-  it('phones (no bar) show it in the page and send the same message', () => {
-    renderView()
-    fireEvent.click(screen.getByRole('button', { name: 'Plan my day' }))
-    expect(m.openAssistant).toHaveBeenCalledWith({ message: 'Plan my day.', autoSend: true })
+describe('Today, trimmed: no planning walk', () => {
+  it('offers nothing to the bar and no Plan/Review my day button in the page', () => {
+    for (const hour of [9, 16]) {
+      setClock(at(hour))
+      const sink = vi.fn()
+      renderView({}, sink)
+      expect(sink).not.toHaveBeenCalledWith(expect.objectContaining({ label: expect.any(String) }))
+      expect(screen.queryByRole('button', { name: 'Plan my day' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Review my day' })).toBeNull()
+      cleanup()
+    }
   })
 })
 
