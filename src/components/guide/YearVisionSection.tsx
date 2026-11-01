@@ -6,6 +6,11 @@ import { Link } from 'react-router-dom'
 import type { GuideNotes } from '@/hooks/usePlanningNotes'
 import './guide.css'
 
+/** Whether a vision has anything written (the page and the section agree). */
+export function hasVision(value?: GuideNotes['vision']): boolean {
+  return !!value?.tenYears?.trim() || !!value?.success?.trim()
+}
+
 export function YearVisionSection({ value, yearWord, editTo }: {
   value?: GuideNotes['vision']
   /** "2027" */
@@ -13,9 +18,9 @@ export function YearVisionSection({ value, yearWord, editTo }: {
   /** The session on the Vision step; omitted where the year can no longer be planned. */
   editTo?: string
 }) {
+  if (!hasVision(value)) return null
   const tenYears = value?.tenYears?.trim() ?? ''
   const success = value?.success?.trim() ?? ''
-  if (!tenYears && !success) return null
   return (
     <section className="guide-yv" aria-label="Vision">
       <div className="guide-yv-top">

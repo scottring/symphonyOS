@@ -370,6 +370,15 @@ describe('GuidedWeek — ?step= opens the session on a step', () => {
     expect(screen.getByText(/Planning the week · step 1 of 7/)).toBeInTheDocument()
   })
 
+  it('date and start beside step survive; only step goes', async () => {
+    open('/week?plan=1&step=calendar&date=2026-09-27&start=2026-09-27')
+    await waitFor(() => expect(where().get('step')).toBeNull())
+    expect(where().get('plan')).toBe('1')
+    expect(where().get('date')).toBe('2026-09-27')
+    expect(where().get('start')).toBe('2026-09-27')
+    expect(screen.getByText(/Planning the week · step 3 of 7/)).toBeInTheDocument()
+  })
+
   it('an id that is not a step of this level is ignored', async () => {
     open('/week?plan=1&step=vision')
     await waitFor(() => expect(where().get('step')).toBeNull())

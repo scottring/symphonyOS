@@ -114,8 +114,8 @@ import { FromYear } from '@/components/plan/guided/season/FromYear'
 import { SeasonCalendar } from '@/components/plan/guided/season/SeasonCalendar'
 import { SeasonEnergy, SeasonIdealWeek, SeasonWildCards } from '@/components/plan/guided/season/SeasonNotes'
 import { IdealWeekSection } from '@/components/guide/IdealWeekSection'
-import { YearVisionSection } from '@/components/guide/YearVisionSection'
-import { YearLandscapeSection } from '@/components/guide/YearLandscapeSection'
+import { YearVisionSection, hasVision } from '@/components/guide/YearVisionSection'
+import { YearLandscapeSection, hasLandscape } from '@/components/guide/YearLandscapeSection'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { YearVision } from '@/components/plan/guided/year/Vision'
 import { YearLandscape } from '@/components/plan/guided/year/Landscape'
@@ -632,7 +632,7 @@ function Inner() {
   // ---- The review by hand (Scott, 2026-10-17) ---------------------------------
   const setMode = (mode: 'review' | 'plan' | null, start?: Date) => setParams((prev) => {
     const p = new URLSearchParams(prev)
-    p.delete('review'); p.delete('plan')
+    p.delete('review'); p.delete('plan'); p.delete('step')
     if (mode) p.set(mode, '1')
     if (start) p.set('start', localYmd(start))
     p.delete('focus')
@@ -1304,10 +1304,10 @@ function Inner() {
       <IdealWeekSection value={seasonNotes.notes.idealWeek} goals={seasonGoals} />
     </div>}
     {/* The year's vision and landscape, made in its session (read-only here). */}
-    {level === 0 && !planning && (!!yearNotes.notes.vision?.tenYears?.trim() || !!yearNotes.notes.vision?.success?.trim()) && <div className="plan-card plan-year-vision">
+    {level === 0 && !planning && hasVision(yearNotes.notes.vision) && <div className="plan-card plan-year-vision">
       <YearVisionSection value={yearNotes.notes.vision} yearWord={periodWord} editTo={editStep('vision')} />
     </div>}
-    {level === 0 && !planning && !!yearNotes.notes.landscape?.some((x) => x.text.trim()) && <div className="plan-card plan-year-landscape">
+    {level === 0 && !planning && hasLandscape(yearNotes.notes.landscape) && <div className="plan-card plan-year-landscape">
       <YearLandscapeSection value={yearNotes.notes.landscape} editTo={editStep('landscape')} />
     </div>}
     {preview.next.length > 0 && <section className="plan-list plan-next-list" aria-label={`${nextWord}, proposed`}>

@@ -805,6 +805,15 @@ describe('TodayView — the Day session', () => {
     expect(search().get('step')).toBeNull()
   })
 
+  it('?step= beside ?date= (opened on another day): the step is used and dropped, plan and the session\'s date survive', async () => {
+    renderAt(10, { url: `/?plan=1&step=energy&date=${localYmd(at(0, 3))}`, dated: true })
+    await vi.waitFor(() => expect(screen.getByText(/Planning today · step 3 of 5/)).toBeInTheDocument())
+    await vi.waitFor(() => expect(search().get('step')).toBeNull())
+    expect(search().get('plan')).toBe('1')
+    expect(search().get('date')).toBe(localYmd(at(0, 0)))
+    expect(screen.getByText(/Planning today · step 3 of 5/)).toBeInTheDocument()
+  })
+
   it('a bare ?plan=1 in the evening takes the page to tomorrow', async () => {
     renderAt(18, { url: '/?plan=1', dated: true })
     await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())

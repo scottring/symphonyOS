@@ -9,13 +9,18 @@ import './guide.css'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString('en-US', { month: 'long' }))
 
+/** Whether any month has an entry (the page and the section agree). */
+export function hasLandscape(value?: GuideNotes['landscape']): boolean {
+  return !!value?.some((x) => x.text.trim())
+}
+
 export function YearLandscapeSection({ value, editTo }: {
   value?: GuideNotes['landscape']
   /** The session on the Landscape step; omitted where the year can no longer be planned. */
   editTo?: string
 }) {
   const textOf = (m: number) => value?.find((x) => x.month === m)?.text ?? ''
-  if (!MONTHS.some((_, i) => textOf(i + 1).trim())) return null
+  if (!hasLandscape(value)) return null
   return (
     <section className="guide-yv" aria-label="Landscape">
       <div className="guide-yv-top">
