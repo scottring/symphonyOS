@@ -9,6 +9,7 @@ import { stepsFor } from '@/lib/guide/steps'
 import type { GuideProgress } from '@/lib/guide/progress'
 import { GuideRail } from '@/components/guide/GuideRail'
 import { SessionBar } from '@/components/guide/SessionBar'
+import { GuidePhoneHeader } from '@/components/guide/GuidePhoneHeader'
 import { WEEK_COUNT_OF, weekStepTitle } from './useGuidedWeek'
 import '@/components/guide/guide.css'
 
@@ -37,6 +38,7 @@ export function GuidedWeek({ canvas, bodies, count, monthWord, progress, saveErr
         <span className="guide-session-count">{count} of {WEEK_COUNT_OF} on this week</span>
       </p>
       {saveError && <p className="guide-session-error" role="alert">{saveError}</p>}
+      <GuidePhoneHeader />
       <div className="guide-session-layout">
         <GuideRail level="week" progress={progress} titleFor={(s) => weekStepTitle(s, monthWord)} bodies={bodies} onJump={onJump} />
         <div className="guide-session-page">{canvas}</div>

@@ -40,6 +40,13 @@ me", Plan my day / Review my day, Help me plan the week) are retired.
   times, even as examples (the never-supply rule).
 - **Calendar paging:** `google-calendar-events` now follows `nextPageToken`
   (cap 10 pages); this needs the function deployed.
+- **Phones (final review ruling):** on a phone the session does not open the
+  conversation over the page. The step's header stands on the page, in the
+  session area above the rail: its title, Next / Skip / Done, and Why, You,
+  Guide behind "Explain". The session bar gains "Talk to the guide", which
+  opens the conversation overlay (the full header still on top). It uses the
+  app's phone width (`useMobile`, under 768px), the same one the shell's
+  overlay uses. Desktop is unchanged.
 - **Removing a life area keeps its goals:** the migration changes
   `goals_area_id_fkey` from ON DELETE CASCADE to SET NULL (tasks already were),
   so a removed area's goals, a partner's under a Family area included, stay

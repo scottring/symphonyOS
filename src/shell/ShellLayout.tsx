@@ -386,7 +386,9 @@ function ShellLayoutInner({ children }: Props) {
 
   // A guided session opens the conversation beside the page once, as it
   // starts (closing it mid-session sticks), and leaving puts the pane back
-  // as it was and returns to the everyday thread.
+  // as it was and returns to the everyday thread. On a phone it does not
+  // open over the page: the step's controls are on the page and "Talk to the
+  // guide" (SessionBar) opens it (phone ruling, final review 2026-11-01).
   const guidedActive = !!guided;
   const paneBefore = useRef<{ aiHidden: boolean; pane: SidePane; phoneChatOpen: boolean } | null>(null);
   const paneNow = useRef({ aiHidden, pane, phoneChatOpen, isMobile });
@@ -397,7 +399,7 @@ function ShellLayoutInner({ children }: Props) {
       if (paneBefore.current) return;
       const now = paneNow.current;
       paneBefore.current = { aiHidden: now.aiHidden, pane: now.pane, phoneChatOpen: now.phoneChatOpen };
-      if (now.isMobile) setPhoneChatOpen(true); else showPane('ai');
+      if (!now.isMobile) showPane('ai');
     } else if (paneBefore.current) {
       const before = paneBefore.current;
       paneBefore.current = null;

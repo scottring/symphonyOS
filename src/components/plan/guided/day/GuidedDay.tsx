@@ -18,6 +18,7 @@ import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { showToast } from '@/hooks/useToast'
 import { GuideRail } from '@/components/guide/GuideRail'
 import { SessionBar } from '@/components/guide/SessionBar'
+import { GuidePhoneHeader } from '@/components/guide/GuidePhoneHeader'
 import { EnergyNote } from '@/components/guide/EnergyNote'
 import { useGuidedDay } from '../useGuidedDay'
 import { DayLookBack } from './DayLookBack'
@@ -102,6 +103,7 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, ro
         <span className="guide-session-count">{count} of {DAY_COUNT_OF} on {dayWord}</span>
       </p>
       {guided.saveError && <p className="guide-session-error" role="alert">{guided.saveError}</p>}
+      <GuidePhoneHeader />
       <div className="guide-session-layout gd-layout">
         {/* Where the session is comes first: no flash of step one before a
             resume. The day beside it stays put while it loads. */}

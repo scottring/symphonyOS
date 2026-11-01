@@ -26,6 +26,7 @@ import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/
 import { GuideHeader } from '@/components/guide/GuideHeader'
 import { GuideRail } from '@/components/guide/GuideRail'
 import { SessionBar } from '@/components/guide/SessionBar'
+import { GuidePhoneHeader } from '@/components/guide/GuidePhoneHeader'
 import type { TaskContext } from '@/types/task'
 import { reporter, type Report } from './reporting'
 import '@/components/guide/guide.css'
@@ -159,6 +160,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
         </span>}
       </p>
       {saveError && <p className="guide-session-error" role="alert">{saveError}</p>}
+      <GuidePhoneHeader />
       <div className="guide-session-layout">
         {/* Where the session is comes first: no flash of step one before a
             resume. The page beside it stays put while it loads. */}

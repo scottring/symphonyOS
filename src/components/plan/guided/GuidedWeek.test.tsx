@@ -37,6 +37,8 @@ vi.mock('@/hooks/usePeriodReview', () => ({ usePeriodReview: () => review }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'me' } }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [] }) }))
 vi.mock('@/contexts/CanvasActivityContext', () => ({ useCanvasActivity: () => ({ changeSet: null, receipt: null }) }))
+const phone = vi.hoisted(() => ({ on: false }))
+vi.mock('@/hooks/useMobile', () => ({ useMobile: () => phone.on }))
 vi.mock('@/hooks/usePlannedDinners', () => ({ usePlannedDinners: () => new Map([['2026-09-28', { dateKey: '2026-09-28', title: 'Tacos' }]]) }))
 const wall = vi.hoisted(() => ({ add: vi.fn(async (..._a: unknown[]) => true) }))
 vi.mock('@/lib/wall/addScratchpadNote', () => ({ addScratchpadNote: wall.add, ownMemberId: async () => 'member-me' }))
@@ -98,7 +100,7 @@ beforeEach(() => {
   session.save.mockReset(); session.save.mockImplementation(async () => { store.order.push('planned'); return true })
   review.finish.mockReset(); review.finish.mockImplementation(async () => { store.order.push('review'); return true })
 })
-afterEach(() => { vi.useRealTimers() })
+afterEach(() => { vi.useRealTimers(); phone.on = false })
 
 describe('GuidedWeek — the Week page while planning', () => {
   it('?plan=1 opens the session on the page: the session bar, the rail, and the week without its strip', () => {
@@ -113,6 +115,32 @@ describe('GuidedWeek — the Week page while planning', () => {
     expect(within(session).queryByRole('button', { name: 'Next step' })).toBeNull()
     expect(panel().getByText('Look back at last week')).toBeInTheDocument()
     expect(shell.reg).toMatchObject({ level: 'week', token: '2026-9-27', threadKey: 'weekly:2026-9-27', stepId: 'look-back' })
+  })
+
+  // Phone ruling (final review 2026-11-01): the conversation does not cover
+  // the page; the step's controls stand in the session area above the rail.
+  it('phone: the step header is on the page above the rail, with Next, Skip and Explain, and Talk to the guide', async () => {
+    phone.on = true
+    open('/week?plan=1')
+    const session = screen.getByRole('region', { name: 'Planning the week' })
+    expect(within(session).getByRole('button', { name: 'Talk to the guide' })).toBeInTheDocument()
+    const header = within(session).getByRole('banner')
+    expect(header.compareDocumentPosition(within(session).getByRole('group', { name: 'Steps in this session' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(header).getByText('Look back at last week')).toBeInTheDocument()
+    expect(within(header).queryByText('Why')).toBeNull()
+    fireEvent.click(within(header).getByRole('button', { name: 'Explain' }))
+    expect(within(header).getByText('Why')).toBeInTheDocument()
+    expect(within(header).getByRole('button', { name: 'Skip this step' })).toBeInTheDocument()
+    await act(async () => { fireEvent.click(within(header).getByRole('button', { name: 'Next step' })) })
+    expect(shell.reg?.stepId).toBe('read-month')
+    expect(within(session).getByText(/Planning the week · step 2 of 7/)).toBeInTheDocument()
+  })
+
+  it('desktop: no header on the page and no Talk button', () => {
+    open('/week?plan=1')
+    const session = screen.getByRole('region', { name: 'Planning the week' })
+    expect(within(session).queryByRole('button', { name: 'Talk to the guide' })).toBeNull()
+    expect(within(session).queryByRole('banner')).toBeNull()
   })
 
   it('resuming opens on the saved step, and the registration carries it', () => {

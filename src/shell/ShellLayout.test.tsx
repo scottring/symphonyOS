@@ -9,6 +9,7 @@ import { deriveActiveView, pageOwnsFilterChrome, ShellLayout } from './ShellLayo
 import { useMemo } from 'react'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
+import { AssistantLaunchProvider, useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 
 vi.mock('@/lib/canvas/reviewedChange', async () => {
   const {applyChangeSet} = await import('@/lib/canvas/applyChangeSet')
@@ -695,15 +696,23 @@ describe('A guided planning session in the shell', () => {
     expect(onApplied).toHaveBeenCalledTimes(1)
   })
 
-  it('phone: the conversation overlay opens with the header, and closes again on leaving', () => {
+  // Phone ruling (final review 2026-11-01): the session stays on the page,
+  // its controls there; the conversation opens only when asked.
+  it('phone: the overlay does not open on its own; Talk to the guide opens it with the header; leaving closes it', () => {
     mobileState.isMobile = true
-    const view = render(at(<GuidedPage stepId="inbox" on={false} />))
+    function Talk() { const { openAssistant } = useAssistantLauncher(); return <button type="button" onClick={() => openAssistant()}>Talk to the guide</button> }
+    const atPhone = (node: ReactNode) => <AssistantLaunchProvider>{at(<>{node}<Talk /></>)}</AssistantLaunchProvider>
+    const view = render(atPhone(<GuidedPage stepId="inbox" on={false} />))
     const overlay = () => document.querySelector<HTMLElement>('[aria-label="Symphony conversation"]')!
     expect(overlay().style.display).toBe('none')
-    view.rerender(at(<GuidedPage stepId="inbox" />))
+    view.rerender(atPhone(<GuidedPage stepId="inbox" />))
+    expect(overlay().style.display).toBe('none')
+    // The session's own thread still opens, ready for when they talk.
+    expect(assistantState.openThread.mock.calls[0].slice(0, 2)).toEqual(['planning_session', 'weekly:2026-11-1'])
+    fireEvent.click(screen.getByRole('button', { name: 'Talk to the guide' }))
     expect(overlay().style.display).not.toBe('none')
     expect(within(overlay()).getByText('Step header: inbox')).toBeInTheDocument()
-    view.rerender(at(<GuidedPage stepId="inbox" on={false} />))
+    view.rerender(atPhone(<GuidedPage stepId="inbox" on={false} />))
     expect(overlay().style.display).toBe('none')
     expect(assistantState.resetSession).toHaveBeenCalledTimes(1)
   })
