@@ -161,6 +161,8 @@ export interface DbTask {
   source_id: string | null
   goal_id: string | null
   goal_task_id: string | null
+  /** Life area (goal_areas.id) the task is filed under. */
+  area_id?: string | null
   /** Optional until its migration is applied: `select('*')` against a
    *  database without the column simply returns rows that lack it. */
   supports_goal_task_id?: string | null
@@ -251,6 +253,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     sourceId: dbTask.source_id ?? undefined,
     goalId: dbTask.goal_id ?? undefined,
     goalTaskId: dbTask.goal_task_id ?? undefined,
+    areaId: dbTask.area_id ?? undefined,
     supportsGoalTaskId: dbTask.supports_goal_task_id ?? undefined,
     isFun: dbTask.is_fun ?? undefined,
     sortOrder: dbTask.sort_order ?? null,
@@ -2031,6 +2034,7 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('goalTaskId' in updates) dbUpdates.goal_task_id = updates.goalTaskId ?? null
+    if ('areaId' in updates) dbUpdates.area_id = updates.areaId ?? null
     if ('supportsGoalTaskId' in updates) dbUpdates.supports_goal_task_id = updates.supportsGoalTaskId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
@@ -2326,6 +2330,7 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('goalTaskId' in updates) dbUpdates.goal_task_id = updates.goalTaskId ?? null
+    if ('areaId' in updates) dbUpdates.area_id = updates.areaId ?? null
     if ('supportsGoalTaskId' in updates) dbUpdates.supports_goal_task_id = updates.supportsGoalTaskId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null

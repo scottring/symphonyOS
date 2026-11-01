@@ -167,6 +167,8 @@ export interface Task {
   /** The annual goal this task ultimately serves. Stamped on goal promotion,
    *  inherited by every copy below, so goal roll-up is a flat filter. */
   goalId?: string
+  /** The life area (goal_areas row) this task is filed under. */
+  areaId?: string | null
   /** The month/season GOAL this task serves — an is_goal task row on the same
    *  list. Distinct from sourceId (copied down FROM) and goalId (the annual
    *  goals-table row): this one says "belongs under", and it is what lets a
