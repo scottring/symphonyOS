@@ -10,7 +10,7 @@ import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
  *
  * NOT wired to the route yet — that happens in R4.
  */
-import { useContext, createElement, useMemo, useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react'
+import { useContext, createElement, useMemo, useCallback, useRef, useState, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -52,7 +52,11 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { TodayFlow, type DayPictureItem } from '@/components/plan/choose/TodayFlow'
+import { GuidedDay } from '@/components/plan/guided/day/GuidedDay'
+import type { DayActions, DayPictureItem } from '@/components/plan/guided/day/DayRows'
+import { dayTarget } from '@/lib/guide/dayTarget'
+import { usePlanningNotes } from '@/hooks/usePlanningNotes'
+import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
 import { buildTodayChoice, buildTodayReview, goalOf } from '@/lib/planning/chooseToday'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { dayToken, usePlanningSession } from '@/hooks/usePlanningSession'
@@ -388,7 +392,25 @@ export function TodayView({
   const { state: guide } = useGuidedPlan()
   const guideOnToday = guide?.status === 'active' && currentStep(guide) === 'today'
   useEffect(() => { if (guideOnToday) { if (alongsideWorkspace) alongsideWorkspace.showWeek(); else setTodayViewState('ref') } }, [guideOnToday, alongsideWorkspace])
-  const showWeek = !alongsideWorkspace && todayView === 'ref'
+  // ── The Day session (spec 2026-11-01): ?plan=1 runs it on this page,
+  // replacing Plan today / Review today. It plans today until 4 pm and
+  // tomorrow from 4 pm (dayTarget); which day is fixed when it opens, so 4 pm
+  // passing mid-session does not move it. It runs on the day it plans (the
+  // page is the day picture), so opening it in the evening takes the page to
+  // tomorrow. The week column steps aside: the steps rail stands there.
+  const [dayParams, setDayParams] = useSearchParams()
+  const planOpen = dayParams.get('plan') === '1'
+  const [openedAt, setOpenedAt] = useState<number | null>(null)
+  if (planOpen && openedAt === null) setOpenedAt(nowTick)
+  if (!planOpen && openedAt !== null) setOpenedAt(null)
+  const live = dayTarget(new Date(openedAt ?? nowTick))
+  const targetKey = localYmd(live.target)
+  const day = useMemo(() => {
+    const [y, m, d] = targetKey.split('-').map(Number)
+    return { target: new Date(y, m - 1, d), lookBackOn: new Date(y, m - 1, d - 1), isTomorrow: live.isTomorrow }
+  }, [targetKey, live.isTomorrow])
+  const sessionShown = planOpen && localYmd(viewedDate) === targetKey
+  const showWeek = !alongsideWorkspace && todayView === 'ref' && !sessionShown
   const splitRef = useColumnsFitWindow(showWeek)
   const weekNo = weekOfYear(viewedDate, readCadenceConfig().weekStartsOn)
   // The dock's Today pin showed this same list beside the page; the column
@@ -620,35 +642,63 @@ export function TodayView({
   const planTalk = data.isToday ? <PlanTalkChip tasks={tasks} meId={meId} today={nowForDisplay} /> : null
   const headerLine = headerSentence || planTalk ? <>{headerSentence}{headerSentence && planTalk && ' '}{planTalk}</> : null
 
-  // ── Plan today / Review today (spec 2026-10-19, Today mockup approved):
-  // the same choosing as every horizon, one level down. ?plan=1 opens "This
-  // week → today", ?review=1 "Today → tomorrow". Today's date only. The chat
-  // walk (Plan my day / Review my day) stays beside it in the bar.
-  const [dayParams, setDayParams] = useSearchParams()
-  const dayFlow: 'plan' | 'review' | null = !data.isToday ? null
-    : dayParams.get('plan') === '1' ? 'plan' : dayParams.get('review') === '1' ? 'review' : null
-  const setDayFlow = (f: 'plan' | 'review' | null) => setDayParams((prev) => {
+  // ── Opening the Day session, and what it reads from the page.
+  const openDaySession = () => {
+    setDayParams((prev) => {
+      const p = new URLSearchParams(prev)
+      p.delete('review'); p.set('plan', '1')
+      // A ?date= the page was opened on would hold it on that day.
+      if (p.has('date')) p.set('date', targetKey)
+      return p
+    })
+    if (localYmd(viewedDate) !== targetKey) onDateChange(day.target)
+  }
+  const closeDaySession = () => setDayParams((prev) => {
     const p = new URLSearchParams(prev)
-    p.delete('plan'); p.delete('review')
-    if (f) p.set(f, '1')
+    p.delete('plan')
     return p
   })
-  const dayReview = usePeriodReview('daily', data.isToday ? dayToken(viewedDate) : '')
-  // "Plan today" is recorded, as every horizon's planning is, so its button
-  // can step aside once the day is planned (reviewed design, 2026-10-20).
-  const dayPlan = usePlanningSession('daily', data.isToday ? dayToken(viewedDate) : '')
+  // Review today is retired: its link opens the session.
+  useEffect(() => {
+    if (dayParams.get('review') !== '1') return
+    setDayParams((prev) => {
+      const p = new URLSearchParams(prev)
+      p.delete('review'); p.set('plan', '1')
+      return p
+    }, { replace: true })
+  }, [dayParams, setDayParams])
+  // Opened on another day than the one it plans (a link, a reload in the
+  // evening): the page goes to that day, once per opening. Moving off it
+  // afterwards is the reader's choice; the session waits on its day.
+  const movedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!planOpen) { movedFor.current = null; return }
+    if (movedFor.current === targetKey) return
+    movedFor.current = targetKey
+    if (localYmd(viewedDate) === targetKey) return
+    if (dayParams.get('date')) setDayParams((prev) => { const p = new URLSearchParams(prev); p.set('date', targetKey); return p }, { replace: true })
+    onDateChange(day.target)
+  }, [planOpen, targetKey, viewedDate, dayParams, setDayParams, onDateChange, day.target])
+
+  // The day being planned is recorded planned, as every horizon's planning
+  // is, so its button can step aside (reviewed design, 2026-10-20).
+  const dayPlan = usePlanningSession('daily', dayToken(day.target))
+  const dayWord = day.isTomorrow ? 'tomorrow' : 'today'
   const monthWordToday = viewedDate.toLocaleDateString('en-US', { month: 'long' })
   const tasksById = useMemo(() => {
     const m = new Map<string, Task>()
     for (const t of tasks) { m.set(t.id, t); for (const st of t.subtasks ?? []) if (!m.has(st.id)) m.set(st.id, st) }
     return m
   }, [tasks])
+  // This week → the day on the page (the day being planned, while it runs).
   const todayChoice = useMemo(() => buildTodayChoice({
     week: data.dayPlan.chooserTasks.flatMap((e) => (e.kind === 'task' && e.task ? [e.task] : [])),
     carried: data.dayPlan.carried.flatMap((e) => (e.kind === 'task' && e.task ? [e.task] : [])),
     allTasks: tasks, today: viewedDate, userId, monthWord: monthWordToday,
   }), [data.dayPlan, tasks, viewedDate, userId, monthWordToday])
-  const todayReview = useMemo(() => buildTodayReview({ allTasks: tasks, today: viewedDate, userId }), [tasks, viewedDate, userId])
+  const lookBack = useMemo(() => buildTodayReview({ allTasks: tasks, today: day.lookBackOn, userId }), [tasks, day.lookBackOn, userId])
+  // The day as this page shows it, under its filters: the session's count
+  // and pictures read exactly what is drawn.
   const dayPicture = useMemo<DayPictureItem[]>(() => SECTIONS_ORDER.flatMap((sec) => data.grouped[sec] ?? [])
     .filter((i) => !i.skipped)
     .map((i) => ({
@@ -656,38 +706,57 @@ export function TodayView({
       kind: (i.type === 'event' ? 'event' : i.type === 'task' ? 'task' : 'routine') as DayPictureItem['kind'],
       time: i.startTime && !i.allDay ? i.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(':00', '').replace(' ', '').toLowerCase() : undefined,
     })), [data.grouped])
-  const tomorrowOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
-  const todayActions = {
-    today: (t: Task) => planActions.chooseTaskDay(t.id, viewedDate),
-    undoToday: async (t: Task) => { await planActions.unchooseTask(t.id, viewedDate); return true },
-    done: async (t: Task) => { await onToggleTask(t.id); return true },
-    undone: async (t: Task) => { await onToggleTask(t.id); return true },
-    tomorrow: (t: Task) => planActions.chooseTaskDay(t.id, tomorrowOf(viewedDate), { focus: false }),
-    // Off today, onto the week with no day: a row the week never held is put on it.
-    backToWeek: async (t: Task) => {
-      await planActions.unchooseTask(t.id, viewedDate)
+  // The page's own writers, each given the day it acts on.
+  const dayActions = useMemo<DayActions>(() => ({
+    place: (t, on, time) => {
+      if (!time) return planActions.chooseTaskDay(t.id, on)
+      const [h, min] = time.split(':').map(Number)
+      return planActions.timeTask(t.id, new Date(on.getFullYear(), on.getMonth(), on.getDate(), h, min))
+    },
+    unplace: async (t, on) => { await planActions.unchooseTask(t.id, on); return true },
+    done: async (t) => { await onToggleTask(t.id); return true },
+    undone: async (t) => { await onToggleTask(t.id); return true },
+    // Off the day, onto the week with no day: a row the week never held is put on it.
+    backToWeek: async (t, from) => {
+      await planActions.unchooseTask(t.id, from)
       if (!openCommitmentOf({ commitments: bootstrapOf(t) }, 'week')) await planActions.commitTask(t.id, 'week')
       return true
     },
+  }), [planActions, onToggleTask])
+  // Done planning: the day is stamped planned (the existing savedAt).
+  const finishDay = async () => {
+    if (!(await dayPlan.save({ wentWell: dayPlan.mine?.wentWell ?? '', didnt: dayPlan.mine?.didnt ?? '' }))) showToast(`Couldn’t mark ${dayWord} planned — try again.`, 'error', 5000)
+    return true
   }
-  // One button at most, only the one that's due, as on every horizon: "Plan
-  // today" before 4 pm until the day is planned, "Review today" from 4 pm
-  // until it is reviewed. Done, a quiet link offers it again.
-  const planHours = nowForDisplay.getHours() < 16
-  const dayFlowOffer = data.isToday && !dayFlow && !dayPlan.loading && !dayReview.loading
-    ? (planHours ? { label: 'Plan today', flow: 'plan' as const, due: !dayPlan.saved } : { label: 'Review today', flow: 'review' as const, due: !dayReview.reviewed })
-    : null
+  // One button at most: "Plan today" (until 4 pm) or "Plan tomorrow" (from
+  // 4 pm) until that day is planned, then a quiet "… again". On today's page,
+  // and on the day being planned.
+  const dayFlowOffer = !sessionShown && !dayPlan.loading && (data.isToday || localYmd(viewedDate) === targetKey)
+    ? { label: `Plan ${dayWord}`, due: !dayPlan.saved } : null
   const dayFlowButton = dayFlowOffer
     ? dayFlowOffer.due
-      ? <button type="button" className="pv2-btn today-flow-btn" data-explain="day-flow" data-explain-label={dayFlowOffer.label} onClick={() => setDayFlow(dayFlowOffer.flow)}>{dayFlowOffer.label}</button>
-      : <button type="button" className="canvas-link wc-quiet-link today-flow-again" onClick={() => setDayFlow(dayFlowOffer.flow)}>{planHours ? 'Plan today again' : 'Review today again'}</button>
+      ? <button type="button" className="pv2-btn today-flow-btn" data-explain="day-flow" data-explain-label={dayFlowOffer.label} onClick={openDaySession}>{dayFlowOffer.label}</button>
+      : <button type="button" className="canvas-link wc-quiet-link today-flow-again" onClick={openDaySession}>{dayFlowOffer.label} again</button>
     : null
+  // The shown day's line under the title: "Planned Sun · energy: medium ·
+  // looked back". Looked back: its session did its Look back step, or the
+  // day before has a review (what that step writes).
+  const shownNotes = usePlanningNotes('daily', dayToken(viewedDate))
+  const shownDayBefore = usePeriodReview('daily', dayToken(new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate() - 1)))
+  const shownGuide = shownNotes.notes.guide
+  const shownSavedAt = typeof shownNotes.notes.savedAt === 'string' ? shownNotes.notes.savedAt : undefined
+  const dayLine = !sessionShown && !shownNotes.error ? (
+    <PeriodSummaryLine plannedAt={shownGuide?.plannedAt ?? shownSavedAt} energy={shownNotes.notes.energy}
+      reviewed={!!shownGuide?.done?.includes('look-back') || !!shownDayBefore.reviewed} />
+  ) : null
+  const reloadShownNotes = shownNotes.reload
 
   // ── Plan my day / Review my day: the bar's walk into a conversation that
   // ends in one change card. Today's date only; phones offer it in the page.
   const walk = data.isToday ? (nowForDisplay.getHours() < 16 ? PLAN_WALK : REVIEW_WALK) : null
   const walkInBar = useConversationWalk(walk)
-  const pageWalk = walk && !walkInBar ? walk : null
+  // A Day session is the one way to plan while it runs (no second walk).
+  const pageWalk = walk && !walkInBar && !sessionShown ? walk : null
 
   // ── A pending change card, drawn dashed on the day (todayPreview.ts).
   const { changeSet } = useCanvasActivity()
@@ -1143,6 +1212,19 @@ export function TodayView({
     currentMemberId: meId,
   }
 
+  // The Day session wraps the page it runs on: the session bar, the steps
+  // rail, and this same page beside them.
+  const inDaySession = (page: ReactNode) => !sessionShown ? page : (
+    <div className="px-4 md:px-0">
+      <GuidedDay key={targetKey} target={day.target} lookBackOn={day.lookBackOn} isTomorrow={day.isTomorrow}
+        canvas={page} dayItems={dayPicture} lookBack={lookBack} choice={todayChoice} actions={dayActions}
+        goalLabel={(t) => (goalOf(t, tasksById) ? `${monthWordToday} goal` : undefined)}
+        onFinish={finishDay}
+        onClose={() => { closeDaySession(); reloadShownNotes() }}
+        onPlanned={() => { dayPlan.reload(); reloadShownNotes() }} />
+    </div>
+  )
+
   return (
     // @container: the day and its week column split on the page's own width
     // (no ancestor declared one, so the old decision rail never went beside).
@@ -1150,7 +1232,7 @@ export function TodayView({
     // the week column beside the day, a planning page that fills the screen.
     // In the connected workspace Today always shares the planning frame, so
     // Today, Week, Plan and Routines have one shape (Scott, 2026-10-10).
-    <div className={`today-page @container w-full ${showWeek || alongsideWorkspace ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
+    <div className={`today-page @container w-full ${showWeek || alongsideWorkspace || sessionShown ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}
@@ -1220,7 +1302,7 @@ export function TodayView({
         // every horizon (Scott, 2026-09-30). The masthead keeps them only where
         // there is no control row to hold them.
         controls={foldedControls
-          ? <div className="flex items-center gap-1">{dayFlowButton}{desktopToolbar}{!alongsideWorkspace && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}</div>
+          ? <div className="flex items-center gap-1">{dayFlowButton}{desktopToolbar}{!alongsideWorkspace && !sessionShown && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}</div>
           : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
@@ -1235,6 +1317,8 @@ export function TodayView({
         footer={!desktopControls ? desktopToolbar : undefined}
 
       />
+      {/* What the day's planning left: one quiet line under the title. */}
+      <div className="px-4 md:px-0 empty:hidden">{dayLine}</div>
       {/* Phones have no conversation bar: the page offers the same walk. */}
       {(pageWalk || (dayFlowButton && !foldedControls)) && (
         <div className="today-walk px-4 md:px-0">
@@ -1243,20 +1327,6 @@ export function TodayView({
             onClick={() => openAssistant({ message: pageWalk.message, autoSend: true })}>{pageWalk.label}</button>}
         </div>
       )}
-      {dayFlow && <div className="deck choose-flow today-flow px-4 md:px-0">
-        <TodayFlow mode={dayFlow} choice={todayChoice} review={todayReview} dayItems={dayPicture} actions={todayActions}
-          dayLabel={viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}
-          goalLabel={(t) => (goalOf(t, tasksById) ? `${monthWordToday} goal` : undefined)}
-          onLeave={() => setDayFlow(null)}
-          onFinish={async (win) => {
-            // The review is kept as the day's planning_sessions note, as every
-            // horizon keeps its own; planning the day marks it planned.
-            if (dayFlow === 'review' && !(await dayReview.finish({ wentWell: win, didnt: '' }))) return false
-            if (dayFlow === 'plan' && !(await dayPlan.save({ wentWell: '', didnt: '' }))) showToast('Couldn’t mark today planned — try again.', 'error', 5000)
-            setDayFlow(null)
-            return true
-          }} />
-      </div>}
       {/* Notices sit under the heading on every destination (one page shape). */}
       <div className="px-4 md:px-0 empty:hidden"><CalendarReconnectBanner /></div>
 
@@ -1267,7 +1337,7 @@ export function TodayView({
       {!foldedControls && (
         <div className="pv2-toolbar today-toolbar px-4 md:px-0">
           <div className="pv2-status"><span className="pv2-hint">{weekLine}</span></div>
-          {!alongsideWorkspace && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}
+          {!alongsideWorkspace && !sessionShown && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}
         </div>
       )}
       {/* The column beside the day: the week (and anything needing a
@@ -1275,7 +1345,9 @@ export function TodayView({
       {/* With the week beside it, the day and the week each scroll on their
           own (Scott, 2026-10-05), as Week and Month do: useColumnsFitWindow
           sizes them to the window, layout-system.css scrolls them. */}
-      <div ref={splitRef} style={dayFlow ? { display: 'none' } : undefined} className={`px-4 md:px-0 ${showWeek ? 'today-split is-colscroll @[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
+      {/* While the Day session runs, this is its page: the steps rail stands
+          beside it where the week column would. */}
+      {inDaySession(<div ref={splitRef} className={`${sessionShown ? '' : 'px-4 md:px-0 '}${showWeek ? 'today-split is-colscroll @[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
         <main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,
@@ -1607,7 +1679,7 @@ export function TodayView({
           )}
         </aside>
         )}
-      </div>
+      </div>)}
 
       {/* Phone: the floating capture bar above the dock (native TodayView). */}
       {isMobile && canAdd && (

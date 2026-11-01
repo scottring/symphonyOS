@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, afterEach, onTestFinished } from 'vitest'
+import { act } from 'react'
 import { ALL_LAYERS } from '@/lib/domains'
 import { screen, fireEvent, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { TodayView } from './TodayView'
 import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
+import { GuidedSessionProvider, useGuidedSession } from '@/contexts/GuidedSessionContext'
 
 // File-wide mock: every test in this file renders TodayView's mobile branch.
 // This affects the EveningMealCard branch (TodayView.tsx ~line 651) and WHERE
@@ -21,6 +23,24 @@ const daySession = vi.hoisted(() => ({ saved: null as null | { at: Date; authorI
 vi.mock('@/hooks/usePlanningSession', async (importOriginal) => ({ ...await importOriginal<object>(),
   usePlanningSession: () => ({ saved: daySession.saved, mine: null, loading: false, loadedToken: '', error: null, reload: vi.fn(), save: daySession.save }) }))
 vi.mock('@/hooks/usePeriodReview', () => ({ usePeriodReview: () => ({ reviewed: daySession.reviewed, mine: null, loading: false, error: null, reload: vi.fn(), finish: daySession.finish }) }))
+// The person's notes rows (usePlanningNotes), in memory: the Day session's
+// place in its steps and the day's energy.
+const dayNotes = vi.hoisted(() => ({ notes: {} as Record<string, unknown>, patches: [] as Record<string, unknown>[] }))
+vi.mock('@/hooks/usePlanningNotes', async () => {
+  const { useState, useCallback } = await import('react')
+  return {
+    usePlanningNotes: () => {
+      const [notes, setNotes] = useState(dayNotes.notes)
+      const patch = useCallback(async (p: Record<string, unknown>, defaults?: Record<string, unknown>) => {
+        dayNotes.patches.push(p)
+        dayNotes.notes = { ...defaults, ...dayNotes.notes, ...p }
+        setNotes(dayNotes.notes)
+        return true
+      }, [])
+      return { notes, loading: false, error: null, patch, reload: () => undefined }
+    },
+  }
+})
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
 vi.mock('@/hooks/useRoutineStats', () => ({ useRoutineStats: () => ({ getStats: () => undefined }) }))
 vi.mock('@/hooks/useRecurringEventDetection', () => ({ useRecurringEventDetection: () => ({ isPromotionSuggested: () => false }) }))
@@ -626,66 +646,122 @@ describe('TodayView — the day card carries the date nav', () => {
   })
 })
 
-// Plan today / Review today (spec 2026-10-19, Today mockup approved): the
-// same choosing as every horizon, one level down — "This week → today" until
-// 4 pm, "Today → tomorrow" after. The ⋯ menu still has no review of its own.
-describe('TodayView — Plan today / Review today', () => {
-  afterEach(() => { mockUseMobile.mockReturnValue(true); vi.useRealTimers(); window.history.replaceState({}, '', '/'); daySession.saved = null; daySession.reviewed = null })
-  const renderAt = (hour: number) => {
+// The Day session (spec 2026-11-01) replaces Plan today / Review today:
+// "Plan today" until 4 pm, "Plan tomorrow" from 4 pm, and the session runs on
+// the page itself, the day still showing beside its steps.
+function GuidePanel() {
+  const reg = useGuidedSession()
+  return reg ? <div data-testid="guide-panel">{reg.header}</div> : null
+}
+describe('TodayView — the Day session', () => {
+  afterEach(() => { mockUseMobile.mockReturnValue(true); vi.useRealTimers(); window.history.replaceState({}, '', '/'); daySession.saved = null; daySession.reviewed = null; daySession.save.mockClear(); dayNotes.notes = {}; dayNotes.patches = [] })
+  const at = (hour: number, days = 0) => new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + days, hour, 0)
+  const renderAt = (hour: number, { url = '/', viewed = at(hour) }: { url?: string; viewed?: Date } = {}) => {
     vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), hour, 0))
+    vi.setSystemTime(at(hour))
+    window.history.replaceState({}, '', url)
     mockUseMobile.mockReturnValue(false)
     const host = document.createElement('div')
     document.body.appendChild(host)
+    onTestFinished(() => host.remove())
+    const onDateChange = vi.fn()
     const view = render(
       <DesktopControlsContext.Provider value={host}>
-        <ScheduleActionsProvider value={ctxValue as never}>
-          <TodayView
-            tasks={[]} events={[]} routines={[]} dateInstances={[]}
-            selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
-            onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
-            viewedDate={new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), hour, 0)} onDateChange={vi.fn()} projects={[]}
-          />
-        </ScheduleActionsProvider>
+        <GuidedSessionProvider>
+          <ScheduleActionsProvider value={ctxValue as never}>
+            <TodayView
+              tasks={[]} events={[]} routines={[]} dateInstances={[]}
+              selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
+              onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
+              viewedDate={viewed} onDateChange={onDateChange} projects={[]}
+            />
+          </ScheduleActionsProvider>
+          <GuidePanel />
+        </GuidedSessionProvider>
       </DesktopControlsContext.Provider>,
     )
-    return { ...view, host }
+    return { ...view, onDateChange }
   }
-  it('in the morning the page offers Plan today, which opens This week → today', async () => {
-    const { user, host } = renderAt(10)
+  const search = () => new URLSearchParams(window.location.search)
+
+  it('in the morning the page offers Plan today, which opens the session on the page itself', async () => {
+    const { user } = renderAt(10)
     expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Plan tomorrow' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Plan today' }))
-    expect(screen.getByText('This week → today')).toBeInTheDocument()
-    // Finishing records the day planned, so the button can step aside.
-    await user.click(screen.getByRole('button', { name: 'Done' }))
-    await vi.waitFor(() => expect(daySession.save).toHaveBeenCalledWith({ wentWell: '', didnt: '' }))
-    host.remove()
+    const session = screen.getByRole('region', { name: 'Planning today' })
+    expect(search().get('plan')).toBe('1')
+    expect(within(session).getByRole('group', { name: 'Steps in this session' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('guide-panel')).getByText('Look back at yesterday')).toBeInTheDocument()
+    // One page: the day is still there beside the steps.
+    expect(within(session).getByRole('heading', { name: 'For today' })).toBeInTheDocument()
+    expect(within(session).getByRole('heading', { name: 'The day' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Plan today' })).not.toBeInTheDocument()
   })
-  it('from 4 pm it offers Review today, which opens Today → tomorrow; ⋯ has no end-of-day review', async () => {
-    const { user, host } = renderAt(17)
+
+  it('from 4 pm it offers Plan tomorrow, which takes the page to tomorrow; there is no Review today', async () => {
+    const { user, onDateChange } = renderAt(17)
     await openOverflow(user)
     expect(screen.queryByRole('button', { name: /End of day review/i })).not.toBeInTheDocument()
     await user.keyboard('{Escape}')
-    await user.click(screen.getByRole('button', { name: 'Review today' }))
-    expect(screen.getByText('Today → tomorrow')).toBeInTheDocument()
-    host.remove()
+    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
+    expect(onDateChange).toHaveBeenCalledWith(at(0, 1))
+    expect(search().get('plan')).toBe('1')
+    // Today's page does not run tomorrow's session over today.
+    expect(screen.queryByRole('region', { name: /Planning/ })).not.toBeInTheDocument()
   })
+
+  it('on tomorrow’s page in the evening the session plans tomorrow and looks back at today', () => {
+    renderAt(17, { url: '/?plan=1', viewed: at(0, 1) })
+    const session = screen.getByRole('region', { name: 'Planning tomorrow' })
+    expect(within(session).getByRole('button', { name: /Look back at today/ })).toBeInTheDocument()
+    expect(within(session).getByRole('button', { name: /Tomorrow's calendar/ })).toBeInTheDocument()
+    expect(within(session).getByText('0 of 3–5 on tomorrow')).toBeInTheDocument()
+  })
+
+  it('?review=1 opens the session (the old Review today link)', async () => {
+    renderAt(10, { url: '/?review=1' })
+    await vi.waitFor(() => expect(search().get('plan')).toBe('1'))
+    expect(search().get('review')).toBeNull()
+    expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
+  })
+
+  it('a bare ?plan=1 in the evening takes the page to tomorrow', () => {
+    const { onDateChange } = renderAt(18, { url: '/?plan=1' })
+    expect(onDateChange).toHaveBeenCalledWith(at(0, 1))
+  })
+
   // One button at most, only the one that's due (reviewed design, 2026-10-20).
   it('once the day is planned, Plan today steps aside for a quiet "Plan today again"', async () => {
-    daySession.saved = { at: new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), 8), authorId: 'me', notes: {} }
-    const { user, host } = renderAt(10)
+    daySession.saved = { at: at(8), authorId: 'me', notes: {} }
+    const { user } = renderAt(10)
     expect(screen.queryByRole('button', { name: 'Plan today' })).not.toBeInTheDocument()
     expect(document.querySelectorAll('.today-flow-btn')).toHaveLength(0)
     await user.click(screen.getByRole('button', { name: 'Plan today again' }))
-    expect(screen.getByText('This week → today')).toBeInTheDocument()
-    host.remove()
+    expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
   })
-  it('once the day is reviewed, Review today steps aside', () => {
-    daySession.reviewed = { at: new Date(), authorId: 'me', wentWell: '', didnt: '' }
-    const { host } = renderAt(17)
-    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Review today again' })).toBeInTheDocument()
-    host.remove()
+
+  it('the shown day’s line under the title: when it was planned, its energy, looked back', () => {
+    dayNotes.notes = { guide: { current: 'habits', done: ['look-back'], skipped: [], plannedAt: at(8).toISOString() }, energy: { level: 'medium' } }
+    renderAt(10)
+    const day = at(8).toLocaleDateString('en-US', { weekday: 'short' })
+    expect(screen.getByText(`Planned ${day}`).closest('p')).toHaveTextContent(`Planned ${day} · energy: medium · looked back`)
+  })
+
+  it('with nothing saved for the day, no line', () => {
+    renderAt(10)
+    expect(document.querySelector('.guide-summary-line')).toBeNull()
+  })
+
+  it('"Done planning today" marks the day planned and the page comes back as every day', async () => {
+    dayNotes.notes = { guide: { current: 'habits', done: [], skipped: [] } }
+    renderAt(10, { url: '/?plan=1' })
+    await act(async () => { fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Done planning today' })) })
+    await vi.waitFor(() => expect(search().get('plan')).toBeNull())
+    expect(daySession.save).toHaveBeenCalledWith({ wentWell: '', didnt: '' })
+    expect(screen.queryByRole('region', { name: 'Planning today' })).not.toBeInTheDocument()
+    expect(dayNotes.patches.some((p) => (p.guide as { finishedAt?: string } | undefined)?.finishedAt)).toBe(true)
   })
 })
 

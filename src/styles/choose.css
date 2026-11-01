@@ -122,22 +122,12 @@
 .choose-look-also-list { margin: 6px 0 0; padding: 0 12px 0 28px; max-height: 220px; overflow-y: auto; font-size: 13.5px; line-height: 1.6; color: var(--color-neutral-700); }
 .choose-settled-line.is-static { cursor: default; margin-top: 10px; }
 
-/* Today: the list and the day side by side */
-.choose.choose-today { width: min(1040px, 100%); }
-.choose-today-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
-.choose-today-h { margin-top: 16px; }
+/* Today: the day session's goal groups and its day picture (guided/day) */
 .choose-today-group + .choose-today-group { margin-top: 10px; }
 .choose-today-goal { margin: 8px 0 6px; font: 500 12px var(--font-family-sans); color: var(--color-primary-500); }
-.choose-daypic { position: sticky; top: 76px; }
-.choose-daypic-h { margin: 0; font: 400 24px var(--font-family-display); color: var(--color-neutral-900); }
 .choose-daypic-slot { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: start; margin-bottom: 6px; }
 .choose-daypic-time { padding-top: 6px; font-size: 11.5px; color: var(--color-neutral-500); text-align: right; font-variant-numeric: tabular-nums; }
 .choose-daypic-ev { padding: 6px 9px; border-left: 3px solid hsl(207 30% 70%); border-radius: 6px; background: var(--color-neutral-50); font-size: 13px; color: var(--color-neutral-700); }
 .choose-daypic-ev.is-task { border-left-color: var(--color-primary-500); }
 .choose-daypic-untimed { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--color-neutral-200); display: flex; flex-direction: column; gap: 5px; }
 .choose-daypic-task { padding: 6px 9px; border: 1px solid var(--color-neutral-200); border-radius: 8px; background: var(--color-bg-elevated); font: 400 16px/1.25 var(--font-family-display); color: var(--color-neutral-900); }
-.choose-daypic-task.is-new { border-color: var(--color-primary-500); box-shadow: 0 0 0 1px var(--color-primary-500) inset; }
-@media (max-width: 760px) {
-  .choose-today-grid { grid-template-columns: minmax(0, 1fr); }
-  .choose-daypic { position: static; }
-}

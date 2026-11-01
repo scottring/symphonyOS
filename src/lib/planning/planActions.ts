@@ -184,16 +184,18 @@ export function makePlanActions(deps: PlanActionDeps) {
     deps.pushAction?.(`Removed "${t.title}" from this day`, () => { void deps.updateTask(taskId, prev) })
   }
 
+  /** Give a task a time on a day. Resolves whether it saved. */
   async function timeTask(taskId: string, when: Date) {
     const t = deps.findTask(taskId)
-    if (!t) return
+    if (!t) return false
     const prev = snapshot(t)
     const result = await deps.updateTask(taskId, {
       bucket: 'timed', scheduledFor: when, isAllDay: false,
       endTime: new Date(when.getTime() + DEFAULT_DURATION_MS),
     })
-    if (result === false) return
+    if (result === false) return false
     deps.pushAction?.(`Scheduled "${t.title}"`, () => { void deps.updateTask(taskId, prev) })
+    return true
   }
 
   async function planTaskWeekend(taskId: string, saturday: Date) {

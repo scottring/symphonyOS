@@ -179,8 +179,13 @@ it('refuses a day that is not in the weekend, and a goal', async () => {
 it('a cancelled time placement does not offer undo for an unwritten change', async () => {
   const { actions, deps, undo } = setup([createMockTask({ id: 'task' })])
   deps.updateTask.mockResolvedValueOnce(false)
-  await actions.timeTask('task', new Date(2026, 8, 28, 10))
+  expect(await actions.timeTask('task', new Date(2026, 8, 28, 10))).toBe(false)
   expect(undo).toHaveLength(0)
+})
+it('a time placement that saved says so', async () => {
+  const { actions } = setup([createMockTask({ id: 'task' })])
+  expect(await actions.timeTask('task', new Date(2026, 8, 28, 10))).toBe(true)
+  expect(await actions.timeTask('missing', new Date(2026, 8, 28, 10))).toBe(false)
 })
 
 
