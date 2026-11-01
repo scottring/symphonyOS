@@ -1706,10 +1706,12 @@ describe('useSupabaseTasks', () => {
         expect(result.current.tasks).toHaveLength(2)
       })
 
+      let deleted: boolean | undefined
       await act(async () => {
-        await result.current.deleteTask('task-1')
+        deleted = await result.current.deleteTask('task-1')
       })
 
+      expect(deleted).toBe(true)
       expect(result.current.tasks).toHaveLength(1)
       expect(result.current.tasks[0].id).toBe('task-2')
     })
@@ -1742,11 +1744,13 @@ describe('useSupabaseTasks', () => {
 
       mockError = { message: 'Delete failed' }
 
+      let deleted: boolean | undefined
       await act(async () => {
-        await result.current.deleteTask('task-1')
+        deleted = await result.current.deleteTask('task-1')
       })
 
-      // Should roll back
+      // Should roll back, and say it did not delete
+      expect(deleted).toBe(false)
       expect(result.current.tasks).toHaveLength(1)
       expect(result.current.tasks[0].id).toBe('task-1')
     })

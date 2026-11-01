@@ -1418,10 +1418,12 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     }
   }, [findTaskById, findParentOfSubtask])
 
-  const deleteTask = useCallback(async (id: string) => {
+  // Answers whether the row was deleted (false: not found, or refused and
+  // rolled back), so an Undo built on it can say when it did not take.
+  const deleteTask = useCallback(async (id: string): Promise<boolean> => {
     // Save for rollback
     const taskToDelete = findTaskById(id)
-    if (!taskToDelete) return
+    if (!taskToDelete) return false
 
     const isSubtask = !!taskToDelete.parentTaskId
 
@@ -1460,9 +1462,10 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
       }
       setError(deleteError.message)
       showToast('Failed to delete task', 'error', 4000)
-    } else {
-      announceLocalWrite({ kind: 'delete', id })
+      return false
     }
+    announceLocalWrite({ kind: 'delete', id })
+    return true
   }, [findTaskById, findParentOfSubtask])
 
   /**

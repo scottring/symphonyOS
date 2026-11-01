@@ -102,7 +102,7 @@ export async function groupItems(
 }
 
 type UpdateFn = (id: string, updates: Partial<Task>) => Promise<void | boolean> | void
-type DeleteFn = (id: string) => Promise<void> | void
+type DeleteFn = (id: string) => Promise<unknown> | void
 type RefetchFn = () => Promise<void> | void
 
 /**

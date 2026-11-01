@@ -279,7 +279,7 @@
 /* Year step bodies (guided/year): the vision's fields, the 12 months (one
    column in the rail, two or more where the rail is wide), a crowded month
    marked in the guide accent, the brain dump's areas, the booking row. */
-.gy-vision, .gy-landscape { display: grid; gap: 8px; min-width: 0; }
+.gy-vision, .gy-landscape, .gy-refine { display: grid; gap: 8px; min-width: 0; }
 .gy-vision .gw-h { display: block; }
 .gy-months { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
 .gy-month { --g-accent: color-mix(in oklab, var(--color-review-600) 72%, var(--color-neutral-900)); display: grid; gap: 3px; min-width: 0; }

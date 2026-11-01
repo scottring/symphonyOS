@@ -1420,10 +1420,10 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
  it('Look back: 2025’s open goals — Carry, Someday, Let go, Done — each through the page’s writers, with Undo',async()=>{
   inSession()
   api.goals=[...GOALS.map(g=>({...g})),
-   {id:'a',name:'Learn to sail',year:2025,status:'active',context:'personal'},{id:'b',name:'Write the book',year:2025,status:'active',context:'work',areaId:'h'},
+   {id:'a',name:'Learn to sail',year:2025,status:'active',context:'personal'},{id:'b',name:'Write the book',year:2025,status:'active',context:'work',areaId:'h',notes:'Two pages a day'},
    {id:'c',name:'Run a marathon',year:2025,status:'active',context:'personal'},{id:'d',name:'Paint the porch',year:2025,status:'active',context:'family'},
    {id:'e',name:'Met already',year:2025,status:'completed',context:'personal'}]
-  api.deleteTask.mockResolvedValue(undefined)
+  api.deleteTask.mockResolvedValue(true)
   atStep('look-back')
   year()
   const open=within(screen.getByRole('list',{name:'Open from 2025'}))
@@ -1435,14 +1435,19 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   expect(lastRun().label).toBe('Bring “Learn to sail” into 2026')
   // Someday: goals have no Someday, so its words go on the Someday list and the goal is put away.
   await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Someday: Write the book'}))})
-  expect(api.addTask).toHaveBeenCalledWith('Write the book',undefined,undefined,undefined,expect.objectContaining({bucket:'someday',context:'work',areaId:'h'}))
+  expect(api.addTask).toHaveBeenCalledWith('Write the book',undefined,undefined,undefined,expect.objectContaining({bucket:'someday',context:'work',areaId:'h',notes:'Two pages a day'}))
   expect(api.updateGoal).toHaveBeenLastCalledWith('b',{status:'archived'})
   expect(lastRun().label).toBe('Moved to Someday: “Write the book”')
   const somedayId=api.addTask.mock.calls[0][4].id
   api.updateGoal.mockClear()
-  await act(async()=>{await lastRun().opts.undo()})
+  await act(async()=>{expect(await lastRun().opts.undo()).toBe(true)})
   expect(api.deleteTask).toHaveBeenCalledWith(somedayId)
   expect(api.updateGoal).toHaveBeenCalledWith('b',{status:'active'})
+  // An Undo whose Someday line would not go says so, and leaves the goal put away.
+  const someday=lastRun()
+  api.updateGoal.mockClear();api.deleteTask.mockResolvedValueOnce(false)
+  await act(async()=>{expect(await someday.opts.undo()).toBe(false)})
+  expect(api.updateGoal).not.toHaveBeenCalled()
   // Let go: archived, never deleted.
   await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Let go: Run a marathon'}))})
   expect(api.updateGoal).toHaveBeenLastCalledWith('c',{status:'archived'})
@@ -1517,26 +1522,49 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   expect(api.addGoal).toHaveBeenLastCalledWith(null,'Redo the will','personal',expect.objectContaining({year:2026}))
   expect(plannedMarks()).toHaveLength(1)
  })
+ it('Brain dump: under a space filter, a goal in an area stays under its area; an area with nothing in view stays out',()=>{
+  inSession()
+  filters.on=true;filters.layers=new Set(['family'])
+  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Money',context:'personal',mine:true,sortOrder:1},{id:'f',name:'Home',context:'family',mine:true,sortOrder:2}]
+  api.goals=[{id:'fg',name:'Family hikes',year:2026,status:'active',context:'family',areaId:'h'},{id:'pg',name:'Private one',year:2026,status:'active',context:'personal',areaId:'m'}]
+  atStep('brain-dump')
+  year()
+  expect(within(screen.getByRole('region',{name:'Health'})).getByText('Family hikes')).toBeInTheDocument()
+  expect(screen.queryByRole('region',{name:'Money'})).toBeNull()
+  expect(screen.queryByText('Private one')).toBeNull()
+  expect(within(screen.getByRole('region',{name:'Home'})).getByText('Nothing in Home yet.')).toBeInTheDocument()
+  expect(within(screen.getByRole('region',{name:'No area'})).queryByText('Family hikes')).toBeNull()
+ })
  it('Refine: goals that overlap, with Keep both, Let go of one, Someday — nothing merges on its own',async()=>{
   inSession()
-  api.goals=[...GOALS.map(g=>({...g})),{id:'r1',name:'Run a 10k',year:2026,status:'active',context:'personal'},{id:'r2',name:'Run a half marathon',year:2026,status:'active',context:'personal'}]
+  api.goals=[...GOALS.map(g=>({...g})),{id:'r1',name:'Family trip to Maine',year:2026,status:'active',context:'personal'},{id:'r2',name:'Maine family trip',year:2026,status:'active',context:'personal'}]
   atStep('refine')
   year()
-  const pair=()=>within(screen.getByRole('listitem',{name:'Run a 10k and Run a half marathon'}))
+  const pair=()=>within(screen.getByRole('listitem',{name:'Family trip to Maine and Maine family trip'}))
   fireEvent.click(pair().getByRole('button',{name:'Let go of one'}))
-  await act(async()=>{fireEvent.click(pair().getByRole('button',{name:'Run a half marathon'}))})
+  await act(async()=>{fireEvent.click(pair().getByRole('button',{name:'Maine family trip'}))})
   expect(api.updateGoal).toHaveBeenLastCalledWith('r2',{status:'archived'})
-  expect(lastRun().label).toBe('Let go of “Run a half marathon”')
+  expect(lastRun().label).toBe('Let go of “Maine family trip”')
   fireEvent.click(pair().getByRole('button',{name:'Someday'}))
-  await act(async()=>{fireEvent.click(pair().getByRole('button',{name:'Run a 10k'}))})
-  expect(api.addTask).toHaveBeenCalledWith('Run a 10k',undefined,undefined,undefined,expect.objectContaining({bucket:'someday',context:'personal'}))
+  await act(async()=>{fireEvent.click(pair().getByRole('button',{name:'Family trip to Maine'}))})
+  expect(api.addTask).toHaveBeenCalledWith('Family trip to Maine',undefined,undefined,undefined,expect.objectContaining({bucket:'someday',context:'personal'}))
   expect(api.updateGoal).toHaveBeenLastCalledWith('r1',{status:'archived'})
   const writes=api.updateGoal.mock.calls.length+api.addTask.mock.calls.length
-  fireEvent.click(pair().getByRole('button',{name:'Keep both'}))
+  // Keep both: no goal is written; the pair is kept in the year's notes.
+  await act(async()=>{fireEvent.click(pair().getByRole('button',{name:'Keep both'}))})
   expect(screen.getByText('Nothing on the list looks alike.')).toBeInTheDocument()
   expect(api.updateGoal.mock.calls.length+api.addTask.mock.calls.length).toBe(writes)
+  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({keptPairs:[['r1','r2']]})
   expect(api.deleteGoal).not.toHaveBeenCalled()
   expect(plannedMarks()).toHaveLength(0)
+ })
+ it('Refine: a pair kept in an earlier session does not come back',()=>{
+  inSession()
+  api.goals=[...GOALS.map(g=>({...g})),{id:'r1',name:'Family trip to Maine',year:2026,status:'active',context:'personal'},{id:'r2',name:'Maine family trip',year:2026,status:'active',context:'personal'}]
+  notesStore.notes={guide:{current:'refine',done:[],skipped:[]},keptPairs:[['r1','r2']]}
+  year()
+  expect(screen.queryByRole('listitem',{name:'Family trip to Maine and Maine family trip'})).toBeNull()
+  expect(screen.getByText('Nothing on the list looks alike.')).toBeInTheDocument()
  })
  it('Share and book: Scott’s own Work and Personal goals can go to Family after a confirm on the page; the season session is booked on the day he picks',async()=>{
   inSession()
@@ -1550,6 +1578,7 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   fireEvent.click(goals.getByRole('button',{name:'Share with the family: Together'}))
   expect(api.updateGoal).not.toHaveBeenCalled()
   expect(screen.queryByRole('dialog')).toBeNull()
+  expect(goals.getByText('Everyone in the family will see it. Its steps stay yours.')).toBeInTheDocument()
   await act(async()=>{fireEvent.click(goals.getByRole('button',{name:'Share it'}))})
   expect(api.updateGoal).toHaveBeenCalledWith('g',{context:'family'})
   expect(lastRun().label).toBe('Share “Together” with the family')

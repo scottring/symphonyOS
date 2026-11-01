@@ -18,6 +18,8 @@ export interface GuideNotes {
   idealWeek?: IdealWeek
   weekend?: string
   wildCards?: string[]
+  /** Year, Refine: goal pairs set aside with "Keep both" ([earlier id, later id]). */
+  keptPairs?: [string, string][]
   scenery?: string
 }
 

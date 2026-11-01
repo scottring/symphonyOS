@@ -2,11 +2,13 @@
 // may say the same thing, shown as pairs for Scott to decide on; nothing here
 // merges or changes anything.
 //
-// Two goals overlap when their titles share two meaningful words (lowercased,
-// stop words out), when one title holds the other, or when the words they
-// share are at least half of the shorter title's: two short titles that
-// share their one real word ("Run a 10k", "Run a half marathon") are worth a
-// second look, two long ones that share one word are not.
+// Precision over recall (controller ruling, Task 18 fix round 1): a false
+// pair costs a tap and some trust, a missed one only a reread. Two goals
+// pair when their titles share two meaningful words (lowercased, stop words
+// out), or when every meaningful word of one is in the other ("Get fit",
+// "Get fit this year"). A number or amount ("10k", "$401k", "2027") never
+// counts as shared: "Save $10k" and "Run a 10k" are different goals, and a
+// title with one is never held by another.
 
 const STOP = new Set([
   'a', 'an', 'the', 'and', 'or', 'but', 'nor', 'so', 'yet',
@@ -14,7 +16,7 @@ const STOP = new Set([
   'is', 'are', 'be', 'been', 'being', 'am', 'was', 'were', 'do', 'does', 'did', 'have', 'has', 'had', 'get', 'got', 'make', 'go', 'take',
   'i', 'me', 'my', 'we', 'us', 'our', 'you', 'your', 'it', 'its', 'they', 'them', 'their', 'he', 'him', 'his', 'she', 'her',
   'this', 'that', 'these', 'those', 'some', 'any', 'all', 'each', 'every', 'more', 'most', 'less', 'much', 'many', 'few', 'very', 'really', 'just', 'also', 'again',
-  'not', 'no', 'than', 'then', 'as', 'if', 'when', 'what', 'which', 'who', 'how', 'year',
+  'not', 'no', 'than', 'then', 'as', 'if', 'when', 'what', 'which', 'who', 'how', 'year', 'new',
 ])
 
 /** The title's words that carry meaning, lowercased, once each, in order. */
@@ -23,16 +25,16 @@ export function meaningfulWords(title: string): string[] {
   return [...new Set(words)]
 }
 
-const normal = (title: string) => ` ${title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ')} `
+/** A number or amount: in the title, never a match. */
+const isNumber = (word: string) => /\d/.test(word)
 
 function overlap(a: { title: string }, b: { title: string }): boolean {
   const wa = meaningfulWords(a.title), wb = meaningfulWords(b.title)
   if (!wa.length || !wb.length) return false
-  const na = normal(a.title), nb = normal(b.title)
-  if (na.includes(nb) || nb.includes(na)) return true
-  const inB = new Set(wb)
-  const shared = wa.filter((w) => inB.has(w)).length
-  return shared >= 2 || (shared >= 1 && shared * 2 >= Math.min(wa.length, wb.length))
+  const matches = (w: string, other: ReadonlySet<string>) => !isNumber(w) && other.has(w)
+  const inA = new Set(wa), inB = new Set(wb)
+  const shared = wa.filter((w) => matches(w, inB)).length
+  return shared >= 2 || wa.every((w) => matches(w, inB)) || wb.every((w) => matches(w, inA))
 }
 
 /** Every pair of goals that may overlap, once, in list order: [earlier id, later id]. */

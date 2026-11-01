@@ -1,8 +1,9 @@
 // Planning the year, step 7 (spec 2026-11-01): share and book the next
 // session. Scott's own Work and Personal year goals, each with "Share with
 // the family", which asks once on the page before it moves the goal to
-// Family. Then a date for the first season session: "Book it" puts a
-// personal, all-day "Plan {Season}" on that day. The date starts empty;
+// Family (its season and month steps keep their own space). Then a date for
+// the first season session: "Book it" puts a personal, all-day
+// "Plan {Season}" on that day. The date starts empty;
 // nothing is shared or booked without a tap.
 
 import { useId, useState } from 'react'
@@ -56,7 +57,7 @@ export function ShareBook<G extends Goal>({ goals, seasonWord, onShare, onBook }
           <span className="gw-row-note">{SPACE[g.context]}</span>
           {confirming === g.id
             ? <span className="gw-row-acts" role="group" aria-label={`Share ${g.title}?`}>
-              <span className="gw-row-note">Everyone in the family will see it.</span>
+              <span className="gw-row-note">Everyone in the family will see it. Its steps stay yours.</span>
               <button type="button" className="choose-verb" disabled={pending !== null}
                 onClick={() => { void run(g.id, () => onShare(g)).then((ok) => { if (ok) setConfirming(null) }) }}>Share it</button>
               <button type="button" className="choose-verb is-quiet" disabled={pending !== null} onClick={() => setConfirming(null)}>Not now</button>

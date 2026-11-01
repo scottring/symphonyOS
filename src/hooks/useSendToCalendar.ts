@@ -44,7 +44,7 @@ function classifyFailure(err: unknown): SendFailureReason {
   return 'failed'
 }
 
-export function useSendToCalendar(deleteTask: (id: string) => void | Promise<void>) {
+export function useSendToCalendar(deleteTask: (id: string) => void | Promise<unknown>) {
   const { isConnected, createEvent, deleteEvent, defaultCalendarId } = useGoogleCalendar()
   const { getCalendarForDomain, mappings } = useCalendarDomainMappings()
 

@@ -118,7 +118,7 @@ import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { YearVision } from '@/components/plan/guided/year/Vision'
 import { YearLandscape } from '@/components/plan/guided/year/Landscape'
 import { BrainDump } from '@/components/plan/guided/year/BrainDump'
-import { Refine } from '@/components/plan/guided/year/Refine'
+import { YearRefine } from '@/components/plan/guided/year/Refine'
 import { ShareBook } from '@/components/plan/guided/year/ShareBook'
 import { AreasEditor } from '@/components/guide/AreasEditor'
 import { useAuth } from '@/hooks/useAuth'
@@ -253,9 +253,6 @@ function Inner() {
   const [forKey, setForKey] = useState('')
   // A link just made: the goal's "For" line lights up.
   const [linked, setLinked] = useState<string | null>(null)
-  // Planning the year, Refine: the pairs set aside with "Keep both", until
-  // the session is left.
-  const [keptPairs, setKeptPairs] = useState<ReadonlySet<string>>(() => new Set())
   const mainRef = useRef<HTMLElement>(null)
   // A goal just added, to bring into view once it arrives.
   const reveal = useRef<string | null>(null)
@@ -1010,18 +1007,20 @@ function Inner() {
   // or done.
   const toggleOf = (t: Task) => async () => (await toggleTask(t.id)) !== false
   // A year goal to Someday: goals have no Someday of their own, so its words
-  // go on the Someday list (a task, with its space and area) and the goal is
-  // put away (archived, never deleted). Undo takes both back; a goal that
-  // could not be put away takes its Someday line back too.
+  // go on the Someday list (a task, with its space, area and notes; a task
+  // has no strategy, which stays on the archived goal) and the goal is put
+  // away (archived, never deleted). Undo takes both back, and says so when
+  // the Someday line would not go; a goal that could not be put away takes
+  // its Someday line back too.
   const goalToSomeday = (node: PlanNode): Promise<boolean> => {
     const g = node.goal!
     const id = crypto.randomUUID()
     const status = g.status
     return act(`${describeTriageWhen('someday')}: “${g.name}”`, async () => {
-      if (!(await addTask(g.name, undefined, undefined, undefined, { id, bucket: 'someday', context: g.context ?? null, ...(g.areaId ? { areaId: g.areaId } : {}) }))) return false
+      if (!(await addTask(g.name, undefined, undefined, undefined, { id, bucket: 'someday', context: g.context ?? null, ...(g.areaId ? { areaId: g.areaId } : {}), ...(g.notes ? { notes: g.notes } : {}) }))) return false
       if ((await updateGoal(g.id, { status: 'archived' })) === false) { await deleteTask(id); return false }
       return true
-    }, { ids: [id, g.id], undo: async () => { await deleteTask(id); return (await updateGoal(g.id, { status })) !== false } })
+    }, { ids: [id, g.id], undo: async () => (await deleteTask(id)) && (await updateGoal(g.id, { status })) !== false })
   }
   // Brain dump: a year goal in a life area (its space the area's), or in none
   // (the space the page adds in).
@@ -1163,11 +1162,14 @@ function Inner() {
     // The choosing step: every add goes through the session's report, so
     // the first that saves marks the year planned.
     'brain-dump': <BrainDump yearWord={periodWord}
-      areas={lifeAreas.filter((a) => matchesLayers(a.context ?? 'personal', layers)).map((a) => ({ id: a.id, name: a.name }))}
+      // An area shows under the space filter, as the page's goals do, or
+      // when a goal on the list is in it: a goal never falls to "No area"
+      // while its area is one the viewer can see.
+      areas={lifeAreas.filter((a) => matchesLayers(a.context ?? 'personal', layers) || yearOpen.some((n) => n.goal!.areaId === a.id)).map((a) => ({ id: a.id, name: a.name }))}
       goals={yearOpen.map((n) => ({ id: n.id, title: n.title, areaId: n.goal!.areaId || null }))}
       onAdd={t.report(addYearGoal)} />,
-    refine: <Refine goals={yearOpen.map((n) => ({ id: n.id, title: n.title, node: n }))} kept={keptPairs}
-      onKeepBoth={(key) => setKeptPairs((s) => new Set([...s, key]))}
+    // Keep both is kept in the year's notes, so a pair set aside stays so.
+    refine: <YearRefine goals={yearOpen.map((n) => ({ id: n.id, title: n.title, node: n }))} value={t.notes.keptPairs} patch={t.patch}
       onLetGo={(g) => setGoalStatus(g.node, 'archived', `Let go of “${g.title}”`)} onSomeday={(g) => goalToSomeday(g.node)} />,
     'share-book': <ShareBook seasonWord={nextSeasonWord} onShare={(g) => shareGoal(g.node)} onBook={bookSeason}
       goals={yearOpen.flatMap((n) => {
@@ -1326,7 +1328,7 @@ function Inner() {
       // Planning: the guided session on this page, the rail where the strip
       // stands and the period's list beside it.
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
-          page={pageBody} bodies={sessionBodies} onFinish={closePeriod} onLeave={() => { setKeptPairs(new Set()); setMode(null) }}
+          page={pageBody} bodies={sessionBodies} onFinish={closePeriod} onLeave={() => setMode(null)}
           onPlanned={() => planSession.reload()} listenPageWrites={listenPageWrites}
           plannedAt={!planSession.error ? planSession.saved?.at : undefined}
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}
