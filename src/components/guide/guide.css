@@ -1,0 +1,88 @@
+/* Guided-session frame. Surfaces ride the neutral scale (which turns light-on-dark
+   at night); the guide accent is --color-review-600, mixed toward the page text so
+   it reads in both light and dark. */
+.guide-rail, .guide-header, .guide-summary-line, .guide-session-bar, .guide-energy {
+  --g-accent: color-mix(in oklab, var(--color-review-600) 72%, var(--color-neutral-900));
+  --g-tint: color-mix(in oklab, var(--color-review-600) 12%, var(--color-neutral-50));
+  --g-rule: color-mix(in oklab, var(--color-review-600) 25%, transparent);
+  font-family: var(--font-family-sans);
+  color: var(--color-neutral-900);
+}
+
+/* steps rail */
+.guide-rail { background: var(--color-neutral-50); border-radius: 10px; padding: 12px 8px; min-width: 0; }
+.guide-rail-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.guide-rail-step {
+  width: 100%; text-align: left; border: 0; background: none; color: inherit; font: inherit; cursor: pointer;
+  padding: 8px; border-radius: 7px; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 2px 8px; align-items: start;
+}
+.guide-rail-step:hover { background: var(--color-neutral-100); }
+.guide-rail-step:focus-visible, .guide-btn:focus-visible, .guide-summary-part:focus-visible, .guide-session-leave:focus-visible {
+  outline: 2px solid var(--g-accent); outline-offset: 2px;
+}
+.guide-rail-mark {
+  width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--color-neutral-300);
+  display: grid; place-items: center; font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums;
+}
+.guide-rail-title { font-size: 14px; line-height: 1.3; }
+.guide-rail-meta { grid-column: 2; font-size: 12px; color: var(--color-neutral-500); }
+.guide-rail-item[data-state='done'] .guide-rail-mark { background: var(--color-primary-100); border-color: transparent; color: var(--color-primary-700); }
+.guide-rail-item[data-state='done'] .guide-rail-title { color: var(--color-neutral-500); }
+.guide-rail-item[data-state='skipped'] .guide-rail-title { color: var(--color-neutral-500); font-style: italic; }
+.guide-rail-item[data-state='skipped'] .guide-rail-mark { border-style: dashed; }
+.guide-rail-item[data-state='current'] .guide-rail-step { background: var(--g-tint); }
+.guide-rail-item[data-state='current'] .guide-rail-mark { border-color: var(--g-accent); color: var(--g-accent); font-weight: 600; }
+.guide-rail-item[data-state='current'] .guide-rail-title { font-weight: 600; }
+.guide-rail-item[data-viewing] .guide-rail-step { outline: 1.5px dashed var(--g-accent); outline-offset: -2px; }
+.guide-rail-peek { padding: 2px 8px 8px 38px; font-size: 13px; color: var(--color-neutral-600); display: grid; gap: 8px; justify-items: start; }
+.guide-rail-peek p { margin: 0; }
+.guide-rail-body { min-width: 0; margin-top: 8px; }
+.guide-rail-body:empty { display: none; }
+
+@media (max-width: 760px) {
+  .guide-rail-list { display: flex; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+  .guide-rail-item { flex: 0 0 auto; max-width: 180px; }
+  .guide-rail-meta { display: none; }
+  .guide-rail-peek { padding-left: 8px; }
+}
+
+/* guide header */
+.guide-header { background: var(--g-tint); border: 1px solid var(--g-rule); border-radius: 10px; padding: 14px 16px 12px; min-width: 0; }
+.guide-header-who { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--g-accent); }
+.guide-header-title { font-family: var(--font-family-display); font-weight: 500; font-size: 23px; line-height: 1.15; margin: 2px 0 10px; text-wrap: balance; }
+.guide-header-lines { margin: 0; display: grid; gap: 8px; font-size: 14px; }
+.guide-header-lines > div { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 8px; }
+.guide-header-lines dt { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-500); font-weight: 600; padding-top: 2px; }
+.guide-header-lines dd { margin: 0; }
+.guide-header-more { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--color-neutral-700); border-left: 2px solid var(--g-rule); padding-left: 10px; }
+.guide-header-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+
+.guide-btn {
+  border: 1px solid var(--color-neutral-200); background: var(--color-neutral-50); color: var(--color-neutral-900);
+  border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.guide-btn:hover { background: var(--color-neutral-100); }
+.guide-btn-primary { background: var(--g-accent); border-color: var(--g-accent); color: var(--color-neutral-50); }
+.guide-btn-primary:hover { background: color-mix(in oklab, var(--g-accent) 88%, var(--color-neutral-900)); }
+
+/* session line + period summary */
+.guide-session-bar { font-size: 11.5px; font-weight: 600; color: var(--g-accent); }
+.guide-session-leave, .guide-summary-part { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.guide-session-leave { text-decoration: underline; }
+.guide-summary-line { margin: 0; font-size: 13px; color: var(--color-neutral-600); }
+.guide-summary-part:hover { text-decoration: underline; }
+
+/* energy */
+.guide-energy { display: grid; gap: 8px; }
+.guide-energy-levels { display: flex; flex-wrap: wrap; gap: 6px; }
+.guide-energy-level {
+  border: 1px solid var(--color-neutral-200); border-radius: 999px; padding: 5px 14px; font-size: 14px; cursor: pointer;
+  background: var(--color-neutral-50);
+}
+.guide-energy-level input { position: absolute; opacity: 0; pointer-events: none; }
+.guide-energy-level[data-checked] { background: var(--g-tint); border-color: var(--g-accent); color: var(--g-accent); font-weight: 600; }
+.guide-energy-level:has(input:focus-visible) { outline: 2px solid var(--g-accent); outline-offset: 2px; }
+.guide-energy-words {
+  font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--color-neutral-200);
+  background: var(--color-neutral-50); color: var(--color-neutral-900); min-width: 0;
+}
