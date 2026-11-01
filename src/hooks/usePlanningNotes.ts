@@ -24,6 +24,17 @@ export interface GuideNotes {
 export type PlanningNotes = Record<string, unknown> & GuideNotes
 export type NotesPatch = Partial<GuideNotes> & Record<string, unknown>
 
+// One chain per row, shared by every hook instance, so each patch reads after the
+// previous one has written and no instance drops another's keys.
+const chains = new Map<string, Promise<unknown>>()
+function serialized<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const result = (chains.get(key) ?? Promise.resolve()).then(run)
+  const tail = result.catch(() => undefined)
+  chains.set(key, tail)
+  void tail.then(() => { if (chains.get(key) === tail) chains.delete(key) })
+  return result
+}
+
 export function usePlanningNotes(horizon: SessionHorizon, token: string) {
   const { user } = useAuth()
   const [notes, setNotes] = useState<PlanningNotes>({})
@@ -33,7 +44,7 @@ export function usePlanningNotes(horizon: SessionHorizon, token: string) {
 
   const load = useCallback(async () => {
     const req = ++latest.current
-    if (!token) { setLoading(false); return }
+    if (!token) { setNotes({}); setLoading(false); return }
     if (!user?.id) return
     setLoading(true)
     setError(null)
@@ -51,20 +62,23 @@ export function usePlanningNotes(horizon: SessionHorizon, token: string) {
    *  already have (decided on the freshly read row, not on state). */
   const patch = useCallback(async (p: NotesPatch, defaults?: Record<string, unknown>): Promise<boolean> => {
     if (!user?.id || !token) return false
+    const uid = user.id
+    return serialized(`${uid}|${horizon}|${token}`, async () => {
     const { data: own, error: readError } = await supabase.from('planning_sessions')
-      .select('notes').eq('author_id', user.id).eq('horizon', horizon).eq('period_token', token).maybeSingle()
+      .select('notes').eq('author_id', uid).eq('horizon', horizon).eq('period_token', token).maybeSingle()
     if (readError) return false
     const existing = ((own as { notes?: Record<string, unknown> | null } | null)?.notes ?? {}) as Record<string, unknown>
     const fill: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(defaults ?? {})) if (existing[k] == null) fill[k] = v
     const merged = { ...existing, ...fill, ...p }
     const { error: writeError } = await supabase.from('planning_sessions').upsert(
-      { author_id: user.id, horizon, period_token: token, notes: merged, updated_at: new Date().toISOString() },
+      { author_id: uid, horizon, period_token: token, notes: merged, updated_at: new Date().toISOString() },
       { onConflict: 'author_id,horizon,period_token' },
     )
     if (writeError) return false
     setNotes(merged as PlanningNotes)
     return true
+    })
   }, [user?.id, horizon, token])
 
   return { notes, loading, error, patch, reload: () => { void load() } }

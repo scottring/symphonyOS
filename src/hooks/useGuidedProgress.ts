@@ -11,7 +11,7 @@ export function useGuidedProgress(level: GuideLevel, token: string) {
   const { notes, loading, patch } = usePlanningNotes(HORIZON_OF[level], token)
   const [progress, setProgress] = useState<GuideProgress>(() => startProgress(level))
   const ref = useRef(progress)
-  const queue = useRef<Promise<unknown>>(Promise.resolve())
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Take the saved step when a load finishes; later saves don't echo back over newer taps.
   const guideRef = useRef(notes.guide)
@@ -23,13 +23,12 @@ export function useGuidedProgress(level: GuideLevel, token: string) {
     setProgress(p)
   }, [loading, level])
 
-  // Saves run one after another so each read-then-merge sees the one before.
+  // patch serializes saves per row; a failed save keeps the optimistic step and sets saveError.
   const commit = useCallback(async (p: GuideProgress, extra?: Record<string, unknown>, defaults?: Record<string, unknown>) => {
     ref.current = p
     setProgress(p)
-    const run = queue.current.then(() => patch({ guide: p, ...extra }, defaults))
-    queue.current = run.catch(() => undefined)
-    await run
+    const ok = await patch({ guide: p, ...extra }, defaults)
+    setSaveError(ok ? null : 'Could not save your place. It may not be there next time.')
   }, [patch])
 
   const next = useCallback(async () => { if (!loading) await commit(goNext(ref.current, level)) }, [commit, level, loading])
@@ -54,5 +53,5 @@ export function useGuidedProgress(level: GuideLevel, token: string) {
     await commit({ ...ref.current, threadId: id })
   }, [commit, loading])
 
-  return { progress, loading, next, skip, jump, markPlanned, finish, setThreadId }
+  return { progress, loading, saveError, next, skip, jump, markPlanned, finish, setThreadId }
 }

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 
+let failWrite = false
 let stored: Record<string, unknown> | null = null
-const upsert = vi.fn(async (row: { notes: Record<string, unknown> }) => { stored = row.notes; return { error: null } })
+const upsert = vi.fn(async (row: { notes: Record<string, unknown> }) => { if (failWrite) return { error: { message: 'x' } }; stored = row.notes; return { error: null } })
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
@@ -23,7 +24,7 @@ const steps = stepsFor('week')
 const ready = async (r: { current: { loading: boolean } }) => { await waitFor(() => expect(r.current.loading).toBe(false)) }
 
 describe('useGuidedProgress', () => {
-  beforeEach(() => { stored = null; upsert.mockClear() })
+  beforeEach(() => { stored = null; failWrite = false; upsert.mockClear() })
 
   it('next() persists notes.guide and a reload returns the saved step', async () => {
     const { result } = renderHook(() => useGuidedProgress('week', '2026-W44'))
@@ -78,5 +79,27 @@ describe('useGuidedProgress', () => {
     await act(async () => { await result.current.finish() })
     expect(stored!.guide).toMatchObject({ threadId: 't1', current: steps[0].id })
     expect((stored!.guide as { finishedAt?: string }).finishedAt).toBeTruthy()
+  })
+
+  it('a failed save sets saveError, keeps the step, and clears on the next success', async () => {
+    const { result } = renderHook(() => useGuidedProgress('week', '2026-W44'))
+    await ready(result)
+    failWrite = true
+    await act(async () => { await result.current.next() })
+    expect(result.current.saveError).toBeTruthy()
+    expect(result.current.progress.current).toBe(steps[1].id)
+    failWrite = false
+    await act(async () => { await result.current.next() })
+    expect(result.current.saveError).toBeNull()
+  })
+
+  it('next() then markPlanned() without awaiting saves both', async () => {
+    const { result } = renderHook(() => useGuidedProgress('week', '2026-W44'))
+    await ready(result)
+    await act(async () => { await Promise.all([result.current.next(), result.current.markPlanned()]) })
+    const g = stored!.guide as { current: string; plannedAt?: string }
+    expect(g.current).toBe(steps[1].id)
+    expect(g.plannedAt).toBeTruthy()
+    expect(stored!.savedAt).toBeTruthy()
   })
 })
