@@ -229,3 +229,42 @@
 .choose-lines > .choose-area-head:first-child { margin-top: 0; }
 .choose-area-name { margin: 0; font: inherit; letter-spacing: inherit; color: inherit; }
 .gm-upkeep .hs-list { margin: 0; }
+
+/* Ideal week (Season): the 168-hour bar, legend, rows, and the editor's fields.
+   Base blocks are quiet neutral steps; goal blocks take the guide accent; free is hatched. */
+.guide-iw {
+  --g-accent: color-mix(in oklab, var(--color-review-600) 72%, var(--color-neutral-900));
+  --g-tint: color-mix(in oklab, var(--color-review-600) 12%, var(--color-neutral-50));
+  font-family: var(--font-family-sans); color: var(--color-neutral-900); min-width: 0;
+}
+.guide-iw-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.guide-iw-title { margin: 0; font-family: var(--font-family-display); font-size: 18px; font-weight: 600; }
+.guide-iw-left { margin: 0; font-size: 13px; color: var(--color-neutral-600); font-variant-numeric: tabular-nums; }
+.guide-iw-left b { color: var(--color-neutral-900); }
+.guide-iw-left[data-over] , .guide-iw-left[data-over] b { color: var(--color-danger-600); }
+.guide-iw-bar { display: flex; height: 28px; border-radius: 6px; overflow: hidden; margin: 8px 0; background: var(--color-neutral-100); }
+.guide-iw-bar > span { display: block; height: 100%; min-width: 0; }
+.guide-iw-base-0 { background: color-mix(in oklab, var(--color-neutral-500) 34%, var(--color-neutral-50)); }
+.guide-iw-base-1 { background: color-mix(in oklab, var(--color-neutral-500) 22%, var(--color-neutral-50)); }
+.guide-iw-base-2 { background: color-mix(in oklab, var(--color-neutral-500) 44%, var(--color-neutral-50)); }
+.guide-iw-base-3 { background: color-mix(in oklab, var(--color-neutral-500) 28%, var(--color-neutral-50)); }
+.guide-iw-goal { background: var(--g-accent); }
+.guide-iw-free { background: repeating-linear-gradient(45deg, var(--color-neutral-200) 0 4px, transparent 4px 8px); }
+.guide-iw-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-neutral-600); font-variant-numeric: tabular-nums; }
+.guide-iw-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
+.guide-iw-rows { list-style: none; margin: 12px 0 0; padding: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+.guide-iw-rows li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--color-neutral-200); }
+.guide-iw-rows li > span:last-child { color: var(--color-neutral-600); white-space: nowrap; }
+.guide-iw-rows li[data-goal] > span:first-child { color: var(--g-accent); }
+.guide-iw-sub { color: var(--color-neutral-500); }
+.guide-iw-edit-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.guide-iw-edit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+.guide-iw-in { font: inherit; font-size: 14px; color: inherit; background: var(--color-neutral-50); border: 1px solid var(--color-neutral-200); border-radius: 7px; padding: 6px 9px; min-width: 0; }
+.guide-iw-in:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 2px; }
+.guide-iw-in[aria-invalid] { border-color: var(--color-danger-600); }
+.guide-iw-in-label { flex: 2 1 130px; }
+.guide-iw-in-hours { flex: 0 1 120px; width: 120px; }
+.guide-iw-in-goal { flex: 1 1 120px; }
+.guide-iw-in-when { flex: 1 1 120px; }
+.guide-iw-spacer { width: 27px; }
+.guide-iw-bad { flex-basis: 100%; font-size: 12px; color: var(--color-danger-600); }
