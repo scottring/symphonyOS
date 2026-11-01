@@ -21,7 +21,7 @@ import type { AgentProposalItem } from '@/lib/agentStream'
 import { WRITE_TOOLS } from '@/lib/agentTurn'
 import { describeChanges, diffSnapshots, type CanvasChange, type Snapshot } from '@/lib/canvas/changeSet'
 import { toolSavingLabel } from '@/lib/canvas/toolLabels'
-import { changeCardNote, type ChangeCardNote, type ChangeSet } from '@/lib/canvas/changeCard'
+import { changeCardNote, toApply, type ChangeCardNote, type ChangeSet } from '@/lib/canvas/changeCard'
 import type { ApplyResult } from '@/lib/canvas/applyChangeSet'
 import { allowanceReceipt, isAllowanceCode } from '@/lib/aiAllowance'
 
@@ -387,7 +387,8 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     approvingRef.current = true
     try {
     setPending({ ...set, state: 'saving', message: undefined })
-    const opts: CommandOptions = { ids: [], changeCount: set.ops.length }
+    // Rows with a question are not written (applyChangeSet), so not counted.
+    const opts: CommandOptions = { ids: [], changeCount: toApply(set.ops).length }
     let failure: string | null = null
     let recoverable = false
     const ok = await run(set.title, async () => {

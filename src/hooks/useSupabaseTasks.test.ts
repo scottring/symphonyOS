@@ -536,6 +536,27 @@ describe('useSupabaseTasks', () => {
       )
     })
 
+    it('writes the life area a new task is filed under, and leaves area_id out when there is none', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+      })
+
+      await act(async () => {
+        await result.current.addTask('Book shoulder follow-up', undefined, undefined, undefined, {
+          bucket: 'week', weekStart: new Date(2026, 10, 1), context: 'personal', areaId: 'area-health',
+        })
+      })
+      expect(mockInsert).toHaveBeenLastCalledWith(expect.objectContaining({ context: 'personal', area_id: 'area-health' }))
+      expect(result.current.tasks.find((t) => t.title === 'Book shoulder follow-up')?.areaId).toBe('area-health')
+
+      await act(async () => {
+        await result.current.addTask('Call about the gutters')
+      })
+      expect(mockInsert.mock.calls.at(-1)![0]).not.toHaveProperty('area_id')
+    })
+
     it('rolls back optimistic update on server error', async () => {
       const { result } = renderHook(() => useSupabaseTasks())
 

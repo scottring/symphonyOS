@@ -77,8 +77,14 @@ export interface ChangeOp {
   showOnTimeline?: boolean
   /** routine_rest: YYYY-MM-DD it wakes; none = rest with no date. */
   until?: string
-  /** routine_add: the life area. */
+  /** routine_add, add, plan_add: the space (Work, Family or Personal). */
   context?: 'family' | 'personal' | 'work'
+  /** add, plan_add: the life area (goal_areas row) it is filed under, and its name. */
+  areaId?: string
+  areaName?: string
+  /** Any op: what Symphony needs to know before this row can be written.
+   *  Shown on the row; Apply writes the other rows and not this one. */
+  question?: string
   /** plan ops: which list. */
   level?: PlanLevel
   /** plan ops: YYYY-MM-DD start of the period the item is on now (or, for
@@ -188,7 +194,14 @@ export interface ChangeSet {
   /** YYYY-MM-DD: the week being planned (read_week's start). An add with no
    *  day lands in it. */
   weekStart?: string
+  /** A line under the rows, e.g. what a guided step left out. */
+  note?: string
 }
+
+/** A row waiting on the person's answer: shown, never written by Apply. */
+export const isQuestion = (op: ChangeOp) => !!op.question
+/** The rows Apply writes. */
+export const toApply = (ops: readonly ChangeOp[]) => ops.filter((op) => !isQuestion(op))
 
 /** What became of the latest card, told to the next turn: Symphony's history
  *  holds only the words, so without this it re-proposes changes already saved
@@ -198,13 +211,13 @@ export interface ChangeCardNote {
   draft?: ChangeSet
   state: 'pending' | 'approved' | 'dismissed'
   title: string
-  ops: { op: ChangeOpKind; title: string; where: string; taskId?: string; date?: string; time?: string }[]
+  ops: { op: ChangeOpKind; title: string; where: string; taskId?: string; date?: string; time?: string; question?: string }[]
   /** ISO time the card reached this state. */
   at: string
 }
 
 export function changeCardNote(set: ChangeSet, state: ChangeCardNote['state'], now = new Date()): ChangeCardNote {
-  return { state, title: set.title, ops: set.ops.map((op) => ({ op: op.op, title: op.title, where: opRow(op, now).where, ...(op.taskId ? {taskId:op.taskId} : {}), ...(op.date ? {date:op.date} : {}), ...(op.time ? {time:op.time} : {}) })), at: now.toISOString() }
+  return { state, title: set.title, ops: set.ops.map((op) => ({ op: op.op, title: op.title, where: opRow(op, now).where, ...(op.taskId ? {taskId:op.taskId} : {}), ...(op.date ? {date:op.date} : {}), ...(op.time ? {time:op.time} : {}), ...(op.question ? {question:op.question} : {}) })), at: now.toISOString() }
 }
 
 /** Tasks with their steps (and Today-group members) laid out flat. The app
@@ -300,11 +313,14 @@ function eventTitle(op: ChangeOp, when: string): string {
 }
 
 /** One card row: what kind of change, to what, and where it lands. */
+/** "No day yet · Health": the life area an add is filed under, when it has one. */
+const inArea = (op: ChangeOp, where: string) => (op.areaName ? `${where} · ${op.areaName}` : where)
+
 export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string; where: string } {
   switch (op.op) {
     case 'place': return { kind: 'MOVE', title: op.title, where: `→ ${dayWords(op, today)}` }
     case 'unplace': return { kind: 'MOVE', title: op.title, where: '→ No day yet' }
-    case 'add': return { kind: 'ADD', title: op.title, where: op.date ? dayWords(op, today) : 'No day yet' }
+    case 'add': return { kind: 'ADD', title: op.title, where: inArea(op, op.date ? dayWords(op, today) : 'No day yet') }
     case 'someday': return { kind: 'LATER', title: op.title, where: '→ Someday' }
     case 'assign': return { kind: 'WHO', title: op.title, where: `→ ${op.assigneeName ?? 'someone'}` }
     case 'done': return { kind: 'DONE', title: op.title, where: '→ Done' }
@@ -330,7 +346,7 @@ export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string
       return { kind, title, where: parts.length ? `→ ${parts.join(' ')}` : '' }
     }
     case 'routine_rest': return { kind: 'REST', title: op.title, where: op.until ? `→ until ${ymdDate(op.until).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '→ resting' }
-    case 'plan_add': return { kind: 'NEW', title: op.title, where: `→ ${op.periodLabel ?? 'the list'}${op.parentTitle ? `, for ${op.parentTitle}` : ''}` }
+    case 'plan_add': return { kind: 'NEW', title: op.title, where: inArea(op, `→ ${op.periodLabel ?? 'the list'}${op.parentTitle ? `, for ${op.parentTitle}` : ''}`) }
     case 'plan_carry': {
       const to = op.toPeriodLabel ?? 'next'
       return { kind: op.toNext === false ? 'MOVE' : 'CARRY', title: op.title, where: op.newTitle ? `→ ${to}, as “${op.newTitle}”` : `→ ${to}` }

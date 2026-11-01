@@ -7,7 +7,7 @@
 import { useId } from 'react'
 import { X } from 'lucide-react'
 import { useCanvasActivity, type PendingChangeSet } from '@/contexts/CanvasActivityContext'
-import { choiceHeading, isEventOp, opRow, opScope, planHeading, SCOPE_HEADING, type ChangeOp, type OpScope } from '@/lib/canvas/changeCard'
+import { choiceHeading, isEventOp, isQuestion, opRow, opScope, planHeading, SCOPE_HEADING, toApply, type ChangeOp, type OpScope } from '@/lib/canvas/changeCard'
 
 interface Props {
   set: PendingChangeSet
@@ -24,6 +24,9 @@ export function ChangeCard({ set, today, onApprove, onDismiss, chat = false, upd
   // The phone shows the card twice (the page's strip and the conversation
   // over it), so the heading id is per instance.
   const titleId = `change-card-${useId()}`
+  // Rows with a question wait for an answer; Apply writes the others.
+  const asking = set.ops.some(isQuestion)
+  const applying = toApply(set.ops).length
   return (
     <section className={`change-card is-${set.state}${chat ? " is-chat-draft" : ""}`} aria-busy={saving || updating} role="region" aria-labelledby={titleId}>
       <header className="change-card-head">
@@ -39,10 +42,11 @@ export function ChangeCard({ set, today, onApprove, onDismiss, chat = false, upd
             {g.ops.map((op) => {
               const row = opRow(op, today)
               return (
-                <li key={op.key} className="change-card-row">
+                <li key={op.key} className={`change-card-row${op.question ? ' is-asking' : ''}`}>
                   <span className="change-card-kind">{chat ? row.kind.charAt(0) + row.kind.slice(1).toLowerCase() : row.kind}</span>
                   <span className="change-card-what">{row.title}</span>
                   <span className="change-card-where">{chat ? chatWhere(op, row.where) : row.where}</span>
+                  {op.question && <span className="change-card-question">{op.question}</span>}
                 </li>
               )
             })}
@@ -50,10 +54,11 @@ export function ChangeCard({ set, today, onApprove, onDismiss, chat = false, upd
         </div>
       ))}
       </div>
+      {set.note && <p className="change-card-left-out">{set.note}</p>}
       {(set.state === 'failed' || set.state === 'partial') && set.message && <p className="change-card-error" role="alert">{set.message}</p>}
       <footer className="change-card-foot">
-        <button type="button" className="change-card-approve" onClick={onApprove} disabled={saving || updating || (set.state === 'partial' && !set.recoverable)}>
-          {saving ? 'Saving…' : set.state === 'partial' ? (set.recoverable ? 'Check save' : 'Ask for an updated card') : chat ? `Save ${set.ops.length} ${set.ops.length === 1 ? 'change' : 'changes'}` : `Approve all ${set.ops.length}`}
+        <button type="button" className="change-card-approve" onClick={onApprove} disabled={saving || updating || (set.state === 'partial' && !set.recoverable) || applying === 0}>
+          {saving ? 'Saving…' : set.state === 'partial' ? (set.recoverable ? 'Check save' : 'Ask for an updated card') : asking ? `Apply ${applying}` : chat ? `Save ${set.ops.length} ${set.ops.length === 1 ? 'change' : 'changes'}` : `Approve all ${set.ops.length}`}
         </button>
         {chat && onEdit && <button type="button" className="canvas-link" onClick={onEdit} disabled={saving || updating}>Make a change</button>}
         {chat && <button type="button" className="canvas-link change-card-discard" onClick={onDismiss} disabled={saving || updating}>Discard draft</button>}

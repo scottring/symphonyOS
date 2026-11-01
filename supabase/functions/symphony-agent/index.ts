@@ -9,6 +9,7 @@ import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
 import { PROPOSE_CHANGES_TOOL, changeCardNote, changeSetFromInput, resolveRefs } from './changeSet.ts'
+import { guideFromInput, sessionPromptBlock, stepCard } from './guideMode.ts'
 import { READ_WEEK_TOOL, local, readCalendarCoverage, shapeWeek, weekWindow } from './readWeek.ts'
 import { READ_PLAN_TOOL, loadPlanRefs, readPlan } from './readPlan.ts'
 import { PROPOSE_CHOICE_CHANGES_TOOL, READ_CHOICES_TOOL, choiceSetFromInput, loadChoiceRefs, readChoices, resolveChoiceRefs } from './choices.ts'
@@ -1454,6 +1455,10 @@ Deno.serve(async (req) => {
     rawSessionContext && typeof rawSessionContext.horizon === 'string' && typeof rawSessionContext.stepTitle === 'string'
       ? rawSessionContext
       : null
+  // A guided planning session (guideMode.ts): the step, what it may write, the
+  // lines above and the life areas. Present = the guide's rules, and the
+  // change card is kept inside the step.
+  const guide = sessionContext ? guideFromInput((rawSessionContext as { guide?: unknown }).guide) : null
   if (!Array.isArray(incoming) || incoming.length === 0) return json({ error: 'messages is required' }, 400)
 
   // Who's who: inject the household roster so names like "Iris" or "Kaleb"
@@ -1526,22 +1531,7 @@ Deno.serve(async (req) => {
   }
   // What became of the last change card (the history holds words, not tool calls).
   datePrefix += changeCardNote(body.changeCard)
-  if (sessionContext) {
-    const strList = (label: string, items?: string[]) =>
-      items && items.length > 0 ? ` ${label}: ${items.map((t) => `"${t}"`).join(', ')}.` : ''
-    datePrefix +=
-      `\n(The user is INSIDE their ${sessionContext.horizon} planning session — period ${sessionContext.periodLabel},` +
-      ` step "${sessionContext.stepTitle}".` +
-      strList('Their current list', sessionContext.listTitles) +
-      strList('The level above', sessionContext.aboveTitles) +
-      strList('Their year goals', sessionContext.goalNames) +
-      ' You are their planning guide for this moment: be warm and brief, help break big items into' +
-      ' moves sized to this horizon, name what the lists reveal, and keep plans honest about time and energy.' +
-      ' Never restate the lists back at them. Suggest — do not write. Only create or change tasks when' +
-      ' the user explicitly asks; then use the right bucket for this horizon' +
-      (sessionContext.bucket ? ` (bucket "${sessionContext.bucket}")` : '') + '.' +
-      ' When asked for moves/suggestions in JSON, return ONLY the JSON array.)'
-  }
+  if (sessionContext) datePrefix += sessionPromptBlock(sessionContext, guide)
   const convo: Array<{ role: string; content: unknown }> = incoming.map(
     (m: { role: string; content: unknown }, i: number) => {
       if (i !== 0) return { role: m.role, content: m.content }
@@ -1648,6 +1638,8 @@ Deno.serve(async (req) => {
                   const taskIds = [...new Set(parsed.set.ops.flatMap((o) => [o.taskId, o.fromTaskId].filter((x): x is string => !!x)))]
                   const memberIds = [...new Set(parsed.set.ops.flatMap((o) => [...(o.assignee ? [o.assignee] : []), ...(o.assignees ?? [])]))]
                   const routineIds = [...new Set(parsed.set.ops.flatMap((o) => o.routineId ? [o.routineId] : []))]
+                  // Life areas the adds are filed under: absent = not visible to them.
+                  const areaIds = [...new Set(parsed.set.ops.flatMap((o) => o.areaId ? [o.areaId] : []))]
                   // Goals on Month, Season and Year: the items and parents plan ops name.
                   const planIds = [...new Set(parsed.set.ops.flatMap((o) => [o.itemId, o.parentId].filter((x): x is string => !!x)))]
                   const hasPlanOps = parsed.set.ops.some((o) => o.op.startsWith('plan_'))
@@ -1658,22 +1650,26 @@ Deno.serve(async (req) => {
                   const wallRefused = wall && parsed.set.ops.some((o) => !WALL_CARD_OPS.has(o.op))
                   // Same RLS client as every tool: a routine or goal the person
                   // cannot see is simply absent, and resolveRefs refuses it.
-                  const [tasksRead, membersRead, routinesRead, planRead] = await Promise.all([
+                  const [tasksRead, membersRead, routinesRead, planRead, areasRead] = await Promise.all([
                     taskIds.length ? tdb.from('tasks').select('id, title, updated_at, completed, scheduled_for, is_all_day').in('id', taskIds) : { data: [], error: null },
                     memberIds.length ? tdb.from('family_members').select('id, name').in('id', memberIds) : { data: [], error: null },
                     routineIds.length ? tdb.from('routines').select('id, name, updated_at, parent_routine_id').in('id', routineIds) : { data: [], error: null },
                     hasPlanOps && !wallRefused ? loadPlanRefs(tdb, planIds, local(new Date().toISOString()).date).catch(() => null) : undefined,
+                    areaIds.length ? tdb.from('goal_areas').select('id, name, context').in('id', areaIds) : { data: [], error: null },
                   ])
-                  const resolved = wallRefused
+                  const checked = wallRefused
                     ? { error: 'On the kitchen wall the change card can move, add, set aside and assign tasks. Routine changes, done, merge, talk-about and goals are made in the Symphony app for now: say so, and offer to note it on the scratchpad.' }
-                    : tasksRead.error || membersRead.error || routinesRead.error || planRead === null
+                    : tasksRead.error || membersRead.error || routinesRead.error || planRead === null || areasRead.error
                     ? { error: 'Could not read the tasks, routines and goals to check this list. Try again.' }
-                    : resolveRefs(parsed.set, (tasksRead.data ?? []).map(t => ({...t, ...(t.scheduled_for ? {placement:{date:local(t.scheduled_for).date, ...(!t.is_all_day ? {time:local(t.scheduled_for).time} : {})}} : {})})), membersRead.data ?? [], routinesRead.data ?? [], planRead)
+                    : resolveRefs(parsed.set, (tasksRead.data ?? []).map(t => ({...t, ...(t.scheduled_for ? {placement:{date:local(t.scheduled_for).date, ...(!t.is_all_day ? {time:local(t.scheduled_for).time} : {})}} : {})})), membersRead.data ?? [], routinesRead.data ?? [], planRead, areasRead.data ?? [])
+                  // In a guided step the card keeps to what the step may write.
+                  const resolved = guide && !('error' in checked) ? stepCard(checked.set, guide.writes) : { ...checked, leftOut: [] as string[] }
                   if ('error' in resolved) result = JSON.stringify({ error: resolved.error })
                   else {
                     send({ type: 'change_set', set: resolved.set })
                     shown.proposal = { key: resolved.set.key, title: resolved.set.title, ops: resolved.set.ops.length }
-                    result = JSON.stringify({ shown: resolved.set.ops.length, saved: false, note: wall ? 'Shown as a change card. Nothing is saved until a grown-up approves. Ask your next useful question or say it is ready to approve.' : 'Shown as a draft in chat, marked Not saved. The plan is unchanged until the person clicks Save. Do not repeat the list or the review reminder; acknowledge the change or ask your next useful question.' })
+                    const leftOut = resolved.leftOut.length ? ` Left off the card because they belong to another step: ${resolved.leftOut.map((t) => `"${t}"`).join(', ')}. Say which step each belongs to; do not propose them again in this step.` : ''
+                    result = JSON.stringify({ shown: resolved.set.ops.length, saved: false, note: (wall ? 'Shown as a change card. Nothing is saved until a grown-up approves. Ask your next useful question or say it is ready to approve.' : 'Shown as a draft in chat, marked Not saved. The plan is unchanged until the person clicks Save. Do not repeat the list or the review reminder; acknowledge the change or ask your next useful question.') + leftOut })
                   }
                 }
               } else if (block.name === PROPOSE_CHOICE_CHANGES_TOOL.name) {

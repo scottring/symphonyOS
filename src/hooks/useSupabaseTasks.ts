@@ -847,6 +847,8 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     goalId?: string
     goalTaskId?: string
     supportsGoalTaskId?: string
+    /** The life area (goal_areas row) the task is filed under. */
+    areaId?: string
     /** Fun-audit mark. */
     isFun?: boolean
     /** Rich context carried on the INSERT. Same race rationale as `bucket`: a
@@ -920,6 +922,7 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
       sourceId: options?.sourceId,
       goalId: options?.goalId,
       supportsGoalTaskId: options?.supportsGoalTaskId,
+      areaId: options?.areaId,
       isFun: options?.isFun,
       pickedAt: options?.pickedAt,
       notes: options?.notes,
@@ -983,6 +986,9 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
         // just the one flow that uses it — the migration for this column is
         // deliberately unapplied while the branch is under review.
         ...(options?.supportsGoalTaskId ? { supports_goal_task_id: options.supportsGoalTaskId } : {}),
+        // Named only when set, for the same reason: tasks.area_id arrives
+        // with the guided-planning migration.
+        ...(options?.areaId ? { area_id: options.areaId } : {}),
         is_fun: options?.isFun ?? false,
         picked_at: options?.pickedAt?.toISOString() ?? null,
         notes: options?.notes ?? null,

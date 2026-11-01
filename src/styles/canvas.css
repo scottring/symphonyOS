@@ -226,6 +226,12 @@
 .dark .change-card-where, .dark .change-card-note { color: #a5aca9; }
 .dark .change-card-error { color: #f2a07f; }
 .change-card-head .canvas-icon { min-width: 44px; min-height: 44px; }
+/* A row with a question (guided planning): the question under it, amber, as
+   the mockup's note; Apply leaves the row unsaved until it is answered. */
+.change-card-question { grid-column: 1 / -1; margin-top: 2px; padding: 5px 8px; border-radius: 5px; font-size: 13px; line-height: 1.4; color: hsl(35 85% 30%); background: color-mix(in srgb, var(--color-warning-500) 14%, var(--color-warning-50)); overflow-wrap: anywhere; }
+.dark .change-card:not(.is-chat-draft) .change-card-question { color: hsl(42 80% 66%); background: color-mix(in srgb, var(--color-warning-500) 16%, transparent); }
+.change-card-left-out { margin: 8px 0 0; font-size: 13px; color: #4a4f4d; }
+.dark .change-card:not(.is-chat-draft) .change-card-left-out { color: #a5aca9; }
 .canvas-receipt-request { color: var(--color-neutral-600); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-receipt-summary { color: var(--color-neutral-900); min-width: 0; }
 .canvas-receipt-changes { display: inline-flex; gap: 6px; flex-wrap: wrap; }

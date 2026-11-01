@@ -2,6 +2,8 @@ import type { SessionHorizon } from '@/hooks/usePlanningSession'
 
 export type GuideLevel = 'day' | 'week' | 'month' | 'season' | 'year'
 
+// Duplicated in supabase/functions/symphony-agent/guideMode.ts (Deno cannot
+// import src/). Keep the two unions identical.
 export type StepWrite =
   | 'review'
   | 'triage'

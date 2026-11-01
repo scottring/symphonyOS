@@ -55,6 +55,31 @@ describe('applyChangeSet', () => {
     expect(d.addTask).toHaveBeenCalledWith('Hold', new Date(2026, 9, 14, 13, 0), { isAllDay: false, bucket: 'timed' })
   })
 
+  it('leaves a row with a question unwritten and applies the rest', async () => {
+    const d = deps()
+    const r = await applyChangeSet({ key: 'q', title: '2 changes', ops: [
+      { key: 'q:0', op: 'add', title: 'A' },
+      { key: 'q:1', op: 'add', title: 'B', question: 'Which day?' },
+    ] }, d)
+    expect(r).toMatchObject({ ok: true, ids: ['new1'] })
+    expect(d.addTask).toHaveBeenCalledTimes(1)
+    expect(d.addTask).toHaveBeenCalledWith('A', undefined, { bucket: 'week', weekStart: new Date(2026, 9, 10) })
+  })
+
+  it('a question row needs no writer the page lacks', () => {
+    const page = deps({ routines: undefined, updateRoutine: undefined })
+    expect(canApply({ key: 'q', title: '2', ops: [
+      { key: 'q:0', op: 'add', title: 'A' },
+      { key: 'q:1', op: 'routine_change', routineId: 'r1', title: 'r1', name: 'x', question: 'Every week?' },
+    ] }, page)).toBe(true)
+  })
+
+  it('an add in a space and a life area creates the task with that context and area', async () => {
+    const d = deps()
+    await applyChangeSet({ key: 'c', title: '1 change', ops: [{ key: 'c:0', op: 'add', title: 'Call about the gutters', context: 'family', areaId: 'x' }] }, d)
+    expect(d.addTask).toHaveBeenCalledWith('Call about the gutters', undefined, { bucket: 'week', weekStart: new Date(2026, 9, 10), context: 'family', areaId: 'x' })
+  })
+
   it('Undo reverses everything, newest first', async () => {
     const d = deps()
     const r = await applyChangeSet(set, d)
@@ -415,6 +440,18 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
     const d = planDeps()
     await applyOk(one({ key: 'p:0', op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'Clean the garage' }), d)
     expect(d.addTask).toHaveBeenCalledWith('Clean the garage', undefined, { bucket: 'month', monthStart: new Date(2026, 10, 1) })
+  })
+
+  it('plan_add takes its own space and life area over the parent\'s and the page\'s', async () => {
+    const d = planDeps({ defaultContext: 'work' })
+    await applyOk(one({ key: 'p:0', op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'Book the cabin', parentId: 's1', parentTitle: 'Plan winter vacation', context: 'personal', areaId: 'area-fun' }), d)
+    expect(d.addTask).toHaveBeenCalledWith('Book the cabin', undefined, { bucket: 'month', monthStart: new Date(2026, 10, 1), sourceId: 's1', goalId: 'g1', context: 'personal', areaId: 'area-fun' })
+  })
+
+  it('plan_add to a year files the goal under its life area, in its space', async () => {
+    const d = planDeps({ defaultContext: 'work' })
+    await applyOk(one({ key: 'p:0', op: 'plan_add', level: 'year', periodStart: '2027-01-01', title: 'Run a 10k', context: 'personal', areaId: 'area-health' }), d)
+    expect(d.addGoal).toHaveBeenCalledWith('Run a 10k', { year: 2027, context: 'personal', areaId: 'area-health' })
   })
 
   it('plan_add refuses as stale when its parent has gone', async () => {

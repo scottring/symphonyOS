@@ -77,3 +77,31 @@ it('chat leaves a time inside a LOG row\'s summary as written', () => {
   expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Redo the bathrooms · Contractor', 'Redo the bathrooms'])
 })
 
+
+describe('ChangeCard: questions on rows', () => {
+  const today = new Date(2026, 9, 14, 8)
+  const asking = pending({ title: '2 changes', ops: [
+    { key: 's:0', op: 'add', title: 'Finish GW application' },
+    { key: 's:1', op: 'add', title: "Mia's dentist", question: 'Is this booking the appointment, or going to it?' },
+  ] })
+  it('shows the question on its own row and Apply counts the rest', () => {
+    render(<ChangeCard set={asking} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
+    const row = screen.getByText("Mia's dentist").closest('li')!
+    expect(row).toHaveTextContent('Is this booking the appointment, or going to it?')
+    expect(screen.getByText('Finish GW application').closest('li')).not.toHaveTextContent('booking')
+    expect(screen.getByRole('button', { name: 'Apply 1' })).toBeEnabled()
+  })
+  it('in chat the button reads Apply 1 too', () => {
+    render(<ChangeCard chat set={asking} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Apply 1' })).toBeInTheDocument()
+  })
+  it('a card of questions only has nothing to apply', () => {
+    render(<ChangeCard set={pending({ ops: [asking.ops[1]] })} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Apply 0' })).toBeDisabled()
+  })
+  it('shows what a guided step left out, and a row\'s life area', () => {
+    render(<ChangeCard set={pending({ note: 'Left out: “Run a 10k” belongs to another step.', ops: [{ key: 's:0', op: 'add', title: 'Book shoulder follow-up', areaId: 'a1', areaName: 'Health' }] })} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
+    expect(screen.getByText('Left out: “Run a 10k” belongs to another step.')).toBeInTheDocument()
+    expect(screen.getByText('No day yet · Health')).toBeInTheDocument()
+  })
+})

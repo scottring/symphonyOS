@@ -11,7 +11,7 @@ import type { Goal, GoalStatus } from '@/types/goal'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { CreateRoutineInput, UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { RescheduleResult } from '@/hooks/useActionableInstances'
-import { isChoiceOp, isEventOp, isGoalEvent, opWhen, opWrite, withSteps, type ChangeOp, type ChangeOpKind, type ChangeSet, type ChoiceOpKind, type DayKey } from './changeCard'
+import { isChoiceOp, isEventOp, isGoalEvent, isQuestion, opWhen, opWrite, withSteps, type ChangeOp, type ChangeOpKind, type ChangeSet, type ChoiceOpKind, type DayKey } from './changeCard'
 import type { ChoiceWriters } from '@/lib/choices/applyDeps'
 import type { ChoiceDetail } from '@/lib/choices/db'
 import { OPTION_STATUSES, type CellValue, type Choice, type ChoiceColumn, type ChoiceOption, type ColumnKind, type GoalRef, type WorkPiece } from '@/types/choice'
@@ -33,6 +33,8 @@ export interface ApplyDeps extends Partial<MoreApplyDeps> {
     isAllDay?: boolean; bucket?: TaskBucket; weekStart?: Date; assignedTo?: string; assignedToAll?: string[]; sourceId?: string
     /** plan_add: a month or season goal, committed to its period, with its parent link. */
     monthStart?: Date; seasonStart?: Date; goalId?: string; context?: TaskContext
+    /** add / plan_add: the life area it is filed under. */
+    areaId?: string
   }) => Promise<string | undefined>
   deleteTask: (id: string) => Promise<unknown>
   /** The planned week's start, for an add with no day (plannedWeekStart). */
@@ -321,10 +323,12 @@ function decisionOf(c: Choice): Parameters<ChoiceWriters['updateChoice']>[1] {
 
 /** Whether this page has every writer the set needs. */
 export function canApply(set: ChangeSet, deps: ApplyDeps): boolean {
-  return set.ops.every((op) => [...(NEEDS[op.op] ?? []), ...planNeeds(op)].every((k) => deps[k] !== undefined))
+  return set.ops.filter((op) => !isQuestion(op)).every((op) => [...(NEEDS[op.op] ?? []), ...planNeeds(op)].every((k) => deps[k] !== undefined))
 }
 
-export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<ApplyResult> {
+export async function applyChangeSet(card: ChangeSet, given: ApplyDeps): Promise<ApplyResult> {
+  // A row with a question waits for the person's answer: Apply writes the rest.
+  const set: ChangeSet = { ...card, ops: card.ops.filter((op) => !isQuestion(op)) }
   if (!canApply(set, given)) return { ok: false, reason: 'failed', reverted: true, kept: [] }
   // Every writer an op below calls was checked just above.
   const deps = given as ApplyDeps & MoreApplyDeps
@@ -594,9 +598,11 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
         case 'add': {
           const when = opWhen(op)
           const who = op.assignee ? { assignedTo: op.assignee, assignedToAll: [op.assignee] } : {}
+          // The space and life area it was filed under on the card.
+          const filed = { ...(op.context ? { context: op.context } : {}), ...(op.areaId ? { areaId: op.areaId } : {}) }
           const options = when
-            ? { isAllDay: !op.time, bucket: 'timed' as const, ...who, ...(op.goalId ? { sourceId: op.goalId } : {}) }
-            : { bucket: 'week' as const, weekStart: deps.weekStart, ...who, ...(op.goalId ? { sourceId: op.goalId } : {}) }
+            ? { isAllDay: !op.time, bucket: 'timed' as const, ...who, ...(op.goalId ? { sourceId: op.goalId } : {}), ...filed }
+            : { bucket: 'week' as const, weekStart: deps.weekStart, ...who, ...(op.goalId ? { sourceId: op.goalId } : {}), ...filed }
           const id = await deps.addTask(op.title, when, options)
           if (!id) return fail()
           ids.push(id)
@@ -676,7 +682,8 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
         case 'plan_add': {
           const start = localDay(op.periodStart!)
           if (op.level === 'year') {
-            const id = await deps.addGoal(op.title, { year: start.getFullYear(), ...(deps.defaultContext ? { context: deps.defaultContext } : {}) })
+            const goalContext = op.context ?? deps.defaultContext
+            const id = await deps.addGoal(op.title, { year: start.getFullYear(), ...(goalContext ? { context: goalContext } : {}), ...(op.areaId ? { areaId: op.areaId } : {}) })
             if (!id) return fail()
             ids.push(id)
             undos.push({ id, undo: () => deps.deleteGoal(id) })
@@ -687,11 +694,12 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           // (sourceId) and inherits that one's year goal.
           const parentGoal = op.level === 'season' && op.parentId ? goalsById.get(op.parentId) : undefined
           const parentTask = op.level === 'month' && op.parentId ? byId.get(op.parentId) : undefined
-          const context = (parentGoal ? parentGoal.context : parentTask?.context) ?? deps.defaultContext
+          // The card's own space first (Symphony checked it against the parent's).
+          const context = op.context ?? (parentGoal ? parentGoal.context : parentTask?.context) ?? deps.defaultContext
           const options = op.level === 'season'
             ? { bucket: 'quarter' as const, seasonStart: start, ...(op.parentId ? { goalId: op.parentId } : {}) }
             : { bucket: 'month' as const, monthStart: start, ...(op.parentId ? { sourceId: op.parentId } : {}), ...(parentTask?.goalId ? { goalId: parentTask.goalId } : {}) }
-          const id = await deps.addTask(op.title, undefined, { ...options, ...(context ? { context } : {}) })
+          const id = await deps.addTask(op.title, undefined, { ...options, ...(context ? { context } : {}), ...(op.areaId ? { areaId: op.areaId } : {}) })
           if (!id) return fail()
           ids.push(id)
           undos.push({ id, undo: () => deps.deleteTask(id) })

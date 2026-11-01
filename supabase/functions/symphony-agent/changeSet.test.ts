@@ -328,7 +328,8 @@ describe('agent wiring', () => {
   it('resolves routines and merged tasks through the same RLS client', () => {
     expect(src).toContain("tdb.from('routines').select('id, name, updated_at, parent_routine_id').in('id', routineIds)")
     expect(src).toContain('resolveRefs(parsed.set, (tasksRead.data ?? []).map')
-    expect(src).toContain('membersRead.data ?? [], routinesRead.data ?? [], planRead)')
+    expect(src).toContain('membersRead.data ?? [], routinesRead.data ?? [], planRead, areasRead.data ?? [])')
+    expect(src).toContain("tdb.from('goal_areas').select('id, name, context').in('id', areaIds)")
     expect(src).toContain('loadPlanRefs(tdb, planIds,')
     expect(src).toContain('[o.taskId, o.fromTaskId]')
   })
