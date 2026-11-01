@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { HORIZON_OF, stepsFor, type GuideLevel } from '@/lib/guide/steps'
-import { goNext, jumpTo, parseProgress, skipStep, startProgress, type GuideProgress } from '@/lib/guide/progress'
+import { goNext, jumpTo, parseProgress, reopenProgress, skipStep, startProgress, type GuideProgress } from '@/lib/guide/progress'
 
 export function useGuidedProgress(level: GuideLevel, token: string) {
   const { notes, loading, patch } = usePlanningNotes(HORIZON_OF[level], token)
@@ -13,12 +13,13 @@ export function useGuidedProgress(level: GuideLevel, token: string) {
   const ref = useRef(progress)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Take the saved step when a load finishes; later saves don't echo back over newer taps.
+  // Take the saved step when a load finishes (a finished session starts again
+  // at the top); later saves don't echo back over newer taps.
   const guideRef = useRef(notes.guide)
   useEffect(() => { guideRef.current = notes.guide }, [notes.guide])
   useEffect(() => {
     if (loading) return
-    const p = parseProgress(guideRef.current, level)
+    const p = reopenProgress(parseProgress(guideRef.current, level), level)
     ref.current = p
     setProgress(p)
   }, [loading, level])

@@ -95,6 +95,26 @@ describe('useGuidedProgress', () => {
     expect((stored!.guide as { finishedAt?: string }).finishedAt).toBeTruthy()
   })
 
+  // Final review 2026-11-01: "Plan … again" on a finished session starts at
+  // the top, not on the last step, with what was done and skipped still marked.
+  it('a finished session opens again on its first step, its done and skipped marks kept', async () => {
+    stored = { guide: { current: 'family', done: ['look-back', 'read-month', 'choose'], skipped: ['inbox'], plannedAt: '2026-11-01T10:00:00Z', finishedAt: '2026-11-01T11:00:00Z', threadId: 't1' } }
+    const { result } = renderHook(() => useGuidedProgress('week', '2026-W44'))
+    await ready(result)
+    expect(result.current.progress).toEqual({ current: steps[0].id, done: ['look-back', 'read-month', 'choose'], skipped: ['inbox'], plannedAt: '2026-11-01T10:00:00Z', threadId: 't1' })
+    // Running again, it is not finished: the next save says so, and Done sets it again.
+    await act(async () => { await result.current.jump('calendar') })
+    expect(stored!.guide).toMatchObject({ current: 'calendar', done: ['look-back', 'read-month', 'choose'], skipped: ['inbox'] })
+    expect((stored!.guide as { finishedAt?: string }).finishedAt).toBeUndefined()
+  })
+
+  it('an unfinished session still resumes where it was', async () => {
+    stored = { guide: { current: 'family', done: ['look-back'], skipped: [] } }
+    const { result } = renderHook(() => useGuidedProgress('week', '2026-W44'))
+    await ready(result)
+    expect(result.current.progress.current).toBe('family')
+  })
+
   it('a failed save sets saveError, keeps the step, and clears on the next success', async () => {
     const { result } = renderHook(() => useGuidedProgress('week', '2026-W44'))
     await ready(result)

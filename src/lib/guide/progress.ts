@@ -64,3 +64,12 @@ export function parseProgress(raw: unknown, level: GuideLevel): GuideProgress {
   if (typeof r.threadId === 'string') out.threadId = r.threadId
   return out
 }
+
+/** A session finished before, opened again ("Plan … again"): it starts on its
+ *  first step, with what was done and skipped still marked. Running again it
+ *  is not finished; Done sets finishedAt again. */
+export function reopenProgress(p: GuideProgress, level: GuideLevel): GuideProgress {
+  if (!p.finishedAt) return p
+  const { finishedAt: _finished, ...rest } = p
+  return { ...rest, current: stepsFor(level)[0].id }
+}
