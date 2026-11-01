@@ -2,7 +2,7 @@ import type { WorkspaceContext } from '@/lib/workspace/context'
 import type { TurnOutcome } from '@/lib/turnOutcome'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
-import type { AgentApiMessage, AgentProposalItem, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
+import type { AgentApiMessage, AgentProposalItem, AssistantSessionContext, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
 import { runAgentTurn, type AgentTurnResult } from '@/lib/agentTurn'
 import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 import type { ChatMessage, ChatSession } from '@/types/chat'
@@ -23,6 +23,8 @@ export interface UseSymphonyAssistantOptions {
   onMutate?: () => void
   /** Scope the conversation to one task/routine (sent to the edge fn every turn). */
   taskContext?: AssistantTaskContext
+  /** The planning session and step the conversation is inside (sent every turn). */
+  sessionContext?: AssistantSessionContext
   /** Persist conversations to chat_sessions under this entity_type (e.g.
    *  'symphony_rail', 'task'). Omit only for truly ephemeral chats. */
   persistKey?: string
@@ -78,7 +80,7 @@ function hydrateMessages(raw: unknown, sessionId: string): ChatMessage[] {
  * chat_sessions so conversations survive reloads (history dropdown).
  */
 export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
-  const { surface, resolveAction, onPlanSaved, onWorkspace, onMutate, taskContext, workspaceContext, persistKey, persistEntityId, turnObserver } = options ?? {}
+  const { surface, resolveAction, onPlanSaved, onWorkspace, onMutate, taskContext, sessionContext, workspaceContext, persistKey, persistEntityId, turnObserver } = options ?? {}
   // The last message sent, so a failed turn can be retried with the same turn
   // id (the server can then recognise writes it already made).
   const lastTurn = useRef<{ text: string; turnId: string; changeCard?: ChangeCardNote } | null>(null)
@@ -95,6 +97,12 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   // The persisted row id survives across turns without waiting for state.
   const sessionIdRef = useRef<string | null>(null)
+  // A thread opened by entity (openThread): a new conversation is saved under
+  // it instead of persistKey, and its row id is reported once it exists.
+  const threadRef = useRef<{ entityType: string; entityId: string; onThread?: (id: string) => void } | null>(null)
+  // Bumped by anything that changes the conversation, so a thread still
+  // loading does not land over what replaced it.
+  const openRequest = useRef(0)
   const { getCurrentUserMember } = useFamilyMembers()
 
   // Recent persisted conversations for the history dropdown.
@@ -144,7 +152,8 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
 
   /** Insert or update the chat_sessions row for the current conversation. */
   const persistTurn = useCallback(async (finalMessages: ChatMessage[]) => {
-    if (!persistKey) return
+    const thread = threadRef.current
+    if (!persistKey && !thread) return
     try {
       const stored = serializeMessages(finalMessages)
       if (stored.length === 0) return
@@ -162,25 +171,29 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
         const { data: { user } } = await getAuthUser()
         if (!user) return
         const title = stored.find((m) => m.role === 'user')?.content.slice(0, 80) ?? 'Chat'
+        const entityType = thread ? thread.entityType : persistKey!
+        const entityId = thread ? thread.entityId : persistEntityId ?? null
         const { data, error: saveError } = await supabase
           .from('chat_sessions')
-          .insert({ user_id: user.id, title, entity_type: persistKey, entity_id: persistEntityId ?? null, mode: 'chat', messages: stored })
+          .insert({ user_id: user.id, title, entity_type: entityType, entity_id: entityId, mode: 'chat', messages: stored })
           .select()
           .single()
         if (saveError || !data?.id) throw saveError ?? new Error('Conversation not saved')
         if (data?.id) {
           sessionIdRef.current = data.id
           setActiveSessionId(data.id)
-          setSessions((prev) => [{
+          // Only the conversations the history lists join it.
+          if (!thread) setSessions((prev) => [{
             id: data.id,
             title,
-            entityType: persistKey,
-            entityId: persistEntityId ?? null,
+            entityType,
+            entityId,
             mode: 'chat',
             messages: finalMessages,
             createdAt: new Date(),
             updatedAt: new Date(),
           }, ...prev])
+          thread?.onThread?.(data.id)
         }
       }
     } catch {
@@ -276,6 +289,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       attachment: attachmentMeta,
       currentMemberId: getCurrentUserMember()?.id,
       taskContext,
+      sessionContext,
       workspaceContext,
       changeCard,
       onWorkspace,
@@ -299,7 +313,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     setLoading(false)
     sending.current = false
     return { text: turn.text, outcome: turn.outcome, error: turn.error }
-  }, [surface, resolveAction, onPlanSaved, onWorkspace, workspaceContext, messages, onMutate, taskContext, getCurrentUserMember, persistTurn, turnObserver])
+  }, [surface, resolveAction, onPlanSaved, onWorkspace, workspaceContext, messages, onMutate, taskContext, sessionContext, getCurrentUserMember, persistTurn, turnObserver])
 
   const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment, opts?: { turnId?: string; retry?: boolean }) => (await sendTurn(text, attachment, opts))?.text, [sendTurn])
 
@@ -312,6 +326,8 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
 
   const resetSession = useCallback(() => {
     if (sending.current) return
+    openRequest.current += 1
+    threadRef.current = null
     setMessages([])
     setError(null)
     setToolActivity([])
@@ -319,9 +335,47 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     setActiveSessionId(null)
   }, [])
 
+  /** Open the conversation saved for one entity (a planning session's
+   *  thread): the newest chat_sessions row with that entity_type/entity_id,
+   *  or, when there is none yet, an empty conversation whose first turn is
+   *  saved under it. `onThread` hears the row's id once it is known. */
+  const openThread = useCallback(async (entityType: string, entityId: string, onThread?: (id: string) => void) => {
+    if (sending.current) return
+    const request = ++openRequest.current
+    threadRef.current = { entityType, entityId, onThread }
+    setMessages([])
+    setError(null)
+    setToolActivity([])
+    sessionIdRef.current = null
+    setActiveSessionId(null)
+    try {
+      const { data, error: readError } = await supabase
+        .from('chat_sessions')
+        .select('id, messages')
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .eq('mode', 'chat')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+      if (readError) throw readError
+      // Replaced meanwhile (reset, another thread, a loaded conversation) or
+      // already talking: the new turn starts the thread instead.
+      if (request !== openRequest.current || sending.current) return
+      const row = data?.[0]
+      if (!row) return
+      setMessages(hydrateMessages(row.messages, row.id))
+      sessionIdRef.current = row.id
+      setActiveSessionId(row.id)
+      onThread?.(row.id)
+    } catch {
+      if (request === openRequest.current) setError('This session\'s earlier conversation could not be loaded. Your plan is unchanged.')
+    }
+  }, [])
+
   /** Restore a persisted conversation into the pane. */
   const loadSession = useCallback((session: ChatSession) => {
     if (sending.current) return
+    openRequest.current += 1
     setMessages(session.messages)
     setError(null)
     setToolActivity([])
@@ -341,7 +395,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   }, [resetSession])
 
   return {
-    messages, loading, error, toolActivity, sendMessage, sendTurn, retryLast, resetSession,
+    messages, loading, error, toolActivity, sendMessage, sendTurn, retryLast, resetSession, openThread,
     sessions, sessionsLoading, sessionsError, reloadSessions, activeSessionId, loadSession, deleteSession,
   }
 }

@@ -6,6 +6,9 @@ import { DomainProvider } from '@/hooks/useDomain'
 import { DomainGateProvider } from '@/components/domain/DomainGate'
 import { DesktopPageControls } from '@/components/layout/DesktopNavigation'
 import { deriveActiveView, pageOwnsFilterChrome, ShellLayout } from './ShellLayout'
+import { useMemo } from 'react'
+import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
+import { useConversationWalk } from '@/components/canvas/conversationWalk'
 
 vi.mock('@/lib/canvas/reviewedChange', async () => {
   const {applyChangeSet} = await import('@/lib/canvas/applyChangeSet')
@@ -66,12 +69,20 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
   addTask: tasksState.addTask, deleteTask: vi.fn(), refetch: vi.fn(),
 }) }))
 const aiState = vi.hoisted(() => ({ hidden: true }))
-vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: aiState.hidden, setHidden: vi.fn() }) }))
+// Stateful like the real preference, so opening and closing the pane shows.
+vi.mock('@/hooks/useScratchpadHidden', async () => {
+  const { useState } = await import('react')
+  return { useScratchpadHidden: () => { const [hidden, setHidden] = useState(aiState.hidden); return { hidden, setHidden } } }
+})
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ routines: [], deleteRoutine: vi.fn(), updateRoutine: vi.fn(), refetch: vi.fn(), addRoutine: vi.fn() }) }))
-const assistantState = vi.hoisted(() => ({ observer: null as null | import('@/hooks/useSymphonyAssistant').AssistantTurnObserver, sendMessage: vi.fn() }))
+const assistantState = vi.hoisted(() => ({
+  observer: null as null | import('@/hooks/useSymphonyAssistant').AssistantTurnObserver, sendMessage: vi.fn(),
+  options: undefined as undefined | import('@/hooks/useSymphonyAssistant').UseSymphonyAssistantOptions,
+  openThread: vi.fn(async (..._args: unknown[]) => {}), resetSession: vi.fn(),
+}))
 vi.mock('@/hooks/useSymphonyAssistant', () => ({
-  useSymphonyAssistant: (options?: { turnObserver?: import('@/hooks/useSymphonyAssistant').AssistantTurnObserver }) => (assistantState.observer = options?.turnObserver ?? null, {
-    messages: [], loading: false, error: null, sendMessage: assistantState.sendMessage, resetSession: vi.fn(),
+  useSymphonyAssistant: (options?: import('@/hooks/useSymphonyAssistant').UseSymphonyAssistantOptions) => (assistantState.observer = options?.turnObserver ?? null, assistantState.options = options, {
+    messages: [], loading: false, error: null, sendMessage: assistantState.sendMessage, resetSession: assistantState.resetSession, openThread: assistantState.openThread,
     toolActivity: [], sessions: [], sessionsLoading: false, loadSession: vi.fn(),
     deleteSession: vi.fn(), activeSessionId: null,
   }),
@@ -581,5 +592,86 @@ describe('typing while voice is on (2026-10-14, Wednesday Wheelie\'s)', () => {
     voiceState.active = false
     voiceState.access = false
     aiState.hidden = true
+  })
+})
+
+// Guided planning (spec 2026-11-01): a page registers its session; the shell
+// opens the conversation beside it with the step's header on top, reopens the
+// session's own thread, and sends the step with every turn.
+describe('A guided planning session in the shell', () => {
+  const onThread = vi.fn()
+  function GuidedPage({ stepId, on = true }: { stepId: string; on?: boolean }) {
+    useConversationWalk({ label: 'Help me plan the rest of my week', message: 'Help me plan the rest of my week.' })
+    const reg = useMemo<GuidedSessionRegistration | null>(() => (on ? {
+      level: 'week', periodLabel: 'Week of Nov 1', token: '2026-11-1', stepId,
+      header: <p>Step header: {stepId}</p>,
+      sessionContext: { horizon: 'weekly', periodLabel: 'Week of Nov 1', stepId, stepTitle: stepId,
+        guide: { level: 'week', stepId, stepTitle: stepId, writes: ['inbox'], aboveLines: [], areas: [] } },
+      threadKey: 'weekly:2026-11-1', onThread, threadId: 'known-thread',
+    } : null), [stepId, on])
+    useGuidedSessionRegistration(reg)
+    return <div data-testid="app-content" />
+  }
+  const at = (node: ReactNode) => <MemoryRouter initialEntries={['/week']}><DomainProvider><DomainGateProvider><ShellLayout>{node}</ShellLayout></DomainGateProvider></DomainProvider></MemoryRouter>
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; aiState.hidden = true; assistantState.openThread.mockClear(); assistantState.resetSession.mockClear(); onThread.mockClear() })
+  afterEach(() => { mobileState.isMobile = false; aiState.hidden = true })
+
+  it('desktop: opens the panel once with the step header, reopens the session thread, and restores on leaving', () => {
+    const view = render(at(<GuidedPage stepId="look-back" on={false} />))
+    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
+    expect(assistantState.options?.sessionContext).toBeUndefined()
+
+    view.rerender(at(<GuidedPage stepId="inbox" />))
+    const panel = screen.getByRole('region', { name: 'Chat with Symphony' })
+    expect(within(panel).getByText('Step header: inbox')).toBeInTheDocument()
+    // The page's suggested talk gives way to the session.
+    expect(within(panel).queryByText(/Suggested:/)).not.toBeInTheDocument()
+    expect(assistantState.openThread).toHaveBeenCalledTimes(1)
+    expect(assistantState.openThread.mock.calls[0].slice(0, 2)).toEqual(['planning_session', 'weekly:2026-11-1'])
+    expect(assistantState.options?.sessionContext).toMatchObject({ stepId: 'inbox', guide: { stepId: 'inbox' } })
+
+    // The thread link reaches the page only when it is a different row.
+    const reportThread = assistantState.openThread.mock.calls[0][2] as (id: string) => void
+    reportThread('known-thread')
+    expect(onThread).not.toHaveBeenCalled()
+    reportThread('new-thread')
+    expect(onThread).toHaveBeenCalledWith('new-thread')
+
+    // Closed by hand mid-session, a step change does not force it back open.
+    fireEvent.click(screen.getByRole('button', { name: 'Close Chat' }))
+    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
+    view.rerender(at(<GuidedPage stepId="calendar" />))
+    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
+    expect(assistantState.openThread).toHaveBeenCalledTimes(1)
+    expect(assistantState.options?.sessionContext).toMatchObject({ guide: { stepId: 'calendar' } })
+
+    view.rerender(at(<GuidedPage stepId="calendar" on={false} />))
+    expect(assistantState.resetSession).toHaveBeenCalledTimes(1)
+    expect(assistantState.options?.sessionContext).toBeUndefined()
+    // Hidden before the session, hidden after it.
+    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
+  })
+
+  it('desktop: leaving restores the pane as it was, and the walk returns', () => {
+    const view = render(at(<GuidedPage stepId="inbox" on={false} />))
+    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
+    view.rerender(at(<GuidedPage stepId="inbox" />))
+    expect(screen.getByRole('region', { name: 'Chat with Symphony' })).toBeInTheDocument()
+    view.rerender(at(<GuidedPage stepId="inbox" on={false} />))
+    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Step header: inbox')).not.toBeInTheDocument()
+  })
+
+  it('phone: the conversation overlay opens with the header, and closes again on leaving', () => {
+    mobileState.isMobile = true
+    const view = render(at(<GuidedPage stepId="inbox" on={false} />))
+    const overlay = () => document.querySelector<HTMLElement>('[aria-label="Symphony conversation"]')!
+    expect(overlay().style.display).toBe('none')
+    view.rerender(at(<GuidedPage stepId="inbox" />))
+    expect(overlay().style.display).not.toBe('none')
+    expect(within(overlay()).getByText('Step header: inbox')).toBeInTheDocument()
+    view.rerender(at(<GuidedPage stepId="inbox" on={false} />))
+    expect(overlay().style.display).toBe('none')
+    expect(assistantState.resetSession).toHaveBeenCalledTimes(1)
   })
 })

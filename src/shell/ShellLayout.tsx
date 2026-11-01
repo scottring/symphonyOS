@@ -58,6 +58,7 @@ import { conversationStripPath } from '@/lib/canvas/stripPaths';
 import { ConversationWalkContext, type ConversationWalk } from '@/components/canvas/conversationWalk';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
+import { GuidedSessionProvider, useGuidedSession } from '@/contexts/GuidedSessionContext';
 import { useShellChrome } from './useShellChrome';
 import { addScratchpadNote, ownMemberId } from '@/lib/wall/addScratchpadNote';
 import { SchoolPaperCapture } from '@/components/capture/SchoolPaperCapture';
@@ -293,6 +294,9 @@ function ShellLayoutInner({ children }: Props) {
   // button toggles the same state); phones open it per launch.
   const conversationContext = useMemo(() => assistantSelection(scopedTasks, selection, layers), [scopedTasks, selection, layers]);
   const screenContext = useMemo(() => workspaceContext(scopedTasks, location.pathname, location.search, layers, selection?.kind === 'task' ? selection.id : null, new Date(), scopedGoals), [scopedTasks, scopedGoals, location.pathname, location.search, layers, selection, cadenceConfig.weekStartsOn]);
+  // A guided planning session on the page (GuidedSessionContext): its step
+  // goes with every turn, its header tops the conversation, its own thread.
+  const guided = useGuidedSession();
   const approveConversationCard = async () => { const a = canvasRef.current; if (!a?.changeSet) return 'none' as const; let outcome: 'saved' | 'partial' | 'failed' = 'failed'; await a.approveChangeSet(state => { outcome = state; }); return outcome; };
   const assistant = useSymphonyAssistant({ resolveAction: text => resolveConversationAction(text, approveConversationCard, async () => (await canvasRef.current?.undo()) ?? 'none'), persistKey: 'symphony_rail', onPlanSaved: (saved) => {
     void refetch();
@@ -301,7 +305,7 @@ function ShellLayoutInner({ children }: Props) {
       const query = new URLSearchParams({ view: 'constellation', start: saved.date, horizon: String(saved.level), focus: `${saved.level}:${saved.id}` });
       navigate(`/year?${query}`, { replace: true });
     }
-  }, onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); }, turnObserver });
+  }, onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, sessionContext: guided?.sessionContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); }, turnObserver });
   const { hidden: aiHidden, setHidden: setAiHidden } = useScratchpadHidden();
   const [phoneChatOpen, setPhoneChatOpen] = useState(false);
   const [conversationDraft, setConversationDraft] = useState('');
@@ -377,6 +381,41 @@ function ShellLayoutInner({ children }: Props) {
     if (next === 'ai') setAiHidden(false);
     setPane(next);
   }, [setAiHidden]);
+
+  // A guided session opens the conversation beside the page once, as it
+  // starts (closing it mid-session sticks), and leaving puts the pane back
+  // as it was and returns to the everyday thread.
+  const guidedActive = !!guided;
+  const paneBefore = useRef<{ aiHidden: boolean; pane: SidePane; phoneChatOpen: boolean } | null>(null);
+  const paneNow = useRef({ aiHidden, pane, phoneChatOpen, isMobile });
+  useEffect(() => { paneNow.current = { aiHidden, pane, phoneChatOpen, isMobile }; });
+  const { openThread, resetSession } = assistant;
+  useEffect(() => {
+    if (guidedActive) {
+      if (paneBefore.current) return;
+      const now = paneNow.current;
+      paneBefore.current = { aiHidden: now.aiHidden, pane: now.pane, phoneChatOpen: now.phoneChatOpen };
+      if (now.isMobile) setPhoneChatOpen(true); else showPane('ai');
+    } else if (paneBefore.current) {
+      const before = paneBefore.current;
+      paneBefore.current = null;
+      setAiHidden(before.aiHidden);
+      setPane(before.pane);
+      setPhoneChatOpen(before.phoneChatOpen);
+      resetSession();
+    }
+  }, [guidedActive, showPane, setAiHidden, resetSession]);
+  // Each session has its own saved thread; reopening the session reopens it.
+  const guidedLatest = useRef(guided);
+  useEffect(() => { guidedLatest.current = guided; });
+  const threadKey = guided?.threadKey ?? null;
+  useEffect(() => {
+    if (!threadKey) return;
+    void openThread('planning_session', threadKey, (id) => {
+      const reg = guidedLatest.current;
+      if (reg && reg.threadKey === threadKey && reg.threadId !== id) reg.onThread(id);
+    });
+  }, [threadKey, openThread]);
 
   // Programmatic launches (unibox "Ask Symphony", Add-to-today…).
   const { openAssistant } = useAssistantLauncher();
@@ -464,7 +503,8 @@ function ShellLayoutInner({ children }: Props) {
   // same conversation looked like two assistants). Its history, files and
   // note links came over from the older pane.
   const chatPane = (onClose?: () => void) => <ConversationStrip chatOnly panel draft={conversationDraft} onDraftChange={setConversationDraft}
-    error={assistant.error} messages={assistant.messages} walk={conversationStripPath(location.pathname) ? walk : null}
+    error={assistant.error} messages={assistant.messages} walk={!guided && conversationStripPath(location.pathname) ? walk : null}
+    header={guided?.header}
     onSend={sendConversation} busy={assistant.loading} voice={stripVoice} onClose={onClose}
     history={{ sessions: assistant.sessions, loading: assistant.sessionsLoading, activeSessionId: assistant.activeSessionId,
       onLoad: (session) => { voice.stop(); assistant.loadSession(session); }, onDelete: assistant.deleteSession, onNew: resetConversation }}
@@ -806,7 +846,7 @@ export function ShellLayout({ children }: Props) {
     <ListsProvider>
       <NotesProvider deferLoad>
         <PinsProvider>
-          <ReferenceListsProvider key={user?.id ?? "anonymous"} userId={user?.id ?? "anonymous"}><GuideProvider><PageGuideProvider><ShellLayoutInner>{children}</ShellLayoutInner><GuideLayer /></PageGuideProvider></GuideProvider></ReferenceListsProvider>
+          <ReferenceListsProvider key={user?.id ?? "anonymous"} userId={user?.id ?? "anonymous"}><GuideProvider><PageGuideProvider><GuidedSessionProvider><ShellLayoutInner>{children}</ShellLayoutInner></GuidedSessionProvider><GuideLayer /></PageGuideProvider></GuideProvider></ReferenceListsProvider>
         </PinsProvider>
       </NotesProvider>
     </ListsProvider>

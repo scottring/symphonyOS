@@ -76,6 +76,19 @@ describe('docked conversation bar (approved Season board, 2026-10-10)', () => {
 })
 
 describe('conversation panel', () => {
+  it('shows a guided session\'s step header above the thread, in panel mode only', () => {
+    const header = <div data-testid="step-header">Step 2 of 7</div>
+    const { unmount } = render(<ConversationStrip chatOnly panel onClose={vi.fn()} header={header} messages={[msg('1', 'user', 'First ask')]} onSend={vi.fn()} busy={false} voice={voice} />)
+    const shown = screen.getByTestId('step-header')
+    // Fixed above the scrolling thread, below the panel's own title row.
+    expect(shown.closest('.conversation-panel-scroll')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Chat with Symphony' }).compareDocumentPosition(shown) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(shown.compareDocumentPosition(screen.getByText('First ask')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    unmount()
+    render(<ConversationStrip chatOnly docked header={header} messages={[]} onSend={vi.fn()} busy={false} voice={voice} />)
+    expect(screen.queryByTestId('step-header')).not.toBeInTheDocument()
+  })
+
   it('shows the whole history and keeps voice activity outside the scrolling history', () => {
     render(<ConversationStrip panel messages={[msg('1', 'user', 'First ask'), msg('2', 'assistant', 'First answer'), msg('3', 'user', 'Second ask')]} onSend={vi.fn()} busy={false} voice={{ ...voice, active: true, status: 'live', turn: 'listening' }} />)
     expect(screen.getByText('First answer')).toBeInTheDocument()

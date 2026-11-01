@@ -19,6 +19,7 @@ const db = vi.hoisted(() => ({
   inserted: [] as Array<Record<string, unknown>>,
   updated: [] as Array<{ id: string; patch: Record<string, unknown> }>,
   deleted: [] as string[],
+  nextId: 'sess-1',
 }))
 
 vi.mock('@/lib/supabase', () => {
@@ -38,10 +39,11 @@ vi.mock('@/lib/supabase', () => {
           // .eq()s (entity_type, mode, and optionally entity_id).
           const query: Record<string, unknown> = {}
           const back = () => query
+          const filters: Array<[string, unknown]> = []
           Object.assign(query, {
-            eq: back,
+            eq: (col: string, value: unknown) => { filters.push([col, value]); return query },
             order: back,
-            limit: () => db.failRead?Promise.resolve({data:null,error:new Error('Read unavailable')}):thenable(db.sessionsRows),
+            limit: () => db.failRead?Promise.resolve({data:null,error:new Error('Read unavailable')}):thenable(db.sessionsRows.filter((row) => filters.every(([col, value]) => row[col] === value))),
           })
           return {
             select: () => query,
@@ -49,7 +51,7 @@ vi.mock('@/lib/supabase', () => {
               db.inserted.push(row)
               return {
                 select: () => ({
-                  single: () => Promise.resolve(db.failInsert ? {data:null,error:new Error('offline')} : { data: { id: 'sess-1' }, error: null }),
+                  single: () => Promise.resolve(db.failInsert ? {data:null,error:new Error('offline')} : { data: { id: db.nextId }, error: null }),
                 }),
               }
             },
@@ -196,6 +198,21 @@ describe('useSymphonyAssistant', () => {
     expect(seen).toEqual(taskContext)
   })
 
+  it('sends the guided session\'s context with every turn', async () => {
+    const seen: unknown[] = []
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
+      seen.push(h.sessionContext)
+      h.onDone?.('ok', null)
+    })
+    const sessionContext = { horizon: 'weekly', periodLabel: 'Week of Nov 1', stepId: 'inbox', stepTitle: 'Clear the inbox',
+      guide: { level: 'week' as const, stepId: 'inbox', stepTitle: 'Clear the inbox', writes: ['inbox' as const], aboveLines: [], areas: [] } }
+    const { result } = renderHook(() => useSymphonyAssistant({ sessionContext }))
+    await act(async () => { await result.current.sendMessage('what is left?') })
+    await act(async () => { await result.current.sendMessage('and then?') })
+    expect(seen).toEqual([sessionContext, sessionContext])
+    expect((seen[0] as typeof sessionContext).guide.stepId).toBe('inbox')
+  })
+
   it('calls onMutate after a turn that used a write tool', async () => {
     vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
       h.onTool?.('symphony_update_task')
@@ -211,6 +228,7 @@ describe('useSymphonyAssistant', () => {
   describe('persistence (persistKey)', () => {
     beforeEach(() => {
       db.sessionsRows = []
+      db.nextId = 'sess-1'
       db.inserted = []
       db.updated = []
       db.deleted = []
@@ -264,6 +282,61 @@ describe('useSymphonyAssistant', () => {
       expect(db.deleted).toContain('s9')
       expect(result.current.sessions.length).toBe(0)
       expect(result.current.messages.length).toBe(0)
+      expect(result.current.activeSessionId).toBeNull()
+    })
+
+    it('openThread reopens the newest saved thread for that entity', async () => {
+      const row = (id: string, entity_id: string, content: string, updated_at: string) => ({
+        id, title: content, entity_type: 'planning_session', entity_id, mode: 'chat',
+        messages: [{ role: 'user', content, timestamp: updated_at }, { role: 'assistant', content: `re: ${content}`, timestamp: updated_at }],
+        created_at: updated_at, updated_at,
+      })
+      db.sessionsRows = [row('p1', 'weekly:2026-11-1', 'Sunday talk', '2026-11-01T10:00:00Z'), row('p0', 'weekly:2026-10-25', 'last week', '2026-10-25T10:00:00Z')]
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onDone?.('ok', null) })
+      const onThread = vi.fn()
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      await act(async () => { await result.current.openThread('planning_session', 'weekly:2026-11-1', onThread) })
+      expect(result.current.messages.map((m) => m.content)).toEqual(['Sunday talk', 're: Sunday talk'])
+      expect(result.current.activeSessionId).toBe('p1')
+      expect(onThread).toHaveBeenCalledWith('p1')
+      // Tuesday's turn carries on the same row.
+      await act(async () => { await result.current.sendMessage('and Tuesday?') })
+      expect(db.inserted).toHaveLength(0)
+      expect(db.updated[0].id).toBe('p1')
+      // The planning thread is not one of the rail's "older conversations".
+      expect(result.current.sessions.some((s) => s.id === 'p1')).toBe(false)
+    })
+
+    it('openThread without a saved thread starts one: the next send inserts it under that entity', async () => {
+      db.nextId = 'new-thread'
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => { h.onText?.('ok'); h.onDone?.('ok', null) })
+      const onThread = vi.fn()
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      await act(async () => { await result.current.sendMessage('rail chat') })
+      db.inserted = []
+      await act(async () => { await result.current.openThread('planning_session', 'weekly:2026-11-1', onThread) })
+      // The rail conversation is not carried into the session.
+      expect(result.current.messages).toEqual([])
+      expect(onThread).not.toHaveBeenCalled()
+      await act(async () => { await result.current.sendMessage('what is on this week?') })
+      expect(db.inserted).toHaveLength(1)
+      expect(db.inserted[0]).toMatchObject({ entity_type: 'planning_session', entity_id: 'weekly:2026-11-1', mode: 'chat', user_id: 'u1' })
+      expect(onThread).toHaveBeenCalledWith('new-thread')
+      // Back to the rail: the next new conversation is a rail one again.
+      act(() => result.current.resetSession())
+      db.nextId = 'rail-2'
+      await act(async () => { await result.current.sendMessage('rail again') })
+      expect(db.inserted[1]).toMatchObject({ entity_type: 'symphony_rail', entity_id: null })
+      expect(onThread).toHaveBeenCalledTimes(1)
+    })
+
+    it('a reset while a thread is still loading keeps the rail empty', async () => {
+      db.sessionsRows = [{ id: 'p1', title: 't', entity_type: 'planning_session', entity_id: 'weekly:2026-11-1', mode: 'chat', messages: [{ role: 'user', content: 'Sunday talk' }], created_at: '2026-11-01T10:00:00Z', updated_at: '2026-11-01T10:00:00Z' }]
+      const { result } = renderHook(() => useSymphonyAssistant({ persistKey: 'symphony_rail' }))
+      let opening: Promise<void> | undefined
+      act(() => { opening = result.current.openThread('planning_session', 'weekly:2026-11-1'); result.current.resetSession() })
+      await act(async () => { await opening })
+      expect(result.current.messages).toEqual([])
       expect(result.current.activeSessionId).toBeNull()
     })
 

@@ -1,6 +1,6 @@
 // Conversation history, proposed changes and confirmed results share one reading surface.
 
-import { useEffect, useRef, useState, useId, type FormEvent } from 'react'
+import { useEffect, useRef, useState, useId, type FormEvent, type ReactNode } from 'react'
 import { Mic, Send, Undo2, RotateCcw, X, MessageSquare, Check, Paperclip, Plus } from 'lucide-react'
 import { ChatMessage } from '@/components/chat/ChatMessage'
 import type { ChatMessage as ChatMessageType } from '@/types/chat'
@@ -78,6 +78,8 @@ interface Props {
   onSourceClick?: (noteId: string) => void
   /** Panel: the empty conversation's line, e.g. about the item open. */
   emptyHint?: string
+  /** Panel: a guided session's step header, above the thread. */
+  header?: ReactNode
 }
 
 const STATE_LABEL: Record<CanvasReceipt['state'], string> = {
@@ -146,7 +148,7 @@ function DockedTranscript({ messages, busy, voice, panel = false, chatOnly = fal
   </div>
 }
 
-export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, panel = false, onClose, messages, walk, right = 0, draft: externalDraft, onDraftChange, error, history, toolActivity, onSourceClick, emptyHint }: Props) {
+export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, panel = false, onClose, messages, walk, right = 0, draft: externalDraft, onDraftChange, error, history, toolActivity, onSourceClick, emptyHint, header }: Props) {
   const { receipt, undo, retry, dismiss, proposals, changeSet } = useCanvasActivity()
   const selection = useSelectionOptional()
   const [localDraft, setLocalDraft] = useState('')
@@ -204,6 +206,7 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
           {onClose && <button type="button" className="canvas-icon" aria-label="Close conversation" onClick={onClose}><X size={20} /></button>}
         </div>
       </header>}
+      {panel && header && <div className="conversation-panel-guide">{header}</div>}
       <div ref={panelScroll} className={panel ? 'conversation-panel-scroll' : undefined} onScroll={event => {
         const el = event.currentTarget
         followLatest.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80

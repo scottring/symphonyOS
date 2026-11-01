@@ -9,7 +9,7 @@ import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 // code drifting away from the first.
 
 import { UNKNOWN_OUTCOME, type TurnOutcome } from '@/lib/turnOutcome'
-import { streamSymphonyAgent, type AgentApiMessage, type AgentProposalItem, type AgentSourceNote, type AssistantTaskContext, type AttachmentMeta } from '@/lib/agentStream'
+import { streamSymphonyAgent, type AgentApiMessage, type AgentProposalItem, type AgentSourceNote, type AssistantSessionContext, type AssistantTaskContext, type AttachmentMeta } from '@/lib/agentStream'
 
 /** Tools that mutate task/project data. When the agent uses one, the app needs
  *  to refresh so the change shows without a page reload. */
@@ -64,6 +64,8 @@ export interface AgentTurnHandlers {
   attachment?: AttachmentMeta
   currentMemberId?: string
   taskContext?: AssistantTaskContext
+  /** The planning session (and guided step) the conversation is inside. */
+  sessionContext?: AssistantSessionContext
 }
 
 export interface AgentTurnResult {
@@ -159,6 +161,7 @@ export async function runAgentTurn(
       attachment: handlers.attachment,
       currentMemberId: handlers.currentMemberId,
       taskContext: handlers.taskContext,
+      sessionContext: handlers.sessionContext,
     })
   } catch {
     streamError = 'Connection dropped'
