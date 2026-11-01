@@ -9,7 +9,7 @@
 import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { DeckCard, DeckSource } from '@/lib/planning/deck'
-import { buildDeck } from '@/lib/planning/deck'
+import { buildDeck, carriedWeeks } from '@/lib/planning/deck'
 import type { DeckActions, LaterWhen } from './useDeckActions'
 import { buildChooseTree, countsLine, type ChooseNode, type ChooseLine, type LooseItem } from '@/lib/planning/chooseFromAbove'
 import type { ChooseItemView, ChooseLineView, ChooseVerb } from '@/components/plan/choose/ChoosePlan'
@@ -18,7 +18,10 @@ import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { openCommitment, liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { timingRemoval } from '@/lib/planning/planActions'
+import { assigneesOf } from '@/lib/planning/v2/planV2'
 import type { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import type { FamilyMember } from '@/types/family'
+import type { LooseEnd } from '@/components/plan/guided/week/WeekLookBack'
 
 type AddTaskOptions = NonNullable<Parameters<ReturnType<typeof useSupabaseTasks>['addTask']>[4]>
 
@@ -158,6 +161,27 @@ export function useChooseWeek(d: ChooseWeekDeps) {
       return [...(l.planned.kind === 'last' ? [l.task] : []), ...kids.flatMap(all)]
     }).concat(tree.loose.filter((x) => x.source === 'last').map((x) => x.task))
 
+    // Looking back (the guided session's step 1): each of last week's not
+    // done, with the four calls on it. Hand off is assignment through the
+    // gated update (its scope follows, as everywhere); Undo puts the people back.
+    const handOff = (t: Task) => (to: FamilyMember) => {
+      const before: Partial<Task> = { assignedTo: t.assignedTo, assignedToAll: t.assignedToAll }
+      return activity.run(`Hand “${t.title}” to ${to.name}`, async () => ok(await d.updateTask(t.id, { assignedTo: to.id, assignedToAll: [to.id] })),
+        { ids: [t.id], undo: async () => ok(await d.updateTask(t.id, before)) })
+    }
+    const looseEnds: LooseEnd[] = unanswered.map((t) => {
+      const n = carriedWeeks(t)
+      return {
+        key: t.id, title: t.title, note: n >= 1 ? `Carried ${n} ${n === 1 ? 'week' : 'weeks'}` : undefined,
+        who: assigneesOf(t),
+        thisWeek: () => d.actions.keepThisWeek(card(t, 'last-week')),
+        smaller: addUnder(t, `Add a smaller step under “${t.title}”`),
+        handOff: handOff(t),
+        drop: () => d.actions.letGo(card(t, 'last-week')),
+        done: () => d.actions.done(card(t, 'last-week')),
+      }
+    })
+
     return {
       tree,
       monthWord,
@@ -171,6 +195,7 @@ export function useChooseWeek(d: ChooseWeekDeps) {
       unanswered,
       /** How many of last week's are still open (Looking back's count). */
       notDoneLastWeek: unanswered.length,
+      looseEnds,
     }
   }, [d, activity, monthWord])
 }

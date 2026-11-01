@@ -9,6 +9,7 @@ import { GiveThemADay, type PlaceItem } from './GiveThemADay'
 import { LookingBack } from './LookingBack'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
+import type { LooseEnd } from '@/components/plan/guided/week/WeekLookBack'
 
 export interface WeekChoose {
   monthWord: string
@@ -20,6 +21,8 @@ export interface WeekChoose {
   placedCount: number
   /** Last week's still open (Looking back's count). */
   notDoneLastWeek: number
+  /** The same, each with its calls (the guided session's Look back). */
+  looseEnds?: LooseEnd[]
 }
 
 export function PlanWeekFlow({ mode, choose, stripDays, loading, aged = 0, onSeeAged, onFinish, onLeave, look }: {

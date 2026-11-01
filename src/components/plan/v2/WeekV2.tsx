@@ -31,6 +31,12 @@ import type { WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
 import { GiveThemADay } from '@/components/plan/choose/GiveThemADay'
 import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
 import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
+import { WeekLookBack } from '@/components/plan/guided/week/WeekLookBack'
+import { ReadMonth } from '@/components/plan/guided/week/ReadMonth'
+import { CalendarCheck } from '@/components/plan/guided/week/CalendarCheck'
+import { InboxStep } from '@/components/plan/guided/week/InboxStep'
+import type { ClashEvent } from '@/lib/guide/clashes'
+import type { FamilyMember } from '@/types/family'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import type { DeckCard, DeckMode } from '@/lib/planning/deck'
 import type { DeckActions } from '@/components/home/week/useDeckActions'
@@ -77,6 +83,10 @@ export interface WeekDeck {
   /** The page's scoped tasks (the deck's list): the guided session counts
    *  the week from these, exactly what the page shows. */
   tasks?: readonly Task[]
+  /** The week's timed events as the page draws them (the calendar check). */
+  events?: readonly ClashEvent[]
+  /** Who a loose end can be handed to: the household, but not the viewer. */
+  handOffTo?: readonly FamilyMember[]
 }
 
 export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
@@ -230,7 +240,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
       {deckMode && deck
         // Drawn only once the tasks are in: no flash of an empty October.
         ? (deck.loading ? null : deckMode === 'full'
-          ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} isCurrent={isCurrent} deck={deck}
+          ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} isCurrent={isCurrent} deck={deck} lastReview={lastReview}
               canvas={typeof canvas === 'function' ? canvas({ hideStrip: true }) : canvas}
               onFinish={closeWeek} onClose={() => setMode(null)} onPlanned={session.reload} />
           : <section className="deck choose-flow" aria-label="Plan this week">
@@ -243,13 +253,16 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
 }
 
 const NO_TASKS: readonly Task[] = []
+const NOBODY: readonly FamilyMember[] = []
 
 /** Planning the week (spec 2026-11-01): the guided session on this page.
  *  Mounted only while it runs, so its notes are read only then. */
-function WeekSession({ weekStart, isCurrent, deck, canvas, onFinish, onClose, onPlanned }: {
+function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish, onClose, onPlanned }: {
   weekStart: Date
   isCurrent: boolean
   deck: WeekDeck
+  /** Last week's review: Look back's notes save through it. */
+  lastReview: ReturnType<typeof usePeriodReview>
   canvas: ReactNode
   onFinish: () => Promise<boolean>
   onClose: () => void
@@ -258,6 +271,16 @@ function WeekSession({ weekStart, isCurrent, deck, canvas, onFinish, onClose, on
   const guided = useGuidedWeek({ weekStart, isCurrent, tasks: deck.tasks ?? NO_TASKS, choose: deck.choose, onFinish, onClose, onPlanned })
   // Where the session is comes first: no flash of step one before a resume.
   if (guided.loading) return null
-  return <GuidedWeek canvas={canvas} bodies={{}} count={guided.count} monthWord={guided.monthWord}
+  const choose = deck.choose
+  // What each step shows inside the rail (Choose, Weekly ops and Tell the
+  // family come with Task 10).
+  const bodies = {
+    'look-back': <WeekLookBack review={lastReview} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
+      notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} members={deck.handOffTo ?? NOBODY} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
+    'read-month': <ReadMonth monthWord={choose.monthWord} lines={choose.lines} doneLines={choose.doneLines} />,
+    calendar: <CalendarCheck weekStart={weekStart} events={deck.events ?? []} />,
+    inbox: <InboxStep cards={deck.cards.filter((c) => c.source === 'inbox')} actions={deck.actions} />,
+  }
+  return <GuidedWeek canvas={canvas} bodies={bodies} count={guided.count} monthWord={guided.monthWord}
     progress={guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }} onLeave={onClose} />
 }

@@ -1139,6 +1139,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
     lines: planLines, pool: planPool, weekAnchor, lastWeekStart, monthStart: planMonth, isCurrent: weekIsCurrent,
     actions: deckActions, keepForward, dropCommitment, updateTask, addTask, deleteTask,
   })
+  // The guided session's calendar check reads the timed events the days draw
+  // (the page's space filter); Look back hands a loose end to anyone else.
+  const clashEvents = useMemo(() => eventItems.flatMap((i) => i.startTime && i.endTime
+    ? [{ id: i.id, title: i.title, start: i.startTime, end: i.endTime, ...(i.location ? { place: i.location } : {}) }] : []), [eventItems])
+  const handOffTo = useMemo(() => familyMembers.filter((m) => m.id !== meId), [familyMembers, meId])
   const deck: WeekDeck = {
     mode: deckMode, available: deckAvailable,
     cards: deckCards, doneLastWeek, plannedLastWeek, alsoDoneLastWeek, doneThisWeek, onThisWeek, aged, actions: deckActions, stripDays,
@@ -1159,6 +1164,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
     onSeeAged: () => navigate('/someday'),
     choose: chooseWeek,
     tasks: deckTasks,
+    events: clashEvents,
+    handOffTo,
   }
 
   return (

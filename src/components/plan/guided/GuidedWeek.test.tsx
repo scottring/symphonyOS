@@ -54,7 +54,7 @@ const makeChoose = (over: Partial<WeekChoose> = {}): WeekChoose => ({
 const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
   mode: null, available: true, cards: [], doneLastWeek: 0, aged: 0, stripDays: [], onSeeAged: vi.fn(),
   onFinish: vi.fn(async () => { store.order.push('drain'); return true }),
-  actions: { done: vi.fn(), placeOnDay: vi.fn(), keepThisWeek: vi.fn(), later: vi.fn(), laterOnDate: vi.fn(), letGo: vi.fn(), drain: vi.fn() } as unknown as WeekDeck['actions'],
+  actions: { done: vi.fn(), placeOnDay: vi.fn(), keepThisWeek: vi.fn(async () => true), later: vi.fn(), laterOnDate: vi.fn(), letGo: vi.fn(), drain: vi.fn() } as unknown as WeekDeck['actions'],
   choose: makeChoose(), tasks: [],
   ...over,
 })
@@ -129,6 +129,36 @@ describe('GuidedWeek — the Week page while planning', () => {
     fireEvent.click(screen.getByRole('button', { name: /Choose this week/ }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Go to this step' })) })
     expect(shell.reg?.stepId).toBe('choose')
+  })
+
+  it('the first four steps show their bodies inside the rail, from the page’s own lists', async () => {
+    const gate = { key: 'gate', title: 'Fix the gate', who: [], thisWeek: vi.fn(async () => true), smaller: vi.fn(async () => true), handOff: vi.fn(async () => true), drop: vi.fn(async () => true), done: vi.fn(async () => true) }
+    const vet = createMockTask({ id: 'vet', title: 'Book the vet', bucket: 'inbox' })
+    const deck = makeDeck({
+      aged: 2, doneLastWeek: 3, plannedLastWeek: 4,
+      choose: makeChoose({ notDoneLastWeek: 1, looseEnds: [gate] }),
+      cards: [{ key: 'vet', task: vet, source: 'inbox', facts: 'Captured Monday' }],
+      events: [{ id: 'e1', title: 'Dentist', start: new Date(2026, 8, 28, 9), end: new Date(2026, 8, 28, 10) }, { id: 'e2', title: 'Team call', start: new Date(2026, 8, 28, 9, 30), end: new Date(2026, 8, 28, 11) }],
+    })
+    open('/week?plan=1', deck)
+    const rail = () => within(screen.getByRole('group', { name: 'Steps in this session' }))
+    // 1 · Look back: the notes save as last week's review; the loose end and the sweep's note.
+    fireEvent.change(rail().getByLabelText('What went well'), { target: { value: 'Rested' } })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Save notes' })) })
+    expect(review.finish).toHaveBeenCalledWith({ wentWell: 'Rested', didnt: '' })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Drop: Fix the gate' })) })
+    expect(gate.drop).toHaveBeenCalled()
+    expect(rail().getByText(/Moved 2 untouched things to Later/)).toBeInTheDocument()
+    // 2 · Read October: the month's lines.
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    expect(rail().getByRole('listitem', { name: 'Get the house ready' })).toBeInTheDocument()
+    // 3 · Calendar check: the clash, flagged on its day.
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    expect(rail().getByText('Overlap: Dentist and Team call')).toBeInTheDocument()
+    // 4 · Clear the inbox: filed through the deck's writers.
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'This week: Book the vet' })) })
+    expect(deck.actions.keepThisWeek).toHaveBeenCalledWith(deck.cards[0])
   })
 
   it('the count reads "{n} of about 15": what is on this week, from the page’s own list', () => {
