@@ -42,6 +42,14 @@ beforeEach(() => {
 })
 
 describe('useFirstWeekSignals', () => {
+  it('reads only my own planning_sessions rows: planned is per person', async () => {
+    h.results.planning_sessions = { data: [], error: null }
+    const { result } = renderHook(() => useFirstWeekSignals())
+    await waitFor(() => expect(result.current.signals).not.toBeNull())
+    expect(h.calls).toContainEqual({ table: 'planning_sessions', op: 'eq', args: ['author_id', 'user-1'] })
+  })
+
+
   it('derives signals from the counts the account already has', async () => {
     h.results.planning_sessions = { data: [{ savedAt: '2026-01-05T00:00:00.000Z' }], error: null }
     h.results.family_members = { count: 4, data: null, error: null }

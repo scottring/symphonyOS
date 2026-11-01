@@ -1,5 +1,5 @@
-// The Home checklist's one read (cadenceChecklist.ts): every planning_sessions
-// row in the household for the periods it names, last and this, per horizon.
+// The Home checklist's one read (cadenceChecklist.ts): the signed-in person's own
+// planning_sessions rows (planned and reviewed are per person) for the periods it names, last and this, per horizon.
 // Unknown is not "not done": a failed read shows no checklist at all.
 
 import { useEffect, useMemo, useState } from 'react'
@@ -22,7 +22,7 @@ export function useCadenceChecklist(today: Date, weekStartsOn: WeekStart, season
     let live = true
     // Shared while in flight: Home asked for the same checklist twice per load.
     void shareInFlight(`planning_sessions:checklist:${userId}|${key}`,
-      async () => await supabase.from('planning_sessions').select('horizon, period_token, notes').in('period_token', key.split('|')))
+      async () => await supabase.from('planning_sessions').select('horizon, period_token, notes').eq('author_id', userId).in('period_token', key.split('|')))
       .then(({ data: rows, error }) => { if (live) setData({ key, rows: error ? null : (rows ?? []) as SessionRow[] }) })
       .catch(() => { if (live) setData({ key, rows: null }) })
     return () => { live = false }
