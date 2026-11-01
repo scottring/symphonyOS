@@ -16,19 +16,21 @@
 //
 // It is chrome AROUND the existing week: the canvas, drag and drop and
 // add-to-day are WeekViewV2's, unchanged. Review (?review=1) and Plan
-// (?plan=1) swap the canvas for Plan this week (spec 2026-10-19): Choose from
-// the month, then Give them a day. "Place them" (?place=1) opens straight on
-// the days. Month, Season and Year plan with the same Choose step
-// (ConstellationPage).
+// (?plan=1) open the guided session on this same page (spec 2026-11-01): the
+// steps rail where the strip stands, the week beside it, the step's header
+// in the conversation. "Place them" (?place=1) opens Give them a day.
 
-import { useContext, useState, type ReactNode } from 'react'
-import type { ReviewNotes } from '@/hooks/usePeriodReview'
+import { useContext, type ReactNode } from 'react'
+import type { Task } from '@/types/task'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
-import { PlanWeekFlow, type WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
+import type { WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
+import { GiveThemADay } from '@/components/plan/choose/GiveThemADay'
+import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
+import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import type { DeckCard, DeckMode } from '@/lib/planning/deck'
 import type { DeckActions } from '@/components/home/week/useDeckActions'
@@ -72,13 +74,17 @@ export interface WeekDeck {
   onSeeAged: () => void
   /** Plan this week (spec 2026-10-19): Choose from the month, then Give them a day. */
   choose: WeekChoose
+  /** The page's scoped tasks (the deck's list): the guided session counts
+   *  the week from these, exactly what the page shows. */
+  tasks?: readonly Task[]
 }
 
 export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   weekStart: Date
   isCurrent: boolean
-  /** The week at rest: WeekViewV2's canvas. */
-  canvas?: ReactNode | (() => ReactNode)
+  /** The week at rest: WeekViewV2's canvas. A guided session asks for it
+   *  without its strip (its steps stand there). */
+  canvas?: ReactNode | ((opts?: { hideStrip?: boolean }) => ReactNode)
   /** Today's first item, for the fact line ("Today: …"); null when there is
    *  none, the week is not this one, or it has not loaded. */
   today?: string | null
@@ -129,24 +135,20 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   // cards) and records that week's review. So reviewing this week opens the
   // deck on the week after it, and last week's review opens it here.
   const target = reviewTarget({ start: weekStart, end: nextWeek }, new Date(), REVIEW_WINDOW_DAYS.week)
-  // Full deck: the undealt last-week cards go to Later (WeekViewV2's drain),
-  // then last week is recorded reviewed, then this week is marked planned —
-  // unless this week ends today: a week on its last day is not marked planned
-  // (the old bar offered no mark then either). "Place them" does none of these. Either way the deck gives way to the week.
-  // A drain that failed records nothing and keeps the deck open: the
-  // activity strip says why, and "That's enough for this week" tries again.
-  // What Looking back said about last week, so the closing record keeps it
-  // (it used to write two empty notes over whatever was there).
-  const [lookNotes, setLookNotes] = useState<ReviewNotes | null>(null)
-  const finishDeck = async (decided: ReadonlySet<string>) => {
-    if (deckMode === 'full' && deck) {
-      let drained = false
-      try { drained = await deck.onFinish(decided) } catch { drained = false }
-      if (!drained) return
-      if (!(await lastReview.finish(lookNotes ?? lastReview.mine ?? { wentWell: '', didnt: '' }))) showToast('Couldn’t mark last week reviewed — try again.', 'error', 5000)
-      else if (!endsToday && !(await markPlanned())) showToast('Couldn’t mark this week planned — try again.', 'error', 5000)
-    }
-    setMode(null)
+  // Done planning the week (the guided session's last step): the undealt
+  // last-week leftovers go to Later or back to the month (WeekViewV2's drain),
+  // then last week is recorded reviewed (what its look back said), then this
+  // week is marked planned — unless it ends today: a week on its last day is
+  // not marked planned. A drain that failed records nothing and keeps the
+  // session open: the activity strip says why, and Done tries again.
+  const closeWeek = async (): Promise<boolean> => {
+    if (!deck) return true
+    let drained = false
+    try { drained = await deck.onFinish(new Set()) } catch { drained = false }
+    if (!drained) return false
+    if (!(await lastReview.finish(lastReview.mine ?? { wentWell: '', didnt: '' }))) showToast('Couldn’t mark last week reviewed — try again.', 'error', 5000)
+    else if (!endsToday && !(await markPlanned())) showToast('Couldn’t mark this week planned — try again.', 'error', 5000)
+    return true
   }
 
   // ── The header ─────────────────────────────────────────────────────────
@@ -227,14 +229,35 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
       )}
       {deckMode && deck
         // Drawn only once the tasks are in: no flash of an empty October.
-        ? (deck.loading ? null : <PlanWeekFlow key={`${localYmd(weekStart)}-${deckMode}`} mode={deckMode} choose={deck.choose}
-            stripDays={deck.stripDays} aged={deck.aged} onSeeAged={deck.onSeeAged} onFinish={() => finishDeck(new Set())} onLeave={() => setMode(null)}
-            look={deckMode === 'full' ? {
-              done: deck.doneLastWeek, outOf: deck.plannedLastWeek, alsoDone: deck.alsoDoneLastWeek, initial: lastReview.mine,
-              reviewed: lastReview.reviewed ? `Reviewed ${lastReview.reviewed.at.toLocaleDateString('en-US', { weekday: 'long' })}` : null,
-              onContinue: async (notes) => { setLookNotes(notes); return lastReview.finish(notes) },
-            } : undefined} />)
+        ? (deck.loading ? null : deckMode === 'full'
+          ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} isCurrent={isCurrent} deck={deck}
+              canvas={typeof canvas === 'function' ? canvas({ hideStrip: true }) : canvas}
+              onFinish={closeWeek} onClose={() => setMode(null)} onPlanned={session.reload} />
+          : <section className="deck choose-flow" aria-label="Plan this week">
+              <GiveThemADay days={deck.stripDays} items={deck.choose.placeItems} placedCount={deck.choose.placedCount}
+                onLeave={() => setMode(null)} primary={{ label: 'Done', run: () => setMode(null) }} />
+            </section>)
         : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
     </div>
   )
+}
+
+const NO_TASKS: readonly Task[] = []
+
+/** Planning the week (spec 2026-11-01): the guided session on this page.
+ *  Mounted only while it runs, so its notes are read only then. */
+function WeekSession({ weekStart, isCurrent, deck, canvas, onFinish, onClose, onPlanned }: {
+  weekStart: Date
+  isCurrent: boolean
+  deck: WeekDeck
+  canvas: ReactNode
+  onFinish: () => Promise<boolean>
+  onClose: () => void
+  onPlanned: () => void
+}) {
+  const guided = useGuidedWeek({ weekStart, isCurrent, tasks: deck.tasks ?? NO_TASKS, choose: deck.choose, onFinish, onClose, onPlanned })
+  // Where the session is comes first: no flash of step one before a resume.
+  if (guided.loading) return null
+  return <GuidedWeek canvas={canvas} bodies={{}} count={guided.count} monthWord={guided.monthWord}
+    progress={guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }} onLeave={onClose} />
 }

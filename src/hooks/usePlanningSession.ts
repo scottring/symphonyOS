@@ -79,15 +79,18 @@ export function usePlanningSession(horizon: SessionHorizon, token: string) {
 
   const save = useCallback(async (notes: SessionNotes): Promise<boolean> => {
     if (!user?.id) return false
-    // The row may carry this period's review by hand (usePeriodReview): read
-    // it first and keep it; a failed read saves nothing rather than drop it.
+    // The row may carry this period's review by hand (usePeriodReview) and a
+    // guided session's notes (usePlanningNotes: its step, energy, weekend…):
+    // read it first and keep every key this save does not set; a failed read
+    // saves nothing rather than drop them.
     const { data: own, error: readError } = await supabase.from('planning_sessions')
       .select('notes').eq('author_id', user.id).eq('horizon', horizon).eq('period_token', token).maybeSingle()
     if (readError) return false
-    const periodReview = (own as { notes?: { periodReview?: unknown } } | null)?.notes?.periodReview
+    const existing = ((own as { notes?: Record<string, unknown> | null } | null)?.notes ?? {}) as Record<string, unknown>
+    const { wentWell: _w, didnt: _d, focus: _f, ...kept } = existing
     const savedAt = new Date().toISOString()
     const { error } = await supabase.from('planning_sessions').upsert(
-      { author_id: user.id, horizon, period_token: token, notes: { ...notes, ...(periodReview ? { periodReview } : {}), savedAt }, updated_at: savedAt },
+      { author_id: user.id, horizon, period_token: token, notes: { ...kept, ...notes, savedAt }, updated_at: savedAt },
       { onConflict: 'author_id,horizon,period_token' },
     )
     if (error) return false

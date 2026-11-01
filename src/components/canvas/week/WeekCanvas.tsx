@@ -184,6 +184,9 @@ export interface WeekCanvasProps {
   viewerId?: string
   /** The month above this week, for the strip's month tab. */
   month?: { word: string; href: string; lines: StripLine[] }
+  /** A guided session's steps stand where the strip does (spec 2026-11-01:
+   *  the strip's lists appear inside the steps that use them). */
+  hideStrip?: boolean
 }
 
 type Drag = { kind: 'task' | 'routine' | 'occ' | 'event'; id: string; groupKey?: string; fromKey?: string }
@@ -236,7 +239,7 @@ const NODAY_FOLD_AT = 4
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, viewerId, month }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, viewerId, month, hideStrip }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   // Touch first (the iPad, the wall): rows lift on a held press instead of the
   // browser's own drag, which a long press would otherwise start too.
@@ -868,12 +871,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const nodayN = unplaced.length
   return withTouch(
     <div className={`wc wc-with-strip hs-layout${drag ? ' is-dragging' : ''}`}>
-      <HorizonStrip id="week" label="Week strip" railLabel={`This week${nodayN ? ` · ${nodayN} without a day` : ''}`}
+      {!hideStrip && <HorizonStrip id="week" label="Week strip" railLabel={`This week${nodayN ? ` · ${nodayN} without a day` : ''}`}
         tabs={[
           { id: 'week', label: 'Week', count: nodayN || undefined, content: weekTab },
           { id: 'routines', label: 'Routines', count: routineCount || undefined, content: routinesTab },
           ...(monthTab ? [{ id: 'month', label: month!.word, content: monthTab }] : []),
-        ]} />
+        ]} />}
       <div className="hs-main">
       {subtitleNode}
       {composerNode}

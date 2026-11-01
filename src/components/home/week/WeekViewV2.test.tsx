@@ -13,6 +13,7 @@ import { ALL_LAYERS } from '@/lib/domains'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { ConversationWalkContext } from '@/components/canvas/conversationWalk'
 import { CanvasActivityProvider, useCanvasActivity } from '@/contexts/CanvasActivityContext'
+import { GuidedSessionProvider, useGuidedSession } from '@/contexts/GuidedSessionContext'
 import { WEEK_PREF_KEYS } from '@/hooks/useWeekViewPrefs'
 
 // These tests cover the Lists view; Open journal is the default since
@@ -72,13 +73,33 @@ vi.mock('@/hooks/useActionableInstances', () => ({
   }),
 }))
 
-// The deck (Friday session, Stage 1): its props are what these tests read, and
-// its writers are spies — the deck's own behaviour is Deck.test's.
+// The deck (Friday session, Stage 1), now opened as the guided session (spec
+// 2026-11-01): what the page hands WeekV2 is what these tests read, and its
+// writers are spies — the session's own behaviour is GuidedWeek.test's.
 const dropCommitmentMock = vi.hoisted(() => vi.fn(async () => true))
-const deckMock = vi.hoisted(() => ({ props: null as null | Record<string, unknown> }))
-vi.mock('@/components/plan/choose/PlanWeekFlow', () => ({
-  PlanWeekFlow: (props: Record<string, unknown>) => { deckMock.props = props; return <div data-testid="deck" data-mode={String(props.mode)} /> },
+const deckMock = vi.hoisted(() => ({ deck: null as null | Record<string, unknown>, guided: null as null | Record<string, unknown>, place: null as null | Record<string, unknown> }))
+vi.mock('@/components/plan/v2/WeekV2', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/plan/v2/WeekV2')>()
+  const Real = actual.WeekV2
+  return { ...actual, WeekV2: (props: React.ComponentProps<typeof Real>) => { deckMock.deck = (props.deck ?? null) as Record<string, unknown> | null; return <Real {...props} /> } }
+})
+vi.mock('@/components/plan/guided/GuidedWeek', () => ({
+  GuidedWeek: (props: Record<string, unknown>) => { deckMock.guided = props; return <div data-testid="deck" data-mode="full" /> },
 }))
+vi.mock('@/components/plan/choose/GiveThemADay', () => ({
+  GiveThemADay: (props: Record<string, unknown>) => { deckMock.place = props; return <div data-testid="deck" data-mode="place" /> },
+}))
+// The session's place in the week: on its last step, so Done planning shows.
+vi.mock('@/hooks/usePlanningNotes', async () => {
+  const { useState, useCallback } = await import('react')
+  return {
+    usePlanningNotes: () => {
+      const [notes, setNotes] = useState<Record<string, unknown>>({ guide: { current: 'family', done: [], skipped: [] } })
+      const patch = useCallback(async (p: Record<string, unknown>) => { setNotes((n) => ({ ...n, ...p })); return true }, [])
+      return { notes, loading: false, error: null, patch }
+    },
+  }
+})
 const deckActions = vi.hoisted(() => ({
   done: vi.fn(async () => true), placeOnDay: vi.fn(async () => true), keepThisWeek: vi.fn(async () => true),
   later: vi.fn(async () => true), laterOnDate: vi.fn(async () => true), letGo: vi.fn(async () => true), drain: vi.fn(async () => true),
@@ -818,7 +839,22 @@ describe('WeekViewV2 — the deck', () => {
     onLeave: () => void
     onSeeAged: () => void
   }
-  const props = () => deckMock.props as unknown as FlowProps
+  // What the old flow was handed, read off the deck and the session now:
+  // Done planning is the session's header (the shell's), Leave its bar.
+  const props = (): FlowProps => {
+    const deck = deckMock.deck as unknown as FlowProps
+    const mode = screen.getByTestId('deck').getAttribute('data-mode') as 'full' | 'place'
+    const place = deckMock.place as unknown as { onLeave: () => void; primary: { run: () => void } }
+    return {
+      ...deck, mode,
+      onLeave: mode === 'full' ? (deckMock.guided as unknown as { onLeave: () => void }).onLeave : place.onLeave,
+      onFinish: async () => {
+        if (mode === 'place') { place.primary.run(); return }
+        fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Done planning the week' }))
+        await new Promise((r) => setTimeout(r, 0))
+      },
+    }
+  }
   // What the planner shows: each line's steps, then Not under a line.
   const shown = () => {
     const walk = (xs: Item[]): string[] => xs.flatMap((x) => [x.key, ...walk(x.children)])
@@ -829,7 +865,7 @@ describe('WeekViewV2 — the deck', () => {
     localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(now)
-    deckMock.props = null
+    deckMock.deck = null; deckMock.guided = null; deckMock.place = null
     Object.values(deckActions).forEach((f) => f.mockClear())
     dropCommitmentMock.mockClear()
     periodReview.finish.mockClear()
@@ -844,9 +880,15 @@ describe('WeekViewV2 — the deck', () => {
     window.history.replaceState({}, '', '/')
   })
 
+  // The shell's side of a guided session: its header, above the conversation.
+  function Shell() {
+    const reg = useGuidedSession()
+    return reg ? <div data-testid="guide-panel">{reg.header}</div> : null
+  }
+  const page = (node: React.ReactNode) => <GuidedSessionProvider>{node}<Shell /></GuidedSessionProvider>
   const open = (query: string, tasks: Task[], extra: Partial<React.ComponentProps<typeof WeekViewV2>> = {}) => {
     window.history.replaceState({}, '', `/week${query}`)
-    return render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sat} tasks={tasks} {...extra} />)
+    return render(page(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sat} tasks={tasks} {...extra} />))
   }
 
   // Review Focus 1: a Family view never deals, counts or drains a private task.
@@ -914,7 +956,7 @@ describe('WeekViewV2 — the deck', () => {
     expect(deckActions.drain).toHaveBeenCalledWith(staleForDrain([tasks[0], tasks[1]], now))
     expect((deckActions.drain.mock.calls[0] as unknown as [Task[]])[0].map((t) => t.id)).toEqual(['stale'])
     await waitFor(() => expect(props().aged).toBe(1))
-    view.rerender(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sat} tasks={[...tasks]} layers={familyOnly} />)
+    view.rerender(page(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sat} tasks={[...tasks]} layers={familyOnly} />))
     expect(deckActions.drain).toHaveBeenCalledTimes(1)
     expect(props().aged).toBe(1)
   })
@@ -925,7 +967,7 @@ describe('WeekViewV2 — the deck', () => {
     const view = open('?review=1', [], { sources: loading })
     expect(screen.queryByTestId('deck')).toBeNull()
     expect(deckActions.drain).not.toHaveBeenCalled()
-    view.rerender(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sat} tasks={tasks} sources={{ ...loading, tasks: 'ready' }} />)
+    view.rerender(page(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sat} tasks={tasks} sources={{ ...loading, tasks: 'ready' }} />))
     expect(screen.getByTestId('deck')).toBeInTheDocument()
     expect(deckActions.drain).toHaveBeenCalledTimes(1)
   })
@@ -1088,7 +1130,7 @@ describe('WeekViewV2 — the deck', () => {
         tasks={[createMockTask({ id: 'b', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 20), isAllDay: true, updatedAt: new Date(2026, 9, 20) })]} />
     }
     window.history.replaceState({}, '', '/week')
-    render(<Page />)
+    render(page(<Page />))
     fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
     expect(screen.getByTestId('deck')).toHaveAttribute('data-mode', 'full')
     expect(document.querySelector('.pv2-week')).toHaveAttribute('data-week', '2026-10-24')

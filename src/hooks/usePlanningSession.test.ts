@@ -78,6 +78,17 @@ describe('usePlanningSession', () => {
     }), expect.anything())
   })
 
+  // A guided session keeps its step and notes on the same row (usePlanningNotes):
+  // marking the period planned must not wipe them.
+  it('keeps a guided session\'s notes and drops only the keys it sets', async () => {
+    ownRow = { notes: { guide: { current: 'choose', done: [], skipped: [] }, energy: { level: 'low' }, focus: 'old focus', wentWell: 'old' } }
+    const { result } = renderHook(() => usePlanningSession('weekly', '2026-11-1'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => { await result.current.save({ wentWell: 'new', didnt: '' }) })
+    const notes = (upsert.mock.calls.at(-1) as unknown as [{ notes: Record<string, unknown> }])[0].notes
+    expect(notes).toEqual({ guide: { current: 'choose', done: [], skipped: [] }, energy: { level: 'low' }, wentWell: 'new', didnt: '', savedAt: expect.any(String) })
+  })
+
   it('reads the latest saved session visible to me, from anyone in the household', async () => {
     rows.push({ author_id: 'u2', updated_at: '2026-09-29T20:00:00Z', notes: { wentWell: 'bike rack', savedAt: '2026-09-29' } })
     const { result } = renderHook(() => usePlanningSession('monthly', '2026-10'))

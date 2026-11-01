@@ -221,6 +221,14 @@ describe('WeekCanvas — filing a task under a goal', () => {
     expect(screen.getAllByRole('complementary').map((c) => c.getAttribute('aria-label'))).toEqual(['Week strip'])
     expect(screen.queryByRole('button', { name: /Show October goals/ })).toBeNull()
   })
+
+  // Guided planning (spec 2026-11-01): while a session runs, its steps stand
+  // where the strip does; the days stay.
+  it('hideStrip leaves the strip out and keeps the days', () => {
+    show(writers(), { hideStrip: true })
+    expect(screen.queryByRole('complementary', { name: 'Week strip' })).toBeNull()
+    expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
+  })
 })
 
 describe('WeekCanvas — the days', () => {

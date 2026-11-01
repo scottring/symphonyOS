@@ -91,6 +91,7 @@ import { doableBy } from '@/lib/planning/poolViews'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import { useDeckActions } from './useDeckActions'
+import { weekCount } from '@/components/plan/guided/useGuidedWeek'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
@@ -998,8 +999,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
   ])), [dayChoices])
-  const weekCanvas = () => (
-    <WeekCanvas weekStart={weekAnchor} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
+  const weekCanvas = (opts?: { hideStrip?: boolean }) => (
+    <WeekCanvas weekStart={weekAnchor} hideStrip={opts?.hideStrip} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers} viewerId={meId ?? undefined}
       pointing={activity.pointing}
@@ -1063,10 +1064,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
     () => deckTasks.filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) === 'done').length,
     [deckTasks, weekAnchor, weekIsCurrent],
   )
-  const onThisWeek = useMemo(
-    () => deckTasks.filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) !== undefined).length,
-    [deckTasks, weekAnchor, weekIsCurrent],
-  )
+  // The guided session's "{n} of about 15" is this same count (weekCount).
+  const onThisWeek = useMemo(() => weekCount(deckTasks, weekAnchor, weekIsCurrent), [deckTasks, weekAnchor, weekIsCurrent])
   const alsoDoneLastWeek = useMemo(
     () => alsoDoneIn(deckTasks, lastWeekStart, weekAnchor, (t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) !== undefined),
     [deckTasks, lastWeekStart, weekAnchor],
@@ -1159,6 +1158,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     },
     onSeeAged: () => navigate('/someday'),
     choose: chooseWeek,
+    tasks: deckTasks,
   }
 
   return (

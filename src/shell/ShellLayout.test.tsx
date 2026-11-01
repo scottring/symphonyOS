@@ -601,15 +601,15 @@ describe('typing while voice is on (2026-10-14, Wednesday Wheelie\'s)', () => {
 // session's own thread, and sends the step with every turn.
 describe('A guided planning session in the shell', () => {
   const onThread = vi.fn()
-  function GuidedPage({ stepId, on = true }: { stepId: string; on?: boolean }) {
+  function GuidedPage({ stepId, on = true, onApplied }: { stepId: string; on?: boolean; onApplied?: () => void }) {
     useConversationWalk({ label: 'Help me plan the rest of my week', message: 'Help me plan the rest of my week.' })
     const reg = useMemo<GuidedSessionRegistration | null>(() => (on ? {
       level: 'week', periodLabel: 'Week of Nov 1', token: '2026-11-1', stepId,
       header: <p>Step header: {stepId}</p>,
       sessionContext: { horizon: 'weekly', periodLabel: 'Week of Nov 1', stepId, stepTitle: stepId,
         guide: { level: 'week', stepId, stepTitle: stepId, writes: ['inbox'], aboveLines: [], areas: [] } },
-      threadKey: 'weekly:2026-11-1', onThread, threadId: 'known-thread',
-    } : null), [stepId, on])
+      threadKey: 'weekly:2026-11-1', onThread, threadId: 'known-thread', onApplied,
+    } : null), [stepId, on, onApplied])
     useGuidedSessionRegistration(reg)
     return <div data-testid="app-content" />
   }
@@ -683,6 +683,16 @@ describe('A guided planning session in the shell', () => {
     view.rerender(at(<GuidedPage stepId="inbox" on={false} />))
     expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
     expect(screen.queryByText('Step header: inbox')).not.toBeInTheDocument()
+  })
+
+  // The Week marks itself planned once a card is applied at its choosing step.
+  it('a change card applied while the session runs is told to the page', async () => {
+    const onApplied = vi.fn()
+    render(at(<GuidedPage stepId="choose" onApplied={onApplied} />))
+    act(() => assistantState.observer!.changeSet?.({ key: 'g1', title: '1 change', ops: [{ key: 'g1:0', op: 'add', title: 'Book the vet' }] }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save 1 change' })) })
+    expect(tasksState.addTask).toHaveBeenCalled()
+    expect(onApplied).toHaveBeenCalledTimes(1)
   })
 
   it('phone: the conversation overlay opens with the header, and closes again on leaving', () => {

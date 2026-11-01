@@ -464,32 +464,38 @@ function ShellLayoutInner({ children }: Props) {
   // task already reopened by hand must not be toggled closed again.
   const latestTasks = useRef(tasks);
   useEffect(() => { latestTasks.current = tasks; }, [tasks]);
-  const applyChanges = useCallback((set: ChangeSet) => applyReviewedChange(set, {
-    tasks, updateTask, deleteTask,
-    addTask: (title, when, options) => addTask(title, undefined, undefined, when, options),
-    weekStart: plannedWeekStart(set, new Date(), readCadenceConfig().weekStartsOn),
-    completeTask,
-    reopenTask: async (id) => {
-      const now = withSteps(latestTasks.current).find((t) => t.id === id);
-      return now && !now.completed ? true : toggleTask(id);
-    },
-    routines: canvasRoutines, updateRoutine, deleteRoutine,
-    addRoutine: async (input) => (await addRoutine(input))?.id,
-    skipOccurrence: (id, date) => skipInstance('routine', id, date),
-    undoSkip: (id, date) => undoInstanceDone('routine', id, date),
-    moveOccurrence: (id, from, to, opts) => reschedule('routine', id, from, to, opts),
-    undoMove: undoReschedule,
-    setOccurrenceAssignee: (id, date, memberId) => setOccurrenceAssignee('routine', id, date, memberId),
-    // Month / Season / Year: the pages' own writers (ConstellationPage, the year carry).
-    defaultContext: soleDomain ?? undefined,
-    goals,
-    addGoal: async (name, { year, context, carriedFrom, areaId, notes, strategy, assignedToAll }) =>
-      (await addGoal(areaId ?? null, name, context, { year, carriedFrom, notes, strategy, assignedToAll }))?.id,
-    updateGoal, deleteGoal, keepForward, dropCommitment,
-    choiceWriters,
-    // Undo's conflict check reads the rows as they are then.
-    latest: () => ({ tasks: latestTasks.current, routines: canvasRoutines }),
-  }, reviewedWriter), [reviewedWriter, tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment, choiceWriters]);
+  const applyChanges = useCallback(async (set: ChangeSet) => {
+    const result = await applyReviewedChange(set, {
+      tasks, updateTask, deleteTask,
+      addTask: (title, when, options) => addTask(title, undefined, undefined, when, options),
+      weekStart: plannedWeekStart(set, new Date(), readCadenceConfig().weekStartsOn),
+      completeTask,
+      reopenTask: async (id) => {
+        const now = withSteps(latestTasks.current).find((t) => t.id === id);
+        return now && !now.completed ? true : toggleTask(id);
+      },
+      routines: canvasRoutines, updateRoutine, deleteRoutine,
+      addRoutine: async (input) => (await addRoutine(input))?.id,
+      skipOccurrence: (id, date) => skipInstance('routine', id, date),
+      undoSkip: (id, date) => undoInstanceDone('routine', id, date),
+      moveOccurrence: (id, from, to, opts) => reschedule('routine', id, from, to, opts),
+      undoMove: undoReschedule,
+      setOccurrenceAssignee: (id, date, memberId) => setOccurrenceAssignee('routine', id, date, memberId),
+      // Month / Season / Year: the pages' own writers (ConstellationPage, the year carry).
+      defaultContext: soleDomain ?? undefined,
+      goals,
+      addGoal: async (name, { year, context, carriedFrom, areaId, notes, strategy, assignedToAll }) =>
+        (await addGoal(areaId ?? null, name, context, { year, carriedFrom, notes, strategy, assignedToAll }))?.id,
+      updateGoal, deleteGoal, keepForward, dropCommitment,
+      choiceWriters,
+      // Undo's conflict check reads the rows as they are then.
+      latest: () => ({ tasks: latestTasks.current, routines: canvasRoutines }),
+    }, reviewedWriter);
+    // A guided session hears that a card was applied (Week: planned once
+    // something is applied at its choosing step).
+    if (result.ok) guidedLatest.current?.onApplied?.();
+    return result;
+  }, [reviewedWriter, tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment, choiceWriters]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   // School review saves happen in Settings. Refresh the mounted planning
   // data immediately, including when the realtime socket has gone to sleep.

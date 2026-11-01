@@ -1,0 +1,148 @@
+// The Week's guided session (spec 2026-11-01): where Scott is in it, the
+// week's count, and the session's registration with the shell (its step
+// header above the conversation, its own thread, the step on every turn).
+//
+// The count is worked out here, once, and handed to the frame and the steps
+// that show it, so two places never disagree. It counts exactly the tasks the
+// page shows under its filters (the deck's scoped list).
+//
+// Planned (per person) once anything is applied at the choosing step: a
+// Choose verb or a change card's Apply, whichever comes first.
+
+import { createElement, useCallback, useEffect, useMemo, useRef } from 'react'
+import type { Task } from '@/types/task'
+import { useGuidedProgress } from '@/hooks/useGuidedProgress'
+import { stepsFor, type GuideStep } from '@/lib/guide/steps'
+import { isLastStep } from '@/lib/guide/progress'
+import { weekToken } from '@/hooks/usePlanningSession'
+import { weekReviewState } from '@/lib/planning/periodReview'
+import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
+import { GuideHeader } from '@/components/guide/GuideHeader'
+import type { WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
+import type { ChooseItemView, ChooseLineView, ChooseVerb } from '@/components/plan/choose/ChoosePlan'
+
+/** About fifteen tasks a week: stated, never enforced. */
+export const WEEK_COUNT_OF = 'about 15'
+
+/** "Read November": the one step titled by the month above. */
+export function weekStepTitle(s: GuideStep, monthWord: string): string {
+  return s.id === 'read-month' ? `Read ${monthWord}` : s.title
+}
+
+/** Everything on the week, done or open — the week's count. */
+export function weekCount(tasks: readonly Task[], weekStart: Date, isCurrent: boolean): number {
+  return tasks.filter((t) => weekReviewState(t, weekStart, { isCurrent }) !== undefined).length
+}
+
+/** The same Choose, with every write that succeeds also reported to `applied`. */
+export function reportingChoose(choose: WeekChoose, applied: () => void): WeekChoose {
+  const wrap = <A extends unknown[]>(run: (...a: A) => Promise<boolean>) => async (...a: A) => {
+    const ok = await run(...a)
+    if (ok) applied()
+    return ok
+  }
+  const verb = (v: ChooseVerb): ChooseVerb => ({ ...v, run: wrap(v.run), ...(v.menu ? { menu: v.menu.map(verb) } : {}) })
+  const item = (x: ChooseItemView): ChooseItemView => ({
+    ...x, verbs: x.verbs.map(verb), children: x.children.map(item),
+    ...(x.onBreakDown ? { onBreakDown: wrap(x.onBreakDown) } : {}),
+  })
+  const line = (l: ChooseLineView): ChooseLineView => ({
+    ...l, verbs: l.verbs.map(verb), steps: l.steps.map(item),
+    ...(l.onAddStep ? { onAddStep: wrap(l.onAddStep) } : {}),
+  })
+  return {
+    ...choose,
+    lines: choose.lines.map(line),
+    doneLines: choose.doneLines.map(line),
+    loose: choose.loose.map(item),
+    onAddLoose: wrap(choose.onAddLoose),
+    placeItems: choose.placeItems.map((p) => ({ ...p, onPlace: wrap(p.onPlace) })),
+  }
+}
+
+const CHOOSING = stepsFor('week').find((s) => s.choosing)!.id
+
+export function useGuidedWeek({ weekStart, isCurrent, tasks, choose, onFinish, onClose, onPlanned }: {
+  weekStart: Date
+  isCurrent: boolean
+  /** The page's scoped tasks (the deck's list): what the count covers. */
+  tasks: readonly Task[]
+  choose: WeekChoose
+  /** The week's closing writes; false keeps the session open. */
+  onFinish: () => Promise<boolean>
+  /** Leave the session (the page comes back as it is every day). */
+  onClose: () => void
+  /** The week was just marked planned (the page re-reads its planned mark). */
+  onPlanned?: () => void
+}) {
+  const token = weekToken(weekStart)
+  const { progress, loading, saveError, next, skip, jump, markPlanned, finish, setThreadId } = useGuidedProgress('week', token)
+  const steps = stepsFor('week')
+  const monthWord = choose.monthWord
+  const count = useMemo(() => weekCount(tasks, weekStart, isCurrent), [tasks, weekStart, isCurrent])
+
+  const latest = useRef({ progress, onFinish, onClose, onPlanned })
+  useEffect(() => { latest.current = { progress, onFinish, onClose, onPlanned } })
+
+  // Once per session: the first write applied at the choosing step.
+  const planning = useRef(false)
+  const markPlannedOnce = useCallback(async () => {
+    const p = latest.current.progress
+    if (loading || p.current !== CHOOSING || p.plannedAt || planning.current) return
+    planning.current = true
+    await markPlanned()
+    latest.current.onPlanned?.()
+  }, [loading, markPlanned])
+
+  const reported = useMemo(() => reportingChoose(choose, () => { void markPlannedOnce() }), [choose, markPlannedOnce])
+
+  // Done planning the week: the closing writes, then the session's own
+  // finish, then back to the week. A failed closing write keeps it open.
+  const finishing = useRef(false)
+  const done = useCallback(async () => {
+    if (finishing.current) return
+    finishing.current = true
+    try {
+      if (!(await latest.current.onFinish())) return
+      await finish()
+      latest.current.onClose()
+    } finally { finishing.current = false }
+  }, [finish])
+
+  // The month's lines, for the agent, stable while their titles are.
+  const linesKey = choose.lines.map((l) => `${l.key}\u0000${l.title}`).join('\u0001')
+  const aboveLines = useMemo(() => linesKey ? linesKey.split('\u0001').map((x) => { const [id, title] = x.split('\u0000'); return { id, title } }) : [], [linesKey])
+
+  const registration = useMemo<GuidedSessionRegistration | null>(() => {
+    if (loading) return null
+    const index = Math.max(0, steps.findIndex((s) => s.id === progress.current))
+    const step = steps[index]
+    const stepTitle = weekStepTitle(step, monthWord)
+    const periodLabel = `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    return {
+      level: 'week', periodLabel, token, stepId: step.id,
+      header: createElement(GuideHeader, {
+        level: 'week', step: { ...step, title: stepTitle }, index, total: steps.length,
+        onNext: () => { void next() }, onSkip: () => { void skip() },
+        isLast: isLastStep(progress, 'week'), finishLabel: 'Done planning the week', onFinish: () => { void done() },
+      }),
+      sessionContext: {
+        horizon: 'weekly', periodLabel, stepId: step.id, stepTitle,
+        aboveTitles: aboveLines.map((l) => l.title),
+        guide: {
+          level: 'week', stepId: step.id, stepTitle, writes: step.writes, aboveLines,
+          // Life areas come with Stage 3; until then the card's area is the space.
+          areas: [],
+          counts: { label: 'tasks on this week', n: count, of: WEEK_COUNT_OF },
+        },
+      },
+      threadKey: `weekly:${token}`,
+      onThread: (id) => { void setThreadId(id) },
+      threadId: progress.threadId,
+      onApplied: () => { void markPlannedOnce() },
+    }
+  }, [loading, steps, progress, monthWord, weekStart, count, token, next, skip, done, aboveLines, setThreadId, markPlannedOnce])
+  useGuidedSessionRegistration(registration)
+
+  return { progress, loading, saveError, count, monthWord, choose: reported, markPlannedOnce, jump, done, registration }
+}

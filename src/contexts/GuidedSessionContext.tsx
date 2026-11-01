@@ -44,6 +44,9 @@ export interface GuidedSessionRegistration {
   onThread: (chatSessionId: string) => void
   /** The thread already linked from the session row, if any. */
   threadId?: string
+  /** A change card was applied while the session ran (Week: the first one
+   *  at the choosing step marks the week planned). */
+  onApplied?: () => void
 }
 
 type Setter = Dispatch<SetStateAction<GuidedSessionRegistration | null>>
