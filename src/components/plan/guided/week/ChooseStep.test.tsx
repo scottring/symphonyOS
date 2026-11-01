@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within, act } from '@testing-library/react'
-import type { WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
+import type { WeekChoose } from '@/components/home/week/useChooseWeek'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import { ChooseStep } from './ChooseStep'
 

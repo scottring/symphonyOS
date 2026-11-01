@@ -9,7 +9,7 @@
 // that saves here marks the week planned.
 
 import { useState } from 'react'
-import type { WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
+import type { WeekChoose } from '@/components/home/week/useChooseWeek'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import { ChoosePlan } from '@/components/plan/choose/ChoosePlan'
 import { GiveThemADay } from '@/components/plan/choose/GiveThemADay'

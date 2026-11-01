@@ -18,7 +18,7 @@ import { weekToken } from '@/hooks/usePlanningSession'
 import { weekReviewState } from '@/lib/planning/periodReview'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
-import type { WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
+import type { WeekChoose } from '@/components/home/week/useChooseWeek'
 import type { ChooseItemView, ChooseLineView, ChooseVerb } from '@/components/plan/choose/ChoosePlan'
 
 /** About fifteen tasks a week: stated, never enforced. */

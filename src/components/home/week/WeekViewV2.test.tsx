@@ -96,7 +96,7 @@ vi.mock('@/hooks/usePlanningNotes', async () => {
     usePlanningNotes: () => {
       const [notes, setNotes] = useState<Record<string, unknown>>({ guide: { current: 'family', done: [], skipped: [] } })
       const patch = useCallback(async (p: Record<string, unknown>) => { setNotes((n) => ({ ...n, ...p })); return true }, [])
-      return { notes, loading: false, error: null, patch }
+      return { notes, loading: false, error: null, patch, reload: () => undefined }
     },
   }
 })

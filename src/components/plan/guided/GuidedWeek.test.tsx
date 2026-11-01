@@ -23,7 +23,7 @@ vi.mock('@/hooks/usePlanningNotes', async () => {
         setNotes(store.notes)
         return true
       }, [])
-      return { notes, loading: false, error: null, patch }
+      return { notes, loading: false, error: null, patch, reload: () => undefined }
     },
   }
 })
@@ -43,7 +43,7 @@ vi.mock('@/lib/wall/addScratchpadNote', () => ({ addScratchpadNote: wall.add, ow
 
 import { WeekV2, type WeekDeck } from '@/components/plan/v2/WeekV2'
 import { useGuidedWeek } from './useGuidedWeek'
-import type { WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
+import type { WeekChoose } from '@/components/home/week/useChooseWeek'
 
 const weekStart = new Date(2026, 8, 27) // Sunday
 const onWeek = (id: string, extra = {}) => createMockTask({ id, title: id, bucket: 'week', weekStart, commitments: [{ level: 'week', periodStart: weekStart, status: 'open' }], ...extra })

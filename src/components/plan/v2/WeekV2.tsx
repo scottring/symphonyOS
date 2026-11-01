@@ -5,7 +5,7 @@
 // this file once ran is retired (2026-10-14).
 //
 // The header (calm pass 2, mockup approved 2026-10-18): one quiet fact line
-// ("4 of 16 done", a bar, "planned Sunday · Today: {first item}" — this week's
+// ("4 of 16 done", a bar, "Today: {first item}" — this week's
 // count, as Month counts October; last week's lives in Looking back), at most
 // one button, only the one that's due (reviewed design, 2026-10-20), and a ⋯
 // menu (WeekMenu). On the desk they fold into HomeHeader's masthead; on a phone
@@ -27,7 +27,9 @@ import { useSearchParams } from 'react-router-dom'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePlanningSession, weekToken } from '@/hooks/usePlanningSession'
 import { usePeriodReview, type ReviewNotes } from '@/hooks/usePeriodReview'
-import type { WeekChoose } from '@/components/plan/choose/PlanWeekFlow'
+import { usePlanningNotes } from '@/hooks/usePlanningNotes'
+import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
+import type { WeekChoose } from '@/components/home/week/useChooseWeek'
 import { GiveThemADay } from '@/components/plan/choose/GiveThemADay'
 import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
 import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
@@ -124,6 +126,10 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   const lastReview = deck?.lastReview ?? ownReview
   // This week's own review (due on its last day) and next week's plan record.
   const thisReview = usePeriodReview('weekly', weekToken(weekStart))
+  // What this week's planning left behind, for the everyday line. "Looked
+  // back": this week's session did its Look back step, or last week's review
+  // is recorded (what that step writes).
+  const planNotes = usePlanningNotes('weekly', weekToken(weekStart))
   const [, setParams] = useSearchParams()
   const deckMode = deck?.mode ?? null
   const setMode = (mode: 'review' | 'plan' | 'place' | null, week?: Date) => setParams((prev) => {
@@ -161,12 +167,15 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
   // week is marked planned — unless it ends today: a week on its last day is
   // not marked planned. A drain that failed records nothing and keeps the
   // session open: the activity strip says why, and Done tries again.
-  const closeWeek = async (): Promise<boolean> => {
+  const closeWeek = async (lookDraft?: ReviewNotes | null): Promise<boolean> => {
     if (!deck) return true
     let drained = false
     try { drained = await deck.onFinish(new Set()) } catch { drained = false }
     if (!drained) return false
-    if (!(await lastReview.finish(lastReview.mine ?? { wentWell: '', didnt: '' }))) showToast('Couldn’t mark last week reviewed — try again.', 'error', 5000)
+    // Done is an explicit tap: Look back notes typed and not yet saved are
+    // saved as the review, not dropped.
+    const draft = lookDraft ? { wentWell: lookDraft.wentWell.trim(), didnt: lookDraft.didnt.trim() } : null
+    if (!(await lastReview.finish(draft ?? lastReview.mine ?? { wentWell: '', didnt: '' }))) showToast('Couldn’t mark last week reviewed — try again.', 'error', 5000)
     else if (!endsToday && !(await markPlanned())) showToast('Couldn’t mark this week planned — try again.', 'error', 5000)
     return true
   }
@@ -191,21 +200,23 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
     ...(plannable ? [{ id: 'plan', label: planned ? `Plan ${reviewWord} again` : `Plan ${reviewWord}`, due: !planned, run: () => setMode('plan') }] : []),
   ]
   const primary = offers.find((o) => o.due) ?? null
-  // The fact line: this week's count and bar, when it was planned, and
-  // today's first item.
+  // The fact line: this week's count and bar, and today's first item.
   const on = deck?.onThisWeek ?? 0, doneHere = deck?.doneThisWeek ?? 0
   const countText = `${doneHere} of ${on} done`
-  const plannedOn = !session.loading && !session.error && session.saved
-    ? `planned ${session.saved.at.toLocaleDateString('en-US', { weekday: 'long' })}` : null
-  const progress = on > 0 || plannedOn ? <>
-    {on > 0 && <><span className="wk-facts-count"><b>{doneHere}</b> of {on} done</span>
-      <span className="wk-facts-bar" role="img" aria-label={countText}><span style={{ width: `${Math.round(doneHere / on * 1000) / 10}%` }} /></span></>}
-    {plannedOn && <>{on > 0 && ' · '}<b className="wk-facts-reviewed">{plannedOn}</b></>}
+  // When it was planned is the summary line's now (one place, below).
+  const progress = on > 0 ? <>
+    <span className="wk-facts-count"><b>{doneHere}</b> of {on} done</span>
+    <span className="wk-facts-bar" role="img" aria-label={countText}><span style={{ width: `${Math.round(doneHere / on * 1000) / 10}%` }} /></span>
   </> : null
   const facts = !deckMode && (progress || today) ? (
     <p className="wk-facts" data-explain="week-facts" data-explain-label="This week’s facts">
       {progress}{progress && today && ' · '}{today && <>Today: {today}</>}
     </p>
+  ) : null
+  const guide = planNotes.notes.guide
+  const line = !deckMode && !planNotes.error ? (
+    <PeriodSummaryLine plannedAt={guide?.plannedAt ?? (!session.loading && !session.error ? session.saved?.at.toISOString() : undefined)} energy={planNotes.notes.energy}
+      reviewed={!!guide?.done?.includes('look-back') || !!lastReview.reviewed} />
   ) : null
   const controls = (
     <>
@@ -224,6 +235,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
         // draws it; layout system 2026-10-01).
         <>
           {facts && createPortal(facts, slots.subline)}
+          {line && createPortal(line, slots.subline)}
           {createPortal(controls, slots.controls)}
         </>
       ) : (
@@ -233,6 +245,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
           <div className="wk-head-actions">{controls}</div>
         </div>
       )}
+      {!(slots?.subline && slots.controls) && line}
 
       {session.saved?.notes?.focus && (
         // What the week is for, as agreed when it was planned.
@@ -252,7 +265,8 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, talk, deck }: {
         ? (deck.loading ? null : deckMode === 'full'
           ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} isCurrent={isCurrent} deck={deck} lastReview={lastReview}
               canvas={typeof canvas === 'function' ? canvas({ hideStrip: true }) : canvas}
-              onFinish={closeWeek} onClose={() => setMode(null)} onPlanned={session.reload} />
+              onFinish={closeWeek} onClose={() => { setMode(null); planNotes.reload() }}
+              onPlanned={() => { session.reload(); planNotes.reload() }} />
           : <section className="deck choose-flow" aria-label="Plan this week">
               <GiveThemADay days={deck.stripDays} items={deck.choose.placeItems} placedCount={deck.choose.placedCount}
                 onLeave={() => setMode(null)} primary={{ label: 'Done', run: () => setMode(null) }} />
@@ -275,14 +289,15 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   /** Last week's review: Look back's notes save through it. */
   lastReview: ReturnType<typeof usePeriodReview>
   canvas: ReactNode
-  onFinish: () => Promise<boolean>
+  onFinish: (lookDraft: ReviewNotes | null) => Promise<boolean>
   onClose: () => void
   onPlanned: () => void
 }) {
-  const guided = useGuidedWeek({ weekStart, isCurrent, tasks: deck.tasks ?? NO_TASKS, choose: deck.choose, onFinish, onClose, onPlanned })
   // Look back's notes as typed, kept here so they outlive its step's body
-  // (only the current step's body is drawn): nothing is lost on Next.
+  // (only the current step's body is drawn): nothing is lost on Next. Done
+  // planning the week saves what is still unsaved.
   const [lookDraft, setLookDraft] = useState<ReviewNotes | null>(null)
+  const guided = useGuidedWeek({ weekStart, isCurrent, tasks: deck.tasks ?? NO_TASKS, choose: deck.choose, onFinish: () => onFinish(lookDraft), onClose, onPlanned })
   const [weekendDraft, setWeekendDraft] = useState<string | null>(null)
   const [familyDraft, setFamilyDraft] = useState<string | null>(null)
   // A write saved on the page itself (a task dragged onto a day) counts as

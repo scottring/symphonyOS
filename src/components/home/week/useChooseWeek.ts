@@ -23,6 +23,22 @@ import type { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import type { FamilyMember } from '@/types/family'
 import type { LooseEnd } from '@/components/plan/guided/week/WeekLookBack'
 
+/** What the week's choosing needs: October's lines, the loose items, and the
+ *  days to place on. Bound by useChooseWeek; drawn by the guided session. */
+export interface WeekChoose {
+  monthWord: string
+  lines: ChooseLineView[]
+  doneLines: ChooseLineView[]
+  loose: ChooseItemView[]
+  onAddLoose: (title: string) => Promise<boolean>
+  placeItems: PlaceItem[]
+  placedCount: number
+  /** Last week's still open (Looking back's count). */
+  notDoneLastWeek: number
+  /** The same, each with its calls (the guided session's Look back). */
+  looseEnds?: LooseEnd[]
+}
+
 type AddTaskOptions = NonNullable<Parameters<ReturnType<typeof useSupabaseTasks>['addTask']>[4]>
 
 export interface ChooseWeekDeps {

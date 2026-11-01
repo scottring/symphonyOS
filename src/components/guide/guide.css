@@ -40,7 +40,8 @@
 .guide-rail-body:empty { display: none; }
 
 @media (max-width: 760px) {
-  .guide-rail-list { display: flex; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+  /* relative: the screen-reader-only marks inside stay in this scroller instead of widening the page */
+  .guide-rail-list { position: relative; display: flex; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
   .guide-rail-item { flex: 0 0 auto; max-width: 180px; }
   .guide-rail-meta { display: none; }
   .guide-rail-peek { padding-left: 8px; }

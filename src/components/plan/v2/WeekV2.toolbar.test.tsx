@@ -14,13 +14,14 @@ const review = { reviewed: null as null | { at: Date; authorId: string; wentWell
 vi.mock('@/hooks/usePeriodReview', () => ({ usePeriodReview: () => review }))
 // The guided session's place in the week (usePlanningNotes): on its last step,
 // so "Done planning the week" is the header's primary.
+const seed = { notes: { guide: { current: 'family', done: [], skipped: [] } } as Record<string, unknown> }
 vi.mock('@/hooks/usePlanningNotes', async () => {
   const { useState, useCallback } = await import('react')
   return {
     usePlanningNotes: () => {
-      const [notes, setNotes] = useState<Record<string, unknown>>({ guide: { current: 'family', done: [], skipped: [] } })
+      const [notes, setNotes] = useState<Record<string, unknown>>(seed.notes)
       const patch = useCallback(async (p: Record<string, unknown>) => { setNotes((n) => ({ ...n, ...p })); return true }, [])
-      return { notes, loading: false, error: null, patch }
+      return { notes, loading: false, error: null, patch, reload: () => undefined }
     },
   }
 })
@@ -35,7 +36,7 @@ import { GuidedSessionProvider, useGuidedSession } from '@/contexts/GuidedSessio
 // A fixed Tuesday: the week's own last day changes what the toolbar offers,
 // so these tests must not ride the wall clock.
 beforeEach(() => { activity.changeSet = null; activity.receipt = null; vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 29, 12)) })
-afterEach(() => { vi.useRealTimers(); localStorage.clear() })
+afterEach(() => { vi.useRealTimers(); localStorage.clear(); seed.notes = { guide: { current: 'family', done: [], skipped: [] } } })
 
 const renderWeek = (props: Partial<React.ComponentProps<typeof WeekV2>> = {}) => render(
   <MemoryRouter>
@@ -173,14 +174,16 @@ describe('WeekV2 header — the fact line', () => {
 
   // One count on every horizon (reviewed design, 2026-10-20): this week's,
   // done out of everything on it, with its bar; last week's lives in Looking back.
-  it('"{done} of {all} done", a bar, "planned {Weekday}", then today', () => {
+  it('"{done} of {all} done", a bar, then today; "planned {Weekday}" is the summary line’s', () => {
     renderAt('/week', { deck: makeDeck({ doneThisWeek: 4, onThisWeek: 16 }), today: 'Kaleb’s baseball' })
     expect(document.querySelector('.wk-facts')?.textContent).toBe('4 of 16 done · Today: Kaleb’s baseball')
     expect(screen.getByRole('img', { name: '4 of 16 done' }).querySelector('span')).toHaveStyle({ width: '25%' })
     cleanup()
     session.saved = { authorId: 'me', at: new Date(2026, 8, 27, 18) } // Sunday
     renderAt('/week', { deck: makeDeck({ doneThisWeek: 4, onThisWeek: 16 }), today: 'Kaleb’s baseball' })
-    expect(document.querySelector('.wk-facts')?.textContent).toBe('4 of 16 done · planned Sunday · Today: Kaleb’s baseball')
+    // When it was planned is the summary line's, not the facts'.
+    expect(document.querySelector('.wk-facts')?.textContent).toBe('4 of 16 done · Today: Kaleb’s baseball')
+    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun')
   })
 
   // ⋯ no longer offers "Review last week" (it opened the same deck as Plan
@@ -295,6 +298,31 @@ describe('WeekV2 — Review opens the deck', () => {
     expect(review.finish).not.toHaveBeenCalled()
   })
 
+  it('"Review this week" opens next week’s session on its Look back at this one', () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 9))
+    seed.notes = { guide: { current: 'look-back', done: [], skipped: [] } }
+    renderAt('/week', { deck: makeDeck() })
+    fireEvent.click(screen.getByRole('button', { name: 'Review this week' }))
+    expect(within(screen.getByRole('region', { name: 'Planning the week' })).getByLabelText('What went well')).toBeTruthy()
+  })
+
+  it('Done planning the week saves a Look back draft as last week’s review notes', async () => {
+    seed.notes = { guide: { current: 'look-back', done: [], skipped: [] } }
+    review.finish.mockClear()
+    renderAt('/week?plan=1', { deck: makeDeck() })
+    fireEvent.change(await screen.findByLabelText('What went well'), { target: { value: ' Rested ' } })
+    fireEvent.change(screen.getByLabelText('What didn’t'), { target: { value: 'Late nights' } })
+    // Walk on to the last step: the draft outlives Look back's body.
+    const panel = within(screen.getByTestId('guide-panel'))
+    for (let i = 0; i < 8 && !panel.queryByRole('button', { name: 'Done planning the week' }); i++) {
+      fireEvent.click(panel.getByRole('button', { name: 'Next step' }))
+      await screen.findByTestId('guide-panel')
+    }
+    await finishPlanning()
+    await vi.waitFor(() => expect(review.finish).toHaveBeenCalledWith({ wentWell: 'Rested', didnt: 'Late nights' }))
+    await vi.waitFor(() => expect(where().get('plan')).toBeNull())
+  })
+
   it('reviewed on its last day: no button', () => {
     vi.setSystemTime(new Date(2026, 9, 3, 9))
     review.reviewed = { at: new Date(2026, 9, 3, 8), authorId: 'me', wentWell: '', didnt: '' }
@@ -392,6 +420,51 @@ describe('WeekV2 — Review opens the deck', () => {
   it('without a deck (the v1 week) there is no review', () => {
     renderWeek()
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
+  })
+})
+
+// The everyday line (spec 2026-11-01): what this week's planning left behind,
+// in one quiet line under the title. "Looked back" reads: this week's session
+// did its Look back step, or last week's review was recorded.
+describe('WeekV2 — the planning summary line', () => {
+  beforeEach(() => { session.saved = null; session.loading = false; session.error = null; review.reviewed = null })
+
+  it('says when it was planned, the energy and that it looked back', () => {
+    seed.notes = { guide: { current: 'family', done: ['look-back'], skipped: [], plannedAt: new Date(2026, 8, 27, 18).toISOString() }, energy: { level: 'medium' } }
+    renderAt('/week', { deck: makeDeck() })
+    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun · energy: medium · looked back')
+  })
+
+  it('counts last week’s recorded review as having looked back', () => {
+    seed.notes = { guide: { current: 'family', done: [], skipped: [], plannedAt: new Date(2026, 8, 27, 18).toISOString() } }
+    review.reviewed = { at: new Date(2026, 8, 26), authorId: 'me', wentWell: '', didnt: '' }
+    renderAt('/week', { deck: makeDeck() })
+    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun · looked back')
+  })
+
+  it('with nothing saved there is no line', () => {
+    renderAt('/week', { deck: makeDeck() })
+    expect(document.querySelector('.guide-summary-line')).toBeNull()
+  })
+
+  it('is not drawn while the session is open', () => {
+    seed.notes = { guide: { current: 'family', done: [], skipped: [], plannedAt: new Date(2026, 8, 27, 18).toISOString() } }
+    renderAt('/week?plan=1', { deck: makeDeck() })
+    expect(document.querySelector('.guide-summary-line')).toBeNull()
+  })
+
+  it('on the desk it sits in the masthead beside the facts', () => {
+    seed.notes = { guide: { current: 'family', done: [], skipped: [], plannedAt: new Date(2026, 8, 27, 18).toISOString() } }
+    const slots = slotsFor()
+    render(
+      <MemoryRouter>
+        <PlanMastheadSlotsContext.Provider value={slots}>
+          <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent deck={makeDeck()} today="Dentist" />
+        </PlanMastheadSlotsContext.Provider>
+      </MemoryRouter>,
+    )
+    expect(slots.subline.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun')
+    slots.done()
   })
 })
 
