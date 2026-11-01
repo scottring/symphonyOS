@@ -327,7 +327,7 @@ export function ChoosePlan(p: ChoosePlanProps) {
             const open = openLine === line.key
             const group = p.groupOf?.(line)
             const head = group && (i === 0 || p.groupOf!(p.lines[i - 1]).key !== group.key)
-              ? <li role="presentation" className="choose-area-head">{group.heading}</li> : null
+              ? <li role="presentation" className="choose-area-head"><h4 className="choose-area-name">{group.heading}</h4></li> : null
             return <Fragment key={line.key}>{head}<li className={`choose-line${open ? ' is-open' : ''}`}>
               <button type="button" className="choose-line-row" aria-expanded={open} onClick={() => setOpenLine(open ? null : line.key)}>
                 <span className="choose-line-title">{line.title}</span>

@@ -1046,6 +1046,8 @@ describe('Done planning October (spec 2026-11-01)',()=>{
   atStep('upkeep-fun')
   month('&plan=1')
   await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Done planning October'}))})
+  // September, not reviewed yet, is recorded reviewed even with nothing typed.
+  expect(review.finish).toHaveBeenCalledWith({wentWell:'',didnt:''})
   expect(plan.save).toHaveBeenCalledWith({wentWell:'',didnt:''})
   // The session finished and left; the way on is this week.
   await waitFor(()=>expect(screen.getByTestId('where').textContent).not.toContain('plan=1'))
@@ -1075,6 +1077,39 @@ describe('Done planning October (spec 2026-11-01)',()=>{
   expect(toast.showToast).toHaveBeenCalledWith('Couldn’t save that — try again.','error',5000)
   expect(screen.getByTestId('where').textContent).toContain('plan=1')
   expect((notesStore.notes.guide as any).finishedAt).toBeUndefined()
+ })
+ it('Review October, then Done with nothing typed: October is recorded reviewed and no longer offered',async()=>{
+  at(new Date(2026,9,30,12)); onTestFinished(()=>{vi.useRealTimers();review.reviewed=null;review.prevReviewed=null})
+  review.finish.mockImplementation(async()=>{review.reviewed=REVIEWED;review.prevReviewed=REVIEWED;return true})
+  atStep('upkeep-fun')
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Review October'}))
+  expect(screen.getByText(/Planning November · step 6 of 6/)).toBeInTheDocument()
+  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Done planning November'}))})
+  expect(review.finish).toHaveBeenCalledWith({wentWell:'',didnt:''})
+  cleanup()
+  month()
+  expect(primaries()).toEqual([])
+  expect(menu()).not.toContain('Review October')
+ })
+ it('the period before already reviewed and nothing new typed: Done leaves its review as it was',async()=>{
+  at(new Date(2026,9,17,9)); onTestFinished(()=>{vi.useRealTimers();review.prevReviewed=null;review.mine=null})
+  review.prevReviewed={wentWell:'Gate fixed',didnt:'',at:new Date(2026,9,2),authorId:'u1'};review.mine={wentWell:'Gate fixed',didnt:''}
+  atStep('upkeep-fun')
+  month('&plan=1')
+  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Done planning October'}))})
+  expect(plan.save).toHaveBeenCalled()
+  expect(review.finish).not.toHaveBeenCalled()
+ })
+ it('planning a period again says so quietly in the session line',()=>{
+  at(new Date(2026,9,17,9)); onTestFinished(()=>{vi.useRealTimers();plan.saved=null})
+  plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
+  month('&plan=1')
+  const line=screen.getByRole('region',{name:'Planning October'}).querySelector('.guide-session-line')!
+  expect(line).toHaveTextContent('October was planned Oct 3. You can still change it.')
+  cleanup();plan.saved=null
+  month('&plan=1')
+  expect(screen.queryByText(/was planned/)).toBeNull()
  })
  it('a period already over is reviewed, not planned',()=>{
   open('/month?view=constellation&horizon=2&start=2025-03-09')
@@ -1182,6 +1217,24 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   fireEvent.change(add,{target:{value:'Paint the fence'}})
   await act(async()=>{fireEvent.submit(add.closest('form')!)})
   await waitFor(()=>expect(notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt).length).toBeGreaterThan(0))
+ })
+ // (This file stubs taskReviewState, so every row here reads as October; which
+ // label a step wears is chooseFromAbove's own test.)
+ it('The month by area: Not in October on a line already on Fall ends only October’s commitment — nothing to put back first',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  const FALL=new Date(2026,8,1)
+  api.tasks=[{id:'s',title:'Get the house in order',bucket:'quarter',goalId:'g',commitments:[{level:'season',periodStart:FALL,status:'open'}]},
+   {id:'p',title:'Paint the office',bucket:'quarter',sourceId:'s',commitments:[{level:'season',periodStart:FALL,status:'open'}]},
+   {id:'o',title:'Organize documents',bucket:'month',monthStart:OCT,sourceId:'s',commitments:[{level:'season',periodStart:FALL,status:'open'},{level:'month',periodStart:OCT,status:'open'}]}]
+  api.keepForward.mockResolvedValue('p');api.dropCommitment.mockResolvedValue(true)
+  atStep('by-area')
+  month('&plan=1')
+  fireEvent.click(screen.getByRole('button',{name:/Get the house in order/}))
+  expect(screen.getByRole('list',{name:'Steps of Get the house in order'})).toHaveTextContent('Paint the office')
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Not in October: Organize documents'}))})
+  expect(api.dropCommitment).toHaveBeenCalledWith('o','month',OCT)
+  expect(api.keepForward).not.toHaveBeenCalled()
+  expect(lastRun().label).toBe('Back to Fall: “Organize documents”')
  })
  it('Maintenance and fun: the monthly routines and the month’s fun lines; a fun line is added from what is typed',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})

@@ -47,7 +47,7 @@ type Line = { id: string; title: string }
 type Area = { id: string; name: string; context: TaskContext | null }
 const NONE: readonly never[] = []
 
-export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites }: {
+export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites, plannedAt }: {
   level: PeriodLevel
   /** The period's planning token (monthToken, seasonToken, yearToken). */
   token: string
@@ -71,7 +71,11 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   /** Hear of each placement-type write saved on the page itself; returns the
    *  way to stop listening. */
   listenPageWrites?: (listener: () => void) => () => void
+  /** When the period was last marked planned. Planned before this session
+   *  opened, the session line says so quietly: it is being planned again. */
+  plannedAt?: Date
 }) {
+  const [openedAt] = useState(() => Date.now())
   const steps = stepsFor(level)
   const CHOOSING = choosingStep(level).id
   const { progress, loading, saveError, next, skip, jump, markPlanned, finish, setThreadId } = useGuidedProgress(level, token)
@@ -148,6 +152,9 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
     <section className="guide-session" aria-label={`Planning ${periodLabel}`}>
       <p className="guide-session-line">
         <SessionBar label={`Planning ${periodLabel}`} index={index} total={steps.length} onLeave={onLeave} />
+        {plannedAt && plannedAt.getTime() < openedAt && <span className="guide-session-count">
+          {periodLabel[0].toUpperCase() + periodLabel.slice(1)} was planned {plannedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. You can still change it.
+        </span>}
       </p>
       {saveError && <p className="guide-session-error" role="alert">{saveError}</p>}
       <div className="guide-session-layout">

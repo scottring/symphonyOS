@@ -175,6 +175,16 @@ describe('GuidedPeriod — Month, Season and Year while planning', () => {
     expect((store.notes.guide as { finishedAt?: string }).finishedAt).toBeUndefined()
   })
 
+  it('planned before the session opened, the session line says so quietly; planned during it, it does not', () => {
+    const { unmount } = render(<GuidedSessionProvider><GuidedPeriod level="month" token="2026-11" periodLabel="November" page={null} bodies={() => ({})}
+      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} plannedAt={new Date(2026, 9, 3)} /></GuidedSessionProvider>)
+    expect(screen.getByText('November was planned Oct 3. You can still change it.')).toBeInTheDocument()
+    unmount()
+    render(<GuidedSessionProvider><GuidedPeriod level="month" token="2026-11" periodLabel="November" page={null} bodies={() => ({})}
+      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} plannedAt={new Date(Date.now() + 1000)} /></GuidedSessionProvider>)
+    expect(screen.queryByText(/was planned/)).toBeNull()
+  })
+
   it('Season and Year use their own steps and finish label', async () => {
     store.notes = { guide: { current: 'wild-cards', done: [], skipped: [] } }
     setup({ level: 'season', token: '2026-fall', periodLabel: 'Fall' })

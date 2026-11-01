@@ -61,11 +61,12 @@ describe('GuideRail', () => {
       addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
     }) as MediaQueryList)
     let scrolled: { el: Element; opts: unknown }[] = []
+    const original = Element.prototype.scrollIntoView
     beforeEach(() => {
       scrolled = []
       Element.prototype.scrollIntoView = vi.fn(function (this: Element, opts?: unknown) { scrolled.push({ el: this, opts }) })
     })
-    afterEach(() => { vi.restoreAllMocks() })
+    afterEach(() => { vi.restoreAllMocks(); Element.prototype.scrollIntoView = original })
 
     it('brings the current chip into view on arrival and when the step changes', () => {
       phone(true)

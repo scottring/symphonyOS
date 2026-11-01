@@ -139,6 +139,8 @@ describe('ChoosePlan — grouped by life area (Month by area)', () => {
     expect(Array.from(list.children).map((li) => li.classList.contains('choose-area-head') ? `# ${li.textContent}` : li.querySelector('.choose-line-title')?.textContent))
       .toEqual(['# Health', 'Plan a winter vacation', 'Run three times a week', '# Home', 'Organize important family documents'])
     expect(document.querySelector('.choose-foot')).toBeNull()
+    // Each area is a heading, so a screen reader can move between them.
+    expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Health', 'Home'])
   })
 })
 

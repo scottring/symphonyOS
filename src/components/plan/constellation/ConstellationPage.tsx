@@ -1011,17 +1011,18 @@ function Inner() {
       : <PeriodLookBack {...common} open={open}
           verbs={{ carry, table: (x) => somedayOf(x).run(), drop: (x) => moves(x)[1].onClick(), done: doneOf }} />
   }
-  // Done planning: the look back's unsaved notes are saved as the review
-  // (Done is an explicit tap), then the period is marked planned — the
-  // closing write; one that fails keeps the session open. Then the way on
-  // is the next horizon down (planNext), offered on the page.
+  // Done planning, as the Week's: the period before is recorded reviewed
+  // (with the look back's notes as typed — Done is an explicit tap — or what
+  // was already said), unless it already is and nothing new was typed. Then
+  // the period is marked planned — the closing write; one that fails keeps
+  // the session open. Then the way on is the next horizon down (planNext),
+  // offered on the page.
   const closePeriod = async (draft: ReviewNotes | null): Promise<boolean> => {
-    if (draft) {
-      const saved = prevReview.mine ?? { wentWell: '', didnt: '' }
-      const notes = { wentWell: draft.wentWell.trim(), didnt: draft.didnt.trim() }
-      if ((notes.wentWell !== saved.wentWell || notes.didnt !== saved.didnt) && !(await prevReview.finish(notes).catch(() => false))) {
-        showToast(`Couldn’t save the notes on ${prevWord} — try again.`, 'error', 5000)
-      }
+    const saved = prevReview.mine ?? { wentWell: '', didnt: '' }
+    const notes = draft ? { wentWell: draft.wentWell.trim(), didnt: draft.didnt.trim() } : saved
+    const changed = notes.wentWell !== saved.wentWell || notes.didnt !== saved.didnt
+    if ((!prevReview.reviewed || changed) && !(await prevReview.finish(notes).catch(() => false))) {
+      showToast(`Couldn’t mark ${prevWord} reviewed — try again.`, 'error', 5000)
     }
     const ok = await markPlanned()
     if (ok) setMarkedKey(periodKey)
@@ -1211,6 +1212,7 @@ function Inner() {
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
           page={pageBody} bodies={sessionBodies} onFinish={closePeriod} onLeave={() => setMode(null)}
           onPlanned={() => planSession.reload()} listenPageWrites={listenPageWrites}
+          plannedAt={!planSession.error ? planSession.saved?.at : undefined}
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}
           areas={lifeAreas.map((x) => ({ id: x.id, name: x.name, context: x.context }))} />
       : <>
