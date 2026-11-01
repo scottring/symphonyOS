@@ -5,6 +5,9 @@ export interface ConsolidatedIngredient {
   text: string
   category: GroceryCategory
   fromRecipeIds: string[]
+  /** The canonical "what is this" key ("garlic", "dijon"): the same line across
+   *  rebuilds, so the shopping list can follow the plan (lib/mealGroceries.ts). */
+  key: string
 }
 
 interface Parsed {
@@ -118,6 +121,14 @@ function cleanDisplay(raw: string): string {
   return s.replace(/\s+/g, ' ')
 }
 
+/** Recipes group their lines under section labels ("SAUCE: 4 garlic cloves",
+ *  "Drizzle: 1 tbsp Dijon", "DOUGH : 700 g bread flour"). The label says where
+ *  it goes in the recipe, not what to buy; left on, it split one ingredient
+ *  into two shopping lines and hid staples from the staple check (2026-11-01). */
+export function stripSectionLabel(raw: string): string {
+  return raw.replace(/^\s*[a-z][a-z ]{0,24}?\s*(?:\([^)]*\)\s*)?:\s*(?=\S)/i, '')
+}
+
 function parseIngredient(ingredient: string): Parsed | null {
   const lower = ingredient.toLowerCase().trim()
   // Quantity: integer, fraction, mixed, decimal, or unicode fraction at the start.
@@ -188,7 +199,7 @@ function formatNumber(n: number): string {
 }
 
 function pluralizeUnit(unit: string, count: number): string {
-  if (count === 1) return unit
+  if (count <= 1) return unit // "1/2 cup", not "1/2 cups"
   // Most units pluralize by adding 's'. Exceptions: g, kg, ml, l, oz, lb, tbsp, tsp.
   const NO_PLURAL = new Set(['g', 'kg', 'ml', 'l', 'oz', 'lb', 'tbsp', 'tsp'])
   if (NO_PLURAL.has(unit)) return unit
@@ -203,6 +214,7 @@ function ingredientKey(_parsed: Parsed | null, raw: string): string {
 }
 
 interface Accumulator {
+  key: string
   category: GroceryCategory
   fromRecipeIds: string[]
   contributions: { raw: string; parsed: Parsed | null }[]
@@ -251,7 +263,8 @@ export function consolidateIngredients(plan: MealPlan, recipes: Recipe[]): Conso
   }
 
   for (const recipe of uniqueRecipes) {
-    for (const ingredient of recipe.ingredients) {
+    for (const line of recipe.ingredients) {
+      const ingredient = stripSectionLabel(line)
       const parsed = parseIngredient(ingredient)
       const key = ingredientKey(parsed, ingredient)
       if (!key) continue
@@ -263,6 +276,7 @@ export function consolidateIngredients(plan: MealPlan, recipes: Recipe[]): Conso
         }
       } else {
         byKey.set(key, {
+          key,
           category: categorizeIngredient(ingredient),
           fromRecipeIds: [recipe.id],
           contributions: [{ raw: ingredient, parsed }],
@@ -275,5 +289,6 @@ export function consolidateIngredients(plan: MealPlan, recipes: Recipe[]): Conso
     text: renderText(acc),
     category: acc.category,
     fromRecipeIds: acc.fromRecipeIds,
+    key: acc.key,
   }))
 }

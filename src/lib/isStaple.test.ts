@@ -3,7 +3,7 @@ import { isStaple } from './isStaple'
 import type { ConsolidatedIngredient } from './consolidateIngredients'
 
 const item = (text: string, category: ConsolidatedIngredient['category']): ConsolidatedIngredient =>
-  ({ text, category, fromRecipeIds: ['r1'] })
+  ({ text, category, fromRecipeIds: ['r1'], key: text })
 
 describe('isStaple', () => {
   it('treats spices as staples', () => {
@@ -24,5 +24,12 @@ describe('isStaple', () => {
     expect(isStaple(item('8 oz pasta', 'Pantry'))).toBe(false)
     expect(isStaple(item('4 tomatoes', 'Produce'))).toBe(false)
     expect(isStaple(item('8 eggs', 'Dairy'))).toBe(false)
+  })
+
+  it('treats seasoning pepper as a staple but a bell or chili pepper as produce', () => {
+    expect(isStaple(item('Pepper', 'Produce'))).toBe(true)
+    expect(isStaple(item('Crushed red pepper flakes', 'Produce'))).toBe(true)
+    expect(isStaple(item('Red bell pepper', 'Produce'))).toBe(false)
+    expect(isStaple(item('2 jalapeño peppers', 'Produce'))).toBe(false)
   })
 })

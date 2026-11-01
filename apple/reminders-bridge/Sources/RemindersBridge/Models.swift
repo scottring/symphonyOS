@@ -46,7 +46,6 @@ public enum SyncOp: Equatable, Hashable {
     case insertApple(symphony: SymphonyItem, appleListName: String)
     /// Both sides have it; Symphony is newer — update Apple.
     case updateApple(externalId: String, fromSymphony: SymphonyItem)
-    /// Symphony marked deleted (we use hard-delete); Apple still has it — delete from Apple.
-    /// v1 does NOT support this case (Symphony delete propagation deferred — see plan notes).
+    /// Deleted in Symphony (hard delete) after both sides had it — delete from Apple.
     case deleteApple(externalId: String)
 }

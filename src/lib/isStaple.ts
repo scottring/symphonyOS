@@ -21,5 +21,10 @@ const STAPLE_PATTERN = new RegExp(
  *  by default. Spices are always treated as staples. */
 export function isStaple(item: ConsolidatedIngredient): boolean {
   if (item.category === 'Spices') return true
+  // "pepper" the seasoning is a staple; a bell or chili pepper is produce you
+  // buy (a red bell pepper was left off the list, 2026-11-01).
+  if (FRESH_PEPPER.test(item.text)) return false
   return STAPLE_PATTERN.test(item.text)
 }
+
+const FRESH_PEPPER = /\b(bell|jalape\w*|poblano|serrano|habanero|banana|sweet|shishito|chil[ei])\s+peppers?\b/i

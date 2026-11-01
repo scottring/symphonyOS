@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
-import { supabase, getAuthUser } from '@/lib/supabase'
 import { CATEGORY_ORDER, type GroceryCategory } from '@/lib/categorizeIngredient'
 import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
 import { isStaple } from '@/lib/isStaple'
@@ -13,6 +12,10 @@ interface Props {
   consolidated: ConsolidatedIngredient[]
   groceriesListId: string | null
   currentItemTexts: string[]
+  /** Puts the ticked items on the list; resolves to an error message or null.
+   *  useGroceryStatus.build also remembers the week, so the list follows later
+   *  meal changes. */
+  onSend: (items: ConsolidatedIngredient[]) => Promise<string | null>
   onSent: () => void
 }
 
@@ -57,6 +60,7 @@ export function SendToGroceriesModalV2({
   consolidated,
   groceriesListId,
   currentItemTexts,
+  onSend,
   onSent,
 }: Props) {
   const [items, setItems] = useState<ConsolidatedIngredient[]>([])
@@ -122,28 +126,12 @@ export function SendToGroceriesModalV2({
     if (!groceriesListId || items.length === 0) return
     setSending(true)
     setError(null)
-    const { data: userResult } = await getAuthUser()
-    const userId = userResult?.user?.id
-    if (!userId) {
-      setError('not authenticated')
-      setSending(false)
-      return
-    }
-
-    const inserts = items.map((it, idx) => ({
-      list_id: groceriesListId,
-      user_id: userId,
-      text: it.text,
-      sort_order: idx,
-      completed: false,
-    }))
-    const { error: insertErr } = await supabase.from('list_items').insert(inserts)
-    if (insertErr) {
-      setError(insertErr.message)
-      setSending(false)
-      return
-    }
+    const err = await onSend(items)
     setSending(false)
+    if (err) {
+      setError(err)
+      return
+    }
     onSent()
     onClose()
   }

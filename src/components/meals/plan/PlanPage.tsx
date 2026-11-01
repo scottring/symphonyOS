@@ -56,11 +56,11 @@ export function PlanPage() {
   }, [weekStart])
 
   const { plan, loading, error, addMeal, removeMeal, moveMeal, setWeekRange } = useMealPlan(weekStart)
-  const { recipes, refresh: refreshRecipes, addManual } = useRecipes()
+  const { recipes, loading: recipesLoading, refresh: refreshRecipes, addManual } = useRecipes()
   const { members: familyMembers } = useFamilyMembers()
   const chat = useMealPlannerChat(chatWeek, weekStart)
   const isMobile = useMobile()
-  const groceryStatus = useGroceryStatus(plan, recipes)
+  const groceryStatus = useGroceryStatus(plan, recipes, !loading && !recipesLoading)
 
   const [picker, setPicker] = useState<PickerState | null>(null)
   const [groceriesOpen, setGroceriesOpen] = useState(false)
@@ -312,6 +312,7 @@ export function PlanPage() {
         consolidated={groceryStatus.missingItems}
         groceriesListId={groceryStatus.groceriesListId}
         currentItemTexts={[]}
+        onSend={groceryStatus.build}
         onSent={() => setGroceriesOpen(false)}
       />
 

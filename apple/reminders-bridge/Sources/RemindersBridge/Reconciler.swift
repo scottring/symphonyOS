@@ -6,7 +6,10 @@ public enum Reconciler {
     ///
     /// Strategy:
     /// - Match items by externalId.
-    /// - Apple-only: insertSymphony.
+    /// - Apple-only, never seen on both sides: insertSymphony (added in Reminders).
+    /// - Apple-only, seen on both sides at the last pass (`paired`): deleteApple
+    ///   (deleted in Symphony). Without this, a Symphony delete was copied back
+    ///   from Reminders on the next tick (2026-11-01).
     /// - Symphony-only with externalId: deleteSymphony (Apple deleted it).
     /// - Symphony-only without externalId: insertApple (kiosk created it).
     /// - Both, same title and completion: no-op (already converged).
@@ -24,7 +27,8 @@ public enum Reconciler {
     public static func reconcile(
         apple: [AppleItem],
         symphony: [SymphonyItem],
-        mapping: ListMapping
+        mapping: ListMapping,
+        paired: Set<String> = []
     ) -> [SyncOp] {
         var ops: [SyncOp] = []
 
@@ -55,6 +59,8 @@ public enum Reconciler {
                     ops.append(.updateApple(externalId: a.externalId, fromSymphony: s))
                 }
                 // equal timestamps: no-op
+            } else if paired.contains(a.externalId) {
+                ops.append(.deleteApple(externalId: a.externalId))
             } else {
                 ops.append(.insertSymphony(listId: mapping.symphonyListId, apple: a))
             }
@@ -71,5 +77,22 @@ public enum Reconciler {
         }
 
         return ops
+    }
+
+    /// The items on both sides as fetched this pass, less the ones this pass
+    /// deletes. Only what was actually seen on both sides counts, so an item
+    /// whose copy failed is never mistaken for one deleted later.
+    public static func pairedAfter(apple: [AppleItem], symphony: [SymphonyItem], ops: [SyncOp]) -> Set<String> {
+        let symphonyIds = Set(symphony.compactMap { $0.externalId })
+        var paired = Set(apple.map { $0.externalId }).intersection(symphonyIds)
+        for op in ops {
+            switch op {
+            case .deleteApple(let ext): paired.remove(ext)
+            case .deleteSymphony(let id):
+                if let ext = symphony.first(where: { $0.id == id })?.externalId { paired.remove(ext) }
+            default: break
+            }
+        }
+        return paired
     }
 }

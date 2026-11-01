@@ -202,4 +202,17 @@ describe('consolidateIngredients — quantity aggregation + prep stripping', () 
     expect(result.length).toBe(1)
     expect(result[0].text).toMatch(/parsley/i)
   })
+
+  it('ignores recipe section labels, so a labelled line merges with a plain one', () => {
+    const a = makeRecipe('a', ['4 garlic cloves', '1 1/2 tbsp dijon'])
+    const b = makeRecipe('b', ['SAUCE: 4 garlic cloves', 'Drizzle: 1 tbsp Dijon', 'DOUGH (totals for two pans): 700 g bread flour'])
+    const result = consolidateIngredients(planWith([a, b]), [a, b])
+    expect(result.map(r => r.text)).toEqual(['8 garlic cloves', '2 1/2 tbsp dijon', '700 g bread flour'])
+    expect(result.map(r => r.key)).toEqual(['garlic', 'dijon', 'bread flour'])
+  })
+
+  it('keeps a fraction of a unit singular', () => {
+    const a = makeRecipe('a', ['½ cup grated Parmesan'])
+    expect(consolidateIngredients(planWith([a]), [a])[0].text).toBe('1/2 cup grated parmesan')
+  })
 })

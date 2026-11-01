@@ -3,26 +3,10 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { SendToGroceriesModalV2 } from './SendToGroceriesModalV2'
 import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
 
-const insertMock = vi.fn(() => Promise.resolve({ error: null }))
-vi.mock('@/lib/supabase', () => {
-  const __mod: any = {
-  supabase: {
-    from: vi.fn(() => ({ insert: insertMock })),
-    auth: { getUser: vi.fn(() => Promise.resolve({ data: { user: { id: 'u1' } }, error: null })) },
-  },
-}
-  // getAuthUser is the real module's cached-session reader; here it
-  // just answers from whatever this mock's auth returns.
-  return {
-    ...__mod,
-    getAuthUser: (...a: any[]) =>
-      __mod.supabase.auth?.getUser?.(...a) ??
-      Promise.resolve({ data: { user: null }, error: null }),
-  }
-})
+const sendMock = vi.fn((_items: ConsolidatedIngredient[]) => Promise.resolve(null as string | null))
 
 const ci = (text: string, category: ConsolidatedIngredient['category']): ConsolidatedIngredient =>
-  ({ text, category, fromRecipeIds: ['r1'] })
+  ({ text, category, fromRecipeIds: ['r1'], key: text })
 
 const consolidated: ConsolidatedIngredient[] = [
   ci('2 lb chicken breast', 'Meat'),
@@ -39,6 +23,7 @@ function open() {
       consolidated={consolidated}
       groceriesListId="list-1"
       currentItemTexts={[]}
+      onSend={sendMock}
       onSent={vi.fn()}
     />,
   )
@@ -58,9 +43,8 @@ describe('SendToGroceriesModalV2 — staples', () => {
   it('sends only non-staple items by default', async () => {
     open()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Send to Apple Reminders/i })) })
-    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1))
-    const rows = insertMock.mock.calls[0][0] as Array<{ text: string }>
-    const texts = rows.map(r => r.text)
+    await waitFor(() => expect(sendMock).toHaveBeenCalledTimes(1))
+    const texts = sendMock.mock.calls[0][0].map(r => r.text)
     expect(texts).toContain('2 lb chicken breast')
     expect(texts).toContain('8 eggs')
     expect(texts).not.toContain('2 tbsp olive oil')
@@ -72,9 +56,16 @@ describe('SendToGroceriesModalV2 — staples', () => {
     fireEvent.click(screen.getByRole('button', { name: /STAPLES — CHECK BEFORE BUYING/i }))
     fireEvent.click(screen.getByRole('button', { name: /Add 2 tbsp olive oil to the list/i }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Send to Apple Reminders/i })) })
-    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1))
-    const texts = (insertMock.mock.calls[0][0] as Array<{ text: string }>).map(r => r.text)
+    await waitFor(() => expect(sendMock).toHaveBeenCalledTimes(1))
+    const texts = sendMock.mock.calls[0][0].map(r => r.text)
     expect(texts).toContain('2 tbsp olive oil')
     expect(texts).not.toContain('salt')
+  })
+
+  it('shows the error and stays open when the send fails', async () => {
+    sendMock.mockResolvedValueOnce('permission denied')
+    open()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Send to Apple Reminders/i })) })
+    expect(await screen.findByText(/permission denied/)).toBeTruthy()
   })
 })

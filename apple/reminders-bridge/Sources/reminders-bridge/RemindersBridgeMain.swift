@@ -13,7 +13,8 @@ struct RemindersBridgeMain {
             let bridge = Bridge(
                 config: config,
                 reminders: RemindersClient(),
-                symphony: SymphonyClient(supabaseUrl: config.supabaseUrl, serviceRoleKey: config.serviceRoleKey)
+                symphony: SymphonyClient(supabaseUrl: config.supabaseUrl, serviceRoleKey: config.serviceRoleKey),
+                pairs: FilePairStore(path: (configPath as NSString).deletingLastPathComponent + "/paired.json")
             )
             try await bridge.runOnce()
             // Implicit return → exit 0 with proper teardown.
