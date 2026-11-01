@@ -2,7 +2,7 @@
 // at the period before. Its count and the two notes (Looking back, compact; a
 // month's energy goes in these notes), then each line it left open with the
 // level's calls: Month carry / back to the season / drop; Season Carry /
-// Table (Someday) / Let go; Year carry / Someday / drop. Every call saves
+// Table (Someday) / Let go; Year Carry / Someday / Let go. Every call saves
 // through the page's writers (receipt and Undo); nothing writes until a
 // button is pressed.
 

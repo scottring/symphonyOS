@@ -89,7 +89,7 @@ import { EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 import { monthToken, usePlanningSession, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
 import { showToast } from '@/hooks/useToast'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
-import { seasonToken } from '@/lib/cadence/seasons'
+import { nextSeasonStart, seasonLabel, seasonToken } from '@/lib/cadence/seasons'
 import { REVIEW_WINDOW_DAYS, alsoDoneIn, movedOn, reviewTarget, taskReviewState, weekPhrase, yearGoalReviewState } from '@/lib/planning/periodReview'
 import type { ReviewState } from '@/lib/planning/periodReview'
 import { ChoosePlan, type ChooseItemView, type ChooseLineView, type ChooseVerb } from '@/components/plan/choose/ChoosePlan'
@@ -115,6 +115,13 @@ import { SeasonCalendar } from '@/components/plan/guided/season/SeasonCalendar'
 import { SeasonEnergy, SeasonIdealWeek, SeasonWildCards } from '@/components/plan/guided/season/SeasonNotes'
 import { IdealWeekSection } from '@/components/guide/IdealWeekSection'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
+import { YearVision } from '@/components/plan/guided/year/Vision'
+import { YearLandscape } from '@/components/plan/guided/year/Landscape'
+import { BrainDump } from '@/components/plan/guided/year/BrainDump'
+import { Refine } from '@/components/plan/guided/year/Refine'
+import { ShareBook } from '@/components/plan/guided/year/ShareBook'
+import { AreasEditor } from '@/components/guide/AreasEditor'
+import { useAuth } from '@/hooks/useAuth'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import { isAboveDrag, ABOVE_MIME } from './aboveDrag'
 
@@ -163,7 +170,8 @@ function Inner() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const area = useAddArea()
-  const { areas: lifeAreas } = useLifeAreas()
+  const { areas: lifeAreas, add: addArea, rename: renameArea, setContext: setAreaContext, remove: removeArea } = useLifeAreas()
+  const { user } = useAuth()
   const { getRoutinesForDate } = useRoutines()
   // The shell's "How this page works", or the page's own ask where it offers none.
   const shellHelp = usePageHelp()
@@ -245,6 +253,9 @@ function Inner() {
   const [forKey, setForKey] = useState('')
   // A link just made: the goal's "For" line lights up.
   const [linked, setLinked] = useState<string | null>(null)
+  // Planning the year, Refine: the pairs set aside with "Keep both", until
+  // the session is left.
+  const [keptPairs, setKeptPairs] = useState<ReadonlySet<string>>(() => new Set())
   const mainRef = useRef<HTMLElement>(null)
   // A goal just added, to bring into view once it arrives.
   const reveal = useRef<string | null>(null)
@@ -994,9 +1005,49 @@ function Inner() {
   // The look back's open lines, each with the level's calls. Month: carry
   // into this month, back to the season, drop (to Someday), or done. Season:
   // Carry into this season, Table (to Someday), Let go (off that season; a
-  // year goal it was for stays on the year), or done. Year keeps its old
-  // moves until its own session (Task 18) gives it its.
+  // year goal it was for stays on the year), or done. Year: Carry (the
+  // strip's "→ 2026", a copy that remembers it), Someday, Let go (archived),
+  // or done.
   const toggleOf = (t: Task) => async () => (await toggleTask(t.id)) !== false
+  // A year goal to Someday: goals have no Someday of their own, so its words
+  // go on the Someday list (a task, with its space and area) and the goal is
+  // put away (archived, never deleted). Undo takes both back; a goal that
+  // could not be put away takes its Someday line back too.
+  const goalToSomeday = (node: PlanNode): Promise<boolean> => {
+    const g = node.goal!
+    const id = crypto.randomUUID()
+    const status = g.status
+    return act(`${describeTriageWhen('someday')}: “${g.name}”`, async () => {
+      if (!(await addTask(g.name, undefined, undefined, undefined, { id, bucket: 'someday', context: g.context ?? null, ...(g.areaId ? { areaId: g.areaId } : {}) }))) return false
+      if ((await updateGoal(g.id, { status: 'archived' })) === false) { await deleteTask(id); return false }
+      return true
+    }, { ids: [id, g.id], undo: async () => { await deleteTask(id); return (await updateGoal(g.id, { status })) !== false } })
+  }
+  // Brain dump: a year goal in a life area (its space the area's), or in none
+  // (the space the page adds in).
+  const addYearGoal = (title: string, areaId: string | null): Promise<boolean> => {
+    const lifeArea = areaId ? lifeAreas.find((a) => a.id === areaId) : undefined
+    const context = lifeArea ? lifeArea.context ?? 'personal' : contextFor(null)
+    const id = crypto.randomUUID()
+    return act(`Add “${title}” to ${year}`, async () => !!(await addGoal(areaId, title, context, { year, id, sortOrder: lastInYear(year) })),
+      { ids: [id], undo: async () => { await deleteGoal(id) } })
+  }
+  // Share: a Work or Personal year goal moved to Family (who sees it follows
+  // the space, as updateGoal derives it).
+  const shareGoal = (node: PlanNode): Promise<boolean> => {
+    const before = node.goal!.context ?? null
+    return act(`Share “${node.title}” with the family`, () => updateGoal(node.id, { context: 'family' }),
+      { ids: [node.id], undo: async () => (await updateGoal(node.id, { context: before })) !== false })
+  }
+  // Book the first season session: a personal, all-day "Plan {Season}" on
+  // the day picked, for the next season to start.
+  const nextSeasonWord = periodWordOf({ label: seasonLabel(nextSeasonStart(now, seasons), seasons) })
+  const bookSeason = (day: Date): Promise<boolean> => {
+    const id = crypto.randomUUID(), title = `Plan ${nextSeasonWord}`
+    return act(`Add “${title}” to ${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
+      async () => !!(await addTask(title, undefined, undefined, day, { id, isAllDay: true, context: 'personal', assignedTo: meId ?? undefined })),
+      { ids: [id], undo: async () => { await deleteTask(id) } })
+  }
   // Let go of a season goal the season before left open: only that season's
   // commitment ends. The goal it was for is a goals row and stays on the year.
   const letGoOf = (t: Task) => act(`Let go: “${t.title}”`, () => dropCommitment(t.id, 'season', prevB.start), { ids: [t.id], undo: restoreOf(t) })
@@ -1007,8 +1058,9 @@ function Inner() {
     if (level === 0) {
       const open = goalsOf(year - 1).filter((g) => yearGoalReviewState(g, thisYearGoals) === 'open')
         .map((g) => ({ id: g.id, title: g.name, node: { key: `0:${g.id}`, id: g.id, title: g.name, level: 0, parent: null, goal: g } as PlanNode }))
-      return <PeriodLookBack {...common} open={open} verbs={{
+      return <PeriodLookBack {...common} open={open} labels={{ drop: 'Let go' }} verbs={{
         carry: (l) => carryGoal(l.node, year, `Bring “${l.title}” into ${year}`),
+        table: (l) => goalToSomeday(l.node),
         drop: (l) => setGoalStatus(l.node, 'archived', `Let go of “${l.title}”`),
         done: (l) => setGoalStatus(l.node, 'completed', `Complete “${l.title}”`),
       }} />
@@ -1084,6 +1136,8 @@ function Inner() {
   // of the season), and a new block can be for an open one.
   const seasonGoals = level === 1 ? levelNodes.map((n) => ({ id: n.id, title: n.title })) : []
   const openSeasonGoals = level === 1 ? openNodes.map((n) => ({ id: n.id, title: n.title })) : []
+  // The year's open goals, for the brain dump, refine and share steps.
+  const yearOpen = level === 0 ? openNodes.filter((n) => n.goal) : []
   const sessionBodies = (t: PeriodSessionTools) => level === 2 ? {
     'fresh-start': <FreshStart monthWord={periodWord} value={t.notes.scenery} patch={t.patch} />,
     'look-back': lookBackBody(t),
@@ -1103,7 +1157,26 @@ function Inner() {
     'wild-cards': <SeasonWildCards value={t.notes.wildCards} patch={t.patch} />,
   } : {
     'look-back': lookBackBody(t),
-    'brain-dump': chooseBody(t),
+    vision: <YearVision yearWord={periodWord} value={t.notes.vision} patch={t.patch} />,
+    landscape: <YearLandscape value={t.notes.landscape} patch={t.patch} />,
+    areas: <div className="gw-body"><AreasEditor areas={lifeAreas} onAdd={addArea} onRename={renameArea} onSetContext={setAreaContext} onRemove={removeArea} /></div>,
+    // The choosing step: every add goes through the session's report, so
+    // the first that saves marks the year planned.
+    'brain-dump': <BrainDump yearWord={periodWord}
+      areas={lifeAreas.filter((a) => matchesLayers(a.context ?? 'personal', layers)).map((a) => ({ id: a.id, name: a.name }))}
+      goals={yearOpen.map((n) => ({ id: n.id, title: n.title, areaId: n.goal!.areaId || null }))}
+      onAdd={t.report(addYearGoal)} />,
+    refine: <Refine goals={yearOpen.map((n) => ({ id: n.id, title: n.title, node: n }))} kept={keptPairs}
+      onKeepBoth={(key) => setKeptPairs((s) => new Set([...s, key]))}
+      onLetGo={(g) => setGoalStatus(g.node, 'archived', `Let go of “${g.title}”`)} onSomeday={(g) => goalToSomeday(g.node)} />,
+    'share-book': <ShareBook seasonWord={nextSeasonWord} onShare={(g) => shareGoal(g.node)} onBook={bookSeason}
+      goals={yearOpen.flatMap((n) => {
+        const g = n.goal!
+        // Scott's own: a partner's goal is theirs to share. A goal just
+        // added has no owner on it yet, and is his.
+        if ((g.context !== 'work' && g.context !== 'personal') || (g.userId && g.userId !== user?.id)) return []
+        return [{ id: n.id, title: n.title, context: g.context, node: n }]
+      })} />,
   }
 
   // ---- The header (calm pass, 2026-10-18) ------------------------------------
@@ -1253,7 +1326,7 @@ function Inner() {
       // Planning: the guided session on this page, the rail where the strip
       // stands and the period's list beside it.
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
-          page={pageBody} bodies={sessionBodies} onFinish={closePeriod} onLeave={() => setMode(null)}
+          page={pageBody} bodies={sessionBodies} onFinish={closePeriod} onLeave={() => { setKeptPairs(new Set()); setMode(null) }}
           onPlanned={() => planSession.reload()} listenPageWrites={listenPageWrites}
           plannedAt={!planSession.error ? planSession.saved?.at : undefined}
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}

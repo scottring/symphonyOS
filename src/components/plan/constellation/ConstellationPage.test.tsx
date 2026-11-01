@@ -6,10 +6,10 @@ import {ConversationWalkContext} from '@/components/canvas/conversationWalk'
 import {GuidedSessionProvider,useGuidedSession} from '@/contexts/GuidedSessionContext'
 const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),updateTaskOrders:vi.fn(),redraw:(()=>{}) as ()=>void,tasks:[] as any[],goals:[] as any[]}))
 const activity=vi.hoisted(()=>({calls:[] as {label:string;ok:boolean;opts:any}[],proposals:[] as any[],changeSet:null as any,setProposalState:vi.fn(),removeProposal:vi.fn()}))
-const lifeAreas=vi.hoisted(()=>({list:[] as any[]}))
+const lifeAreas=vi.hoisted(()=>({list:[] as any[],add:vi.fn(async()=>null),rename:vi.fn(async()=>true),setContext:vi.fn(async()=>true),remove:vi.fn(async()=>true)}))
 const launcher=vi.hoisted(()=>({openAssistant:vi.fn()}))
 const selection=vi.hoisted(()=>({setSelection:vi.fn()}))
-vi.mock('@/hooks/useLifeAreas',()=>({useLifeAreas:()=>({areas:lifeAreas.list,loading:false})}))
+vi.mock('@/hooks/useLifeAreas',()=>({useLifeAreas:()=>({areas:lifeAreas.list,loading:false,add:lifeAreas.add,rename:lifeAreas.rename,setContext:lifeAreas.setContext,remove:lifeAreas.remove})}))
 vi.mock('@/contexts/GoalsContext',()=>({GoalsProvider:({children}:any)=>children,useGoalsContext:()=>({goals:api.goals,loading:false,...api})}))
 vi.mock('@/contexts/CanvasActivityContext',()=>({
  useCanvasActivity:()=>({proposals:activity.proposals,changeSet:activity.changeSet,setProposalState:activity.setProposalState,removeProposal:activity.removeProposal,
@@ -1260,11 +1260,11 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(plan.save).not.toHaveBeenCalled()
   expect(document.querySelector('.hs-layout')).not.toBeNull()
  })
- it('Year: last year’s open goals can be brought in at the brain dump',async()=>{
+ it('Year: last year’s open goals can be carried in at the look back',async()=>{
   api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
-  atStep('brain-dump')
+  atStep('look-back')
   open('/year?view=constellation&start=2026-10-09&plan=1')
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'2026: Learn to sail'}))})
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Carry: Learn to sail'}))})
   expect(api.addGoal).toHaveBeenCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old'}))
   expect(lastRun().label).toBe('Bring “Learn to sail” into 2026')
   fireEvent.click(screen.getByRole('button',{name:'Leave'}))
@@ -1399,6 +1399,173 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(iw.getByText(/Unhurried weekends/)).toBeInTheDocument()
   expect(iw.getByText('108h')).toBeInTheDocument()
   expect(iw.queryByRole('textbox')).toBeNull()
+ })
+})
+
+describe('planning a year: the guided session (spec 2026-11-01)',()=>{
+ // 2026, planned on Oct 17; the year before is 2025. Seasons here: Spring
+ // Mar 1, Summer Jun 1, Fall Sep 1, Winter Dec 1 — the next one is Winter.
+ const plannedMarks=()=>notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)
+ const inSession=()=>{at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})}
+ const year=()=>open('/year?view=constellation&start=2026-10-09&plan=1')
+ it('seven steps, the page beside them',()=>{
+  inSession()
+  year()
+  const session=within(screen.getByRole('region',{name:'Planning 2026'}))
+  expect(session.getAllByRole('listitem').filter((li)=>li.classList.contains('guide-rail-item')).map((li)=>li.querySelector('.guide-rail-title')?.textContent))
+   .toEqual(['Look back at last year','Picture 5–10 years out','Map the 12 months','Choose life areas','Brain dump goals','Refine the list','Share and book the next session'])
+  expect(screen.getByRole('list',{name:'2026 goals'})).toBeInTheDocument()
+  expect(shell.reg).toMatchObject({level:'year',token:'2026',threadKey:'annual:2026'})
+ })
+ it('Look back: 2025’s open goals — Carry, Someday, Let go, Done — each through the page’s writers, with Undo',async()=>{
+  inSession()
+  api.goals=[...GOALS.map(g=>({...g})),
+   {id:'a',name:'Learn to sail',year:2025,status:'active',context:'personal'},{id:'b',name:'Write the book',year:2025,status:'active',context:'work',areaId:'h'},
+   {id:'c',name:'Run a marathon',year:2025,status:'active',context:'personal'},{id:'d',name:'Paint the porch',year:2025,status:'active',context:'family'},
+   {id:'e',name:'Met already',year:2025,status:'completed',context:'personal'}]
+  api.deleteTask.mockResolvedValue(undefined)
+  atStep('look-back')
+  year()
+  const open=within(screen.getByRole('list',{name:'Open from 2025'}))
+  expect(open.queryByText('Met already')).toBeNull()
+  expect(within(open.getByRole('listitem',{name:'Learn to sail'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Carry','Someday','Let go','Done'])
+  // Carry: the strip's own "→ 2026", a copy that remembers it.
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Carry: Learn to sail'}))})
+  expect(api.addGoal).toHaveBeenCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'a'}))
+  expect(lastRun().label).toBe('Bring “Learn to sail” into 2026')
+  // Someday: goals have no Someday, so its words go on the Someday list and the goal is put away.
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Someday: Write the book'}))})
+  expect(api.addTask).toHaveBeenCalledWith('Write the book',undefined,undefined,undefined,expect.objectContaining({bucket:'someday',context:'work',areaId:'h'}))
+  expect(api.updateGoal).toHaveBeenLastCalledWith('b',{status:'archived'})
+  expect(lastRun().label).toBe('Moved to Someday: “Write the book”')
+  const somedayId=api.addTask.mock.calls[0][4].id
+  api.updateGoal.mockClear()
+  await act(async()=>{await lastRun().opts.undo()})
+  expect(api.deleteTask).toHaveBeenCalledWith(somedayId)
+  expect(api.updateGoal).toHaveBeenCalledWith('b',{status:'active'})
+  // Let go: archived, never deleted.
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Let go: Run a marathon'}))})
+  expect(api.updateGoal).toHaveBeenLastCalledWith('c',{status:'archived'})
+  expect(lastRun().label).toBe('Let go of “Run a marathon”')
+  expect(lastRun().opts.undo).toEqual(expect.any(Function))
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Done: Paint the porch'}))})
+  expect(api.updateGoal).toHaveBeenLastCalledWith('d',{status:'completed'})
+  expect(api.deleteGoal).not.toHaveBeenCalled()
+  expect(plannedMarks()).toHaveLength(0)
+ })
+ it('Look back: a Someday whose goal could not be put away takes its Someday line back',async()=>{
+  inSession()
+  api.goals=[...GOALS.map(g=>({...g})),{id:'a',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
+  api.updateGoal.mockResolvedValue(false)
+  atStep('look-back')
+  year()
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Someday: Learn to sail'}))})
+  expect(lastRun().ok).toBe(false)
+  expect(api.deleteTask).toHaveBeenCalledWith(api.addTask.mock.calls[0][4].id)
+ })
+ it('Picture 5–10 years out saves the vision into the year’s notes, in Scott’s words',async()=>{
+  inSession()
+  atStep('vision')
+  year()
+  const day=screen.getByRole('textbox',{name:'An ordinary day ten years from now'})
+  expect(day).toHaveValue('')
+  fireEvent.change(day,{target:{value:'Coffee on the porch, then the workshop'}})
+  await act(async()=>{fireEvent.blur(day)})
+  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({vision:{tenYears:'Coffee on the porch, then the workshop'}})
+  expect(screen.getByRole('textbox',{name:'What would make 2026 a success'})).toHaveValue('')
+ })
+ it('Map the 12 months saves each month’s lines, and marks a month crowded',async()=>{
+  inSession()
+  atStep('landscape')
+  year()
+  const july=screen.getByRole('textbox',{name:'July'})
+  fireEvent.change(july,{target:{value:'Beach week\nCamp\nWedding'}})
+  await act(async()=>{fireEvent.blur(july)})
+  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({landscape:[{month:7,text:'Beach week\nCamp\nWedding'}]})
+  expect(within(screen.getByRole('listitem',{name:'July'})).getByText('Crowded')).toBeInTheDocument()
+ })
+ it('Choose life areas: the areas editor, writing through the life areas’ own writers',async()=>{
+  inSession()
+  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0}]
+  atStep('areas')
+  year()
+  expect(screen.getByText(/3 to 8 is typical/)).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('textbox',{name:'New area'}),{target:{value:'Money'}})
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Add'}))})
+  expect(lifeAreas.add).toHaveBeenCalledWith('Money','personal')
+  expect(plannedMarks()).toHaveLength(0)
+ })
+ it('Brain dump: the year’s goals by area, an empty area pointed out; the first add that saves marks 2026 planned',async()=>{
+  inSession()
+  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Money',context:'work',mine:true,sortOrder:1}]
+  api.goals=[{...GOALS[0]},{...GOALS[1],areaId:'h'}]
+  atStep('brain-dump')
+  year()
+  const health=within(screen.getByRole('region',{name:'Health'}))
+  expect(health.getByText('Health',{selector:'.gw-step-title'})).toBeInTheDocument()
+  expect(within(screen.getByRole('region',{name:'Money'})).getByText('Nothing in Money yet.')).toBeInTheDocument()
+  expect(within(screen.getByRole('region',{name:'No area'})).getByText('Together')).toBeInTheDocument()
+  const field=within(screen.getByRole('region',{name:'Money'})).getByRole('textbox',{name:'New goal in Money'})
+  fireEvent.change(field,{target:{value:'Max the 401k'}})
+  await act(async()=>{fireEvent.submit(field.closest('form')!)})
+  expect(api.addGoal).toHaveBeenCalledWith('m','Max the 401k','work',expect.objectContaining({year:2026,id:expect.any(String)}))
+  expect(lastRun().label).toBe('Add “Max the 401k” to 2026')
+  expect(plannedMarks()).toHaveLength(1)
+  const more=within(screen.getByRole('region',{name:'No area'})).getByRole('textbox',{name:'New goal, no area'})
+  fireEvent.change(more,{target:{value:'Redo the will'}})
+  await act(async()=>{fireEvent.submit(more.closest('form')!)})
+  expect(api.addGoal).toHaveBeenLastCalledWith(null,'Redo the will','personal',expect.objectContaining({year:2026}))
+  expect(plannedMarks()).toHaveLength(1)
+ })
+ it('Refine: goals that overlap, with Keep both, Let go of one, Someday — nothing merges on its own',async()=>{
+  inSession()
+  api.goals=[...GOALS.map(g=>({...g})),{id:'r1',name:'Run a 10k',year:2026,status:'active',context:'personal'},{id:'r2',name:'Run a half marathon',year:2026,status:'active',context:'personal'}]
+  atStep('refine')
+  year()
+  const pair=()=>within(screen.getByRole('listitem',{name:'Run a 10k and Run a half marathon'}))
+  fireEvent.click(pair().getByRole('button',{name:'Let go of one'}))
+  await act(async()=>{fireEvent.click(pair().getByRole('button',{name:'Run a half marathon'}))})
+  expect(api.updateGoal).toHaveBeenLastCalledWith('r2',{status:'archived'})
+  expect(lastRun().label).toBe('Let go of “Run a half marathon”')
+  fireEvent.click(pair().getByRole('button',{name:'Someday'}))
+  await act(async()=>{fireEvent.click(pair().getByRole('button',{name:'Run a 10k'}))})
+  expect(api.addTask).toHaveBeenCalledWith('Run a 10k',undefined,undefined,undefined,expect.objectContaining({bucket:'someday',context:'personal'}))
+  expect(api.updateGoal).toHaveBeenLastCalledWith('r1',{status:'archived'})
+  const writes=api.updateGoal.mock.calls.length+api.addTask.mock.calls.length
+  fireEvent.click(pair().getByRole('button',{name:'Keep both'}))
+  expect(screen.getByText('Nothing on the list looks alike.')).toBeInTheDocument()
+  expect(api.updateGoal.mock.calls.length+api.addTask.mock.calls.length).toBe(writes)
+  expect(api.deleteGoal).not.toHaveBeenCalled()
+  expect(plannedMarks()).toHaveLength(0)
+ })
+ it('Share and book: Scott’s own Work and Personal goals can go to Family after a confirm on the page; the season session is booked on the day he picks',async()=>{
+  inSession()
+  api.goals=[...GOALS.map(g=>({...g})),{id:'w',name:'Ship the site',year:2026,status:'active',context:'work',userId:'u1'},
+   {id:'f',name:'Family trip',year:2026,status:'active',context:'family'},{id:'p2',name:'Iris’s own',year:2026,status:'active',context:'personal',userId:'u2'},
+   {id:'x',name:'Finished',year:2026,status:'completed',context:'personal'}]
+  atStep('share-book')
+  year()
+  const goals=within(screen.getByRole('list',{name:'Work and Personal goals'}))
+  expect(goals.getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['Together','Health','Ship the site'])
+  fireEvent.click(goals.getByRole('button',{name:'Share with the family: Together'}))
+  expect(api.updateGoal).not.toHaveBeenCalled()
+  expect(screen.queryByRole('dialog')).toBeNull()
+  await act(async()=>{fireEvent.click(goals.getByRole('button',{name:'Share it'}))})
+  expect(api.updateGoal).toHaveBeenCalledWith('g',{context:'family'})
+  expect(lastRun().label).toBe('Share “Together” with the family')
+  await act(async()=>{await lastRun().opts.undo()})
+  expect(api.updateGoal).toHaveBeenLastCalledWith('g',{context:'personal'})
+  // The season session: nothing but the title is filled in.
+  const date=screen.getByLabelText('First season session')
+  expect(date).toHaveValue('')
+  expect(screen.getByText('Adds “Plan Winter” to that day, for you.')).toBeInTheDocument()
+  expect(api.addTask).not.toHaveBeenCalled()
+  fireEvent.change(date,{target:{value:'2026-12-05'}})
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Book it'}))})
+  expect(api.addTask).toHaveBeenCalledWith('Plan Winter',undefined,undefined,new Date(2026,11,5),expect.objectContaining({isAllDay:true,context:'personal',id:expect.any(String)}))
+  expect(lastRun().label).toBe('Add “Plan Winter” to Sat, Dec 5')
+  expect(lastRun().opts.undo).toEqual(expect.any(Function))
+  expect(plannedMarks()).toHaveLength(0)
  })
 })
 
@@ -1568,15 +1735,15 @@ describe('the compact list, ordered by drag, and the level above beside it',()=>
    {id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal',sortOrder:0}]
   liveGoals()
   // Into 2027, from reviewing 2026 (which plans 2027).
-  atStep('brain-dump')
+  atStep('look-back')
   open('/year?view=constellation&start=2026-10-09&review=1')
-  fireEvent.click(screen.getByRole('button',{name:'2027: Together'}))
+  fireEvent.click(screen.getByRole('button',{name:'Carry: Together'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g',sortOrder:5000})))
   cleanup()
   // Bring into 2026, while planning it.
-  atStep('brain-dump')
+  atStep('look-back')
   open('/year?view=constellation&start=2026-10-09&plan=1')
-  fireEvent.click(screen.getByRole('button',{name:'2026: Learn to sail'}))
+  fireEvent.click(screen.getByRole('button',{name:'Carry: Learn to sail'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenLastCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old',sortOrder:2000})))
  })
  it('privacy: with the area and people filters on, a private line from another area is not listed, counted, marked or reordered',async()=>{
