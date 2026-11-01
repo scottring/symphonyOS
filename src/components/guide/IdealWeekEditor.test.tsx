@@ -86,6 +86,51 @@ describe('IdealWeekEditor', () => {
     expect(onChange.mock.calls[1][0].blocks[1]).toEqual({ id: 'b2', label: 'Running', hours: 3.75, when: 'Mon Wed Fri' })
   })
 
+  it('leaving a field whose shown amount is unchanged writes nothing, even when the stored hours are finer than a minute', () => {
+    const onChange = vi.fn()
+    render(<IdealWeekEditor value={{ blocks: [{ id: 'x', label: 'Reading', hours: 1 / 3 }] }} goals={[]} onChange={onChange} />)
+    const hours = screen.getByLabelText('Hours for Reading')
+    expect(hours).toHaveValue('20m')
+    fireEvent.blur(hours)
+    fireEvent.blur(screen.getByLabelText('When for Reading'))
+    expect(onChange).not.toHaveBeenCalled()
+    // Changing the words still writes, and keeps the hours as they were.
+    fireEvent.change(screen.getByLabelText('Label for Reading'), { target: { value: 'Reading aloud' } })
+    fireEvent.blur(screen.getByLabelText('Label for Reading'))
+    expect(onChange).toHaveBeenCalledWith({ blocks: [{ id: 'x', label: 'Reading aloud', hours: 1 / 3 }] })
+  })
+
+  it('the new row is added only when focus leaves the row, so a goal picked next lands on it', () => {
+    const onChange = vi.fn()
+    render(<IdealWeekEditor value={{ blocks: [] }} goals={goals} onChange={onChange} />)
+    const label = screen.getByLabelText('Label for new block')
+    const hours = screen.getByLabelText('Hours for new block')
+    const goal = screen.getByLabelText('Goal for new block')
+    fireEvent.change(label, { target: { value: 'Training' } })
+    fireEvent.blur(label, { relatedTarget: hours })
+    fireEvent.change(hours, { target: { value: '3h' } })
+    fireEvent.blur(hours, { relatedTarget: goal })
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.change(goal, { target: { value: 'g1' } })
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.blur(goal, { relatedTarget: document.body })
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange.mock.calls[0][0].blocks).toEqual([expect.objectContaining({ label: 'Training', hours: 3, goalId: 'g1' })])
+    expect(label).toHaveValue('')
+    expect(goal).toHaveValue('')
+  })
+
+  it('an unreadable amount stops saying so as soon as it is retyped', () => {
+    render(<IdealWeekEditor value={week} goals={goals} onChange={vi.fn()} />)
+    const hours = screen.getByLabelText('Hours for Sleep')
+    fireEvent.change(hours, { target: { value: 'lots' } })
+    fireEvent.blur(hours)
+    expect(hours).toHaveAttribute('aria-invalid', 'true')
+    fireEvent.change(hours, { target: { value: '5' } })
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(hours).not.toHaveAttribute('aria-invalid')
+  })
+
   it('removes a block', () => {
     const onChange = vi.fn()
     render(<IdealWeekEditor value={week} goals={goals} onChange={onChange} />)

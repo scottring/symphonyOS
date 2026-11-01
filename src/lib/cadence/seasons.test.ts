@@ -111,3 +111,13 @@ describe('readSeasons / cacheSeasons', () => {
     expect(readSeasons()).toEqual(DEFAULT_SEASONS)
   })
 })
+
+describe('seasonBounds', () => {
+  it('is the season a date falls in: its first day, and the next season’s first day (exclusive)', async () => {
+    const { seasonBounds } = await import('./seasons')
+    const fall = seasonBounds(new Date(2026, 9, 17), DEFAULT_SEASONS)
+    expect([ymd(fall.start), ymd(fall.end)]).toEqual(['2026-9-1', '2026-12-1'])
+    const winter = seasonBounds(new Date(2027, 0, 15), DEFAULT_SEASONS)
+    expect([ymd(winter.start), ymd(winter.end)]).toEqual(['2026-12-1', '2027-3-1'])
+  })
+})

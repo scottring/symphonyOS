@@ -36,32 +36,42 @@ function BlockFields({ initial, goals, onCommit, onRemove, fresh }: {
 
   const commit = (over: Partial<{ label: string; goalId: string; when: string }> = {}) => {
     const l = (over.label ?? label).trim()
-    const h = parseDuration(hours)
-    if (hours.trim() && h === null) { setBad(true); return }
+    const parsed = parseDuration(hours)
+    if (hours.trim() && parsed === null) { setBad(true); return }
     setBad(false)
-    if (!l || h === null) {
+    if (!l || parsed === null) {
       if (!fresh && initial) { setLabel(initial.label); setHours(formatHours(initial.hours)) }
       return
     }
+    // The amount as shown is rounded to the minute: the same minutes are the
+    // same amount, so leaving the field untouched rewrites nothing.
+    const h = initial && Math.round(parsed * 60) === Math.round(initial.hours * 60) ? initial.hours : parsed
     const g = over.goalId ?? goalId, w = (over.when ?? when).trim()
     const accepted = onCommit({ label: l, hours: h, ...(g ? { goalId: g } : {}), ...(w ? { when: w } : {}) })
     if (accepted && fresh) { setLabel(''); setHours(''); setGoalId(''); setWhen('') }
   }
-  // Leaving one field of a half-typed new row must not wipe the others.
+  // A block already there saves as each field is left. The new row waits
+  // until focus leaves the row: a goal or a "when" picked after the hours
+  // lands on the new block, and leaving one half-typed field wipes nothing.
+  const leave = (e: React.FocusEvent<HTMLElement>) => {
+    if (fresh && e.currentTarget.closest('li')?.contains(e.relatedTarget as Node | null)) return
+    commit()
+  }
   return (
     <li className="guide-iw-edit-row" data-fresh={fresh || undefined}>
       <input type="text" className="guide-iw-in guide-iw-in-label" aria-label={`Label for ${name}`} placeholder="Label"
-        value={label} onChange={e => setLabel(e.target.value)} onBlur={() => commit()} onKeyDown={enterBlurs} />
+        value={label} onChange={e => setLabel(e.target.value)} onBlur={leave} onKeyDown={enterBlurs} />
       <input type="text" inputMode="decimal" className="guide-iw-in guide-iw-in-hours" aria-label={`Hours for ${name}`} placeholder="Hours per week"
-        aria-invalid={bad || undefined} value={hours} onChange={e => setHours(e.target.value)} onBlur={() => commit()} onKeyDown={enterBlurs} />
+        aria-invalid={bad || undefined} value={hours} onChange={e => { setHours(e.target.value); setBad(false) }} onBlur={leave} onKeyDown={enterBlurs} />
       <select className="guide-iw-in guide-iw-in-goal" aria-label={`Goal for ${name}`} value={goalId}
-        onChange={e => { setGoalId(e.target.value); commit({ goalId: e.target.value }) }}>
+        onChange={e => { setGoalId(e.target.value); if (!fresh) commit({ goalId: e.target.value }) }}
+        onBlur={fresh ? leave : undefined}>
         <option value="">Not a goal</option>
         {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
         {goalId && !goals.some(g => g.id === goalId) && <option value={goalId}>(goal no longer here)</option>}
       </select>
       <input type="text" className="guide-iw-in guide-iw-in-when" aria-label={`When for ${name}`} placeholder="When (optional)"
-        value={when} onChange={e => setWhen(e.target.value)} onBlur={() => commit()} onKeyDown={enterBlurs} />
+        value={when} onChange={e => setWhen(e.target.value)} onBlur={leave} onKeyDown={enterBlurs} />
       {onRemove
         ? <button type="button" className="guide-areas-icon" aria-label={`Remove ${name}`} onClick={onRemove}><Trash2 size={15} aria-hidden="true" /></button>
         : <span className="guide-iw-spacer" aria-hidden="true" />}

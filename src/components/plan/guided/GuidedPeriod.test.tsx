@@ -192,4 +192,30 @@ describe('GuidedPeriod — Month, Season and Year while planning', () => {
     expect(panel().getByRole('button', { name: 'Done planning Fall' })).toBeInTheDocument()
     expect(shell.reg).toMatchObject({ level: 'season', threadKey: 'seasonal:2026-fall' })
   })
+
+  it('Season: a write picked from the year does not plan it; the first at its goals by area does', async () => {
+    const onPlanned = vi.fn()
+    const pick = vi.fn(async () => true), choose = vi.fn(async () => true)
+    const bodies = (t: PeriodSessionTools) => {
+      const picked = t.report(pick), chosen = t.report(choose)
+      return {
+        'from-year': <button type="button" onClick={() => { void picked() }}>Bring it into Fall</button>,
+        'by-area': <button type="button" onClick={() => { void chosen() }}>Add a Fall goal</button>,
+      }
+    }
+    store.notes = { guide: { current: 'from-year', done: ['look-back'], skipped: [] } }
+    const first = render(<GuidedSessionProvider><GuidedPeriod level="season" token="2026-fall" periodLabel="Fall" page={null} bodies={bodies}
+      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} onPlanned={onPlanned} /><Shell /></GuidedSessionProvider>)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Bring it into Fall' })) })
+    expect(pick).toHaveBeenCalled()
+    expect(store.patches.some((x) => (x.p.guide as { plannedAt?: string } | undefined)?.plannedAt)).toBe(false)
+    expect(onPlanned).not.toHaveBeenCalled()
+    first.unmount()
+    store.notes = { guide: { current: 'by-area', done: ['look-back', 'from-year', 'calendar', 'energy'], skipped: [] } }
+    render(<GuidedSessionProvider><GuidedPeriod level="season" token="2026-fall" periodLabel="Fall" page={null} bodies={bodies}
+      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} onPlanned={onPlanned} /><Shell /></GuidedSessionProvider>)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add a Fall goal' })) })
+    await waitFor(() => expect(onPlanned).toHaveBeenCalledTimes(1))
+    expect(store.patches.filter((x) => (x.p.guide as { plannedAt?: string } | undefined)?.plannedAt)).toHaveLength(1)
+  })
 })

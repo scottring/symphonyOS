@@ -44,12 +44,14 @@ describe('PeriodLookBack — look back at the period before', () => {
     expect(p.verbs.done).toHaveBeenCalledWith(OPEN[0])
   })
 
-  it('Season: table sends it to Someday instead of back up', async () => {
-    const table = vi.fn(async () => true)
-    setup({ prevLabel: 'Summer', upLabel: undefined, verbs: { carry: vi.fn(async () => true), table, drop: vi.fn(async () => true) } })
-    expect(row('Fix the gate').getAllByRole('button').map((b) => b.textContent)).toEqual(['Carry', 'Someday', 'Drop'])
-    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Someday: Fix the gate' })) })
+  it('Season: Table (to Someday) instead of back up, and Let go, in the season’s own words', async () => {
+    const table = vi.fn(async () => true), drop = vi.fn(async () => true)
+    setup({ prevLabel: 'Summer', upLabel: undefined, labels: { table: 'Table', drop: 'Let go' }, verbs: { carry: vi.fn(async () => true), table, drop } })
+    expect(row('Fix the gate').getAllByRole('button').map((b) => b.textContent)).toEqual(['Carry', 'Table', 'Let go'])
+    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Table: Fix the gate' })) })
     expect(table).toHaveBeenCalledWith(OPEN[0])
+    await act(async () => { fireEvent.click(row('Call the bank').getByRole('button', { name: 'Let go: Call the bank' })) })
+    expect(drop).toHaveBeenCalledWith(OPEN[1])
   })
 
   it('a write that did not save says so on its row', async () => {

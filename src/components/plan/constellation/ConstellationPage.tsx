@@ -110,6 +110,11 @@ import { PeriodLookBack } from '@/components/plan/guided/month/PeriodLookBack'
 import { ReadAbove } from '@/components/plan/guided/month/ReadAbove'
 import { NextWeeks } from '@/components/plan/guided/month/NextWeeks'
 import { UpkeepFun } from '@/components/plan/guided/month/UpkeepFun'
+import { FromYear } from '@/components/plan/guided/season/FromYear'
+import { SeasonCalendar } from '@/components/plan/guided/season/SeasonCalendar'
+import { SeasonEnergy, SeasonIdealWeek, SeasonWildCards } from '@/components/plan/guided/season/SeasonNotes'
+import { IdealWeekSection } from '@/components/guide/IdealWeekSection'
+import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import { isAboveDrag, ABOVE_MIME } from './aboveDrag'
 
@@ -205,6 +210,10 @@ function Inner() {
   // The next period's record: "Plan {next}" is offered only while it is unplanned.
   const nextToken = level === 0 ? yearToken(year + 1) : level === 1 ? seasonToken(bounds.next, seasons) : monthToken(bounds.next)
   const nextPlanSession = usePlanningSession(SESSION_HORIZONS[level], nextToken)
+  // The season's notes, for its everyday page (the ideal week). Read only off
+  // a session: while one runs it holds the notes, and leaving it reads them
+  // afresh.
+  const seasonNotes = usePlanningNotes('seasonal', level === 1 && !planning ? sessionToken : '')
   const markPlanned = async (): Promise<boolean> => {
     const mine = planSession.mine
     const ok = await planSession.save({ wentWell: mine?.wentWell ?? '', didnt: mine?.didnt ?? '', ...(mine?.focus ? { focus: mine.focus } : {}) })
@@ -983,10 +992,14 @@ function Inner() {
 
   // ---- The guided session (spec 2026-11-01) ------------------------------------
   // The look back's open lines, each with the level's calls. Month: carry
-  // into this month, back to the season, drop (to Someday), or done.
-  // Season and Year keep their old moves until their own sessions (Tasks 16
-  // and 18) give them theirs.
+  // into this month, back to the season, drop (to Someday), or done. Season:
+  // Carry into this season, Table (to Someday), Let go (off that season; a
+  // year goal it was for stays on the year), or done. Year keeps its old
+  // moves until its own session (Task 18) gives it its.
   const toggleOf = (t: Task) => async () => (await toggleTask(t.id)) !== false
+  // Let go of a season goal the season before left open: only that season's
+  // commitment ends. The goal it was for is a goals row and stays on the year.
+  const letGoOf = (t: Task) => act(`Let go: “${t.title}”`, () => dropCommitment(t.id, 'season', prevB.start), { ids: [t.id], undo: restoreOf(t) })
   const doneOf = (t: Task) => act(`Complete “${t.title}”`, toggleOf(t), { ids: [t.id], undo: toggleOf(t) })
   const lookBackBody = (t: PeriodSessionTools) => {
     if (!planning) return null
@@ -1008,8 +1021,8 @@ function Inner() {
     return lvl === 'month'
       ? <PeriodLookBack {...common} open={open} upLabel={`Back to ${seasonWord}`}
           verbs={{ carry, up: (x) => backToAbove(x, 'month', prevB.start), drop: (x) => somedayOf(x).run(), done: doneOf }} />
-      : <PeriodLookBack {...common} open={open}
-          verbs={{ carry, table: (x) => somedayOf(x).run(), drop: (x) => moves(x)[1].onClick(), done: doneOf }} />
+      : <PeriodLookBack {...common} open={open} labels={{ table: 'Table', drop: 'Let go' }}
+          verbs={{ carry, table: (x) => somedayOf(x).run(), drop: (x) => letGoOf(x), done: doneOf }} />
   }
   // Done planning, as the Week's: the period before is recorded reviewed
   // (with the look back's notes as typed — Done is an explicit tap — or what
@@ -1050,6 +1063,25 @@ function Inner() {
         onAddLoose={t.report((title: string) => runCreate(level, title, null, `Add “${title}”`))} />
     </div>
   }
+  // Season, choose from the year: each year goal with what the season holds
+  // under it, and Someday. Bringing one in is a write, not choosing: only the
+  // goals by area mark the season planned (the session checks the step).
+  const fromYearBody = () => {
+    if (!planning || level !== 1) return null
+    const yearGoals = above.filter((n) => n.goal).map((n) => ({
+      id: n.id, title: n.title, node: n, here: levelNodes.filter((c) => c.parent === n.key && isOpen(c)).map((c) => c.title),
+    }))
+    const someday = visible.filter((t) => t.bucket === 'someday' && !t.completed && !t.parentTaskId).map((t) => ({ id: t.id, title: t.title, task: t }))
+    return <FromYear yearWord={String(year)} seasonWord={periodWord} goals={yearGoals} someday={someday}
+      onPick={(g) => runCreate(1, g.title, g.node, `${periodWord}: “${g.title}”`)}
+      onBring={({ task }) => {
+        const before = { ...placementOf(task), commitments: liveCommitments({ commitments: bootstrapCommitments(task) }) }
+        return act(`${periodWord}: “${task.title}”`, async () => !!(await keepForward(task.id, { seasonStart: bounds.start })),
+          { ids: [task.id], undo: async () => (await updateTask(task.id, before)) !== false })
+      }} />
+  }
+  // The season's goals, for the ideal week's goal blocks.
+  const seasonGoals = level === 1 ? levelNodes.map((n) => ({ id: n.id, title: n.title })) : []
   const sessionBodies = (t: PeriodSessionTools) => level === 2 ? {
     'fresh-start': <FreshStart monthWord={periodWord} value={t.notes.scenery} patch={t.patch} />,
     'look-back': lookBackBody(t),
@@ -1061,7 +1093,12 @@ function Inner() {
       onAddFun={(title) => runCreate(2, title, null, `Add “${title}” for fun`, undefined, { isFun: true })} />,
   } : level === 1 ? {
     'look-back': lookBackBody(t),
-    'from-year': chooseBody(t),
+    'from-year': fromYearBody(),
+    calendar: <SeasonCalendar date={bounds.start} seasons={seasons} />,
+    energy: <SeasonEnergy value={t.notes.energy} patch={t.patch} />,
+    'by-area': chooseBody(t),
+    'ideal-week': <SeasonIdealWeek value={t.notes.idealWeek} goals={seasonGoals} patch={t.patch} />,
+    'wild-cards': <SeasonWildCards value={t.notes.wildCards} patch={t.patch} />,
   } : {
     'look-back': lookBackBody(t),
     'brain-dump': chooseBody(t),
@@ -1167,6 +1204,10 @@ function Inner() {
         {openNodes.length > 0 && <Link to={onward.to} className="plan-next" data-explain="next" data-explain-label={onward.label.replace(' →', '')}>{onward.label}</Link>}
       </footer>
     </section>
+    {/* The season's ideal week, made in its session (read-only here). */}
+    {level === 1 && !planning && !!seasonNotes.notes.idealWeek?.blocks.length && <div className="plan-card plan-ideal-week">
+      <IdealWeekSection value={seasonNotes.notes.idealWeek} goals={seasonGoals} />
+    </div>}
     {preview.next.length > 0 && <section className="plan-list plan-next-list" aria-label={`${nextWord}, proposed`}>
       <p className="plan-next-list-title">{nextWord}</p>
       <ul className="plan-items plan-goal-list" aria-label={`${nextWord} goals`}>

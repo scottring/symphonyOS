@@ -1,8 +1,8 @@
 // Planning a month, season or year, step 1 or 2 (spec 2026-11-01): look back
 // at the period before. Its count and the two notes (Looking back, compact; a
 // month's energy goes in these notes), then each line it left open with the
-// level's calls: Month carry / back to the season / drop; Season carry /
-// table (Someday) / drop; Year carry / Someday / drop. Every call saves
+// level's calls: Month carry / back to the season / drop; Season Carry /
+// Table (Someday) / Let go; Year carry / Someday / drop. Every call saves
 // through the page's writers (receipt and Undo); nothing writes until a
 // button is pressed.
 
@@ -12,7 +12,7 @@ import { LookingBack } from '@/components/plan/choose/LookingBack'
 
 type Write<T> = (line: T) => Promise<boolean>
 
-export function PeriodLookBack<T extends { id: string; title: string }>({ prevLabel, review, draft, onDraft, done, outOf, alsoDone, open, verbs, upLabel }: {
+export function PeriodLookBack<T extends { id: string; title: string }>({ prevLabel, review, draft, onDraft, done, outOf, alsoDone, open, verbs, upLabel, labels }: {
   /** "October", "Summer", "2025" */
   prevLabel: string
   /** The period before's review (usePeriodReview): what was said, and its save. */
@@ -30,6 +30,8 @@ export function PeriodLookBack<T extends { id: string; title: string }>({ prevLa
   verbs: { carry: Write<T>; up?: Write<T>; table?: Write<T>; drop: Write<T>; done?: Write<T> }
   /** "Back to Fall" (Month's `up`). */
   upLabel?: string
+  /** The level's own words for table and drop (Season: "Table", "Let go"). */
+  labels?: { table?: string; drop?: string }
 }) {
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
@@ -51,8 +53,8 @@ export function PeriodLookBack<T extends { id: string; title: string }>({ prevLa
   const calls = (line: T) => [
     { label: 'Carry', write: verbs.carry, quiet: false },
     ...(verbs.up ? [{ label: upLabel ?? 'Back up', write: verbs.up, quiet: true }] : []),
-    ...(verbs.table ? [{ label: 'Someday', write: verbs.table, quiet: true }] : []),
-    { label: 'Drop', write: verbs.drop, quiet: true },
+    ...(verbs.table ? [{ label: labels?.table ?? 'Someday', write: verbs.table, quiet: true }] : []),
+    { label: labels?.drop ?? 'Drop', write: verbs.drop, quiet: true },
     ...(verbs.done ? [{ label: 'Done', write: verbs.done, quiet: true }] : []),
   ].map((c) => <button key={c.label} type="button" className={`choose-verb${c.quiet ? ' is-quiet' : ''}`} disabled={pending !== null}
     aria-label={`${c.label}: ${line.title}`} onClick={() => { void run(line.id, () => c.write(line)) }}>{c.label}</button>)

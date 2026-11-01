@@ -1276,6 +1276,131 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
  })
 })
 
+describe('planning a season: the guided session (spec 2026-11-01)',()=>{
+ // Fall 2026 (Sep 1 – Nov 30), planned on Oct 17; the season before is Summer.
+ // This file's selectPeriodTasks stub keeps a row with a monthStart only on the
+ // period starting then: Summer's rows carry SUMMER so they stay off Fall.
+ const SUMMER=new Date(2026,5,1),FALL=new Date(2026,8,1)
+ const plannedMarks=()=>notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)
+ const inSession=()=>{at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})}
+ it('seven steps, the page beside them',()=>{
+  inSession()
+  season('&plan=1')
+  const session=within(screen.getByRole('region',{name:'Planning Fall'}))
+  expect(session.getAllByRole('listitem').filter((li)=>li.classList.contains('guide-rail-item')).map((li)=>li.querySelector('.guide-rail-title')?.textContent))
+   .toEqual(['Look back at last season','Choose from the year','Season calendar','Energy check','Season goals by area','Ideal week','Wild cards'])
+  expect(screen.getByRole('list',{name:'Fall goals'})).toBeInTheDocument()
+  expect(shell.reg).toMatchObject({level:'season',token:'2026-fall',threadKey:'seasonal:2026-fall'})
+ })
+ it('Look back: Summer’s open goals — Carry, Table (to Someday), Let go (off Summer only) — each through the page’s writers',async()=>{
+  inSession()
+  api.tasks=[{id:'a',title:'Swim lessons',bucket:'quarter',monthStart:SUMMER},{id:'b',title:'Learn the banjo',bucket:'quarter',monthStart:SUMMER},
+   {id:'c',title:'Run a 10k block',bucket:'quarter',monthStart:SUMMER,goalId:'g'},{id:'d',title:'Camp booked',bucket:'quarter',monthStart:SUMMER,completed:true}]
+  api.keepForward.mockResolvedValue('x');api.dropCommitment.mockResolvedValue(true);api.setBucket.mockResolvedValue(true)
+  atStep('look-back')
+  season('&plan=1')
+  const open=within(screen.getByRole('list',{name:'Open from Summer'}))
+  expect(open.queryByText('Camp booked')).toBeNull()
+  expect(within(open.getByRole('listitem',{name:'Swim lessons'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Carry','Table','Let go','Done'])
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Carry: Swim lessons'}))})
+  expect(api.keepForward).toHaveBeenCalledWith('a',{seasonStart:FALL},SUMMER)
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Table: Learn the banjo'}))})
+  expect(api.setBucket.mock.calls[0].slice(0,2)).toEqual(['b','someday'])
+  expect(lastRun().label).toBe('Moved to Someday: “Learn the banjo”')
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Let go: Run a 10k block'}))})
+  expect(api.dropCommitment).toHaveBeenCalledWith('c','season',SUMMER)
+  expect(lastRun().label).toBe('Let go: “Run a 10k block”')
+  expect(lastRun().opts.undo).toEqual(expect.any(Function))
+  // The year goal it was for stays on the year.
+  expect(api.updateGoal).not.toHaveBeenCalled()
+  expect(plannedMarks()).toHaveLength(0)
+ })
+ it('Choose from the year: a year goal with nothing on Fall is brought in under it; Someday can be put on Fall; neither marks Fall planned',async()=>{
+  inSession()
+  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'sd',title:'Learn to sail',bucket:'someday'}]
+  api.keepForward.mockResolvedValue('sd')
+  atStep('from-year')
+  season('&plan=1')
+  const year=within(screen.getByRole('list',{name:'2026 goals'}))
+  expect(within(year.getByRole('listitem',{name:'Together'})).getByText('On Fall: Unhurried weekends')).toBeInTheDocument()
+  await act(async()=>{fireEvent.click(year.getByRole('button',{name:'Fall: Health'}))})
+  expect(api.addTask).toHaveBeenCalledWith('Health',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',seasonStart:FALL,goalId:'other'}))
+  expect(lastRun().label).toBe('Fall: “Health”')
+  fireEvent.click(screen.getByRole('button',{name:'Someday · 1'}))
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Fall: Learn to sail'}))})
+  expect(api.keepForward).toHaveBeenCalledWith('sd',{seasonStart:FALL})
+  expect(plannedMarks()).toHaveLength(0)
+ })
+ it('Season calendar only shows, month by month from today; nothing there writes',()=>{
+  inSession()
+  atStep('calendar')
+  season('&plan=1')
+  const months=within(screen.getByRole('list',{name:'The season’s fixed dates'}))
+  expect(months.getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['October','November'])
+  expect(months.queryAllByRole('button')).toHaveLength(0)
+ })
+ it('Energy check saves the season’s energy note',async()=>{
+  inSession()
+  atStep('energy')
+  season('&plan=1')
+  await act(async()=>{fireEvent.click(screen.getByRole('radio',{name:'Medium'}))})
+  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({energy:{level:'medium'}})
+  expect(screen.getByRole('radio',{name:'Medium'})).toBeChecked()
+ })
+ it('Season goals by area: the year’s goals as lines; the first write that saves marks Fall planned',async()=>{
+  inSession()
+  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'}]
+  atStep('by-area')
+  season('&plan=1')
+  expect(within(screen.getByRole('list',{name:'2026 goals'})).getAllByRole('listitem').map((li)=>li.querySelector('.choose-line-title')?.textContent).filter(Boolean))
+   .toEqual(['Together','Health'])
+  fireEvent.click(screen.getByRole('button',{name:/Health/}))
+  fireEvent.click(screen.getByRole('button',{name:'Add a step in Fall under Health'}))
+  const field=screen.getByRole('textbox',{name:'A step in Fall under Health'})
+  fireEvent.change(field,{target:{value:'Sleep by eleven'}})
+  await act(async()=>{fireEvent.submit(field.closest('form')!)})
+  expect(api.addTask).toHaveBeenCalledWith('Sleep by eleven',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',seasonStart:FALL,goalId:'other'}))
+  expect(plannedMarks()).toHaveLength(1)
+ })
+ it('Ideal week: blocks typed here save into the season’s notes, a goal block naming one of Fall’s goals',async()=>{
+  inSession()
+  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'}]
+  atStep('ideal-week')
+  season('&plan=1')
+  expect(screen.getByText(/of 168h left/)).toBeInTheDocument()
+  expect(within(screen.getByLabelText('Goal for new block')).getAllByRole('option').map((o)=>o.textContent)).toEqual(['Not a goal','Unhurried weekends'])
+  fireEvent.change(screen.getByLabelText('Label for new block'),{target:{value:'Long walks'}})
+  fireEvent.change(screen.getByLabelText('Hours for new block'),{target:{value:'4h'}})
+  fireEvent.change(screen.getByLabelText('Goal for new block'),{target:{value:'s'}})
+  await act(async()=>{fireEvent.blur(screen.getByLabelText('Goal for new block'))})
+  const saved=notesStore.patches.map((x)=>x.p.idealWeek).filter(Boolean)
+  expect(saved).toEqual([{blocks:[expect.objectContaining({label:'Long walks',hours:4,goalId:'s'})]}])
+  expect(screen.getByLabelText('Label for Long walks')).toBeInTheDocument()
+ })
+ it('Wild cards: the cards turned on are kept in the season’s notes; no lines are written for them',async()=>{
+  inSession()
+  atStep('wild-cards')
+  season('&plan=1')
+  await act(async()=>{fireEvent.click(screen.getByRole('checkbox',{name:'Travel'}))})
+  await act(async()=>{fireEvent.click(screen.getByRole('checkbox',{name:'Money'}))})
+  expect(notesStore.patches.map((x)=>x.p.wildCards).filter(Boolean)).toEqual([['travel'],['money','travel']])
+  expect(api.addTask).not.toHaveBeenCalled()
+ })
+ it('the everyday Season page shows the ideal week once it has blocks',()=>{
+  inSession()
+  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'}]
+  season()
+  expect(screen.queryByRole('region',{name:'Ideal week'})).toBeNull()
+  cleanup()
+  notesStore.notes={idealWeek:{blocks:[{id:'b1',label:'Sleep',hours:56},{id:'b2',label:'Long walks',hours:4,goalId:'s'}]}}
+  season()
+  const iw=within(screen.getByRole('region',{name:'Ideal week'}))
+  expect(iw.getByText(/Unhurried weekends/)).toBeInTheDocument()
+  expect(iw.getByText('108h')).toBeInTheDocument()
+  expect(iw.queryByRole('textbox')).toBeNull()
+ })
+})
+
 // The list never runs off the page (calm pass, mockup approved 2026-10-18):
 // a compact card of 8 then "+N more", ordered by drag, with the level above
 // beside it, quieter and read-only.

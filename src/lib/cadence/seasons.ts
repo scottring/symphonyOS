@@ -77,6 +77,11 @@ export function seasonEndFor(date: Date, seasons: Seasons): Date {
   return boundaryDate(seasons[0], start.getFullYear() + 1)
 }
 
+/** The season `date` is in: its first midnight and the next season's (exclusive). */
+export function seasonBounds(date: Date, seasons: Seasons): { start: Date; end: Date } {
+  return { start: seasonStartFor(date, seasons), end: seasonEndFor(date, seasons) }
+}
+
 export function nextSeasonStart(date: Date, seasons: Seasons): Date {
   return seasonEndFor(date, seasons)
 }

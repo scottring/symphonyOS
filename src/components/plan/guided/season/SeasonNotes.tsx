@@ -1,0 +1,41 @@
+// The season's own notes, each a step body: energy (step 4), the ideal week
+// (step 6) and the wild cards (step 7). Each saves into this person's notes
+// for the season (usePlanningNotes' patch) on an explicit change, and says so
+// when a save did not land.
+
+import type { GuideNotes, NotesPatch } from '@/hooks/usePlanningNotes'
+import type { IdealWeek } from '@/lib/guide/idealWeek'
+import { EnergyNote } from '@/components/guide/EnergyNote'
+import { IdealWeekEditor } from '@/components/guide/IdealWeekEditor'
+import type { IdealWeekGoal } from '@/components/guide/IdealWeekSection'
+import { WildCards } from './WildCards'
+import { useNoteSave } from './useNoteSave'
+
+type Patch = (p: NotesPatch) => Promise<boolean>
+const EMPTY_WEEK: IdealWeek = { blocks: [] }
+const NO_CARDS: string[] = []
+const Failed = ({ on }: { on: boolean }) => on ? <p className="choose-status is-failed" role="alert">Didn’t save. Try again.</p> : null
+
+export function SeasonEnergy({ value, patch }: { value?: GuideNotes['energy']; patch: Patch }) {
+  const note = useNoteSave(value, (energy) => patch({ energy }))
+  return <div className="gw-body">
+    <EnergyNote value={note.value} onChange={note.set} />
+    <Failed on={note.failed} />
+  </div>
+}
+
+export function SeasonIdealWeek({ value, goals, patch }: { value?: IdealWeek; goals: IdealWeekGoal[]; patch: Patch }) {
+  const note = useNoteSave(value ?? EMPTY_WEEK, (idealWeek) => patch({ idealWeek }))
+  return <div className="gw-body">
+    <IdealWeekEditor value={note.value} goals={goals} onChange={note.set} />
+    <Failed on={note.failed} />
+  </div>
+}
+
+export function SeasonWildCards({ value, patch }: { value?: string[]; patch: Patch }) {
+  const note = useNoteSave(value ?? NO_CARDS, (wildCards) => patch({ wildCards }))
+  return <>
+    <WildCards value={note.value} onChange={note.set} />
+    <Failed on={note.failed} />
+  </>
+}

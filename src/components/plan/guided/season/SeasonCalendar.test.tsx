@@ -1,0 +1,83 @@
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
+
+// The calendar the planning day tiles and Month's next weeks read
+// (useDayLoadEvents): what it holds, and the range it was actually read for.
+const cal = vi.hoisted(() => ({ events: [] as unknown[], available: true, loading: false, failed: false, range: null as { start: number; end: number } | null, enabled: [] as boolean[] }))
+vi.mock('@/hooks/useDayLoadEvents', () => ({
+  useDayLoadEvents: (enabled: boolean) => { cal.enabled.push(enabled); return { events: cal.events, available: cal.available, loading: cal.loading, failed: cal.failed, range: cal.range } },
+}))
+const conn = vi.hoisted(() => ({ connected: true as boolean | null }))
+vi.mock('@/lib/calendarConnection', () => ({ getCalendarConnected: () => conn.connected }))
+
+import { SeasonCalendar } from './SeasonCalendar'
+
+const ev = (id: string, title: string, at: string, over: Partial<CalendarEvent> = {}): CalendarEvent => ({ id, title, start_time: at, ...over })
+const at = (d: Date) => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(d); onTestFinished(() => { vi.useRealTimers() }) }
+const months = () => screen.getAllByRole('listitem', { name: /^(September|October|November|December|January|February)/ })
+
+beforeEach(() => {
+  cal.events = []; cal.available = true; cal.loading = false; cal.failed = false; cal.enabled = []
+  cal.range = { start: new Date(2026, 7, 25).getTime(), end: new Date(2026, 11, 31).getTime() }
+  conn.connected = true
+})
+
+describe('SeasonCalendar — the season’s fixed dates, month by month', () => {
+  it('lists the fixed events inside the season’s bounds (seasonBounds), by month; nothing outside it', () => {
+    at(new Date(2026, 7, 28, 9)) // planning Fall before it starts
+    cal.events = [
+      ev('0', 'Late August trip', '2026-08-30', { all_day: true }),
+      ev('1', 'School starts', '2026-09-08', { all_day: true }),
+      ev('2', 'Dentist', '2026-10-06T09:30:00'),
+      ev('3', 'Dentist', '2026-10-06T09:30:00', { calendar_id: 'other' }),
+      ev('4', 'Thanksgiving', '2026-11-26', { all_day: true }),
+      ev('5', 'Winter break', '2026-12-01', { all_day: true }),
+    ]
+    render(<SeasonCalendar date={new Date(2026, 9, 1)} seasons={DEFAULT_SEASONS} />)
+    expect(cal.enabled.every(Boolean)).toBe(true)
+    expect(months().map((m) => m.getAttribute('aria-label'))).toEqual(['September', 'October', 'November'])
+    expect(within(months()[0]).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Tue 8All day School starts'])
+    expect(within(months()[1]).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Tue 69:30 AM Dentist'])
+    expect(within(months()[2]).getByText('Thanksgiving')).toBeInTheDocument()
+    expect(screen.queryByText('Late August trip')).toBeNull()
+    expect(screen.queryByText('Winter break')).toBeNull()
+    // Read only: what is missing is said in the conversation.
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
+
+  it('a season already under way starts from today; a month past what was read says so rather than reading as empty', () => {
+    at(new Date(2026, 9, 17, 9))
+    cal.range = { start: new Date(2026, 9, 10).getTime(), end: new Date(2026, 10, 15).getTime() }
+    cal.events = [ev('1', 'Fall fair', '2026-10-03', { all_day: true }), ev('2', 'Pumpkins', '2026-10-24', { all_day: true })]
+    render(<SeasonCalendar date={new Date(2026, 9, 17)} seasons={DEFAULT_SEASONS} />)
+    expect(months().map((m) => m.getAttribute('aria-label'))).toEqual(['October', 'November'])
+    expect(screen.queryByText('Fall fair')).toBeNull()
+    expect(within(months()[0]).getByText('Pumpkins')).toBeInTheDocument()
+    expect(within(months()[1]).getByText('Nothing fixed')).toBeInTheDocument()
+    expect(within(months()[1]).getByText('The calendar was read through Nov 15')).toBeInTheDocument()
+  })
+
+  it('a month wholly past the calendar’s read says so', () => {
+    at(new Date(2026, 7, 28, 9))
+    cal.range = { start: new Date(2026, 7, 21).getTime(), end: new Date(2026, 9, 12).getTime() }
+    render(<SeasonCalendar date={new Date(2026, 8, 1)} seasons={DEFAULT_SEASONS} />)
+    expect(within(months()[0]).getByText('Nothing fixed')).toBeInTheDocument()
+    expect(within(months()[2]).getByText('Past what the calendar was read for')).toBeInTheDocument()
+  })
+
+  it('loading, a read that failed, and no calendar connected each say so', () => {
+    cal.available = false; cal.loading = true; cal.range = null
+    const { unmount } = render(<SeasonCalendar date={new Date(2026, 9, 1)} seasons={DEFAULT_SEASONS} />)
+    expect(screen.getByRole('status')).toHaveTextContent('Reading the calendar…')
+    unmount()
+    cal.loading = false; cal.failed = true
+    const second = render(<SeasonCalendar date={new Date(2026, 9, 1)} seasons={DEFAULT_SEASONS} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('The calendar couldn’t be read')
+    second.unmount()
+    conn.connected = false; cal.failed = false
+    render(<SeasonCalendar date={new Date(2026, 9, 1)} seasons={DEFAULT_SEASONS} />)
+    expect(screen.getByText('No calendar connected.')).toBeInTheDocument()
+  })
+})
