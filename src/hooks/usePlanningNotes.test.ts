@@ -12,6 +12,8 @@ vi.mock('@/lib/supabase', () => ({
       select: () => {
         const chain = {
           eq: (c: string, v: unknown) => { eqCalls.push([c, v]); return chain },
+          // usePlanningSession's page read (its own test covers it).
+          order: async () => ({ data: [], error: null }),
           maybeSingle: async () => {
             const snap = ownRow ? { notes: { ...ownRow.notes } } : null
             if (readDelay) await new Promise(r => setTimeout(r, readDelay))
@@ -27,6 +29,7 @@ vi.mock('@/lib/supabase', () => ({
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 
 import { usePlanningNotes } from './usePlanningNotes'
+import { usePlanningSession } from './usePlanningSession'
 
 describe('usePlanningNotes', () => {
   beforeEach(() => { eqCalls.length = 0; ownRow = null; readError = null; readDelay = 0; upsert.mockClear() })
@@ -67,6 +70,23 @@ describe('usePlanningNotes', () => {
     readDelay = 20
     await act(async () => { await Promise.all([a.result.current.patch({ weekend: 'a' }), b.result.current.patch({ scenery: 'b' })]) })
     expect(ownRow!.notes).toEqual({ savedAt: 's', weekend: 'a', scenery: 'b' })
+  })
+
+  it('a session save runs on the same per-row chain: a patch and a save fired together both keep their keys', async () => {
+    ownRow = { notes: { energy: { level: 'low' } } }
+    const n = renderHook(() => usePlanningNotes('weekly', '2026-W44'))
+    const s = renderHook(() => usePlanningSession('weekly', '2026-W44'))
+    await waitFor(() => expect(n.result.current.loading || s.result.current.loading).toBe(false))
+    readDelay = 20
+    await act(async () => {
+      expect(await Promise.all([n.result.current.patch({ guide: { current: 'choose', done: [], skipped: [] } }), s.result.current.save({ wentWell: 'w', didnt: 'd' })])).toEqual([true, true])
+    })
+    expect(ownRow!.notes).toMatchObject({ energy: { level: 'low' }, guide: { current: 'choose' }, wentWell: 'w', didnt: 'd', savedAt: expect.any(String) })
+    // And the other way round: a save first, then a patch.
+    await act(async () => {
+      await Promise.all([s.result.current.save({ wentWell: 'w2', didnt: 'd2' }), n.result.current.patch({ weekend: 'rest' })])
+    })
+    expect(ownRow!.notes).toMatchObject({ guide: { current: 'choose' }, wentWell: 'w2', weekend: 'rest' })
   })
 
   it('an empty token resets notes to empty', async () => {

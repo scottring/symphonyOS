@@ -25,9 +25,12 @@ export type PlanningNotes = Record<string, unknown> & GuideNotes
 export type NotesPatch = Partial<GuideNotes> & Record<string, unknown>
 
 // One chain per row, shared by every hook instance, so each patch reads after the
-// previous one has written and no instance drops another's keys.
+// previous one has written and no instance drops another's keys. Every other
+// read-modify-write of the row (usePlanningSession's save) runs on it too, keyed
+// by rowKey.
 const chains = new Map<string, Promise<unknown>>()
-function serialized<T>(key: string, run: () => Promise<T>): Promise<T> {
+export function rowKey(uid: string, horizon: SessionHorizon, token: string): string { return `${uid}|${horizon}|${token}` }
+export function serialized<T>(key: string, run: () => Promise<T>): Promise<T> {
   const result = (chains.get(key) ?? Promise.resolve()).then(run)
   const tail = result.catch(() => undefined)
   chains.set(key, tail)
@@ -63,7 +66,7 @@ export function usePlanningNotes(horizon: SessionHorizon, token: string) {
   const patch = useCallback(async (p: NotesPatch, defaults?: Record<string, unknown>): Promise<boolean> => {
     if (!user?.id || !token) return false
     const uid = user.id
-    return serialized(`${uid}|${horizon}|${token}`, async () => {
+    return serialized(rowKey(uid, horizon, token), async () => {
     const { data: own, error: readError } = await supabase.from('planning_sessions')
       .select('notes').eq('author_id', uid).eq('horizon', horizon).eq('period_token', token).maybeSingle()
     if (readError) return false

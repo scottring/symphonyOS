@@ -24,11 +24,12 @@ export function useGuidedProgress(level: GuideLevel, token: string) {
   }, [loading, level])
 
   // patch serializes saves per row; a failed save keeps the optimistic step and sets saveError.
-  const commit = useCallback(async (p: GuideProgress, extra?: Record<string, unknown>, defaults?: Record<string, unknown>) => {
+  const commit = useCallback(async (p: GuideProgress, extra?: Record<string, unknown>, defaults?: Record<string, unknown>): Promise<boolean> => {
     ref.current = p
     setProgress(p)
     const ok = await patch({ guide: p, ...extra }, defaults)
     setSaveError(ok ? null : 'Could not save your place. It may not be there next time.')
+    return ok
   }, [patch])
 
   const next = useCallback(async () => { if (!loading) await commit(goNext(ref.current, level)) }, [commit, level, loading])
@@ -38,11 +39,19 @@ export function useGuidedProgress(level: GuideLevel, token: string) {
     const p = jumpTo(ref.current, id)
     if (p !== ref.current) await commit(p)
   }, [commit, level, loading])
-  const markPlanned = useCallback(async () => {
-    if (loading) return
+  /** Resolves whether the planned mark saved. One that didn't is taken back,
+   *  so the next applied write can try again. */
+  const markPlanned = useCallback(async (): Promise<boolean> => {
+    if (loading) return false
     const now = new Date().toISOString()
     const cur = ref.current
-    await commit(cur.plannedAt ? cur : { ...cur, plannedAt: now }, undefined, { savedAt: now })
+    const ok = await commit(cur.plannedAt ? cur : { ...cur, plannedAt: now }, undefined, { savedAt: now })
+    if (!ok && ref.current.plannedAt === now) {
+      const { plannedAt: _p, ...back } = ref.current
+      ref.current = back
+      setProgress(back)
+    }
+    return ok
   }, [commit, loading])
   const finish = useCallback(async () => {
     if (loading) return

@@ -8,13 +8,14 @@ import { GuidedSessionProvider, useGuidedSession, type GuidedSessionRegistration
 
 // The person's notes row for the week, in memory: what usePlanningNotes reads
 // and patch merges into (the real merge is usePlanningNotes' own test).
-const store = vi.hoisted(() => ({ notes: {} as Record<string, unknown>, patches: [] as { p: Record<string, unknown>; defaults?: Record<string, unknown> }[], order: [] as string[] }))
+const store = vi.hoisted(() => ({ notes: {} as Record<string, unknown>, patches: [] as { p: Record<string, unknown>; defaults?: Record<string, unknown> }[], order: [] as string[], fail: false }))
 vi.mock('@/hooks/usePlanningNotes', async () => {
   const { useState, useCallback } = await import('react')
   return {
     usePlanningNotes: () => {
       const [notes, setNotes] = useState(store.notes)
       const patch = useCallback(async (p: Record<string, unknown>, defaults?: Record<string, unknown>) => {
+        if (store.fail) return false
         store.patches.push({ p, defaults })
         if ((p.guide as { finishedAt?: string } | undefined)?.finishedAt) store.order.push('finished')
         store.notes = { ...defaults, ...store.notes, ...p }
@@ -86,7 +87,7 @@ const panel = () => within(screen.getByTestId('guide-panel'))
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 29, 12)) // Tuesday
-  store.notes = {}; store.patches = []; store.order = []
+  store.notes = {}; store.patches = []; store.order = []; store.fail = false
   shell.reg = null
   canvas.mockClear()
   session.save.mockReset(); session.save.mockImplementation(async () => { store.order.push('planned'); return true })
@@ -221,6 +222,20 @@ describe('useGuidedWeek — planned once something is applied at Choose', () => 
     await waitFor(() => expect(plannedPatches()).toHaveLength(1))
     await act(async () => { result.current.registration?.onApplied?.() })
     expect(plannedPatches()).toHaveLength(1)
+  })
+
+  it('a planned mark that did not save tells nobody, and the next applied write tries again', async () => {
+    store.notes = { guide: { current: 'choose', done: [], skipped: [] } }
+    const onPlanned = vi.fn()
+    const { result } = hook(makeChoose(), onPlanned)
+    store.fail = true
+    await act(async () => { await result.current.choose.lines[0].verbs[0].run() })
+    expect(plannedPatches()).toHaveLength(0)
+    expect(onPlanned).not.toHaveBeenCalled()
+    store.fail = false
+    await act(async () => { await result.current.choose.lines[0].verbs[0].run() })
+    await waitFor(() => expect(plannedPatches()).toHaveLength(1))
+    expect(onPlanned).toHaveBeenCalledTimes(1)
   })
 
   it('a week already planned in this session is not marked again', async () => {

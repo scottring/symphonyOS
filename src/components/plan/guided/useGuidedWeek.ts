@@ -84,14 +84,15 @@ export function useGuidedWeek({ weekStart, isCurrent, tasks, choose, onFinish, o
   const latest = useRef({ progress, onFinish, onClose, onPlanned })
   useEffect(() => { latest.current = { progress, onFinish, onClose, onPlanned } })
 
-  // Once per session: the first write applied at the choosing step.
+  // Once per session: the first write applied at the choosing step. A mark
+  // that did not save lets the next applied write try again.
   const planning = useRef(false)
   const markPlannedOnce = useCallback(async () => {
     const p = latest.current.progress
     if (loading || p.current !== CHOOSING || p.plannedAt || planning.current) return
     planning.current = true
-    await markPlanned()
-    latest.current.onPlanned?.()
+    if (await markPlanned()) latest.current.onPlanned?.()
+    else planning.current = false
   }, [loading, markPlanned])
 
   const reported = useMemo(() => reportingChoose(choose, () => { void markPlannedOnce() }), [choose, markPlannedOnce])

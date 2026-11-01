@@ -63,6 +63,20 @@ describe('useGuidedProgress', () => {
     expect(stored!.savedAt).toBe(savedAt)
   })
 
+  it('markPlanned says whether it saved; a failed one leaves the week not planned, so it can be tried again', async () => {
+    const { result } = renderHook(() => useGuidedProgress('week', '2026-W44'))
+    await ready(result)
+    failWrite = true
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.markPlanned() })
+    expect(ok).toBe(false)
+    expect(result.current.progress.plannedAt).toBeUndefined()
+    failWrite = false
+    await act(async () => { ok = await result.current.markPlanned() })
+    expect(ok).toBe(true)
+    expect((stored!.guide as { plannedAt?: string }).plannedAt).toBeTruthy()
+  })
+
   it('markPlanned keeps an existing savedAt', async () => {
     stored = { savedAt: '2026-10-02T09:00:00Z', wentWell: 'x' }
     const { result } = renderHook(() => useGuidedProgress('week', '2026-W44'))
