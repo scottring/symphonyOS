@@ -1347,7 +1347,9 @@ function Inner() {
           onPlanned={() => planSession.reload()} listenPageWrites={listenPageWrites}
           plannedAt={!planSession.error ? planSession.saved?.at : undefined}
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}
-          areas={lifeAreas.map((x) => ({ id: x.id, name: x.name, context: x.context }))} />
+          // Only the areas the space filter shows (a legacy area with no
+          // space is Personal): the guide never hears of one out of view.
+          areas={lifeAreas.filter((x) => matchesLayers(x.context ?? 'personal', layers)).map((x) => ({ id: x.id, name: x.name, context: x.context }))} />
       : <>
         {/* Just planned here: the way on is the next horizon down. */}
         {justMarked && <div className="pv2-saved plan-planned-next" role="note">

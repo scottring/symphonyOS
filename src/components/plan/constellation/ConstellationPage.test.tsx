@@ -1208,6 +1208,15 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(marks).toHaveLength(1)
   expect(marks[0].defaults).toMatchObject({savedAt:expect.any(String)})
  })
+ // Final review 2026-11-01: the guide is told only the areas the space filter shows.
+ it('under a space filter the guide is told only the areas in view (a legacy area with no space is Personal)',()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  filters.on=true;filters.layers=new Set(['family'])
+  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Home',context:'family',mine:true,sortOrder:1},{id:'w',name:'Career',context:'work',mine:true,sortOrder:2},{id:'x',name:'Old area',context:null,mine:true,sortOrder:3}]
+  atStep('by-area')
+  month('&plan=1')
+  expect(shell.reg?.sessionContext.guide.areas).toEqual([{id:'m',name:'Home',context:'family'}])
+ })
  it('The month by area: a step added under a line, and a new line written on the page, count as applied',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'}]
