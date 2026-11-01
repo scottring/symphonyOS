@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { GuideRail } from './GuideRail'
 import { stepsFor } from '@/lib/guide/steps'
 
@@ -19,7 +19,9 @@ describe('GuideRail', () => {
     expect(items[0]).toHaveAttribute('data-state', 'done')
     expect(items[1]).toHaveAttribute('data-state', 'skipped')
     expect(items[2]).toHaveAttribute('data-state', 'current')
-    expect(items[2]).toHaveAttribute('aria-current', 'step')
+    expect(within(items[2]).getByRole('button')).toHaveAttribute('aria-current', 'step')
+    expect(items[0]).toHaveTextContent('(done)')
+    expect(items[1]).toHaveTextContent('(skipped)')
     expect(items[3]).toHaveAttribute('data-state', 'todo')
   })
 
@@ -42,5 +44,14 @@ describe('GuideRail', () => {
   it('uses titleFor when given', () => {
     render(<GuideRail level="week" progress={{ current: steps[0].id, done: [], skipped: [] }} bodies={{}} titleFor={() => 'Custom'} onJump={() => {}} />)
     expect(screen.getAllByText('Custom').length).toBe(steps.length)
+  })
+
+  it('closes a previewed step when the current step changes', () => {
+    const p = { current: steps[2].id, done: [], skipped: [] }
+    const { rerender } = render(<GuideRail level="week" progress={p} bodies={bodies} onJump={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(steps[4].title) }))
+    expect(screen.getByText(steps[4].why)).toBeInTheDocument()
+    rerender(<GuideRail level="week" progress={{ ...p, current: steps[3].id }} bodies={bodies} onJump={() => {}} />)
+    expect(screen.queryByText(steps[4].why)).toBeNull()
   })
 })

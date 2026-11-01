@@ -17,6 +17,11 @@ export function GuideRail({ level, progress, titleFor, bodies, onJump }: {
 }) {
   const steps = stepsFor(level)
   const [viewing, setViewing] = useState<string | null>(null)
+  const [at, setAt] = useState(progress.current)
+  if (at !== progress.current) {
+    setAt(progress.current)
+    setViewing(null)
+  }
   const viewed = viewing && viewing !== progress.current ? steps.find(s => s.id === viewing) : undefined
 
   const stateOf = (id: string) =>
@@ -37,17 +42,18 @@ export function GuideRail({ level, progress, titleFor, bodies, onJump }: {
               className="guide-rail-item"
               data-state={state}
               data-viewing={isViewed || undefined}
-              aria-current={state === 'current' ? 'step' : undefined}
             >
               <button
                 type="button"
                 className="guide-rail-step"
+                aria-current={state === 'current' ? 'step' : undefined}
                 onClick={() => setViewing(isViewed || state === 'current' ? null : s.id)}
               >
                 <span className="guide-rail-mark" aria-hidden="true">
                   {state === 'done' ? <Check size={12} strokeWidth={2.5} /> : i + 1}
                 </span>
                 <span className="guide-rail-title">{titleFor ? titleFor(s) : s.title}</span>
+                {(state === 'done' || state === 'skipped') && <span className="guide-sr-only"> ({state})</span>}
                 <span className="guide-rail-meta">
                   {state === 'skipped' ? 'Skipped' : `${s.minutes} min`}
                 </span>

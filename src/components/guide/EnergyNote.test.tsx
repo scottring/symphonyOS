@@ -26,4 +26,18 @@ describe('EnergyNote', () => {
     fireEvent.blur(input)
     expect(onChange).toHaveBeenCalledWith({ level: 'low', words: 'slept badly' })
   })
+
+  it('follows a new value instead of keeping stale words', () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<EnergyNote value={{ level: 'low', words: 'tired' }} onChange={onChange} />)
+    rerender(<EnergyNote value={{ level: 'high', words: 'bright' }} onChange={onChange} />)
+    expect(screen.getByRole('textbox')).toHaveValue('bright')
+    fireEvent.click(screen.getByRole('radio', { name: 'Medium' }))
+    expect(onChange).toHaveBeenCalledWith({ level: 'medium', words: 'bright' })
+  })
+
+  it('keeps words disabled until a level is chosen', () => {
+    render(<EnergyNote onChange={() => {}} />)
+    expect(screen.getByRole('textbox')).toBeDisabled()
+  })
 })
