@@ -1441,4 +1441,48 @@ describe('grouped by life area',()=>{
   expect(heads()).toEqual(['Health','No area'])
   expect(titles('October goals')).toEqual(['Run','Loose'])
  })
+ it('hides the heading when No area is the only group',()=>{
+  lifeAreas.list=[A('a1','Health',0)]
+  api.tasks=[{id:'t1',title:'Loose',bucket:'month',context:'personal',areaId:null}]
+  month()
+  expect(heads()).toEqual([])
+ })
+ it('two areas with the same name stay separate groups',()=>{
+  lifeAreas.list=[{...A('a1','Health',0),context:'work'},{...A('a2','Health',1),context:'family'}]
+  api.tasks=[{id:'t1',title:'One',bucket:'month',context:'work',areaId:'a1'},{id:'t2',title:'Two',bucket:'month',context:'family',areaId:'a2'}]
+  month()
+  expect(heads()).toEqual(['Health','Health'])
+ })
+ describe('ordering by drag when grouped',()=>{
+  const dt=()=>{const data:Record<string,string>={};return{setData:(k:string,v:string)=>{data[k]=v},getData:(k:string)=>data[k]??'',types:[] as string[],effectAllowed:'',dropEffect:''}}
+  const drag=(title:string,y:number)=>{
+   const ul=list('October goals'),rows=ul.querySelectorAll<HTMLElement>('li[data-order-id]')
+   const rect=(top:number,bottom:number)=>()=>({top,bottom,left:0,right:300,width:300,height:bottom-top,x:0,y:top,toJSON:()=>({})}) as DOMRect
+   rows.forEach((li,i)=>{li.getBoundingClientRect=rect(i*40,i*40+40)});ul.getBoundingClientRect=rect(0,rows.length*40)
+   const t=dt()
+   fireEvent.dragStart(row(title),{dataTransfer:t})
+   for(const type of ['dragOver','drop'] as const){const ev=createEvent[type](ul,{dataTransfer:t});Object.defineProperty(ev,'clientY',{value:y});fireEvent(ul,ev)}
+  }
+  const setup=()=>{
+   lifeAreas.list=[A('h','Health',0),A('f','Fun',1)]
+   api.tasks=[{id:'a',title:'Alpha',bucket:'month',context:'personal',areaId:'h',sortOrder:0},{id:'b',title:'Bravo',bucket:'month',context:'personal',areaId:'h',sortOrder:1000},{id:'c',title:'Charlie',bucket:'month',context:'personal',areaId:'f',sortOrder:2000}]
+   api.updateTaskOrders.mockResolvedValue(true)
+   month()
+  }
+  it('a drop across an area boundary writes nothing',()=>{
+   setup()
+   drag('Alpha',100)
+   drag('Charlie',10)
+   expect(api.updateTaskOrders).not.toHaveBeenCalled()
+  })
+  it('a drop inside its own area still moves the line, writing only that area',()=>{
+   setup()
+   drag('Alpha',75)
+   expect(api.updateTaskOrders).toHaveBeenCalledTimes(1)
+   const ids=api.updateTaskOrders.mock.calls[0][0].map((w:any)=>w.id)
+   expect(ids).toContain('a')
+   expect(ids).not.toContain('c')
+  })
+ })
 })
+

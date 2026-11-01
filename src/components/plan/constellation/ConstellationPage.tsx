@@ -523,7 +523,11 @@ function Inner() {
   const areaGroups = lifeAreas.length ? groupByArea(listed.map((n) => ({ n, areaId: nodeArea(n) })), lifeAreas) : null
   const items = areaGroups ? areaGroups.flatMap((g) => g.items.map((x) => x.n)) : listed
   const areaNameOf = new Map(lifeAreas.map((a) => [a.id, a.name]))
-  const headingOf = areaGroups ? (n: PlanNode) => areaNameOf.get(nodeArea(n) ?? '') ?? 'No area' : undefined
+  // Grouped by area id (two areas may share a name); an area the viewer cannot see is '' (No area).
+  const groupOf = areaGroups ? (n: PlanNode) => { const id = nodeArea(n) ?? ''; return areaNameOf.has(id) ? id : '' } : undefined
+  // "No area" alone says nothing: no heading unless an area is in play.
+  const onlyNoArea = !!areaGroups && areaGroups.every((g) => g.area === null)
+  const headingOf = groupOf && !onlyNoArea ? (n: PlanNode) => areaNameOf.get(groupOf(n)) ?? 'No area' : undefined
   // "5 done, 1 moved on · Taxes, Picnic…": what is no longer open, in one line.
   const folded = [...doneNodes, ...movedNodes]
   const doneLine = `${[doneNodes.length ? `${doneNodes.length} done` : '', movedNodes.length ? `${movedNodes.length} moved on` : ''].filter(Boolean).join(', ')} · ${folded.slice(0, 2).map((n) => n.title).join(', ')}${folded.length > 2 ? '…' : ''}`
@@ -1094,7 +1098,7 @@ function Inner() {
           routinesNote={level === 2 ? 'Weekly routines are on the Week; every-day ones on Today.' : 'Monthly routines are on each month.'} />
         <div className={`hs-main plan-horizon-body${preview.next.length ? ' has-next' : ''}`}>
         <section className={`plan-list plan-card${linkOver === '' ? ' is-link-over' : ''}`} {...listDrop} data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
-          <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items} headingOf={headingOf}
+          <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items} headingOf={headingOf} groupOf={groupOf}
             keyOf={(n) => n.key} titleOf={(n) => n.title}
             // Only an open line orders; done and moved-on lines keep their place.
             orderIdOf={(n) => isOpen(n) ? n.id : null}

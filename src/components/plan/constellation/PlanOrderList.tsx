@@ -10,7 +10,7 @@
 // drags (the Week's dnd-kit sensors), so a tap still opens and a swipe still
 // scrolls. Every write is the caller's (`onReorder`); this draws and asks.
 
-import { useRef, useState, type DragEvent, type HTMLAttributes, type ReactNode, type Ref } from 'react'
+import { Fragment, useRef, useState, type DragEvent, type HTMLAttributes, type ReactNode, type Ref } from 'react'
 import {
   DndContext, DragOverlay, MouseSensor, TouchSensor, useDraggable, useSensor, useSensors,
   type DragEndEvent, type DragMoveEvent, type DragStartEvent,
@@ -30,7 +30,7 @@ export interface RowOrder {
   orderable: boolean
   onDragStart?: (e: DragEvent) => void
   onDragEnd?: () => void
-  liProps: HTMLAttributes<HTMLLIElement> & { ref?: Ref<HTMLLIElement>; 'data-order-id'?: string }
+  liProps: HTMLAttributes<HTMLLIElement> & { ref?: Ref<HTMLLIElement>; 'data-order-id'?: string; 'data-group'?: string }
 }
 
 /** "+N more" / "Show less", when the list folds. */
@@ -63,11 +63,13 @@ export interface PlanOrderListProps<T> {
   onReorder: (id: string, orderedIds: string[], toIndex: number) => void
   /** Rows drawn after the lines, inside the list and always shown (pending ones). */
   tail?: ReactNode
-  /** A group's plain name (a life area), drawn above its first line. Items must already be in group order; omit for an ungrouped list. */
+  /** A group's plain name (a life area), drawn above its first line; null draws none. Needs `groupOf`; items must already be in group order. */
   headingOf?: (t: T) => string | null
+  /** The group a line belongs to (a life area's id, '' for none). With it, a line only orders within its own group. */
+  groupOf?: (t: T) => string
 }
 
-export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinnedOf, renderRow, onReorder, tail, headingOf }: PlanOrderListProps<T>) {
+export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinnedOf, renderRow, onReorder, tail, headingOf, groupOf }: PlanOrderListProps<T>) {
   const coarse = useMediaQuery('(pointer: coarse)')
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: MOUSE_MOVE }),
@@ -80,13 +82,34 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinn
   const { shown, toggle } = useFold(items, pinnedOf)
 
   // ── the gap, read from the shown open lines ─────────────────────────────
-  const orderRows = () => [...(listRef.current?.querySelectorAll<HTMLElement>('li[data-order-id]') ?? [])]
-  const gapIn = (y: number) => gapAt(y, orderRows().map((r) => r.getBoundingClientRect()))
-  const showGap = (y: number) => { const g = gapIn(y); if (g !== gap) setGap(g) }
+  // Grouped, a line orders only among its own group's lines: the gap and the
+  // drop ignore the other groups, and a pointer outside its group is no drop.
+  const groupOfId = (id: string | null) => {
+    if (!groupOf || !id) return null
+    const t = items.find((x) => orderIdOf(x) === id)
+    return t ? groupOf(t) : null
+  }
+  const orderRows = (id: string | null = dragId) => {
+    const g = groupOfId(id)
+    return [...(listRef.current?.querySelectorAll<HTMLElement>('li[data-order-id]') ?? [])]
+      .filter((r) => g === null || r.dataset.group === g)
+  }
+  const inOwnGroup = (id: string | null, y: number) => {
+    if (!groupOf) return true
+    const rects = orderRows(id).map((r) => r.getBoundingClientRect())
+    return rects.length > 0 && y >= Math.min(...rects.map((r) => r.top)) && y <= Math.max(...rects.map((r) => r.bottom))
+  }
+  const gapIn = (y: number, id: string | null = dragId) => gapAt(y, orderRows(id).map((r) => r.getBoundingClientRect()))
+  const showGap = (y: number) => {
+    const g = inOwnGroup(dragId, y) ? gapIn(y) : null
+    if (g !== gap) setGap(g)
+  }
   const endDrag = () => { setDragId(null); setGap(null); setLifted(null) }
   const dropAt = (id: string, y: number) => {
-    const orderedIds = items.flatMap((t) => { const o = orderIdOf(t); return o ? [o] : [] })
-    const to = gapToListIndex(gapIn(y), orderRows().map((r) => r.dataset.orderId!), orderedIds)
+    if (!inOwnGroup(id, y)) { endDrag(); return }
+    const g = groupOfId(id)
+    const orderedIds = items.flatMap((t) => { const o = orderIdOf(t); return o && (g === null || groupOf!(t) === g) ? [o] : [] })
+    const to = gapToListIndex(gapIn(y, id), orderRows(id).map((r) => r.dataset.orderId!), orderedIds)
     endDrag()
     onReorder(id, orderedIds, to)
   }
@@ -136,7 +159,8 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinn
   }
 
   // The shown open lines, numbered for the gap marker.
-  const orderable = shown.filter((t) => orderIdOf(t) !== null)
+  const dragGroup = groupOfId(dragId)
+  const orderable = shown.filter((t) => orderIdOf(t) !== null && (dragGroup === null || groupOf!(t) === dragGroup))
   const row = (t: T) => {
     const id = orderIdOf(t)
     const index = id ? orderable.indexOf(t) : -1
@@ -156,6 +180,7 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinn
         liProps: {
           ...(lift ? { ref, ...listeners } : {}),
           'data-order-id': id ?? undefined,
+          ...(groupOf ? { 'data-group': groupOf(t) } : {}),
           className: `${gapCls.trim()}${isLifted ? ' is-lifted' : ''}`.trim() || undefined,
         },
       })}
@@ -164,11 +189,13 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinn
 
   return <DndContext sensors={sensors} onDragStart={onTouchStart} onDragMove={onTouchMove} onDragEnd={onTouchEnd} onDragCancel={endDrag}>
     <ul ref={listRef} className={`plan-items plan-goal-list${dragId ? ' is-ordering' : ''}`} aria-label={label} {...listDrop}>
-      {headingOf
+      {headingOf && groupOf
         ? shown.map((t, i) => {
           const h = headingOf(t)
-          return [h !== null && (i === 0 || headingOf(shown[i - 1]) !== h)
-            ? <li key={`area:${h}`} className="plan-area-head" role="presentation">{h}</li> : null, row(t)]
+          return <Fragment key={keyOf(t)}>
+            {h !== null && (i === 0 || groupOf(shown[i - 1]) !== groupOf(t)) && <li className="plan-area-head" role="presentation">{h}</li>}
+            {row(t)}
+          </Fragment>
         })
         : shown.map(row)}
       {tail}
