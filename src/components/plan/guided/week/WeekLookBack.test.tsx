@@ -99,12 +99,12 @@ describe('WeekLookBack — step 1, look back at last week', () => {
 
   it('a smaller step that saved is said on its row, with what was typed (walk 2026-11-02)', async () => {
     const smaller = vi.fn(async () => true)
-    setup({ looseEnds: [end('Frame the posters', { smaller })] })
+    setup({ looseEnds: [end('Frame the posters', { smaller, backTo: 'November' })] })
     fireEvent.click(screen.getByRole('button', { name: 'Smaller: Frame the posters' }))
     fireEvent.change(row('Frame the posters').getByRole('textbox'), { target: { value: 'Buy frames' } })
     await act(async () => { fireEvent.click(row('Frame the posters').getByRole('button', { name: 'Add' })) })
     expect(smaller).toHaveBeenCalledWith('Buy frames')
-    expect(screen.getByText('Smaller step on this week: “Buy frames”')).toBeInTheDocument()
+    expect(screen.getByText('“Buy frames” on this week · “Frame the posters” back to November')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Drop: Frame the posters' })).toBeNull()
   })
 

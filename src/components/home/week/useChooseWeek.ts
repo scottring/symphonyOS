@@ -119,6 +119,28 @@ export function useChooseWeek(d: ChooseWeekDeps) {
         { ids: [id], undo: async () => { await d.deleteTask(id) } })
     }
 
+    // Smaller, from the look back (walk 2026-11-02): the step goes on this
+    // week, and the bigger thing goes back to the month it serves, so it is
+    // answered and not carried again as undone. One write with one Undo; if
+    // the bigger thing can't go back up, the new step is taken away again.
+    const smallerStep = (t: Task) => async (title: string) => {
+      const id = crypto.randomUUID()
+      const opts: AddTaskOptions = { id, bucket: 'week', weekStart: d.weekAnchor, sourceId: t.id, goalId: t.goalId, context: t.context }
+      const restore = restoreOf(t)
+      return activity.run(`A smaller step under “${t.title}”; it goes back to ${monthWord}`, async () => {
+        if (!(await d.addTask(title, undefined, undefined, undefined, opts))) return false
+        const up = async () => {
+          if (t.scheduledFor && !ok(await d.updateTask(t.id, timingRemoval(t, 'day').updates))) return false
+          if (!openCommitment({ commitments: bootstrapCommitments(t) }, 'month') && !(await d.keepForward(t.id, { monthStart: d.monthStart }))) return false
+          return d.dropCommitment(t.id, 'week', d.lastWeekStart)
+        }
+        if (await up().catch(() => false)) return true
+        await restore().catch(() => false)
+        await d.deleteTask(id)
+        return false
+      }, { ids: [id, t.id], undo: async () => { await d.deleteTask(id); return restore() } })
+    }
+
     const stepVerbs = (n: { task: Task; planned: ChooseNode['planned'] }): ChooseVerb[] => {
       const t = n.task
       switch (n.planned.kind) {
@@ -196,7 +218,8 @@ export function useChooseWeek(d: ChooseWeekDeps) {
         who: assigneesOf(t),
         canHandOff: t.context === 'family',
         thisWeek: () => d.actions.keepThisWeek(card(t, 'last-week')),
-        smaller: addUnder(t, `Add a smaller step under “${t.title}”`),
+        smaller: smallerStep(t),
+        backTo: monthWord,
         handOff: handOff(t),
         drop: () => d.actions.letGo(card(t, 'last-week')),
         done: () => d.actions.done(card(t, 'last-week')),

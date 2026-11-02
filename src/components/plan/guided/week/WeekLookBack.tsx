@@ -25,8 +25,10 @@ export interface LooseEnd {
   /** Only a Family item: assigning anything else would share it. */
   canHandOff: boolean
   thisWeek: () => Promise<boolean>
-  /** A smaller step under it, on this week. */
+  /** A smaller step under it, on this week; it goes back to its month. */
   smaller: (title: string) => Promise<boolean>
+  /** The month it goes back to ("November"). */
+  backTo?: string
   /** Assigned to them instead. Assignment is not permission. */
   handOff: (to: FamilyMember) => Promise<boolean>
   drop: () => Promise<boolean>
@@ -113,7 +115,7 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
               {verb('Done', e.done, 'Marked done')}
             </span>
             {open?.key === e.key && open.what === 'smaller' && <InlineComposer label={`A smaller step under ${e.title}`} saveLabel="Add"
-              onSave={async (title) => run(e, () => e.smaller(title), `Smaller step on this week: “${title.trim()}”`)} onCancel={() => setOpen(null)} />}
+              onSave={async (title) => run(e, () => e.smaller(title), `“${title.trim()}” on this week${e.backTo ? ` · “${e.title}” back to ${e.backTo}` : ''}`)} onCancel={() => setOpen(null)} />}
             {open?.key === e.key && open.what === 'hand' && <div className="choose-menu" role="group" aria-label={`Hand off ${e.title} to`}>
               {members.map((m) => <button key={m.id} type="button" className="choose-when" disabled={busy} aria-pressed={e.who.includes(m.id)}
                 onClick={() => { void run(e, () => e.handOff(m), `Handed to ${m.name}`) }}>{m.name}</button>)}
