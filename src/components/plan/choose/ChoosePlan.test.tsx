@@ -48,7 +48,7 @@ describe('ChoosePlan — one October goal per card', () => {
     expect(screen.getByText('1 of 2')).toBeTruthy()
     const card = within(screen.getByRole('article', { name: 'Plan a winter vacation' }))
     expect(card.getByText('On October · no steps yet')).toBeTruthy()
-    expect(card.getAllByRole('button').map((b) => b.textContent)).toEqual(['This week', 'Not this week', 'Done', '+ Add a step'])
+    expect(card.getAllByRole('button').map((b) => b.textContent)).toEqual(['This week', 'Leave on October', 'Done', '+ Add a step'])
   })
 
   it('This week saves, stamps the card and offers Undo, which sends it back', async () => {
@@ -64,10 +64,10 @@ describe('ChoosePlan — one October goal per card', () => {
     expect(screen.getByRole('button', { name: 'This week: Plan a winter vacation' })).toBeTruthy()
   })
 
-  it('Not this week changes nothing but stamps it as staying on October', async () => {
+  it('Leave on October changes nothing but stamps it as staying on October', async () => {
     const g = goal()
     renderChoose({ lines: [g] })
-    fireEvent.click(screen.getByRole('button', { name: 'Not this week: Plan a winter vacation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Leave on October: Plan a winter vacation' }))
     await waitFor(() => expect(screen.getByText('Stays on October · no steps yet')).toBeTruthy())
     expect(screen.getByRole('img', { name: /on october/i })).toBeTruthy()
     for (const v of g.verbs) expect(v.run).not.toHaveBeenCalled()
