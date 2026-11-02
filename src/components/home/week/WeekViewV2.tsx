@@ -47,7 +47,7 @@ import { sameDay } from '@/lib/placement/model'
 import type { PlanDragPayload } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { showToast } from '@/hooks/useToast'
-import { layoutContextSpans } from '@/lib/week/journalSpread'
+import { eventDays, layoutContextSpans } from '@/lib/week/journalSpread'
 import { localYmd } from '@/lib/cadence/config'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { publishViewedWeek } from '@/lib/viewedWeekSignal'
@@ -1064,6 +1064,19 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // (the page's space filter); Look back hands a loose end to anyone else.
   const clashEvents = useMemo(() => eventItems.flatMap((i) => i.startTime && i.endTime
     ? [{ id: i.id, title: i.title, start: i.startTime, end: i.endTime, ...(i.location ? { place: i.location } : {}) }] : []), [eventItems])
+  // And the all-day ones (a trip, a holiday, a school break), each on every
+  // day it covers: walking each day, a day with a trip on it is not
+  // "Nothing fixed" (walk 2026-11-02). They are not clash-checked: an
+  // all-day event has no hours to overlap.
+  const allDayEvents = useMemo(() => {
+    const first = localYmd(weekAnchor), last = localYmd(new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 6))
+    return events.flatMap((ev) => {
+      if (!isAllDayEvent(ev)) return []
+      const span = eventDays(ev)
+      if (!span || span.last < first || span.first > last) return []
+      return [{ id: `event-${ev.google_event_id || ev.id}`, title: ev.title.trim(), first: span.first, last: span.last }]
+    })
+  }, [events, weekAnchor])
   const handOffTo = useMemo(() => familyMembers.filter((m) => m.id !== meId), [familyMembers, meId])
   // Weekly ops lists the routines the page shows: the same space filter and
   // people lens (the ladder without its one-day rung; the step asks each day).
@@ -1091,6 +1104,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     choose: chooseWeek,
     tasks: deckTasks,
     events: clashEvents,
+    allDayEvents,
     handOffTo,
     routines: opsRoutines,
     listenCanvasWrites,

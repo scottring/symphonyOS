@@ -1,7 +1,9 @@
 // Planning the week, step 3 (spec 2026-11-01): the calendar check. The week's
 // seven days with their fixed times, and what findClashes sees: two things at
-// once, or a move to another place with under 15 minutes to get there. It
-// only points; what changes is Scott's to say in the conversation.
+// once, or a move to another place with under 15 minutes to get there. Each
+// day lists its all-day events too (a trip, a holiday) — they are not clash-
+// checked, having no hours. It only points; what changes is Scott's to say in
+// the conversation.
 
 import { AlertTriangle } from 'lucide-react'
 import { findClashes, type ClashEvent } from '@/lib/guide/clashes'
@@ -9,10 +11,14 @@ import { localYmd } from '@/lib/cadence/config'
 
 const time = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
-export function CalendarCheck({ weekStart, events }: {
+/** An all-day event and the days it covers (YYYY-MM-DD, inclusive). */
+export interface AllDayEvent { id: string; title: string; first: string; last: string }
+
+export function CalendarCheck({ weekStart, events, allDay = [] }: {
   weekStart: Date
   /** The week's timed events, as the page draws them (its space filter). */
   events: readonly ClashEvent[]
+  allDay?: readonly AllDayEvent[]
 }) {
   const clashes = findClashes(events)
   const byId = new Map(events.map((e) => [e.id, e]))
@@ -32,10 +38,13 @@ export function CalendarCheck({ weekStart, events }: {
         const label = `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.getDate()}`
         const todays = events.filter((e) => localYmd(e.start) === key).sort((x, y) => x.start.getTime() - y.start.getTime())
         const flags = clashes.filter((c) => c.day === key)
+        const allDays = allDay.filter((e) => e.first <= key && e.last >= key)
         return <li key={key} className="gw-row gw-day" aria-label={label}>
           <span className="gw-day-label">{label}</span>
-          {todays.length === 0 ? <span className="gw-row-note">Nothing fixed</span>
-            : <ul className="gw-steps">{todays.map((e) => <li key={e.id}>
+          {todays.length === 0 && allDays.length === 0 ? <span className="gw-row-note">Nothing fixed</span>
+            : <ul className="gw-steps">{allDays.map((e) => <li key={e.id}>
+              <span className="gw-row-note">All day</span> <span className="gw-step-title">{e.title}</span>
+            </li>)}{todays.map((e) => <li key={e.id}>
               <span className="gw-row-note">{time(e.start)}</span> <span className="gw-step-title">{e.title}</span>
               {e.place && <span className="gw-row-note"> · {e.place}</span>}
             </li>)}</ul>}

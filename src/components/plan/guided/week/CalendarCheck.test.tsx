@@ -23,6 +23,17 @@ describe('CalendarCheck — step 3, the week’s fixed times', () => {
     expect(screen.getByText('2 to look at')).toBeInTheDocument()
   })
 
+  it('an all-day event is on each day it covers, so that day is not "Nothing fixed"; it is never a clash (walk 2026-11-02)', () => {
+    render(<CalendarCheck weekStart={weekStart} events={[{ id: 'a', title: 'Dentist', start: at(5, 9), end: at(5, 10) }]}
+      allDay={[{ id: 'trip', title: 'Beach trip', first: '2026-11-05', last: '2026-11-07' }, { id: 'h', title: 'Election Day', first: '2026-11-03', last: '2026-11-03' }]} />)
+    const tue = within(screen.getByRole('listitem', { name: /^Tue 3/ }))
+    expect(tue.getByText('Election Day')).toBeInTheDocument()
+    expect(tue.queryByText('Nothing fixed')).toBeNull()
+    for (const d of ['Thu 5', 'Fri 6', 'Sat 7']) expect(within(screen.getByRole('listitem', { name: new RegExp(`^${d}`) })).getByText('Beach trip')).toBeInTheDocument()
+    expect(within(screen.getByRole('listitem', { name: /^Wed 4/ })).getByText('Nothing fixed')).toBeInTheDocument()
+    expect(screen.getByText('No overlaps or tight moves.')).toBeInTheDocument()
+  })
+
   it('a clear week says so', () => {
     render(<CalendarCheck weekStart={weekStart} events={[{ id: 'a', title: 'Dentist', start: at(2, 9), end: at(2, 10) }]} />)
     expect(screen.getByText('No overlaps or tight moves.')).toBeInTheDocument()

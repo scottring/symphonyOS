@@ -33,7 +33,7 @@ import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
 import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
 import { WeekLookBack } from '@/components/plan/guided/week/WeekLookBack'
 import { ReadMonth } from '@/components/plan/guided/week/ReadMonth'
-import { CalendarCheck } from '@/components/plan/guided/week/CalendarCheck'
+import { CalendarCheck, type AllDayEvent } from '@/components/plan/guided/week/CalendarCheck'
 import { InboxStep } from '@/components/plan/guided/week/InboxStep'
 import { ChooseStep } from '@/components/plan/guided/week/ChooseStep'
 import { WeeklyOps } from '@/components/plan/guided/week/WeeklyOps'
@@ -89,6 +89,9 @@ export interface WeekDeck {
   tasks?: readonly Task[]
   /** The week's timed events as the page draws them (the calendar check). */
   events?: readonly ClashEvent[]
+  /** The week's all-day events, each with the days it covers (YYYY-MM-DD,
+   *  inclusive): the calendar check lists them on each of those days. */
+  allDayEvents?: readonly AllDayEvent[]
   /** Who a loose end can be handed to: the household, but not the viewer. */
   handOffTo?: readonly FamilyMember[]
   /** The routines the page shows under its filters (Weekly ops lists them by day). */
@@ -317,7 +320,7 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
     'look-back': <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
       notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} members={deck.handOffTo ?? NOBODY} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
     'read-month': <ReadMonth monthWord={choose.monthWord} lines={choose.lines} doneLines={choose.doneLines} onOpen={deck.openTask} />,
-    calendar: <CalendarCheck weekStart={weekStart} events={deck.events ?? []} />,
+    calendar: <CalendarCheck weekStart={weekStart} events={deck.events ?? []} allDay={deck.allDayEvents} />,
     inbox: <InboxStep cards={deck.cards.filter((c) => c.source === 'inbox')} actions={deck.actions} />,
     choose: <ChooseStep count={guided.count} choose={guided.choose} days={deck.stripDays} />,
     ops: <WeeklyOps weekStart={weekStart} routines={deck.routines ?? NO_ROUTINES} draft={weekendDraft} onDraft={setWeekendDraft} />,
