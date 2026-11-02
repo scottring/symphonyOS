@@ -145,7 +145,7 @@ const WEEK: readonly GuideStep[] = [
     title: 'Choose this week\'s tasks',
     minutes: 15,
     why: 'A short list gets done. About 15 is the limit.',
-    you: 'Say what this week needs. Take from the month or add new.',
+    you: 'Say what this week needs. Take from the month or add new; the rest stays on the month.',
     guide: 'Files each under its month line and counts toward 15.',
     more: 'A week has only so many open hours once everything fixed is counted. A short list that fits is more useful than a long one that mostly rolls into next week. Each task stays tied to the month line it serves.',
     writes: ['commit', 'place'],

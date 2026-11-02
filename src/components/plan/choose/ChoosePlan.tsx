@@ -184,11 +184,10 @@ export function ChoosePlan(p: ChoosePlanProps) {
     const list: { label: string; v: ChooseVerb; then: Decision | null; primary?: boolean }[] = [
       ...(!onHere && doIt ? [{ label: cap(here), v: doIt, then: 'here' as Decision, primary: true }] : []),
       ...(onHere && back ? [{ label: `Not ${inHere}`, v: back, then: null }] : []),
-      // A goal not on this week, left where it is: it stays, stamped. Named
-      // for what it does — "Not this week" read as taking something off the
-      // week, and the count not moving looked like a bug (walk 2026-11-02).
-      // Last week's leftover goes back up; one never on a week just stays.
-      ...(!onHere && above ? [{ label: pl.kind === 'last' && back ? `Back to ${above}` : `Leave on ${above}`, v: pl.kind === 'last' && back ? back : NOOP, then: 'stay' as Decision }] : []),
+      // Last week's leftover goes back up. A goal never on a week gets no
+      // button for staying: leaving it alone already does that, and a button
+      // that saves nothing read as a decision (walk 2026-11-02).
+      ...(pl.kind === 'last' && back && above ? [{ label: `Back to ${above}`, v: back, then: 'stay' as Decision }] : []),
       ...(done ? [{ label: 'Done', v: done, then: 'done' as Decision }] : []),
     ]
     return <>
