@@ -196,7 +196,11 @@ function Inner() {
   const thisWeek = localYmd(week) === localYmd(weekStartAnchor(now, weekStartsOn))
   const periodTitle = bounds.label
   const current = isCurrentPeriod(bounds, now)
-  const year = anchor.getFullYear()
+  // The year a page reads its year goals from. A season reads the year its
+  // own name carries ("Winter 2026", seasonLabel: the year it starts in), so
+  // Winter from Dec 1 and from Jan 15 read the same goals (walk 2026-11-02:
+  // which year depended on the way in).
+  const year = level === 1 ? seasonB.start.getFullYear() : anchor.getFullYear()
   const periodWord = level === 0 ? String(year) : periodWordOf(bounds)
   const seasonWord = periodWordOf(seasonB), monthWord = periodWordOf(monthB)
   // The review by hand of the period on screen (PeriodReview): open with ?review=1.

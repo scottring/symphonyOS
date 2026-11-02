@@ -1399,6 +1399,18 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(api.keepForward).toHaveBeenCalledWith('sd',{seasonStart:FALL})
   expect(plannedMarks()).toHaveLength(0)
  })
+ it('Choose from the year reads the year the season is named for, however it was opened (walk 2026-11-02)',()=>{
+  at(new Date(2027,0,15,12)); onTestFinished(()=>{vi.useRealTimers()})
+  api.goals=[{id:'g26',name:'Calmer mornings',year:2026,status:'active',context:'personal'},{id:'g27',name:'Learn Spanish',year:2027,status:'active',context:'personal'}]
+  for(const start of ['2026-12-01','2027-01-15']){
+   atStep('from-year')
+   open(`/season?view=constellation&horizon=1&start=${start}&plan=1`)
+   const year=within(screen.getByRole('list',{name:'2026 goals'}))
+   expect(year.getByRole('listitem',{name:'Calmer mornings'})).toBeInTheDocument()
+   expect(year.queryByRole('listitem',{name:'Learn Spanish'})).toBeNull()
+   cleanup()
+  }
+ })
  it('Season calendar only shows, month by month from today; nothing there writes',()=>{
   inSession()
   atStep('calendar')
