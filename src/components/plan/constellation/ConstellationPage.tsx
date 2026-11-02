@@ -1156,7 +1156,8 @@ function Inner() {
   const sessionBodies = (t: PeriodSessionTools) => level === 2 ? {
     'fresh-start': <FreshStart monthWord={periodWord} value={t.notes.scenery} patch={t.patch} />,
     'look-back': lookBackBody(t),
-    'read-season': choose && <ReadAbove aboveWord={seasonWord} lines={choose.lines} doneLines={choose.doneLines} />,
+    'read-season': choose && <ReadAbove aboveWord={seasonWord} lines={choose.lines} doneLines={choose.doneLines}
+      onOpen={(id) => selection?.setSelection({ kind: 'task', id })} chooseLater="You’ll name this month’s goals under these at step 5, by area." />,
     'next-weeks': <NextWeeks start={planWeek} weeks={5} />,
     'by-area': chooseBody(t),
     'upkeep-fun': <UpkeepFun monthWord={periodWord} routines={stripRoutines}

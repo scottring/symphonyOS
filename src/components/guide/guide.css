@@ -338,3 +338,15 @@
 .guide-yl-name { font: 600 10.5px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-600); }
 .guide-yl-crowded { font-size: 11px; font-weight: 600; color: var(--g-accent); }
 .guide-yl-lines { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+/* Reading the level above (ReadAbove): a tick for what's already finished,
+   and a title that opens its panel. */
+.gw-read-head { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.gw-read-tick { flex: none; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--color-primary-600); cursor: pointer; }
+.gw-steps .gw-read-tick { width: 14px; height: 14px; margin-top: 2px; }
+.gw-read-tick:disabled { cursor: default; }
+.gw-read-title { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; min-width: 0; }
+.gw-read-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.gw-read-title:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; border-radius: 4px; }
+.gw-row.is-done { background: transparent; }
+.gw-row.is-done > .gw-read-head .gw-row-title,
+.gw-steps .is-done > .gw-read-head .gw-step-title { color: var(--color-neutral-500); text-decoration: line-through; }

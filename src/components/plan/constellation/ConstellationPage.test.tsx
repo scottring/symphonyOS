@@ -1208,14 +1208,15 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   // Nothing on the look back marks the month planned.
   expect(notesStore.patches.some((x)=>(x.p.guide as any)?.plannedAt)).toBe(false)
  })
- it('Read the season list and the next weeks only show; nothing there writes',()=>{
+ it('Read the season list and the next weeks: reading, with titles that open their panels',()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},{id:'a',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'}]
   atStep('read-season')
   month('&plan=1')
   const fall=within(screen.getByRole('list',{name:'Fall goals'}))
   expect(fall.getByRole('listitem',{name:'Get outside'})).toHaveTextContent('Hike Bear Mountain')
-  expect(fall.queryAllByRole('button')).toHaveLength(0)
+  // Each title opens its panel; nothing else is offered to press but a tick.
+  expect(fall.getAllByRole('button').map((b)=>b.textContent)).toEqual(['Get outside','Hike Bear Mountain'])
   cleanup();atStep('next-weeks')
   month('&plan=1')
   expect(screen.getAllByRole('listitem',{name:/^Week of /}).map((li)=>li.getAttribute('aria-label'))).toEqual(['Week of Oct 11','Week of Oct 18','Week of Oct 25','Week of Nov 1','Week of Nov 8'])

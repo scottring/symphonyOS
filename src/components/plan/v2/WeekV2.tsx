@@ -97,6 +97,8 @@ export interface WeekDeck {
    *  on the choosing step it marks the week planned, as a Choose verb does.
    *  Returns the way to stop listening. */
   listenCanvasWrites?: (listener: () => void) => () => void
+  /** Opens a task or goal in its panel (the page's selection). */
+  openTask?: (id: string) => void
 }
 
 export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
@@ -314,7 +316,7 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   const bodies = {
     'look-back': <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
       notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} members={deck.handOffTo ?? NOBODY} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
-    'read-month': <ReadMonth monthWord={choose.monthWord} lines={choose.lines} doneLines={choose.doneLines} />,
+    'read-month': <ReadMonth monthWord={choose.monthWord} lines={choose.lines} doneLines={choose.doneLines} onOpen={deck.openTask} />,
     calendar: <CalendarCheck weekStart={weekStart} events={deck.events ?? []} />,
     inbox: <InboxStep cards={deck.cards.filter((c) => c.source === 'inbox')} actions={deck.actions} />,
     choose: <ChooseStep count={guided.count} choose={guided.choose} days={deck.stripDays} />,

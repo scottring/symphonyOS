@@ -1071,6 +1071,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     [routines, selectedAssignees, layers])
   const deck: WeekDeck = {
     mode: deckMode, available: deckAvailable,
+    openTask: (id) => onSelectItem(`task-${id}`),
     cards: deckCards, doneLastWeek, plannedLastWeek, alsoDoneLastWeek, doneThisWeek, onThisWeek, aged, actions: deckActions, stripDays,
     loading: !tasksLoaded, lastReview,
     // Last week's leftovers nobody answered: one on October goes back to

@@ -9,7 +9,7 @@ const line = (title: string, counts: string, steps: { title: string; label: stri
 }) as unknown as ChooseLineView
 
 describe('ReadAbove — read the level above (Month: the season list)', () => {
-  it('lists each season goal with how far it has come, and nothing to press', () => {
+  it('lists each season goal with how far it has come; done goals stay in sight, struck', () => {
     render(<ReadAbove aboveWord="Fall" lines={[
       line('Get the house ready', '1 done · 1 in November · 2 on Fall', [{ title: 'Clean gutters', label: 'November' }, { title: 'Order wood', label: 'Done', kind: 'done' }]),
       line('Get outside', ''),
@@ -19,8 +19,7 @@ describe('ReadAbove — read the level above (Month: the season list)', () => {
     expect(house.getByText('1 done · 1 in November · 2 on Fall')).toBeInTheDocument()
     expect(house.getByText('Order wood').closest('li')).toHaveClass('is-done')
     expect(within(screen.getByRole('listitem', { name: 'Get outside' })).getByText('Nothing under it yet')).toBeInTheDocument()
-    expect(screen.getByText('1 done on Fall')).toBeInTheDocument()
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    expect(screen.getByRole('listitem', { name: 'Renew passports' })).toHaveClass('is-done')
   })
 
   it('an empty season says so; one all done says that', () => {
