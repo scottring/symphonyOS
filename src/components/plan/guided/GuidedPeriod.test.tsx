@@ -70,6 +70,21 @@ beforeEach(() => {
 })
 
 describe('GuidedPeriod — Month, Season and Year while planning', () => {
+  // Walk 2026-11-01: "Look back at October" stood beside November's list.
+  it('the look back step shows the period before’s page; every other step the period’s own; the session stays the period’s', async () => {
+    setup({ lookBackPage: <section aria-label="October">October goals</section> })
+    expect(screen.getByRole('region', { name: 'The month' })).toBeInTheDocument()
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    expect(shell.reg?.stepId).toBe('look-back')
+    expect(screen.getByRole('region', { name: 'October' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'The month' })).toBeNull()
+    expect(shell.reg).toMatchObject({ token: '2026-11', threadKey: 'monthly:2026-11' })
+    expect(screen.getByRole('region', { name: 'Planning November' })).toBeInTheDocument()
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    expect(screen.getByRole('region', { name: 'The month' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'October' })).toBeNull()
+  })
+
   it('Month: six steps in the rail, the session line, the page beside it, the header in the conversation', () => {
     setup()
     const session = screen.getByRole('region', { name: 'Planning November' })

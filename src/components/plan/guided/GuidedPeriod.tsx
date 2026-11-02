@@ -49,7 +49,7 @@ type Line = { id: string; title: string }
 type Area = { id: string; name: string; context: TaskContext | null }
 const NONE: readonly never[] = []
 
-export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites, plannedAt }: {
+export function GuidedPeriod({ level, token, periodLabel, page, lookBackPage, bodies, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites, plannedAt }: {
   level: PeriodLevel
   /** The period's planning token (monthToken, seasonToken, yearToken). */
   token: string
@@ -57,6 +57,9 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   periodLabel: string
   /** The period's page itself, without its strip (the rail stands there). */
   page: ReactNode
+  /** The period before's page (the one the look back is about), drawn beside
+   *  the look back step in place of `page`. The session stays this period's. */
+  lookBackPage?: ReactNode
   /** What each step shows inside the rail, by step id. */
   bodies: (tools: PeriodSessionTools) => Partial<Record<string, ReactNode>>
   /** The period's closing writes, with the look back's unsaved notes; false
@@ -166,7 +169,9 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
             resume. The page beside it stays put while it loads. */}
         {loading ? <div className="guide-rail" aria-busy="true" />
           : <GuideRail level={level} progress={progress} bodies={drawn} onJump={(id) => { void jump(id) }} />}
-        <div className="guide-session-page">{page}</div>
+        {/* The page shows the period each step is about (walk 2026-11-01:
+            "Look back at October" stood beside November's list). */}
+        <div className="guide-session-page">{!loading && progress.current === 'look-back' && lookBackPage ? lookBackPage : page}</div>
       </div>
     </section>
   )

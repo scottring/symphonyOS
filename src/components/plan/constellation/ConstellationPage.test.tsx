@@ -1147,6 +1147,37 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(shell.reg).toMatchObject({level:'month',token:'2026-10',threadKey:'monthly:2026-10'})
   expect(shell.reg?.sessionContext.guide.aboveLines).toEqual([{id:'s',title:'Get outside'}])
  })
+ // Walk 2026-11-01: "Look back at October" stood beside November's list.
+ // The page shows the month each step is about; the session stays November's.
+ it('Review October: the look back shows October’s list, Next November’s, the rail October’s again',async()=>{
+  at(new Date(2026,9,30,12)); onTestFinished(()=>{vi.useRealTimers()})
+  const NOV=new Date(2026,10,1)
+  api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},
+   {id:'o1',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'},
+   {id:'o2',title:'Pay taxes',bucket:'month',monthStart:OCT,completed:true},
+   {id:'n1',title:'Book flights',bucket:'month',monthStart:NOV}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Review October'}))
+  expect(screen.getByText(/Planning November · step 2 of 6/)).toBeInTheDocument()
+  const october=()=>within(screen.getByRole('region',{name:'October 2026, looked back on'}))
+  expect(october().getByRole('heading',{level:2,name:'October 2026'})).toBeInTheDocument()
+  expect(titles('October goals')).toEqual(['Hike Bear Mountain'])
+  expect(october().getByText('Hike Bear Mountain',{selector:'.plan-item-title'}).closest('li')).toHaveTextContent('For Get outside')
+  expect(october().getByText('1 done · Pay taxes')).toBeInTheDocument()
+  expect(screen.queryByRole('list',{name:'November goals'})).toBeNull()
+  // Tapping a line opens its panel, as on October's own page.
+  fireEvent.click(october().getByRole('button',{name:'Hike Bear Mountain'}))
+  expect(selection.setSelection).toHaveBeenCalledWith({kind:'task',id:'o1'})
+  expect(shell.reg).toMatchObject({level:'month',token:'2026-11',stepId:'look-back'})
+  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Next step'}))})
+  expect(screen.queryByRole('region',{name:'October 2026, looked back on'})).toBeNull()
+  expect(titles('November goals')).toEqual(['Book flights'])
+  fireEvent.click(within(screen.getByRole('group',{name:'Steps in this session'})).getByRole('button',{name:/Look back at last month/}))
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Go to this step'}))})
+  expect(titles('October goals')).toEqual(['Hike Bear Mountain'])
+  expect(screen.getByRole('region',{name:'Planning November'})).toBeInTheDocument()
+  expect(shell.reg).toMatchObject({token:'2026-11',threadKey:'monthly:2026-11'})
+ })
  it('Fresh start changes the app’s scenery and keeps it as the month’s',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   month('&plan=1')
@@ -1310,8 +1341,23 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   const session=within(screen.getByRole('region',{name:'Planning Fall'}))
   expect(session.getAllByRole('listitem').filter((li)=>li.classList.contains('guide-rail-item')).map((li)=>li.querySelector('.guide-rail-title')?.textContent))
    .toEqual(['Look back at last season','Choose from the year','Season calendar','Energy check','Season goals by area','Ideal week','Wild cards'])
-  expect(screen.getByRole('list',{name:'Fall goals'})).toBeInTheDocument()
+  // The look back's page is the season it looks back on (walk 2026-11-01).
+  expect(screen.getByRole('region',{name:'Summer 2026, looked back on'})).toBeInTheDocument()
+  expect(screen.getByRole('list',{name:'Summer goals'})).toBeInTheDocument()
+  expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
   expect(shell.reg).toMatchObject({level:'season',token:'2026-fall',threadKey:'seasonal:2026-fall'})
+ })
+ it('the look back shows Summer’s list; the next step Fall’s',async()=>{
+  inSession()
+  api.tasks=[{id:'a',title:'Swim lessons',bucket:'quarter',monthStart:SUMMER},{id:'f',title:'Rake the leaves',bucket:'quarter',monthStart:FALL}]
+  season('&plan=1')
+  const summer=within(screen.getByRole('region',{name:'Summer 2026, looked back on'}))
+  expect(summer.getByRole('heading',{level:2,name:'Summer 2026'})).toBeInTheDocument()
+  expect(titles('Summer goals')).toEqual(['Swim lessons'])
+  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Next step'}))})
+  expect(screen.queryByRole('region',{name:'Summer 2026, looked back on'})).toBeNull()
+  expect(titles('Fall goals')).toEqual(['Rake the leaves'])
+  expect(shell.reg).toMatchObject({token:'2026-fall',stepId:'from-year'})
  })
  it('Look back: Summer’s open goals — Carry, Table (to Someday), Let go (off Summer only) — each through the page’s writers',async()=>{
   inSession()
@@ -1453,8 +1499,24 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   const session=within(screen.getByRole('region',{name:'Planning 2026'}))
   expect(session.getAllByRole('listitem').filter((li)=>li.classList.contains('guide-rail-item')).map((li)=>li.querySelector('.guide-rail-title')?.textContent))
    .toEqual(['Look back at last year','Picture 5–10 years out','Map the 12 months','Choose life areas','Brain dump goals','Refine the list','Share and book the next session'])
-  expect(screen.getByRole('list',{name:'2026 goals'})).toBeInTheDocument()
+  // The look back's page is the year it looks back on (walk 2026-11-01).
+  expect(screen.getByRole('list',{name:'2025 goals'})).toBeInTheDocument()
+  expect(screen.queryByRole('list',{name:'2026 goals'})).toBeNull()
   expect(shell.reg).toMatchObject({level:'year',token:'2026',threadKey:'annual:2026'})
+ })
+ it('the look back shows 2025’s goals, met and carried folded; the next step 2026’s',async()=>{
+  inSession()
+  api.goals=[...GOALS.map(g=>({...g})),{id:'sail',name:'Learn to sail',year:2025,status:'active',context:'personal'},
+   {id:'run',name:'Run a 10k',year:2025,status:'completed',context:'personal'}]
+  year()
+  const last=within(screen.getByRole('region',{name:'2025, looked back on'}))
+  expect(last.getByRole('heading',{level:2,name:'2025'})).toBeInTheDocument()
+  expect(titles('2025 goals')).toEqual(['Learn to sail'])
+  expect(last.getByText('1 done · Run a 10k')).toBeInTheDocument()
+  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Next step'}))})
+  expect(screen.queryByRole('list',{name:'2025 goals'})).toBeNull()
+  expect(titles('2026 goals')).toEqual(['Together','Health'])
+  expect(shell.reg).toMatchObject({token:'2026',stepId:'vision'})
  })
  it('Look back: 2025’s open goals — Carry, Someday, Let go, Done — each through the page’s writers, with Undo',async()=>{
   inSession()

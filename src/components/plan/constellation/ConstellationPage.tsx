@@ -310,10 +310,12 @@ function Inner() {
   // A line moved on to a later period stays on this list as the record, but
   // it is not open here: "Moved to November", no verbs, folded with the done.
   const LEVEL_BOUNDS = [yearB, seasonB, monthB]
-  const movedLabel = (node: PlanNode): string | null => {
+  // A line of another period's list (the look back's) is read against that
+  // period's bounds (`b`).
+  const movedLabel = (node: PlanNode, b: ReturnType<typeof periodBounds> = LEVEL_BOUNDS[node.level]): string | null => {
     if (node.goal) return goals.some((g) => g.year === node.goal!.year + 1 && g.carriedFrom === node.id && g.status !== 'archived') ? `Moved to ${node.goal.year + 1}` : null
     if (!node.task || node.level === 0 || node.level > 2) return null
-    const lvl = PERIODS[node.level] as 'season' | 'month', b = LEVEL_BOUNDS[node.level]
+    const lvl = PERIODS[node.level] as 'season' | 'month'
     const moved = movedOn(node.task, lvl, b.start, { isCurrent: isCurrentPeriod(b, now), seasons })
     if (!moved) return null
     return `Moved to ${periodWordOf(periodBounds(lvl, moved.to ?? b.next, seasons))}`
@@ -556,26 +558,32 @@ function Inner() {
   const aboveWord = level === 2 ? seasonWord : String(year)
 
   // ---- The period's goals: open first, done folded into one line -----------
-  const levelNodes = allNodes.filter((n) => n.level === level)
-  const openNodes = inOrder(levelNodes.filter(isOpen))
-  const doneNodes = levelNodes.filter(isDone)
-  const movedNodes = levelNodes.filter((n) => !isDone(n) && !!movedLabel(n))
-  const listed = showDone ? [...openNodes, ...movedNodes, ...doneNodes] : openNodes
   // With life areas, the lines gather under their area's name ("No area" last).
   // A year goal's areaId is '' when it has none; areas the viewer cannot see
   // are not in lifeAreas, so their lines fall under "No area".
   const nodeArea = (n: PlanNode) => n.goal ? n.goal.areaId : n.task?.areaId
-  const areaGroups = lifeAreas.length ? groupByArea(listed.map((n) => ({ n, areaId: nodeArea(n) })), lifeAreas) : null
-  const items = areaGroups ? areaGroups.flatMap((g) => g.items.map((x) => x.n)) : listed
   const areaNameOf = new Map(lifeAreas.map((a) => [a.id, a.name]))
-  // Grouped by area id (two areas may share a name); an area the viewer cannot see is '' (No area).
-  const groupOf = areaGroups ? (n: PlanNode) => { const id = nodeArea(n) ?? ''; return areaNameOf.has(id) ? id : '' } : undefined
-  // "No area" alone says nothing: no heading unless an area is in play.
-  const onlyNoArea = !!areaGroups && areaGroups.every((g) => g.area === null)
-  const headingOf = groupOf && !onlyNoArea ? (n: PlanNode) => areaNameOf.get(groupOf(n)) ?? 'No area' : undefined
-  // "5 done, 1 moved on · Taxes, Picnic…": what is no longer open, in one line.
-  const folded = [...doneNodes, ...movedNodes]
-  const doneLine = `${[doneNodes.length ? `${doneNodes.length} done` : '', movedNodes.length ? `${movedNodes.length} moved on` : ''].filter(Boolean).join(', ')} · ${folded.slice(0, 2).map((n) => n.title).join(', ')}${folded.length > 2 ? '…' : ''}`
+  // One list drawn one way: this period's, and the look back's (the period before).
+  const shapeList = (nodes: PlanNode[], movedOf: (n: PlanNode) => string | null) => {
+    const open = (n: PlanNode) => !isDone(n) && !movedOf(n)
+    const openNodes = inOrder(nodes.filter(open))
+    const doneNodes = nodes.filter(isDone)
+    const movedNodes = nodes.filter((n) => !isDone(n) && !!movedOf(n))
+    const listed = showDone ? [...openNodes, ...movedNodes, ...doneNodes] : openNodes
+    const areaGroups = lifeAreas.length ? groupByArea(listed.map((n) => ({ n, areaId: nodeArea(n) })), lifeAreas) : null
+    const items = areaGroups ? areaGroups.flatMap((g) => g.items.map((x) => x.n)) : listed
+    // Grouped by area id (two areas may share a name); an area the viewer cannot see is '' (No area).
+    const groupOf = areaGroups ? (n: PlanNode) => { const id = nodeArea(n) ?? ''; return areaNameOf.has(id) ? id : '' } : undefined
+    // "No area" alone says nothing: no heading unless an area is in play.
+    const onlyNoArea = !!areaGroups && areaGroups.every((g) => g.area === null)
+    const headingOf = groupOf && !onlyNoArea ? (n: PlanNode) => areaNameOf.get(groupOf(n)) ?? 'No area' : undefined
+    // "5 done, 1 moved on · Taxes, Picnic…": what is no longer open, in one line.
+    const folded = [...doneNodes, ...movedNodes]
+    const doneLine = `${[doneNodes.length ? `${doneNodes.length} done` : '', movedNodes.length ? `${movedNodes.length} moved on` : ''].filter(Boolean).join(', ')} · ${folded.slice(0, 2).map((n) => n.title).join(', ')}${folded.length > 2 ? '…' : ''}`
+    return { openNodes, doneNodes, movedNodes, items, groupOf, headingOf, folded, doneLine }
+  }
+  const levelNodes = allNodes.filter((n) => n.level === level)
+  const { openNodes, doneNodes, items, groupOf, headingOf, folded, doneLine } = shapeList(levelNodes, (n) => movedLabel(n))
 
   // ---- A pending change card, drawn dashed (planPreview.ts) -----------------
   const span = (b: { start: Date; end: Date; label: string }): PeriodSpan => ({ start: localYmd(b.start), end: localYmd(b.end), label: periodWordOf(b) })
@@ -1251,6 +1259,54 @@ function Inner() {
   const help = shellHelp ?? (() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true }))
   const menuLabel = `${PERIODS[level][0].toUpperCase()}${PERIODS[level].slice(1)} options`
 
+  // ---- The period looked back on (the session's look back step) -------------
+  // Walk 2026-11-01: "Look back at October" stood beside November's list. On
+  // the look back the page beside the rail is the period before's list, as
+  // that period's own page draws it: its lines under the goals above them,
+  // open first by order and area, done and moved on folded under the same
+  // Show done, and its name above it. It is read only here (the look back's
+  // answers are aimed at this period): a month or season line opens its
+  // panel, a year goal opens in place with Done and Let go.
+  const prevAllNodes: PlanNode[] = !planning ? [] : level === 0 ? planNodes(prevGoals, [])
+    : level === 1 ? planNodes(goalsOf(prevB.start.getFullYear()), [prevTasks])
+    : (() => {
+      const prevSeason = periodBounds('season', prevB.start, seasons)
+      return planNodes(goalsOf(prevB.start.getFullYear()), [
+        selectPeriodTasks(visible, 'season', prevSeason.start, isCurrentPeriod(prevSeason, now), lens.scopeId, seasons), prevTasks,
+      ])
+    })()
+  const prevShape = shapeList(prevAllNodes.filter((n) => n.level === level), (n) => movedLabel(n, prevB))
+  const prevRow = (node: PlanNode, order?: RowOrder) => {
+    const parent = node.parent ? prevAllNodes.find((n) => n.key === node.parent) : undefined
+    const status = node.goal?.status ?? 'active'
+    const more = node.goal ? [
+      status === 'completed'
+        ? { label: 'Reopen', onSelect: () => setGoalStatus(node, 'active', `Reopen “${node.title}”`) }
+        : { label: 'Done', onSelect: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
+      { label: 'Let go', onSelect: () => setGoalStatus(node, 'archived', `Let go of “${node.title}”`) },
+    ] : undefined
+    return <PlanItemRow key={node.key} node={node} parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
+      done={isDone(node)} movedTo={movedLabel(node, prevB) ?? undefined} saved={false}
+      onOpen={node.goal ? () => setExpanded((k) => k === node.key ? null : node.key) : () => selection?.setSelection({ kind: 'task', id: node.id })}
+      expanded={expanded === node.key} more={more}
+      readiness={node.task ? readinessOf(node.task, prepLookup) : undefined} {...order} />
+  }
+  const lookBackPage = planning ? (
+    <div className="hs-main plan-horizon-body">
+    <section className="plan-list plan-card" aria-label={`${prevB.label}, looked back on`}>
+      <h2 className="plan-next-list-title">{prevB.label}</h2>
+      <PlanOrderList key={`look-back:${level}:${localYmd(prevB.start)}`} label={`${prevWord} goals`} items={prevShape.items}
+        headingOf={prevShape.headingOf} groupOf={prevShape.groupOf} keyOf={(n) => n.key} titleOf={(n) => n.title}
+        orderIdOf={() => null} renderRow={prevRow} onReorder={KEEP_VIEW} />
+      {prevShape.openNodes.length === 0 && <p className="plan-empty">Nothing{prevShape.folded.length ? ' open' : ''} for {prevWord}.</p>}
+      {prevShape.folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => prefs.set('done', !showDone)}>
+        <span className="plan-done-fold-text">{prevShape.doneLine}</span>
+        <span className="canvas-link plan-done-fold-go">{showDone ? 'Hide' : 'Show'}</span>
+      </button>}
+    </section>
+    </div>
+  ) : null
+
   // The period's list: the page itself, beside the strip every day and beside
   // the steps rail while planning.
   const pageBody = (
@@ -1343,7 +1399,7 @@ function Inner() {
       // Planning: the guided session on this page, the rail where the strip
       // stands and the period's list beside it.
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
-          page={pageBody} bodies={sessionBodies} onFinish={closePeriod} onLeave={() => setMode(null)}
+          page={pageBody} lookBackPage={lookBackPage} bodies={sessionBodies} onFinish={closePeriod} onLeave={() => setMode(null)}
           onPlanned={() => planSession.reload()} listenPageWrites={listenPageWrites}
           plannedAt={!planSession.error ? planSession.saved?.at : undefined}
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}
