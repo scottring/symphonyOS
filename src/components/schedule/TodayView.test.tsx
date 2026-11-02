@@ -735,31 +735,61 @@ describe('TodayView — the Day session', () => {
     expect(screen.queryByRole('button', { name: 'Plan today' })).not.toBeInTheDocument()
   })
 
-  it('from 4 pm it offers Plan tomorrow, which takes the page to tomorrow; there is no Review today', async () => {
+  it('from 4 pm it offers Plan tomorrow, which opens on today for the look back; there is no Review today', async () => {
     const { user } = renderAt(17)
     await openOverflow(user)
     expect(screen.queryByRole('button', { name: /End of day review/i })).not.toBeInTheDocument()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
-    // One URL write: the session and its day; the page's parent moves the day.
     expect(search().get('plan')).toBe('1')
-    expect(search().get('date')).toBe(localYmd(at(0, 1)))
-    // Today's page does not run tomorrow's session over today.
-    expect(screen.queryByRole('region', { name: /Planning/ })).not.toBeInTheDocument()
+    // Walk 2026-11-01: "Look back at today" stood beside tomorrow. The look
+    // back runs on today's page; the day is not moved.
+    expect(search().get('date')).toBeNull()
+    const session = await screen.findByRole('region', { name: 'Planning tomorrow' })
+    expect(within(screen.getByTestId('guide-panel')).getByText('Look back at today')).toBeInTheDocument()
+    // Today's page is no count of tomorrow's.
+    expect(within(session).queryByText(/on tomorrow$/)).toBeNull()
   })
 
-  it('with the real date-writing parent, one tap on Plan tomorrow opens tomorrow’s session; Leave goes back to today', async () => {
+  it('with the real date-writing parent, the page shows the day each step is about; Leave goes back to today', async () => {
     const { user } = renderAt(17, { dated: true })
+    const heading = (d: Date) => ({ level: 1, name: d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })
     await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
     await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())
-    expect(search().get('plan')).toBe('1')
+    // Look back at today: today on the page.
+    expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument()
+    expect(search().get('date')).toBeNull()
+    // Tomorrow's calendar: the page goes to tomorrow, the session with it.
+    await user.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Next step' }))
+    await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0, 1)))).toBeInTheDocument())
     expect(search().get('date')).toBe(localYmd(at(0, 1)))
+    expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
+    expect(screen.getByText('0 of 3–5 on tomorrow')).toBeInTheDocument()
+    // Back to the look back from the rail: today again.
+    await user.click(within(screen.getByRole('group', { name: 'Steps in this session' })).getByRole('button', { name: /Look back at today/ }))
+    await user.click(screen.getByRole('button', { name: 'Go to this step' }))
+    await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
+    expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Leave' }))
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
     // Today keeps its clean URL: no ?date= naming it.
-    expect(search().get('date')).toBeNull()
-    await vi.waitFor(() => expect(screen.getByRole('heading', { level: 1, name: at(0).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })).toBeInTheDocument())
+    await vi.waitFor(() => expect(search().get('date')).toBeNull())
+    await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
+  })
+
+  it('in the morning the look back shows yesterday, and the next step brings the page back to today', async () => {
+    const { user } = renderAt(10, { dated: true })
+    const heading = (d: Date) => ({ level: 1, name: d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })
+    await user.click(screen.getByRole('button', { name: 'Plan today' }))
+    await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0, -1)))).toBeInTheDocument())
+    expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
+    await user.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Next step' }))
+    await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Leave' }))
+    await vi.waitFor(() => expect(search().get('plan')).toBeNull())
+    await vi.waitFor(() => expect(search().get('date')).toBeNull())
+    await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
   })
 
   it('a task dragged onto the day while on Pick marks the day planned', async () => {
@@ -814,10 +844,17 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByText(/Planning today · step 3 of 5/)).toBeInTheDocument()
   })
 
-  it('a bare ?plan=1 in the evening takes the page to tomorrow', async () => {
+  it('a bare ?plan=1 in the evening plans tomorrow, its look back on today’s page', async () => {
     renderAt(18, { url: '/?plan=1', dated: true })
     await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())
-    expect(search().get('date')).toBe(localYmd(at(0, 1)))
+    expect(search().get('date')).toBeNull()
+  })
+
+  it('opened on a later step in the evening, the page goes to tomorrow', async () => {
+    dayNotes.notes = { guide: { current: 'pick', done: ['look-back', 'calendar', 'energy'], skipped: [] } }
+    renderAt(18, { url: '/?plan=1', dated: true })
+    await vi.waitFor(() => expect(search().get('date')).toBe(localYmd(at(0, 1))))
+    await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())
   })
 
   // One button at most, only the one that's due (reviewed design, 2026-10-20).

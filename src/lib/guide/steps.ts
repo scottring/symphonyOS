@@ -70,10 +70,10 @@ const DAY: readonly GuideStep[] = [
     id: 'energy',
     title: 'Energy',
     minutes: 1,
-    why: 'Pick work that fits how you feel today.',
+    why: 'Pick work that fits how you\'ll actually feel.',
     you: 'Say how you\'re doing: high, medium or low.',
     guide: 'Notes it beside the day. Nothing else changes.',
-    more: 'The same task feels different depending on how rested you are. Saying plainly how today feels lets the choices that follow be honest ones. Nothing is decided by it; it is just a note beside the day.',
+    more: 'The same task feels different depending on how rested you are. Saying plainly how the day ahead feels lets the choices that follow be honest ones. Nothing is decided by it; it is just a note beside the day.',
     writes: ['note'],
   },
   {

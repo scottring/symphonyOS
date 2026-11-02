@@ -24,8 +24,9 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
   /** The day being planned. */
   target: Date
   isTomorrow: boolean
-  /** The day's count, as the page shows it (dayCount). */
-  count: number
+  /** The day's count, as the page shows it (dayCount); null while the page
+   *  shows the day looked back on. */
+  count: number | null
   /** The page's writers; the session's own report a pick that saved. */
   actions: DayActions
   /** The day's closing writes; false keeps the session open. */
@@ -99,7 +100,7 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
           // The day files tasks under no life area: none are sent, so the
           // guide neither sets area_id nor asks about an area (guidePromptBlock).
           areas: [],
-          counts: { label: `tasks on ${dayWord}`, n: count, of: DAY_COUNT_OF },
+          counts: count === null ? undefined : { label: `tasks on ${dayWord}`, n: count, of: DAY_COUNT_OF },
         },
       },
       threadKey: `daily:${token}`,

@@ -388,9 +388,11 @@ export function TodayView({
   // ── The Day session (spec 2026-11-01): ?plan=1 runs it on this page,
   // replacing Plan today / Review today. It plans today until 4 pm and
   // tomorrow from 4 pm (dayTarget); which day is fixed when it opens, so 4 pm
-  // passing mid-session does not move it. It runs on the day it plans (the
-  // page is the day picture), so opening it in the evening takes the page to
-  // tomorrow. The week column steps aside: the steps rail stands there.
+  // passing mid-session does not move it. The page shows the day each step
+  // is about: the look back shows the day looked back on (today, in the
+  // evening), every other step the day being planned (walk 2026-11-01: "look
+  // back at today" stood beside tomorrow). The week column steps aside: the
+  // steps rail stands there.
   const [dayParams, setDayParams] = useSearchParams()
   const planOpen = dayParams.get('plan') === '1'
   const [openedAt, setOpenedAt] = useState<number | null>(null)
@@ -402,7 +404,14 @@ export function TodayView({
     const [y, m, d] = targetKey.split('-').map(Number)
     return { target: new Date(y, m - 1, d), lookBackOn: new Date(y, m - 1, d - 1), isTomorrow: live.isTomorrow }
   }, [targetKey, live.isTomorrow])
-  const sessionShown = planOpen && localYmd(viewedDate) === targetKey
+  const lookBackKey = localYmd(day.lookBackOn)
+  // The session's step, as GuidedDay reports it once its place has loaded.
+  const [sessionStep, setSessionStep] = useState<string | null>(null)
+  if (!planOpen && sessionStep !== null) setSessionStep(null)
+  // The day the current step is about (null until the step is known).
+  const stepDayKey = sessionStep === null ? null : sessionStep === 'look-back' ? lookBackKey : targetKey
+  const onSessionDay = (key: string) => key === targetKey || key === lookBackKey
+  const sessionShown = planOpen && onSessionDay(localYmd(viewedDate))
   const showWeek = !alongsideWorkspace && todayView === 'ref' && !sessionShown
   const splitRef = useColumnsFitWindow(showWeek)
   const weekNo = weekOfYear(viewedDate, readCadenceConfig().weekStartsOn)
@@ -654,11 +663,11 @@ export function TodayView({
   const sessionUrl = (prev: URLSearchParams) => {
     const p = new URLSearchParams(prev)
     p.delete('review'); p.set('plan', '1')
-    if (localYmd(viewedDate) !== targetKey || p.has('date')) p.set('date', targetKey)
+    if (!onSessionDay(localYmd(viewedDate))) p.set('date', targetKey)
     return p
   }
   const openDaySession = () => {
-    if (localYmd(viewedDate) !== targetKey) movedFrom.current = localYmd(viewedDate)
+    if (!onSessionDay(localYmd(viewedDate))) movedFrom.current = localYmd(viewedDate)
     setDayParams(sessionUrl)
   }
   // Back to today is a clean URL (no ?date= naming today), and a ?date=
@@ -668,7 +677,7 @@ export function TodayView({
   const closeDaySession = () => {
     const back = movedFrom.current
     movedFrom.current = null
-    const goBack = !!back && localYmd(viewedDate) === targetKey
+    const goBack = !!back && onSessionDay(localYmd(viewedDate))
     const backIsToday = goBack && back === localYmd(new Date())
     if (backIsToday) returnTo.current = new Date(new Date().setHours(0, 0, 0, 0))
     setDayParams((prev) => {
@@ -694,25 +703,45 @@ export function TodayView({
       return p
     }, { replace: true })
   }, [dayParams, setDayParams])
-  // Opened on another day than the one it plans (a link, a reload in the
-  // evening): the page goes to that day, once per opening, by the same one
-  // URL write. Moving off it afterwards is the reader's choice; the session
-  // waits on its day.
+  // The page goes to the day the step is about, once per step day, by the
+  // same one URL write: opened on neither of the session's days (a link),
+  // first to the day it plans; then, once the step is known, to that step's
+  // day — and again whenever the step moves between the look back and the
+  // rest. Moving off it afterwards is the reader's choice; the session waits
+  // on its days.
   const movedFor = useRef<string | null>(null)
+  // The day the page is on its way to, until it gets there: a step reported
+  // while an earlier move is still landing (a resume's jump right after its
+  // first step) is not taken as already there.
+  const movingTo = useRef<string | null>(null)
   const viewedKeyNow = localYmd(viewedDate)
+  const urlDate = dayParams.get('date')
+  // A ?step= is the session's to use and drop first (useOpenOnStep): the
+  // URL is written from itself as last rendered, so two writes at once would
+  // undo one another, and the step reported until then is not the one it opens on.
+  const urlStep = dayParams.has('step')
   useEffect(() => {
     // Closed by any route (Leave, Done, Back, a link): it moved nothing.
-    if (!planOpen) { movedFor.current = null; movedFrom.current = null; return }
-    if (movedFor.current === targetKey) return
-    movedFor.current = targetKey
-    if (viewedKeyNow === targetKey) return
-    if (movedFrom.current === null) movedFrom.current = viewedKeyNow
+    if (!planOpen) { movedFor.current = null; movedFrom.current = null; movingTo.current = null; return }
+    if (urlStep && stepDayKey !== null) return
+    const want = stepDayKey ?? (viewedKeyNow === targetKey || viewedKeyNow === lookBackKey ? null : targetKey)
+    if (want === null) return
+    const key = `${stepDayKey === null ? 'open' : 'step'}:${want}`
+    if (movedFor.current !== key) {
+      movedFor.current = key
+      movingTo.current = want
+      if (viewedKeyNow !== want && movedFrom.current === null) movedFrom.current = viewedKeyNow
+    }
+    const to = movingTo.current
+    if (to === null) return
+    if (viewedKeyNow === to && (urlDate ?? viewedKeyNow) === to) { movingTo.current = null; return }
+    if (urlDate === to) return
     setDayParams((prev) => {
       const p = new URLSearchParams(prev)
-      p.set('date', targetKey)
+      p.set('date', to)
       return p
     }, { replace: true })
-  }, [planOpen, targetKey, viewedKeyNow, setDayParams])
+  }, [planOpen, urlStep, targetKey, lookBackKey, stepDayKey, viewedKeyNow, urlDate, setDayParams])
 
   // The day being planned is recorded planned, as every horizon's planning
   // is, so its button can step aside (reviewed design, 2026-10-20).
@@ -1238,7 +1267,7 @@ export function TodayView({
   const inDaySession = (page: ReactNode) => !sessionShown ? page : (
     <div className="px-4 md:px-0">
       <GuidedDay key={targetKey} target={day.target} lookBackOn={day.lookBackOn} isTomorrow={day.isTomorrow}
-        canvas={page} dayItems={dayPicture} routinesHidden={hideRoutines} lookBack={lookBack} choice={todayChoice} actions={dayActions}
+        canvas={page} dayItems={localYmd(viewedDate) === targetKey ? dayPicture : null} onStep={setSessionStep} routinesHidden={hideRoutines} lookBack={lookBack} choice={todayChoice} actions={dayActions}
         listenPlacements={listenPlacements}
         goalLabel={(t) => (goalOf(t, tasksById) ? `${monthWordToday} goal` : undefined)}
         onFinish={finishDay}

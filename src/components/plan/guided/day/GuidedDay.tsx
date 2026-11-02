@@ -27,7 +27,7 @@ import { DayPicture, type DayPictureItem } from './DayRows'
 import type { DayActions } from '@/lib/planning/dayActions'
 import '@/components/guide/guide.css'
 
-export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, routinesHidden, lookBack, choice, actions, goalLabel, listenPlacements, onFinish, onClose, onPlanned }: {
+export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, onStep, routinesHidden, lookBack, choice, actions, goalLabel, listenPlacements, onFinish, onClose, onPlanned }: {
   /** The day being planned (dayTarget). */
   target: Date
   lookBackOn: Date
@@ -35,8 +35,12 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, ro
   /** The day itself: the page as it is every day. */
   canvas: ReactNode
   /** The day being planned as the page shows it, under its filters: the
-   *  calendar step's picture, Habits' routines and the count. */
-  dayItems: readonly DayPictureItem[]
+   *  calendar step's picture, Habits' routines and the count. Null while the
+   *  page shows the day looked back on (the look back step): no count then. */
+  dayItems: readonly DayPictureItem[] | null
+  /** The current step, once the session's place has loaded: the page shows
+   *  the day that step is about. */
+  onStep?: (stepId: string) => void
   /** The page's "hide routines" is on: Habits says so rather than "none". */
   routinesHidden?: boolean
   /** What the day looked back on held (buildTodayReview). */
@@ -61,7 +65,8 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, ro
   const [winDraft, setWinDraft] = useState<string | null>(null)
   const review = usePeriodReview('daily', dayToken(lookBackOn))
   const notes = usePlanningNotes('daily', dayToken(target))
-  const count = dayCount(dayItems)
+  const items = dayItems ?? []
+  const count = dayItems ? dayCount(dayItems) : null
   const closeDay = async () => {
     const win = winDraft?.trim()
     if (winDraft !== null && win !== (review.mine?.wentWell ?? '')
@@ -72,19 +77,21 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, ro
   }
   const guided = useGuidedDay({ target, isTomorrow, count, actions, onFinish: closeDay, onClose, onPlanned })
   const { markPlannedOnce } = guided
+  const stepNow = guided.loading ? null : guided.progress.current
+  useEffect(() => { if (stepNow) onStep?.(stepNow) }, [stepNow, onStep])
   useEffect(() => listenPlacements?.(() => { void markPlannedOnce() }), [listenPlacements, markPlannedOnce])
 
   const dayWord = isTomorrow ? 'tomorrow' : 'today'
   const dayLabel = target.toLocaleDateString('en-US', { weekday: 'long' })
   const steps = stepsFor('day')
   const index = Math.max(0, steps.findIndex((s) => s.id === guided.progress.current))
-  const routines = dayItems.filter((i) => i.kind === 'routine')
+  const routines = items.filter((i) => i.kind === 'routine')
   const bodies = {
     'look-back': <DayLookBack isTomorrow={isTomorrow} target={target} lookBackOn={lookBackOn} lookBack={lookBack}
       actions={guided.actions} goalLabel={goalLabel} review={review} draft={winDraft} onDraft={setWinDraft} />,
-    calendar: <div className="gw-body"><DayPicture dayLabel={dayLabel} items={dayItems} /></div>,
+    calendar: <div className="gw-body"><DayPicture dayLabel={dayLabel} items={items} /></div>,
     energy: <DayEnergy value={notes.notes.energy} save={(energy) => notes.patch({ energy })} />,
-    pick: <DayPick count={count} isTomorrow={isTomorrow} target={target} choice={choice}
+    pick: <DayPick count={count ?? 0} isTomorrow={isTomorrow} target={target} choice={choice}
       skip={new Set(lookBack.open.map((t) => t.id))} actions={guided.actions} />,
     habits: <div className="gw-body">
       {routinesHidden ? <p className="choose-empty">Routines are hidden on this page.</p>
@@ -100,7 +107,7 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, ro
     <section className="guide-session" aria-label={`Planning ${dayWord}`}>
       <p className="guide-session-line">
         <SessionBar label={`Planning ${dayWord}`} index={index} total={steps.length} onLeave={onClose} />
-        <span className="guide-session-count">{count} of {DAY_COUNT_OF} on {dayWord}</span>
+        {count !== null && <span className="guide-session-count">{count} of {DAY_COUNT_OF} on {dayWord}</span>}
       </p>
       {guided.saveError && <p className="guide-session-error" role="alert">{guided.saveError}</p>}
       <GuidePhoneHeader />
