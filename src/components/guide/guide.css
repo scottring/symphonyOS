@@ -112,8 +112,29 @@
 .gw-row-title, .gw-day-label { font: 400 16px/1.25 var(--font-family-display); color: var(--color-neutral-900); overflow-wrap: anywhere; }
 .gw-day-label { font-size: 15px; font-weight: 500; }
 .gw-row-note { font-size: 12px; color: var(--color-neutral-500); }
-.gw-row-acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
-.gw-row-acts .choose-verb { min-height: 30px; padding: 0 9px; font-size: 12.5px; }
+.gw-row-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 0; margin-top: 2px; }
+/* A row's calls read as one line of words, not a block of buttons (walk
+   2026-11-02): "This week · Smaller · Hand off · Drop · Done". The first,
+   the usual call, in the accent; the rest quiet. Each keeps a 30px target. */
+.guide-session :is(.gw-row-acts, .choose-row-acts) { gap: 0; }
+.guide-session :is(.gw-row-acts, .choose-row-acts) .choose-verb {
+  min-height: 30px; padding: 0 7px; border: 0; border-radius: 6px; background: none;
+  font-size: 13px; font-weight: 500; color: var(--color-neutral-600);
+}
+.guide-session :is(.gw-row-acts, .choose-row-acts) .choose-verb:first-child { padding-left: 0; }
+.guide-session :is(.gw-row-acts, .choose-row-acts) .choose-verb:not(.is-quiet) { color: var(--color-primary-700); font-weight: 600; }
+.guide-session :is(.gw-row-acts, .choose-row-acts) .choose-verb:hover:not(:disabled) { background: none; text-decoration: underline; text-underline-offset: 3px; }
+.guide-session :is(.gw-row-acts, .choose-row-acts) .choose-verb + .choose-verb::before {
+  content: '·'; display: inline-block; margin-right: 7px; color: var(--color-neutral-300); text-decoration: none;
+}
+.guide-session :is(.gw-row-acts, .choose-row-acts) .choose-verb[aria-expanded='true'] { color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 3px; }
+/* A decided row says what happened, in place (receipts.tsx). */
+.gw-row.is-decided { background: transparent; border-style: dashed; }
+.gw-row.is-decided .gw-row-title { color: var(--color-neutral-600); }
+.gw-receipt { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin: 0; font-size: 13px; color: var(--color-success-600); }
+.gw-receipt svg { flex: none; align-self: center; }
+.gw-receipt-change { border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; color: var(--color-neutral-500); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.gw-receipt-change:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; border-radius: 4px; }
 .gw-row .choose-menu { margin-top: 2px; }
 .gw-row .choose-status { margin: 0; }
 .gw-row .plan-composer { margin-top: 2px; }

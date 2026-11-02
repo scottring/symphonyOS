@@ -23,8 +23,8 @@ function WithDraft(p: Omit<Props, 'draft' | 'onDraft'>) {
 }
 const setup = (over: Partial<Omit<Props, 'draft' | 'onDraft'>> = {}) => {
   const props = { review: review(), done: 3, outOf: 5, notDone: 2, looseEnds: [end('Fix the gate'), end('Call the bank')], members: [iris], aged: 0, onSeeAged: vi.fn(), ...over }
-  render(<WithDraft {...props} />)
-  return props
+  const r = render(<WithDraft {...props} />)
+  return { ...props, rerender: (looseEnds: LooseEnd[]) => r.rerender(<WithDraft {...props} looseEnds={looseEnds} />) }
 }
 const row = (title: string) => within(screen.getByRole('listitem', { name: title }))
 
@@ -62,7 +62,7 @@ describe('WeekLookBack — step 1, look back at last week', () => {
     const p = setup()
     fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Smaller: Fix the gate' }))
     fireEvent.change(screen.getByRole('textbox', { name: 'A smaller step under Fix the gate' }), { target: { value: 'Buy a hinge' } })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add' })) })
+    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Add' })) })
     expect(p.looseEnds[0].smaller).toHaveBeenCalledWith('Buy a hinge')
   })
 
@@ -91,7 +91,32 @@ describe('WeekLookBack — step 1, look back at last week', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'This week: Fix the gate' })) })
     for (const v of ['Smaller', 'Hand off', 'Drop', 'Done']) expect(screen.getByRole('button', { name: `${v}: Fix the gate` })).toBeDisabled()
     await act(async () => { finish(true) })
+    // Saved: the row says so in place, and Change brings the calls back.
+    expect(screen.getByText('On this week')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
     expect(screen.getByRole('button', { name: 'Smaller: Fix the gate' })).toBeEnabled()
+  })
+
+  it('a smaller step that saved is said on its row, with what was typed (walk 2026-11-02)', async () => {
+    const smaller = vi.fn(async () => true)
+    setup({ looseEnds: [end('Frame the posters', { smaller })] })
+    fireEvent.click(screen.getByRole('button', { name: 'Smaller: Frame the posters' }))
+    fireEvent.change(row('Frame the posters').getByRole('textbox'), { target: { value: 'Buy frames' } })
+    await act(async () => { fireEvent.click(row('Frame the posters').getByRole('button', { name: 'Add' })) })
+    expect(smaller).toHaveBeenCalledWith('Buy frames')
+    expect(screen.getByText('Smaller step on this week: “Buy frames”')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Drop: Frame the posters' })).toBeNull()
+  })
+
+  it('a row the call took off the list stays in its place as what happened', async () => {
+    const p = setup({ looseEnds: [end('Fix the gate'), end('Call the bank')] })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Drop: Fix the gate' })) })
+    p.rerender([end('Call the bank')])
+    const rows = within(screen.getByRole('list', { name: 'Not done last week' })).getAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('Fix the gate')
+    expect(rows[0]).toHaveTextContent('Dropped')
+    expect(within(rows[0]).queryByRole('button', { name: 'Change' })).toBeNull()
+    expect(rows[1]).toHaveTextContent('Call the bank')
   })
 
   it('with no one to hand to, Hand off is not offered', () => {

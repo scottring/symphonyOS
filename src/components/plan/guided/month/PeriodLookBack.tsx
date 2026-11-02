@@ -4,11 +4,13 @@
 // level's calls: Month carry / back to the season / drop; Season Carry /
 // Table (Someday) / Let go; Year Carry / Someday / Let go. Every call saves
 // through the page's writers (receipt and Undo); nothing writes until a
-// button is pressed.
+// button is pressed. What a call did is said on its row (receipts.tsx).
 
 import { useState } from 'react'
 import type { ReviewNotes, Reviewed } from '@/hooks/usePeriodReview'
 import { LookingBack } from '@/components/plan/choose/LookingBack'
+import { useReceipts, withReceipts } from '../receipts'
+import { ReceiptLine } from '../ReceiptLine'
 
 type Write<T> = (line: T) => Promise<boolean>
 
@@ -35,11 +37,13 @@ export function PeriodLookBack<T extends { id: string; title: string }>({ prevLa
 }) {
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
-  const run = async (key: string, write: () => Promise<boolean>) => {
-    setPending(key); setFailed(null)
+  const { said, record, clear } = useReceipts()
+  const run = async (line: T, write: () => Promise<boolean>, text: string) => {
+    setPending(line.id); setFailed(null)
     const ok = await write().catch(() => false)
     setPending(null)
-    if (!ok) setFailed(key)
+    if (!ok) setFailed(line.id)
+    else record(line.id, { title: line.title, text, at: open.findIndex((x) => x.id === line.id) })
   }
   const savedNotes = review.mine ?? { wentWell: '', didnt: '' }
   const notes = draft ?? savedNotes
@@ -50,28 +54,42 @@ export function PeriodLookBack<T extends { id: string; title: string }>({ prevLa
     return ok
   }
   const reviewedOn = review.reviewed ? `Reviewed ${review.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
+  const tableWord = labels?.table ?? 'Someday'
+  const dropWord = labels?.drop ?? 'Drop'
   const calls = (line: T) => [
-    { label: 'Carry', write: verbs.carry, quiet: false },
-    ...(verbs.up ? [{ label: upLabel ?? 'Back up', write: verbs.up, quiet: true }] : []),
-    ...(verbs.table ? [{ label: labels?.table ?? 'Someday', write: verbs.table, quiet: true }] : []),
-    { label: labels?.drop ?? 'Drop', write: verbs.drop, quiet: true },
-    ...(verbs.done ? [{ label: 'Done', write: verbs.done, quiet: true }] : []),
+    { label: 'Carry', write: verbs.carry, quiet: false, text: 'Carried forward' },
+    ...(verbs.up ? [{ label: upLabel ?? 'Back up', write: verbs.up, quiet: true, text: upLabel ?? 'Moved back up' }] : []),
+    ...(verbs.table ? [{ label: tableWord, write: verbs.table, quiet: true, text: tableWord === 'Someday' ? 'Moved to Someday' : 'Tabled' }] : []),
+    { label: dropWord, write: verbs.drop, quiet: true, text: dropWord === 'Let go' ? 'Let go' : 'Dropped' },
+    ...(verbs.done ? [{ label: 'Done', write: verbs.done, quiet: true, text: 'Marked done' }] : []),
   ].map((c) => <button key={c.label} type="button" className={`choose-verb${c.quiet ? ' is-quiet' : ''}`} disabled={pending !== null}
-    aria-label={`${c.label}: ${line.title}`} onClick={() => { void run(line.id, () => c.write(line)) }}>{c.label}</button>)
+    aria-label={`${c.label}: ${line.title}`} onClick={() => { void run(line, () => c.write(line), c.text) }}>{c.label}</button>)
 
   return <div className="gw-body gw-look">
     {review.loading ? <p className="choose-status" role="status">Loading…</p>
       : <LookingBack compact periodWord={prevLabel} done={done} outOf={outOf} notDone={open.length} alsoDone={alsoDone}
           value={notes} onChange={onDraft} unsaved={unsaved} reviewed={reviewedOn} nextLabel="Save notes" onContinue={save} />}
     <h4 className="gw-h">Open from {prevLabel}</h4>
-    {open.length === 0 ? <p className="choose-empty">Nothing left open from {prevLabel}.</p>
+    {open.length === 0 && Object.keys(said).length === 0 ? <p className="choose-empty">Nothing left open from {prevLabel}.</p>
       : <ul className="gw-rows" aria-label={`Open from ${prevLabel}`}>
-        {open.map((line) => <li key={line.id} className="gw-row" aria-label={line.title}>
-          <span className="gw-row-title">{line.title}</span>
-          <span className="gw-row-acts" role="group" aria-label={`Decide ${line.title}`}>{calls(line)}</span>
-          {pending === line.id && <p className="choose-status" role="status">Saving…</p>}
-          {failed === line.id && <p className="choose-status is-failed" role="alert">Didn’t save. Try again.</p>}
-        </li>)}
+        {withReceipts(open, (l) => l.id, said).map((row) => {
+          if ('gone' in row) return <li key={row.key} className="gw-row is-decided" aria-label={row.gone.title}>
+            <span className="gw-row-title">{row.gone.title}</span>
+            <ReceiptLine text={row.gone.text} />
+          </li>
+          const line = row.item
+          const receipt = said[line.id]
+          if (receipt) return <li key={line.id} className="gw-row is-decided" aria-label={line.title}>
+            <span className="gw-row-title">{line.title}</span>
+            <ReceiptLine text={receipt.text} onChange={() => clear(line.id)} />
+          </li>
+          return <li key={line.id} className="gw-row" aria-label={line.title}>
+            <span className="gw-row-title">{line.title}</span>
+            <span className="gw-row-acts" role="group" aria-label={`Decide ${line.title}`}>{calls(line)}</span>
+            {pending === line.id && <p className="choose-status" role="status">Saving…</p>}
+            {failed === line.id && <p className="choose-status is-failed" role="alert">Didn’t save. Try again.</p>}
+          </li>
+        })}
       </ul>}
   </div>
 }

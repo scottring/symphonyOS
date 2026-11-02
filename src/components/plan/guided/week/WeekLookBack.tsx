@@ -3,13 +3,16 @@
 // moved to Later, then each loose end from last week with four plain calls:
 // This week, Smaller (a step under it), Hand off (to someone in the
 // household), Drop. Every call saves through the page's writers (receipt and
-// Undo); nothing writes until a button is pressed.
+// Undo); nothing writes until a button is pressed. What a call did is said on
+// its row (receipts.tsx).
 
 import { useState } from 'react'
 import type { FamilyMember } from '@/types/family'
 import type { ReviewNotes, Reviewed } from '@/hooks/usePeriodReview'
 import { LookingBack } from '@/components/plan/choose/LookingBack'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
+import { useReceipts, withReceipts } from '../receipts'
+import { ReceiptLine } from '../ReceiptLine'
 
 /** One of last week's not done, with its writers (useChooseWeek binds them). */
 export interface LooseEnd {
@@ -51,13 +54,14 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const [open, setOpen] = useState<{ key: string; what: 'smaller' | 'hand' } | null>(null)
+  const { said, record, clear } = useReceipts()
 
-  const run = async (key: string, write: () => Promise<boolean>) => {
-    setPending(key); setFailed(null)
+  const run = async (e: LooseEnd, write: () => Promise<boolean>, text: string) => {
+    setPending(e.key); setFailed(null)
     const ok = await write().catch(() => false)
     setPending(null)
-    if (!ok) setFailed(key)
-    else setOpen(null)
+    if (!ok) setFailed(e.key)
+    else { setOpen(null); record(e.key, { title: e.title, text, at: looseEnds.findIndex((x) => x.key === e.key) }) }
     return ok
   }
   const toggle = (key: string, what: 'smaller' | 'hand') => setOpen(open?.key === key && open.what === what ? null : { key, what })
@@ -79,30 +83,40 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
       Moved {aged} untouched {aged === 1 ? 'thing' : 'things'} to Later · <button type="button" className="deck-link" onClick={onSeeAged}>See them</button>
     </p>}
     <h4 className="gw-h">Not done last week</h4>
-    {looseEnds.length === 0 ? <p className="choose-empty">Nothing left open from last week.</p>
+    {looseEnds.length === 0 && Object.keys(said).length === 0 ? <p className="choose-empty">Nothing left open from last week.</p>
       : <ul className="gw-rows" aria-label="Not done last week">
-        {looseEnds.map((e) => {
+        {withReceipts(looseEnds, (e) => e.key, said).map((row) => {
+          if ('gone' in row) return <li key={row.key} className="gw-row is-decided" aria-label={row.gone.title}>
+            <span className="gw-row-title">{row.gone.title}</span>
+            <ReceiptLine text={row.gone.text} />
+          </li>
+          const e = row.item
+          const receipt = said[e.key]
+          if (receipt) return <li key={e.key} className="gw-row is-decided" aria-label={e.title}>
+            <span className="gw-row-title">{e.title}</span>
+            <ReceiptLine text={receipt.text} onChange={() => clear(e.key)} />
+          </li>
           const busy = pending !== null
-          const verb = (label: string, write: () => Promise<boolean>, quiet = true) =>
+          const verb = (label: string, write: () => Promise<boolean>, text: string, quiet = true) =>
             <button type="button" className={`choose-verb${quiet ? ' is-quiet' : ''}`} disabled={busy} aria-label={`${label}: ${e.title}`}
-              onClick={() => { void run(e.key, write) }}>{label}</button>
+              onClick={() => { void run(e, write, text) }}>{label}</button>
           return <li key={e.key} className="gw-row" aria-label={e.title}>
             <span className="gw-row-title">{e.title}</span>
             {e.note && <span className="gw-row-note">{e.note}</span>}
             <span className="gw-row-acts" role="group" aria-label={`Decide ${e.title}`}>
-              {verb('This week', e.thisWeek, false)}
+              {verb('This week', e.thisWeek, 'On this week', false)}
               <button type="button" className="choose-verb is-quiet" disabled={busy} aria-expanded={open?.key === e.key && open.what === 'smaller'}
                 aria-label={`Smaller: ${e.title}`} onClick={() => toggle(e.key, 'smaller')}>Smaller</button>
               {e.canHandOff && members.length > 0 && <button type="button" className="choose-verb is-quiet" disabled={busy} aria-expanded={open?.key === e.key && open.what === 'hand'}
                 aria-label={`Hand off: ${e.title}`} onClick={() => toggle(e.key, 'hand')}>Hand off</button>}
-              {verb('Drop', e.drop)}
-              {verb('Done', e.done)}
+              {verb('Drop', e.drop, 'Dropped')}
+              {verb('Done', e.done, 'Marked done')}
             </span>
             {open?.key === e.key && open.what === 'smaller' && <InlineComposer label={`A smaller step under ${e.title}`} saveLabel="Add"
-              onSave={async (title) => { const ok = await e.smaller(title).catch(() => false); if (ok) setOpen(null); return ok }} onCancel={() => setOpen(null)} />}
+              onSave={async (title) => run(e, () => e.smaller(title), `Smaller step on this week: “${title.trim()}”`)} onCancel={() => setOpen(null)} />}
             {open?.key === e.key && open.what === 'hand' && <div className="choose-menu" role="group" aria-label={`Hand off ${e.title} to`}>
               {members.map((m) => <button key={m.id} type="button" className="choose-when" disabled={busy} aria-pressed={e.who.includes(m.id)}
-                onClick={() => { void run(e.key, () => e.handOff(m)) }}>{m.name}</button>)}
+                onClick={() => { void run(e, () => e.handOff(m), `Handed to ${m.name}`) }}>{m.name}</button>)}
             </div>}
             {pending === e.key && <p className="choose-status" role="status">Saving…</p>}
             {failed === e.key && <p className="choose-status is-failed" role="alert">Didn’t save. Try again.</p>}
