@@ -73,6 +73,18 @@ describe('ChoosePlan — one October goal per card', () => {
     for (const v of g.verbs) expect(v.run).not.toHaveBeenCalled()
   })
 
+  it('in the list, a goal decided this sitting is one line — what happened and Undo — with no stamp (walk 2026-11-02)', async () => {
+    const g = goal()
+    renderChoose({ lines: [g], view: 'all' })
+    fireEvent.click(screen.getByRole('button', { name: /Plan a winter vacation/, expanded: false }))
+    fireEvent.click(screen.getByRole('button', { name: 'Leave on October: Plan a winter vacation' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Stays on October'))
+    expect(screen.queryByRole('img', { name: /on october/i })).toBeNull()
+    expect(screen.queryByText(/no steps yet/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo: Plan a winter vacation' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Leave on October: Plan a winter vacation' })).toBeTruthy())
+  })
+
   it('a goal’s steps are on its card: done struck, one on this week stamped, the rest with their own choices', async () => {
     renderChoose()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))

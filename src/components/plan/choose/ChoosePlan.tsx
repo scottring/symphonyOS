@@ -13,6 +13,7 @@
 // which one is saving, whether it failed, and stamps what was decided here.
 
 import { Fragment, useRef, useState, type ReactNode } from 'react'
+import { Check } from 'lucide-react'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { Stamp } from '@/components/plan/v2/Stamp'
 import type { Planned } from '@/lib/planning/chooseFromAbove'
@@ -252,9 +253,24 @@ export function ChoosePlan(p: ChoosePlanProps) {
     </li>
   }
 
-  const goalBody = (line: ChooseLineView) => <>
-    <p className="choose-fact">{whereNow(line.planned, decided[line.key])}{line.steps.length ? '' : ' · no steps yet'}</p>
-    {choices(line.key, line.title, line.planned, line.verbs)}
+  // In the list, a goal decided this sitting is one line: what happened and
+  // Undo — not a fact line, a full-width Undo box and a stamp (walk
+  // 2026-11-02). The one-at-a-time card keeps its stamp.
+  const decidedLine = (line: ChooseLineView) => {
+    const d = decided[line.key]
+    const undo = d === 'stay' ? NOOP : d === 'done' ? role(line.verbs, 'reopen') : role(line.verbs, 'back')
+    return <p className="choose-receipt" role="status">
+      <Check size={13} strokeWidth={2.5} aria-hidden="true" />
+      <span>{whereNow(line.planned, d)}</span>
+      {undo && <button type="button" className="choose-receipt-undo" disabled={pending !== null} aria-label={`Undo: ${line.title}`}
+        onClick={() => { void run(line.key, undo, null) }}>Undo</button>}
+    </p>
+  }
+  const goalBody = (line: ChooseLineView, inList = false) => <>
+    {inList && decided[line.key] ? decidedLine(line) : <>
+      <p className="choose-fact">{whereNow(line.planned, decided[line.key])}{line.steps.length ? '' : ' · no steps yet'}</p>
+      {choices(line.key, line.title, line.planned, line.verbs)}
+    </>}
     {status(line.key)}
     {(line.steps.length > 0 || line.onAddStep) && <div className="choose-steps-box">
       {line.steps.length > 0 && <h4 className="choose-steps-h">Steps</h4>}
@@ -340,7 +356,7 @@ export function ChoosePlan(p: ChoosePlanProps) {
                 <span className="choose-counts">{line.counts}</span>
                 <span className="choose-chev" aria-hidden="true">{open ? '▾' : '▸'}</span>
               </button>
-              {open && <div className="choose-line-body">{goalBody(line)}{stampFor(line.key, line.planned, true)}</div>}
+              {open && <div className="choose-line-body">{goalBody(line, true)}</div>}
             </li></Fragment>
           })}
         </ul>)}
