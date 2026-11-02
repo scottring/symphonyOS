@@ -75,11 +75,12 @@ function Shell() {
 }
 function Where() { return <output data-testid="where">{useLocation().search}</output> }
 const where = () => new URLSearchParams(screen.getByTestId('where').textContent ?? '')
-function WithDeck({ deck, canvas }: { deck: WeekDeck; canvas: (o?: { hideStrip?: boolean }) => ReactNode }) {
+function WithDeck({ deck, canvas }: { deck: WeekDeck; canvas: (o?: { hideStrip?: boolean; period?: 'previous' }) => ReactNode }) {
   const [params] = useSearchParams()
   return <WeekV2 weekStart={weekStart} isCurrent canvas={canvas} deck={{ ...deck, mode: deckModeOf(params) }} />
 }
-const canvas = vi.fn((o?: { hideStrip?: boolean }) => <section aria-label="The days">{o?.hideStrip ? 'days without the strip' : 'days with the strip'}</section>)
+const canvas = vi.fn((o?: { hideStrip?: boolean; period?: 'previous' }) => <section aria-label="The days" data-week={o?.period ?? 'planned'}>{o?.hideStrip ? 'days without the strip' : 'days with the strip'}</section>)
+const daysShown = () => screen.getByRole('region', { name: 'The days' }).getAttribute('data-week')
 const open = (url: string, deck = makeDeck()) => render(
   <MemoryRouter initialEntries={[url]}>
     <GuidedSessionProvider>
@@ -110,7 +111,8 @@ describe('GuidedWeek — the Week page while planning', () => {
     expect(within(session).getByRole('group', { name: 'Steps in this session' })).toBeInTheDocument()
     expect(within(session).getByRole('button', { name: /Read October/ })).toBeInTheDocument()
     expect(within(session).getByText('days without the strip')).toBeInTheDocument()
-    expect(canvas).toHaveBeenLastCalledWith({ hideStrip: true })
+    // Step 1 looks back: the page beside it is the week before.
+    expect(canvas).toHaveBeenLastCalledWith({ hideStrip: true, period: 'previous' })
     // The step's header is the conversation's, not the page's.
     expect(within(session).queryByRole('button', { name: 'Next step' })).toBeNull()
     expect(panel().getByText('Look back at last week')).toBeInTheDocument()
@@ -152,6 +154,26 @@ describe('GuidedWeek — the Week page while planning', () => {
     expect(shell.reg?.stepId).toBe('inbox')
     expect(shell.reg?.threadId).toBe('t1')
     expect(shell.reg?.sessionContext.guide).toMatchObject({ stepId: 'inbox', writes: ['inbox'], aboveLines: [{ id: 'L', title: 'Get the house ready' }] })
+  })
+
+  // Walk 2026-11-01: "Look back at last week" stood beside the week being
+  // planned. The page shows the week each step is about; the session, its
+  // count and its thread stay the planned week's.
+  it('the look back shows the week before; Next and the rail bring the planned week back, the count this week’s throughout', async () => {
+    open('/week?plan=1', makeDeck({ onThisWeek: 3 }))
+    expect(daysShown()).toBe('previous')
+    expect(screen.getByText('3 of about 15 on this week')).toBeInTheDocument()
+    expect(shell.reg).toMatchObject({ token: '2026-9-27', stepId: 'look-back' })
+    expect(shell.reg?.sessionContext.guide?.counts).toEqual({ label: 'tasks on this week', n: 3, of: 'about 15' })
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    expect(daysShown()).toBe('planned')
+    expect(canvas).toHaveBeenLastCalledWith({ hideStrip: true })
+    expect(screen.getByText('3 of about 15 on this week')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Look back at last week/ }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Go to this step' })) })
+    expect(shell.reg?.stepId).toBe('look-back')
+    expect(daysShown()).toBe('previous')
+    expect(shell.reg).toMatchObject({ token: '2026-9-27', threadKey: 'weekly:2026-9-27' })
   })
 
   it('Next step moves the registration on; tapping a step and going there jumps', async () => {

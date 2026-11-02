@@ -316,18 +316,27 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // the previous range's events on screen until the new fetch lands, and a
   // count drawn from them would describe last week (Codex, 2026-09-24).
   const [eventsRange, setEventsRange] = useState<{ start: number; end: number } | null>(null);
+  // While the Week's guided session is open (?plan=1 or ?review=1, the full
+  // deck), its look back shows the week before the one it plans, with that
+  // week's events: the read reaches back a week further (walk 2026-11-01).
+  const weekSessionOpen = fixedView === 'week' && (searchParams.get('plan') === '1' || searchParams.get('review') === '1');
+  const weekEventSpan = useCallback((d: Date) => {
+    const span = rangeEventSpan(d);
+    if (!weekSessionOpen) return span;
+    return { start: new Date(span.start.getFullYear(), span.start.getMonth(), span.start.getDate() - 7), end: span.end };
+  }, [weekSessionOpen]);
   const refetchViewedDayEvents = useCallback(async () => {
     if (!isConnected) return;
     const span = fixedView === 'week'
       // Two weeks, not one: the grid may draw any run of up to seven days
       // starting in the viewed week (a weekend, a custom Thu–Wed).
-      ? rangeEventSpan(viewedDate)
+      ? weekEventSpan(viewedDate)
       // The same window Home asks for, so moving between them shares a read.
       : dayEventSpan(viewedDate);
     setEventsRange(null);
     await fetchEvents(span.start, span.end);
     setEventsRange({ start: span.start.getTime(), end: span.end.getTime() });
-  }, [isConnected, viewedDate, fetchEvents, fixedView]);
+  }, [isConnected, viewedDate, fetchEvents, fixedView, weekEventSpan]);
 
   /**
    * What each source can honestly say about the range in view.
@@ -343,7 +352,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   }), [events, updateEvent, refetchViewedDayEvents]);
 
   const densitySources = useMemo<DensitySources>(() => {
-    const span = fixedView === 'week' ? rangeEventSpan(viewedDate) : null;
+    const span = fixedView === 'week' ? weekEventSpan(viewedDate) : null;
     return densitySourcesFor({
       tasksLoading,
       routinesLoading,
@@ -351,7 +360,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       heldRange: eventsRange,
       neededRange: span ? { start: span.start.getTime(), end: span.end.getTime() } : null,
     });
-  }, [fixedView, viewedDate, eventsRange, tasksLoading, routinesLoading, isConnected, calendarError, calendarLoading, calendarFetching]);
+  }, [fixedView, viewedDate, weekEventSpan, eventsRange, tasksLoading, routinesLoading, isConnected, calendarError, calendarLoading, calendarFetching]);
 
   useEffect(() => {
     void refetchViewedDayEvents();

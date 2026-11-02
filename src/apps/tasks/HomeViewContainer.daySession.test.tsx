@@ -151,3 +151,30 @@ describe('HomeViewContainer — leaving the Day session', () => {
     expect(s.probe.mounts).toBe(1)
   })
 })
+
+// Walk 2026-11-01: the Week session's look back shows the week before the one
+// it plans, with that week's events, so the Week's calendar read reaches back
+// a week while a session is open (and only then).
+describe('HomeViewContainer — the Week session reads last week’s events too', () => {
+  const was = { connected: s.calendar.isConnected, fetch: s.calendar.fetchEvents }
+  afterEach(() => {
+    s.calendar.isConnected = was.connected; s.calendar.fetchEvents = was.fetch
+    window.history.replaceState({}, '', '/')
+  })
+  const fetchedFrom = async (url: string) => {
+    const fetchEvents = vi.fn(async () => undefined)
+    s.calendar.isConnected = true; s.calendar.fetchEvents = fetchEvents
+    window.history.replaceState({}, '', url)
+    const view = render(<HomeViewContainer fixedView="week" />)
+    await act(async () => {})
+    view.unmount()
+    return localYmd((fetchEvents.mock.calls.at(-1) as unknown as [Date, Date])[0])
+  }
+
+  it('with ?plan=1 the read starts a week before the viewed week’s; without, at it', async () => {
+    // Wednesday Oct 21, 2026: the viewed week's read starts Sunday Oct 18.
+    expect(await fetchedFrom('/week?date=2026-10-21')).toBe('2026-10-18')
+    expect(await fetchedFrom('/week?plan=1&date=2026-10-21')).toBe('2026-10-11')
+    expect(await fetchedFrom('/week?review=1&date=2026-10-21')).toBe('2026-10-11')
+  })
+})

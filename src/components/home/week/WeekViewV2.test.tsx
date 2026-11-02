@@ -89,12 +89,14 @@ vi.mock('@/components/plan/guided/GuidedWeek', () => ({
 vi.mock('@/components/plan/choose/GiveThemADay', () => ({
   GiveThemADay: (props: Record<string, unknown>) => { deckMock.place = props; return <div data-testid="deck" data-mode="place" /> },
 }))
-// The session's place in the week: on its last step, so Done planning shows.
+// The session's place in the week: on its last step, so Done planning shows
+// (a test may open it elsewhere).
+const guideAt = vi.hoisted(() => ({ step: 'family' }))
 vi.mock('@/hooks/usePlanningNotes', async () => {
   const { useState, useCallback } = await import('react')
   return {
     usePlanningNotes: () => {
-      const [notes, setNotes] = useState<Record<string, unknown>>({ guide: { current: 'family', done: [], skipped: [] } })
+      const [notes, setNotes] = useState<Record<string, unknown>>({ guide: { current: guideAt.step, done: [], skipped: [] } })
       const patch = useCallback(async (p: Record<string, unknown>) => { setNotes((n) => ({ ...n, ...p })); return true }, [])
       return { notes, loading: false, error: null, patch, reload: () => undefined }
     },
@@ -806,6 +808,7 @@ describe('WeekViewV2 — the deck', () => {
     periodReview.token = ''
     periodReview.reviewed = null
     viewer.me = null
+    guideAt.step = 'family'
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -1104,6 +1107,39 @@ describe('WeekViewV2 — the deck', () => {
     expect(periodReview.finish).not.toHaveBeenCalled()
     expect(screen.getByTestId('deck')).toBeInTheDocument()
     expect(new URLSearchParams(window.location.search).get('review')).toBe('1')
+  })
+
+  // Walk 2026-11-01: "Look back at last week" stood beside the week being
+  // planned. The look back's page is the week before, drawn as the week is:
+  // its days and what was on them, its name above them. The next step is
+  // this week again; the session's count is this week's throughout.
+  it('the session’s look back shows last week’s days and what was on them; the next step shows this week', async () => {
+    guideAt.step = 'look-back'
+    const tasks = [
+      createMockTask({ id: 'porch', title: 'Fix the porch', scheduledFor: new Date(2026, 9, 13), isAllDay: true, updatedAt: recent }),
+      createMockTask({ id: 'garage', title: 'Clean the garage', scheduledFor: new Date(2026, 9, 19), isAllDay: true, updatedAt: recent }),
+    ]
+    const dentist = mockEvent({ id: 'dentist', title: 'Dentist', start: new Date(2026, 9, 14, 9).toISOString(), end: new Date(2026, 9, 14, 10).toISOString() })
+    open('?plan=1', tasks, { events: [dentist] })
+    const guided = () => deckMock.guided as unknown as { canvas: React.ReactNode; count: number }
+    expect(guided().count).toBe(1)
+    const lookBack = render(<>{guided().canvas}</>)
+    const shown = within(lookBack.container)
+    expect(shown.getByRole('heading', { level: 2, name: /^Week \d+ · October 10–16$/ })).toBeInTheDocument()
+    expect(within(shown.getByTestId('journal-day-2026-10-13')).getByText('Fix the porch')).toBeInTheDocument()
+    expect(within(shown.getByTestId('journal-day-2026-10-14')).getByText('Dentist')).toBeInTheDocument()
+    expect(shown.queryByTestId('journal-day-2026-10-19')).toBeNull()
+    expect(shown.queryByText('Clean the garage')).toBeNull()
+    // It adds nothing: an add would land on this week.
+    expect(shown.queryByRole('button', { name: '+ Add to week' })).toBeNull()
+    lookBack.unmount()
+    await act(async () => { fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Next step' })) })
+    const planned = render(<>{guided().canvas}</>)
+    const now = within(planned.container)
+    expect(now.queryByRole('heading', { level: 2, name: /^Week \d+ ·/ })).toBeNull()
+    expect(within(now.getByTestId('journal-day-2026-10-19')).getByText('Clean the garage')).toBeInTheDocument()
+    expect(now.queryByText('Fix the porch')).toBeNull()
+    expect(guided().count).toBe(1)
   })
 
   // Controller ruling: the deck reviews the week that is ending, opened from the

@@ -103,8 +103,9 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   weekStart: Date
   isCurrent: boolean
   /** The week at rest: WeekViewV2's canvas. A guided session asks for it
-   *  without its strip (its steps stand there). */
-  canvas?: ReactNode | ((opts?: { hideStrip?: boolean }) => ReactNode)
+   *  without its strip (its steps stand there), and on its look back for the
+   *  week before (`period: 'previous'`), the one that step looks back on. */
+  canvas?: ReactNode | ((opts?: { hideStrip?: boolean; period?: 'previous' }) => ReactNode)
   /** Today's first item, for the fact line ("Today: …"); null when there is
    *  none, the week is not this one, or it has not loaded. */
   today?: string | null
@@ -257,7 +258,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
         // Drawn only once the tasks are in: no flash of an empty October.
         ? (deck.loading ? null : deckMode === 'full'
           ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} isCurrent={isCurrent} deck={deck} lastReview={lastReview}
-              canvas={typeof canvas === 'function' ? canvas({ hideStrip: true }) : canvas}
+              canvas={(period) => typeof canvas === 'function' ? canvas(period === 'previous' ? { hideStrip: true, period } : { hideStrip: true }) : canvas}
               onFinish={closeWeek} onClose={() => { setMode(null); planNotes.reload() }}
               onPlanned={() => { session.reload(); planNotes.reload() }} />
           : <section className="deck choose-flow" aria-label="Plan this week">
@@ -281,7 +282,9 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   deck: WeekDeck
   /** Last week's review: Look back's notes save through it. */
   lastReview: ReturnType<typeof usePeriodReview>
-  canvas: ReactNode
+  /** The week as the page draws it: the week being planned, or the week
+   *  before it (the one the look back is about). */
+  canvas: (period: 'planned' | 'previous') => ReactNode
   onFinish: (lookDraft: ReviewNotes | null) => Promise<boolean>
   onClose: () => void
   onPlanned: () => void
@@ -318,6 +321,10 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
     ops: <WeeklyOps weekStart={weekStart} routines={deck.routines ?? NO_ROUTINES} draft={weekendDraft} onDraft={setWeekendDraft} />,
     family: <TellFamily weekStart={weekStart} familyItems={familyItems} draft={familyDraft} onDraft={setFamilyDraft} />,
   }
-  return <GuidedWeek canvas={canvas} bodies={bodies} count={guided.count} monthWord={guided.monthWord}
+  // The page shows the week each step is about (walk 2026-11-01: "Look back
+  // at last week" stood beside the week being planned): the look back the
+  // week before, every other step this one. The session, its notes and its
+  // count stay this week's.
+  return <GuidedWeek canvas={canvas(guided.progress.current === 'look-back' ? 'previous' : 'planned')} bodies={bodies} count={guided.count} monthWord={guided.monthWord}
     progress={guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }} onLeave={onClose} />
 }

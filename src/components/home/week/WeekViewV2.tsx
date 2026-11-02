@@ -35,7 +35,7 @@ import { useDayChoices } from '@/hooks/useDayChoices'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal } from './WeekJournal'
-import { buildJournalDays, inDayOrder, type JournalDay, type JournalEntry } from '@/lib/week/journalDays'
+import { buildJournalDays, inDayOrder, type JournalDay, type JournalEntry, type JournalWeekend } from '@/lib/week/journalDays'
 import { reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { routineMoveKind } from '@/lib/week/routineMove'
 import type { DensitySources } from '@/lib/planning/dayDensity'
@@ -57,7 +57,7 @@ import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
 import { WeekV2 } from '@/components/plan/v2/WeekV2'
-import { useWeather } from '@/hooks/useWeather'
+import { useWeather, type DayForecast } from '@/hooks/useWeather'
 import { useWeekViewPrefs } from '@/hooks/useWeekViewPrefs'
 import { planV2Enabled, lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
@@ -72,7 +72,7 @@ import { densityDescription } from '@/lib/planning/dayDensity'
 import { dayFreeWindows, formatFree } from '@/lib/week/dayShape'
 import { parseSpecials } from '@/lib/today/specials'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
-import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
+import { buildShelf, type ShelfGroup, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
 import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
@@ -91,7 +91,9 @@ import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import { useDeckActions } from './useDeckActions'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
-import { plannedMealHref } from '@/lib/mealDayRecipes'
+import { plannedMealHref, type PlannedMeal } from '@/lib/mealDayRecipes'
+import type { FamilyMember } from '@/types/family'
+import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
@@ -360,28 +362,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
     [goalTitles],
   )
 
-  // Calendar events as items, with the day's Specials folded into its School
-  // block subtitle (or kept as their own item on a day without one). Shared by
-  // the grid and the journal so the two modes can never disagree about them.
-  const eventItems = useMemo(() => {
-    const items = extras.rest.map(eventToTimelineItem)
-    const schoolByDay = new Map<string, (typeof items)[number]>()
-    for (const item of items) {
-      if (item.startTime && /^school\b/i.test(item.title)) {
-        const key = localYmd(item.startTime)
-        if (!schoolByDay.has(key)) schoolByDay.set(key, item)
-      }
-    }
-    for (const [key, entries] of extras.specialsByDay) {
-      const school = schoolByDay.get(key)
-      if (school) {
-        school.subtitle = entries.map((e) => e.label).join(' · ')
-      } else {
-        items.push(...entries.map((e) => eventToTimelineItem(e.event)))
-      }
-    }
-    return items
-  }, [extras])
+  // Shared by the grid and the journal so the two modes can never disagree
+  // about them (weekEventItems).
+  const eventItems = useMemo(() => weekEventItems(extras), [extras])
 
   // Routines are always on the week, a day's untimed ones folded behind one
   // line (Scott, 2026-10-03). The toolbar's Routines switch that hid them all
@@ -739,23 +722,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const [people] = useAssigneeFilter()
   const lens = useMemo(() => planPeopleLens(people, meId), [people, meId])
   const weekListed = useMemo(() => weekListTasks(tasks, weekAnchor, lens.scopeId, { isCurrent: weekIsCurrentFor(weekAnchor) }).filter(lens.keep), [tasks, weekAnchor, lens])
-  const canvasWeekTasks = useMemo(() => {
-    const end = weekAnchor.getTime() + 7 * 86_400_000
-    const inWeekend = (t: Task) => !!t.weekendStart && !t.scheduledFor && t.weekendStart.getTime() >= weekAnchor.getTime() && t.weekendStart.getTime() < end
-    return weekListed.filter((t) => !inWeekend(t))
-  }, [weekListed, weekAnchor])
   // The week's count, and the guided session's "{n} of about 15": the tasks
   // the page draws for this week (its list and its days), through exactly
   // their filters.
   const weekShown = useMemo(() => weekShownTasks({ listed: weekListed, drawn: drawnTasks, weekStart: weekAnchor }), [weekListed, drawnTasks, weekAnchor])
-  const canvasMonths = useMemo(() => monthsOfWeek(weekAnchor).map((start) => ({
-    name: start.toLocaleDateString('en-US', { month: 'long' }),
-    rows: selectPeriodTasks(tasks, 'month', start, weekIsCurrentFor(weekAnchor) && start.getTime() === monthStartOf(new Date(weekAnchor.getTime() + 3 * 86_400_000)).getTime(), meId, readSeasons()),
-  })), [tasks, weekAnchor, meId])
-  const shelf = useMemo(() => buildShelf({
-    weekTasks: canvasWeekTasks, tasks, weekStart: weekAnchor,
-    milestones: canvasMonths.flatMap((m) => m.rows.map((t): ShelfMilestone => ({ id: t.id, title: t.title, completed: !!t.completed, month: m.name, context: t.context ?? null, onWeek: !!committedTo(t, 'week', weekAnchor, { isCurrent: weekIsCurrentFor(weekAnchor) }) }))),
-  }), [canvasWeekTasks, tasks, weekAnchor, canvasMonths])
+  const shelf = useMemo(() => weekShelf(tasks, weekAnchor, weekListed, meId), [tasks, weekAnchor, weekListed, meId])
   const routinesToPlace = useMemo(() => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }, { weekStart: weekAnchor, instances: weekInstances })
     .map((r) => ({ id: r.id, title: r.name })), [routines, selectedAssignees, layers, weekAnchor, weekInstances])
   // Every-day routines: written once above the days (default), or in each
@@ -766,51 +737,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // its calendar is not view-only (the event's calendar, from the events read).
   const { isReadOnlyCalendar } = useCalendarPermissions()
   const eventCalendar = useMemo(() => new Map(events.map((ev) => [`event-${ev.google_event_id || ev.id}`, ev.calendar_id ?? ev.calendarId ?? null])), [events])
-  const canvasDays = useMemo(() => {
-    const onShelf = new Set(shelf.flatMap((g) => g.rows.map((r) => r.task.id)))
-    // Repeated tasks too ("Pick up from FFG" each weekday), and repeats on
-    // part of the week ("Mon–Thu"): written once above.
-    const found = weekRhythm(journalDays, undefined, { tasks: true, partial: true })
-    const rhythm = dailyShown ? { everyDay: [], weekdays: [], repeats: [], days: journalDays } : found
-    const toItem = (e: JournalEntry): CanvasDayItem => ({
-      id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId, people: e.people,
-      ...(e.kind === 'event' ? { end: e.end, movable: !!onUpdateEvent && !!e.time && eventCalendar.has(e.id) && !isReadOnlyCalendar(eventCalendar.get(e.id)) } : {}),
-    })
-    // Open calendar time is planning information: today and the days ahead,
-    // counted from the whole day — every-day routines too, though written above.
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-    const whole = new Map(journalDays.map((d) => [d.key, d]))
-    const days: CanvasDay[] = rhythm.days.map((d, i) => {
-      const events = [
-        ...d.notes.map((ev): CanvasDayItem => ({ id: `event-${ev.google_event_id || ev.id}`, kind: 'event', title: ev.title, completed: false })),
-        ...d.entries.filter((e) => e.kind === 'event').map(toItem),
-      ]
-      // "Specials — Ella: Library · Kaleb: Art" is one chip per kid, as on
-      // Today (ROW-LANGUAGE: specials), not an event row.
-      const specials = events.flatMap((ev) => parseSpecials(ev.title) ?? [])
-      return {
-        date: d.date, key: d.key,
-        events: events.filter((ev) => !parseSpecials(ev.title)),
-        specials,
-        // The day's order (Task 13): tasks by the order dragged into them, then
-        // time, then title; the top two are what the day shows.
-        items: [...inDayOrder(d.entries), ...d.foldedRoutines].filter((e) => !(e.task && onShelf.has(e.task.id))).map(toItem),
-        sometime: journalWeekend && journalWeekend.satIndex === i ? journalWeekend.sometime.map(toItem) : undefined,
-        dinners: d.dinners.length
-          ? d.dinners.map(({ event, label }) => ({ id: `event-${event.google_event_id || event.id}`, label }))
-          : plannedDinners.has(d.key)
-            ? [{ id: `meal-${d.key}`, label: plannedDinners.get(d.key)!.title, href: plannedMealHref(plannedDinners.get(d.key)!) }]
-            : [],
-        weather: forecast[d.key] ? <DayWeather weather={forecast[d.key]} narrow={false} /> : undefined,
-        // The hours with nothing scheduled ("Calendar clear 10:30a–4:15p"),
-        // not a promise of spare time: untimed tasks still want some.
-        free: d.date >= todayStart && sources?.events === 'ready'
-          ? formatFree(dayFreeWindows(whole.get(d.key)?.entries ?? d.entries)) : undefined,
-      }
-    })
-    const lines = rhythmLines(rhythm)
-    return { days, lines }
-  }, [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners, sources?.events, onUpdateEvent, eventCalendar, isReadOnlyCalendar])
+  const canMoveEvent = useCallback((id: string) => !!onUpdateEvent && eventCalendar.has(id) && !isReadOnlyCalendar(eventCalendar.get(id)),
+    [onUpdateEvent, eventCalendar, isReadOnlyCalendar])
+  const canvasDays = useMemo(() => toCanvasDays({
+    days: journalDays, weekend: journalWeekend, shelf, dailyShown, forecast, plannedDinners, eventsReady: sources?.events === 'ready', canMoveEvent,
+  }), [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners, sources?.events, canMoveEvent])
   // Beta: drafts stay in chat. The week always shows the stored plan;
   // successful writes reach it through the shared task hooks.
 
@@ -974,21 +905,22 @@ export function WeekViewV2(props: WeekViewV2Props) {
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, keepForward, addTask, deleteTask, meId, layers])
-  const canvasSpans = useMemo(() => {
-    const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }
-    const wd = (i: number) => journalDays[i].date.toLocaleDateString('en-US', { weekday: 'short' })
-    return journalSpans.map((sp) => ({
-      id: `event-${sp.event.google_event_id || sp.event.id}`,
-      when: `${wd(sp.startCol)}${sp.endCol !== sp.startCol ? `–${wd(sp.endCol)}` : ''}`,
-      from: journalDays[sp.startCol].key, to: journalDays[sp.endCol].key,
-      title: sp.event.title.trim(),
-      tail: sp.continuesBefore || sp.continuesAfter ? `${sp.continuesBefore ? `, from ${ymdLabel(sp.first)}` : ''}${sp.continuesAfter ? `, through ${ymdLabel(sp.last)}` : ''}` : undefined,
-    }))
-  }, [journalSpans, journalDays])
+  const canvasSpans = useMemo(() => toCanvasSpans(journalSpans, journalDays), [journalSpans, journalDays])
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
   ])), [dayChoices])
-  const weekCanvas = (opts?: { hideStrip?: boolean }) => (
+  // A guided session's look back asks for the week it looks back on (walk
+  // 2026-11-01: "Look back at last week" stood beside the week being
+  // planned): the week before this one, drawn the same way (PastWeekCanvas).
+  // Nothing is added from there: a typed add or a month line lands on this
+  // week, so neither is offered on it.
+  const lookBackWriters = useMemo<WeekCanvasWriters>(() => ({ ...canvasWriters, addTyped: undefined, pullLine: undefined }), [canvasWriters])
+  const weekCanvas = (opts?: { hideStrip?: boolean; period?: 'previous' }) => opts?.period === 'previous' ? (
+    <PastWeekCanvas anchor={lastWeekStart} hideStrip={opts.hideStrip} tasks={tasks} drawnTasks={drawnTasks} weekendTasks={weekendTasks}
+      events={events} routines={routines} selectedAssignees={selectedAssignees} layers={layers} userId={userId} labelFor={labelFor}
+      lens={lens} meId={meId} dailyShown={dailyShown} forecast={forecast} eventsReady={sources?.events === 'ready'} canMoveEvent={canMoveEvent}
+      writers={lookBackWriters} members={familyMembers} pointing={activity.pointing} />
+  ) : (
     <WeekCanvas weekStart={weekAnchor} hideStrip={opts?.hideStrip} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers} viewerId={meId ?? undefined}
@@ -1271,4 +1203,178 @@ export function WeekViewV2(props: WeekViewV2Props) {
     </div>
     </WeekPlanHost>
   )
+}
+
+/** Calendar events as items, with the day's Specials folded into its School
+ *  block subtitle (or kept as their own item on a day without one). */
+function weekEventItems(extras: ReturnType<typeof partitionWeekExtras>) {
+  const items = extras.rest.map(eventToTimelineItem)
+  const schoolByDay = new Map<string, (typeof items)[number]>()
+  for (const item of items) {
+    if (item.startTime && /^school\b/i.test(item.title)) {
+      const key = localYmd(item.startTime)
+      if (!schoolByDay.has(key)) schoolByDay.set(key, item)
+    }
+  }
+  for (const [key, entries] of extras.specialsByDay) {
+    const school = schoolByDay.get(key)
+    if (school) {
+      school.subtitle = entries.map((e) => e.label).join(' · ')
+    } else {
+      items.push(...entries.map((e) => eventToTimelineItem(e.event)))
+    }
+  }
+  return items
+}
+
+/** The week's own list on the canvas: what is chosen for the week (`listed`,
+ *  through the people lens) less what waits for its weekend, under the
+ *  month(s)' milestones in the reader's scope. */
+function weekShelf(tasks: Task[], anchor: Date, listed: Task[], meId: string | null) {
+  const end = anchor.getTime() + 7 * 86_400_000
+  const inWeekend = (t: Task) => !!t.weekendStart && !t.scheduledFor && t.weekendStart.getTime() >= anchor.getTime() && t.weekendStart.getTime() < end
+  const isCurrent = weekIsCurrentFor(anchor)
+  const months = monthsOfWeek(anchor).map((start) => ({
+    name: start.toLocaleDateString('en-US', { month: 'long' }),
+    rows: selectPeriodTasks(tasks, 'month', start, isCurrent && start.getTime() === monthStartOf(new Date(anchor.getTime() + 3 * 86_400_000)).getTime(), meId, readSeasons()),
+  }))
+  return buildShelf({
+    weekTasks: listed.filter((t) => !inWeekend(t)), tasks, weekStart: anchor,
+    milestones: months.flatMap((m) => m.rows.map((t): ShelfMilestone => ({ id: t.id, title: t.title, completed: !!t.completed, month: m.name, context: t.context ?? null, onWeek: !!committedTo(t, 'week', anchor, { isCurrent }) }))),
+  })
+}
+
+/** The days as the canvas draws them, from the days buildJournalDays assembles. */
+function toCanvasDays({ days: journalDays, weekend: journalWeekend, shelf, dailyShown, forecast, plannedDinners, eventsReady, canMoveEvent }: {
+  days: JournalDay[]
+  weekend: JournalWeekend | null
+  shelf: ShelfGroup[]
+  dailyShown: boolean
+  forecast: Record<string, DayForecast>
+  plannedDinners: Map<string, PlannedMeal>
+  /** The calendar read covers the week: open time may be counted. */
+  eventsReady: boolean
+  /** A timed event that may be dragged to another day, by its id. */
+  canMoveEvent: (id: string) => boolean
+}) {
+  const onShelf = new Set(shelf.flatMap((g) => g.rows.map((r) => r.task.id)))
+  // Repeated tasks too ("Pick up from FFG" each weekday), and repeats on
+  // part of the week ("Mon–Thu"): written once above.
+  const found = weekRhythm(journalDays, undefined, { tasks: true, partial: true })
+  const rhythm = dailyShown ? { everyDay: [], weekdays: [], repeats: [], days: journalDays } : found
+  const toItem = (e: JournalEntry): CanvasDayItem => ({
+    id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId, people: e.people,
+    ...(e.kind === 'event' ? { end: e.end, movable: !!e.time && canMoveEvent(e.id) } : {}),
+  })
+  // Open calendar time is planning information: today and the days ahead,
+  // counted from the whole day — every-day routines too, though written above.
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const whole = new Map(journalDays.map((d) => [d.key, d]))
+  const days: CanvasDay[] = rhythm.days.map((d, i) => {
+    const events = [
+      ...d.notes.map((ev): CanvasDayItem => ({ id: `event-${ev.google_event_id || ev.id}`, kind: 'event', title: ev.title, completed: false })),
+      ...d.entries.filter((e) => e.kind === 'event').map(toItem),
+    ]
+    // "Specials — Ella: Library · Kaleb: Art" is one chip per kid, as on
+    // Today (ROW-LANGUAGE: specials), not an event row.
+    const specials = events.flatMap((ev) => parseSpecials(ev.title) ?? [])
+    return {
+      date: d.date, key: d.key,
+      events: events.filter((ev) => !parseSpecials(ev.title)),
+      specials,
+      // The day's order (Task 13): tasks by the order dragged into them, then
+      // time, then title; the top two are what the day shows.
+      items: [...inDayOrder(d.entries), ...d.foldedRoutines].filter((e) => !(e.task && onShelf.has(e.task.id))).map(toItem),
+      sometime: journalWeekend && journalWeekend.satIndex === i ? journalWeekend.sometime.map(toItem) : undefined,
+      dinners: d.dinners.length
+        ? d.dinners.map(({ event, label }) => ({ id: `event-${event.google_event_id || event.id}`, label }))
+        : plannedDinners.has(d.key)
+          ? [{ id: `meal-${d.key}`, label: plannedDinners.get(d.key)!.title, href: plannedMealHref(plannedDinners.get(d.key)!) }]
+          : [],
+      weather: forecast[d.key] ? <DayWeather weather={forecast[d.key]} narrow={false} /> : undefined,
+      // The hours with nothing scheduled ("Calendar clear 10:30a–4:15p"),
+      // not a promise of spare time: untimed tasks still want some.
+      free: d.date >= todayStart && eventsReady
+        ? formatFree(dayFreeWindows(whole.get(d.key)?.entries ?? d.entries)) : undefined,
+    }
+  })
+  const lines = rhythmLines(rhythm)
+  return { days, lines }
+}
+
+/** A stay across days, written once: one bar across the columns it covers. */
+function toCanvasSpans(journalSpans: ReturnType<typeof layoutContextSpans>, journalDays: JournalDay[]) {
+  const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }
+  const wd = (i: number) => journalDays[i].date.toLocaleDateString('en-US', { weekday: 'short' })
+  return journalSpans.map((sp) => ({
+    id: `event-${sp.event.google_event_id || sp.event.id}`,
+    when: `${wd(sp.startCol)}${sp.endCol !== sp.startCol ? `–${wd(sp.endCol)}` : ''}`,
+    from: journalDays[sp.startCol].key, to: journalDays[sp.endCol].key,
+    title: sp.event.title.trim(),
+    tail: sp.continuesBefore || sp.continuesAfter ? `${sp.continuesBefore ? `, from ${ymdLabel(sp.first)}` : ''}${sp.continuesAfter ? `, through ${ymdLabel(sp.last)}` : ''}` : undefined,
+  }))
+}
+
+/** The week a guided session looks back on (walk 2026-11-01: "Look back at
+ *  last week" stood beside the week being planned). The same canvas, built
+ *  the same way from the page's own lists, for the week before: its days and
+ *  what was on them, its list, and its name above it. Mounted only on the
+ *  look back, so its routine occurrences and dinners are read only then. */
+function PastWeekCanvas({ anchor, tasks, drawnTasks, weekendTasks, events, routines, selectedAssignees, layers, userId, labelFor, lens, meId, dailyShown, forecast, eventsReady, canMoveEvent, writers, members, pointing, hideStrip }: {
+  /** The week looked back on: its first day. */
+  anchor: Date
+  tasks: Task[]
+  drawnTasks: Task[]
+  weekendTasks: Task[]
+  events: CalendarEvent[]
+  routines: Routine[]
+  selectedAssignees?: AssigneeFilter
+  layers: ReadonlySet<Layer>
+  userId: string | null | undefined
+  labelFor: (t: Task) => string | undefined
+  lens: ReturnType<typeof planPeopleLens>
+  meId: string | null
+  dailyShown: boolean
+  forecast: Record<string, DayForecast>
+  eventsReady: boolean
+  canMoveEvent: (id: string) => boolean
+  writers: WeekCanvasWriters
+  members: (Pick<FamilyMember, 'id' | 'name'> & Partial<FamilyMember>)[]
+  pointing?: { dates: Set<string>; taskIds: Set<string> } | null
+  hideStrip?: boolean
+}) {
+  const anchorMs = anchor.getTime()
+  const start = useMemo(() => new Date(anchorMs), [anchorMs])
+  const instances = useWeekInstances(start, 7)
+  const plannedDinners = usePlannedDinners(start, 7)
+  const isCurrent = weekIsCurrentFor(start)
+  const journal = useMemo(() => {
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7)
+    // Its timed events, as the page's own week takes its (weekEvents).
+    const timed = events.filter((ev) => {
+      const startStr = (ev as { start_time?: string }).start_time ?? (ev as { startTime?: string }).startTime
+      if (!startStr) return false
+      const at = new Date(startStr)
+      return at >= start && at < end && !isAllDayEvent(ev)
+    })
+    const extras = partitionWeekExtras(timed)
+    const routineItems = buildWeekRoutineItems({ routines, weekStart: start, dayCount: 7, instances, member: selectedAssignees, prefs: { hideRoutines: false, layers } })
+    return buildJournalDays({
+      weekStart: start, dayCount: 7, tasks: drawnTasks, weekendTasks, userId, eventItems: weekEventItems(extras), events,
+      dinnersByDay: extras.dinnersByDay, routineItems, instances, labelFor,
+    })
+  }, [start, events, routines, instances, selectedAssignees, layers, drawnTasks, weekendTasks, userId, labelFor])
+  const shelf = useMemo(() => weekShelf(tasks, start, weekListTasks(tasks, start, lens.scopeId, { isCurrent }).filter(lens.keep), meId),
+    [tasks, start, lens, isCurrent, meId])
+  const routinesToPlace = useMemo(() => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }, { weekStart: start, instances })
+    .map((r) => ({ id: r.id, title: r.name })), [routines, selectedAssignees, layers, start, instances])
+  const canvasDays = useMemo(() => toCanvasDays({ days: journal.days, weekend: journal.weekend, shelf, dailyShown, forecast, plannedDinners, eventsReady, canMoveEvent }),
+    [journal, shelf, dailyShown, forecast, plannedDinners, eventsReady, canMoveEvent])
+  const spans = useMemo(() => toCanvasSpans(layoutContextSpans(events, journal.days.map((d) => d.date)), journal.days), [events, journal])
+  return <>
+    <h2 className="week-days-heading">Week {weekOfYear(start, readCadenceConfig().weekStartsOn)} · {formatWeekRange(start)}</h2>
+    <WeekCanvas weekStart={start} hideStrip={hideStrip} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
+      rhythm={canvasDays.lines} isCurrent={isCurrent} writers={writers} spans={spans} members={members} viewerId={meId ?? undefined}
+      pointing={pointing} />
+  </>
 }
