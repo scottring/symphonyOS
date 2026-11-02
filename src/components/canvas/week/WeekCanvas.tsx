@@ -185,7 +185,9 @@ export interface WeekCanvasProps {
   /** The month above this week, for the strip's month tab. */
   month?: { word: string; href: string; lines: StripLine[] }
   /** A guided session's steps stand where the strip does (spec 2026-11-01:
-   *  the strip's lists appear inside the steps that use them). */
+   *  the strip's lists appear inside the steps that use them). Planning,
+   *  every day shows its whole slate, nothing behind "+N more" (Scott,
+   *  2026-11-02): how full a day is is what the session is judging. */
   hideStrip?: boolean
 }
 
@@ -455,7 +457,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // A few things a day (foldDay, calm pass 2): the calendar events always
   // show, and beside them two things, timed or not, routines included, in the
   // day's order (the top two are the priority). A row Symphony is proposing or
-  // pointing at stays in sight. The rest wait behind "+N more".
+  // pointing at stays in sight. The rest wait behind "+N more" — except while
+  // a guided session plans the week (hideStrip): then every day is whole.
   const dayLists = (day: CanvasDay) => {
     // A routine on a day shows on that day (2026-10-26: dragging one onto
     // Monday left the grid unchanged); the strip's Routines tab is the
@@ -466,7 +469,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       ...day.events.map(() => ({ event: true, it: null })),
       ...all.map((it) => ({ event: false, pinned: !!it.proposed || pointedTask(it.task?.id), it })),
     ])
-    const shown = openDays.has(day.key) ? all : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
+    const shown = hideStrip || openDays.has(day.key) ? all : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
     return { all, fold, shown }
   }
   const tasksOf = (items: CanvasDayItem[]) => items.flatMap((it) => (it.task && !it.proposed ? [it.task] : []))
@@ -576,7 +579,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           </ul>
         )}
         {items.length > 0 && <ul className="cw-rows wc-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{items.map((it) => dayRow(it, day, orderOf(it)))}</ul>}
-        {fold.hidden > 0 && (
+        {!hideStrip && fold.hidden > 0 && (
           <button type="button" className="canvas-link wc-quiet-link wc-more" aria-expanded={dayOpen} onClick={() => toggleDayOpen(day.key)}>
             {dayOpen ? 'Show less' : `+${fold.hidden} more`}
           </button>

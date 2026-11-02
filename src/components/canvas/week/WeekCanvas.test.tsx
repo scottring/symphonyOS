@@ -629,6 +629,15 @@ describe('WeekCanvas — a few things a day', () => {
     expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
   })
 
+  it('planning the week (a guided session), every day shows its whole slate, with no "+N more" (Scott, 2026-11-02)', () => {
+    const d = days()
+    d[3] = { ...d[3], items: untimed(7) }
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} hideStrip />)
+    const day = screen.getByTestId('journal-day-2026-10-06')
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(7)
+    expect(within(day).queryByRole('button', { name: /more|Show less/ })).toBeNull()
+  })
+
   it('a day with 2 events and 5 tasks shows both events, 2 tasks and "+3 more"', () => {
     const d = days()
     const ev = (i: number) => ({ id: `event-y${i}`, kind: 'event' as const, title: `Appointment ${i + 1}`, time: new Date(2026, 9, 6, 9 + i), completed: false })
