@@ -9,7 +9,7 @@ describe('guide progress', () => {
 
   it('goNext marks current done and moves on', () => {
     const p = goNext(startProgress('week'), 'week')
-    expect(p.current).toBe('read-month')
+    expect(p.current).toBe('calendar')
     expect(p.done).toEqual(['look-back'])
   })
 
@@ -17,7 +17,7 @@ describe('guide progress', () => {
     const p = skipStep(startProgress('week'), 'week')
     expect(p.skipped).toEqual(['look-back'])
     expect(p.done).toEqual([])
-    expect(p.current).toBe('read-month')
+    expect(p.current).toBe('calendar')
   })
 
   it('goNext clears a prior skip and skipStep clears a prior done', () => {

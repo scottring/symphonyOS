@@ -134,7 +134,7 @@ describe('GuidedWeek — the Week page while planning', () => {
     expect(within(header).getByText('Why')).toBeInTheDocument()
     expect(within(header).getByRole('button', { name: 'Skip this step' })).toBeInTheDocument()
     await act(async () => { fireEvent.click(within(header).getByRole('button', { name: 'Next step' })) })
-    expect(shell.reg?.stepId).toBe('read-month')
+    expect(shell.reg?.stepId).toBe('calendar')
     expect(within(session).getByText(/Planning the week · step 2 of 7/)).toBeInTheDocument()
   })
 
@@ -179,8 +179,8 @@ describe('GuidedWeek — the Week page while planning', () => {
   it('Next step moves the registration on; tapping a step and going there jumps', async () => {
     open('/week?plan=1')
     await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
-    expect(shell.reg?.stepId).toBe('read-month')
-    expect(panel().getByText('Read October')).toBeInTheDocument()
+    expect(shell.reg?.stepId).toBe('calendar')
+    expect(panel().getByText('Calendar check')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Choose this week/ }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Go to this step' })) })
     expect(shell.reg?.stepId).toBe('choose')
@@ -204,12 +204,13 @@ describe('GuidedWeek — the Week page while planning', () => {
     await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Drop: Fix the gate' })) })
     expect(gate.drop).toHaveBeenCalled()
     expect(rail().getByText(/Moved 2 untouched things to Later/)).toBeInTheDocument()
-    // 2 · Read October: the month's lines.
-    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
-    expect(rail().getByRole('listitem', { name: 'Get the house ready' })).toBeInTheDocument()
-    // 3 · Calendar check: the clash, flagged on its day.
+    // 2 · Calendar check, before the month (Scott, 2026-11-02): how full
+    // the week already is comes first. The clash, flagged on its day.
     await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
     expect(rail().getByText('Overlap: Dentist and Team call')).toBeInTheDocument()
+    // 3 · Read October: the month's lines.
+    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
+    expect(rail().getByRole('listitem', { name: 'Get the house ready' })).toBeInTheDocument()
     // 4 · Clear the inbox: filed through the deck's writers.
     await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Next step' })) })
     await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'This week: Book the vet' })) })
@@ -413,7 +414,7 @@ describe('GuidedWeek — ?step= opens the session on a step', () => {
     open('/week?plan=1&step=calendar')
     await waitFor(() => expect(where().get('step')).toBeNull())
     expect(where().get('plan')).toBe('1')
-    expect(screen.getByText(/Planning the week · step 3 of 7/)).toBeInTheDocument()
+    expect(screen.getByText(/Planning the week · step 2 of 7/)).toBeInTheDocument()
   })
 
   it('step=look-back (Review this week) moves a session left further on back to the look back', async () => {
@@ -429,7 +430,7 @@ describe('GuidedWeek — ?step= opens the session on a step', () => {
     expect(where().get('plan')).toBe('1')
     expect(where().get('date')).toBe('2026-09-27')
     expect(where().get('start')).toBe('2026-09-27')
-    expect(screen.getByText(/Planning the week · step 3 of 7/)).toBeInTheDocument()
+    expect(screen.getByText(/Planning the week · step 2 of 7/)).toBeInTheDocument()
   })
 
   it('an id that is not a step of this level is ignored', async () => {

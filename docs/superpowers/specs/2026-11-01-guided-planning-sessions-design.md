@@ -231,8 +231,8 @@ what Apply may change. Existing pieces are reused as step bodies where named.
 | # | Step | Reads | Writes |
 |---|---|---|---|
 | 1 | Look back at last week | last week's done/open (today's Looking back) | review notes (went well / didn't); per loose end: move to this week, break smaller, hand off (assign), drop |
-| 2 | Read November | the month's lines with what's planned under each | nothing |
-| 3 | Calendar check | the week's days and fixed events; overlaps and back-to-backs flagged | event changes Scott states |
+| 2 | Calendar check | the week's days and fixed events; overlaps and back-to-backs flagged (before the month: how full the week already is sets how much to take on — Scott, 2026-11-02) | event changes Scott states |
+| 3 | Read November | the month's lines with what's planned under each | nothing |
 | 4 | Clear the inbox | Inbox captures | file each: this week, later, gone |
 | 5 | Choose this week's tasks | month lines + "Not under a line" (today's Choose step) | tasks committed to the week under a line; count toward ~15 |
 | 6 | Weekly ops | meal plan, routines for the week, weekend | meals onto the meal plan, workouts onto days, a weekend note |

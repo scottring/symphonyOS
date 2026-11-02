@@ -111,6 +111,16 @@ const WEEK: readonly GuideStep[] = [
     writes: ['review', 'triage'],
   },
   {
+    id: 'calendar',
+    title: 'Calendar check',
+    minutes: 10,
+    why: 'See how full the week already is before choosing what goes in it.',
+    you: 'Walk each day. Say what\'s wrong or missing.',
+    guide: 'Points out overlaps and back-to-back moves. You decide what changes.',
+    more: 'A busy week has less room than an empty one, and that should set how much you take on. Clashes and tight changeovers are cheap to fix before the week begins and cost a scramble once the day arrives. You decide what changes; the guide only points out what it sees.',
+    writes: ['place'],
+  },
+  {
     id: 'read-month',
     title: 'Read the month',
     minutes: 5,
@@ -119,16 +129,6 @@ const WEEK: readonly GuideStep[] = [
     guide: 'Shows the month\'s lines with what\'s already planned under each.',
     more: 'A month can drift when each week is planned on its own. Seeing which lines have had nothing under them lately shows where the month needs help. It is easy to miss that until the month is nearly gone.',
     writes: ['none'],
-  },
-  {
-    id: 'calendar',
-    title: 'Calendar check',
-    minutes: 10,
-    why: 'Clashes and tight changeovers are easier to fix on Sunday than on Tuesday.',
-    you: 'Walk each day. Say what\'s wrong or missing.',
-    guide: 'Points out overlaps and back-to-back moves. You decide what changes.',
-    more: 'Two things at once, or a move that leaves no room before the next commitment, are cheap to fix before the week begins. Once the day arrives, the same clash costs a scramble. You decide what changes; the guide only points out what it sees.',
-    writes: ['place'],
   },
   {
     id: 'inbox',
