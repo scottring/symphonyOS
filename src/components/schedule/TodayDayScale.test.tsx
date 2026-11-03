@@ -114,4 +114,66 @@ describe('TodayDayScale', () => {
     ], { onResize: vi.fn(), isReadOnlyEvent: () => true })
     expect(screen.queryByTestId('scale-resize')).toBeNull()
   })
+
+  // Scott, 2026-11-03: "we need to be able to enter items directly on to the
+  // calendar grid".
+  describe('typing onto the day', () => {
+    const parserContext = { projects: [], contacts: [], familyMembers: [] }
+    const pin = () => {
+      const track = screen.getByTestId('today-day-scale')
+      track.getBoundingClientRect = () => ({ top: 100, left: 0, right: 400, bottom: 800, width: 400, height: 700, x: 0, y: 100, toJSON: () => ({}) })
+      return track
+    }
+
+    it('a click on an empty stretch opens a box at that quarter hour; Enter makes a task there', () => {
+      const onCreateTask = vi.fn()
+      renderScale([], { create: { parserContext, onCreateTask } })
+      // 7a at the top, 48px an hour: 2:20 PM falls in the 2:15 slot.
+      fireEvent.click(pin(), { clientY: 100 + 7 * 48 + 16 })
+      const input = screen.getByRole('textbox', { name: /New task · 2:15/ })
+      fireEvent.change(input, { target: { value: 'Call the dentist' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(onCreateTask).toHaveBeenCalledOnce()
+      const r = onCreateTask.mock.calls[0][0]
+      expect(r.title).toBe('Call the dentist')
+      expect([r.scheduledFor.getDate(), r.scheduledFor.getHours(), r.scheduledFor.getMinutes()]).toEqual([6, 14, 15])
+      expect(screen.queryByRole('textbox')).toBeNull()
+    })
+
+    it('Event makes an event instead', () => {
+      const onCreateTask = vi.fn(), onCreateEvent = vi.fn()
+      renderScale([], { create: { parserContext, onCreateTask, onCreateEvent } })
+      fireEvent.click(pin(), { clientY: 100 + 2 * 48 })
+      fireEvent.click(screen.getByRole('radio', { name: 'Event' }))
+      const input = screen.getByRole('textbox', { name: /New event · 9:00/ })
+      fireEvent.change(input, { target: { value: 'Parent-teacher conference' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(onCreateEvent).toHaveBeenCalledOnce()
+      expect(onCreateTask).not.toHaveBeenCalled()
+    })
+
+    it('Escape closes the box without adding anything', () => {
+      const onCreateTask = vi.fn()
+      renderScale([], { create: { parserContext, onCreateTask } })
+      fireEvent.click(pin(), { clientY: 200 })
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' })
+      expect(screen.queryByRole('textbox')).toBeNull()
+      expect(onCreateTask).not.toHaveBeenCalled()
+    })
+
+    it('a click on a thing opens it, not a box', () => {
+      const onSelect = vi.fn()
+      renderScale([item({ id: 'task-library', title: 'Library books', startTime: at(10) })], { onSelect, create: { parserContext, onCreateTask: vi.fn() } })
+      pin()
+      fireEvent.click(screen.getByRole('button', { name: 'Library books, 10:00 AM' }))
+      expect(onSelect).toHaveBeenCalledWith('task-library')
+      expect(screen.queryByRole('textbox')).toBeNull()
+    })
+
+    it('without create, the column takes no clicks of its own', () => {
+      renderScale([])
+      fireEvent.click(pin(), { clientY: 200 })
+      expect(screen.queryByRole('textbox')).toBeNull()
+    })
+  })
 })

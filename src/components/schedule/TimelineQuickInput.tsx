@@ -48,9 +48,11 @@ interface Props {
   parserContext: ParserContext
   onSubmit: (r: TimelineCaptureResult) => void
   onCancel: () => void
+  /** The input's own look, where the default display size doesn't fit (the day grid). */
+  inputClassName?: string
 }
 
-export function TimelineQuickInput({ kind, anchorTime, parserContext, onSubmit, onCancel }: Props) {
+export function TimelineQuickInput({ kind, anchorTime, parserContext, onSubmit, onCancel, inputClassName }: Props) {
   const [title, setTitle] = useState('')
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => { ref.current?.focus() }, [])
@@ -116,7 +118,8 @@ export function TimelineQuickInput({ kind, anchorTime, parserContext, onSubmit, 
         }}
         onBlur={onCancel}
         placeholder={placeholder}
-        className="w-full bg-transparent text-lg md:text-2xl font-display text-neutral-800 placeholder:text-neutral-400 outline-none"
+        aria-label={placeholder}
+        className={inputClassName ?? 'w-full bg-transparent text-lg md:text-2xl font-display text-neutral-800 placeholder:text-neutral-400 outline-none'}
       />
       <ParsedFieldChips
         parsed={chipsParsed}

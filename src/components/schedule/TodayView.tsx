@@ -1527,6 +1527,13 @@ export function TodayView({
                 }
               }}
               fromHour={canHideEarlier && hideEarlier ? earlierCutoff : null}
+              // Typing straight onto the day (Scott, 2026-11-03): the same
+              // creates the list's "+" between rows uses.
+              create={ctx.onCreateTaskAt && ctx.parserContext ? {
+                parserContext: ctx.parserContext,
+                onCreateTask: ctx.onCreateTaskAt,
+                onCreateEvent: ctx.onCreateEventAt,
+              } : undefined}
               handleRef={scaleRef}
             />
             {timedItems.length === 0 && (

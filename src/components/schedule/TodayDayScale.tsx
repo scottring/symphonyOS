@@ -11,6 +11,8 @@ import { useTravelTime } from '@/hooks/useTravelTime'
 import { effectiveStartTime, formatTimeLong } from '@/lib/timeUtils'
 import type { ProposedRow, RowMark } from './todayPreview'
 import { TaskCheckbox } from './TaskCheckbox'
+import { TimelineQuickInput, type TimelineCaptureResult } from './TimelineQuickInput'
+import type { ParserContext } from '@/lib/quickInputParser'
 
 /**
  * The day, to scale (Scott, 2026-10-06, option B): Today's timed day as a
@@ -23,6 +25,10 @@ import { TaskCheckbox } from './TaskCheckbox'
  * Everything moves by dragging; a drop lands on the quarter hour under the
  * pointer, and the list beside it ("For today") and the week column drop
  * onto it to give something a time.
+ *
+ * An empty stretch takes a click (Scott, 2026-11-03: "we need to be able to
+ * enter items directly on to the calendar grid"): a box opens at that quarter
+ * hour, Task or Event, typed the way Add task is typed; Enter puts it there.
  */
 
 export interface DayScaleHandle {
@@ -230,6 +236,7 @@ export function TodayDayScale({
   proposed = [],
   showOpenTime = true,
   onResize,
+  create,
 }: {
   /** The day's timed rows (a group's children ride with their parent). */
   items: TimelineItem[]
@@ -259,6 +266,13 @@ export function TodayDayScale({
   showOpenTime?: boolean
   /** A new end for a task or event, from dragging its bottom edge. */
   onResize?: (item: TimelineItem, end: Date) => void
+  /** Typing straight onto an empty stretch. Unset: the column takes no clicks
+   *  of its own. Without onCreateEvent it adds tasks only. */
+  create?: {
+    parserContext: ParserContext
+    onCreateTask: (r: TimelineCaptureResult) => void
+    onCreateEvent?: (r: TimelineCaptureResult) => void
+  }
 }) {
   // When each thing runs. An all-day "Dinner: …" event sits at its meal's
   // hour (effectiveStartTime), for the half hour a bare time gets.
@@ -340,16 +354,52 @@ export function TodayDayScale({
 
   const byId = useMemo(() => new Map(timed.map((t) => [t.item.id, t])), [timed])
 
+  // ── Typing onto the grid ──
+  // A click lands on the quarter hour it falls in (4:00–4:14 is 4:00), not
+  // the nearest one: the slot you clicked is the slot you get.
+  const [draft, setDraft] = useState<{ top: number; when: Date; kind: 'task' | 'event' } | null>(null)
+  const [hover, setHover] = useState<{ top: number; label: string } | null>(null)
+  const slotAt = (clientY: number) => {
+    const rect = trackRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    const when = timeAtOffset(scale, clientY - rect.top - scale.pxPerHour / 8, viewedDate)
+    const h = when.getHours() + when.getMinutes() / 60
+    return { when, top: (h - scale.startHour) * scale.pxPerHour }
+  }
+  // Only the column itself, its hour lines and its free stretches open a box.
+  const onEmpty = (target: EventTarget) =>
+    target instanceof Element && !target.closest('.today-scale-item, .today-scale-draft')
+  const createHandlers = create ? {
+    onClick: (e: React.MouseEvent) => {
+      if (!onEmpty(e.target) || draft) return
+      const at = slotAt(e.clientY)
+      if (at) { setHover(null); setDraft({ ...at, kind: 'task' }) }
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (e.pointerType !== 'mouse' || draft || landing || !onEmpty(e.target)) { if (hover) setHover(null); return }
+      const at = slotAt(e.clientY)
+      if (at && at.top !== hover?.top) setHover({ top: at.top, label: formatTimeLong(at.when) })
+    },
+    onPointerLeave: () => setHover(null),
+  } : {}
+  const submitDraft = (r: TimelineCaptureResult) => {
+    if (!draft || !create) return
+    if (draft.kind === 'event' && create.onCreateEvent) create.onCreateEvent(r)
+    else create.onCreateTask(r)
+    setDraft(null)
+  }
+
   const nowMs = now?.getTime() ?? null
   const nowLabel = now ? `now ${clock(now)}` : null
 
   return (
     <div
       ref={setTrack}
-      className={`today-scale${isOver ? ' is-over' : ''}`}
+      className={`today-scale${isOver ? ' is-over' : ''}${create ? ' is-writable' : ''}`}
       style={{ height: scale.height }}
       data-testid="today-day-scale"
       {...planDrop}
+      {...createHandlers}
     >
       {scale.ticks.map((t) => (
         <div key={t.label} className="today-scale-hour" style={{ top: t.top }} aria-hidden="true"><span>{t.label}</span></div>
@@ -390,6 +440,36 @@ export function TodayDayScale({
       )}
       {landing && (
         <div className="today-scale-landing" style={{ top: landing.top }} aria-hidden="true"><span>{landing.label}</span></div>
+      )}
+      {hover && !landing && (
+        <div className="today-scale-hint" style={{ top: hover.top }} aria-hidden="true"><span>+ {hover.label}</span></div>
+      )}
+      {draft && create && (
+        <div className="today-scale-draft" style={{ top: draft.top }} role="group" aria-label={`Add at ${formatTimeLong(draft.when)}`}>
+          <div className="today-scale-draft-head">
+            <span className="tabular-nums">{formatTimeLong(draft.when)}</span>
+            {create.onCreateEvent && (
+              <span className="today-scale-draft-kinds" role="radiogroup" aria-label="Kind">
+                {(['task', 'event'] as const).map((k) => (
+                  <button key={k} type="button" role="radio" aria-checked={draft.kind === k}
+                    // Keeps the input focused (its blur closes the box).
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setDraft({ ...draft, kind: k })}>
+                    {k === 'task' ? 'Task' : 'Event'}
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
+          <TimelineQuickInput
+            kind={draft.kind}
+            anchorTime={draft.when}
+            parserContext={create.parserContext}
+            onSubmit={submitDraft}
+            onCancel={() => setDraft(null)}
+            inputClassName="today-scale-draft-input"
+          />
+        </div>
       )}
     </div>
   )

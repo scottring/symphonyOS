@@ -2134,6 +2134,19 @@ html.desktop-shell a {
 .today-scale-now > span { position: absolute; right: 0; top: -18px; font-size: 11px; font-weight: 600; color: var(--color-neutral-900); background: var(--color-bg-base); padding-left: 4px; }
 .today-scale-landing { position: absolute; left: var(--scale-gutter); right: 0; border-top: 2px dashed var(--color-primary-500); z-index: 4; pointer-events: none; }
 .today-scale-landing > span { position: absolute; left: 4px; top: -20px; padding: 1px 6px; border-radius: 6px; background: var(--color-primary-600); color: #fff; font-size: 11px; font-weight: 600; }
+/* Typing onto the day (Scott, 2026-11-03): an empty stretch takes a click.
+   The mouse shows which quarter hour it would be; the box sits on that line. */
+.today-scale.is-writable { cursor: copy; }
+.today-scale.is-writable .today-scale-item { cursor: grab; }
+.today-scale-hint { position: absolute; left: var(--scale-gutter); right: 0; border-top: 1px dashed var(--color-primary-400); z-index: 3; pointer-events: none; }
+.today-scale-hint > span { position: absolute; right: 4px; top: -9px; padding: 0 6px; border-radius: 6px; background: var(--color-bg-elevated); color: var(--color-primary-700); font-size: 11px; font-weight: 600; }
+.today-scale-draft { position: absolute; left: var(--scale-gutter); right: 0; z-index: 6; cursor: auto; padding: 6px 8px 4px 11px; border-radius: 8px; background: var(--color-bg-elevated); box-shadow: inset 3px 0 0 var(--color-primary-600), 0 6px 18px rgb(0 0 0 / .12); border: 1px solid var(--color-primary-200); }
+.today-scale-draft-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; color: var(--color-primary-700); }
+.today-scale-draft-kinds { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--color-neutral-100); }
+.today-scale-draft-kinds button { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--color-neutral-600); }
+.today-scale-draft-kinds button[aria-checked="true"] { background: var(--color-bg-elevated); color: var(--color-primary-800); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.today-scale-draft-input { width: 100%; background: transparent; outline: none; font-size: 15px; line-height: 1.4; color: var(--color-neutral-900); }
+.today-scale-draft-input::placeholder { color: var(--color-neutral-400); }
 .today-ref-row[draggable="true"] { cursor: grab; }
 /* The week column's check: a ring whose tick shows on hover — done, not
    "select" — and "+ Today" a bordered button beside it. */
