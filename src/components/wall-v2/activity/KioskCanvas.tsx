@@ -22,7 +22,7 @@
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen, Calculator, Zap } from 'lucide-react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen, Calculator, Zap, GraduationCap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
@@ -63,6 +63,8 @@ import { WallV2PhoneScreen, type PhoneFixture } from '../WallV2PhoneScreen'
 import { MathStage } from './MathStage'
 import type { KidMath } from '@/hooks/useKidMath'
 import { EnergyStage } from './EnergyStage'
+import { DigestStage } from './DigestStage'
+import { dayLabel, toDoLabel, type SchoolDigest } from '@/lib/schoolDigest/schoolDigests'
 import { WebAppStage } from './WebAppStage'
 import { AgendaStage, AgendaViews } from './AgendaStage'
 import { StickySheet, StickyStrip } from './KioskStickies'
@@ -117,6 +119,8 @@ export interface KioskCanvasProps {
   recipeTitle: string | null
   onOpenRecipe: () => void
   onTapRow: (id: string) => void
+  /** Opens a piece of school work (a homework or paper task) by its id. */
+  onOpenWork?: (taskId: string) => void
   /** Ticks a task or routine on the day's lists off. */
   onCompleteRow?: (id: string) => void
   /** All of today · This weekend (the dock's Today), and its checks both ways. */
@@ -146,6 +150,11 @@ export interface KioskCanvasProps {
   energy?: EnergyLive | null
   /** A period's totals for the Energy stage's Today / 7 days / 30 days. */
   loadEnergyPeriod?: (days: number) => Promise<EnergyPeriod>
+  /** The kept 5pm school digests, newest day first (useSchoolDigests);
+   *  absent hides the School digest tile. */
+  schoolDigests?: SchoolDigest[]
+  /** Re-read them (the wall never "comes back" to a tab, so it asks on open). */
+  onRefreshDigests?: () => void
 }
 
 const V2_FONTS = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Instrument+Sans:wght@400;500;600;700&display=swap'
@@ -370,6 +379,14 @@ export function KioskCanvas(p: KioskCanvasProps) {
     energyNow
       ? { id: 'energy', label: 'Energy', sub: `Solar ${formatWatts(energyNow.pv)} · using ${formatWatts(energyNow.house)}`, icon: Zap, onSelect: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'energy' } }) } }
       : null,
+    p.schoolDigests
+      ? {
+          id: 'digest', label: 'School digest',
+          sub: p.schoolDigests[0] ? `${dayLabel(p.schoolDigests[0], localYmd(p.now))} · ${toDoLabel(p.schoolDigests[0].toDoCount)}` : 'The 5pm email, kept',
+          icon: GraduationCap,
+          onSelect: () => { setMoreOpen(false); p.onRefreshDigests?.(); dispatch({ type: 'OPEN', stage: { kind: 'digest' } }) },
+        }
+      : null,
     shellTile('list'),
     { id: 'recipes', label: 'Recipes', sub: 'The family’s recipes', icon: BookOpen, onSelect: () => { setMoreOpen(false); p.tools.onRecipes() } },
     shellTile('notes'),
@@ -402,7 +419,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
         <KioskHomeV1
           {...p.v1} now={p.v1.at ?? p.now} members={p.members} dinner={p.dinner} bedtime={p.bedtime}
           have={state.have} scale={p.dinner ? Math.max(1, Math.round((state.serves ?? p.dinner.baseServes) / p.dinner.baseServes)) : 1}
-          onTick={p.onTick} onTapRow={p.onTapRow} onCompleteRow={p.onCompleteRow}
+          onTick={p.onTick} onTapRow={p.onTapRow} onOpenWork={p.onOpenWork} onCompleteRow={p.onCompleteRow}
           onOpenKid={(m) => dispatch({ type: 'OPEN', stage: { kind: 'person', memberId: m.id } })}
           onToggleHave={(index) => dispatch({ type: 'TOGGLE_HAVE', index })}
           onScale={(n) => { if (p.dinner) dispatch({ type: 'SET_SERVES', serves: p.dinner.baseServes * n }) }}
@@ -481,6 +498,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
       break
     case 'energy':
       content = <EnergyStage live={energy} now={p.now} loadPeriod={p.loadEnergyPeriod} />
+      break
+    case 'digest':
+      content = <DigestStage digests={p.schoolDigests ?? []} todayYmd={localYmd(p.now)} />
       break
     case 'agenda':
       content = p.agenda && p.onSetDone

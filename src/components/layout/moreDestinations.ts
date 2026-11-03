@@ -18,6 +18,8 @@ export const MORE_GROUPS: [string, MoreDestination[]][] = [
   ['Reference', [
     { label: 'Getting started', route: '/getting-started' },
     { label: 'Discussions', route: '/discussions' },
+    // The 5pm email, kept (2026-11-03): it kept getting lost in Gmail.
+    { label: 'School digest', route: '/school-digest' },
     { label: 'Contacts', route: '/contacts' },
     { label: 'Documents', route: '/documents' },
     { label: 'Notes', route: '/notes' },

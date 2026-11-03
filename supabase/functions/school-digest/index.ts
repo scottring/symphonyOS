@@ -1,8 +1,10 @@
 // SCHOOL-DIGEST — takes a day's worth of school/parent-group transcripts from
 // the connectors worker, asks Claude for a short digest, and emails it from
-// the user's own Gmail to the household. The email is the product; the one
-// thing written to Symphony is the kids' WORK (lib/homework.ts, 2026-10-07):
-// homework tasks per child, which the wall draws. No notes, events or to-dos.
+// the user's own Gmail to the household. The email is the product. Two
+// things are written to Symphony: the kids' WORK (lib/homework.ts,
+// 2026-10-07), homework tasks per child, which the wall draws; and a copy of
+// the digest itself (school_digests, 2026-11-03) for More → School digest.
+// No notes, events or to-dos.
 //
 // Auth: shared secret (x-capture-secret), same as capture-to-inbox — the
 // caller is the Fly worker, which already holds it.
@@ -205,6 +207,26 @@ async function postKidsWork(
   return { written: rows.length }
 }
 
+// ── Keeping the digest ─────────────────────────────────────────────────
+
+/**
+ * Keep the digest that was just emailed (migration 20261103120000), so More →
+ * School digest can show it after the email is buried. Never fails the run:
+ * the family already has the email.
+ */
+async function keepDigest(
+  supabase: Db, userId: string, row: { digest_date: string; date_label: string; sections: unknown; to_do_count: number },
+): Promise<{ kept: boolean; skipped?: string }> {
+  const { data: mine, error: hmError } = await supabase.from('household_members').select('household_id')
+    .eq('user_id', userId).eq('status', 'active').in('role', ['owner', 'admin', 'member']).limit(1)
+  if (hmError) throw new Error(`household read failed: ${hmError.message}`)
+  const householdId = mine?.[0]?.household_id
+  if (!householdId) return { kept: false, skipped: 'no household' }
+  const { error } = await supabase.from('school_digests').insert({ household_id: householdId, user_id: userId, ...row })
+  if (error) throw new Error(`digest insert failed: ${error.message}`)
+  return { kept: true }
+}
+
 // ── Handler ────────────────────────────────────────────────────────────
 
 interface Body {
@@ -255,6 +277,14 @@ Deno.serve(async (req: Request) => {
       text: renderDigestText(digest, dateLabel),
       html: renderDigestHtml(digest, dateLabel),
     }))
+    // Keep it for More → School digest — after the email, never at its cost.
+    let kept: { kept: boolean; skipped?: string } | { error: string }
+    try {
+      kept = await keepDigest(supabase, userId, { digest_date: todayIn(timezone).ymd, date_label: dateLabel, sections: digest.sections, to_do_count: toDo })
+    } catch (e) {
+      console.error('school-digest: keeping the digest failed:', e)
+      kept = { error: String(e) }
+    }
     // Trial (2026-10-20): with DIGEST_SHADOW_MODEL set, the same transcripts
     // are digested by that model too and mailed to the sending account only
     // (not DIGEST_TO, which can include the household inbound address),
@@ -289,7 +319,7 @@ Deno.serve(async (req: Request) => {
         kidsWork = { error: String(e) }
       }
     }
-    return json({ ok: true, messageId: id, to, sections: digest.sections.length, toDo, kidsWork })
+    return json({ ok: true, messageId: id, to, sections: digest.sections.length, toDo, kept, kidsWork })
   } catch (e) {
     // Digest refused: nothing was sent or written; the worker retries later.
     if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)

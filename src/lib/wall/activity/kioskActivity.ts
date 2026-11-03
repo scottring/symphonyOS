@@ -35,6 +35,8 @@ export type KioskStage =
   | { kind: 'math' }
   /** The house's power right now (the home-energy bridge on the wall Pi). */
   | { kind: 'energy' }
+  /** The kept 5pm school digests, newest day first (More → School digest). */
+  | { kind: 'digest' }
   /** Everything on today, or the weekend, each task and routine with its check. */
   | { kind: 'agenda'; view: 'today' | 'weekend' }
   /** A web app from a kid's routine (wallApps), full screen. `routineId` is
@@ -177,6 +179,7 @@ export function stageHoldsOpen(s: KioskState, ctx: HoldContext): boolean {
     case 'math':
     case 'energy':
     case 'agenda':
+    case 'digest':
       return false
     // A web app: touches inside it never reach the wall, so idle can't judge
     // it; the stage closes itself after a while instead (WebAppStage).
@@ -351,6 +354,8 @@ export function kioskPlace(s: KioskState, ctx: PlaceContext): string {
       return 'Math of the day'
     case 'energy':
       return 'Energy'
+    case 'digest':
+      return 'School digest'
     case 'agenda':
       return stage.view === 'today' ? 'All of today' : ctx.weekendDates ? `This weekend · ${ctx.weekendDates}` : 'This weekend'
     case 'webapp':

@@ -628,7 +628,17 @@
 .is-v1 .kw-work-i { display: grid; place-items: center; color: var(--kw-muted); }
 .is-v1 .kw-work-i svg { width: calc(32 * var(--p)); height: calc(32 * var(--p)); stroke-width: 1.7; }
 .is-v1 .kw-work-t { display: flex; align-items: baseline; gap: calc(14 * var(--p)); min-width: 0; font-size: calc(30 * var(--p)); font-weight: 600; }
-.is-v1 .kw-work-t > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* Titles wrap, never ellipsize (Scott, 2026-11-03: assignments "are often cut
+   off or truncated so you can't see what the whole assignment is"). The note
+   ("today", "6:45") flows on after the last word instead of taking a column. */
+.is-v1 .kw-work-t { display: block; line-height: 1.15; padding: calc(4 * var(--p)) 0; overflow-wrap: anywhere; }
+.is-v1 .kw-work-t small { margin-left: calc(12 * var(--p)); white-space: nowrap; }
+/* A homework or paper row opens its sheet: the button keeps the text's look. */
+.is-v1 button.kw-work-t, .is-v1 button.kw-work-wt { width: 100%; min-height: calc(56 * var(--p)); border: 0; background: none; color: inherit; font-family: inherit; text-align: left; cursor: pointer; border-radius: calc(10 * var(--p)); }
+.is-v1 button.kw-work-t { font-size: calc(30 * var(--p)); font-weight: 600; }
+.is-v1 .kw-work-row.is-done button.kw-work-t { font-weight: 400; }
+.is-v1 button.kw-work-wt { font-size: inherit; }
+.is-v1 button.kw-work-t:active, .is-v1 button.kw-work-wt:active { background: var(--kw-sym-tint); }
 .is-v1 .kw-work-t small { flex: none; font-size: calc(24 * var(--p)); font-weight: 400; color: var(--kw-muted); }
 .is-v1 .kw-work-t small.is-late { color: var(--kw-now); font-weight: 600; }
 .is-v1 .kw-work-row.is-done .kw-work-t { color: var(--kw-muted); font-weight: 400; }
@@ -641,7 +651,9 @@
 .is-v1 .kw-work-lab { margin-top: calc(18 * var(--p)); }
 .is-v1 .kw-work-week li { display: grid; grid-template-columns: calc(110 * var(--p)) minmax(0, 1fr) auto; align-items: center; column-gap: calc(18 * var(--p)); min-height: calc(56 * var(--p)); font-size: calc(26 * var(--p)); }
 .is-v1 .kw-work-due { color: var(--kw-muted); }
-.is-v1 .kw-work-wt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.is-v1 .kw-work-wt { min-width: 0; overflow-wrap: anywhere; line-height: 1.15; padding: calc(4 * var(--p)) 0; }
 .is-v1 .kw-work-faces { display: flex; gap: calc(6 * var(--p)); }
-.is-v1 .kw-kid-week { margin: calc(4 * var(--p)) 0 0; font-size: calc(24 * var(--p)); color: var(--kw-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.is-v1 .kw-kid-week { margin: calc(4 * var(--p)) 0 0; font-size: calc(24 * var(--p)); line-height: 1.25; color: var(--kw-muted); overflow-wrap: anywhere; }
+.is-v1 .kw-kid-week-open { padding: calc(6 * var(--p)) 0; border: 0; background: none; color: inherit; font-family: inherit; font-size: inherit; text-align: left; text-decoration: underline; text-decoration-color: var(--kw-line); text-underline-offset: calc(5 * var(--p)); cursor: pointer; }
+.is-v1 .kw-kid-week-open:active { background: var(--kw-sym-tint); }
 .is-v1 .kw-kid-week b { margin-right: calc(8 * var(--p)); font-weight: 600; color: var(--kw-ink); }

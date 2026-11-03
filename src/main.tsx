@@ -87,6 +87,8 @@ await import('./styles/kiosk-math.css')
 await import('./styles/kiosk-energy.css')
 // All of today · This weekend on the wall.
 await import('./styles/kiosk-agenda.css')
+// The kept school digest on the wall (More → School digest).
+await import('./styles/kiosk-digest.css')
 // A kid's tablet (/kid).
 await import('./styles/kid-kiosk.css')
 await import('./styles/canvas-routines.css')

@@ -1,0 +1,33 @@
+/* ===== School digest on the wall ==============================================
+   More → School digest (Scott, 2026-11-03). The day's 5pm email, kept: a
+   block a source in two columns that scroll inside the stage. Every line
+   wraps — nothing here ellipsizes, the whole sentence is the point. */
+.kiosk-canvas .kd-stage { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: calc(16 * var(--p)); }
+.kiosk-canvas .kd-head { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: calc(12 * var(--p)) calc(24 * var(--p)); }
+.kiosk-canvas .kd-days { display: flex; gap: calc(8 * var(--p)); overflow-x: auto; max-width: 100%; }
+.kiosk-canvas .kd-days button {
+  flex: none; height: calc(64 * var(--p)); padding: 0 calc(26 * var(--p)); border-radius: 999px;
+  border: calc(2 * var(--p)) solid var(--kw-line); background: var(--kw-surface); color: var(--kw-ink);
+  font: 600 calc(24 * var(--p)) var(--kw-sans); white-space: nowrap;
+}
+.kiosk-canvas .kd-days button[aria-pressed="true"] { border-color: var(--kw-sym); background: var(--kw-sym-tint); }
+.kiosk-canvas .kd-days button:active { transform: scale(.97); }
+.kiosk-canvas .kd-body {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  columns: 2; column-gap: calc(48 * var(--p)); column-rule: 1px solid var(--kw-line);
+  padding-bottom: calc(24 * var(--p));
+}
+.kiosk-canvas .kd-source { break-inside: avoid; margin: 0 0 calc(32 * var(--p)); color: var(--kw-ink); }
+.kiosk-canvas .kd-source h3 { margin: 0 0 calc(10 * var(--p)); padding-bottom: calc(8 * var(--p)); border-bottom: 1px solid var(--kw-line); font: 600 calc(34 * var(--p))/1.15 var(--kw-serif); color: var(--kw-sym); }
+.kiosk-canvas .kd-todo, .kiosk-canvas .kd-know { list-style: none; margin: 0; padding: 0; }
+.kiosk-canvas .kd-todo li { padding: calc(10 * var(--p)) 0; }
+.kiosk-canvas .kd-t { margin: 0; font-size: calc(29 * var(--p)); line-height: 1.25; }
+.kiosk-canvas .kd-t b { font-weight: 600; }
+.kiosk-canvas .kd-when { color: var(--kw-sym); font-weight: 600; }
+.kiosk-canvas .kd-d { margin: calc(4 * var(--p)) 0 0; font-size: calc(24 * var(--p)); line-height: 1.3; color: var(--kw-muted); }
+.kiosk-canvas .kd-none { margin: calc(6 * var(--p)) 0; font-size: calc(24 * var(--p)); color: var(--kw-muted); }
+.kiosk-canvas .kd-lab { margin: calc(16 * var(--p)) 0 calc(6 * var(--p)); }
+.kiosk-canvas .kd-know li { position: relative; padding: calc(5 * var(--p)) 0 calc(5 * var(--p)) calc(26 * var(--p)); font-size: calc(25 * var(--p)); line-height: 1.3; }
+.kiosk-canvas .kd-know li::before { content: ""; position: absolute; left: calc(6 * var(--p)); top: calc(19 * var(--p)); width: calc(8 * var(--p)); height: calc(8 * var(--p)); border-radius: 999px; background: var(--kw-line-strong); }
+.kiosk-canvas .kd-chatter { margin: calc(12 * var(--p)) 0 0; font-size: calc(23 * var(--p)); font-style: italic; line-height: 1.3; color: var(--kw-muted); }
+.kiosk-canvas .kd-empty { margin: 0; font-size: calc(30 * var(--p)); }

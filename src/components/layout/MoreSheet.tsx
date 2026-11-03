@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 // desktop More menu (moreDestinations.ts), plus Settings, which desktop keeps
 // in its account menu.
 import {
-  Archive, BookOpen, Compass, FileText, History, Home, Inbox, ListChecks, MessageCircle, Printer,
+  Archive, BookOpen, Compass, GraduationCap, FileText, History, Home, Inbox, ListChecks, MessageCircle, Printer,
   Repeat, Settings, Sparkles, StickyNote, UtensilsCrossed, Users,
 } from 'lucide-react'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
@@ -28,6 +28,7 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   Lists: ListChecks,
   House: Home,
   Discussions: MessageCircle,
+  'School digest': GraduationCap,
   Contacts: Users,
   Documents: FileText,
   Notes: StickyNote,

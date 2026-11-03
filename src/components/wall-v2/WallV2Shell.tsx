@@ -14,7 +14,7 @@ import { createReviewedWriter, applyReviewedChange } from '@/lib/canvas/reviewed
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun, Moon, Plus, ClipboardList, Settings, StickyNote, Users } from 'lucide-react';
+import { Sun, Moon, Plus, ClipboardList, Settings, StickyNote, Users, BookOpen } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
 import { WallV2GuestScreen } from './WallV2GuestScreen';
@@ -84,6 +84,7 @@ import { useScratchpad } from '@/hooks/useScratchpad';
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useKidMath } from '@/hooks/useKidMath';
 import { fetchEnergyPeriod, useHomeEnergy } from '@/hooks/useHomeEnergy';
+import { useSchoolDigests } from '@/hooks/useSchoolDigests';
 import { openScratchpadRows, recentlySorted, type ScratchpadRow } from '@/lib/wall/scratchpad';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -720,6 +721,8 @@ export function WallV2Shell() {
   const kidMath = useKidMath(user?.id ?? null, kids, localYmd(now), mathFailed);
   // The house's power, from the home-energy bridge on the wall Pi (null elsewhere).
   const homeEnergy = useHomeEnergy();
+  // The kept 5pm school digests, for More → School digest.
+  const schoolDigests = useSchoolDigests();
   const todayItems = useMemo(() => todayData?.items ?? emptySections<TimelineItem>(), [todayData]);
   const tomorrowData = useMemo(() => wallData.days.find((d) => !d.isToday && d.date > now) ?? wallData.days[1], [wallData.days, now]);
   const specials = useMemo(() => specialsWeek(wallData.days, kids, now), [wallData.days, kids, now]);
@@ -1058,6 +1061,24 @@ export function WallV2Shell() {
     if (row) showFlash(row.title);
   }, [timeline, todayRows, showFlash]);
 
+  // School work on the home screen opens like any wall row (Scott,
+  // 2026-11-03): the whole title, the digest's notes (what to do, where it
+  // came from, the teacher's words) and Done. Homework due later isn't on
+  // today's timeline, so it is built from the task itself.
+  const handleOpenWork = useCallback((taskId: string) => {
+    const tapped = timeline.flatMap((s) => s.events).find((e) => e.id === taskId || e.id === `task-${taskId}`);
+    if (tapped) { setActionSheetItem(tapped); return; }
+    const t = [...wallData.homeworkTasks, ...wallData.paperTasks, ...wallData.tasks].find((x) => x.id === taskId);
+    if (!t) return;
+    const due = t.neededOn ?? t.scheduledFor;
+    setActionSheetItem({
+      // Prefixed as the timeline's ids are: Done and Push strip it.
+      id: `task-${t.id}`, icon: BookOpen, tint: 'sky', title: t.title, kind: 'task', completed: t.completed,
+      subtitle: due ? `Due ${due.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}` : undefined,
+      notes: t.notes || undefined,
+    });
+  }, [timeline, wallData.homeworkTasks, wallData.paperTasks, wallData.tasks]);
+
   // A check on the day's lists (Scott, 2026-10-17): the same writer the
   // action sheet's Done uses, and the flash says it took.
   const handleCompleteRow = useCallback((id: string) => {
@@ -1251,6 +1272,7 @@ export function WallV2Shell() {
           recipeTitle={recipeTitle}
           onOpenRecipe={() => { setMealDayKey(null); setRecipeViewerMeal('dinner'); }}
           onTapRow={handleTapRow}
+          onOpenWork={handleOpenWork}
           onCompleteRow={handleCompleteRow}
           agenda={agenda}
           onSetDone={handleSetDone}
@@ -1265,6 +1287,8 @@ export function WallV2Shell() {
           math={kidMath}
           energy={homeEnergy}
           loadEnergyPeriod={fetchEnergyPeriod}
+          schoolDigests={schoolDigests.loading ? undefined : schoolDigests.digests}
+          onRefreshDigests={() => { void schoolDigests.refresh(); }}
         />
       </div>
 

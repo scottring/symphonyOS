@@ -35,6 +35,24 @@ import type { MathRow } from '@/lib/wall/math/mathProgress'
 import { useLocalKidMath } from './useLocalKidMath'
 import type { EnergyLive, EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
 import type { AgendaDay, AgendaRow } from '@/lib/wall/wallAgenda'
+import type { SchoolDigest } from '@/lib/schoolDigest/schoolDigests'
+
+// The kept school digests: today's (two sources) and yesterday's.
+const DIGESTS: SchoolDigest[] = [
+  { id: 'd2', date: '2026-10-13', label: 'Tue, Oct 13', toDoCount: 4, createdAt: new Date(2026, 9, 13, 17, 2), sections: [
+    { source: '3-01 Mr. Gorby / Ms. Rozanc', toDo: [
+      { title: 'Study for Unit 4 math test (multiplying by 0, 1, 2, 5, 10)', when: 'Thu Oct 15', details: 'The attached Unit 4 Review can help; the test covers patterns for multiplying by 0, 1, 2, 5 and 10.' },
+      { title: 'Fluency homework — Giant Squid', when: 'next Thursday', details: 'Goes with the class reading “Giant Squid: Search for a Sea Monster”.' },
+    ], goodToKnow: ['Early dismissal at 12:30 on Wednesday for conferences.', 'Practice Book pages are optional and not turned in.'], chatter: 'Photos from the pumpkin patch trip and thanks to the parent volunteers.' },
+    { source: 'Hampden Elementary (school-wide)', toDo: [
+      { title: 'Return picture day order form', when: 'by Friday', details: 'Fill it in and return it to the Main Office; contact the office if you did not get one.' },
+      { title: 'Sign up as a recess volunteer', details: 'PTO is asking for consistent 30-minute shifts: tinyurl.com/hemsrecess' },
+    ], goodToKnow: ['Report any absence or late arrival to the front office by 9am.'], chatter: 'Nothing else.' },
+  ] },
+  { id: 'd1', date: '2026-10-12', label: 'Mon, Oct 12', toDoCount: 1, createdAt: new Date(2026, 9, 12, 17, 2), sections: [
+    { source: 'HEMs Third Graders', toDo: [{ title: 'Send in a labeled water bottle' }], goodToKnow: [], chatter: 'Greetings and a few photos.' },
+  ] },
+]
 
 /** Math of the day with fixed problems: Liam's long division (with a story,
  *  six days in a row behind it), Mia's fractions in plain words. */
@@ -80,6 +98,7 @@ const SCENE_CLOCK: Record<KioskScene, { moment: WallMoment; h: number; min: numb
   energy: { moment: 'dinner', h: 18, min: 20 },
   agenda: { moment: 'after', h: 14, min: 5 },
   'agenda-weekend': { moment: 'after', h: 14, min: 5 },
+  digest: { moment: 'dinner', h: 17, min: 30 },
 }
 
 // Wall v2 moments (mockups 2026-10-14): each at the time its mockup shows.
@@ -161,6 +180,7 @@ function sceneState(scene: KioskScene, dateKey: string, nowMs: number): KioskSta
     energy: [{ type: 'OPEN', stage: { kind: 'energy' } }],
     agenda: [{ type: 'OPEN', stage: { kind: 'agenda', view: 'today' } }],
     'agenda-weekend': [{ type: 'OPEN', stage: { kind: 'agenda', view: 'weekend' } }],
+    digest: [{ type: 'OPEN', stage: { kind: 'digest' } }],
   }
   let s = events[scene].reduce(kioskReducer, initialKioskState(dateKey))
   // "Cumin — probably in the pantry": the board shows one line left off.
@@ -318,11 +338,11 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
       // the test both study for this week.
       work: {
         today: [
-          { row: { entityType: 'task' as const, id: 'retest', title: 'Unit 3 math retest review sheet', done: false, timeOfDay: null, target: null }, note: 'today' },
+          { row: { entityType: 'task' as const, id: 'retest', title: 'Unit 3 math retest — do the Post-Test Review sheet (below 80% only)', done: false, timeOfDay: null, target: null }, note: 'today' },
           { row: { entityType: 'routine' as const, id: `read-${i}`, title: 'Reading, 20 minutes', done: i === 0, timeOfDay: null, target: null }, note: null },
           { row: { entityType: 'routine' as const, id: `gal-${i}`, title: 'Puzzle Trail: 1 round', done: false, timeOfDay: '18:45', target: null }, note: '6:45' },
         ],
-        week: [{ id: 'u4', title: 'Study for Unit 4 math test', due: 'Thu' }],
+        week: [{ id: 'u4', title: 'Study for Unit 4 math test (multiplying by 0, 1, 2, 5, 10)', due: 'Thu' }],
       },
       papers: i ? [{ id: 'pp-k', title: 'Pink health form', due: 'Thu', late: false, heldByName: null, done: false }]
         : [{ id: 'pp-e', title: 'Field trip slip + $12', due: 'Today', late: false, heldByName: 'Iris', done: false }],
@@ -365,12 +385,13 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
           selectedId: scene === 'call' ? 'g' : undefined,
         }}
         personPage={null} recipePage={null} recipeTitle={null}
-        onOpenRecipe={noop} onTapRow={noop} onTick={noop} onClaim={noop} onTapQuestion={noop} flash={noop}
+        onOpenRecipe={noop} onTapRow={noop} onOpenWork={noop} onTick={noop} onClaim={noop} onTapQuestion={noop} flash={noop}
         v1={v1}
         math={math}
         energy={energyFixture(now)}
         loadEnergyPeriod={energyPeriodFixture}
         agenda={{ ...AGENDA, sometime: AGENDA_SOMETIME }}
+        schoolDigests={DIGESTS}
         onSetDone={noop}
         onAddSticky={async () => true}
         listenerPreview={v1Screen ? dock ?? (v1Screen === 'night' ? 'quiet' : 'idle') : undefined}

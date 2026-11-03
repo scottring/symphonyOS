@@ -20,6 +20,7 @@ import { guideAppDef } from '@/apps/guide';
 import { familyAppDef } from '@/apps/family';
 import { overviewAppDef } from '@/apps/overview';
 import { choicesAppDef } from '@/apps/choices';
+import { schoolDigestAppDef } from '@/apps/school-digest';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -92,4 +93,5 @@ export const appRegistry: AppRegistry = createRegistry([
   familyAppDef,
   overviewAppDef,
   choicesAppDef,
+  schoolDigestAppDef,
 ]);

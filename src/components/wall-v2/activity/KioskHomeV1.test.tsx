@@ -362,6 +362,27 @@ describe('school work on the board', () => {
     expect(within(ellas).getByText('Study for Unit 4 math test · Nov 5')).toBeInTheDocument()
   })
 
+  // Scott, 2026-11-03: "it should be clickable on the home screen so you can
+  // see the details and check them off if relevant".
+  it('a piece of homework opens by its task id; a routine step does not', () => {
+    const onOpenWork = vi.fn()
+    render(<KioskHomeV1 {...withWork({ onOpenWork })} />)
+    const box = screen.getByRole('region', { name: 'School work' })
+    fireEvent.click(within(box).getByRole('button', { name: /^Unit 3 math retest review sheet/ }))
+    expect(onOpenWork).toHaveBeenCalledWith('retest')
+    fireEvent.click(within(box).getByRole('button', { name: 'Study for Unit 4 math test' }))
+    expect(onOpenWork).toHaveBeenCalledWith('u4')
+    expect(within(box).queryByRole('button', { name: /^Puzzle Trail/ })).toBeNull()
+  })
+
+  it('home from school: the week’s homework opens too', () => {
+    const onOpenWork = vi.fn()
+    render(<KioskHomeV1 {...withWork({ pick: { screen: 'home', title: 'Home', dark: false }, onOpenWork })} />)
+    const ellas = screen.getByRole('region', { name: 'Ella after school' })
+    fireEvent.click(within(ellas).getByRole('button', { name: 'Study for Unit 4 math test · Nov 5' }))
+    expect(onOpenWork).toHaveBeenCalledWith('u4')
+  })
+
   it('shows nothing when no kid has school work', () => {
     render(<KioskHomeV1 {...props({ pick: { screen: 'rest', title: 'Today', dark: false } })} />)
     expect(screen.queryByRole('region', { name: 'School work' })).toBeNull()

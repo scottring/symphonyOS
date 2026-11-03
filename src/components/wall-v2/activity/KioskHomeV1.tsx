@@ -109,6 +109,10 @@ export interface KioskHomeV1Props {
   onStartCooking: () => void
   onAnotherQuestion?: () => void
   onTapRow: (id: string) => void
+  /** Opens a piece of school work by its task id: the whole title, the
+   *  digest's notes, and Done (Scott, 2026-11-03: "it should be clickable on
+   *  the home screen so you can see the details and check them off"). */
+  onOpenWork?: (taskId: string) => void
   /** Ticks a task or routine on the day's lists off (Scott, 2026-10-17). */
   onCompleteRow?: (id: string) => void
   /** The scratchpad: the night's talk-abouts open it. */
@@ -404,7 +408,14 @@ function SchoolWork({ p, max, weekMax }: { p: KioskHomeV1Props; max: number; wee
             {shown.map((r) => (
               <li key={r.key} className={`kw-work-row ${allDone(r) ? 'is-done' : ''}`}>
                 <span className="kw-work-i" aria-hidden="true">{createElement(stepIcon(r.title))}</span>
-                <span className="kw-work-t"><span>{r.title}</span>{r.note && <small className={r.note === 'late' ? 'is-late' : ''}>{r.note}</small>}</span>
+                {(() => {
+                  const body = <><span>{r.title}</span>{r.note && <small className={r.note === 'late' ? 'is-late' : ''}>{r.note}</small>}</>
+                  // A task (homework, a paper) opens; a routine step has nothing more to show.
+                  const task = r.cells.find((c) => c?.entityType === 'task')
+                  return task && p.onOpenWork
+                    ? <button type="button" className="kw-work-t is-open" onClick={() => p.onOpenWork!(task.id)}>{body}</button>
+                    : <span className="kw-work-t">{body}</span>
+                })()}
                 <span className="kw-work-who">
                   {r.cells.map((c, i) => {
                     const k = kids[i]
@@ -429,7 +440,9 @@ function SchoolWork({ p, max, weekMax }: { p: KioskHomeV1Props; max: number; wee
             {ahead.map((w) => (
               <li key={w.id}>
                 <span className="kw-work-due">{w.due}</span>
-                <span className="kw-work-wt">{w.title}</span>
+                {p.onOpenWork
+                  ? <button type="button" className="kw-work-wt is-open" onClick={() => p.onOpenWork!(w.id)}>{w.title}</button>
+                  : <span className="kw-work-wt">{w.title}</span>}
                 <span className="kw-work-faces">{w.who.map((m) => <Face key={m.id} member={m} size="xs" />)}</span>
                 <span className="sr-only">{w.who.map((m) => m.name).join(' & ')}</span>
               </li>
@@ -450,11 +463,15 @@ export const hasSchoolWork = (kids: V1Kid[]) => kids.some((k) => !!k.work && (k.
 const workIds = (p: KioskHomeV1Props) => new Set(p.kids.flatMap((k) => (k.work?.today ?? []).map(({ row }) => `${row.entityType}-${row.id}`)))
 
 /** A kid's homework due later this week, one line under their after-school list. */
-function KidWeek({ kid }: { kid: V1Kid }) {
+function KidWeek({ kid, onOpen }: { kid: V1Kid; onOpen?: (taskId: string) => void }) {
   const week = kid.work?.week ?? []
   if (!week.length) return null
   return (
-    <p className="kw-kid-week"><b>This week</b> {week.slice(0, 2).map((w) => `${w.title} · ${w.due}`).join(' · ')}</p>
+    <p className="kw-kid-week"><b>This week</b> {week.slice(0, 2).map((w, i) => (
+      <span key={w.id}>{i > 0 && ' · '}{onOpen
+        ? <button type="button" className="kw-kid-week-open" onClick={() => onOpen(w.id)}>{`${w.title} · ${w.due}`}</button>
+        : `${w.title} · ${w.due}`}</span>
+    ))}</p>
   )
 }
 
@@ -748,7 +765,7 @@ function HomeFromSchool(p: KioskHomeV1Props) {
               <KidChecklist kid={k.member} steps={rows} max={p.math ? 4 : 5} onTick={(r) => p.onTick(k.member, r)} />
               <PaperChips kid={k.member} papers={k.papers} onOpen={() => p.onOpenKid(k.member)} />
               <MathButton p={p} member={k.member} />
-              <KidWeek kid={k} />
+              <KidWeek kid={k} onOpen={p.onOpenWork} />
             </section>
           )
         })}
