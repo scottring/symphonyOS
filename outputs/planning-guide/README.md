@@ -41,20 +41,31 @@ browser's again.
 
 ## Where it stands
 
+The guide was rewritten on 2026-11-03 to follow the app's Plan button: This
+is, Looking back, Choose from the level above (written beside this period's
+list), and on the week, Give them a day.
+
 | Sheet | Sides, Letter and A4 |
 | --- | --- |
 | Week | 1 |
 | Month | 2 |
-| Season | 3 |
-| Year | 3 |
+| Season | 2 |
+| Year | 2 |
 
-Nine sides in all, and each sheet says its own number on itself. The check
+Seven sides in all, and each sheet says its own number on itself. The check
 compares that claim against what Chromium actually prints, so the page cannot
 go on saying "four sheets" while producing twelve sides (Codex, 2026-09-24).
 
-The week sheet earns its single side by **asking less** — a shorter look-back
-folded into one band, two priorities, three next actions, and the family prompt
-as one line rather than a band — not by shrinking the explanation. Print type
-went back UP: 10pt labels, 9.5pt questions, 9pt hints and leads. Bands may now
-run over a page break (blocks may not), because keeping a 460pt band whole
-threw it onto a fresh side and left the one before it half empty.
+The week sheet earns its single side by **asking less**: a short Looking back,
+four goals beside four tasks, and seven day boxes plus No day yet. On the
+month and season sheets the Choose band starts the back of the page
+(`break-before: page`): two lists standing beside each other cannot share a
+page break, and the alternative was a half-empty front. Looking back fills the
+front instead.
+
+Bands may run over a page break (blocks may not), because keeping a 460pt band
+whole threw it onto a fresh side and left the one before it half empty.
+
+The proof picks the built stylesheet that carries the guide's print rules. It
+used to take the first `.css` file alphabetically, which stopped being the main
+stylesheet once the build split CSS into chunks, and every check then failed.

@@ -1,8 +1,10 @@
 // src/components/plan/PlanningGuide.tsx
 //
 // The planning guide: a short introduction and four sheets you can print, one
-// per horizon. It is a permanent page, not an onboarding step — nothing here
-// is a gate, and none of the four sheets is a prerequisite for another.
+// per horizon, each following the app's Plan button (Looking back, choose from
+// the level above, and on the week, give them a day). It is a permanent page,
+// not an onboarding step — nothing here is a gate, and none of the four sheets
+// is a prerequisite for another.
 //
 // PRINTING. The sheets must stay IN FLOW, or the browser paginates nothing:
 // a printable subtree lifted out with `position: absolute` leaves the document
@@ -21,7 +23,7 @@ import { Printer, ArrowUpRight } from 'lucide-react'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
-import { GUIDE_SHEETS, sidesLabel, type GuideBand, type GuideBlock, type GuideLevel, type GuideSheet } from '@/lib/planning/guideSheets'
+import { GUIDE_SHEETS, sidesLabel, totalSidesLabel, type GuideBand, type GuideBlock, type GuideLevel, type GuideSheet } from '@/lib/planning/guideSheets'
 
 type PrintTarget = GuideLevel | 'all' | null
 
@@ -47,6 +49,24 @@ function Block({ block }: { block: GuideBlock }) {
       </div>
     )
   }
+  if (block.kind === 'days') {
+    return (
+      <div className="guide-days">
+        {Array.from({ length: block.count + 1 }, (_, i) => (
+          <div key={i} className="guide-day">
+            {i < block.count
+              ? <span className="guide-day-head"><span className="guide-rule-line" /></span>
+              : <p className="guide-block-label">{block.last}</p>}
+            <ul className="guide-lines">
+              {Array.from({ length: block.lines }, (_, j) => (
+                <li key={j} className="guide-line"><Ruled /></li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    )
+  }
   if (block.kind === 'fields') {
     return (
       <div className="guide-fields">
@@ -66,9 +86,6 @@ function Block({ block }: { block: GuideBlock }) {
       <ul className="guide-lines">
         {Array.from({ length: block.count }, (_, i) => (
           <li key={i} className="guide-line">
-            {/* Printed, never drawn: a second signal for a scan when the
-                handwriting crosses the boundary between two areas. */}
-            {block.glyph && <span className="guide-glyph" aria-hidden="true">{block.glyph}</span>}
             <Ruled tail={block.tail} />
           </li>
         ))}
@@ -83,7 +100,7 @@ const bandId = (title: string) => title.toLowerCase().replace(/[^a-z]+/g, '-').r
 
 function Band({ band, n }: { band: GuideBand; n: number }) {
   return (
-    <section className="guide-band" data-band={bandId(band.title)}>
+    <section className="guide-band" data-band={bandId(band.title)} data-layout={band.beside ? 'beside' : undefined}>
       <h3 className="guide-band-title">
         <span className="guide-band-n">{n}</span>
         {band.title}
@@ -164,11 +181,11 @@ export function PlanningGuide() {
           variant="page"
           eyebrow={<span className="text-[12px] uppercase tracking-wider text-neutral-500">Planning</span>}
           title="The planning guide"
-          subline={<p className="text-[12px] text-neutral-500">Four exercises you can print — nine sides in all, and none of them required.</p>}
+          subline={<p className="text-[12px] text-neutral-500">Four exercises you can print — {totalSidesLabel()} in all, and none of them required.</p>}
           action={(
             <button type="button" onClick={() => print('all')} className="guide-print-btn">
               <Printer className="h-4 w-4" aria-hidden="true" />
-              Print all nine sides
+              Print all {totalSidesLabel()}
             </button>
           )}
         />
@@ -180,16 +197,30 @@ export function PlanningGuide() {
             week sheet every week and never touching the others is using this correctly.
           </p>
           <p>
-            <strong>The week sheet is one side</strong> and is the one to start with. The month is
-            two sides, the season and the year three each — they ask more because there is more to
-            decide, not because they are compulsory. Every one of them begins the same way, with
-            which period this is and what it already holds, before asking what matters; the
-            questions themselves change with the horizon, because a week and a year are not asking
-            the same thing.
+            <strong>Each sheet follows the Plan button in Symphony</strong>, in the same order. It
+            opens on <strong>Looking back</strong> at the period before — how much got done, what
+            went well, what didn’t, and a decision for each thing left over. Then you{' '}
+            <strong>choose from the level above</strong>, written on the left so this period’s
+            list sits beside it: the month’s goals beside the season’s list, the week’s tasks
+            beside the month’s goals. The week sheet ends the way Plan this week does, by{' '}
+            <strong>giving them a day</strong> — and what can be done any day stays in No day yet.
+          </p>
+          <p>
+            Year, season and month hold <strong>goals</strong>; the week and the day hold{' '}
+            <strong>tasks</strong>. The year is a short list to look at, a season is a brainstorm,
+            and a month is a plain list with its season beside it — nothing above the week is
+            sorted into kinds, and a goal is never given a day. When a line is too big for its
+            period, write a smaller piece under it and plan that. Today has no sheet: Plan today
+            in the app takes it from the week.
+          </p>
+          <p>
+            <strong>The week sheet is one side</strong> and is the one to start with. The month,
+            season and year are two sides each — they ask more because there is more to decide,
+            not because they are compulsory.
           </p>
           <p>
             <strong>Leave blanks blank.</strong> A date you have not decided, an owner nobody has
-            agreed to, a priority you are not sure about — all of those are better left empty than
+            agreed to, a goal you are not sure about — all of those are better left empty than
             guessed at. Nothing written here is a commitment until you make it one.
           </p>
           <h2>Bringing a filled-in sheet back</h2>
@@ -210,8 +241,9 @@ export function PlanningGuide() {
             anything</strong>, and keep only the lines you want. Things to check as you go:
           </p>
           <ul className="guide-checks">
-            <li>a line that came back as the wrong kind of thing — an idea turned into a task, or
-              the other way round;</li>
+            <li>a line that came back on the wrong horizon — a month goal turned into a week
+              task, or a season brainstorm line made into something planned;</li>
+            <li>a line linked to the wrong goal above it, or to one where you left “for” blank;</li>
             <li>a date, a repetition or an owner on a line where you did not write one. “Swim
               Tuesday” is not by itself a weekly routine;</li>
             <li>anything you meant to leave undecided.</li>

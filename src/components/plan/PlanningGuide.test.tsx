@@ -35,6 +35,26 @@ describe('PlanningGuide', () => {
     expect(consumePlanFromPaperRequest()).toBe(true)
   })
 
+  // The guide teaches the app's own Plan steps, by their names on screen.
+  it('walks through the sheets in the order and words of the Plan button', () => {
+    show()
+    const intro = document.querySelector('.guide-intro')!
+    expect(intro).toHaveTextContent(/follows the Plan button/i)
+    expect(intro).toHaveTextContent(/Looking back/)
+    expect(intro).toHaveTextContent(/choose from the level above/i)
+    expect(intro).toHaveTextContent(/giving them a day/i)
+    expect(intro).toHaveTextContent(/No day yet/)
+    expect(intro).toHaveTextContent(/hold goals; the week and the day hold tasks/i)
+  })
+
+  it('draws the week as day boxes, with one more for no day yet', () => {
+    show()
+    const days = within(sheet('week')).getAllByText((_, el) => el?.classList.contains('guide-day') ?? false)
+    expect(days).toHaveLength(8)
+    expect(within(sheet('week')).getByText('No day yet')).toBeInTheDocument()
+    expect(sheet('month').querySelector('.guide-days')).toBeNull()
+  })
+
   it('says the sheets are optional and that a blank is kept as a blank', () => {
     show()
     expect(screen.getByText(/an aid, not a format you have to obey/i)).toBeInTheDocument()
@@ -47,8 +67,8 @@ describe('PlanningGuide', () => {
     show()
     expect(within(sheet('week')).getByText(/One side · about 10 minutes/i)).toBeInTheDocument()
     expect(within(sheet('month')).getByText(/Two sides/i)).toBeInTheDocument()
-    expect(within(sheet('season')).getByText(/Three sides/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /print all nine sides/i })).toBeInTheDocument()
+    expect(within(sheet('season')).getByText(/Two sides/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /print all seven sides/i })).toBeInTheDocument()
     expect(document.querySelector('.guide-intro')).toHaveTextContent(/the week sheet is one side/i)
   })
 
@@ -93,7 +113,7 @@ describe('PlanningGuide', () => {
   it('prints everything when everything is asked for', async () => {
     show()
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /print all nine sides/i }))
+    await user.click(screen.getByRole('button', { name: /print all seven sides/i }))
     expect(window.print).toHaveBeenCalledTimes(1)
     for (const s of sheets()) expect(s.dataset.print).toBe('on')
   })

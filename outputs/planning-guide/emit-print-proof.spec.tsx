@@ -21,9 +21,13 @@ const root = join(here, '..', '..')
 
 it('emits the printable sheets with the built stylesheet inlined', () => {
   const assets = join(root, 'dist', 'assets')
-  const cssFile = readdirSync(assets).filter((f) => f.endsWith('.css')).sort()[0]
-  if (!cssFile) throw new Error('no built stylesheet in dist/assets — run npm run build first')
-  const css = readFileSync(join(assets, cssFile), 'utf8')
+  // The build splits CSS into chunks, so "the first .css file" is no longer the
+  // main stylesheet: take the one that carries the guide's print rules.
+  const css = readdirSync(assets)
+    .filter((f) => f.endsWith('.css'))
+    .map((f) => readFileSync(join(assets, f), 'utf8'))
+    .find((c) => c.includes('guide-print-ancestor'))
+  if (!css) throw new Error('no built stylesheet with the guide in dist/assets — run npm run build first')
 
   const body = renderToStaticMarkup(<MemoryRouter><PlanningGuide /></MemoryRouter>)
   const html = `<!doctype html>

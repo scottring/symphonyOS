@@ -1626,7 +1626,6 @@ html.desktop-shell a {
 
 .guide-lines { list-style: none; margin: 0; padding: 0; }
 .guide-line { display: flex; align-items: flex-end; gap: 7px; margin: 0 0 13px; }
-.guide-glyph { flex: 0 0 auto; font-size: 13px; line-height: 1.2; color: var(--color-neutral-400); }
 .guide-rule { display: flex; align-items: flex-end; gap: 12px; flex: 1 1 auto; min-width: 0; }
 .guide-rule-line { flex: 1 1 auto; min-width: 40px; border-bottom: 1px solid var(--color-neutral-300); height: 18px; }
 .guide-rule-tail {
@@ -1646,6 +1645,25 @@ html.desktop-shell a {
 .guide-open-sm { height: 70px; }
 .guide-open-md { height: 130px; }
 .guide-open-lg { height: 210px; }
+
+/* The level above, written BESIDE this period's list: a narrow left column
+   for what is copied down, the rest of the band on the right. */
+@media (min-width: 640px) {
+  .guide-band[data-layout="beside"] .guide-band-body {
+    display: grid; grid-template-columns: 2fr 3fr; gap: 0 24px; align-content: start;
+  }
+  .guide-band[data-layout="beside"] .guide-band-body > :first-child { grid-column: 1; grid-row: 1 / span 8; }
+  .guide-band[data-layout="beside"] .guide-band-body > :not(:first-child) { grid-column: 2; }
+}
+
+/* Give them a day: seven boxes headed by a blank for the day and date (a
+   household's week may start on Saturday, Sunday or Monday), then No day yet. */
+.guide-days { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 640px) { .guide-days { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.guide-day { border: 1px solid var(--color-neutral-200); border-radius: 8px; padding: 8px 10px 2px; min-width: 0; }
+.guide-day .guide-block-label { margin-bottom: 4px; }
+.guide-day-head { display: flex; margin: 0 0 10px; }
+.guide-day-head .guide-rule-line { border-bottom-color: var(--color-neutral-400); }
 
 @media print {
   .guide-print, .guide-print * { visibility: visible; }
@@ -1687,16 +1705,27 @@ html.desktop-shell a {
   /* Two columns where the content is a set of short areas rather than a
      sequence — it is the difference between a two-sided worksheet and a
      five-sided one. */
-  .guide-band[data-band="what-that-means"] .guide-band-body,
-  .guide-band[data-band="what-happened"] .guide-band-body,
-  .guide-band[data-band="what-matters-here"] .guide-band-body,
-  .guide-band[data-band="if-more-than-one-of-you-is-filling-this-in"] .guide-band-body,
-  .guide-band[data-band="what-is-already-committed"] .guide-band-body,
-  /* The week sheet is one side, so EVERY band on it pairs up. */
-  .guide-sheet[data-sheet="week"] .guide-band-body {
+  .guide-band[data-band="looking-back"] .guide-band-body,
+  .guide-band[data-band="if-more-than-one-of-you-is-filling-this-in"] .guide-band-body {
     display: grid; grid-template-columns: 1fr 1fr; gap: 0 18pt; align-content: start;
   }
+  .guide-band[data-band="looking-back"] .guide-band-body > .guide-fields { grid-column: 1 / -1; }
+  /* The level above beside this period's list, at any paper width. */
+  .guide-band[data-layout="beside"] .guide-band-body {
+    display: grid; grid-template-columns: 2fr 3fr; gap: 0 18pt; align-content: start;
+  }
+  .guide-band[data-layout="beside"] .guide-band-body > :first-child { grid-column: 1; grid-row: 1 / span 8; }
+  .guide-band[data-layout="beside"] .guide-band-body > :not(:first-child) { grid-column: 2; }
+  /* Month and season: Looking back on the front, the two lists side by side
+     on the back. Two lists that stand beside each other cannot share a page
+     break, and a half-empty front is the alternative. */
+  .guide-sheet:not([data-sheet="week"]) .guide-band[data-layout="beside"] { break-before: page; }
+  .guide-days { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6pt; }
+  .guide-day { border-color: #bbb; border-radius: 4pt; padding: 4pt 6pt 0; break-inside: avoid; }
+  .guide-day-head { margin-bottom: 7pt; }
+  .guide-day-head .guide-rule-line { border-bottom-color: #666; }
   .guide-band-body > .guide-note { grid-column: 1 / -1; }
+  .guide-band[data-layout="beside"] .guide-band-body > .guide-note { grid-column: 2; }
   .guide-block { break-inside: avoid; margin-bottom: 8pt; }
   .guide-band-title { font-size: 8.5pt; color: #333; }
   .guide-band-n { border-color: #888; color: #555; width: 13pt; height: 13pt; font-size: 7pt; }
@@ -1713,7 +1742,6 @@ html.desktop-shell a {
   .guide-questions li { line-height: 1.5; }
   .guide-band-lead { margin-bottom: 6pt; }
   .guide-fields { gap: 10pt; margin-bottom: 8pt; }
-  .guide-glyph { color: #666; }
   .guide-open { border-color: #bbb; }
   .guide-open-lg { height: 105pt; }
 }
