@@ -51,6 +51,8 @@ export interface TodayDataInput {
   /** Weekly routines with no day of their own — they join the To plan list
    *  (lib/week/unhomedRoutines), the same set the Planning dock draws. */
   unhomedRoutines?: Routine[]
+  /** A no-school day's school routines, shown anyway (the calendar was wrong). */
+  showSchoolRoutines?: boolean
 }
 
 export interface TodayCounts {
@@ -79,6 +81,10 @@ export interface TodayData {
   dayPlan: DayPlan
   sectionsOrder: DaySection[]
   counts: TodayCounts
+  /** A no-school day (noSchool.ts): the calendar entry that says so, the
+   *  school routines it left off, and whether they're shown anyway. Null on a
+   *  school day, or when no routine was affected. */
+  schoolOff?: { reason: string; names: string[]; shown: boolean } | null
 }
 
 export const SECTIONS_ORDER: DaySection[] = [

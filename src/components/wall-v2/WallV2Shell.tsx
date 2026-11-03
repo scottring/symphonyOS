@@ -85,6 +85,7 @@ import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useKidMath } from '@/hooks/useKidMath';
 import { fetchEnergyPeriod, useHomeEnergy } from '@/hooks/useHomeEnergy';
 import { useSchoolDigests } from '@/hooks/useSchoolDigests';
+import { noSchoolReason } from '@/lib/today/noSchool';
 import { openScratchpadRows, recentlySorted, type ScratchpadRow } from '@/lib/wall/scratchpad';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -726,9 +727,11 @@ export function WallV2Shell() {
   const todayItems = useMemo(() => todayData?.items ?? emptySections<TimelineItem>(), [todayData]);
   const tomorrowData = useMemo(() => wallData.days.find((d) => !d.isToday && d.date > now) ?? wallData.days[1], [wallData.days, now]);
   const specials = useMemo(() => specialsWeek(wallData.days, kids, now), [wallData.days, kids, now]);
+  // A "No school" day on the calendar is not a school morning, whatever else
+  // is on it (lib/today/noSchool.ts).
   const schoolToday = useMemo(
-    () => specials.some((s) => s.isToday) || Object.values(todayItems).flat().some((i) => /^school\b/i.test(i.title)),
-    [specials, todayItems],
+    () => !noSchoolReason(wallData.calendarEvents, now) && (specials.some((s) => s.isToday) || Object.values(todayItems).flat().some((i) => /^school\b/i.test(i.title))),
+    [specials, todayItems, wallData.calendarEvents, now],
   );
   const moment = useMemo(
     () => wallMoment(now, { schoolDay: schoolToday, dinnerAt: dinnerStartDate ? { h: dinnerStartDate.getHours(), m: dinnerStartDate.getMinutes() } : undefined }),

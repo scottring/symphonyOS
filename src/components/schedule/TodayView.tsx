@@ -314,6 +314,15 @@ export function TodayView({
   // Every instance touching this week: a flexible routine already placed on
   // one of its days has a home for the week and leaves the sheet's To plan.
   const weekInstances = useWeekInstances(currentWeekStart, 7)
+  // A no-school day's school routines, shown anyway — for that day only, on
+  // this device (the calendar was wrong, or the kids went in after all).
+  const schoolKey = `symphony-school-routines-shown:${localYmd(viewedDate)}`
+  const [schoolShownDays, setSchoolShownDays] = useState<Record<string, boolean>>({})
+  const showSchoolRoutines = schoolShownDays[schoolKey] ?? (() => { try { return localStorage.getItem(schoolKey) === '1' } catch { return false } })()
+  const setShowSchoolRoutines = (on: boolean) => {
+    setSchoolShownDays((m) => ({ ...m, [schoolKey]: on }))
+    try { if (on) localStorage.setItem(schoolKey, '1'); else localStorage.removeItem(schoolKey) } catch { /* private window: this visit only */ }
+  }
   const todayInput = useMemo(() => ({
     tasks,
     events,
@@ -333,8 +342,9 @@ export function TodayView({
     eventNotesMap: ctx.eventNotesMap as unknown as Map<string, { notes?: string; assignedTo?: string | null }> | undefined,
     eventContextOverrides: ctx.eventContextOverrides,
     getDomainForCalendar: ctx.getDomainForCalendar,
+    showSchoolRoutines,
   }), [tasks, userId, events, routines, allRoutines, dateInstances, viewedDate, selectedAssignees, hideRoutines, layers, completedLingerCutoff,
-      currentWeekStart, weekInstances, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
+      currentWeekStart, weekInstances, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar, showSchoolRoutines])
 
   const data = useTodayData(todayInput)
 
@@ -1483,6 +1493,21 @@ export function TodayView({
                   )
                 })}
               </ul>
+            )}
+            {/* No school on the calendar: the school routines are off, and
+                the page says so — a fact, with the way back (noSchool.ts). */}
+            {data.schoolOff && (
+              <p className="today-school-off" role="note">
+                {data.schoolOff.shown ? (
+                  <>Showing school routines anyway. <button type="button" onClick={() => setShowSchoolRoutines(false)}>Hide them</button></>
+                ) : (
+                  <>
+                    No school, so {data.schoolOff.names.length === 1 ? <b>{data.schoolOff.names[0]}</b> : <>{data.schoolOff.names.length} school routines</>} {data.schoolOff.names.length === 1 ? 'is' : 'are'} off today
+                    {data.schoolOff.names.length > 1 && <span className="today-school-off-names">: {data.schoolOff.names.join(' · ')}</span>}.
+                    {' '}<button type="button" onClick={() => setShowSchoolRoutines(true)}>Show {data.schoolOff.names.length === 1 ? 'it' : 'them'}</button>
+                  </>
+                )}
+              </p>
             )}
             <TodayDayScale
               showOpenTime={calendarReady}

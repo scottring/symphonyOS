@@ -2077,6 +2077,11 @@ html.desktop-shell a {
 .daybook-journal-allday { display: flex; flex-direction: column; gap: 2px; padding: 6px 0 8px; }
 .daybook-journal-allday button { text-align: left; font-style: italic; font-size: 14px; color: var(--color-neutral-600); }
 .daybook-journal-allday button:hover { color: var(--color-neutral-900); }
+/* No school (Scott, 2026-11-03): which school routines the day left off. */
+.today-school-off { margin: 0 0 6px; font-size: 13px; line-height: 1.45; color: var(--color-neutral-600); }
+.today-school-off b { font-weight: 600; color: var(--color-neutral-800); }
+.today-school-off-names { color: var(--color-neutral-500); }
+.today-school-off button { font-weight: 500; color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 2px; }
 /* ── Today, calmer (2026-10-06) ─────────────────────────────────────────
    One reading measure: the day's sections stop at 54rem so who carries a row
    sits a glance from its title, not across the page. The masthead keeps the

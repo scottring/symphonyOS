@@ -334,3 +334,41 @@ describe('computeTodayData — Today is a commitment surface', () => {
     expect(data.attentionItems).toEqual([])
   })
 })
+
+// Scott, 2026-11-03: "today is labeled as no school election day ... it was
+// still showing things like walk the kids to school, pick up the kids from
+// school".
+describe('computeTodayData — a no-school day', () => {
+  const NOW = new Date()
+  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const tomorrow = new Date(NOW); tomorrow.setDate(NOW.getDate() + 1)
+  const noSchool = { id: 'e', title: 'No school - Election Day', start_time: `${ymd(NOW)}T12:00:00.000Z`, end_time: `${ymd(tomorrow)}T12:00:00.000Z`, all_day: true }
+  const routine = (id: string, name: string, time: string): Routine => ({
+    id, user_id: 'u', name, description: null, default_assignee: null, assigned_to: null, assigned_to_all: null,
+    visibility: 'active', paused_until: null, recurrence_pattern: { type: 'daily' }, time_of_day: time, times_per_day: null,
+    raw_input: null, show_on_timeline: true, parent_routine_id: null, step_order: null, created_at: '', updated_at: '',
+  } as unknown as Routine)
+  const routines = [routine('walk', 'Out the door, walk to school', '07:20:00'), routine('pick', 'School pickup', '15:00:00'), routine('meds', 'Meds', '08:00:00')]
+  const titles = (d: ReturnType<typeof computeTodayData>) => Object.values(d.grouped).flat().map((i) => i.title)
+
+  it('leaves the school routines off the day and its counts, and says which', () => {
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines, events: [noSchool] as never }))
+    expect(titles(d)).toContain('Meds')
+    expect(titles(d)).not.toContain('Out the door, walk to school')
+    expect(titles(d)).not.toContain('School pickup')
+    expect(d.counts.actionableCount).toBe(1)
+    expect(d.schoolOff).toEqual({ reason: 'No school - Election Day', names: ['Out the door, walk to school', 'School pickup'], shown: false })
+  })
+
+  it('shows them anyway when asked', () => {
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines, events: [noSchool] as never, showSchoolRoutines: true }))
+    expect(titles(d)).toContain('School pickup')
+    expect(d.schoolOff?.shown).toBe(true)
+  })
+
+  it('a school day is untouched', () => {
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines }))
+    expect(titles(d)).toContain('School pickup')
+    expect(d.schoolOff).toBeNull()
+  })
+})

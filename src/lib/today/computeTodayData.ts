@@ -11,6 +11,7 @@ import { selectDayPlan, routineResolveCtx, routinesForMain } from './dayPlan'
 import { localYmd } from '@/lib/cadence/config'
 import { dedupeCalendarEvents } from '@/lib/calendar/dedupeEvents'
 import { isFocused } from '@/lib/placement/model'
+import { noSchoolReason, schoolRoutinesOff } from './noSchool'
 import type { Task } from '@/types/task'
 import type { TimelineItem } from '@/types/timeline'
 
@@ -24,7 +25,20 @@ function computeIsToday(viewedDate: Date): boolean {
 }
 
 /** Pure port of TodaySchedule's data memos + counts (~587-975). No React. */
-export function computeTodayData(input: TodayDataInput): TodayData {
+export function computeTodayData(given: TodayDataInput): TodayData {
+  // No school on the calendar: the school routines are off for the day, on
+  // the list, the day column, the pin and the counts alike (noSchool.ts),
+  // unless someone asked to see them anyway.
+  const noSchool = noSchoolReason(given.events, given.viewedDate)
+  const off = noSchool && !given.showSchoolRoutines ? schoolRoutinesOff(given.routines) : []
+  const offIds = new Set(off.map((r) => r.id))
+  const input: TodayDataInput = offIds.size ? { ...given, routines: given.routines.filter((r) => !offIds.has(r.id)) } : given
+  // The names a person reads: the routines, not each checklist step.
+  const offNames = off.filter((r) => !r.parent_routine_id || !offIds.has(r.parent_routine_id)).map((r) => r.name)
+  const schoolOff = noSchool && (offNames.length || given.showSchoolRoutines)
+    ? { reason: noSchool, names: offNames, shown: !!given.showSchoolRoutines }
+    : null
+
   const match = makeAssigneeFilter(input.selectedAssignee)
   const isToday = computeIsToday(input.viewedDate)
 
@@ -144,5 +158,6 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     dayPlan,
     sectionsOrder: SECTIONS_ORDER,
     counts: { completedCount, incompleteOverdue, actionableCount, totalItems, progressPercent },
+    schoolOff,
   }
 }

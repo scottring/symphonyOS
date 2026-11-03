@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { useAuth } from '@/hooks/useAuth'
 import { resolveRoutine, effectiveTimeOfDay, type LastCompletionMap } from '@/lib/routineUtils'
+import { noSchoolReason, schoolRoutinesOff } from '@/lib/today/noSchool'
 import type { Layer } from '@/lib/domains'
 import {
   taskToTimelineItem,
@@ -506,9 +507,13 @@ export function useWallData(): UseWallDataReturn {
         //    routine-type items, so it no longer depends on this override.)
         //  The Kiosk switch (2026-10-27) is the one honoured here: off the
         //  kiosk means off the wall and the kids' tablets.
+        // No school on the calendar: the school routines are off that day,
+        // on the wall as on Today (lib/today/noSchool.ts).
+        const offIds = noSchoolReason(events, date) ? new Set(schoolRoutinesOff(routines).map((r) => r.id)) : null
         const dayRoutines = routines.filter(
           (r) =>
             r.show_on_kiosk !== false &&
+            !offIds?.has(r.id) &&
             resolveRoutine(
               { ...r, show_on_timeline: true, parent_routine_id: null },
               {
