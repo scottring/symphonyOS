@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createMockTask } from '@/test/mocks/factories'
-import { weekListTasks, weekRowNote, weekRowNoteText, weekShownTasks } from './weekList'
+import { weekListTasks, weekRowNote, weekRowNoteText, weekShownTasks, earlierThisWeek, earlierDayMark } from './weekList'
 
 const WEEK = new Date(2026, 9, 4)   // Sunday Oct 4, 2026
 const LAST = new Date(2026, 8, 27)  // Sunday Sep 27
@@ -83,5 +83,39 @@ describe('weekListTasks — undated legacy completions', () => {
     const legacy = createMockTask({ id: 'l', title: 'fix the light', bucket: 'week', completed: true, commitments: [] })
     const open = createMockTask({ id: 'o', title: 'Open', bucket: 'week', commitments: [] })
     expect(weekListTasks([legacy, open], WEEK, null, { isCurrent: true }).map((t) => t.id)).toEqual(['o'])
+  })
+})
+
+// Task 4 (Scott, 2026-11-04): yesterday's unfinished tasks go back where
+// they came from, the week sheet beside the day, first and marked with their
+// day. One selector, read by Today's sheet and the workspace's.
+describe('earlierThisWeek', () => {
+  const SUN = new Date(2026, 10, 1)            // week of Sun Nov 1
+  const WED = new Date(2026, 10, 4)            // the viewed day
+  const on = (d: number, x: Partial<Parameters<typeof createMockTask>[0]> = {}) =>
+    createMockTask({ id: `t${d}${x.title ?? ''}`, title: x.title ?? `Day ${d}`, bucket: 'timed', scheduledFor: new Date(2026, 10, d, 9), isAllDay: true, ...x })
+  it('is what has a day earlier this week, before the viewed day, open and not let go, oldest day first', () => {
+    const tasks = [
+      on(3, { title: 'Tue thing' }), on(2, { title: 'Mon thing' }),
+      on(3, { title: 'Done Tue', completed: true }),
+      on(3, { title: 'Let go Tue', dismissedAt: new Date(2026, 10, 3, 20) }),
+      on(4, { title: 'Today' }), on(5, { title: 'Thu' }),
+      on(31, { title: 'Last week', scheduledFor: new Date(2026, 9, 31) }),
+      createMockTask({ id: 'u', title: 'No day', bucket: 'week' }),
+    ]
+    const got = earlierThisWeek(tasks, { weekStart: SUN, day: WED })
+    expect(got.map((t) => t.title)).toEqual(['Mon thing', 'Tue thing'])
+    expect(got.map(earlierDayMark)).toEqual(['Mon', 'Tue'])
+  })
+  it('leaves out what was chosen for the viewed day, and keeps to the page’s filters', () => {
+    const chosen = on(3, { title: 'Chosen', focus: [{ userId: 'me', date: WED }] })
+    const theirs = on(3, { title: 'Theirs', assignedTo: 'kid' })
+    const mine = on(3, { title: 'Mine', assignedTo: 'me' })
+    expect(earlierThisWeek([chosen, theirs, mine], { weekStart: SUN, day: WED, userId: 'me' }).map((t) => t.title)).toEqual(['Theirs', 'Mine'])
+    expect(earlierThisWeek([theirs, mine], { weekStart: SUN, day: WED, scopeId: 'me' }).map((t) => t.title)).toEqual(['Mine'])
+    expect(earlierThisWeek([theirs, mine], { weekStart: SUN, day: WED, keep: (t) => t.assignedTo === 'kid' }).map((t) => t.title)).toEqual(['Theirs'])
+  })
+  it('is nothing on the week’s first day', () => {
+    expect(earlierThisWeek([on(31, { scheduledFor: new Date(2026, 9, 31) })], { weekStart: SUN, day: SUN })).toEqual([])
   })
 })

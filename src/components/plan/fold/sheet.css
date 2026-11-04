@@ -28,6 +28,12 @@ button.above-sheet-row-title {
   padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer;
 }
 button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-neutral-900)); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+/* Earlier this week and still open (Task 4): first on the sheet, its day
+   faint beside it ("Tue"). */
+.above-sheet-row-mark {
+  flex: none; font: 500 11px/1 var(--font-family-sans); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--color-neutral-400);
+}
 .above-sheet-pick {
   flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -4px -4px -4px 0;
   border: 1px solid color-mix(in srgb, var(--paper-fold-accent, var(--color-primary-600)) 35%, transparent); border-radius: 999px;

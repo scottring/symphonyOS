@@ -52,7 +52,7 @@ import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { rememberFolded } from '@/components/plan/fold/PaperFold'
-import { PlanChip } from '@/components/guide/GuideCoach'
+import { PlanChip, type CoachAsk } from '@/components/guide/GuideCoach'
 import { stepsFor } from '@/lib/guide/steps'
 import { GuidedDay } from '@/components/plan/guided/day/GuidedDay'
 import type { DayPictureItem } from '@/components/plan/guided/day/DayRows'
@@ -60,9 +60,8 @@ import { makeDayActions } from '@/lib/planning/dayActions'
 import { dayTarget } from '@/lib/guide/dayTarget'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
-import { EnergyChip } from '@/components/guide/EnergyChip'
-import { FromYesterday } from './FromYesterday'
-import { buildTodayReview } from '@/lib/planning/chooseToday'
+import { earlierThisWeek } from '@/lib/planning/weekList'
+import { ENERGY_CHOICES, isEnergyLevel, withEnergy } from '@/lib/guide/energy'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { dayToken, usePlanningSession } from '@/hooks/usePlanningSession'
 import { SECTIONS_ORDER } from '@/lib/today/types'
@@ -783,44 +782,45 @@ export function TodayView({
   const dayFlowButton = dayFlowOffer
     ? <PlanChip level="day" word={dayWord} onStart={openDaySession} />
     : null
-  // The shown day's line under the title: "Planned Sun · energy: medium ·
-  // looked back". Looked back: its session did its Look back step, or the
+  // The shown day's line under the title: "Planned Sun · Yesterday's review ·
+  // Energy: medium". Looked back: its session did its Look back step, or the
   // day before has a review (what that step writes).
   const shownNotes = usePlanningNotes('daily', dayToken(viewedDate))
   const shownDayBefore = usePeriodReview('daily', dayToken(new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate() - 1)))
   const shownGuide = shownNotes.notes.guide
   const shownSavedAt = typeof shownNotes.notes.savedAt === 'string' ? shownNotes.notes.savedAt : undefined
   // Kept through the Day session (fix round 1): the page never changes shape.
-  // The day's energy is the Energy chip beside it (the Energy step's home,
-  // Task 2): it cycles low, medium, high and writes the day's note.
+  // The day's energy is asked in the Energy step's tooltip (Task 4, Scott
+  // 2026-11-04: Today stays as it was, no chip); once said it is here, and a
+  // tap on it changes it (Low · Medium · High · Clear).
+  const shownEnergy = shownNotes.notes.energy
+  const patchShownNotes = shownNotes.patch
   const dayLine = !shownNotes.error ? (
-    <PeriodSummaryLine plannedAt={shownGuide?.plannedAt ?? shownSavedAt}
+    <PeriodSummaryLine plannedAt={shownGuide?.plannedAt ?? shownSavedAt} energy={shownEnergy}
+      onEnergy={shownNotes.loading ? undefined : (energy) => patchShownNotes({ energy })}
       reviewed={!!shownGuide?.done?.includes('look-back') || !!shownDayBefore.reviewed} level="day" />
   ) : null
-  // Keyed by the day, so a tap on one day never carries to the next; drawn
-  // only once that day's notes have loaded (fix round 1).
-  const energyChip = shownNotes.error
-    ? <span className="energy-chip-unloaded">Energy couldn’t load</span>
-    : !shownNotes.loading
-      ? <EnergyChip key={dayToken(viewedDate)} value={shownNotes.notes.energy} save={(energy) => shownNotes.patch({ energy })} />
-      : null
   const reloadShownNotes = shownNotes.reload
-  // "From yesterday" (Task 2): what the day before held and did not finish,
-  // at the top of the day's lists, on today's page (and, in the evening's
-  // session, on tomorrow's: "From today"). Through the page's filters: `tasks`
-  // arrives filtered to the reader's spaces, and the people filter is applied
-  // as the chooser's is. What was let go, and what is already on this day,
-  // is not asked about again.
+  // The Energy step's ask, in its tooltip: the day being planned, once its
+  // notes are read (shown here only while the page shows that day).
   const viewedYmd = localYmd(viewedDate)
-  const showsLeftovers = data.isToday || (sessionShown && viewedYmd === targetKey)
-  const dayBefore = useMemo(() => new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate() - 1), [viewedDate])
-  const leftovers = useMemo(() => {
-    if (!showsLeftovers) return []
+  const dayAsks = useMemo<Partial<Record<string, CoachAsk>>>(() => viewedYmd !== targetKey || shownNotes.loading || shownNotes.error ? {} : {
+    energy: {
+      kind: 'choice', label: 'Energy', choices: ENERGY_CHOICES, value: shownEnergy?.level,
+      pick: (level) => isEnergyLevel(level) ? patchShownNotes({ energy: withEnergy(shownEnergy, level) }) : Promise.resolve(false),
+    },
+  }, [viewedYmd, targetKey, shownNotes.loading, shownNotes.error, shownEnergy, patchShownNotes])
+  // Earlier this week and still open (Task 4): back on the week sheet beside
+  // the day, first, marked with their day; + plans one for this day. Through
+  // the page's filters: `tasks` arrives filtered to the reader's spaces, and
+  // the people filter is applied as the chooser's is.
+  const earlier = useMemo(() => {
     const match = makeAssigneeFilter(selectedAssignees ?? [])
-    const onThisDay = new Set(buildTodayReview({ allTasks: tasks, today: viewedDate, userId, match }).open.map((t) => t.id))
-    return buildTodayReview({ allTasks: tasks, today: dayBefore, userId, match }).open
-      .filter((t) => !t.dismissedAt && !onThisDay.has(t.id))
-  }, [showsLeftovers, tasks, viewedDate, dayBefore, userId, selectedAssignees])
+    return earlierThisWeek(tasks, {
+      weekStart: weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn), day: viewedDate, userId,
+      keep: (t) => match(t.assignedTo, t.assignedToAll),
+    })
+  }, [tasks, viewedDate, userId, selectedAssignees])
 
   // ── A pending change card, drawn dashed on the day (todayPreview.ts).
   const { changeSet } = useCanvasActivity()
@@ -1284,7 +1284,7 @@ export function TodayView({
   // and the step's tooltip pointing into it.
   const inDaySession = (page: ReactNode) => !sessionShown ? page : (
     <GuidedDay key={targetKey} target={day.target} isTomorrow={day.isTomorrow}
-      canvas={page} dayItems={localYmd(viewedDate) === targetKey ? dayPicture : null} onStep={setSessionStep} actions={dayActions}
+      canvas={page} dayItems={localYmd(viewedDate) === targetKey ? dayPicture : null} onStep={setSessionStep} actions={dayActions} asks={dayAsks}
       listenPlacements={listenPlacements}
       onFinish={finishDay}
       onClose={() => { closeDaySession(); reloadShownNotes() }}
@@ -1303,7 +1303,7 @@ export function TodayView({
       <SheetRoutines plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />, alongsideWorkspace.routinesSlot)}
   </> : (
     <TodayWeekFold drive={driveWeek} plan={data.dayPlan} day={viewedDate}
-      weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
+      weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions} earlier={earlier}
       nextWeek={nextWeek}
       chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
       restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)}>
@@ -1403,9 +1403,8 @@ export function TodayView({
         footer={!desktopControls ? desktopToolbar : undefined}
 
       />
-      {/* What the day's planning left: one quiet line under the title, and
-          the day's Energy chip beside it. */}
-      <div className="today-day-line px-4 md:px-0">{dayLine}{energyChip}</div>
+      {/* What the day's planning left: one quiet line under the title. */}
+      <div className="px-4 md:px-0 empty:hidden">{dayLine}</div>
       {/* The Day session's door, when the controls are not folded. */}
       {dayFlowButton && !foldedControls && (
         <div className="today-walk px-4 md:px-0">{dayFlowButton}</div>
@@ -1436,10 +1435,6 @@ export function TodayView({
               footer's "New from email", suggestions the ⋯ menu. */}
       {/* The agenda is part of the page, with no enclosing card. */}
       <div ref={listRef} {...agendaDrop} className={`daybook-agenda${agendaDropOver ? ' daybook-agenda-drop' : ''}`}>
-        {/* From yesterday, at the top of the day's lists (Task 2): the Look
-            back step's home, there every day, gone once each is decided. */}
-        {showsLeftovers && <FromYesterday key={viewedYmd} open={leftovers} day={viewedDate} dayBefore={dayBefore}
-          isToday={data.isToday} actions={dayActions} />}
         {/* Needed today — hand-curated, silent when empty. Placed first so a
             marked item reads as the day's opening note, not buried under the
             timeline. Safe at the top only because it renders nothing when

@@ -1,8 +1,9 @@
 // Today while a Day session runs: planning is a few tooltips on the same page
 // (Scott, 2026-11-04). The plan chip in the header shows where the session
 // is; each step is one tooltip (GuideCoach) pointing at the real thing on the
-// day, which stays exactly as it is every day. Pick and Habits open the week
-// beside the day (steps.ts `drives`; TodayView drives the fold). The step's
+// day, which stays exactly as it is every day. Look back, Pick and Habits
+// open the week beside the day (steps.ts `drives`; TodayView drives the
+// fold); the Energy step asks its one fact in its tooltip (Task 4). The step's
 // header and the conversation are the shell's (useGuidedDay registers them;
 // it never opens by itself).
 //
@@ -12,13 +13,13 @@
 import { useEffect, type ReactNode } from 'react'
 import { dayCount, dayStepTitle } from '@/lib/guide/dayTarget'
 import { stepsFor } from '@/lib/guide/steps'
-import { GuideCoach, usePlanSessionLoading } from '@/components/guide/GuideCoach'
+import { GuideCoach, usePlanSessionLoading, type CoachAsk } from '@/components/guide/GuideCoach'
 import { useGuidedDay } from '../useGuidedDay'
 import type { DayPictureItem } from './DayRows'
 import type { DayActions } from '@/lib/planning/dayActions'
 import '@/components/guide/guide.css'
 
-export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, actions, listenPlacements, onFinish, onClose, onPlanned }: {
+export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, actions, asks, listenPlacements, onFinish, onClose, onPlanned }: {
   /** The day being planned (dayTarget). */
   target: Date
   isTomorrow: boolean
@@ -33,6 +34,8 @@ export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, action
   onStep?: (stepId: string) => void
   /** The page's writers, each taking the day it acts on. */
   actions: DayActions
+  /** A step's one small fact, by step id, asked in its tooltip (Energy). */
+  asks?: Partial<Record<string, CoachAsk>>
   /** Placements saved on the page itself (a task dragged onto the day, + on
    *  the week beside it): on the pick step they mark the day planned. Returns
    *  the unsubscribe. */
@@ -63,7 +66,7 @@ export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, action
       {canvas}
       <GuideCoach level="day" current={guided.progress.current} word={dayWord} titleFor={(s) => dayStepTitle(s, isTomorrow)}
         onNext={() => { void guided.next() }} onBack={() => { if (index > 0) void guided.jump(steps[index - 1].id) }}
-        onStop={onClose} onFinish={() => { void guided.done() }} error={guided.saveError} />
+        onStop={onClose} onFinish={() => { void guided.done() }} error={guided.saveError} ask={asks?.[guided.progress.current]} />
     </section>
   )
 }

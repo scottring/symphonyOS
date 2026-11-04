@@ -28,7 +28,7 @@ import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import { HORIZON_OF, choosingStep, stepsFor } from '@/lib/guide/steps'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
-import { GuideCoach, usePlanSessionLoading, type CoachAction } from '@/components/guide/GuideCoach'
+import { GuideCoach, usePlanSessionLoading, type CoachAsk } from '@/components/guide/GuideCoach'
 import type { TaskContext } from '@/types/task'
 import '@/components/guide/guide.css'
 
@@ -57,7 +57,7 @@ type Line = { id: string; title: string }
 type Area = { id: string; name: string; context: TaskContext | null }
 const NONE: readonly never[] = []
 
-export function GuidedPeriod({ level, token, periodLabel, page, look, actions, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites }: {
+export function GuidedPeriod({ level, token, periodLabel, page, look, asks, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites }: {
   level: PeriodLevel
   /** The period's planning token (monthToken, seasonToken, yearToken). */
   token: string
@@ -68,8 +68,8 @@ export function GuidedPeriod({ level, token, periodLabel, page, look, actions, o
   page: ReactNode | ((fold: SessionFold) => ReactNode)
   /** The look back, drawn in the sheet above on its step. */
   look: (tools: PeriodSessionTools) => ReactNode
-  /** A step's one action, by step id, carried in its tooltip. */
-  actions?: Partial<Record<string, CoachAction>>
+  /** A step's one small fact, by step id, asked in its tooltip. */
+  asks?: Partial<Record<string, CoachAsk>>
   /** The period's closing writes, with the look back's unsaved notes; false
    *  keeps the session open. */
   onFinish: (lookDraft: ReviewNotes | null) => Promise<boolean>
@@ -170,7 +170,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, look, actions, o
       {pageNode}
       <GuideCoach level={level} current={progress.current} word={periodLabel}
         onNext={() => { void next() }} onBack={() => { if (index > 0) void jump(steps[index - 1].id) }}
-        onStop={onLeave} onFinish={() => { void done() }} error={saveError} action={actions?.[progress.current]} />
+        onStop={onLeave} onFinish={() => { void done() }} error={saveError} ask={asks?.[progress.current]} />
     </section>
   )
 }

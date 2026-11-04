@@ -1551,32 +1551,44 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(months.getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['October','November'])
   expect(months.queryAllByRole('button')).toHaveLength(0)
  })
- // Planning as tooltips (Task 2): the Energy chip in the season's header, every day.
- it('Energy check: the Energy chip in the header cycles low, medium, high, then clears, and saves the season’s energy note',async()=>{
+ // Task 4 (Scott, 2026-11-04): the season's energy is asked in the Energy
+ // step's tooltip, Low · Medium · High; there is no Energy chip. Once said, the
+ // header line carries it, and a tap there changes it (Clear keeps the words).
+ it('Energy check: the tooltip asks Low · Medium · High and saves the season’s energy with its words; the header line says it and changes it',async()=>{
   inSession()
   notesStore.notes={guide:{current:'energy',done:[],skipped:[]},energy:{level:'medium',words:'New baby'}}
   season('&plan=1')
-  const chipEl=head().querySelector('[data-guide-anchor="energy"]') as HTMLElement
-  expect(chipEl).toHaveTextContent('Energy: medium')
-  await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
+  expect(head().querySelector('.energy-chip')).toBeNull()
+  const group=within(coach().getByRole('radiogroup',{name:'Energy'}))
+  expect(group.getAllByRole('radio').map((b)=>b.textContent)).toEqual(['Low','Medium','High'])
+  expect(group.getByRole('radio',{name:'Medium'})).toHaveAttribute('aria-checked','true')
+  await act(async()=>{fireEvent.click(group.getByRole('radio',{name:'High'}))})
   // The words already said stay with it.
   expect(notesStore.patches.map((x)=>x.p)).toContainEqual({energy:{level:'high',words:'New baby'}})
-  expect(chipEl).toHaveTextContent('Energy: high')
-  // After high it clears (fix round 1).
-  await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
-  expect(notesStore.patches[notesStore.patches.length-1].p).toEqual({energy:undefined})
-  expect(chipEl).toHaveTextContent('Energy: —')
-  // Not said twice in the header.
+  expect(group.getByRole('radio',{name:'High'})).toHaveAttribute('aria-checked','true')
+  // The header line says it, and its anchor is the Energy step's home.
+  expect(summary()).toMatch(/Energy: high$/)
+  expect(screen.getByRole('dialog',{name:'Planning guide'}).dataset.at).toBe('energy')
+  // Its menu: Clear removes only the level.
+  fireEvent.click(within(head()).getByRole('button',{name:'Energy: high'}))
+  const menu=within(screen.getByRole('menu',{name:'Energy'}))
+  expect([...menu.getAllByRole('menuitemradio'),menu.getByRole('menuitem')].map((b)=>b.textContent)).toEqual(['Low','Medium','High','Clear'])
+  await act(async()=>{fireEvent.click(menu.getByRole('menuitem',{name:'Clear'}))})
+  expect(notesStore.patches[notesStore.patches.length-1].p).toEqual({energy:{words:'New baby'}})
   expect(summary()??'').not.toMatch(/Energy/)
-  // Every day, unset: a dash.
-  cleanup();notesStore.notes={};notesStore.patches=[]
-  season()
-  expect(within(head()).getByRole('button',{name:/^Energy/})).toHaveTextContent('Energy: —')
-  await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
-  expect(notesStore.patches.map((x)=>x.p)).toEqual([{energy:{level:'low'}}])
-  // Month and Year have none.
-  cleanup();month()
+ })
+ it('Energy check, nothing said yet: no energy on the page, and the tooltip points at the title',()=>{
+  inSession()
+  notesStore.notes={guide:{current:'energy',done:[],skipped:[]}}
+  season('&plan=1')
   expect(within(head()).queryByRole('button',{name:/^Energy/})).toBeNull()
+  expect(summary()??'').not.toMatch(/Energy/)
+  expect(screen.getByRole('dialog',{name:'Planning guide'}).dataset.at).toBe('title')
+  expect(coach().getByRole('radiogroup',{name:'Energy'})).toBeInTheDocument()
+  // Month and Year never say it.
+  cleanup();notesStore.notes={energy:{level:'low'}}
+  month()
+  expect(summary()??'').not.toMatch(/Energy/)
  })
  it('Season goals by area: the year open beside Fall; the first line written on the sheet marks Fall planned',async()=>{
   inSession()
@@ -2239,6 +2251,9 @@ describe('every step’s tooltip points at its home on the everyday page',()=>{
  const rows=(['month','season','year'] as const).flatMap((level)=>stepsFor(level).map((st)=>[level,st.id,st.at] as const))
  it.each(rows)('%s · %s → [data-guide-anchor="%s"]',(level,id,anchor)=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  // Energy's home is the header line, once said (Task 4).
+  const said=anchor==='energy'?{energy:{level:'medium' as const}}:{}
+  notesStore.notes={...said}
   open(pages[level])
   // Month's routines are on its calendar sheet, drawn once it is unfolded.
   if(anchor==='routines')fireEvent.keyDown(screen.getByRole('button',{name:/ calendar\. Unfold to read$/}),{key:'Enter'})
@@ -2246,7 +2261,7 @@ describe('every step’s tooltip points at its home on the everyday page',()=>{
   expect(home).not.toBeNull()
   expect(home!.closest('[hidden]')).toBeNull()
   cleanup()
-  atStep(id)
+  atStep(id); notesStore.notes={...notesStore.notes,...said}
   open(pages[level]+'&plan=1')
   expect(screen.getByRole('dialog',{name:'Planning guide'}).dataset.at).toBe(anchor)
  })
@@ -2255,12 +2270,13 @@ describe('every step’s tooltip points at its home on the everyday page',()=>{
 // Fix round 1: a period's sections and chip are that period's alone, and
 // nothing on them writes until its notes have loaded.
 describe('the homes belong to the period on screen, once its notes are in',()=>{
- it('tapping energy on Fall, then going to Winter, shows Winter’s own level and writes nothing into Winter',async()=>{
+ it('changing energy on Fall, then going to Winter, shows Winter’s own level and writes nothing into Winter',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
-  notesStore.byToken={'2026-fall':{},'2026-winter':{energy:{level:'high'},wildCards:['house']}}
+  notesStore.byToken={'2026-fall':{energy:{level:'low'}},'2026-winter':{energy:{level:'high'},wildCards:['house']}}
   season()
-  await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
-  expect(notesStore.patches).toEqual([expect.objectContaining({p:{energy:{level:'low'}},token:'2026-fall'})])
+  fireEvent.click(within(head()).getByRole('button',{name:'Energy: low'}))
+  await act(async()=>{fireEvent.click(within(screen.getByRole('menu',{name:'Energy'})).getByRole('menuitemradio',{name:'Medium'}))})
+  expect(notesStore.patches).toEqual([expect.objectContaining({p:{energy:{level:'medium'}},token:'2026-fall'})])
   // An editor left open on Fall closes with it.
   fireEvent.click(within(screen.getByRole('region',{name:'Wild cards'})).getByRole('button',{name:'Edit'}))
   fireEvent.click(screen.getByRole('button',{name:'Next season'}))
@@ -2296,7 +2312,6 @@ describe('the homes belong to the period on screen, once its notes are in',()=>{
   notesStore.error='boom'
   season()
   expect(within(head()).queryByRole('button',{name:/^Energy/})).toBeNull()
-  expect(within(head()).getByText('Energy couldn’t load')).toBeInTheDocument()
   for(const name of ['Ideal week','Wild cards']){
    const sec=within(screen.getByRole('region',{name}))
    expect(sec.getByText('Couldn’t load.')).toBeInTheDocument()

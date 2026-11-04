@@ -44,8 +44,12 @@ export interface GuideStep {
   /** Where the step's tooltip points: the element on the page marked
    *  `data-guide-anchor="<at>"`, the step's permanent home on the everyday
    *  page (planning as tooltips, 2026-11-04: no step has a card of its own).
-   *  Missing on the page, the tooltip points at the page title (`title`). */
+   *  Missing on the page, the tooltip points at `fallback`, else the page
+   *  title (`title`). */
   at: GuideAnchor
+  /** Where it points when its own home is not on the page (Today's look
+   *  back with no leftovers: the week's fold). */
+  fallback?: GuideAnchor
 }
 
 /** The places on the everyday pages a step's tooltip can point at. */
@@ -74,15 +78,21 @@ const DAY: readonly GuideStep[] = [
   {
     id: 'look-back',
     at: 'leftovers',
+    // No leftovers: the week's fold beside the day, not the page title.
+    fallback: 'left',
     title: 'Look back at yesterday',
     minutes: 2,
     why: 'Nothing left from yesterday should quietly vanish.',
-    you: 'Each unfinished item: today, back to the week, or done.',
+    // Task 4 (Scott, 2026-11-04): what was left goes back where it came
+    // from, the week sheet beside the day, first and marked with its day.
+    you: 'Plan them for today with +, or leave them on the week.',
     guide: 'Shows what\'s left and moves it where you say.',
     more: 'An item that slips off the end of a busy day does not announce itself. A quick look puts it in front of you while it still matters. Then it gets a deliberate answer instead of resurfacing days later.',
     // The day's "win" is dropped for now (fix round 1): nothing writes a
-    // review of the day before; the choices are triage only.
-    writes: ['triage'],
+    // review of the day before. A + plans a leftover for the day.
+    writes: ['place'],
+    // The week opens beside the day: the leftovers are first on it.
+    drives: { above: true },
   },
   {
     id: 'calendar',
@@ -101,7 +111,8 @@ const DAY: readonly GuideStep[] = [
     title: 'Energy',
     minutes: 1,
     why: 'Pick work that fits how you\'ll actually feel.',
-    you: 'Tap the Energy chip: low, medium or high.',
+    // Asked in the tooltip itself (Task 4): Low · Medium · High.
+    you: 'Say it here: low, medium or high.',
     guide: 'Notes it beside the day. Nothing else changes.',
     more: 'The same task feels different depending on how rested you are. Saying plainly how the day ahead feels lets the choices that follow be honest ones. Nothing is decided by it; it is just a note beside the day.',
     writes: ['note'],
@@ -286,7 +297,7 @@ const MONTH: readonly GuideStep[] = [
     title: 'Maintenance and fun',
     minutes: 15,
     why: 'Bills, decluttering and supply orders come round again. Fun gets lost unless it\'s planned.',
-    you: 'Check this month\'s routines, then name a thing or two just for fun.',
+    you: 'Check this month\'s routines, then write a fun line on the sheet.',
     guide: 'Shows the monthly routines and adds your fun lines.',
     more: 'Recurring upkeep is easy to forget between cycles, so it helps to see what is due. Fun works the same way in reverse: it rarely happens unless it has a line of its own. The lines are yours; the guide only adds what you name.',
     writes: ['plan_add'],
@@ -337,7 +348,8 @@ const SEASON: readonly GuideStep[] = [
     title: 'Energy check',
     minutes: 10,
     why: 'A plan that ignores how tired you are falls apart by week three.',
-    you: 'Tap the Energy chip for how your energy, health and bandwidth honestly look.',
+    // Asked in the tooltip itself (Task 4): Low · Medium · High.
+    you: 'Say here how your energy, health and bandwidth honestly look.',
     guide: 'Keeps your note at the top of the season.',
     more: 'A season with unusual demands on your health or attention has less room in it than the calendar suggests. Writing that down once lets the later choices respect it. A plan that ignores how tired you are tends to fall apart partway through.',
     writes: ['note'],

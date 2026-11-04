@@ -113,16 +113,13 @@ function findAnchor(id: string): HTMLElement | null {
   }
   return first
 }
-/** The step's anchor, else the page title (a missing section, a phone
+/** The step's anchor, else its fallback (Today's look back with nothing
+ *  left: the week's fold), else the page title (a missing section, a phone
  *  layout): laid out first, then merely present. */
-function anchorOf(at: string): { at: string; el: HTMLElement | null } {
-  const own = findAnchor(at)
-  const title = at === 'title' ? own : findAnchor('title')
-  if (own && sized(own)) return { at, el: own }
-  if (title && sized(title)) return { at: 'title', el: title }
-  if (own) return { at, el: own }
-  if (title) return { at: 'title', el: title }
-  return { at: '', el: null }
+function anchorOf(at: string, fallback?: string): { at: string; el: HTMLElement | null } {
+  const tried = [at, ...(fallback && fallback !== at ? [fallback] : []), ...(at !== 'title' && fallback !== 'title' ? ['title'] : [])]
+  const found = tried.map((id) => ({ at: id, el: findAnchor(id) }))
+  return found.find((x) => x.el && sized(x.el)) ?? found.find((x) => x.el) ?? { at: '', el: null }
 }
 // The highlight is an attribute, not a class: a re-render of the page
 // rewrites className and would wipe it (coordinator ruling, fix round 1).
@@ -135,9 +132,9 @@ const stacked = (el: Element) => (el.closest<HTMLElement>('[data-fold-mode]')?.d
  *  fold's edge from the side, on a spread; anything else from below, or above
  *  when there is no room below. Kept on screen, and never over the anchor
  *  itself; with nothing to point at, in the top right corner, under the bar. */
-function placeCoach(coach: HTMLElement | null, at: string) {
+function placeCoach(coach: HTMLElement | null, at: string, fallback?: string) {
   if (!coach || coach.hidden) return
-  const { at: used, el } = anchorOf(at)
+  const { at: used, el } = anchorOf(at, fallback)
   const r = el?.getBoundingClientRect()
   const cw = coach.offsetWidth, ch = coach.offsetHeight
   const W = window.innerWidth, H = window.innerHeight
@@ -145,8 +142,13 @@ function placeCoach(coach: HTMLElement | null, at: string) {
     : used === 'left' && !stacked(el) ? 'left'
       : used === 'right' && !stacked(el) ? 'right'
         : 'top'
+  // Something on the sheet folded open at the left (Today's leftovers, its
+  // routines): beside the sheet, level with it, so the rows under it and
+  // their + stay in reach (Task 4).
+  const sheet = side === 'top' && el ? el.closest<HTMLElement>('[data-guide-anchor="left"]') : null
   let x: number, y: number, arrow = side
   if (side === 'none' || !r) { x = W - cw - 16; y = 72 }
+  else if (sheet && !stacked(sheet)) { x = sheet.getBoundingClientRect().right + 14; y = r.top + r.height / 2 - 28; arrow = 'left' }
   else if (side === 'left') { x = r.right + 14; y = r.top + 96 }
   else if (side === 'right') { x = r.left - 14 - cw; y = r.top + 96 }
   else {
@@ -184,16 +186,98 @@ function perFrame(fn: () => void): { run: () => void; cancel: () => void } {
 
 const buzz = () => { try { navigator.vibrate?.(6) } catch { /* no haptics */ } }
 
-/** A step's one action, carried in its tooltip (Year's Share and book: "Book
- *  the first Winter session", the existing booking). With `date`, a tap first
- *  opens a day to book (starting on `initial`), and "Book it" runs it on the
- *  day picked. It says when it is done. */
-export interface CoachAction {
+/** A step's one small fact, asked inside its own tooltip (Scott, 2026-11-04:
+ *  nothing is added to the page for it). Two kinds:
+ *  - `choice`: a few words to pick from (Energy: Low · Medium · High). The
+ *    chosen one shows as chosen; a pick saves at once.
+ *  - `book`: Year's Share and book, "Book the first Winter session". With
+ *    `date`, a tap first opens a day to book (starting on `initial`), and
+ *    "Book it" runs it on the day picked. It says when it is done. */
+export type CoachAsk = CoachChoiceAsk | CoachBookAsk
+export interface CoachChoiceAsk {
+  kind: 'choice'
+  /** The group's name ("Energy"). */
+  label: string
+  choices: readonly { value: string; label: string }[]
+  /** The one saved now, if any. */
+  value?: string
+  /** Saves a pick; false when it did not. */
+  pick: (value: string) => Promise<boolean>
+}
+export interface CoachBookAsk {
+  kind: 'book'
   label: string
   date?: { label: string; initial: Date }
   /** Said once it has run ("Booked: Plan Winter, Tue, Dec 1"). */
   done: (day?: Date) => string
   run: (day?: Date) => Promise<boolean>
+}
+
+const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const dayOf = (ymd?: string) => {
+  const m = ymd && /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd)
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : undefined
+}
+const DIDNT_SAVE = 'Didn’t save. Try again.'
+
+/** Low · Medium · High: the pick shows at once and stays until what is
+ *  saved changes (the header's menu, another period), and goes back to what
+ *  is saved if it did not save. Only the latest pick counts. */
+function ChoiceAsk({ ask }: { ask: CoachChoiceAsk }) {
+  const [sent, setSent] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [saved, setSaved] = useState(ask.value)
+  if (saved !== ask.value) { setSaved(ask.value); setSent(null) }
+  const latest = useRef(0)
+  const shown = sent ?? ask.value
+  const pick = async (value: string) => {
+    const n = ++latest.current
+    setSent(value); setFailed(false)
+    const ok = await ask.pick(value).catch(() => false)
+    if (n !== latest.current) return
+    if (!ok) { setSent(null); setFailed(true) }
+  }
+  return <>
+    <div className="coach-choices" role="radiogroup" aria-label={ask.label}>
+      {ask.choices.map((c) => <button key={c.value} type="button" role="radio" aria-checked={shown === c.value}
+        className={`coach-choice${shown === c.value ? ' is-on' : ''}`} onClick={() => { void pick(c.value) }}>{c.label}</button>)}
+    </div>
+    {failed && <p className="coach-error" role="alert">{DIDNT_SAVE}</p>}
+  </>
+}
+
+/** The booking: its button, then (with a date) the day and "Book it"; done,
+ *  what was booked. A second tap while it runs does nothing (a ref, not
+ *  state: two taps can land before a render). */
+function BookAsk({ ask }: { ask: CoachBookAsk }) {
+  const [state, setState] = useState<'idle' | 'picking' | 'running' | 'done' | 'failed'>('idle')
+  const [day, setDay] = useState<string | undefined>(undefined)
+  const busy = useRef(false)
+  const run = async (d?: Date) => {
+    if (busy.current) return
+    busy.current = true
+    setState('running')
+    const ok = await ask.run(d).catch(() => false)
+    busy.current = false
+    setState(ok ? 'done' : 'failed')
+  }
+  const picking = !!ask.date && state !== 'idle'
+  return <>
+    {state === 'done'
+      ? <p className="coach-done" role="status">{ask.done(dayOf(day))}</p>
+      : picking
+        ? <div className="coach-pick">
+          <label className="coach-pick-label">{ask.date!.label}
+            <input type="date" className="coach-pick-date" value={day ?? ''} disabled={state === 'running'}
+              onChange={(e) => { setDay(e.target.value); if (state === 'failed') setState('picking') }} />
+          </label>
+          <button type="button" className="coach-action" disabled={state === 'running' || !dayOf(day)}
+            onClick={() => { void run(dayOf(day)) }}>Book it</button>
+        </div>
+        : <button type="button" className="coach-action" disabled={state === 'running'}
+          onClick={() => { if (ask.date) { setDay(ymdOf(ask.date.initial)); setState('picking') } else void run() }}>{ask.label}</button>}
+    {state === 'failed' && <p className="coach-error" role="alert">{DIDNT_SAVE}</p>}
+  </>
 }
 
 export interface GuideCoachProps {
@@ -211,11 +295,11 @@ export interface GuideCoachProps {
   onStop: () => void
   /** Where the session is could not be saved. */
   error?: string | null
-  /** The current step's one action, if it has one. */
-  action?: CoachAction
+  /** The current step's one small fact, asked in the tooltip, if it has one. */
+  ask?: CoachAsk
 }
 
-export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onFinish, onStop, error, action }: GuideCoachProps) {
+export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onFinish, onStop, error, ask }: GuideCoachProps) {
   const steps = stepsFor(level)
   const index = Math.max(0, steps.findIndex((s) => s.id === current))
   const step = steps[index]
@@ -241,6 +325,7 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
   }, [level, n, m, show])
 
   const at = step.at
+  const fallback = step.fallback
 
   // A step shown (a new one, or again): placed now, its entrance replayed
   // (none under reduced motion), then followed while the folds settle
@@ -250,31 +335,31 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
     if (!coach || hidden) return
     coach.classList.remove('is-in')
     if (!matches('(prefers-reduced-motion: reduce)')) { void coach.offsetWidth; coach.classList.add('is-in') }
-    placeCoach(coach, at)
-    return follow(900, () => placeCoach(coach, at))
-  }, [step.id, hidden, shows, at])
+    placeCoach(coach, at, fallback)
+    return follow(900, () => placeCoach(coach, at, fallback))
+  }, [step.id, hidden, shows, at, fallback])
   // On scroll (any scroller, so capture) and resize.
   useEffect(() => {
     const coach = ref.current
-    const place = () => placeCoach(coach, at)
+    const place = () => placeCoach(coach, at, fallback)
     let rt: ReturnType<typeof setTimeout> | undefined
     const onResize = () => { clearTimeout(rt); rt = setTimeout(place, 80) }
     window.addEventListener('scroll', place, { capture: true, passive: true })
     window.addEventListener('resize', onResize)
     return () => { window.removeEventListener('scroll', place, { capture: true }); window.removeEventListener('resize', onResize); clearTimeout(rt) }
-  }, [at])
+  }, [at, fallback])
   // While it shows, it follows its anchor as the page moves under it: a line
   // written above the write line, a list that grows, a section that loads.
   // The anchor, what holds it, and the page are watched; once a frame.
   useEffect(() => {
     const coach = ref.current
     if (!coach || hidden || typeof ResizeObserver !== 'function') return
-    const frame = perFrame(() => placeCoach(coach, at))
+    const frame = perFrame(() => placeCoach(coach, at, fallback))
     const ro = new ResizeObserver(frame.run)
-    const { el } = anchorOf(at)
+    const { el } = anchorOf(at, fallback)
     for (const n of new Set([el, el?.parentElement, document.body])) if (n) ro.observe(n)
     return () => { ro.disconnect(); frame.cancel() }
-  }, [step.id, hidden, shows, at])
+  }, [step.id, hidden, shows, at, fallback])
   useEffect(() => unlight, [])
 
   // Escape hides it (the session stays).
@@ -302,35 +387,6 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
     return () => cancelAnimationFrame(id)
   }, [step.id, write])
 
-  // The step's action: picking its day, running, done (for this step), or failed.
-  const [acted, setActed] = useState<{ step: string; state: 'picking' | 'running' | 'done' | 'failed'; day?: string } | null>(null)
-  const actState = acted?.step === step.id ? acted.state : null
-  const actDay = acted?.step === step.id ? acted.day : undefined
-  const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  const dayOf = (ymd?: string) => {
-    const m = ymd && /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd)
-    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : undefined
-  }
-  const runAction = async (day?: Date) => {
-    if (!action || actState === 'running') return
-    setActed({ step: step.id, state: 'running', day: actDay })
-    const ok = await action.run(day).catch(() => false)
-    setActed({ step: step.id, state: ok ? 'done' : 'failed', day: actDay })
-  }
-  const actionNode = !action ? null : actState === 'done'
-    ? <p className="coach-done" role="status">{action.done(dayOf(actDay))}</p>
-    : action.date && actState !== null
-      ? <div className="coach-pick">
-        <label className="coach-pick-label">{action.date.label}
-          <input type="date" className="coach-pick-date" value={actDay ?? ''} disabled={actState === 'running'}
-            onChange={(e) => setActed({ step: step.id, state: 'picking', day: e.target.value })} />
-        </label>
-        <button type="button" className="coach-action" disabled={actState === 'running' || !dayOf(actDay)}
-          onClick={() => { void runAction(dayOf(actDay)) }}>Book it</button>
-      </div>
-      : <button type="button" className="coach-action" disabled={actState === 'running'}
-        onClick={() => { if (action.date) setActed({ step: step.id, state: 'picking', day: ymdOf(action.date.initial) }); else void runAction() }}>{action.label}</button>
-
   const title = titleFor ? titleFor(step) : step.title
   return createPortal(
     <div ref={ref} className="coach" role="dialog" aria-label="Planning guide" hidden={hidden} data-level={level}>
@@ -338,8 +394,9 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
       <div className="coach-t">{title}</div>
       <p className="coach-why">{step.why}</p>
       <p className="coach-you">{step.you}</p>
-      {actionNode}
-      {action && actState === 'failed' && <p className="coach-error" role="alert">Didn’t save. Try again.</p>}
+      {/* Keyed by the step: what was picked or booked is that step's alone. */}
+      {ask?.kind === 'choice' && <ChoiceAsk key={step.id} ask={ask} />}
+      {ask?.kind === 'book' && <BookAsk key={step.id} ask={ask} />}
       {error && <p className="coach-error" role="alert">{error}</p>}
       <div className="coach-nav">
         <button type="button" disabled={index === 0} onClick={onBack}>Back</button>

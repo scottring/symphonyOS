@@ -12,7 +12,8 @@ import type { IdealWeek } from '@/lib/guide/idealWeek'
 
 export interface GuideNotes {
   guide?: GuideProgress
-  energy?: { level: 'high' | 'medium' | 'low'; words?: string }
+  /** Cleared, only the words may be left (Task 4: Clear keeps the words). */
+  energy?: { level?: 'high' | 'medium' | 'low'; words?: string }
   vision?: { tenYears?: string; success?: string }
   landscape?: { month: number; text: string }[]
   idealWeek?: IdealWeek

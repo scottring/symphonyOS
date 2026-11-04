@@ -52,9 +52,10 @@ describe('guide step catalog', () => {
       expect(stepsFor(level).find((s) => s.id === 'look-back')?.drives).toEqual({ above: true, look: true })
       expect(choosingStep(level).drives).toEqual({ above: true, write: true })
     }
-    // Today: the week opens beside the day to pick from, and for its routines.
+    // Today: the week opens beside the day for yesterday's leftovers (Task 4:
+    // they are back on the week sheet), to pick from, and for its routines.
     expect(drives('day')).toEqual({
-      'look-back': {}, calendar: {}, energy: {},
+      'look-back': { above: true }, calendar: {}, energy: {},
       pick: { above: true }, habits: { above: true },
     })
   })
@@ -67,6 +68,9 @@ describe('guide step catalog', () => {
     expect(at('month')).toEqual({ 'fresh-start': 'menu', 'look-back': 'left', 'read-season': 'left', 'next-weeks': 'right', 'by-area': 'write', 'upkeep-fun': 'routines' })
     expect(at('season')).toEqual({ 'look-back': 'left', 'from-year': 'left', calendar: 'right', energy: 'energy', 'by-area': 'write', 'ideal-week': 'ideal-week', 'wild-cards': 'wild-cards' })
     expect(at('year')).toEqual({ 'look-back': 'left', vision: 'vision', landscape: 'landscape', areas: 'areas', 'brain-dump': 'write', refine: 'list', 'share-book': 'list' })
+    // With no leftovers on the week sheet the look back points at the
+    // week's fold, not the page title (Task 4).
+    expect(stepsFor('day').find((s) => s.id === 'look-back')?.fallback).toBe('left')
     // A step that opens the calendar points at it, or at its routines
     // (Month's Maintenance and fun; Year's landscape at its own section); a
     // writing step at the write line.
@@ -90,5 +94,14 @@ describe('guide step catalog', () => {
   it('has no emojis in copy', () => {
     const all = JSON.stringify(GUIDE_STEPS)
     expect(/\p{Extended_Pictographic}/u.test(all)).toBe(false)
+  })
+
+  // Task 4 (2026-11-04): a step that captures one small fact asks it in its
+  // tooltip; leftovers are planned from the week sheet.
+  it('says where the small facts are asked, and how leftovers are planned', () => {
+    const step = (level: GuideLevel, id: string) => stepsFor(level).find((s) => s.id === id)!
+    expect(step('day', 'look-back').you).toBe('Plan them for today with +, or leave them on the week.')
+    for (const level of ['day', 'season'] as const) expect(step(level, 'energy').you).not.toMatch(/chip/i)
+    expect(step('month', 'upkeep-fun').you).toMatch(/…?then write a fun line on the sheet\.$/)
   })
 })

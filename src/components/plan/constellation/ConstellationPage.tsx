@@ -110,9 +110,9 @@ import { CalendarSheet, MonthGrid, SheetRoutines, type SheetRoutine } from '@/co
 import { WriteLine } from '@/components/plan/fold/WriteLine'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 import { GuidedPeriod, type PeriodSessionTools, type SessionFold } from '@/components/plan/guided/GuidedPeriod'
-import { PlanChip, PlannedStamp, type CoachAction } from '@/components/guide/GuideCoach'
+import { PlanChip, PlannedStamp, type CoachAsk } from '@/components/guide/GuideCoach'
+import { ENERGY_CHOICES, isEnergyLevel, withEnergy, type EnergyNote } from '@/lib/guide/energy'
 import { PageSection } from '@/components/plan/fold/PageSection'
-import { EnergyChip } from '@/components/guide/EnergyChip'
 import { WILD_CARDS } from '@/lib/guide/wildCards'
 import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
 import { FreshStart } from '@/components/plan/guided/month/FreshStart'
@@ -779,14 +779,25 @@ function Inner() {
   const openSeasonGoals = level === 1 ? openNodes.map((n) => ({ id: n.id, title: n.title })) : []
   // The year's open goals, for the refine and share steps.
   const yearOpen = level === 0 ? openNodes.filter((n) => n.goal) : []
+  // A step that captures one small fact asks it in its tooltip (Task 4,
+  // Scott 2026-11-04).
   // Share and book (Year): sharing is each goal's own space (its panel); the
-  // step's tooltip carries the one action, booking the first session of the
-  // next season, on the day it starts.
-  // A tap opens a day to book, the next season's first unless changed
+  // step's tooltip asks the booking date of the first session of the next
+  // season. A tap opens a day to book, the next season's first unless changed
   // (fix round 1: booking keeps a date); "Book it" books that day, with Undo.
+  // Energy check (Season): Low · Medium · High, the season's energy note,
+  // once its notes are read; the header line says it after.
   const seasonStarts = nextSeasonStart(now, seasons)
-  const sessionActions: Partial<Record<string, CoachAction>> = level === 0 ? {
+  const seasonEnergy = seasonNotes.notes.energy
+  const patchSeasonNotes = seasonNotes.patch
+  const sessionAsks: Partial<Record<string, CoachAsk>> = level === 1 ? (seasonNotes.loading || seasonNotes.error ? {} : {
+    energy: {
+      kind: 'choice', label: 'Energy', choices: ENERGY_CHOICES, value: seasonEnergy?.level,
+      pick: (v) => isEnergyLevel(v) ? patchSeasonNotes({ energy: withEnergy(seasonEnergy, v) }) : Promise.resolve(false),
+    },
+  }) : level === 0 ? {
     'share-book': {
+      kind: 'book',
       label: `Book the first ${nextSeasonWord} session`,
       date: { label: `First ${nextSeasonWord} session`, initial: new Date(seasonStarts.getFullYear(), seasonStarts.getMonth(), seasonStarts.getDate()) },
       done: (day) => `Booked: Plan ${nextSeasonWord}${day ? `, ${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}` : ''}`,
@@ -845,7 +856,11 @@ function Inner() {
     ?? (!planSession.loading && !planSession.error ? planSession.saved?.at.toISOString() : undefined)
   const summary = !reviewing && dataReady && !error && !goalsError
     ? <PeriodSummaryLine level={PERIODS[level]} plannedAt={plannedAt} reviewed={!prevReview.error && !!prevReview.reviewed}
-      />
+      // Season's energy, asked in its Energy step's tooltip (Task 4): said
+      // here, and a tap changes it. Keyed by the period: a menu left open
+      // never carries to the next season.
+      key={`summary:${sessionToken}`}
+      {...(level === 1 && !seasonNotes.loading && !seasonNotes.error ? { energy: seasonEnergy, onEnergy: (energy: EnergyNote | undefined) => patchSeasonNotes({ energy }) } : {})} />
     : null
   const menuChoices: PageMenuChoice[] = [
     ...(dataReady ? offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run })) : []),
@@ -1022,10 +1037,6 @@ function Inner() {
         {summary}
       </div>
       <div className="plan-head-tools">
-        {/* Season's energy: the Energy step's home, every day. */}
-        {level === 1 && (seasonNotes.error
-          ? <span className="energy-chip-unloaded">Energy couldn’t load</span>
-          : !seasonNotes.loading && <EnergyChip key={`energy:${sessionToken}`} value={seasonNotes.notes.energy} save={(energy) => seasonNotes.patch({ energy })} />)}
         {plannable && !reviewing && <PlanChip level={PERIODS[level]} word={periodWord} onStart={() => setMode('plan')} disabled={!dataReady} />}
         {primary && <button type="button" className="pv2-btn wk-plan plan-primary" disabled={!dataReady} onClick={primary.run}
           data-explain="plan-primary" data-explain-label={primary.label}>{primary.label}</button>}
@@ -1055,7 +1066,7 @@ function Inner() {
       // Planning: this same page, one tooltip per step, each step driving
       // the sheet's folds.
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
-          page={pageBody} look={lookBackBody} actions={sessionActions} onFinish={closePeriod}
+          page={pageBody} look={lookBackBody} asks={sessionAsks} onFinish={closePeriod}
           onLeave={() => { setMode(null); periodNotes.reload(); seasonNotes.reload() }}
           onPlanned={() => { planSession.reload(); periodNotes.reload() }} listenPageWrites={listenPageWrites}
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}

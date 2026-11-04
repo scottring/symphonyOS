@@ -259,12 +259,12 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
     } finally { window.matchMedia = mm }
   })
 
-  // Share and book (Year): the tooltip carries the step's one action, the
-  // existing booking; sharing is each goal's own space.
-  it('a step with one action carries its button in the tooltip; it runs once and says it is done; a failure says so', async () => {
+  // Share and book (Year): the tooltip asks the step's one small fact, the
+  // booking date; sharing is each goal's own space.
+  it('a step that books carries its button in the tooltip; it runs once and says it is done; a failure says so', async () => {
     const run = vi.fn(async () => false)
     const coachFor = () => <MemoryRouter><GuideCoach level="year" current="share-book" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()}
-      action={{ label: 'Book the first Winter session', done: () => 'Booked: Plan Winter, Tue, Dec 1', run }} /></MemoryRouter>
+      ask={{ kind: 'book', label: 'Book the first Winter session', done: () => 'Booked: Plan Winter, Tue, Dec 1', run }} /></MemoryRouter>
     const { rerender } = render(coachFor())
     await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Book the first Winter session' })) })
     expect(run).toHaveBeenCalledTimes(1)
@@ -276,7 +276,7 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
     expect(tip().queryByRole('button', { name: 'Book the first Winter session' })).toBeNull()
     expect(tip().queryByRole('alert')).toBeNull()
   })
-  it('a step with no action has no extra button', () => {
+  it('a step with no ask has no extra button', () => {
     render(<MemoryRouter><GuideCoach level="year" current="refine" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()} /></MemoryRouter>)
     expect(tip().getAllByRole('button').map((b) => b.textContent)).toEqual(['Back', 'Next', '✕'])
   })
@@ -285,7 +285,7 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
   it('an action with a date opens the day first (its starting day), and Book it runs it on the day picked', async () => {
     const run = vi.fn(async () => true)
     render(<MemoryRouter><GuideCoach level="year" current="share-book" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()}
-      action={{ label: 'Book the first Winter session', date: { label: 'First Winter session', initial: new Date(2026, 11, 1) },
+      ask={{ kind: 'book', label: 'Book the first Winter session', date: { label: 'First Winter session', initial: new Date(2026, 11, 1) },
         done: (d) => `Booked: ${d?.getDate()}`, run }} /></MemoryRouter>)
     fireEvent.click(tip().getByRole('button', { name: 'Book the first Winter session' }))
     expect(run).not.toHaveBeenCalled()
@@ -295,5 +295,42 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
     await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Book it' })) })
     expect(run).toHaveBeenCalledWith(new Date(2026, 10, 28))
     expect(tip().getByRole('status')).toHaveTextContent('Booked: 28')
+  })
+
+  // Final review: a double tap on Book it books once.
+  it('Book it books once, however fast it is tapped twice', async () => {
+    let resolve: (ok: boolean) => void = () => {}
+    const run = vi.fn(() => new Promise<boolean>((r) => { resolve = r }))
+    render(<MemoryRouter><GuideCoach level="year" current="share-book" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()}
+      ask={{ kind: 'book', label: 'Book the first Winter session', date: { label: 'First Winter session', initial: new Date(2026, 11, 1) },
+        done: () => 'Booked', run }} /></MemoryRouter>)
+    fireEvent.click(tip().getByRole('button', { name: 'Book the first Winter session' }))
+    const book = tip().getByRole('button', { name: 'Book it' })
+    fireEvent.click(book); fireEvent.click(book)
+    expect(run).toHaveBeenCalledTimes(1)
+    await act(async () => { resolve(true) })
+    expect(tip().getByRole('status')).toHaveTextContent('Booked')
+  })
+
+  // Task 4 (Scott, 2026-11-04): a step that captures one small fact asks it
+  // inside its own tooltip. Energy: Low · Medium · High.
+  it('a step that asks a choice shows its choices in the tooltip; a pick saves and is shown chosen', async () => {
+    const pick = vi.fn(async () => true)
+    const coachFor = (value?: string) => <MemoryRouter><GuideCoach level="day" current="energy" word="today" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()}
+      ask={{ kind: 'choice', label: 'Energy', value, pick, choices: [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }] }} /></MemoryRouter>
+    const { rerender } = render(coachFor())
+    const group = within(tip().getByRole('radiogroup', { name: 'Energy' }))
+    expect(group.getAllByRole('radio').map((b) => b.textContent)).toEqual(['Low', 'Medium', 'High'])
+    expect(group.getAllByRole('radio').every((b) => b.getAttribute('aria-checked') === 'false')).toBe(true)
+    await act(async () => { fireEvent.click(group.getByRole('radio', { name: 'Medium' })) })
+    expect(pick).toHaveBeenCalledWith('medium')
+    expect(group.getByRole('radio', { name: 'Medium' })).toHaveAttribute('aria-checked', 'true')
+    rerender(coachFor('medium'))
+    expect(group.getByRole('radio', { name: 'Medium' })).toHaveAttribute('aria-checked', 'true')
+    // A pick that did not save says so, and shows what is saved.
+    pick.mockResolvedValueOnce(false)
+    await act(async () => { fireEvent.click(group.getByRole('radio', { name: 'High' })) })
+    expect(tip().getByRole('alert')).toHaveTextContent('Didn’t save. Try again.')
+    expect(group.getByRole('radio', { name: 'Medium' })).toHaveAttribute('aria-checked', 'true')
   })
 })

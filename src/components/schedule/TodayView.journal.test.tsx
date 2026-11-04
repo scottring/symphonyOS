@@ -87,14 +87,18 @@ describe('Carried over', () => {
   // scheduled work and chosen focus (Scott, 2026-09-21). The page spends no
   // line on it at all — no rows, no count, no second door (2026-09-21): the
   // fold is the one entrance, and the morning review waits in the ⋯ menu.
-  // Planning as tooltips (Task 2, 2026-11-04): yesterday's unfinished items
-  // have one home on Today, "From yesterday", each with its choices. Still no
-  // count, no Carried over heading, no review door.
-  it("draws yesterday's unfinished commitment only under From yesterday, with no line or door pointing at it", () => {
+  // Task 4 (Scott, 2026-11-04): Today stays as it was. Yesterday's
+  // unfinished items go back to the week sheet beside the day, first and
+  // marked with their day. Still no count, no Carried over heading, no
+  // review door, and no section on the day.
+  it("draws yesterday's unfinished commitment only on the week sheet, marked with its day, with no line or door pointing at it", () => {
     const yesterday = createMockTask({ id: 'yest', title: 'Order Comma 4', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 18) })
     renderView({ tasks: [...tasks, yesterday] })
     expect(screen.queryByRole('heading', { name: 'Carried over' })).not.toBeInTheDocument()
-    expect(screen.getByText('Order Comma 4').closest('section')).toBe(screen.getByRole('region', { name: 'From yesterday' }))
+    expect(screen.queryByRole('region', { name: 'From yesterday' })).toBeNull()
+    const row = screen.getByText('Order Comma 4').closest('li')!
+    expect(row.closest('.above-sheet')).not.toBeNull()
+    expect(row.querySelector('.above-sheet-row-mark')).toHaveTextContent('Fri')
     expect(screen.queryByRole('button', { name: /Review unfinished work/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Review' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Carried over · \d/)).toBeNull()

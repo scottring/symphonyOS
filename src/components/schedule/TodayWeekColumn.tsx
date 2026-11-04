@@ -16,6 +16,12 @@
 // row on this day is on the day beside it; one on another day is on that
 // day; done rows are counted, not listed.
 //
+// What was given an earlier day of this week and is still open comes back
+// onto the sheet first, each marked faintly with its day ("Tue"), and + plans
+// it for the day like any row (Task 4, Scott 2026-11-04: yesterday's
+// unfinished tasks go back where they came from; Today itself stays as it
+// was). The first such row is the Day session's look back's home.
+//
 // On the week's last day the week still ahead is on the sheet too
 // (walkthrough 2026-10-02, #24/#18: a plan made for next week was nowhere on
 // Today). Its rows are for reading — a title opens the task, nothing more.
@@ -30,8 +36,9 @@ import { focusSnapshot } from '@/lib/placement/model'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { dayWordFor } from '@/components/canvas/week/compactWeek'
+import { earlierDayMark } from '@/lib/planning/weekList'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
-import { AboveSheet, SheetRows } from '@/components/plan/fold/AboveSheet'
+import { AboveSheet, SheetRows, type SheetRow } from '@/components/plan/fold/AboveSheet'
 
 export interface TodayNextWeek { weekStart: Date; entries: DayPlanEntry[] }
 
@@ -93,13 +100,14 @@ function useToToday(day: Date, actions: DayPlanPanelActions, chooseTask?: (id: s
  *  hours it gets the time it lands at; on For today it is chosen, no time).
  *  Rows are keyed by entry ("task:…", "routine:…"), so a routine and a task
  *  never share a row id. */
-function sheetRowProps(entries: DayPlanEntry[], day: Date, actions: DayPlanPanelActions, toToday: (e: DayPlanEntry) => void) {
+function sheetRowProps(entries: DayPlanEntry[], day: Date, actions: DayPlanPanelActions, toToday: (e: DayPlanEntry) => void,
+  rowOf: (e: DayPlanEntry) => Partial<SheetRow> = () => ({})) {
   const ymd = localYmd(day)
   const { word: dayWord } = dayWordFor(day)
   const byKey = new Map(entries.map((e) => [e.key, e]))
   const with_ = (f: (e: DayPlanEntry) => void) => (key: string) => { const e = byKey.get(key); if (e) f(e) }
   return {
-    rows: entries.map((e) => ({ id: e.key, title: e.title })),
+    rows: entries.map((e): SheetRow => ({ id: e.key, title: e.title, ...rowOf(e) })),
     onPick: with_(toToday),
     pickLabel: (title: string) => `Plan ${title} for ${dayWord}`,
     onOpen: actions.open ? with_((e) => actions.open?.(e)) : undefined,
@@ -125,11 +133,19 @@ export function SheetRoutines({ plan, day, actions }: { plan: DayPlan; day: Date
   </div>
 }
 
-export function TodayWeekFold({ plan, day, weekStart, actions, nextWeek, chooseTask, restoreTask, className, stowed, drive, children }: {
+/** Earlier this week, still open (earlierThisWeek), as sheet entries. */
+const earlierEntry = (t: Task): DayPlanEntry => ({
+  key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: false, planned: false, group: 'week', task: t,
+})
+
+export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nextWeek, chooseTask, restoreTask, className, stowed, drive, children }: {
   plan: DayPlan
   day: Date
   weekStart: Date
   actions: DayPlanPanelActions
+  /** Given an earlier day of this week and still open, under the page's
+   *  filters (earlierThisWeek): first on the sheet, marked with the day. */
+  earlier?: readonly Task[]
   /** Next week's open list — passed only on the week's last day. */
   nextWeek?: TodayNextWeek | null
   /** Choose a task for the day and say whether it saved (planActions'
@@ -150,9 +166,14 @@ export function TodayWeekFold({ plan, day, weekStart, actions, nextWeek, chooseT
   const toToday = useToToday(day, actions, chooseTask, restoreTask)
   // The week's open work with no day yet: not done, not on this day, not on
   // another day of the week.
-  const open = plan.chooserTasks.filter((e) => e.kind === 'task' && !e.completed && !onViewedDay(e, ymd) && !alreadyPlaced(e, day))
+  // Earlier this week's come first, each once.
+  const earlierIds = new Set(earlier.map((t) => t.id))
+  const left = earlier.map(earlierEntry)
+  const open = [...left, ...plan.chooserTasks.filter((e) => e.kind === 'task' && !e.completed && !earlierIds.has(e.id) && !onViewedDay(e, ymd) && !alreadyPlaced(e, day))]
   const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
-  const { rows, ...rowProps } = sheetRowProps(open, day, actions, toToday)
+  const firstLeft = left[0]?.key
+  const { rows, ...rowProps } = sheetRowProps(open, day, actions, toToday, (e) => earlierIds.has(e.id) && e.task
+    ? { mark: earlierDayMark(e.task), anchor: e.key === firstLeft ? 'leftovers' : undefined } : {})
 
   const range = formatWeekRangeShort(weekStart)
   const nextById = new Map((nextWeek?.entries ?? []).map((e) => [e.id, e]))

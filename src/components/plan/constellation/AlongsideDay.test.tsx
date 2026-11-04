@@ -13,7 +13,8 @@ vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null})}))
 vi.mock('@/lib/today/domainFilter',()=>({filterTasksForLayers:(t:Task[])=>t}))
 vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,scopeId:null})}))
-vi.mock('@/lib/planning/weekList',()=>({weekListTasks:(t:Task[])=>t}))
+vi.mock('@/lib/planning/weekList',async(orig)=>({...await orig<object>(),// A let-go item is on no week's list (letGo ends its commitments).
+ weekListTasks:(t:Task[])=>t.filter((x)=>!x.dismissedAt)}))
 vi.mock('@/hooks/useTravelTime',()=>({useTravelTime:()=>null}))
 // Fri Oct 9, 2026, in the Sunday-start week Oct 4 – Oct 10.
 const date=new Date(2026,9,9)
@@ -85,6 +86,26 @@ it('a row drags onto the day with the same payload, and the day places it; unrel
  expect(update).not.toHaveBeenCalled()
  fireEvent.drop(target,{dataTransfer:{getData:(type:string)=>type==='application/x-symphony-week-action'?'same-id':''}})
  await waitFor(()=>expect(update).toHaveBeenCalledWith('same-id',{isAllDay:true,scheduledFor:date,bucket:'timed'}))
+})
+
+// Task 4 (Scott, 2026-11-04): what an earlier day of this week left open is
+// back on the sheet, first, marked faintly with its day; + plans it.
+it('an open task from earlier this week is first on the sheet, marked with its day; + plans it for the day; done ones stay off',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,9,9));onTestFinished(()=>{vi.useRealTimers()})
+ const wed={id:'wed',title:'Call the vet',createdAt:date,completed:false,bucket:'timed',scheduledFor:new Date(2026,9,7),isAllDay:true} as Task
+ const wedDone={...wed,id:'wed-done',title:'Mail the form',completed:true} as Task
+ const letGo={...wed,id:'gone',title:'Let go',dismissedAt:new Date(2026,9,7,20)} as Task
+ const update=vi.fn().mockResolvedValue(true)
+ render(<MemoryRouter><AlongsideDay tasks={[task,wed,wedDone,letGo]} date={date} update={update} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ expect(screen.getByRole('button',{name:'Oct 4 – Oct 10, 2 open. Unfold to read'})).toBeInTheDocument()
+ unfold()
+ const rows=within(screen.getByRole('list',{name:'Oct 4 – Oct 10'})).getAllByRole('listitem')
+ expect(rows.map((li)=>li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Call the vet','Choose picnic spot'])
+ expect(rows[0].querySelector('.above-sheet-row-mark')).toHaveTextContent('Wed')
+ expect(rows[0]).toHaveAttribute('data-guide-anchor','leftovers')
+ expect(rows[1].querySelector('.above-sheet-row-mark')).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:'Plan Call the vet for today'}))
+ await waitFor(()=>expect(update).toHaveBeenCalledWith('wed',expect.objectContaining({scheduledFor:date,isAllDay:true,bucket:'timed'})))
 })
 
 it('a title tap opens the action’s details without scheduling it',()=>{

@@ -14,6 +14,41 @@ import { doableBy } from './poolViews'
 import { isUndatedLegacyDone } from './periodPage'
 import { localYmd } from '@/lib/cadence/config'
 
+/**
+ * What has a day earlier this week (before `day`) and is still open: not
+ * done, not let go, and not chosen for `day` already (Task 4, Scott
+ * 2026-11-04: yesterday's unfinished tasks go back where they came from, the
+ * week sheet beside the day, first and marked with their day). Oldest day
+ * first. Through the page's filters: `keep` (Today's people filter) and
+ * `scopeId` (the workspace's people scope, as weekListTasks reads it).
+ */
+export function earlierThisWeek(tasks: readonly Task[], { weekStart, day, userId, scopeId, keep }: {
+  weekStart: Date
+  day: Date
+  /** Whose choice of `day` counts (null: anyone's). */
+  userId?: string | null
+  scopeId?: string | null
+  keep?: (t: Task) => boolean
+}): Task[] {
+  const first = localYmd(weekStart)
+  const ymd = localYmd(day)
+  return tasks
+    .filter((t) => {
+      if (t.completed || t.dismissedAt || !t.scheduledFor) return false
+      const k = localYmd(t.scheduledFor)
+      if (k < first || k >= ymd) return false
+      if (isFocused(t, userId, ymd)) return false
+      if (scopeId && !doableBy(t, scopeId)) return false
+      return !keep || keep(t)
+    })
+    .sort((a, b) => a.scheduledFor!.getTime() - b.scheduledFor!.getTime() || a.createdAt.getTime() - b.createdAt.getTime())
+}
+
+/** The faint day mark beside an earlier-this-week row: "Tue". */
+export function earlierDayMark(t: Pick<Task, 'scheduledFor'>): string {
+  return t.scheduledFor ? t.scheduledFor.toLocaleDateString('en-US', { weekday: 'short' }) : ''
+}
+
 export function weekListTasks(tasks: readonly Task[], weekStart: Date, meId: string | null, opts: { isCurrent?: boolean } = {}): Task[] {
   const out: Task[] = []
   for (const t of tasks) {

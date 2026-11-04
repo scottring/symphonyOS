@@ -20,7 +20,7 @@ export interface AboveSheetProps {
   /** "Fall 2026", "2026", "2025". */
   title: string
   /** The open lines, titles only. */
-  rows: { id: string; title: string }[]
+  rows: SheetRow[]
   doneCount: number
   /** "For reading. Write November in its own words." */
   foot: string
@@ -41,8 +41,13 @@ export interface AboveSheetProps {
 
 const defaultPickLabel = (title: string) => `Plan ${title} for today`
 
+/** A line on the sheet. Today's week sheet only: `mark`, a faint word beside
+ *  it (an earlier day of the week, "Tue"), and `anchor`, a planning step's
+ *  home (`data-guide-anchor`). */
+export interface SheetRow { id: string; title: string; mark?: string; anchor?: string }
+
 export interface SheetRowsProps {
-  rows: { id: string; title: string }[]
+  rows: SheetRow[]
   /** The list's accessible name. */
   label: string
   onPick?: (id: string) => void
@@ -58,16 +63,17 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
     <ul className="above-sheet-list" aria-label={label}>
       {rows.map((r) => onPick || onOpen || onDragRow ? (
         <li key={r.id} className="above-sheet-row" draggable={onDragRow ? true : undefined}
-          onDragStart={onDragRow ? (ev) => onDragRow(r.id, ev) : undefined}>
+          onDragStart={onDragRow ? (ev) => onDragRow(r.id, ev) : undefined} data-guide-anchor={r.anchor}>
           {onOpen
             ? <button type="button" className="above-sheet-row-title" onClick={() => onOpen(r.id)}>{r.title}</button>
             : <span className="above-sheet-row-title">{r.title}</span>}
+          {r.mark && <span className="above-sheet-row-mark">{r.mark}</span>}
           {onPick && (
             <button type="button" className="above-sheet-pick" aria-label={pickLabel(r.title)} title={pickLabel(r.title)}
               onClick={() => onPick(r.id)}>+</button>
           )}
         </li>
-      ) : <li key={r.id}>{r.title}</li>)}
+      ) : <li key={r.id} data-guide-anchor={r.anchor}>{r.title}{r.mark && <span className="above-sheet-row-mark"> {r.mark}</span>}</li>)}
     </ul>
   )
 }

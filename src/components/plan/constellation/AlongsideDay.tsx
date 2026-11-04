@@ -13,6 +13,11 @@
 // show/hide. It lies folded beside the day like every horizon's level above
 // (PaperFold horizon="day"), and the one exception to "no controls on the
 // sheet above" holds: each row keeps its + and its drag onto the day.
+//
+// What was given an earlier day of this week and is still open comes back
+// first, marked faintly with its day ("Tue"); + plans it for the day (Task 4,
+// Scott 2026-11-04: yesterday's unfinished tasks go back where they came
+// from). The same selector as Today's own sheet (earlierThisWeek).
 import { useRef, useState, useMemo, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
@@ -20,7 +25,7 @@ import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
-import { weekListTasks } from '@/lib/planning/weekList'
+import { weekListTasks, earlierThisWeek, earlierDayMark } from '@/lib/planning/weekList'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
@@ -77,14 +82,17 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
 
   // The week's open work with no day yet, as the Week page's "No day yet"
   // reads it: not done, not on this day, not on another day of the week.
+  // Earlier this week's first, each once.
   const now = new Date()
-  const open = weekTasks.filter((t) => !t.completed
+  const earlier = earlierThisWeek(visible, { weekStart: week, day: date, scopeId: lens.scopeId })
+  const earlierIds = new Set(earlier.map((t) => t.id))
+  const open = [...earlier, ...weekTasks.filter((t) => !t.completed && !earlierIds.has(t.id)
     && !(t.scheduledFor && localYmd(t.scheduledFor) === ymd)
-    && !placedInWeek(t, week, now))
+    && !placedInWeek(t, week, now))]
   const doneCount = weekTasks.filter((t) => t.completed).length
 
   const place = async (id: string) => {
-    const task = weekTasks.find((t) => t.id === id && !t.completed)
+    const task = [...earlier, ...weekTasks].find((t) => t.id === id && !t.completed)
     if (!task || lock.current) return
     lock.current = true; setPending(id); setMessage('')
     const patch = lineDropUpdates(task, { kind: 'day', at: date })
@@ -122,7 +130,9 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
             drive={weekDrive === undefined ? undefined : { above: weekDrive }}
             frontLabel={`${range}, to pick from`}
             above={<AboveSheet kicker="Week" title={range}
-              rows={open.map((t) => ({ id: t.id, title: t.title }))} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
+              rows={open.map((t, i) => earlierIds.has(t.id)
+                ? { id: t.id, title: t.title, mark: earlierDayMark(t), anchor: i === 0 ? 'leftovers' : undefined }
+                : { id: t.id, title: t.title })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
               onOpen={onSelect} onDragRow={(id, ev) => {
