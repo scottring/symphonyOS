@@ -486,6 +486,8 @@ function ShellLayoutInner({ children }: Props) {
       setOccurrenceAssignee: (id, date, memberId) => setOccurrenceAssignee('routine', id, date, memberId),
       // Month / Season / Year: the pages' own writers (ConstellationPage, the year carry).
       defaultContext: soleDomain ?? undefined,
+      // In a guided session the card places items without ties.
+      inSession: !!guided,
       goals,
       addGoal: async (name, { year, context, carriedFrom, areaId, notes, strategy, assignedToAll }) =>
         (await addGoal(areaId ?? null, name, context, { year, carriedFrom, notes, strategy, assignedToAll }))?.id,

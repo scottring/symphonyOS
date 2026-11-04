@@ -27,6 +27,9 @@ import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 export interface ApplyDeps extends Partial<MoreApplyDeps> {
   /** Durable server journal owns rollback/Undo for actual chat writes. */
   managedRecovery?: boolean
+  /** A guided planning session: items are placed by list, period, life area
+   *  and day, never under another item (no sourceId, no goalId). */
+  inSession?: boolean
   tasks: Task[]
   updateTask: (id: string, updates: Partial<Task>) => Promise<boolean | void>
   addTask: (title: string, scheduledFor: Date | undefined, options: {
@@ -345,7 +348,7 @@ export async function applyChangeSet(card: ChangeSet, given: ApplyDeps): Promise
         if (!item || moved) return { ok: false, reason: 'stale', title: op.title }
       }
       // The parent it is written for must still be there to link to.
-      if (op.op === 'plan_add' && op.parentId && op.level !== 'year') {
+      if (op.op === 'plan_add' && op.parentId && op.level !== 'year' && !given.inSession) {
         const parent = op.level === 'season' ? goalsById.get(op.parentId) : byId.get(op.parentId)
         if (!parent) return { ok: false, reason: 'stale', title: op.parentTitle ?? op.title }
       }
@@ -601,8 +604,8 @@ export async function applyChangeSet(card: ChangeSet, given: ApplyDeps): Promise
           // The space and life area it was filed under on the card.
           const filed = { ...(op.context ? { context: op.context } : {}), ...(op.areaId ? { areaId: op.areaId } : {}) }
           const options = when
-            ? { isAllDay: !op.time, bucket: 'timed' as const, ...who, ...(op.goalId ? { sourceId: op.goalId } : {}), ...filed }
-            : { bucket: 'week' as const, weekStart: deps.weekStart, ...who, ...(op.goalId ? { sourceId: op.goalId } : {}), ...filed }
+            ? { isAllDay: !op.time, bucket: 'timed' as const, ...who, ...(op.goalId && !deps.inSession ? { sourceId: op.goalId } : {}), ...filed }
+            : { bucket: 'week' as const, weekStart: deps.weekStart, ...who, ...(op.goalId && !deps.inSession ? { sourceId: op.goalId } : {}), ...filed }
           const id = await deps.addTask(op.title, when, options)
           if (!id) return fail()
           ids.push(id)
@@ -692,13 +695,14 @@ export async function applyChangeSet(card: ChangeSet, given: ApplyDeps): Promise
           // The page's own create (ConstellationPage.createItem): a season goal
           // serves a year goal (goalId); a month goal serves a season goal
           // (sourceId) and inherits that one's year goal.
-          const parentGoal = op.level === 'season' && op.parentId ? goalsById.get(op.parentId) : undefined
-          const parentTask = op.level === 'month' && op.parentId ? byId.get(op.parentId) : undefined
+          const tied = !deps.inSession
+          const parentGoal = tied && op.level === 'season' && op.parentId ? goalsById.get(op.parentId) : undefined
+          const parentTask = tied && op.level === 'month' && op.parentId ? byId.get(op.parentId) : undefined
           // The card's own space first (Symphony checked it against the parent's).
           const context = op.context ?? (parentGoal ? parentGoal.context : parentTask?.context) ?? deps.defaultContext
           const options = op.level === 'season'
-            ? { bucket: 'quarter' as const, seasonStart: start, ...(op.parentId ? { goalId: op.parentId } : {}) }
-            : { bucket: 'month' as const, monthStart: start, ...(op.parentId ? { sourceId: op.parentId } : {}), ...(parentTask?.goalId ? { goalId: parentTask.goalId } : {}) }
+            ? { bucket: 'quarter' as const, seasonStart: start, ...(tied && op.parentId ? { goalId: op.parentId } : {}) }
+            : { bucket: 'month' as const, monthStart: start, ...(tied && op.parentId ? { sourceId: op.parentId } : {}), ...(parentTask?.goalId ? { goalId: parentTask.goalId } : {}) }
           const id = await deps.addTask(op.title, undefined, { ...options, ...(context ? { context } : {}), ...(op.areaId ? { areaId: op.areaId } : {}) })
           if (!id) return fail()
           ids.push(id)

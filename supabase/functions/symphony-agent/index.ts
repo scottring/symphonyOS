@@ -1635,7 +1635,7 @@ Deno.serve(async (req) => {
               } else if (block.name === PROPOSE_CHANGES_TOOL.name) {
                 // A change card: validated and resolved through the person's own
                 // RLS-scoped reads, streamed to the page, never written here.
-                const parsed = (surface==='onboarding_activity'?activitySetFromInput:changeSetFromInput)(block.input ?? {}, String(block.id ?? crypto.randomUUID()))
+                const parsed = (surface==='onboarding_activity'?activitySetFromInput:changeSetFromInput)(block.input ?? {}, String(block.id ?? crypto.randomUUID()), { guide: !!guide })
                 if ('error' in parsed) result = JSON.stringify({ error: parsed.error })
                 else if (surface === 'onboarding' && routineTimeEvidenceError(block.input?.ops, parsed.set.ops, incoming)) result = JSON.stringify({error:routineTimeEvidenceError(block.input?.ops, parsed.set.ops, incoming)})
                 else if (surface === 'onboarding' && !onboardingCardAllowed(parsed.set.ops)) result = JSON.stringify({ error: 'During this introduction, draft new routines or display-only changes to existing routines (routine_change with show_on_timeline only). Other changes happen in the main app. Do not turn one-off activities into routines.' })

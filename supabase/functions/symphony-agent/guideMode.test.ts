@@ -32,7 +32,7 @@ describe('OPS_FOR_WRITE', () => {
     expect(OPS_FOR_WRITE).toEqual({
       review: [],
       triage: ['someday', 'done', 'assign', 'unplace', 'plan_carry', 'plan_let_go', 'plan_done'],
-      commit: ['add', 'plan_carry'],
+      commit: ['add'],
       place: ['place', 'add'],
       inbox: ['place', 'someday', 'done', 'add'],
       plan_add: ['plan_add'],
@@ -53,8 +53,11 @@ describe('opsForStep: each level\'s step gets the ops for its level', () => {
       expect(kinds).toEqual(expect.arrayContaining([...TRIAGE, 'place']))
     }
   })
-  it('Season, choose from the year: a season goal under its year goal, or a carry; never a bare add', () => {
-    expect(opsForStep(stepOf('season', 'from-year', ['commit']))).toEqual(['plan_add', 'plan_carry'])
+  it('Season, choose from the year: a season goal by period and area; no carry across levels, never a bare add', () => {
+    expect(opsForStep(stepOf('season', 'from-year', ['commit']))).toEqual(['plan_add'])
+    expect(OPS_FOR_STEP['season:from-year']).not.toContain('plan_carry')
+    expect(OPS_FOR_STEP['month:by-area']).not.toContain('plan_carry')
+    expect(opsForStep(stepOf('month', 'by-area', ['commit', 'plan_add', 'area']))).toEqual(['plan_add'])
   })
   it('Month by area: month goals, never a bare add (an add lands on this week)', () => {
     const kinds = opsForStep(stepOf('month', 'by-area', ['commit', 'plan_add', 'area']))
@@ -93,7 +96,7 @@ describe('opsForStep: each level\'s step gets the ops for its level', () => {
   })
   it('the prompt names the list a new goal goes on', () => {
     const b = guidePromptBlock({ ...stepOf('season', 'from-year', ['commit']), aboveLines: [{ id: A, title: 'Take a sabbatical' }] }, 'Winter')
-    expect(b).toContain('This step may change: plan_add, plan_carry.')
+    expect(b).toContain('This step may change: plan_add.')
     expect(b).toContain("level 'season'")
     expect(guidePromptBlock(stepOf('season', 'wild-cards', ['plan_add']), 'Winter')).toMatch(/level 'season' or 'month'/)
     expect(guidePromptBlock(inboxStep, 'Nov 1 – 7')).not.toContain('level \'')
@@ -141,7 +144,7 @@ describe('guidePromptBlock', () => {
     expect(areasOnly).toContain('set area_id')
     expect(areasOnly).not.toContain('parent_id')
     const linesOnly = guidePromptBlock({ ...inboxStep, areas: [] }, 'Nov 1 – 7')
-    expect(linesOnly).toContain('goal_id on add, parent_id on plan_add')
+    expect(linesOnly).not.toContain('goal_id on add')
     expect(linesOnly).not.toContain('area_id')
   })
   it('a step that writes nothing says so and asks for no card', () => {
@@ -151,7 +154,7 @@ describe('guidePromptBlock', () => {
   })
   it('dedupes kinds across several writes', () => {
     const b = guidePromptBlock({ ...inboxStep, writes: ['commit', 'place'] }, 'Nov 1 – 7')
-    expect(b).toContain('This step may change: add, plan_carry, place.')
+    expect(b).toContain('This step may change: add, place.')
   })
 })
 
@@ -255,8 +258,8 @@ describe('filterOpsForStep', () => {
   })
   it('takes the union of several writes', () => {
     const r = filterOpsForStep([op('k:0', 'add', 'A'), op('k:1', 'plan_carry', 'B'), op('k:2', 'place', 'C'), op('k:3', 'merge', 'D')], { ...inboxStep, stepId: 'choose', writes: ['commit', 'place'] })
-    expect(r.kept.map((o) => o.op)).toEqual(['add', 'plan_carry', 'place'])
-    expect(r.dropped.map((o) => o.op)).toEqual(['merge'])
+    expect(r.kept.map((o) => o.op)).toEqual(['add', 'place'])
+    expect(r.dropped.map((o) => o.op)).toEqual(['plan_carry', 'merge'])
   })
 })
 
@@ -388,5 +391,30 @@ describe('an add\'s month goal (goal_id) is checked through what the person can 
   it('index.ts reads an add\'s goal_id with the plan refs', () => {
     expect(SRC).toContain("o.op === 'add' ? o.goalId : undefined")
     expect(SRC).toContain("(o.op === 'add' && !!o.goalId)")
+  })
+})
+
+describe('the guide places items without ties', () => {
+  const withLines = { ...stepOf('season', 'from-year', ['commit']), aboveLines: [{ id: A, title: 'Take a sabbatical' }] }
+  it('the prompt has no line-above filing instruction and no parent question', () => {
+    const b = guidePromptBlock(withLines, 'Winter')
+    for (const gone of ['line above', 'parent_id', 'goal_id', "level above's lines", 'File each new item']) expect(b).not.toContain(gone)
+    expect(b).toContain('Never tie an item to another item')
+  })
+  it('a guide card with parent_id or goal_id is refused, without a question to ask', () => {
+    const add = { ops: [{ op: 'add', title: 'Call', goal_id: A }] }
+    const planAddTie = { ops: [{ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: A }] }
+    for (const input of [add, planAddTie]) {
+      const r = changeSetFromInput(input, 'k', { guide: true })
+      expect('error' in r && r.error).toMatch(/not tied/i)
+      expect('error' in r && r.error).not.toMatch(/\?/)
+      expect('error' in changeSetFromInput(input, 'k')).toBe(false)
+    }
+    expect('error' in changeSetFromInput({ ops: [{ op: 'add', title: 'Call' }] }, 'k', { guide: true })).toBe(false)
+  })
+  it('index.ts parses guided cards with ties refused, and the link tool stays unavailable and unchanged outside', () => {
+    expect(SRC).toMatch(/changeSetFromInput\)\(block\.input \?\? \{\}, String\(block\.id \?\? crypto\.randomUUID\(\)\), \{ guide: !!guide \}\)/)
+    expect(guideToolAllowed('symphony_link_plan_item', withLines)).toBe(false)
+    expect(SRC).toContain("update({source_id:parent.id,updated_at:now()})")
   })
 })

@@ -454,6 +454,18 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
     expect(d.addGoal).toHaveBeenCalledWith('Run a 10k', { year: 2027, context: 'personal', areaId: 'area-health' })
   })
 
+  it('in a session an add and a plan_add write no sourceId or goalId', async () => {
+    const d = planDeps({ inSession: true })
+    await applyOk(one({ key: 'p:0', op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'Book the cabin', parentId: 's1', parentTitle: 'Plan winter vacation' }), d)
+    await applyOk(one({ key: 'p:1', op: 'add', title: 'Call', date: '2026-11-03', goalId: 'm1' }), d)
+    await applyOk(one({ key: 'p:2', op: 'add', title: 'Call two', goalId: 'm1' }), d)
+    await applyOk(one({ key: 'p:3', op: 'plan_add', level: 'season', periodStart: '2026-12-01', title: 'Ski', parentId: 'g1' }), d)
+    for (const [, , opts] of vi.mocked(d.addTask).mock.calls) {
+      expect(opts).not.toHaveProperty('sourceId')
+      expect(opts).not.toHaveProperty('goalId')
+    }
+  })
+
   it('plan_add refuses as stale when its parent has gone', async () => {
     const d = planDeps()
     expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'x', parentId: 'gone', parentTitle: 'Old season goal' }), d))

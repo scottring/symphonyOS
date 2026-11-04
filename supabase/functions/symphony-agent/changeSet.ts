@@ -197,7 +197,9 @@ function memberList(v: unknown): string[] | null {
 const routineName = (v: unknown): string => (typeof v === 'string' ? v.trim().slice(0, MAX_NAME) : '')
 const DAYS_ERROR = "days must be a non-empty list of 'sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'"
 
-export function changeSetFromInput(input: Record<string, unknown>, key: string): { set: ChangeSet } | { error: string } {
+/** In a guided session (`guide`) an item is placed by list, period, life area
+ *  and day, never under another item: goal_id and parent_id are refused. */
+export function changeSetFromInput(input: Record<string, unknown>, key: string, opts: { guide?: boolean } = {}): { set: ChangeSet } | { error: string } {
   const raw = Array.isArray(input.ops) ? input.ops : null
   if (!raw || !raw.length) return { error: 'Provide at least one op' }
   if (raw.length > MAX_OPS) return { error: `Propose at most ${MAX_OPS} changes at a time` }
@@ -213,6 +215,9 @@ export function changeSetFromInput(input: Record<string, unknown>, key: string):
   for (let i = 0; i < raw.length; i++) {
     const o = raw[i] as Record<string, unknown> | null
     if (!o || typeof o !== 'object') return { error: `Op ${i + 1} is not an object` }
+    if (opts.guide && ((o.goal_id !== undefined && o.goal_id !== null) || (o.parent_id !== undefined && o.parent_id !== null))) {
+      return { error: `Op ${i + 1}: in a session items are not tied to another item. Remove goal_id and parent_id; place it by list, period, life area and day.` }
+    }
     const op = o.op as ChangeOpKind
     if (!KINDS.has(op)) return { error: `Op ${i + 1}: unknown op "${String(o.op)}" (use ${OP_KINDS.slice(0, -1).join(', ')} or ${OP_KINDS[OP_KINDS.length - 1]})` }
     const base: ChangeOp = { key: `${key}:${i}`, op, title: '' }
