@@ -18,7 +18,7 @@
 // first, marked faintly with its day ("Tue"); + plans it for the day (Task 4,
 // Scott 2026-11-04: yesterday's unfinished tasks go back where they came
 // from). The same selector as Today's own sheet (earlierThisWeek).
-import { useRef, useState, useMemo, type ReactNode } from 'react'
+import { useCallback, useRef, useState, useMemo, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -69,7 +69,13 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
   const [routinesSlot, setRoutinesSlot] = useState<HTMLElement | null>(null)
   // Today drives the week open for the guide's Today step (PaperFold `drive`).
   const [weekDrive, setWeekDrive] = useState<boolean | undefined>(undefined)
-  const workspace = useMemo<AlongsideWorkspace | null>(() => weekView ? null : { weekFolded: true, routinesSlot, driveWeek: setWeekDrive }, [weekView, routinesSlot])
+  // Today hears each placement that saved (the Day session's Pick step).
+  const placedListeners = useRef(new Set<() => void>())
+  const listenPlaced = useCallback((listener: () => void) => {
+    placedListeners.current.add(listener)
+    return () => { placedListeners.current.delete(listener) }
+  }, [])
+  const workspace = useMemo<AlongsideWorkspace | null>(() => weekView ? null : { weekFolded: true, routinesSlot, driveWeek: setWeekDrive, listenPlaced }, [weekView, routinesSlot, listenPlaced])
   const lock = useRef(false)
   const wso = readCadenceConfig().weekStartsOn
   const week = weekStartAnchor(date, wso)
@@ -103,6 +109,7 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
         ids: [id], undo: () => update(id, prev), retry: () => { void place(id) },
       })
       setMessage(ok ? `Planned “${task.title}” for ${dayLabel}.` : 'Could not place this action. It remains available; try again.')
+      if (ok) placedListeners.current.forEach((l) => l())
     } finally { lock.current = false; setPending(null) }
   }
 

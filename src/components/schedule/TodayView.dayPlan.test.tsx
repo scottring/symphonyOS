@@ -178,7 +178,7 @@ describe('Today — the way to Planning', () => {
 })
 
  it('inside the connected workspace, draws no view switch and no fold of its own (AlongsideDay folds the week)',()=>{
-   renderView({}, {weekFolded:true, routinesSlot:null})
+   renderView({}, {weekFolded:true, routinesSlot:null, driveWeek:()=>{}, listenPlaced:()=>()=>{}})
    expect(screen.queryByRole('group',{name:'View'})).not.toBeInTheDocument()
    expect(document.querySelector('.paper-fold')).toBeNull()
    expect(screen.getByText('Call the bank')).toBeInTheDocument()

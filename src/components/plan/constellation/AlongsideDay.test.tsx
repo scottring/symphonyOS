@@ -149,6 +149,22 @@ it('the day can drive the week open for a while; letting go returns it to what w
  expect(screen.getByRole('button',{name:/Unfold to read$/})).toHaveAttribute('aria-expanded','false')
 })
 
+// Pre-ship follow-up: a + (or a drop on the day) that saved tells the day,
+// so the Day session's Pick step counts it as a pick, as Today's own sheet does.
+it('a placement that saved is heard by the day; one that failed is not',async()=>{
+ const heard=vi.fn()
+ function Day(){const ws=useAlongsideWorkspace();useEffect(()=>ws?.listenPlaced(heard),[ws]);return <p>The day</p>}
+ const update=vi.fn().mockResolvedValue(false)
+ render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={update} loading={false} error={false} retry={()=>{}}><Day/></AlongsideDay></MemoryRouter>)
+ unfold()
+ fireEvent.click(screen.getByRole('button',{name:'Plan Choose picnic spot for Friday'}))
+ await screen.findByText(/Could not place this action/)
+ expect(heard).not.toHaveBeenCalled()
+ update.mockResolvedValue(true)
+ fireEvent.click(screen.getByRole('button',{name:'Plan Choose picnic spot for Friday'}))
+ await waitFor(()=>expect(heard).toHaveBeenCalledTimes(1))
+})
+
 // Scott, 2026-11-04: "we need to be able to drag directly from the week strip
 // to the calendar grid in Today." A row dropped on the day's hours gets the
 // time it lands at (the grid takes the drop); anywhere else on the day it is

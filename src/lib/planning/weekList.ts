@@ -21,10 +21,17 @@ import { localYmd } from '@/lib/cadence/config'
  * week sheet beside the day, first and marked with their day). Oldest day
  * first. Through the page's filters: `keep` (Today's people filter) and
  * `scopeId` (the workspace's people scope, as weekListTasks reads it).
+ *
+ * Only days already gone count: the bound is the earlier of `day` and today
+ * (viewing Friday from Wednesday, Thursday's tasks are not left over). A
+ * one-off event whose time has passed (a dinner, a party) is not a leftover
+ * either: it happened or it didn't, there is nothing to plan.
  */
-export function earlierThisWeek(tasks: readonly Task[], { weekStart, day, userId, scopeId, keep }: {
+export function earlierThisWeek(tasks: readonly Task[], { weekStart, day, userId, scopeId, keep, now = new Date() }: {
   weekStart: Date
   day: Date
+  /** Today, for the bound and for an event's time having passed. */
+  now?: Date
   /** Whose choice of `day` counts (null: anyone's). */
   userId?: string | null
   scopeId?: string | null
@@ -32,11 +39,13 @@ export function earlierThisWeek(tasks: readonly Task[], { weekStart, day, userId
 }): Task[] {
   const first = localYmd(weekStart)
   const ymd = localYmd(day)
+  const before = ymd < localYmd(now) ? ymd : localYmd(now)
   return tasks
     .filter((t) => {
       if (t.completed || t.dismissedAt || !t.scheduledFor) return false
       const k = localYmd(t.scheduledFor)
-      if (k < first || k >= ymd) return false
+      if (k < first || k >= before) return false
+      if (t.category === 'event' && t.scheduledFor < now) return false
       if (isFocused(t, userId, ymd)) return false
       if (scopeId && !doableBy(t, scopeId)) return false
       return !keep || keep(t)

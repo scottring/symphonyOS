@@ -118,4 +118,18 @@ describe('earlierThisWeek', () => {
   it('is nothing on the week’s first day', () => {
     expect(earlierThisWeek([on(31, { scheduledFor: new Date(2026, 9, 31) })], { weekStart: SUN, day: SUN })).toEqual([])
   })
+  // Pre-ship follow-ups (2026-11-04).
+  it('skips a one-off event whose time has passed (“Dinner: Trick or Treat Pizza Party”)', () => {
+    const party = on(31, { title: 'Dinner: Trick or Treat Pizza Party', category: 'event', scheduledFor: new Date(2026, 9, 31, 18) })
+    const errand = on(3, { title: 'Return the books', category: 'errand' })
+    const SAT = new Date(2026, 9, 31)
+    expect(earlierThisWeek([party, errand], { weekStart: SAT, day: WED, now: new Date(2026, 10, 4, 9) }).map((t) => t.title)).toEqual(['Return the books'])
+  })
+  it('stops at today: viewing Friday from Wednesday, Thursday’s tasks are not leftovers, nor Wednesday’s', () => {
+    const FRI = new Date(2026, 10, 6)
+    const tasks = [on(3, { title: 'Tue thing' }), on(4, { title: 'Wed thing' }), on(5, { title: 'Thu thing' })]
+    expect(earlierThisWeek(tasks, { weekStart: SUN, day: FRI, now: new Date(2026, 10, 4, 9) }).map((t) => t.title)).toEqual(['Tue thing'])
+    // Viewing a day gone by, it stops at that day.
+    expect(earlierThisWeek(tasks, { weekStart: SUN, day: new Date(2026, 10, 3), now: new Date(2026, 10, 4, 9) })).toEqual([])
+  })
 })

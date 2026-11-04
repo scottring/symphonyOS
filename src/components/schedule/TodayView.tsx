@@ -474,6 +474,8 @@ export function TodayView({
     return () => { if (placementListener.current === listener) placementListener.current = null }
   }, [])
   const notePlaced = useCallback(() => { placementListener.current?.() }, [])
+  // In the workspace the week sheet is AlongsideDay's: its + is heard too.
+  useEffect(() => alongsideWorkspace?.listenPlaced(notePlaced), [alongsideWorkspace, notePlaced])
   const [agendaDropOver, setAgendaDropOver] = useState(false)
   const agendaDrop = planDropHandlers((payload) => {
     void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })
@@ -1298,7 +1300,9 @@ export function TodayView({
     <TodayWeekFold drive={driveWeek} plan={data.dayPlan} day={viewedDate}
       weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions} earlier={earlier}
       nextWeek={nextWeek}
-      chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
+      // A + that saved counts as a pick on the Day session's Pick step, as a
+      // drag onto the day does (notePlaced).
+      chooseTask={async (id) => { const ok = await planActions.chooseTaskDay(id, viewedDate); if (ok) notePlaced(); return ok }}
       restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)}>
       {day}
     </TodayWeekFold>

@@ -48,8 +48,9 @@
 //
 // Every step's editor has a permanent, quiet home on this page (Task 2,
 // 2026-11-04), where its tooltip points: Month's Fresh start in ⋯ and its
-// fun lines on the write line; Season's Energy chip in the header, its ideal
-// week and wild cards under the sheet, and Someday on the year's sheet while
+// fun lines on the write line; Season's energy asked in its step's tooltip
+// and said in the header line (Task 4), its ideal week and wild cards under
+// the sheet, and Someday on the year's sheet while
 // choosing from the year; Year's vision, landscape and life areas under the
 // sheet, the overlapping pairs on its list while refining, and the booking in
 // the Share and book tooltip. A section's step opens its editor; Edit does too.

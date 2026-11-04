@@ -1,6 +1,7 @@
 // The season's own notes, each edited in its section of the Season page
 // (planning as tooltips, Task 2): the ideal week (step 6) and the wild cards
-// (step 7). Energy (step 4) is the header's Energy chip (EnergyChip). Each
+// (step 7). Energy (step 4) is asked in its step's tooltip and changed from
+// the header line's "Energy: …" (PeriodSummaryLine), not here. Each
 // saves into this person's notes for the season (usePlanningNotes' patch) on
 // an explicit change, and says so when a save did not land.
 

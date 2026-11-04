@@ -852,6 +852,16 @@ describe('TodayView — the Day session', () => {
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
   })
 
+  // Pre-ship follow-up: + on the week sheet counts as a pick, as a drag does.
+  it('+ on the week sheet while on Pick marks the day planned', async () => {
+    dayNotes.notes = { guide: { current: 'pick', done: [], skipped: [] } }
+    const w = createMockTask({ id: 'w', title: 'Wash the car', bucket: 'week' })
+    renderAt(10, { url: '/?plan=1', tasks: [w], ctx: { onUpdateTask: vi.fn(async () => true) } })
+    const plus = document.querySelector<HTMLButtonElement>('.above-sheet-pick[aria-label="Plan Wash the car for today"]')!
+    await act(async () => { fireEvent.click(plus) })
+    await vi.waitFor(() => expect(dayNotes.patches.some((p) => (p.guide as { plannedAt?: string } | undefined)?.plannedAt)).toBe(true))
+  })
+
   it('a task dragged onto the day while on Pick marks the day planned', async () => {
     dayNotes.notes = { guide: { current: 'pick', done: [], skipped: [] } }
     const w = createMockTask({ id: 'w', title: 'Wash the car', bucket: 'week' })
@@ -1025,15 +1035,19 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe('left')
   })
 
-  it('in the evening, planning tomorrow: today’s leftover is first on the week sheet beside tomorrow, marked with today', () => {
+  // Pre-ship follow-up: only days gone by leave leftovers. In the evening,
+  // on tomorrow's page, today is not over yet: its open task is an ordinary
+  // row of the week, unmarked, and the look back points at the week's fold.
+  it('in the evening, planning tomorrow: today’s open task is not marked as left over; yesterday’s is', () => {
     weekHoldsYesterday()
     const left = createMockTask({ id: 't', title: 'Pack the lunches', bucket: 'timed', scheduledFor: at(0), isAllDay: true })
-    renderAt(17, { url: '/?plan=1', viewed: at(0, 1), tasks: [left] })
-    const row = document.querySelector<HTMLElement>('[data-guide-anchor="leftovers"]')!
-    expect(row.querySelector('.above-sheet-row-title')).toHaveTextContent('Pack the lunches')
-    expect(row.querySelector('.above-sheet-row-mark')).toHaveTextContent(at(0).toLocaleDateString('en-US', { weekday: 'short' }))
-    expect(row.querySelector('.above-sheet-pick')).toHaveAttribute('aria-label', `Plan Pack the lunches for ${at(0, 1).toLocaleDateString('en-US', { weekday: 'long' })}`)
+    const yest = createMockTask({ id: 'y', title: 'Call the vet', bucket: 'timed', scheduledFor: at(0, -1), isAllDay: true })
+    renderAt(17, { url: '/?plan=1', viewed: at(0, 1), tasks: [left, yest] })
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-guide-anchor="leftovers"]')]
+    expect(rows.map((r) => r.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Call the vet'])
     expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe('leftovers')
+    const marks = [...document.querySelectorAll('.above-sheet-row-mark')].map((m) => m.closest('li')?.querySelector('.above-sheet-row-title')?.textContent)
+    expect(marks).not.toContain('Pack the lunches')
   })
 
   // Every Day step's tooltip points at its home on the everyday page.
@@ -1180,5 +1194,13 @@ describe('Today with the week folded beside it', () => {
     renderView({ tasks: [...weekTasks, tue], viewedDate: NOV4, selectedAssignees: ['me'] })
     expect(document.querySelector('[data-guide-anchor="leftovers"]')).toBeNull()
     expect(screen.queryByText('Kid’s form')).toBeNull()
+  })
+
+  it('viewing Friday from Wednesday, only days already gone are marked: Tuesday’s task, not Thursday’s', () => {
+    setup()
+    const on = (id: string, title: string, d: number) => createMockTask({ id, title, bucket: 'timed', scheduledFor: new Date(2026, 10, d), isAllDay: true })
+    renderView({ tasks: [...weekTasks, on('t', 'Call the vet', 3), on('h', 'Pick up the cake', 5)], viewedDate: new Date(2026, 10, 6) })
+    const marked = [...document.querySelectorAll('.above-sheet-row-mark')].map((m) => m.closest('li')?.querySelector('.above-sheet-row-title')?.textContent)
+    expect(marked).toEqual(['Call the vet'])
   })
 })

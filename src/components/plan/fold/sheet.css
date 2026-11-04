@@ -31,8 +31,7 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 /* Earlier this week and still open (Task 4): first on the sheet, its day
    faint beside it ("Tue"). */
 .above-sheet-row-mark {
-  flex: none; font: 500 11px/1 var(--font-family-sans); letter-spacing: .06em; text-transform: uppercase;
-  color: var(--color-neutral-400);
+  flex: none; font: 500 12px/1 var(--font-family-sans); color: var(--color-neutral-400);
 }
 .above-sheet-pick {
   flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -4px -4px -4px 0;
