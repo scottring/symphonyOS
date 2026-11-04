@@ -344,7 +344,6 @@ and ship".
   look back; right: the calendar) and focus the write line, as before.
 - **Step editors live on the page permanently**, quietly, and the tooltip
   points at them:
-  - Energy: an "Energy" chip in the page header (Today, Season).
   - Ideal week: the Season page's section.
   - Vision, landscape and life areas: sections on the Year page.
   - Wild cards, upkeep and fun, brain dump, refine: the write line and the list.
@@ -352,9 +351,14 @@ and ship".
   - Weekly ops: the week's dinner row.
   - Tell the family: a quiet "For the family this week" line on the Week page.
   - Fresh start: the page ⋯ menu.
-  - Look back at yesterday: a permanent **From yesterday** section at the top
-    of Today (unfinished items from yesterday with Today · Back to the week ·
-    Done), shown until each is decided.
+  - Look back at yesterday: no section on Today (Scott, 2026-11-04: "should
+    not be there, and certainly not permanently"). Unfinished tasks from
+    earlier days this week return to the week sheet beside the day, first and
+    marked faintly with their day ("Tue"); + plans one for today.
+  - **One small fact is asked inside its tooltip:** Energy (Low · Medium ·
+    High) and the booking date. The answer shows in the header line
+    ("Energy: medium"), which can be tapped to change it. There is no energy
+    chip on the page.
 - **Done planning** folds both companions, stamps the sheet and writes the
   header line, as before.
 - **Routines are dated commitments.** On Month and Year the floating Routines
