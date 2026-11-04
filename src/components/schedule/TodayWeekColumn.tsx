@@ -118,10 +118,11 @@ export function SheetRoutines({ plan, day, actions }: { plan: DayPlan; day: Date
   const routines = sheetRoutines(plan, day)
   if (routines.length === 0) return null
   const { word: dayWord } = dayWordFor(day)
-  return <>
+  // The Day session's Habits step points here (planning as tooltips, Task 2).
+  return <div className="sheet-routines" data-guide-anchor="routines">
     <h3 className="above-sheet-sub">Routines {dayWord}</h3>
     <SheetRows label={`Routines ${dayWord}`} {...sheetRowProps(routines, day, actions, toToday)} />
-  </>
+  </div>
 }
 
 export function TodayWeekFold({ plan, day, weekStart, actions, nextWeek, chooseTask, restoreTask, className, stowed, drive, children }: {

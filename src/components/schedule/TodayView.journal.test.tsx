@@ -87,11 +87,14 @@ describe('Carried over', () => {
   // scheduled work and chosen focus (Scott, 2026-09-21). The page spends no
   // line on it at all — no rows, no count, no second door (2026-09-21): the
   // fold is the one entrance, and the morning review waits in the ⋯ menu.
-  it("draws neither yesterday's unfinished commitment nor a line pointing at it", () => {
+  // Planning as tooltips (Task 2, 2026-11-04): yesterday's unfinished items
+  // have one home on Today, "From yesterday", each with its choices. Still no
+  // count, no Carried over heading, no review door.
+  it("draws yesterday's unfinished commitment only under From yesterday, with no line or door pointing at it", () => {
     const yesterday = createMockTask({ id: 'yest', title: 'Order Comma 4', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 18) })
     renderView({ tasks: [...tasks, yesterday] })
     expect(screen.queryByRole('heading', { name: 'Carried over' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Order Comma 4')).not.toBeInTheDocument()
+    expect(screen.getByText('Order Comma 4').closest('section')).toBe(screen.getByRole('region', { name: 'From yesterday' }))
     expect(screen.queryByRole('button', { name: /Review unfinished work/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Review' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Carried over · \d/)).toBeNull()

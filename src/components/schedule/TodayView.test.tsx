@@ -3,7 +3,8 @@ import { act, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { localYmd } from '@/lib/cadence/config'
 import { PLAN_MIME } from '@/lib/planning/planDrag'
-import { createMockTask } from '@/test/mocks/factories'
+import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
+import { stepsFor } from '@/lib/guide/steps'
 import type { Task } from '@/types/task'
 import { ALL_LAYERS } from '@/lib/domains'
 import { screen, fireEvent, within } from '@testing-library/react'
@@ -595,11 +596,13 @@ describe('TodayView: slipped work stays off the page', () => {
     bucket: 'timed' as const, scheduledFor: daysAgo(n),
   })
 
-  it('draws neither carried nor slipped rows, and no scoreboard', () => {
+  it('draws yesterday’s leftover only under From yesterday, never older slipped rows, and no scoreboard', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1), mk('s', 'slipped thing', 200)] } as never)
-    // Leftovers are handled in the Day planning session (the change card), not by a line
-    // or a drawer on the page (spec 2026-10-14).
-    expect(screen.queryByText('carried thing')).toBeNull()
+    // Leftovers are not a line or a drawer on the page (spec 2026-10-14);
+    // yesterday's have one home, From yesterday, with its choices
+    // (planning as tooltips, Task 2, 2026-11-04). Older ones stay off.
+    const fromYesterday = screen.getByRole('region', { name: 'From yesterday' })
+    expect(screen.getByText('carried thing').closest('section')).toBe(fromYesterday)
     expect(screen.queryByText('slipped thing')).toBeNull()
     expect(screen.queryByText(/need attention/)).toBeNull()
     expect(screen.queryByText(/oldest/)).toBeNull()
@@ -716,8 +719,8 @@ function DatedPage({ first, render: page, spy }: { first: Date; render: (d: Date
 describe('TodayView — the Day session', () => {
   afterEach(() => { mockUseMobile.mockReturnValue(true); vi.useRealTimers(); window.history.replaceState({}, '', '/'); daySession.saved = null; daySession.reviewed = null; daySession.save.mockClear(); dayNotes.notes = {}; dayNotes.patches = [] })
   const at = (hour: number, days = 0) => new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + days, hour, 0)
-  type At = { url?: string; viewed?: Date; tasks?: Task[]; selectedAssignees?: string[]; ctx?: Record<string, unknown>; dated?: boolean }
-  const renderAt = (hour: number, { url = '/', viewed = at(hour), tasks = [], selectedAssignees, ctx = {}, dated = false }: At = {}) => {
+  type At = { url?: string; viewed?: Date; tasks?: Task[]; routines?: unknown[]; selectedAssignees?: string[]; ctx?: Record<string, unknown>; dated?: boolean; onToggleTask?: () => void }
+  const renderAt = (hour: number, { url = '/', viewed = at(hour), tasks = [], routines = [], selectedAssignees, ctx = {}, dated = false, onToggleTask = vi.fn() }: At = {}) => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(at(hour))
     window.history.replaceState({}, '', url)
@@ -728,8 +731,8 @@ describe('TodayView — the Day session', () => {
     const onDateChange = vi.fn()
     const page = (viewedDate: Date, change: (d: Date) => void) => (
       <TodayView
-        tasks={tasks} events={[]} routines={[]} dateInstances={[]} selectedAssignees={selectedAssignees}
-        selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
+        tasks={tasks} events={[]} routines={routines as never} dateInstances={[]} selectedAssignees={selectedAssignees}
+        selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={onToggleTask}
         onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
         viewedDate={viewedDate} onDateChange={change} projects={[]}
       />
@@ -771,7 +774,7 @@ describe('TodayView — the Day session', () => {
     expect(screen.queryByRole('button', { name: 'Plan today' })).toBeNull()
   })
 
-  it('from 4 pm it offers Plan tomorrow, which opens on today for the look back; there is no Review today', async () => {
+  it('from 4 pm it offers Plan tomorrow, which opens on tomorrow, where today’s leftovers wait; there is no Review today', async () => {
     const { user } = renderAt(17)
     await openOverflow(user)
     expect(screen.queryByRole('button', { name: /End of day review/i })).not.toBeInTheDocument()
@@ -779,9 +782,9 @@ describe('TodayView — the Day session', () => {
     expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
     await user.click(flowButton('Plan tomorrow'))
     expect(search().get('plan')).toBe('1')
-    // Walk 2026-11-01: "Look back at today" stood beside tomorrow. The look
-    // back runs on today's page; the day is not moved.
-    expect(search().get('date')).toBeNull()
+    // Planning as tooltips (Task 2): the look back's home is the page's
+    // "From today" section, on the day being planned, so the page goes there.
+    await vi.waitFor(() => expect(search().get('date')).toBe(localYmd(at(0, 1))))
     const session = await screen.findByRole('region', { name: 'Planning tomorrow' })
     expect(within(screen.getByTestId('guide-panel')).getByText('Look back at today')).toBeInTheDocument()
     // Today's page is no count of tomorrow's.
@@ -793,18 +796,18 @@ describe('TodayView — the Day session', () => {
     const heading = (d: Date) => ({ level: 1, name: d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })
     await user.click(flowButton('Plan tomorrow'))
     await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())
-    // Look back at today: today on the page.
-    expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument()
-    expect(search().get('date')).toBeNull()
-    // Tomorrow's calendar: the page goes to tomorrow, the session with it.
-    await user.click(coach().getByRole('button', { name: 'Next' }))
+    // Look back at today: its home is "From today" on tomorrow's page, so
+    // the page goes to tomorrow from the first step (Task 2).
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0, 1)))).toBeInTheDocument())
     expect(search().get('date')).toBe(localYmd(at(0, 1)))
-    expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
+    // Tomorrow's calendar: the page stays on tomorrow, the session with it.
+    await user.click(coach().getByRole('button', { name: 'Next' }))
     expect(stepNow()).toBe('Tomorrow\'s calendar')
-    // Back to the look back: today again.
+    expect(screen.getByRole('heading', heading(at(0, 1)))).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
+    // Back to the look back: still tomorrow.
     await user.click(coach().getByRole('button', { name: 'Back' }))
-    await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
+    expect(screen.getByRole('heading', heading(at(0, 1)))).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Stop planning' }))
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
@@ -813,14 +816,17 @@ describe('TodayView — the Day session', () => {
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
   })
 
-  it('in the morning the look back shows yesterday, and the next step brings the page back to today', async () => {
-    const { user } = renderAt(10, { dated: true })
+  it('in the morning the look back stays on today, at its From yesterday section', async () => {
+    const { user } = renderAt(10, { dated: true, tasks: [createMockTask({ id: 'y', title: 'Call the vet', bucket: 'timed', scheduledFor: at(0, -1), isAllDay: true })] })
     const heading = (d: Date) => ({ level: 1, name: d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })
     await user.click(flowButton('Plan today'))
-    await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0, -1)))).toBeInTheDocument())
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument()
+    expect(search().get('date')).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe('leftovers')
+    expect(within(screen.getByRole('region', { name: 'From yesterday' })).getByText('Call the vet')).toBeInTheDocument()
     await user.click(coach().getByRole('button', { name: 'Next' }))
-    await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
+    expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Stop planning' }))
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
     await vi.waitFor(() => expect(search().get('date')).toBeNull())
@@ -867,10 +873,10 @@ describe('TodayView — the Day session', () => {
     expect(stepNow()).toBe('Energy')
   })
 
-  it('a bare ?plan=1 in the evening plans tomorrow, its look back on today’s page', async () => {
+  it('a bare ?plan=1 in the evening plans tomorrow, its look back on tomorrow’s page', async () => {
     renderAt(18, { url: '/?plan=1', dated: true })
     await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())
-    expect(search().get('date')).toBeNull()
+    await vi.waitFor(() => expect(search().get('date')).toBe(localYmd(at(0, 1))))
   })
 
   it('opened on a later step in the evening, the page goes to tomorrow', async () => {
@@ -905,11 +911,13 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
   })
 
-  it('the shown day’s line under the title: when it was planned, yesterday’s review, its energy', () => {
+  it('the shown day’s line under the title: when it was planned, yesterday’s review; its energy is the chip beside it', () => {
     dayNotes.notes = { guide: { current: 'habits', done: ['look-back'], skipped: [], plannedAt: at(8).toISOString() }, energy: { level: 'medium' } }
     renderAt(10)
     const day = at(8).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    expect(screen.getByText(`Planned ${day}`).closest('p')).toHaveTextContent(`Planned ${day} · Yesterday’s review · Energy: medium`)
+    expect(screen.getByText(`Planned ${day}`).closest('p')).toHaveTextContent(`Planned ${day} · Yesterday’s review`)
+    expect(screen.getByText(`Planned ${day}`).closest('p')).not.toHaveTextContent('Energy')
+    expect(screen.getByRole('button', { name: /^Energy/ })).toHaveTextContent('Energy: medium')
   })
 
   it('the line stays under the title while the Day session runs', () => {
@@ -917,7 +925,8 @@ describe('TodayView — the Day session', () => {
     renderAt(10, { url: '/?plan=1' })
     expect(screen.getByRole('dialog', { name: 'Planning guide' })).toBeInTheDocument()
     const day = at(8).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    expect(screen.getByText(`Planned ${day}`).closest('p')).toHaveTextContent(`Planned ${day} · Yesterday’s review · Energy: medium`)
+    expect(screen.getByText(`Planned ${day}`).closest('p')).toHaveTextContent(`Planned ${day} · Yesterday’s review`)
+    expect(screen.getByRole('button', { name: /^Energy/ })).toHaveTextContent('Energy: medium')
   })
 
   it('with nothing saved for the day, no line', () => {
@@ -936,6 +945,91 @@ describe('TodayView — the Day session', () => {
     expect(daySession.save).toHaveBeenCalledWith({ wentWell: '', didnt: '' })
     expect(screen.queryByRole('region', { name: 'Planning today' })).not.toBeInTheDocument()
     expect(dayNotes.patches.some((p) => (p.guide as { finishedAt?: string } | undefined)?.finishedAt)).toBe(true)
+  })
+  // Planning as tooltips (Task 2): what yesterday left undone sits at the top
+  // of Today, every day, until each is decided (the Look back step's home).
+  const yesterdayTasks = () => {
+    const y = at(0, -1)
+    return [
+      createMockTask({ id: 'a', title: 'Call the vet', bucket: 'timed', scheduledFor: y, isAllDay: true }),
+      createMockTask({ id: 'b', title: 'Return the books', bucket: 'timed', scheduledFor: at(15, -1), isAllDay: false }),
+      createMockTask({ id: 'c', title: 'Already done', bucket: 'timed', scheduledFor: y, isAllDay: true, completed: true }),
+      createMockTask({ id: 'd', title: 'Two days ago', bucket: 'timed', scheduledFor: at(0, -2), isAllDay: true }),
+      createMockTask({ id: 'e', title: 'Let go of it', bucket: 'someday', scheduledFor: y, isAllDay: true, dismissedAt: at(20, -1) }),
+    ]
+  }
+  it('From yesterday: yesterday’s two unfinished items, each with Today · Back to the week · Done; Today plans it for today', async () => {
+    const onUpdateTask = vi.fn(async () => true)
+    renderAt(10, { tasks: yesterdayTasks(), ctx: { onUpdateTask } })
+    const section = screen.getByRole('region', { name: 'From yesterday' })
+    expect(section).toHaveAttribute('data-guide-anchor', 'leftovers')
+    const rows = within(within(section).getByRole('list', { name: 'From yesterday' })).getAllByRole('listitem')
+    // Only yesterday's, open, not let go: timed first.
+    expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual(['Return the books', 'Call the vet'])
+    for (const r of rows) expect(within(r).getAllByRole('button').map((b) => b.textContent)).toEqual(['Today', 'Back to the week', 'Done'])
+    // At the top of the day's lists, above For today.
+    expect(section.compareDocumentPosition(screen.getByRole('heading', { name: 'For today' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await act(async () => { fireEvent.click(within(section).getByRole('button', { name: 'Today: Call the vet' })) })
+    expect(onUpdateTask).toHaveBeenCalledWith('a', expect.objectContaining({ bucket: 'timed', scheduledFor: at(0), isAllDay: true }))
+    // Decided: stamped, with Undo in place of the choices.
+    expect(within(within(section).getByRole('listitem', { name: 'Call the vet' })).getByRole('button', { name: 'Undo: Call the vet' })).toBeInTheDocument()
+  })
+
+  it('From yesterday: Done ticks it off; Back to the week takes yesterday’s day away', async () => {
+    const onUpdateTask = vi.fn(async () => true)
+    const onToggleTask = vi.fn()
+    renderAt(10, { tasks: yesterdayTasks(), ctx: { onUpdateTask }, onToggleTask })
+    const section = screen.getByRole('region', { name: 'From yesterday' })
+    await act(async () => { fireEvent.click(within(section).getByRole('button', { name: 'Done: Return the books' })) })
+    expect(onToggleTask).toHaveBeenCalledWith('b')
+    await act(async () => { fireEvent.click(within(section).getByRole('button', { name: 'Back to the week: Call the vet' })) })
+    expect(onUpdateTask).toHaveBeenCalledWith('a', expect.objectContaining({ scheduledFor: undefined }))
+  })
+
+  it('From yesterday is absent with nothing left open yesterday, and on another day', () => {
+    renderAt(10, { tasks: yesterdayTasks().filter((t) => !['a', 'b'].includes(t.id)) })
+    expect(screen.queryByRole('region', { name: 'From yesterday' })).toBeNull()
+    expect(document.querySelector('[data-guide-anchor="leftovers"]')).toBeNull()
+  })
+
+  it('in the evening, planning tomorrow: “From today” on tomorrow’s page, with Tomorrow · Back to the week · Done', () => {
+    const left = createMockTask({ id: 't', title: 'Pack the lunches', bucket: 'timed', scheduledFor: at(0), isAllDay: true })
+    renderAt(17, { url: '/?plan=1', viewed: at(0, 1), tasks: [left] })
+    const section = screen.getByRole('region', { name: 'From today' })
+    expect(within(within(section).getByRole('listitem', { name: 'Pack the lunches' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Tomorrow', 'Back to the week', 'Done'])
+    expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe('leftovers')
+  })
+
+  // The Energy step's home: the Energy chip in the header, every day.
+  it('the Energy chip cycles — · low · medium · high and saves the day’s energy note', async () => {
+    renderAt(10)
+    const chip = screen.getByRole('button', { name: /^Energy/ })
+    expect(chip.closest('[data-guide-anchor="energy"]')).not.toBeNull()
+    expect(chip).toHaveTextContent('Energy: —')
+    await act(async () => { fireEvent.click(chip) })
+    expect(dayNotes.patches).toContainEqual({ energy: { level: 'low' } })
+    expect(chip).toHaveTextContent('Energy: low')
+    await act(async () => { fireEvent.click(chip) })
+    await act(async () => { fireEvent.click(chip) })
+    expect(dayNotes.patches.map((p) => (p.energy as { level: string }).level)).toEqual(['low', 'medium', 'high'])
+    await act(async () => { fireEvent.click(chip) })
+    expect(chip).toHaveTextContent('Energy: low')
+  })
+
+  // Every Day step's tooltip points at its home on the everyday page.
+  const chore = createMockRoutine({ id: 'r1', name: 'Kids clean rooms', time_of_day: null, recurrence_pattern: { type: 'daily' }, show_on_timeline: null as unknown as boolean })
+  it('every Day step’s home is on the everyday page, not hidden', () => {
+    renderAt(10, { tasks: yesterdayTasks(), routines: [chore] })
+    for (const s of stepsFor('day')) {
+      const home = document.querySelector(`[data-guide-anchor="${s.at}"]`)
+      expect(home, s.id).not.toBeNull()
+      expect(home!.closest('[hidden]'), s.id).toBeNull()
+    }
+  })
+  it.each(stepsFor('day').map((s) => [s.id, s.at]))('the day · %s → [data-guide-anchor="%s"]', (id, anchor) => {
+    dayNotes.notes = { guide: { current: id, done: [], skipped: [] } }
+    renderAt(10, { url: '/?plan=1', tasks: yesterdayTasks(), routines: [chore] })
+    expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe(anchor)
   })
 })
 

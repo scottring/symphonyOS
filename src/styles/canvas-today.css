@@ -414,3 +414,27 @@
 /* Next week, on the week's last day: a second, quieter block on the sheet. */
 .today-fold-next { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--paper-fold-rule-above, var(--color-neutral-200)); }
 .today-fold-next .today-fold-next-title { font-size: 21px; }
+
+/* Planning as tooltips (Task 2): the day's line under the title carries the
+   Energy chip beside what its planning left. */
+.today-day-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.today-day-line > .guide-summary-line { margin: 0; }
+/* "From yesterday": the look back's rows, as plain ruled lines on the day's
+   sheet (no tinted card), their choices quiet words between dots. */
+.today-leftovers .today-leftovers-rows { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.today-leftovers .choose-row-main {
+  padding: 8px 0 9px; border-radius: 0; background: none;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.today-leftovers .choose-row-title { font-size: 17px; }
+.today-leftovers .choose-row-acts { display: inline-flex; flex-wrap: wrap; gap: 0; }
+.today-leftovers .choose-verb {
+  min-height: 30px; padding: 0 7px; border: 0; border-radius: 6px; background: none;
+  font-size: 13px; font-weight: 500; color: var(--color-neutral-600);
+}
+.today-leftovers .choose-verb:first-child { padding-left: 0; }
+.today-leftovers .choose-verb:not(.is-quiet) { color: var(--color-primary-700); font-weight: 600; }
+.today-leftovers .choose-verb:hover:not(:disabled) { background: none; text-decoration: underline; text-underline-offset: 3px; }
+.today-leftovers .choose-verb + .choose-verb::before {
+  content: '·'; display: inline-block; margin-right: 7px; color: var(--color-neutral-300); text-decoration: none;
+}

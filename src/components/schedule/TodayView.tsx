@@ -60,6 +60,9 @@ import { makeDayActions } from '@/lib/planning/dayActions'
 import { dayTarget } from '@/lib/guide/dayTarget'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
+import { EnergyChip } from '@/components/guide/EnergyChip'
+import { FromYesterday } from './FromYesterday'
+import { buildTodayReview } from '@/lib/planning/chooseToday'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { dayToken, usePlanningSession } from '@/hooks/usePlanningSession'
 import { SECTIONS_ORDER } from '@/lib/today/types'
@@ -384,11 +387,10 @@ export function TodayView({
   // ── The Day session (spec 2026-11-01): ?plan=1 runs it on this page,
   // replacing Plan today / Review today. It plans today until 4 pm and
   // tomorrow from 4 pm (dayTarget); which day is fixed when it opens, so 4 pm
-  // passing mid-session does not move it. The page shows the day each step
-  // is about: the look back shows the day looked back on (today, in the
-  // evening), every other step the day being planned (walk 2026-11-01: "look
-  // back at today" stood beside tomorrow). The week column steps aside: the
-  // steps rail stands there.
+  // passing mid-session does not move it. The page shows the day being
+  // planned on every step: the look back's home is that day's "From
+  // yesterday" ("From today" on tomorrow, in the evening), at the top of its
+  // lists (planning as tooltips, Task 2).
   const [dayParams, setDayParams] = useSearchParams()
   const planOpen = dayParams.get('plan') === '1'
   const [openedAt, setOpenedAt] = useState<number | null>(null)
@@ -405,7 +407,7 @@ export function TodayView({
   const [sessionStep, setSessionStep] = useState<string | null>(null)
   if (!planOpen && sessionStep !== null) setSessionStep(null)
   // The day the current step is about (null until the step is known).
-  const stepDayKey = sessionStep === null ? null : sessionStep === 'look-back' ? lookBackKey : targetKey
+  const stepDayKey = sessionStep === null ? null : targetKey
   const onSessionDay = (key: string) => key === targetKey || key === lookBackKey
   const sessionShown = planOpen && onSessionDay(localYmd(viewedDate))
   // The week lies folded beside the day — here, or in the connected
@@ -789,11 +791,32 @@ export function TodayView({
   const shownGuide = shownNotes.notes.guide
   const shownSavedAt = typeof shownNotes.notes.savedAt === 'string' ? shownNotes.notes.savedAt : undefined
   // Kept through the Day session (fix round 1): the page never changes shape.
+  // The day's energy is the Energy chip beside it (the Energy step's home,
+  // Task 2): it cycles low, medium, high and writes the day's note.
   const dayLine = !shownNotes.error ? (
-    <PeriodSummaryLine plannedAt={shownGuide?.plannedAt ?? shownSavedAt} energy={shownNotes.notes.energy}
+    <PeriodSummaryLine plannedAt={shownGuide?.plannedAt ?? shownSavedAt}
       reviewed={!!shownGuide?.done?.includes('look-back') || !!shownDayBefore.reviewed} level="day" />
   ) : null
+  const energyChip = !shownNotes.error && !shownNotes.loading
+    ? <EnergyChip value={shownNotes.notes.energy} save={(energy) => shownNotes.patch({ energy })} />
+    : null
   const reloadShownNotes = shownNotes.reload
+  // "From yesterday" (Task 2): what the day before held and did not finish,
+  // at the top of the day's lists, on today's page (and, in the evening's
+  // session, on tomorrow's: "From today"). Through the page's filters: `tasks`
+  // arrives filtered to the reader's spaces, and the people filter is applied
+  // as the chooser's is. What was let go, and what is already on this day,
+  // is not asked about again.
+  const viewedYmd = localYmd(viewedDate)
+  const showsLeftovers = data.isToday || (sessionShown && viewedYmd === targetKey)
+  const dayBefore = useMemo(() => new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate() - 1), [viewedDate])
+  const leftovers = useMemo(() => {
+    if (!showsLeftovers) return []
+    const match = makeAssigneeFilter(selectedAssignees ?? [])
+    const onThisDay = new Set(buildTodayReview({ allTasks: tasks, today: viewedDate, userId, match }).open.map((t) => t.id))
+    return buildTodayReview({ allTasks: tasks, today: dayBefore, userId, match }).open
+      .filter((t) => !t.dismissedAt && !onThisDay.has(t.id))
+  }, [showsLeftovers, tasks, viewedDate, dayBefore, userId, selectedAssignees])
 
   // ── A pending change card, drawn dashed on the day (todayPreview.ts).
   const { changeSet } = useCanvasActivity()
@@ -1376,8 +1399,9 @@ export function TodayView({
         footer={!desktopControls ? desktopToolbar : undefined}
 
       />
-      {/* What the day's planning left: one quiet line under the title. */}
-      <div className="px-4 md:px-0 empty:hidden">{dayLine}</div>
+      {/* What the day's planning left: one quiet line under the title, and
+          the day's Energy chip beside it. */}
+      <div className="today-day-line px-4 md:px-0">{dayLine}{energyChip}</div>
       {/* The Day session's door, when the controls are not folded. */}
       {dayFlowButton && !foldedControls && (
         <div className="today-walk px-4 md:px-0">{dayFlowButton}</div>
@@ -1408,6 +1432,10 @@ export function TodayView({
               footer's "New from email", suggestions the ⋯ menu. */}
       {/* The agenda is part of the page, with no enclosing card. */}
       <div ref={listRef} {...agendaDrop} className={`daybook-agenda${agendaDropOver ? ' daybook-agenda-drop' : ''}`}>
+        {/* From yesterday, at the top of the day's lists (Task 2): the Look
+            back step's home, there every day, gone once each is decided. */}
+        {showsLeftovers && <FromYesterday key={viewedYmd} open={leftovers} day={viewedDate} dayBefore={dayBefore}
+          isToday={data.isToday} actions={dayActions} />}
         {/* Needed today — hand-curated, silent when empty. Placed first so a
             marked item reads as the day's opening note, not buried under the
             timeline. Safe at the top only because it renders nothing when
