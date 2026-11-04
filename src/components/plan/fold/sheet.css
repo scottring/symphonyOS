@@ -172,7 +172,34 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .wk-family { max-width: 46rem; margin: 28px auto 0; }
 .wk-family-posted { list-style: none; margin: 0; padding: 0; }
 .wk-family-posted > li {
-  padding: 7px 0 8px; border-bottom: 1px solid var(--color-neutral-200);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0 8px; border-bottom: 1px solid var(--color-neutral-200);
   font: 400 16px/1.35 var(--font-family-display); color: var(--color-neutral-800); overflow-wrap: anywhere;
 }
 .wk-family-write input { font-size: 16.5px; }
+.wk-family-undo { flex: none; font: 500 12.5px/1 var(--font-family-sans); }
+
+/* Month's Fresh start, opened from ⋯ (fix round 1): a quiet strip of the
+   sheet under the header, not a card or a dialog. */
+.plan-fresh {
+  max-width: 46rem; margin: 6px auto 18px; padding: 10px 0 12px;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.plan-fresh .gw-body { padding: 8px 0 0; }
+/* Year's Refine: the overlapping pairs, written on the sheet under the list
+   while the step is on; ruled lines, their calls quiet words. */
+.sheet-refine { margin: 10px 0 4px; padding-top: 8px; border-top: 1px dashed var(--color-neutral-300); }
+.sheet-refine .gw-rows { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.sheet-refine .gw-row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 7px 0 8px;
+  border: 0; border-bottom: 1px solid var(--color-neutral-200); border-radius: 0; background: none;
+}
+.sheet-refine .gw-row-title { font: 400 16px/1.35 var(--font-family-display); color: var(--color-neutral-800); }
+.sheet-refine .gw-row-title + .gw-row-title::before { content: '≈ '; color: var(--color-neutral-400); }
+.sheet-refine .gw-row-acts { display: inline-flex; flex-wrap: wrap; gap: 0; margin-left: auto; }
+.sheet-refine .choose-verb {
+  min-height: 30px; padding: 0 7px; border: 0; border-radius: 6px; background: none;
+  font-size: 13px; font-weight: 500; color: var(--color-neutral-600);
+}
+.sheet-refine .choose-verb:not(.is-quiet) { color: var(--color-primary-700); font-weight: 600; }
+.sheet-refine .choose-verb + .choose-verb::before { content: '·'; display: inline-block; margin-right: 7px; color: var(--color-neutral-300); }
+.sheet-refine .choose-empty { margin: 0; padding: 4px 0; font: italic 400 15px/1.4 var(--font-family-display); color: var(--color-neutral-400); }

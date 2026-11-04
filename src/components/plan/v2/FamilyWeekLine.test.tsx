@@ -4,8 +4,8 @@ import { render, screen, fireEvent, within, act } from '@testing-library/react'
 // Tell the family's home on the Week page (planning as tooltips, Task 2): a
 // quiet "For the family this week" line, every day. What is written goes on
 // the wall, one note per line, until the week is over.
-const wall = vi.hoisted(() => ({ add: vi.fn(async () => true), member: vi.fn(async () => 'm1') }))
-vi.mock('@/lib/wall/addScratchpadNote', () => ({ addScratchpadNote: wall.add, ownMemberId: wall.member }))
+const wall = vi.hoisted(() => ({ add: vi.fn(async () => true), member: vi.fn(async () => 'm1'), del: vi.fn(async () => true) }))
+vi.mock('@/lib/wall/addScratchpadNote', () => ({ addScratchpadNote: wall.add, ownMemberId: wall.member, deleteScratchpadNote: wall.del }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'me' } }) }))
 
 import { FamilyWeekLine } from './FamilyWeekLine'
@@ -18,7 +18,7 @@ const write = async (text: string) => {
   return line
 }
 
-beforeEach(() => { wall.add.mockReset(); wall.add.mockResolvedValue(true) })
+beforeEach(() => { wall.add.mockReset(); wall.add.mockResolvedValue(true); wall.del.mockReset(); wall.del.mockResolvedValue(true) })
 
 describe('For the family this week', () => {
   it('is a quiet section of the week, the family step’s anchor', () => {
@@ -31,7 +31,7 @@ describe('For the family this week', () => {
   it('a line written goes on the wall until the week is over, and is listed under it', async () => {
     render(<FamilyWeekLine weekStart={weekStart} />)
     const line = await write('  Grandma visits Saturday ')
-    expect(wall.add).toHaveBeenCalledWith('me', 'Grandma visits Saturday', 'note', 'm1', new Date(2026, 10, 7))
+    expect(wall.add).toHaveBeenCalledWith('me', 'Grandma visits Saturday', 'note', 'm1', new Date(2026, 10, 7), expect.any(String))
     expect(line).toHaveValue('')
     expect(within(screen.getByRole('list', { name: 'On the wall this week' })).getByText('Grandma visits Saturday')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('On the wall until the week is over.')
@@ -51,5 +51,23 @@ describe('For the family this week', () => {
     await write('x'.repeat(501))
     expect(wall.add).not.toHaveBeenCalled()
     expect(screen.getByRole('status')).toHaveTextContent('Over 500 characters')
+  })
+
+  // Fix round 1: a note just posted can be taken back.
+  it('Undo takes a posted note off the wall again', async () => {
+    render(<FamilyWeekLine weekStart={weekStart} />)
+    await write('Grandma visits Saturday')
+    const id = (wall.add.mock.calls[0] as unknown[])[5]
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Undo: Grandma visits Saturday' })) })
+    expect(wall.del).toHaveBeenCalledWith(id)
+    expect(screen.queryByRole('list', { name: 'On the wall this week' })).toBeNull()
+  })
+  it('an Undo that did not go through says so and keeps the line', async () => {
+    wall.del.mockResolvedValue(false)
+    render(<FamilyWeekLine weekStart={weekStart} />)
+    await write('Grandma visits Saturday')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Undo: Grandma visits Saturday' })) })
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t take it back. Try again.')
+    expect(within(screen.getByRole('list', { name: 'On the wall this week' })).getByText('Grandma visits Saturday')).toBeInTheDocument()
   })
 })

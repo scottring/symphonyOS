@@ -56,7 +56,7 @@
 import { PageHelpContext, usePageHelp } from '@/components/explain/PageHelp'
 import { PageMenu, type PageMenuChoice } from '@/components/plan/PageMenu'
 import { usePlanPagePrefs } from '@/hooks/usePlanPagePrefs'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
@@ -782,12 +782,15 @@ function Inner() {
   // Share and book (Year): sharing is each goal's own space (its panel); the
   // step's tooltip carries the one action, booking the first session of the
   // next season, on the day it starts.
-  const winterDay = nextSeasonStart(now, seasons)
+  // A tap opens a day to book, the next season's first unless changed
+  // (fix round 1: booking keeps a date); "Book it" books that day, with Undo.
+  const seasonStarts = nextSeasonStart(now, seasons)
   const sessionActions: Partial<Record<string, CoachAction>> = level === 0 ? {
     'share-book': {
       label: `Book the first ${nextSeasonWord} session`,
-      done: `Booked: Plan ${nextSeasonWord}, ${winterDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
-      run: () => bookSeason(new Date(winterDay.getFullYear(), winterDay.getMonth(), winterDay.getDate())),
+      date: { label: `First ${nextSeasonWord} session`, initial: new Date(seasonStarts.getFullYear(), seasonStarts.getMonth(), seasonStarts.getDate()) },
+      done: (day) => `Booked: Plan ${nextSeasonWord}${day ? `, ${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}` : ''}`,
+      run: (day) => day ? bookSeason(day) : Promise.resolve(false),
     },
   } : {}
 
@@ -887,6 +890,14 @@ function Inner() {
   const areasInView = lifeAreas.filter((x) => matchesLayers(x.context ?? 'personal', layers))
   // The season's wild cards turned on, by name ("Money · Travel").
   const wildCards = WILD_CARDS.filter((c) => seasonNotes.notes.wildCards?.includes(c.id)).map((c) => c.label)
+  // A period's notes are written to only once they have been read (fix
+  // round 1): while they load a section shows its heading alone and offers
+  // no editor; a read that failed says so, faintly, and offers none.
+  type NotesRead = { loading: boolean; error: string | null }
+  const notesReady = (n: NotesRead) => !n.loading && !n.error
+  const gated = (n: NotesRead, empty: string | null, editor: ReactNode) => n.error
+    ? { empty: 'Couldn’t load.', editor: undefined }
+    : n.loading ? { empty: null, editor: undefined } : { empty, editor }
   const sheetFor = (fold?: SessionFold) => {
     // A writing step (by area, brain dump) writes area by area: the areas as
     // chips beside the line, the new line in the one picked.
@@ -897,7 +908,7 @@ function Inner() {
     // Year's Refine: the overlapping pairs on the list, with their calls
     // (session-only). Keep both is kept in the year's notes, so a pair set
     // aside stays so.
-    const refine = level === 0 && fold?.stepId === 'refine' && <div className="sheet-refine">
+    const refine = level === 0 && fold?.stepId === 'refine' && notesReady(yearNotes) && <div className="sheet-refine" role="region" aria-label="May overlap">
       <YearRefine goals={yearOpen.map((n) => ({ id: n.id, title: n.title, node: n }))} value={yearNotes.notes.keptPairs} patch={yearNotes.patch}
         onLetGo={(g) => setGoalStatus(g.node, 'archived', `Let go of “${g.title}”`)} onSomeday={(g) => goalToSomeday(g.node)} />
     </div>
@@ -952,28 +963,30 @@ function Inner() {
     </div>
     {/* Each planning step's home on the page (Task 2): quiet sections under
         the sheet, there every day; the step that asks for one opens it. */}
-    {level === 1 && <div className="plan-sections">
-      <PageSection title="Ideal week" anchor="ideal-week" open={fold?.stepId === 'ideal-week'}
-        empty={seasonNotes.notes.idealWeek?.blocks.length ? null : `No ideal week for ${periodWord} yet.`}
-        editor={<SeasonIdealWeek value={seasonNotes.notes.idealWeek} goals={openSeasonGoals} patch={seasonNotes.patch} />}>
-        {seasonNotes.notes.idealWeek && <IdealWeekSection headless value={seasonNotes.notes.idealWeek} goals={seasonGoals} />}
+    {/* Keyed by the period, so an editor left open, or a chip's tap, never
+        carries to the next one (fix round 1). */}
+    {level === 1 && <div className="plan-sections" key={`sections:${sessionToken}`}>
+      <PageSection title="Ideal week" anchor="ideal-week" open={fold?.stepId === 'ideal-week' && notesReady(seasonNotes)}
+        {...gated(seasonNotes, seasonNotes.notes.idealWeek?.blocks.length ? null : `No ideal week for ${periodWord} yet.`,
+          <SeasonIdealWeek value={seasonNotes.notes.idealWeek} goals={openSeasonGoals} patch={seasonNotes.patch} />)}>
+        {notesReady(seasonNotes) && seasonNotes.notes.idealWeek && <IdealWeekSection headless value={seasonNotes.notes.idealWeek} goals={seasonGoals} />}
       </PageSection>
-      <PageSection title="Wild cards" anchor="wild-cards" open={fold?.stepId === 'wild-cards'}
-        empty={wildCards.length ? null : `No wild cards for ${periodWord} yet.`}
-        editor={<SeasonWildCards value={seasonNotes.notes.wildCards} patch={seasonNotes.patch} />}>
-        <p className="page-section-line">{wildCards.join(' · ')}</p>
+      <PageSection title="Wild cards" anchor="wild-cards" open={fold?.stepId === 'wild-cards' && notesReady(seasonNotes)}
+        {...gated(seasonNotes, wildCards.length ? null : `No wild cards for ${periodWord} yet.`,
+          <SeasonWildCards value={seasonNotes.notes.wildCards} patch={seasonNotes.patch} />)}>
+        {notesReady(seasonNotes) && <p className="page-section-line">{wildCards.join(' · ')}</p>}
       </PageSection>
     </div>}
-    {level === 0 && <div className="plan-sections">
-      <PageSection title="Vision" anchor="vision" open={fold?.stepId === 'vision'}
-        empty={hasVision(yearNotes.notes.vision) ? null : `No vision for ${periodWord} yet.`}
-        editor={<YearVision yearWord={periodWord} value={yearNotes.notes.vision} patch={yearNotes.patch} />}>
-        <YearVisionSection headless value={yearNotes.notes.vision} yearWord={periodWord} />
+    {level === 0 && <div className="plan-sections" key={`sections:${sessionToken}`}>
+      <PageSection title="Vision" anchor="vision" open={fold?.stepId === 'vision' && notesReady(yearNotes)}
+        {...gated(yearNotes, hasVision(yearNotes.notes.vision) ? null : `No vision for ${periodWord} yet.`,
+          <YearVision yearWord={periodWord} value={yearNotes.notes.vision} patch={yearNotes.patch} />)}>
+        {notesReady(yearNotes) && <YearVisionSection headless value={yearNotes.notes.vision} yearWord={periodWord} />}
       </PageSection>
-      <PageSection title="Landscape" anchor="landscape" open={fold?.stepId === 'landscape'}
-        empty={hasLandscape(yearNotes.notes.landscape) ? null : 'No months mapped yet.'}
-        editor={<YearLandscape value={yearNotes.notes.landscape} patch={yearNotes.patch} />}>
-        <YearLandscapeSection headless value={yearNotes.notes.landscape} />
+      <PageSection title="Landscape" anchor="landscape" open={fold?.stepId === 'landscape' && notesReady(yearNotes)}
+        {...gated(yearNotes, hasLandscape(yearNotes.notes.landscape) ? null : 'No months mapped yet.',
+          <YearLandscape value={yearNotes.notes.landscape} patch={yearNotes.patch} />)}>
+        {notesReady(yearNotes) && <YearLandscapeSection headless value={yearNotes.notes.landscape} />}
       </PageSection>
       <PageSection title="Life areas" anchor="areas" open={fold?.stepId === 'areas'}
         empty={areasInView.length ? null : 'No life areas yet.'}
@@ -1006,7 +1019,9 @@ function Inner() {
       </div>
       <div className="plan-head-tools">
         {/* Season's energy: the Energy step's home, every day. */}
-        {level === 1 && <EnergyChip value={seasonNotes.notes.energy} save={(energy) => seasonNotes.patch({ energy })} />}
+        {level === 1 && (seasonNotes.error
+          ? <span className="energy-chip-unloaded">Energy couldn’t load</span>
+          : !seasonNotes.loading && <EnergyChip key={`energy:${sessionToken}`} value={seasonNotes.notes.energy} save={(energy) => seasonNotes.patch({ energy })} />)}
         {plannable && !reviewing && <PlanChip level={PERIODS[level]} word={periodWord} onStart={() => setMode('plan')} disabled={!dataReady} />}
         {primary && <button type="button" className="pv2-btn wk-plan plan-primary" disabled={!dataReady} onClick={primary.run}
           data-explain="plan-primary" data-explain-label={primary.label}>{primary.label}</button>}
@@ -1017,12 +1032,13 @@ function Inner() {
         </PageHelpContext.Provider>
       </div>
     </header>
-    {freshOpen && level === 2 && <div className="plan-fresh" role="dialog" aria-label="Fresh start">
+    {freshOpen && level === 2 && <div className="plan-fresh" role="region" aria-label="Fresh start">
       <div className="page-section-head">
         <h3 className="page-section-title">Fresh start · {periodWord}</h3>
         <button type="button" className="canvas-link page-section-edit" onClick={() => setFreshOpen(false)}>Close</button>
       </div>
-      <FreshStart monthWord={periodWord} value={periodNotes.notes.scenery} patch={periodNotes.patch} />
+      {periodNotes.error ? <p className="page-section-empty">Couldn’t load.</p>
+        : !periodNotes.loading && <FreshStart monthWord={periodWord} value={periodNotes.notes.scenery} patch={periodNotes.patch} />}
     </div>}
 
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}

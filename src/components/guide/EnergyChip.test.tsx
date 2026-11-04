@@ -3,17 +3,17 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import { EnergyChip } from './EnergyChip'
 
 // The Energy step's home (planning as tooltips, Task 2): a chip in the page
-// header that cycles — → low → medium → high → low and writes the note.
+// header that cycles — → low → medium → high → — and writes the note.
 describe('EnergyChip', () => {
-  it('cycles from — through low, medium and high, keeping the words already said', async () => {
+  it('cycles through low, medium and high, keeping the words already said', async () => {
     const save = vi.fn(async () => true)
-    render(<EnergyChip value={{ level: 'high', words: 'New baby' }} save={save} />)
+    render(<EnergyChip value={{ level: 'medium', words: 'New baby' }} save={save} />)
     const chip = screen.getByRole('button', { name: /^Energy/ })
     expect(chip.closest('[data-guide-anchor="energy"]')).not.toBeNull()
-    expect(chip).toHaveTextContent('Energy: high')
+    expect(chip).toHaveTextContent('Energy: medium')
     await act(async () => { fireEvent.click(chip) })
-    expect(save).toHaveBeenLastCalledWith({ level: 'low', words: 'New baby' })
-    expect(chip).toHaveTextContent('Energy: low')
+    expect(save).toHaveBeenLastCalledWith({ level: 'high', words: 'New baby' })
+    expect(chip).toHaveTextContent('Energy: high')
   })
 
   it('unset reads “—”; a save that failed says so and can be sent again', async () => {
@@ -29,5 +29,17 @@ describe('EnergyChip', () => {
     expect(save).toHaveBeenCalledTimes(2)
     expect(save.mock.calls[1][0]).toEqual({ level: 'low' })
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  // Fix round 1 (ruling): after high it clears, back to "—".
+  it('after high it clears back to “—”, saving no energy', async () => {
+    const save = vi.fn(async () => true)
+    render(<EnergyChip value={{ level: 'high' }} save={save} />)
+    const chip = screen.getByRole('button', { name: /^Energy/ })
+    await act(async () => { fireEvent.click(chip) })
+    expect(save).toHaveBeenLastCalledWith(undefined)
+    expect(chip).toHaveTextContent('Energy: —')
+    await act(async () => { fireEvent.click(chip) })
+    expect(save).toHaveBeenLastCalledWith({ level: 'low' })
   })
 })

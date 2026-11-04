@@ -12,11 +12,13 @@ export async function addScratchpadNote(
   kind: ScratchpadKind,
   authorMemberId: string | null,
   expiresAt?: Date,
+  /** The note's id, chosen here so it can be taken back (Undo). */
+  id?: string,
 ): Promise<boolean> {
   const text = body.trim()
   if (!text) return false
   const { error } = await supabase.from('scratchpad_notes').insert({
-    user_id: userId, body: text.slice(0, 500), kind, author_member_id: authorMemberId,
+    ...(id ? { id } : {}), user_id: userId, body: text.slice(0, 500), kind, author_member_id: authorMemberId,
     ...(expiresAt ? { expires_at: expiresAt.toISOString() } : {}),
   })
   if (error) { console.error('[scratchpad] add failed:', error.message); return false }
@@ -27,4 +29,11 @@ export async function addScratchpadNote(
 export async function ownMemberId(userId: string): Promise<string | null> {
   const { data } = await supabase.from('family_members').select('id').eq('auth_user_id', userId).limit(1)
   return (data as { id: string }[] | null)?.[0]?.id ?? null
+}
+
+/** Takes a note back off the wall (the Undo of a note just posted). */
+export async function deleteScratchpadNote(id: string): Promise<boolean> {
+  const { error } = await supabase.from('scratchpad_notes').delete().eq('id', id)
+  if (error) { console.error('[scratchpad] delete failed:', error.message); return false }
+  return true
 }

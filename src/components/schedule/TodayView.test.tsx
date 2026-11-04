@@ -1001,7 +1001,7 @@ describe('TodayView — the Day session', () => {
   })
 
   // The Energy step's home: the Energy chip in the header, every day.
-  it('the Energy chip cycles — · low · medium · high and saves the day’s energy note', async () => {
+  it('the Energy chip cycles — · low · medium · high · — and saves the day’s energy note', async () => {
     renderAt(10)
     const chip = screen.getByRole('button', { name: /^Energy/ })
     expect(chip.closest('[data-guide-anchor="energy"]')).not.toBeNull()
@@ -1012,8 +1012,10 @@ describe('TodayView — the Day session', () => {
     await act(async () => { fireEvent.click(chip) })
     await act(async () => { fireEvent.click(chip) })
     expect(dayNotes.patches.map((p) => (p.energy as { level: string }).level)).toEqual(['low', 'medium', 'high'])
+    // Fix round 1 (ruling): after high it clears.
     await act(async () => { fireEvent.click(chip) })
-    expect(chip).toHaveTextContent('Energy: low')
+    expect(dayNotes.patches[dayNotes.patches.length - 1]).toEqual({ energy: undefined })
+    expect(chip).toHaveTextContent('Energy: —')
   })
 
   // Every Day step's tooltip points at its home on the everyday page.

@@ -80,7 +80,9 @@ const DAY: readonly GuideStep[] = [
     you: 'Each unfinished item: today, back to the week, or done.',
     guide: 'Shows what\'s left and moves it where you say.',
     more: 'An item that slips off the end of a busy day does not announce itself. A quick look puts it in front of you while it still matters. Then it gets a deliberate answer instead of resurfacing days later.',
-    writes: ['triage', 'review'],
+    // The day's "win" is dropped for now (fix round 1): nothing writes a
+    // review of the day before; the choices are triage only.
+    writes: ['triage'],
   },
   {
     id: 'calendar',

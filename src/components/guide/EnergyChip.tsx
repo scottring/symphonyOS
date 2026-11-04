@@ -1,5 +1,5 @@
 // The Energy chip in a page header (Today, Season): "Energy: —", and a tap
-// moves it on, low → medium → high → low (planning as tooltips, Task 2; the
+// moves it on, low → medium → high → — (cleared; fix round 1) (planning as tooltips, Task 2; the
 // prototype's energy chip). It is the Energy step's home: it writes the same
 // note that step wrote (notes.energy), keeping any words already said with
 // it. It shows what was last sent while that saves, and says so when a save
@@ -10,18 +10,18 @@ import { useNoteSave } from '@/components/plan/guided/season/useNoteSave'
 import './guide.css'
 
 type Energy = NonNullable<GuideNotes['energy']>
-const NEXT: Record<Energy['level'] | 'none', Energy['level']> = { none: 'low', low: 'medium', medium: 'high', high: 'low' }
+const NEXT: Record<Energy['level'] | 'none', Energy['level'] | null> = { none: 'low', low: 'medium', medium: 'high', high: null }
 
 export function EnergyChip({ value, save }: {
   value?: GuideNotes['energy']
-  /** Saves the note; false when it did not. */
-  save: (energy: Energy) => Promise<boolean>
+  /** Saves the note (undefined: cleared); false when it did not. */
+  save: (energy: Energy | undefined) => Promise<boolean>
 }) {
-  const note = useNoteSave<Energy | undefined>(value, (e) => (e ? save(e) : Promise.resolve(true)))
+  const note = useNoteSave<Energy | undefined>(value, save)
   const shown = note.value
   const cycle = () => {
     const level = NEXT[shown?.level ?? 'none']
-    note.set(shown?.words ? { level, words: shown.words } : { level })
+    note.set(level === null ? undefined : shown?.words ? { level, words: shown.words } : { level })
   }
   return (
     <span className="energy-chip-wrap">

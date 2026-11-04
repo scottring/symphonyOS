@@ -56,11 +56,20 @@ vi.mock('@/hooks/useToast',async(importOriginal)=>({...await importOriginal<any>
 vi.mock('@/components/domain/DomainGate',()=>({useDomainGate:()=>({requireDomain:vi.fn().mockResolvedValue('personal')})}))
 // The guided session's notes row (usePlanningNotes), in memory: where the
 // session is, and what patch merged into it.
-const notesStore=vi.hoisted(()=>({notes:{} as Record<string,unknown>,patches:[] as {p:Record<string,unknown>;defaults?:Record<string,unknown>}[]}))
-vi.mock('@/hooks/usePlanningNotes',async()=>{const {useState,useCallback}=await import('react');return{usePlanningNotes:()=>{
- const [notes,setNotes]=useState(notesStore.notes)
- const patch=useCallback(async(p:Record<string,unknown>,defaults?:Record<string,unknown>)=>{notesStore.patches.push({p,defaults});notesStore.notes={...defaults,...notesStore.notes,...p};setNotes(notesStore.notes);return true},[])
- return{notes,loading:false,error:null,patch,reload:()=>undefined}}}})
+// A test may give each period its own row (byToken: Fall's and Winter's
+// notes apart, as the real rows are), or make the read load or fail.
+const notesStore=vi.hoisted(()=>({notes:{} as Record<string,unknown>,patches:[] as {p:Record<string,unknown>;defaults?:Record<string,unknown>;token?:string}[],
+ byToken:null as null|Record<string,Record<string,unknown>>,loading:false,error:null as string|null}))
+vi.mock('@/hooks/usePlanningNotes',async()=>{const {useState,useCallback}=await import('react');return{usePlanningNotes:(_h:string,token:string)=>{
+ const read=()=>notesStore.byToken?(notesStore.byToken[token]??{}):notesStore.notes
+ const [state,setState]=useState({token,notes:read()})
+ if(state.token!==token)setState({token,notes:read()})
+ const patch=useCallback(async(p:Record<string,unknown>,defaults?:Record<string,unknown>)=>{
+  notesStore.patches.push({p,defaults,token})
+  if(notesStore.byToken){notesStore.byToken[token]={...defaults,...notesStore.byToken[token],...p};setState({token,notes:notesStore.byToken[token]})}
+  else{notesStore.notes={...defaults,...notesStore.notes,...p};setState({token,notes:notesStore.notes})}
+  return true},[token])
+ return{notes:state.notes,loading:notesStore.loading,error:notesStore.error,patch,reload:()=>undefined}}}})
 /** Open the guided session on this step (where it was left). */
 const atStep=(current:string)=>{notesStore.notes={guide:{current,done:[],skipped:[]}}}
 const place=vi.hoisted(()=>({setPlace:vi.fn()}))
@@ -128,7 +137,7 @@ beforeEach(()=>{
 })
 afterEach(()=>{window.matchMedia=setupMatchMedia})
 beforeEach(()=>{
- vi.clearAllMocks();cal.events=[];filters.sole='personal';addArea.real=false;notesStore.notes={};notesStore.patches=[];shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
+ vi.clearAllMocks();cal.events=[];filters.sole='personal';addArea.real=false;notesStore.notes={};notesStore.patches=[];notesStore.byToken=null;notesStore.loading=false;notesStore.error=null;shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
  HTMLElement.prototype.scrollIntoView=vi.fn()
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
@@ -1268,12 +1277,12 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(head().querySelector('[data-guide-anchor="menu"]')?.querySelector('button[aria-label="Month options"]')).not.toBeNull()
   expect(coach().getByText('Fresh start')).toBeInTheDocument()
   choose('Fresh start')
-  const fresh=within(screen.getByRole('dialog',{name:'Fresh start'}))
+  const fresh=within(screen.getByRole('region',{name:'Fresh start'}))
   await act(async()=>{fireEvent.click(fresh.getByRole('button',{name:/Densely Urban/}))})
   expect(place.setPlace).toHaveBeenCalledWith('urban')
   expect(notesStore.patches.some((x)=>x.p.scenery==='urban')).toBe(true)
   fireEvent.click(fresh.getByRole('button',{name:'Close'}))
-  expect(screen.queryByRole('dialog',{name:'Fresh start'})).toBeNull()
+  expect(screen.queryByRole('region',{name:'Fresh start'})).toBeNull()
   // Every day too, outside a session; only the month has one.
   cleanup();month()
   expect(menu()).toContain('Fresh start')
@@ -1516,18 +1525,20 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(months.queryAllByRole('button')).toHaveLength(0)
  })
  // Planning as tooltips (Task 2): the Energy chip in the season's header, every day.
- it('Energy check: the Energy chip in the header cycles low, medium, high and saves the season’s energy note',async()=>{
+ it('Energy check: the Energy chip in the header cycles low, medium, high, then clears, and saves the season’s energy note',async()=>{
   inSession()
-  notesStore.notes={guide:{current:'energy',done:[],skipped:[]},energy:{level:'high',words:'New baby'}}
+  notesStore.notes={guide:{current:'energy',done:[],skipped:[]},energy:{level:'medium',words:'New baby'}}
   season('&plan=1')
   const chipEl=head().querySelector('[data-guide-anchor="energy"]') as HTMLElement
-  expect(chipEl).toHaveTextContent('Energy: high')
+  expect(chipEl).toHaveTextContent('Energy: medium')
   await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
   // The words already said stay with it.
-  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({energy:{level:'low',words:'New baby'}})
-  expect(chipEl).toHaveTextContent('Energy: low')
+  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({energy:{level:'high',words:'New baby'}})
+  expect(chipEl).toHaveTextContent('Energy: high')
+  // After high it clears (fix round 1).
   await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
-  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({energy:{level:'medium',words:'New baby'}})
+  expect(notesStore.patches[notesStore.patches.length-1].p).toEqual({energy:undefined})
+  expect(chipEl).toHaveTextContent('Energy: —')
   // Not said twice in the header.
   expect(summary()??'').not.toMatch(/Energy/)
   // Every day, unset: a dash.
@@ -1839,7 +1850,7 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
  })
  // Planning as tooltips (Task 2): sharing is each goal's own space (its
  // panel); the step's tooltip carries the one action, the booking.
- it('Share and book: the tooltip books the first Winter session, on the day Winter starts; nothing is shared from the page',async()=>{
+ it('Share and book: the tooltip books the first Winter session on the day picked (the day Winter starts unless changed); nothing is shared from the page',async()=>{
   inSession()
   api.goals=[...GOALS.map(g=>({...g})),{id:'w',name:'Ship the site',year:2026,status:'active',context:'work',userId:'u1'}]
   atStep('share-book')
@@ -1847,12 +1858,17 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   expect(screen.queryByRole('list',{name:'Work and Personal goals'})).toBeNull()
   expect(screen.queryByRole('button',{name:/^Share with the family/})).toBeNull()
   expect(coach().getByText('Share and book the next session')).toBeInTheDocument()
+  // The action opens a date, the day Winter starts; nothing is booked yet.
+  fireEvent.click(coach().getByRole('button',{name:'Book the first Winter session'}))
+  const date=coach().getByLabelText('First Winter session')
+  expect(date).toHaveValue('2026-12-01')
   expect(api.addTask).not.toHaveBeenCalled()
-  await act(async()=>{fireEvent.click(coach().getByRole('button',{name:'Book the first Winter session'}))})
-  expect(api.addTask).toHaveBeenCalledWith('Plan Winter',undefined,undefined,new Date(2026,11,1),expect.objectContaining({isAllDay:true,context:'personal',id:expect.any(String)}))
-  expect(lastRun().label).toBe('Add “Plan Winter” to Tue, Dec 1')
+  fireEvent.change(date,{target:{value:'2026-11-28'}})
+  await act(async()=>{fireEvent.click(coach().getByRole('button',{name:'Book it'}))})
+  expect(api.addTask).toHaveBeenCalledWith('Plan Winter',undefined,undefined,new Date(2026,10,28),expect.objectContaining({isAllDay:true,context:'personal',id:expect.any(String)}))
+  expect(lastRun().label).toBe('Add “Plan Winter” to Sat, Nov 28')
   expect(lastRun().opts.undo).toEqual(expect.any(Function))
-  expect(coach().getByRole('status')).toHaveTextContent('Booked: Plan Winter, Tue, Dec 1')
+  expect(coach().getByRole('status')).toHaveTextContent('Booked: Plan Winter, Sat, Nov 28')
   expect(api.updateGoal).not.toHaveBeenCalled()
   expect(plannedMarks()).toHaveLength(0)
   // Only that step carries an action.
@@ -2204,5 +2220,71 @@ describe('every step’s tooltip points at its home on the everyday page',()=>{
   atStep(id)
   open(pages[level]+'&plan=1')
   expect(screen.getByRole('dialog',{name:'Planning guide'}).dataset.at).toBe(anchor)
+ })
+})
+
+// Fix round 1: a period's sections and chip are that period's alone, and
+// nothing on them writes until its notes have loaded.
+describe('the homes belong to the period on screen, once its notes are in',()=>{
+ it('tapping energy on Fall, then going to Winter, shows Winter’s own level and writes nothing into Winter',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  notesStore.byToken={'2026-fall':{},'2026-winter':{energy:{level:'high'},wildCards:['house']}}
+  season()
+  await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
+  expect(notesStore.patches).toEqual([expect.objectContaining({p:{energy:{level:'low'}},token:'2026-fall'})])
+  // An editor left open on Fall closes with it.
+  fireEvent.click(within(screen.getByRole('region',{name:'Wild cards'})).getByRole('button',{name:'Edit'}))
+  fireEvent.click(screen.getByRole('button',{name:'Next season'}))
+  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Winter')
+  expect(within(head()).getByRole('button',{name:/^Energy/})).toHaveTextContent('Energy: high')
+  expect(within(screen.getByRole('region',{name:'Wild cards'})).queryByRole('checkbox')).toBeNull()
+  expect(within(screen.getByRole('region',{name:'Wild cards'})).getByText('The house')).toBeInTheDocument()
+  expect(notesStore.patches.filter((x)=>x.token==='2026-winter')).toEqual([])
+ })
+ it('the year’s sections are each year’s own',()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  notesStore.byToken={'2026':{vision:{tenYears:'Lake mornings'}},'2027':{}}
+  open('/year?view=constellation&start=2026-10-09')
+  fireEvent.click(within(screen.getByRole('region',{name:'Vision'})).getByRole('button',{name:'Edit'}))
+  fireEvent.click(screen.getByRole('button',{name:'Next year'}))
+  const vision=within(screen.getByRole('region',{name:'Vision'}))
+  expect(vision.queryByRole('textbox')).toBeNull()
+  expect(vision.getByText('No vision for 2027 yet.')).toBeInTheDocument()
+ })
+ it('while the notes load: no chip and no editors, so nothing can be written',()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  notesStore.loading=true
+  season()
+  expect(within(head()).queryByRole('button',{name:/^Energy/})).toBeNull()
+  for(const name of ['Ideal week','Wild cards'])expect(within(screen.getByRole('region',{name})).queryByRole('button',{name:'Edit'})).toBeNull()
+  cleanup()
+  open('/year?view=constellation&start=2026-10-09')
+  for(const name of ['Vision','Landscape'])expect(within(screen.getByRole('region',{name})).queryByRole('button',{name:'Edit'})).toBeNull()
+  expect(notesStore.patches).toEqual([])
+ })
+ it('a read that failed says “Couldn’t load” faintly and offers nothing to write',()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  notesStore.error='boom'
+  season()
+  expect(within(head()).queryByRole('button',{name:/^Energy/})).toBeNull()
+  expect(within(head()).getByText('Energy couldn’t load')).toBeInTheDocument()
+  for(const name of ['Ideal week','Wild cards']){
+   const sec=within(screen.getByRole('region',{name}))
+   expect(sec.getByText('Couldn’t load.')).toBeInTheDocument()
+   expect(sec.queryByRole('button',{name:'Edit'})).toBeNull()
+  }
+  cleanup()
+  month()
+  choose('Fresh start')
+  expect(within(screen.getByRole('region',{name:'Fresh start'})).getByText('Couldn’t load.')).toBeInTheDocument()
+  expect(within(screen.getByRole('region',{name:'Fresh start'})).queryByRole('button',{name:/Densely Urban/})).toBeNull()
+  expect(notesStore.patches).toEqual([])
+ })
+ it('the quiet panels are regions, styled on the sheet (Fresh start, the refine pairs)',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  month()
+  choose('Fresh start')
+  expect(screen.getByRole('region',{name:'Fresh start'})).toHaveClass('plan-fresh')
+  expect(screen.queryByRole('dialog',{name:'Fresh start'})).toBeNull()
  })
 })

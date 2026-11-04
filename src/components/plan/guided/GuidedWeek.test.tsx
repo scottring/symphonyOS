@@ -332,6 +332,19 @@ describe('GuidedWeek — For the family this week', () => {
     expect(screen.getByRole('region', { name: 'For the family this week' })).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe('family')
   })
+  // Fix round 1: a week gone by has nothing to tell; each week its own line.
+  it('a past week has none; another week starts its own line', () => {
+    vi.setSystemTime(new Date(2026, 9, 20, 12))
+    open('/')
+    expect(screen.queryByRole('region', { name: 'For the family this week' })).toBeNull()
+  })
+  it('the line is keyed by its week: what was typed for one week is not carried to the next', () => {
+    const { rerender } = render(<MemoryRouter><GuidedSessionProvider><WeekV2 weekStart={weekStart} isCurrent canvas={canvas} deck={makeDeck()} /></GuidedSessionProvider></MemoryRouter>)
+    fireEvent.change(screen.getByRole('textbox', { name: 'What should the family know this week?' }), { target: { value: 'Half day Friday' } })
+    const next = new Date(2026, 9, 4)
+    rerender(<MemoryRouter><GuidedSessionProvider><WeekV2 weekStart={next} isCurrent={false} canvas={canvas} deck={makeDeck()} /></GuidedSessionProvider></MemoryRouter>)
+    expect(screen.getByRole('textbox', { name: 'What should the family know this week?' })).toHaveValue('')
+  })
   it('Give them a day (?place=1) has none', () => {
     open('/?place=1')
     expect(screen.queryByRole('region', { name: 'For the family this week' })).toBeNull()

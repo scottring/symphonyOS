@@ -264,7 +264,7 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
   it('a step with one action carries its button in the tooltip; it runs once and says it is done; a failure says so', async () => {
     const run = vi.fn(async () => false)
     const coachFor = () => <MemoryRouter><GuideCoach level="year" current="share-book" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()}
-      action={{ label: 'Book the first Winter session', done: 'Booked: Plan Winter, Tue, Dec 1', run }} /></MemoryRouter>
+      action={{ label: 'Book the first Winter session', done: () => 'Booked: Plan Winter, Tue, Dec 1', run }} /></MemoryRouter>
     const { rerender } = render(coachFor())
     await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Book the first Winter session' })) })
     expect(run).toHaveBeenCalledTimes(1)
@@ -279,5 +279,21 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
   it('a step with no action has no extra button', () => {
     render(<MemoryRouter><GuideCoach level="year" current="refine" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()} /></MemoryRouter>)
     expect(tip().getAllByRole('button').map((b) => b.textContent)).toEqual(['Back', 'Next', '✕'])
+  })
+
+  // Fix round 1 (ruling): booking keeps a date.
+  it('an action with a date opens the day first (its starting day), and Book it runs it on the day picked', async () => {
+    const run = vi.fn(async () => true)
+    render(<MemoryRouter><GuideCoach level="year" current="share-book" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()}
+      action={{ label: 'Book the first Winter session', date: { label: 'First Winter session', initial: new Date(2026, 11, 1) },
+        done: (d) => `Booked: ${d?.getDate()}`, run }} /></MemoryRouter>)
+    fireEvent.click(tip().getByRole('button', { name: 'Book the first Winter session' }))
+    expect(run).not.toHaveBeenCalled()
+    const date = tip().getByLabelText('First Winter session')
+    expect(date).toHaveValue('2026-12-01')
+    fireEvent.change(date, { target: { value: '2026-11-28' } })
+    await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Book it' })) })
+    expect(run).toHaveBeenCalledWith(new Date(2026, 10, 28))
+    expect(tip().getByRole('status')).toHaveTextContent('Booked: 28')
   })
 })

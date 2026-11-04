@@ -214,6 +214,9 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
       <WeekMenu offers={offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run }))} />
     </>
   )
+  // A week gone by has nothing left to tell the family (its line is hidden).
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const weekGone = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7) <= todayStart
   // HomeHeader's masthead, when it offers a place for the header (desktop
   // only; HomeView decides).
   const slots = useContext(PlanMastheadSlotsContext)
@@ -262,7 +265,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
         : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
       {/* Tell the family's home (planning as tooltips, Task 2): a quiet line
           under the week, every day and through the session. */}
-      {deckMode !== 'place' && <FamilyWeekLine weekStart={weekStart} />}
+      {deckMode !== 'place' && !weekGone && <FamilyWeekLine key={`family:${localYmd(weekStart)}`} weekStart={weekStart} />}
     </div>
   )
 }

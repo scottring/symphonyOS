@@ -185,13 +185,15 @@ function perFrame(fn: () => void): { run: () => void; cancel: () => void } {
 const buzz = () => { try { navigator.vibrate?.(6) } catch { /* no haptics */ } }
 
 /** A step's one action, carried in its tooltip (Year's Share and book: "Book
- *  the first Winter session", the existing booking). It runs on a tap and
- *  says when it is done. */
+ *  the first Winter session", the existing booking). With `date`, a tap first
+ *  opens a day to book (starting on `initial`), and "Book it" runs it on the
+ *  day picked. It says when it is done. */
 export interface CoachAction {
   label: string
+  date?: { label: string; initial: Date }
   /** Said once it has run ("Booked: Plan Winter, Tue, Dec 1"). */
-  done: string
-  run: () => Promise<boolean>
+  done: (day?: Date) => string
+  run: (day?: Date) => Promise<boolean>
 }
 
 export interface GuideCoachProps {
@@ -300,15 +302,34 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
     return () => cancelAnimationFrame(id)
   }, [step.id, write])
 
-  // The step's action: once running, once done (for this step), or failed.
-  const [acted, setActed] = useState<{ step: string; state: 'running' | 'done' | 'failed' } | null>(null)
+  // The step's action: picking its day, running, done (for this step), or failed.
+  const [acted, setActed] = useState<{ step: string; state: 'picking' | 'running' | 'done' | 'failed'; day?: string } | null>(null)
   const actState = acted?.step === step.id ? acted.state : null
-  const runAction = async () => {
-    if (!action || actState === 'running') return
-    setActed({ step: step.id, state: 'running' })
-    const ok = await action.run().catch(() => false)
-    setActed({ step: step.id, state: ok ? 'done' : 'failed' })
+  const actDay = acted?.step === step.id ? acted.day : undefined
+  const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const dayOf = (ymd?: string) => {
+    const m = ymd && /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd)
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : undefined
   }
+  const runAction = async (day?: Date) => {
+    if (!action || actState === 'running') return
+    setActed({ step: step.id, state: 'running', day: actDay })
+    const ok = await action.run(day).catch(() => false)
+    setActed({ step: step.id, state: ok ? 'done' : 'failed', day: actDay })
+  }
+  const actionNode = !action ? null : actState === 'done'
+    ? <p className="coach-done" role="status">{action.done(dayOf(actDay))}</p>
+    : action.date && actState !== null
+      ? <div className="coach-pick">
+        <label className="coach-pick-label">{action.date.label}
+          <input type="date" className="coach-pick-date" value={actDay ?? ''} disabled={actState === 'running'}
+            onChange={(e) => setActed({ step: step.id, state: 'picking', day: e.target.value })} />
+        </label>
+        <button type="button" className="coach-action" disabled={actState === 'running' || !dayOf(actDay)}
+          onClick={() => { void runAction(dayOf(actDay)) }}>Book it</button>
+      </div>
+      : <button type="button" className="coach-action" disabled={actState === 'running'}
+        onClick={() => { if (action.date) setActed({ step: step.id, state: 'picking', day: ymdOf(action.date.initial) }); else void runAction() }}>{action.label}</button>
 
   const title = titleFor ? titleFor(step) : step.title
   return createPortal(
@@ -317,9 +338,7 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
       <div className="coach-t">{title}</div>
       <p className="coach-why">{step.why}</p>
       <p className="coach-you">{step.you}</p>
-      {action && (actState === 'done'
-        ? <p className="coach-done" role="status">{action.done}</p>
-        : <button type="button" className="coach-action" disabled={actState === 'running'} onClick={() => { void runAction() }}>{action.label}</button>)}
+      {actionNode}
       {action && actState === 'failed' && <p className="coach-error" role="alert">Didn’t save. Try again.</p>}
       {error && <p className="coach-error" role="alert">{error}</p>}
       <div className="coach-nav">

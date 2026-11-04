@@ -79,6 +79,12 @@ button.plan-chip:disabled { opacity: .5; cursor: default; }
 }
 .coach-action:hover { background: color-mix(in srgb, var(--coach-accent) 8%, transparent); }
 .coach-action[disabled] { opacity: .5; cursor: default; }
+.coach-pick { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 4px 0 2px; }
+.coach-pick-label { display: grid; gap: 4px; font: 600 10px/1 var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--coach-ink-faint); }
+.coach-pick-date {
+  min-height: 32px; padding: 4px 8px; border: 1px solid var(--coach-rule); border-radius: 8px;
+  background: transparent; color: var(--coach-ink); font: 500 13px/1 var(--font-family-sans); letter-spacing: 0; text-transform: none;
+}
 .coach .coach-done { color: var(--coach-sage); font-weight: 500; }
 .coach-nav { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .coach-nav button {

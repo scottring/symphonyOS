@@ -797,9 +797,13 @@ export function TodayView({
     <PeriodSummaryLine plannedAt={shownGuide?.plannedAt ?? shownSavedAt}
       reviewed={!!shownGuide?.done?.includes('look-back') || !!shownDayBefore.reviewed} level="day" />
   ) : null
-  const energyChip = !shownNotes.error && !shownNotes.loading
-    ? <EnergyChip value={shownNotes.notes.energy} save={(energy) => shownNotes.patch({ energy })} />
-    : null
+  // Keyed by the day, so a tap on one day never carries to the next; drawn
+  // only once that day's notes have loaded (fix round 1).
+  const energyChip = shownNotes.error
+    ? <span className="energy-chip-unloaded">Energy couldn’t load</span>
+    : !shownNotes.loading
+      ? <EnergyChip key={dayToken(viewedDate)} value={shownNotes.notes.energy} save={(energy) => shownNotes.patch({ energy })} />
+      : null
   const reloadShownNotes = shownNotes.reload
   // "From yesterday" (Task 2): what the day before held and did not finish,
   // at the top of the day's lists, on today's page (and, in the evening's

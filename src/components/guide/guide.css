@@ -275,3 +275,4 @@
 .energy-chip:hover { background: color-mix(in srgb, var(--color-neutral-900) 9%, transparent); }
 .energy-chip:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
 .energy-chip-failed { font-size: 12px; color: var(--color-danger-600, hsl(0 60% 42%)); }
+.energy-chip-unloaded { font-size: 12px; color: var(--color-neutral-400); }
