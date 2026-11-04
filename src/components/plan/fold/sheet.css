@@ -127,3 +127,14 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .look-sheet .gw-row { border-bottom: 1px solid var(--paper-fold-rule-above, var(--color-neutral-200)); }
 .look-sheet .gw-row-title { font: 400 16px/1.35 var(--font-family-display); color: var(--paper-fold-ink, var(--color-neutral-900)); }
 .look-sheet-foot { display: block; }
+
+/* A session's writing step (by area, brain dump): the life areas as chips
+   above the write line; the new line is written in the one picked. */
+.sheet-areas { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 2px; }
+.sheet-area {
+  border: 1px solid var(--paper-fold-rule, var(--color-neutral-200)); border-radius: 999px; background: none;
+  padding: 4px 11px; font: 500 12.5px/1.2 var(--font-family-sans); color: var(--paper-fold-ink-soft, var(--color-neutral-600)); cursor: pointer;
+}
+.sheet-area:hover { border-color: var(--paper-fold-accent, var(--color-primary-500)); }
+.sheet-area.is-on { background: color-mix(in srgb, var(--paper-fold-accent, var(--color-primary-500)) 14%, transparent); border-color: var(--paper-fold-accent, var(--color-primary-500)); color: var(--paper-fold-ink, var(--color-neutral-900)); }
+.sheet-area:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }

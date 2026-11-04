@@ -1207,6 +1207,37 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(fall.queryAllByRole('button')).toHaveLength(0)
   expect(document.querySelector('.ribbon-card')).toBeNull()
  })
+ // Fix round 1 (Task 7): by area means by area. The period's life areas are
+ // chips beside the write line; a new line is written in the one picked.
+ it('The month by area: the life areas as chips beside the line; a line is written in the area picked, in its space',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Home',context:'family',mine:true,sortOrder:1}]
+  atStep('by-area')
+  month('&plan=1')
+  const chips=within(screen.getByRole('radiogroup',{name:'Life area'}))
+  expect(chips.getAllByRole('radio').map((r)=>r.textContent)).toEqual(['Health','Home'])
+  fireEvent.click(chips.getByRole('radio',{name:'Home'}))
+  expect(chips.getByRole('radio',{name:'Home'})).toHaveAttribute('aria-checked','true')
+  await writeOn('Write an October goal for Home','Paint the fence')
+  expect(api.addTask).toHaveBeenCalledWith('Paint the fence',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT,areaId:'m',context:'family'}))
+  // Not a writing step: no chips.
+  cleanup();atStep('upkeep-fun')
+  month('&plan=1')
+  expect(screen.queryByRole('radiogroup',{name:'Life area'})).toBeNull()
+ })
+ it('The month by area: a line that did not save marks nothing; a dated line that saved marks October planned',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  atStep('by-area')
+  api.addTask.mockResolvedValue(undefined)
+  month('&plan=1')
+  await writeOn('Write an October goal','Paint the fence')
+  expect(api.addTask).toHaveBeenCalled()
+  expect(notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)).toHaveLength(0)
+  api.addTask.mockResolvedValue('new')
+  await writeOn('Write an October goal','Dentist Oct 23')
+  expect(api.addTask).toHaveBeenLastCalledWith('Dentist',undefined,undefined,new Date(2026,9,23),expect.objectContaining({isAllDay:true}))
+  await waitFor(()=>expect(notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)).toHaveLength(1))
+ })
  it('The month by area: Fall open beside the sheet, the pencil on the write line, the guide told the areas; the first line written marks October planned',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Home',context:'family',mine:true,sortOrder:1}]
@@ -1556,6 +1587,16 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Add'}))})
   expect(lifeAreas.add).toHaveBeenCalledWith('Money','personal')
   expect(plannedMarks()).toHaveLength(0)
+ })
+ it('Brain dump: the year’s life areas as chips; a goal is written in the area picked',async()=>{
+  inSession()
+  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Money',context:'work',mine:true,sortOrder:1}]
+  atStep('brain-dump')
+  year()
+  fireEvent.click(within(screen.getByRole('radiogroup',{name:'Life area'})).getByRole('radio',{name:'Money'}))
+  await writeOn('Write a 2026 goal for Money','Max the 401k')
+  expect(api.addGoal).toHaveBeenCalledWith('m','Max the 401k','work',expect.objectContaining({year:2026}))
+  await waitFor(()=>expect(plannedMarks()).toHaveLength(1))
  })
  it('Brain dump: last year open beside the sheet, the pencil on “Write a 2026 goal”; the first goal written marks 2026 planned',async()=>{
   inSession()

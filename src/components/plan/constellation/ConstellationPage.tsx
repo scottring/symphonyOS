@@ -242,6 +242,8 @@ function Inner() {
   const showDone = prefs.done
   const [expanded, setExpanded] = useState<string | null>(null)
   const [composer, setComposer] = useState<Composer | null>(null)
+  // The life area a session's writing step writes in (by area, brain dump).
+  const [writeAreaId, setWriteAreaId] = useState<string | null>(null)
   // Marked planned in this sitting (the period's key): the way on is the next
   // horizon down.
   const [markedKey, setMarkedKey] = useState<string | null>(null)
@@ -317,27 +319,33 @@ function Inner() {
       return true
     }, opts)
 
-  const contextFor = (parent: PlanNode | null): TaskContext | undefined =>
-    (parent ? (parent.goal ? parent.goal.context : parent.task?.context) : area.area) ?? undefined
+  // The space a new line is written in: the one chosen at the end of the
+  // write line, or, with a life area picked (a session's by-area step), that
+  // area's own space (a legacy area with none is Personal).
+  type WriteArea = { id: string; context: TaskContext | null }
+  const contextFor = (lifeArea?: WriteArea | null): TaskContext | undefined =>
+    lifeArea ? lifeArea.context ?? 'personal' : area.area ?? undefined
 
   // A goal new to a year goes last there: above that year's highest order, so a
   // list already ordered by drag doesn't take it in second.
   const lastInYear = (y: number) => nextTaskSortOrder(goals.filter((g) => g.year === y))
 
-  /** The one create path: period and lineage in a single insert. */
-  const createItem = async (lvl: number, title: string, parent: PlanNode | null, id: string, context: TaskContext | undefined, extra?: { isFun?: boolean }): Promise<boolean> => {
-    if (lvl === 0) return !!await addGoal(null, title, context, { year, id, sortOrder: lastInYear(year) })
+  /** The one create path: a plain item of the period (paper-style horizons,
+   *  2026-11-04: in its own words, tied to nothing), in a life area when one
+   *  is picked. */
+  const createItem = async (lvl: number, title: string, id: string, context: TaskContext | undefined, extra?: { isFun?: boolean; areaId?: string }): Promise<boolean> => {
+    if (lvl === 0) return !!await addGoal(extra?.areaId ?? null, title, context, { year, id, sortOrder: lastInYear(year) })
     return !!await addTask(title, undefined, undefined, undefined, {
       id, ...extra,
       bucket: lvl === 1 ? 'quarter' : lvl === 2 ? 'month' : 'week',
       ...(lvl === 1 ? { seasonStart: seasonB.start } : lvl === 2 ? { monthStart: monthB.start } : { weekStart: week }),
       context,
-      ...(parent ? lvl === 1 ? { goalId: parent.id } : { sourceId: parent.id, goalId: parent.task?.goalId } : {}),
     })
   }
-  const runCreate = (lvl: number, title: string, parent: PlanNode | null, label: string, id: string = crypto.randomUUID(), extra?: { isFun?: boolean }): Promise<boolean> => {
-    const context = contextFor(parent)
-    const attempt = (): Promise<boolean> => act(label, () => createItem(lvl, title, parent, id, context, extra), {
+  const runCreate = (lvl: number, title: string, label: string, id: string = crypto.randomUUID(), extra?: { isFun?: boolean; lifeArea?: WriteArea | null }): Promise<boolean> => {
+    const context = contextFor(extra?.lifeArea)
+    const fields = { ...(extra?.isFun ? { isFun: true } : {}), ...(extra?.lifeArea ? { areaId: extra.lifeArea.id } : {}) }
+    const attempt = (): Promise<boolean> => act(label, () => createItem(lvl, title, id, context, fields), {
       ids: [id],
       undo: async () => { if (lvl === 0) await deleteGoal(id); else await deleteTask(id) },
       retry: () => { void attempt() },
@@ -360,7 +368,7 @@ function Inner() {
   // (paper-style horizons, 2026-11-04): no parent, so no goalId or sourceId.
   const keepProposal = async (p: CanvasProposal) => {
     activity.setProposalState(p.key, 'saving')
-    const ok = await runCreate(level, p.title, null, `Keep “${p.title}”`)
+    const ok = await runCreate(level, p.title, `Keep “${p.title}”`)
     if (ok) activity.removeProposal(p.key)
     else activity.setProposalState(p.key, 'failed')
   }
@@ -569,23 +577,28 @@ function Inner() {
   // (where the week and the day hold it), as the old add box did; writing
   // straight to a day moves nothing between lists.
   const writeLabel = `Write ${aOrAn(periodWord)} ${periodWord} goal`
-  const addHere = async (text: string) => {
+  const addHere = async (text: string, lifeArea?: WriteArea | null) => {
     const id = crypto.randomUUID()
-    const ok = await runCreate(level, text, null, `Add “${text}”`, id)
+    const ok = await runCreate(level, text, `Add “${text}”`, id, { lifeArea })
     if (ok) reveal.current = `${level}:${id}`
     return ok
   }
-  const writeLine = async (parse: HorizonParse, landing: HorizonLanding): Promise<boolean> => {
-    if (landing.kind === 'period') return addHere(parse.title)
+  // In a session's writing step (by area, brain dump) the line is written in
+  // the life area picked beside it (`lifeArea`). A dated line goes to its
+  // day, which is a placement the session counts too.
+  const writeLineIn = (lifeArea: WriteArea | null) => async (parse: HorizonParse, landing: HorizonLanding): Promise<boolean> => {
+    if (landing.kind === 'period') return addHere(parse.title, lifeArea)
     const id = crypto.randomUUID()
     const d = landing.date
     const at = parse.hasTime && parse.date ? parse.date : new Date(d.getFullYear(), d.getMonth(), d.getDate())
     const people = parse.people
-    return act(`Add “${parse.title}” to ${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
+    const ok = await act(`Add “${parse.title}” to ${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
       async () => !!(await addTask(parse.title, parse.quick.contactId, parse.quick.projectId, at, {
         id, isAllDay: !parse.hasTime, assignedTo: people[0] ?? meId ?? undefined, assignedToAll: people.length > 1 ? people : undefined,
-        location: parse.location, context: parse.quick.context ?? contextFor(null),
+        location: parse.location, context: parse.quick.context ?? contextFor(lifeArea), ...(lifeArea ? { areaId: lifeArea.id } : {}),
       })), { ids: [id], undo: async () => { await deleteTask(id) } })
+    if (ok) pageWrote()
+    return ok
   }
 
   // One onward step: the next horizon down, for the period on screen.
@@ -763,7 +776,7 @@ function Inner() {
     'look-back': lookBackBody(t),
     'upkeep-fun': <UpkeepFun monthWord={periodWord} routines={stripRoutines}
       fun={openNodes.filter((n) => n.task?.isFun).map((n) => ({ id: n.id, title: n.title }))}
-      onAddFun={(title) => runCreate(2, title, null, `Add “${title}” for fun`, undefined, { isFun: true })} />,
+      onAddFun={(title) => runCreate(2, title, `Add “${title}” for fun`, undefined, { isFun: true })} />,
   } : level === 1 ? {
     'look-back': lookBackBody(t),
     'from-year': fromYearBody(),
@@ -882,7 +895,19 @@ function Inner() {
         {hasLandscape(yearNotes.notes.landscape) && <YearLandscapeSection value={yearNotes.notes.landscape} />}
         <MonthsCalendar start={bounds.start} end={bounds.end} allMonths perMonth={4} label={`${periodWord}, month by month`} over={`${periodWord} is over.`} />
       </CalendarSheet>
-  const sheet = (
+  // The life areas in view (the space filter; a legacy area with no space is
+  // Personal): the guide's, and the writing step's chips.
+  const areasInView = lifeAreas.filter((x) => matchesLayers(x.context ?? 'personal', layers))
+  const sheetFor = (fold?: SessionFold) => {
+    // A writing step (by area, brain dump) writes area by area: the areas as
+    // chips beside the line, the new line in the one picked.
+    const byArea = !!fold?.write && areasInView.length > 0
+    const picked = byArea ? areasInView.find((a) => a.id === writeAreaId) ?? null : null
+    const areaChips = byArea && <div className="sheet-areas" role="radiogroup" aria-label="Life area">
+      {areasInView.map((a) => <button key={a.id} type="button" role="radio" aria-checked={picked?.id === a.id}
+        className={`sheet-area${picked?.id === a.id ? ' is-on' : ''}`} onClick={() => setWriteAreaId(picked?.id === a.id ? null : a.id)}>{a.name}</button>)}
+    </div>
+    return (
     <section className="plan-list plan-sheet ribbon-host" data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
       {plannable && <RibbonTab label={`Plan ${periodWord}`} onPull={() => setMode('plan')} />}
       {justMarked && !planning && <PlannedStamp at={justMarkedAt} />}
@@ -897,8 +922,9 @@ function Inner() {
             onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />)}
         </>} />
       {openNodes.length === 0 && preview.here.length === 0 && proposals.length === 0 && <p className="plan-empty">Nothing{folded.length ? ' open' : ''} for {periodWord} yet.</p>}
-      <WriteLine placeholder={writeLabel} period={{ start: bounds.start, end: new Date(bounds.end.getTime() - 1) }} periodWord={periodWord}
-        onWrite={writeLine} extra={area.picker} />
+      {areaChips}
+      <WriteLine placeholder={picked ? `${writeLabel} for ${picked.name}` : writeLabel} period={{ start: bounds.start, end: new Date(bounds.end.getTime() - 1) }} periodWord={periodWord}
+        onWrite={writeLineIn(picked ? { id: picked.id, context: picked.context ?? null } : null)} extra={picked ? null : area.picker} />
       {folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => prefs.set('done', !showDone)}>
         <span className="plan-done-fold-text">{doneLine}</span>
         <span className="canvas-link plan-done-fold-go">{showDone ? 'Hide' : 'Show'}</span>
@@ -908,7 +934,8 @@ function Inner() {
         {openNodes.length > 0 && <Link to={onward.to} className="plan-next" data-explain="next" data-explain-label={onward.label.replace(' →', '')}>{onward.label}</Link>}
       </footer>}
     </section>
-  )
+    )
+  }
   // The sheet with its two folds. In a session the step drives them (`fold`):
   // the look back turns the sheet above to the period before, with its
   // choices; otherwise they are the reader's, as they left them.
@@ -920,7 +947,7 @@ function Inner() {
         above={fold?.look ? <LookSheet title={prevWord}>{fold.look}</LookSheet>
           : <AboveSheet {...aboveSheet} foot={`For reading. Write ${periodWord} in its own words.`} />}
         calendar={calendarSheet} calendarLabel={`${periodWord} calendar`} drive={fold?.drive}>
-        {sheet}
+        {sheetFor(fold)}
       </PaperFold>
     </div>
     {/* The season's ideal week, made in its session (read-only here). */}
@@ -984,7 +1011,7 @@ function Inner() {
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}
           // Only the areas the space filter shows (a legacy area with no
           // space is Personal): the guide never hears of one out of view.
-          areas={lifeAreas.filter((x) => matchesLayers(x.context ?? 'personal', layers)).map((x) => ({ id: x.id, name: x.name, context: x.context }))} />
+          areas={areasInView.map((x) => ({ id: x.id, name: x.name, context: x.context }))} />
       : <>
         {/* Just planned here: the way on is the next horizon down. */}
         {justMarked && <div className="pv2-saved plan-planned-next" role="note">
