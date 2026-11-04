@@ -514,6 +514,13 @@ describe('PaperFold: the calendar on the right', () => {
     expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
   })
 
+  // The page tours' "above" and "calendar" steps point at the edges.
+  it('marks its edges for the page tour: above on the left, calendar on the right', () => {
+    const { container } = renderCal()
+    const edges = Array.from(container.querySelectorAll('.paper-fold-edge'))
+    expect(edges.map((e) => e.getAttribute('data-explain'))).toEqual(['above', 'calendar'])
+  })
+
   it('without a calendar there is no second edge, and C does nothing', () => {
     const { container } = renderFold()
     expect(container.querySelector('.paper-fold-slot--calendar')).toBeNull()

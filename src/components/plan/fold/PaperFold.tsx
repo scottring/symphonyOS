@@ -522,6 +522,8 @@ function PaperFoldSheet({
             aria-expanded={open}
             aria-controls={frontId}
             aria-label={edgeName}
+            // The page tours' "above" step points here (pageTours.ts).
+            data-explain="above"
             {...A.handlers}
           >
             <Chevron d="M10 3 5 8l5 5" />
@@ -571,6 +573,8 @@ function PaperFoldSheet({
               aria-expanded={calOpen}
               aria-controls={calId}
               aria-label={calName}
+              // The page tours' "calendar" step points here (pageTours.ts).
+              data-explain="calendar"
               {...C.handlers}
             >
               <Chevron d="M6 3l5 5-5 5" />

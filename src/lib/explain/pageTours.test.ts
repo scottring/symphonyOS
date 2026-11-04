@@ -52,6 +52,23 @@ describe('page-written tours', () => {
     expect(PAGE_GUIDES.week).toContain('⋯')
   })
 
+  // Final review (2026-11-04): the "above" steps pointed at nothing, and
+  // Month said "Nothing here is on a calendar yet." beside its calendar.
+  it('Year, Season and Month point at the fold edges, the level above and the calendar', () => {
+    for (const page of ['year', 'season', 'month']) {
+      document.body.innerHTML = `<div data-explain-root>
+        <h1 data-explain="period">November</h1>
+        <button class="paper-fold-edge" data-explain="above">Fall</button>
+        <button class="paper-fold-edge" data-explain="calendar">November calendar</button>
+      </div>`
+      const targets = tourFor(page).map((s) => s.targets[0])
+      expect(targets, page).toEqual(['period', 'above', 'calendar'])
+    }
+    const words = ['year', 'season', 'month'].flatMap((p) => [PAGE_GUIDES[p], ...(PAGE_TOURS[p] ?? []).map((x) => x.text)]).join(' ')
+    expect(words).not.toMatch(/Nothing here is on a calendar/)
+    for (const p of ['year', 'season', 'month']) expect(PAGE_GUIDES[p]).toContain('press C')
+  })
+
   it('never shows the same part twice, and a page without a tour gets none', () => {
     document.body.innerHTML = `<div data-explain-root><div data-explain="page-title">Oct</div><div data-explain="page-title">Oct again</div></div>`
     expect(tourFor('week').map((s) => s.title)).toEqual(['This week'])
