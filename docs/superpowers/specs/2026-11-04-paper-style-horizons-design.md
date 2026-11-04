@@ -172,6 +172,10 @@ The prototype is the reference for look, motion and sound. Build what it does:
   "Write a task for this week") in the accent color. Return adds the line in
   ink.
 - **Remembered:** open or folded, per person and per horizon.
+- **Stays in view (Scott, 2026-11-04):** on wide screens and the Duo, a sheet
+  beside a long page is sticky under the page header, viewport-tall, and
+  scrolls on its own; it never scrolls away with the page. Phones keep the
+  top or bottom fold with its own scroll.
 - **Reduced motion:** no spring and no swish. It switches state with a short
   crossfade and the landing sound only.
 - **Sizes:** the sheet above takes a reading column of about 36% of the
