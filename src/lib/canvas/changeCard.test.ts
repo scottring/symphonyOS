@@ -21,6 +21,13 @@ describe('opRow', () => {
     expect(opRow(op({ op: 'someday' }), today)).toMatchObject({ kind: 'LATER', where: '→ Someday' })
     expect(opRow(op({ op: 'assign', assigneeName: 'Ella' }), today)).toMatchObject({ kind: 'WHO', where: '→ Ella' })
   })
+
+  // Final review (2026-11-04): Let go is "not ever", as the button does.
+  it('plan_let_go says a month or season item comes off every list; a year goal is let go', () => {
+    expect(opRow(op({ op: 'plan_let_go', level: 'month', title: 'Book the cabin' }), today)).toEqual({ kind: 'LET GO', title: 'Book the cabin', where: '→ Let go · off every list' })
+    expect(opRow(op({ op: 'plan_let_go', level: 'season' }), today).where).toBe('→ Let go · off every list')
+    expect(opRow(op({ op: 'plan_let_go', level: 'year' }), today).where).toBe('→ Let go')
+  })
 })
 
 describe('opWhen', () => {

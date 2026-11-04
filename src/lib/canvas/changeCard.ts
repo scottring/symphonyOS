@@ -351,7 +351,9 @@ export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string
       const to = op.toPeriodLabel ?? 'next'
       return { kind: op.toNext === false ? 'MOVE' : 'CARRY', title: op.title, where: op.newTitle ? `→ ${to}, as “${op.newTitle}”` : `→ ${to}` }
     }
-    case 'plan_let_go': return { kind: 'LET GO', title: op.title, where: '→ Let go' }
+    // Let go is "not ever" (letGo.ts): a month or season item comes off
+    // every list; a year goal is set aside. Search still finds either.
+    case 'plan_let_go': return { kind: 'LET GO', title: op.title, where: op.level === 'year' ? '→ Let go' : '→ Let go · off every list' }
     case 'plan_done': return op.level === 'year' ? { kind: 'MET', title: op.title, where: '→ Met' } : { kind: 'DONE', title: op.title, where: '→ Done' }
     case 'choice_add': return { kind: 'NEW', title: op.choiceTitle ?? op.title, where: '' }
     case 'option_add': return { kind: 'ADD', title: op.optionName ?? op.title, where: op.phone ?? '' }

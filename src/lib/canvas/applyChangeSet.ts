@@ -23,6 +23,8 @@ import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { liveCommitments } from '@/lib/placement/model'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
+import { letGoUpdates, unletGoUpdates } from '@/lib/planning/letGo'
+import { placementOf } from '@/lib/planning/placement'
 
 export interface ApplyDeps extends Partial<MoreApplyDeps> {
   /** Durable server journal owns rollback/Undo for actual chat writes. */
@@ -30,6 +32,11 @@ export interface ApplyDeps extends Partial<MoreApplyDeps> {
   /** A guided planning session: items are placed by list, period, life area
    *  and day, never under another item (no sourceId, no goalId). */
   inSession?: boolean
+  /** The session's level. In a Month or Season session, Someday on a
+   *  period item means what the look back's Someday button means
+   *  (periodMoves): this period's commitment ends, and the item goes to
+   *  Someday only when that was its last open one. */
+  sessionLevel?: 'day' | 'week' | 'month' | 'season' | 'year'
   tasks: Task[]
   updateTask: (id: string, updates: Partial<Task>) => Promise<boolean | void>
   addTask: (title: string, scheduledFor: Date | undefined, options: {
@@ -199,10 +206,24 @@ function planNeeds(op: ChangeOp): (keyof MoreApplyDeps)[] {
       // A season goal's parent is a year goal: it must be visible to link to.
       return op.level === 'season' && op.parentId ? ['goals'] : []
     case 'plan_carry': return goal ? ['goals', 'addGoal', 'deleteGoal'] : ['keepForward']
-    case 'plan_let_go': return goal ? ['goals', 'updateGoal'] : ['dropCommitment']
+    case 'plan_let_go': return goal ? ['goals', 'updateGoal'] : []
     case 'plan_done': return goal ? ['goals', 'updateGoal'] : ['completeTask', 'reopenTask']
     default: return []
   }
+}
+
+/** The period a session's Someday takes an item off: the one the op names,
+ *  else the item's latest open commitment at the session's level (as the
+ *  server resolves a plan op's period). Null outside a Month or Season
+ *  session, or for an item not on that level's list. */
+function sessionSomedayPeriod(op: ChangeOp, task: Task, sessionLevel: ApplyDeps['sessionLevel']): { level: 'month' | 'season'; start: Date } | null {
+  const level = op.level === 'month' || op.level === 'season' ? op.level : sessionLevel
+  if (level !== 'month' && level !== 'season') return null
+  if (op.periodStart && YMD.test(op.periodStart)) return { level, start: localDay(op.periodStart) }
+  const open = commitmentSnapshot(task).filter((c) => c.level === level && c.status === 'open')
+  if (!open.length) return null
+  const latest = open.reduce((a, b) => (b.periodStart > a.periodStart ? b : a))
+  return { level, start: latest.periodStart }
 }
 
 /** A task's commitments as Undo states them back (timingRemoval's snapshot,
@@ -753,10 +774,11 @@ export async function applyChangeSet(card: ChangeSet, given: ApplyDeps): Promise
             if (!(await step(() => deps.updateGoal(g.id, { status: 'archived' }), () => deps.updateGoal(g.id, { status: g.status }), g.id))) return fail()
             continue
           }
+          // Let go means not ever, as the button does (letGo.ts): every open
+          // commitment ends and the item is off every list; Undo puts back
+          // the periods and the place it had.
           const task = byId.get(op.itemId!)!
-          const before = commitmentSnapshot(task)
-          const level = op.level as 'month' | 'season'
-          if (!(await step(() => deps.dropCommitment(task.id, level, localDay(op.periodStart!)), () => deps.updateTask(task.id, { commitments: before }), task.id))) return fail()
+          if (!(await step(() => deps.updateTask(task.id, letGoUpdates()), () => deps.updateTask(task.id, unletGoUpdates(task)), task.id))) return fail()
           continue
         }
         case 'plan_done': {
@@ -778,8 +800,27 @@ export async function applyChangeSet(card: ChangeSet, given: ApplyDeps): Promise
           if (!(await applyChoiceOp(op))) return fail()
           continue
         }
+        case 'someday': {
+          // A Month or Season session: Someday is the look back's button
+          // (periodMoves) — this period off; to Someday only when it was the
+          // item's last open commitment.
+          const task = byId.get(op.taskId!)!
+          const period = given.dropCommitment ? sessionSomedayPeriod(op, task, deps.sessionLevel) : null
+          if (period) {
+            const before = commitmentSnapshot(task)
+            const lastOpen = before.filter((c) => c.status === 'open').length <= 1
+            const ok = lastOpen
+              ? await step(() => deps.updateTask(task.id, { bucket: 'someday', scheduledFor: undefined }), () => deps.updateTask(task.id, { ...placementOf(task), commitments: before }), task.id)
+              : await step(() => deps.dropCommitment(task.id, period.level, period.start), () => deps.updateTask(task.id, { commitments: before }), task.id)
+            if (!ok) return fail()
+            continue
+          }
+          const { updates, previous } = opWrite(op, task)
+          if (!(await step(() => deps.updateTask(task.id, updates), () => deps.updateTask(task.id, previous), task.id))) return fail()
+          continue
+        }
         default: {
-          // place / unplace / someday / assign / talk: plain task writes.
+          // place / unplace / assign / talk: plain task writes.
           const task = byId.get(op.taskId!)!
           const { updates, previous } = opWrite(op, task)
           if (!(await step(() => deps.updateTask(task.id, updates), () => deps.updateTask(task.id, previous), task.id))) return fail()

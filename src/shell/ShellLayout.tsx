@@ -467,6 +467,7 @@ function ShellLayoutInner({ children }: Props) {
   // task already reopened by hand must not be toggled closed again.
   const latestTasks = useRef(tasks);
   useEffect(() => { latestTasks.current = tasks; }, [tasks]);
+  const sessionLevel = guided?.level;
   const applyChanges = useCallback(async (set: ChangeSet) => {
     const result = await applyReviewedChange(set, {
       tasks, updateTask, deleteTask,
@@ -487,7 +488,9 @@ function ShellLayoutInner({ children }: Props) {
       // Month / Season / Year: the pages' own writers (ConstellationPage, the year carry).
       defaultContext: soleDomain ?? undefined,
       // In a guided session the card places items without ties.
-      inSession: !!guided,
+      inSession: !!sessionLevel,
+      // Someday in a Month or Season session means the look back's button.
+      sessionLevel,
       goals,
       addGoal: async (name, { year, context, carriedFrom, areaId, notes, strategy, assignedToAll }) =>
         (await addGoal(areaId ?? null, name, context, { year, carriedFrom, notes, strategy, assignedToAll }))?.id,
@@ -500,7 +503,7 @@ function ShellLayoutInner({ children }: Props) {
     // something is applied at its choosing step).
     if (result.ok) guidedLatest.current?.onApplied?.();
     return result;
-  }, [reviewedWriter, tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment, choiceWriters]);
+  }, [reviewedWriter, tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment, choiceWriters, sessionLevel]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   // School review saves happen in Settings. Refresh the mounted planning
   // data immediately, including when the realtime socket has gone to sleep.

@@ -5,6 +5,7 @@ import type { Routine } from '@/types/actionable'
 import { applyChangeSet, canApply, plannedWeekStart, type ApplyDeps } from './applyChangeSet'
 import type { ChangeOp, ChangeSet } from './changeCard'
 import { planKeep, planPlacement } from '@/lib/placement/intentions'
+import { unletGoUpdates } from '@/lib/planning/letGo'
 import type { Choice, ChoiceOption, PriceLine } from '@/types/choice'
 import type { ChoiceDetail } from '@/lib/choices/db'
 import type { ChoiceWriters } from '@/lib/choices/applyDeps'
@@ -513,12 +514,51 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
     expect(d.deleteGoal).toHaveBeenCalledWith('gnew')
   })
 
-  it('plan_let_go of a month goal drops that month; Undo states the commitments back', async () => {
-    const d = planDeps()
-    const r = await applyOk(one({ key: 'p:0', op: 'plan_let_go', level: 'month', itemId: 'm1', title: 'Plan sabbatical', periodStart: '2026-10-01', seen }), d)
-    expect(d.dropCommitment).toHaveBeenCalledWith('m1', 'month', new Date(2026, 9, 1))
+  // Final review (2026-11-04): the guide's Let go and Someday mean what the
+  // look back's buttons mean (periodMoves), on an item on three lists.
+  const wk: TaskCommitment = { level: 'week', periodStart: new Date(2026, 9, 11), status: 'open' }
+  const multi = () => task('mp', { title: 'Book the cabin', bucket: 'week', weekStart: wk.periodStart, monthStart: oct.periodStart, seasonStart: fall.periodStart, commitments: [fall, oct, wk] })
+
+  it('plan_let_go of a season + month + week item lets it go (not ever); Undo puts back its lists and place', async () => {
+    const t = multi()
+    const d = planDeps({ tasks: [t] })
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_let_go', level: 'month', itemId: 'mp', title: 'Book the cabin', periodStart: '2026-10-01', seen }), d)
+    expect(d.dropCommitment).not.toHaveBeenCalled()
+    const [id, write] = vi.mocked(d.updateTask).mock.calls[0]
+    expect(id).toBe('mp')
+    expect(write).toMatchObject({ bucket: 'someday', focus: [] })
+    expect(write.dismissedAt).toBeInstanceOf(Date)
     await r.undo()
-    expect(d.updateTask).toHaveBeenCalledWith('m1', { commitments: [oct] })
+    expect(d.updateTask).toHaveBeenLastCalledWith('mp', unletGoUpdates(t))
+    expect(vi.mocked(d.updateTask).mock.calls.at(-1)![1]).toMatchObject({ dismissedAt: undefined, commitments: [fall, oct, wk], bucket: 'week' })
+  })
+
+  it('someday in a Month session drops only this month of a season + month + week item; Undo states them back', async () => {
+    const d = planDeps({ tasks: [multi()], sessionLevel: 'month', inSession: true })
+    const r = await applyOk(one({ key: 'p:0', op: 'someday', taskId: 'mp', title: 'Book the cabin', seen }), d)
+    expect(d.dropCommitment).toHaveBeenCalledWith('mp', 'month', new Date(2026, 9, 1))
+    expect(d.updateTask).not.toHaveBeenCalled()
+    await r.undo()
+    expect(d.updateTask).toHaveBeenCalledWith('mp', { commitments: [fall, oct, wk] })
+  })
+
+  it('someday in a Season session drops the season; on its last list the item goes to Someday', async () => {
+    const d = planDeps({ tasks: [multi()], sessionLevel: 'season', inSession: true })
+    await applyOk(one({ key: 'p:0', op: 'someday', taskId: 'mp', title: 'Book the cabin', seen }), d)
+    expect(d.dropCommitment).toHaveBeenCalledWith('mp', 'season', new Date(2026, 8, 1))
+    const last = planDeps({ sessionLevel: 'month', inSession: true })
+    const r = await applyOk(one({ key: 'p:0', op: 'someday', taskId: 'm1', title: 'Plan sabbatical', seen }), last)
+    expect(last.dropCommitment).not.toHaveBeenCalled()
+    expect(last.updateTask).toHaveBeenCalledWith('m1', { bucket: 'someday', scheduledFor: undefined })
+    await r.undo()
+    expect(vi.mocked(last.updateTask).mock.calls.at(-1)![1]).toMatchObject({ bucket: 'month', monthStart: oct.periodStart, commitments: [oct] })
+  })
+
+  it('someday outside a Month or Season session is the plain Someday write', async () => {
+    const d = planDeps({ tasks: [multi()], sessionLevel: 'week', inSession: true })
+    await applyOk(one({ key: 'p:0', op: 'someday', taskId: 'mp', title: 'Book the cabin', seen }), d)
+    expect(d.dropCommitment).not.toHaveBeenCalled()
+    expect(d.updateTask).toHaveBeenCalledWith('mp', { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
   })
 
   it('plan_let_go of a year goal archives it; Undo restores its status', async () => {
@@ -581,7 +621,6 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
     for (const op of [
       { key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', title: 'x', toPeriodStart: '2026-11-01' },
       { key: 'p:0', op: 'plan_carry', level: 'year', itemId: 'g1', title: 'x', toPeriodStart: '2027-01-01' },
-      { key: 'p:0', op: 'plan_let_go', level: 'month', itemId: 'm1', title: 'x', periodStart: '2026-10-01' },
       { key: 'p:0', op: 'plan_let_go', level: 'year', itemId: 'g1', title: 'x' },
       { key: 'p:0', op: 'plan_done', level: 'year', itemId: 'g1', title: 'x' },
       { key: 'p:0', op: 'plan_add', level: 'year', periodStart: '2027-01-01', title: 'x' },
@@ -591,8 +630,10 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
       expect(await applyChangeSet(s(op), noPlan)).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     }
     expect(noPlan.updateTask).not.toHaveBeenCalled()
-    // A month add with no parent needs only the task writers.
+    // A month add with no parent needs only the task writers; so does a
+    // month item's Let go (one task write).
     expect(canApply(one({ key: 'p:0', op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'x' }), noPlan)).toBe(true)
+    expect(canApply(one({ key: 'p:0', op: 'plan_let_go', level: 'month', itemId: 'm1', title: 'x', periodStart: '2026-10-01' }), noPlan)).toBe(true)
   })
 
   it('refuses a malformed plan op before writing anything', async () => {
@@ -604,7 +645,8 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
   })
 
   it('a failed write part way reverses the plan writes before it, newest first', async () => {
-    const d = planDeps({ dropCommitment: vi.fn(async () => false) })
+    // The Let go write (dismissedAt set) fails.
+    const d = planDeps({ updateTask: vi.fn(async (_id: string, u: Partial<Task>) => !(u.dismissedAt instanceof Date)) })
     const s: ChangeSet = { key: 'p', title: '4 changes', ops: [
       { key: 'p:0', op: 'plan_add', level: 'year', periodStart: '2027-01-01', title: 'New goal' },
       { key: 'p:1', op: 'plan_done', level: 'year', itemId: 'g1', title: 'Rest more', seen },
@@ -615,7 +657,8 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
     expect(d.updateTask).toHaveBeenCalledWith('s1', { commitments: [fall] })
     expect(d.updateGoal).toHaveBeenLastCalledWith('g1', { status: 'active' })
     expect(d.deleteGoal).toHaveBeenCalledWith('gnew')
-    const order = [vi.mocked(d.updateTask).mock.invocationCallOrder[0], vi.mocked(d.updateGoal).mock.invocationCallOrder[1], vi.mocked(d.deleteGoal).mock.invocationCallOrder[0]]
+    const s1Revert = vi.mocked(d.updateTask).mock.calls.findIndex(([id]) => id === 's1')
+    const order = [vi.mocked(d.updateTask).mock.invocationCallOrder[s1Revert], vi.mocked(d.updateGoal).mock.invocationCallOrder[1], vi.mocked(d.deleteGoal).mock.invocationCallOrder[0]]
     expect([...order].sort((x, y) => x - y)).toEqual(order)
   })
 

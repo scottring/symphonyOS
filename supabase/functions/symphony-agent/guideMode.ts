@@ -5,7 +5,7 @@
 // question on a row instead of guessing, and its change card is kept inside
 // the step: an op the step does not allow is dropped here and the card says so.
 
-import { areaSpace, type ChangeOp, type ChangeOpKind, type ChangeSet, type PlanLevel } from './changeSet.ts'
+import { areaSpace, guideProposeChangesTool, PROPOSE_CHANGES_TOOL, type ChangeOp, type ChangeOpKind, type ChangeSet, type PlanLevel } from './changeSet.ts'
 
 export type GuideLevel = 'day' | 'week' | 'month' | 'season' | 'year'
 
@@ -187,7 +187,10 @@ export function guideToolAllowed(name: string, guide: GuideTurnContext): boolean
 /** The Symphony tools a guided turn is offered (all of them outside a guide). */
 export function toolsForGuide<T extends { name?: string }>(tools: readonly T[], guide: GuideTurnContext | null): readonly T[] {
   if (!guide) return tools
+  // The change card without its ties (parent_id, goal_id): a session never
+  // places an item under another.
   return tools.filter((t) => !!t.name && guideToolAllowed(t.name, guide))
+    .map((t) => (t.name === PROPOSE_CHANGES_TOOL.name ? guideProposeChangesTool() as unknown as T : t))
 }
 
 /** The ops these writes allow by default, in order, without repeats. */

@@ -696,7 +696,7 @@ export function changeCardNote(raw: unknown): string {
 
 export const PROPOSE_CHANGES_TOOL = {
   name: 'symphony_propose_changes',
-  description: 'Propose ONE list of changes to the person\'s tasks, routines and goals, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, for any routine change, and always at the end of a planning conversation. Never call write tools for the same changes. Nothing is deleted. Task ops (one per task): place (give it a day, optionally a time), unplace (take its day away), add (a new task), someday (set it aside), assign (one household member), done (mark it finished), merge (task_id is the one kept, from_task_id the duplicate that closes into it, notes kept), talk (to talk about with someone before deciding; note like "with Iris"). Routine ops for this week only, on one day\'s occurrence (date = that occurrence\'s day; the routine itself is untouched): routine_skip, routine_move (to_date, optional time), routine_who (assignee). Routine ops from now on: routine_change (any of name, time or null for any time, days, assignees), routine_rest (stops it, optional until), routine_add (name, days, time, assignees, context). One lasting op per routine, one this-week op per routine and day. Routine ids come from symphony_read_week. Plan ops, for goals on the Month, Season and Year lists (ids and period starts come from symphony_read_plan; a month starts YYYY-MM-01, a year YYYY-01-01, a season on the household\'s boundary): plan_add (level, period_start, title in the person\'s words, optional parent_id: a season goal for a month goal, a year goal for a season goal), plan_carry (item_id, to_period_start, a later period; optional new_title when they reword it), plan_let_go (item_id; takes it off its list, nothing deleted), plan_done (item_id; a year goal is marked met). Send level with an item only when it is on both a season and a month list. One op per goal or task. Month and season goals are tasks too: merge and someday work on them. Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change.',
+  description: 'Propose ONE list of changes to the person\'s tasks, routines and goals, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, for any routine change, and always at the end of a planning conversation. Never call write tools for the same changes. Nothing is deleted. Task ops (one per task): place (give it a day, optionally a time), unplace (take its day away), add (a new task), someday (not now: it waits on Someday; on a Month or Season look back it comes off that period only, and goes to Someday when that was its last list), assign (one household member), done (mark it finished), merge (task_id is the one kept, from_task_id the duplicate that closes into it, notes kept), talk (to talk about with someone before deciding; note like "with Iris"). Routine ops for this week only, on one day\'s occurrence (date = that occurrence\'s day; the routine itself is untouched): routine_skip, routine_move (to_date, optional time), routine_who (assignee). Routine ops from now on: routine_change (any of name, time or null for any time, days, assignees), routine_rest (stops it, optional until), routine_add (name, days, time, assignees, context). One lasting op per routine, one this-week op per routine and day. Routine ids come from symphony_read_week. Plan ops, for goals on the Month, Season and Year lists (ids and period starts come from symphony_read_plan; a month starts YYYY-MM-01, a year YYYY-01-01, a season on the household\'s boundary): plan_add (level, period_start, title in the person\'s words, optional parent_id: a season goal for a month goal, a year goal for a season goal), plan_carry (item_id, to_period_start, a later period; optional new_title when they reword it), plan_let_go (item_id; not ever: a month or season item comes off every list and Someday, a year goal is set aside; nothing deleted, search still finds it), plan_done (item_id; a year goal is marked met). Send level with an item only when it is on both a season and a month list. One op per goal or task. Month and season goals are tasks too: merge and someday work on them. Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change.',
   input_schema: {
     type: 'object',
     properties: {
@@ -740,4 +740,25 @@ export const PROPOSE_CHANGES_TOOL = {
     },
     required: ['ops'],
   },
+}
+
+/** The change card as a guided session offers it: a session places items by
+ *  list, period, life area and day, never under another item, so the ties
+ *  (parent_id, goal_id) are not in its schema or description and the model
+ *  is never invited to send what changeSetFromInput would refuse. */
+export function guideProposeChangesTool(): typeof PROPOSE_CHANGES_TOOL {
+  const items = PROPOSE_CHANGES_TOOL.input_schema.properties.ops.items
+  const { parent_id: _parent, goal_id: _goal, ...properties } = items.properties
+  return {
+    ...PROPOSE_CHANGES_TOOL,
+    description: PROPOSE_CHANGES_TOOL.description
+      .replace(', optional parent_id: a season goal for a month goal, a year goal for a season goal', ''),
+    input_schema: {
+      ...PROPOSE_CHANGES_TOOL.input_schema,
+      properties: {
+        ...PROPOSE_CHANGES_TOOL.input_schema.properties,
+        ops: { ...PROPOSE_CHANGES_TOOL.input_schema.properties.ops, items: { ...items, properties: properties as typeof items.properties } },
+      },
+    },
+  }
 }

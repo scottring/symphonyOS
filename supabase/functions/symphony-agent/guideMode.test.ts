@@ -204,6 +204,25 @@ describe('guided turns: reads and the card only', () => {
     expect(offered).toContain('symphony_read_week')
     expect(offered).toContain('symphony_point')
   })
+  // Final review (2026-11-04): a session places items without ties, so the
+  // card it is offered names none — no retries on a field that is refused.
+  it('the card offered in a session has no parent_id or goal_id, in its schema or its description', () => {
+    const offered = toolsForGuide([PROPOSE_CHANGES_TOOL, { name: 'symphony_read_week' }], inboxStep)
+    const card = offered.find((t) => t.name === PROPOSE_CHANGES_TOOL.name) as typeof PROPOSE_CHANGES_TOOL
+    const props = card.input_schema.properties.ops.items.properties as Record<string, unknown>
+    expect(props).not.toHaveProperty('parent_id')
+    expect(props).not.toHaveProperty('goal_id')
+    expect(props).toHaveProperty('area_id')
+    expect(card.description).not.toMatch(/parent_id|goal_id/)
+    expect(card.description).toContain('plan_add (level, period_start, title in the person\'s words)')
+    // Outside a session the full card is unchanged.
+    expect(PROPOSE_CHANGES_TOOL.input_schema.properties.ops.items.properties).toHaveProperty('parent_id')
+    expect(PROPOSE_CHANGES_TOOL.description).toContain('optional parent_id')
+  })
+  it('the card says what Let go and Someday mean, as the buttons do', () => {
+    expect(PROPOSE_CHANGES_TOOL.description).toContain('plan_let_go (item_id; not ever: a month or season item comes off every list')
+    expect(PROPOSE_CHANGES_TOOL.description).toContain('someday (not now: it waits on Someday; on a Month or Season look back it comes off that period only, and goes to Someday when that was its last list)')
+  })
   it('a step that writes nothing is offered no card', () => {
     expect(toolsForGuide(tools, { ...inboxStep, writes: ['note'] }).map((t) => t.name)).not.toContain('symphony_propose_changes')
   })
