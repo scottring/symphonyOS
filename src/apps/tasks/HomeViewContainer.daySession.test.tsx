@@ -126,15 +126,17 @@ describe('HomeViewContainer — leaving the Day session', () => {
     await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
     expect(search().get('plan')).toBe('1')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(tomorrow())
-    // The session is its own screen: the week column steps aside.
-    expect(screen.queryByRole('button', { name: /this week/i })).toBeNull()
+    // The session is its own screen: the week folded beside the day is put
+    // away (paper-style horizons, 2026-11-04: the fold replaced the column).
+    expect(screen.queryByRole('button', { name: /Unfold to read$/ })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Leave' }))
     await act(async () => {})
     expect(search().get('plan')).toBeNull()
     expect(search().get('date')).toBeNull()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(today())
-    if (url.includes('alongside')) expect(screen.getByRole('button', { name: /this week/i })).toBeInTheDocument()
+    // (TodayView is a probe here, so only the workspace's fold is drawn.)
+    if (url.includes('alongside')) expect(screen.getByRole('button', { name: /Unfold to read$/ })).toBeInTheDocument()
     // The day page holds the way back; the session opening and closing must
     // not swap the tree around it.
     expect(s.probe.mounts).toBe(1)

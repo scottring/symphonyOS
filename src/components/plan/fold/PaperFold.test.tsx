@@ -336,3 +336,67 @@ describe('PaperFold', () => {
     })
   })
 })
+
+// Today while a session runs on the page: the fold is put away, but the day
+// on this sheet stays mounted (walk 2026-11-01: the session's way back lives
+// in the day page).
+describe('PaperFold stowed', () => {
+  it('hides the edge, ignores F, and keeps this sheet’s content mounted across stowing', () => {
+    const view = (stowed: boolean) => (
+      <PaperFold horizon="day" edgeLabel="Fall 2026" edgeCount={2} above={<p>above</p>} stowed={stowed}>
+        <input aria-label="The day's own field" />
+      </PaperFold>
+    )
+    const { container, rerender } = render(view(true))
+    const field = screen.getByRole('textbox', { name: "The day's own field" })
+    expect(screen.queryByRole('button', { name: /Fall 2026/ })).toBeNull()
+    expect(root(container)).toHaveAttribute('data-stowed', 'true')
+    fireEvent.keyDown(document, { key: 'f' })
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(localStorage.getItem('symphony-fold:day')).toBeNull()
+    rerender(view(false))
+    expect(edge()).toHaveAccessibleName('Fall 2026, 2 open. Unfold to read')
+    expect(screen.getByRole('textbox', { name: "The day's own field" })).toBe(field)
+    fireEvent.keyDown(document, { key: 'f' })
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+  })
+})
+
+// Scott, 2026-11-04: "the week scrolls while everything else remains fixed."
+// Beside the page ('h', 'duo') the sheet above is pinned under the top bar,
+// viewport-tall, and only its own list scrolls: reaching the list's end never
+// scrolls the page. On a phone it keeps its capped fold, scrolling inside.
+describe('PaperFold: the sheet above stays in view and scrolls on its own', () => {
+  const pin = (c: HTMLElement) => c.querySelector('.paper-fold-pin') as HTMLElement
+  const scrollBox = (c: HTMLElement) => c.querySelector('.paper-fold-scroll') as HTMLElement
+
+  it('h: the edge and the flap are pinned (sticky) under the top bar, bounded to the viewport', () => {
+    setViewport(1316, 900)
+    const { container } = renderFold()
+    expect(root(container)).toHaveAttribute('data-fold-mode', 'h')
+    expect(pin(container)).toContainElement(edge())
+    expect(pin(container)).toContainElement(container.querySelector('.paper-fold-flap') as HTMLElement)
+    expect(pin(container).style.position).toBe('sticky')
+    expect(pin(container).style.top).toBe('76px')
+    expect(pin(container).style.height).toBe('800px') // 900 − 76 − 24
+    expect(pin(container).style.maxHeight).toBe('100%')
+    expect(scrollBox(container).style.overscrollBehavior).toBe('contain')
+  })
+
+  it('duo: pinned the same way', () => {
+    mockMedia({ reduce: true, segments: true })
+    setViewport(1316, 900)
+    const { container } = renderFold()
+    expect(root(container)).toHaveAttribute('data-fold-mode', 'duo')
+    expect(pin(container).style.position).toBe('sticky')
+    expect(scrollBox(container).style.overscrollBehavior).toBe('contain')
+  })
+
+  it('v: not pinned; the capped fold scrolls inside without chaining to the page', () => {
+    setViewport(390, 844)
+    const { container } = renderFold()
+    expect(root(container)).toHaveAttribute('data-fold-mode', 'v')
+    expect(pin(container).style.position).toBe('')
+    expect(scrollBox(container).style.overscrollBehavior).toBe('contain')
+  })
+})

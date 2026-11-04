@@ -19,6 +19,23 @@
   padding: 7px 0 8px; border-bottom: 1px solid var(--paper-fold-rule-above, var(--color-neutral-200));
   font: 400 16px/1.35 var(--font-family-display); overflow-wrap: anywhere;
 }
+/* Today's week sheet: the title opens the task, the + plans it for the day,
+   and the row drags onto the day. */
+.above-sheet-row { display: flex; align-items: baseline; gap: 8px; }
+.above-sheet-row[draggable="true"] { cursor: grab; }
+.above-sheet-row-title { flex: 1; min-width: 0; }
+button.above-sheet-row-title {
+  padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer;
+}
+button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-neutral-900)); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.above-sheet-pick {
+  flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -4px -4px -4px 0;
+  border: 1px solid color-mix(in srgb, var(--paper-fold-accent, var(--color-primary-600)) 35%, transparent); border-radius: 999px;
+  background: none; font: 500 17px/1 var(--font-family-sans); color: var(--paper-fold-accent, var(--color-primary-600)); cursor: pointer;
+}
+.above-sheet-pick:hover { border-color: var(--paper-fold-accent, var(--color-primary-600)); background: var(--color-primary-50); }
+.above-sheet-pick:focus-visible, button.above-sheet-row-title:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
+@media (max-width: 767px) { .above-sheet-pick { width: 36px; height: 36px; } }
 .above-sheet-empty {
   margin: 0; padding: 8px 0; font: italic 400 17px/1.4 var(--font-family-display);
   color: var(--paper-fold-ink-faint, var(--color-neutral-400));

@@ -35,8 +35,15 @@
 }
 
 .paper-fold-slot {
-  position: relative; flex: none; width: 34px;
-  perspective: 2200px; perspective-origin: 100% 40%; z-index: 1;
+  position: relative; flex: none; width: 34px; z-index: 1;
+}
+/* What the slot holds: the edge, the flap and its grip. Beside the page
+   ('h', 'duo') PaperFold pins it under the top bar, viewport-tall (sticky,
+   set from the layout), so the sheet stays in view while the page scrolls;
+   on a phone ('v') it fills the slot. The hinge's perspective lives here. */
+.paper-fold-pin {
+  position: relative; height: 100%;
+  perspective: 2200px; perspective-origin: 100% 40%;
 }
 
 /* this period's sheet */
@@ -59,6 +66,10 @@
   background: linear-gradient(to right, hsl(var(--paper-fold-shadow) / .16), hsl(var(--paper-fold-shadow) / 0));
   opacity: clamp(0, var(--p), 1); border-radius: 3px 0 0 3px;
 }
+
+/* stowed (a session runs on the page): no edge, no sheet above, no hinge shadow */
+.paper-fold[data-stowed='true'] > .paper-fold-slot { display: none; }
+.paper-fold[data-stowed='true'] > .paper-fold-current::before { display: none; }
 
 /* the folded edge of the sheet above, with a second layer of paper behind it */
 .paper-fold-edge {
@@ -118,7 +129,8 @@
 .paper-fold-front::after { opacity: calc((1 - var(--p)) * .9 + .06); }
 .paper-fold-back::after { opacity: .5; }
 .paper-fold-scroll {
-  overflow-y: auto; padding: 26px 30px 24px 30px; flex: 1;
+  /* only the sheet's own list scrolls: its end never scrolls the page */
+  overflow-y: auto; overscroll-behavior: contain; padding: 26px 30px 24px 30px; flex: 1; min-height: 0;
   scrollbar-width: thin; scrollbar-color: var(--paper-fold-rule-above) transparent;
 }
 
@@ -138,7 +150,8 @@
 
 /* ---- phones: the sheet above folds down from the top edge ---- */
 .paper-fold[data-fold-mode='v'] { flex-direction: column; align-items: stretch; width: 100%; }
-.paper-fold[data-fold-mode='v'] .paper-fold-slot { width: auto; height: 46px; perspective-origin: 50% 100%; }
+.paper-fold[data-fold-mode='v'] .paper-fold-slot { width: auto; height: 46px; }
+.paper-fold[data-fold-mode='v'] .paper-fold-pin { perspective-origin: 50% 100%; }
 .paper-fold[data-fold-mode='v'] .paper-fold-current {
   width: 100%; min-height: 0; padding: 24px 20px 22px; border-radius: 3px 3px 12px 12px;
 }

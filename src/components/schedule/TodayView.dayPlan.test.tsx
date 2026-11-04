@@ -1,7 +1,7 @@
-import {AlongsideContext} from '@/components/plan/constellation/AlongsideContext'
+import {AlongsideContext, type AlongsideWorkspace} from '@/components/plan/constellation/AlongsideContext'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ALL_LAYERS } from '@/lib/domains'
-import { screen, fireEvent, within } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext'
@@ -52,7 +52,7 @@ function PinsProbe() {
   return <p data-testid="pins">{ref?.pins.map((p) => p.kind).join(',')}</p>
 }
 
-function renderView(props: Record<string, unknown> = {}, workspace: {showWeek:()=>void}|null = null) {
+function renderView(props: Record<string, unknown> = {}, workspace: AlongsideWorkspace|null = null) {
   const onToggleTask = vi.fn()
   const view = render(
     <AlongsideContext.Provider value={workspace}><ReferenceListsProvider userId="u1">
@@ -89,52 +89,38 @@ describe('Today — the way to Planning', () => {
     expect(screen.queryByText(/\d scheduled for today/)).toBeNull()
   })
 
-  // Scott, 2026-09-30: one shape on every horizon — the level above in a
-  // column beside the list, no drawer. Today shows its week there.
-  it('the week sits beside the day once chosen — flat rows, + Today; no Shelves drawer', () => {
+  // Paper-style horizons (Scott, 2026-11-04): the week folds beside the day
+  // like every other horizon, in place of the This week column and its view
+  // icons. Its rows keep their + (week and day share items).
+  it('the week is folded beside the day: an edge, no column, no view icons, no Shelves drawer', () => {
     const { onToggleTask } = renderView()
     expect(screen.queryByRole('button', { name: 'Shelves' })).toBeNull()
-    // Today opens on the day alone (Scott, 2026-09-30); the view icon adds the week.
     expect(screen.queryByRole('region', { name: /for reference$/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /^With week \d+$/ }))
-    const column = screen.getByRole('region', { name: /^Week \d+, for reference$/ })
-    // The dated task is on the page, not in the column; the chore waits here.
-    expect(within(column).queryByText('Pick up foot meds')).not.toBeInTheDocument()
-    // The day's routines fold to one line that opens in place (canvas, 2026-10-10).
-    fireEvent.click(within(column).getByRole('button', { name: /^Routines today/ }))
-    expect(within(column).getByText('Kids clean rooms')).toBeInTheDocument()
-    expect(within(column).getByRole('button', { name: 'Add Kids clean rooms to today' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'View' })).toBeNull()
+    expect(document.querySelector('.today-aside')).toBeNull()
+    const edge = screen.getByRole('button', { name: /^\w{3} \d+ – \w{3} \d+, \d+ open\. Unfold to read$/ })
+    expect(edge).toHaveAttribute('aria-expanded', 'false')
+    // The day sits on the fold's own sheet.
+    expect(document.querySelector('.paper-fold[data-horizon="day"] > article.paper-fold-current')).toContainElement(screen.getByText('Call the bank'))
+    fireEvent.click(edge)
+    expect(screen.getByText('Pick three to five for today.')).toBeInTheDocument()
     expect(onToggleTask).not.toHaveBeenCalled()
-  })
-
-  // Scott, 2026-10-05: "add independent scrolling to Today page columns".
-  it('with the week beside it, the day and the week scroll on their own', () => {
-    renderView()
-    expect(document.querySelector('.today-split.is-colscroll')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /^With week \d+$/ }))
-    const split = document.querySelector('.today-split.is-colscroll')
-    expect(split).not.toBeNull()
-    expect(split!.querySelector(':scope > main')).not.toBeNull()
-    expect(split!.querySelector(':scope > .today-aside')).toContainElement(screen.getByRole('region', { name: /for reference$/ }))
-  })
-
-  it('the same view icons as every horizon: List hides the week, With week N brings it back', () => {
-    mobile.value = false
-    renderView()
-    fireEvent.click(screen.getByRole('button', { name: /^With week \d+$/ }))
-    expect(screen.getByRole('region', { name: /for reference$/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'List' }))
-    expect(screen.queryByRole('region', { name: /for reference$/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /^With week \d+$/ }))
-    expect(screen.getByRole('region', { name: /for reference$/ })).toBeInTheDocument()
-    // The column replaces the dock's Today pin — never both.
+    // The sheet replaces the dock's Today pin — never both.
     expect(screen.getByTestId('pins')).toHaveTextContent('')
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
   })
+
+  it('the day is the fold’s sheet on the desk too, with no split columns', () => {
+    mobile.value = false
+    renderView()
+    expect(document.querySelector('.today-split')).toBeNull()
+    expect(document.querySelector('.paper-fold[data-horizon="day"]')).not.toBeNull()
+  })
 })
 
- it('does not show a second weekly-view switch inside the connected workspace',()=>{
-   renderView({}, {showWeek:vi.fn()})
+ it('inside the connected workspace, draws no view switch and no fold of its own (AlongsideDay folds the week)',()=>{
+   renderView({}, {weekFolded:true})
    expect(screen.queryByRole('group',{name:'View'})).not.toBeInTheDocument()
+   expect(document.querySelector('.paper-fold')).toBeNull()
    expect(screen.getByText('Call the bank')).toBeInTheDocument()
  })

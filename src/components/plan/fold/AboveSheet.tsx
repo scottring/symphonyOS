@@ -4,7 +4,14 @@
 // kicker, title, its open lines, how many are done, and the foot line. No
 // controls of any kind: this period is written in its own words, not copied
 // or tied to these. It lies inside PaperFold's scroll box.
+//
+// The one exception is Today (Scott, 2026-11-04: "add today with the + on the
+// week sheet"): week and day share items, so the week sheet beside the day
+// keeps a + on each row (onPick), its drag onto the day (onDragRow) and a
+// title tap that opens the task (onOpen). Without them, nothing here is a
+// control.
 
+import type { DragEvent } from 'react'
 import './sheet.css'
 
 export interface AboveSheetProps {
@@ -19,16 +26,37 @@ export interface AboveSheetProps {
   foot: string
   /** Said instead of the list when nothing is open ("Nothing left open from 2025."). */
   empty?: string
+  /** Today's week sheet only: each row gets a "+" that plans it for the day. */
+  onPick?: (id: string) => void
+  /** The +'s name. Default "Plan {title} for today". */
+  pickLabel?: (title: string) => string
+  /** Today's week sheet only: a title tap opens the task. */
+  onOpen?: (id: string) => void
+  /** Today's week sheet only: the rows drag onto the day. */
+  onDragRow?: (id: string, ev: DragEvent<HTMLLIElement>) => void
 }
 
-export function AboveSheet({ kicker, title, rows, doneCount, foot, empty }: AboveSheetProps) {
+const defaultPickLabel = (title: string) => `Plan ${title} for today`
+
+export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel = defaultPickLabel, onOpen, onDragRow }: AboveSheetProps) {
   return (
     <div className="above-sheet">
       <p className="above-sheet-kicker">{kicker}</p>
       <h2 className="above-sheet-title">{title}</h2>
       {rows.length > 0 ? (
         <ul className="above-sheet-list" aria-label={title}>
-          {rows.map((r) => <li key={r.id}>{r.title}</li>)}
+          {rows.map((r) => onPick || onOpen || onDragRow ? (
+            <li key={r.id} className="above-sheet-row" draggable={onDragRow ? true : undefined}
+              onDragStart={onDragRow ? (ev) => onDragRow(r.id, ev) : undefined}>
+              {onOpen
+                ? <button type="button" className="above-sheet-row-title" onClick={() => onOpen(r.id)}>{r.title}</button>
+                : <span className="above-sheet-row-title">{r.title}</span>}
+              {onPick && (
+                <button type="button" className="above-sheet-pick" aria-label={pickLabel(r.title)} title={pickLabel(r.title)}
+                  onClick={() => onPick(r.id)}>+</button>
+              )}
+            </li>
+          ) : <li key={r.id}>{r.title}</li>)}
         </ul>
       ) : empty ? (
         <p className="above-sheet-empty">{empty}</p>

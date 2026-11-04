@@ -2180,17 +2180,6 @@ html.desktop-shell a {
 .today-scale-draft-kinds button[aria-checked="true"] { background: var(--color-bg-elevated); color: var(--color-primary-800); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
 .today-scale-draft-input { width: 100%; background: transparent; outline: none; font-size: 15px; line-height: 1.4; color: var(--color-neutral-900); }
 .today-scale-draft-input::placeholder { color: var(--color-neutral-400); }
-.today-ref-row[draggable="true"] { cursor: grab; }
-/* The week column's check: a ring whose tick shows on hover — done, not
-   "select" — and "+ Today" a bordered button beside it. */
-.today-ref-check-ring { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--color-neutral-400); color: transparent; transition: border-color .15s, background-color .15s, color .15s; }
-.today-ref-check:hover .today-ref-check-ring, .today-ref-check:focus-visible .today-ref-check-ring { border-color: var(--color-primary-600); background: var(--color-primary-600); color: #fff; }
-/* The outline is on the label, so a phone's taller touch target keeps it a
-   small pill. */
-.today-ref-add > span { display: inline-block; padding: 2px 8px; border: 1px solid color-mix(in srgb, var(--color-primary-600) 35%, transparent); border-radius: 999px; background: var(--color-bg-elevated); font-weight: 500; line-height: 1.35; }
-.today-ref-add:hover > span { border-color: var(--color-primary-600); background: var(--color-primary-50); }
-.today-ref-hide { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 4px; border-radius: 6px; color: var(--color-neutral-500); align-self: center; }
-.today-ref-hide:hover { color: var(--color-neutral-900); background: var(--color-neutral-100); }
 .today-scale-toggle { font-size: 12.5px; color: var(--color-neutral-600); font-family: var(--font-family-sans); }
 .today-scale-toggle:hover { color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 2px; }
 .today-for-today-over { outline: 2px dashed var(--color-primary-300); outline-offset: 6px; border-radius: 6px; }
@@ -3775,20 +3764,8 @@ button.pv2-pgroup-h:hover { color: var(--color-primary-700); }
 .guide-slot:has(.guide-bar) ~ * .pv2-toolbar > .pv2-btn { background: var(--color-bg-elevated); color: var(--color-neutral-700); border: 1px solid var(--color-neutral-200); box-shadow: none; }
 @media (max-width: 767px) { .guide-slot.has-lens:has(.guide-bar, .guide-pause) { padding-top: calc(env(safe-area-inset-top, 0px) + 52px); } }
 
-/* Today's week column (2026-09-30): the same reference column the other
-   horizons carry on their right — flat, headed "Week 40 for reference". */
+/* Today's control row (the week column it once headed is the fold now). */
 .today-toolbar { margin-bottom: 18px; }
-.today-ref { position: sticky; top: 76px; max-height: calc(100vh - 100px); overflow: auto; padding: 0; background: none; border-radius: 0; }
-.today-ref .pv2-colh { min-height: 30px; margin: 0 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--color-neutral-300); align-items: flex-end; }
-.today-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
-/* Its heading rule meets For today's and The day's on one line: the same
-   serif size and line height as their h2 and the same 8px pad, rather than a
-   height tuned to one version of the heading beside it (a 41px minimum sat
-   7px low once Add task lost its padding). */
-.today-ref > .pv2-colh:first-child { min-height: 0; font-size: var(--ds-text-section, 22px); line-height: 1.2; align-items: baseline; }
-.today-ref .today-ref-sub { margin-top: 18px; }
-@container (max-width: 48rem) { .today-ref { position: static; max-height: none; } }
-@media (max-width: 860px) { .today-ref { position: static; max-height: none; } }
 
 .pv2-stepcount { font-size: 12px; color: var(--color-sage-600, #3f6b4f); white-space: nowrap; font-family: var(--font-family-sans); }
 

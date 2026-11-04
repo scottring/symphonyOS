@@ -1,6 +1,6 @@
-import {fireEvent,render,screen,waitFor} from '@testing-library/react'
+import {fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import {MemoryRouter} from 'react-router-dom'
-import {vi,it,expect} from 'vitest'
+import {vi,it,expect,beforeEach,onTestFinished} from 'vitest'
 import {AlongsideDay} from './AlongsideDay'
 import type {Task} from '@/types/task'
 vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[]})}))
@@ -9,26 +9,68 @@ vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMe
 vi.mock('@/lib/today/domainFilter',()=>({filterTasksForLayers:(t:Task[])=>t}))
 vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,scopeId:null})}))
 vi.mock('@/lib/planning/weekList',()=>({weekListTasks:(t:Task[])=>t}))
+// Fri Oct 9, 2026, in the Sunday-start week Oct 4 – Oct 10.
 const date=new Date(2026,9,9)
 const task={id:'same-id',title:'Choose picnic spot',createdAt:date,completed:false,sourceId:'month'} as Task
-it('places the existing action without replacing its parent link; failed saves can retry',async()=>{
- window.matchMedia=vi.fn().mockReturnValue({matches:false})
+// Reduced motion: the fold jumps to its state, so a tap opens it at once.
+beforeEach(()=>{
+ localStorage.clear()
+ window.matchMedia=vi.fn().mockImplementation((q:string)=>({matches:q.includes('prefers-reduced-motion'),media:q,addEventListener:()=>{},removeEventListener:()=>{}}))
+})
+const unfold=()=>fireEvent.click(screen.getByRole('button',{name:/Unfold to read$/}))
+
+// Paper-style horizons (Scott, 2026-11-04: "add today with the + on the week
+// sheet"): Today's This week column is the week folded beside the day, as on
+// every other horizon. Its rows keep their + and their drag onto the day.
+it('folds the week beside the day: an edge with the week’s dates and open count, no This week column',()=>{
+ const placed={id:'placed',title:'Pack the basket',createdAt:date,completed:false,scheduledFor:date,isAllDay:true} as Task
+ const done={id:'done',title:'Pick a date',createdAt:date,completed:true} as Task
+ const {container}=render(<MemoryRouter><AlongsideDay tasks={[task,placed,done]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}><p>The day</p></AlongsideDay></MemoryRouter>)
+ expect(screen.getByRole('button',{name:'Oct 4 – Oct 10, 1 open. Unfold to read'})).toBeInTheDocument()
+ expect(container.querySelector('.paper-fold[data-horizon="day"] > article.paper-fold-current')).toContainElement(screen.getByText('The day'))
+ expect(container.querySelector('#ad-week, aside.ad-week')).toBeNull()
+ expect(screen.queryByRole('heading',{name:'This week'})).toBeNull()
+ expect(screen.queryByRole('button',{name:/this week$/i})).toBeNull()
+})
+
+it('unfolded, lists the week’s no-day tasks only, counts the done, and reads the foot',()=>{
+ // As the Week page reads it on Friday morning: a day still ahead is a day.
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,9,9));onTestFinished(()=>{vi.useRealTimers()})
+ const onDay={id:'placed',title:'Pack the basket',createdAt:date,completed:false,scheduledFor:date,isAllDay:true} as Task
+ const elsewhere={id:'else',title:'Buy a blanket',createdAt:date,completed:false,scheduledFor:new Date(2026,9,10),isAllDay:true} as Task
+ const done={id:'done',title:'Pick a date',createdAt:date,completed:true} as Task
+ render(<MemoryRouter><AlongsideDay tasks={[task,onDay,elsewhere,done]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ unfold()
+ const list=screen.getByRole('list',{name:'Week 41'})
+ expect(within(list).getAllByRole('listitem').map((li)=>li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Choose picnic spot'])
+ expect(screen.getByText('Week · Oct 4 – Oct 10')).toBeInTheDocument()
+ expect(screen.getByText('1 done')).toBeInTheDocument()
+ expect(screen.getByText('Pick three to five for today.')).toBeInTheDocument()
+ expect(localStorage.getItem('symphony-fold:day')).toBe('open')
+})
+
+it('"+" places the existing action without replacing its parent link; failed saves can retry',async()=>{
  const update=vi.fn().mockResolvedValue(false)
  render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={update} loading={false} error={false} retry={()=>{}}><p>Existing calendar and routines</p></AlongsideDay></MemoryRouter>)
- fireEvent.click(screen.getByRole('button',{name:/^Add Choose picnic spot to/}))
+ unfold()
+ fireEvent.click(screen.getByRole('button',{name:'Plan Choose picnic spot for Friday'}))
  await screen.findByText(/Could not place this action/)
  expect(update).toHaveBeenCalledWith('same-id',{isAllDay:true,scheduledFor:date,bucket:'timed'})
  expect(update.mock.calls[0][1]).not.toHaveProperty('sourceId')
- update.mockResolvedValue(true);fireEvent.click(screen.getByRole('button',{name:/^Add Choose picnic spot to/}))
+ update.mockResolvedValue(true);fireEvent.click(screen.getByRole('button',{name:'Plan Choose picnic spot for Friday'}))
  await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('Planned “Choose picnic spot”'))
  expect(screen.getByText('Existing calendar and routines')).toBeVisible()
- fireEvent.click(screen.getByRole('button',{name:'Hide this week'}))
- expect(screen.getByRole('button',{name:'Show this week'})).toHaveAttribute('aria-expanded','false')
 })
-it('uses the same placement for dragging and ignores unrelated drag payloads',async()=>{
- window.matchMedia=vi.fn().mockReturnValue({matches:false})
+
+it('a row drags onto the day with the same payload, and the day places it; unrelated drops are ignored',async()=>{
  const update=vi.fn().mockResolvedValue(true)
  render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={update} loading={false} error={false} retry={()=>{}}><p>Day drop area</p></AlongsideDay></MemoryRouter>)
+ unfold()
+ const set:Record<string,string>={}
+ const row=screen.getByText('Choose picnic spot').closest('li')!
+ expect(row).toHaveAttribute('draggable','true')
+ fireEvent.dragStart(row,{dataTransfer:{setData:(k:string,v:string)=>{set[k]=v},effectAllowed:''}})
+ expect(set).toEqual({'application/x-symphony-week-action':'same-id'})
  const target=screen.getByText('Day drop area')
  fireEvent.drop(target,{dataTransfer:{getData:()=>''}})
  expect(update).not.toHaveBeenCalled()
@@ -36,71 +78,29 @@ it('uses the same placement for dragging and ignores unrelated drag payloads',as
  await waitFor(()=>expect(update).toHaveBeenCalledWith('same-id',{isAllDay:true,scheduledFor:date,bucket:'timed'}))
 })
 
-it('gives details the weekly choices space, then restores the previous choice',async()=>{
- const {SideColumn}=await import('@/shell/SideColumn')
- window.matchMedia=vi.fn().mockReturnValue({matches:false})
- const view=(selected:boolean)=><MemoryRouter><SideColumn hasSelection={selected} aiOpen={false} pane="details" onPaneChange={()=>{}} onCloseDetails={()=>{}} onCloseAi={()=>{}} ai={null}><AlongsideDay tasks={[task]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></SideColumn></MemoryRouter>
- const {rerender}=render(view(false))
- expect(screen.getByRole('button',{name:/^Add Choose picnic spot to/})).toBeVisible()
- rerender(view(true))
- expect(screen.queryByRole('button',{name:/^Add Choose picnic spot to/})).toBeNull()
- rerender(view(false))
- expect(screen.getByRole('button',{name:/^Add Choose picnic spot to/})).toBeVisible()
- fireEvent.click(screen.getByRole('button',{name:'Hide this week'}))
- rerender(view(true));rerender(view(false))
- expect(screen.getByRole('button',{name:'Show this week'})).toHaveAttribute('aria-expanded','false')
-})
-
-it('opens weekly action details without scheduling it',()=>{
- window.matchMedia=vi.fn().mockReturnValue({matches:false})
+it('a title tap opens the action’s details without scheduling it',()=>{
  const update=vi.fn(),onSelect=vi.fn()
  render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={update} onSelect={onSelect} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ unfold()
  fireEvent.click(screen.getByRole('button',{name:'Choose picnic spot'}))
  expect(onSelect).toHaveBeenCalledWith('same-id')
  expect(update).not.toHaveBeenCalled()
 })
 
-// Canvas design, 2026-10-10: the same compact list Today's classic column draws.
-it('draws the shared compact list: on-day rows marked, done rows behind a reveal, drag payload unchanged',()=>{
- window.matchMedia=vi.fn().mockReturnValue({matches:false})
- const month={id:'month',title:'Plan the autumn picnic',createdAt:date,completed:false} as Task
- const second={id:'second',title:'Buy a blanket',createdAt:date,completed:false,sourceId:'month'} as Task
- const placed={id:'placed',title:'Pack the basket',createdAt:date,completed:false,scheduledFor:date,isAllDay:true} as Task
- const done={id:'done',title:'Pick a date',createdAt:date,completed:true} as Task
- const complete=vi.fn().mockResolvedValue(true)
- render(<MemoryRouter><AlongsideDay tasks={[month,task,second,placed,done]} date={date} update={vi.fn()} complete={complete} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
- const list=screen.getByRole('group',{name:'This week’s tasks'})
- expect(list).toHaveClass('cw-list')
- // Paper-style horizons (2026-11-04): flat, no heading for the month line.
- expect(screen.queryByRole('region',{name:'Plan the autumn picnic'})).toBeNull()
- expect(list).toHaveTextContent('Choose picnic spot')
- expect(list).toHaveTextContent('Buy a blanket')
- const onDay=screen.getByText('Pack the basket').closest('li')!
- expect(onDay).toHaveClass('is-on-today')
- expect(screen.queryByRole('button',{name:/^Add Pack the basket/})).toBeNull()
- expect(screen.queryByText('Pick a date')).toBeNull()
- fireEvent.click(screen.getByRole('button',{name:'Show done'}))
- expect(screen.getByText('Pick a date')).toBeInTheDocument()
- const set:Record<string,string>={}
- fireEvent.dragStart(screen.getByText('Choose picnic spot').closest('li')!,{dataTransfer:{setData:(k:string,v:string)=>{set[k]=v},effectAllowed:''}})
- expect(set).toEqual({'application/x-symphony-week-action':'same-id'})
- fireEvent.click(screen.getByRole('button',{name:'Complete Choose picnic spot'}))
- expect(complete).toHaveBeenCalledWith('same-id')
+// A session on the page (walk, 2026-11-01): the week steps aside and the day
+// under it is never remounted.
+it('a session stows the fold and keeps the day mounted',()=>{
+ const view=(stepAside:boolean)=><MemoryRouter><AlongsideDay tasks={[task]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}} stepAside={stepAside}><input aria-label="Day field" /></AlongsideDay></MemoryRouter>
+ const {rerender}=render(view(false))
+ const field=screen.getByRole('textbox',{name:'Day field'})
+ expect(screen.getByRole('button',{name:/Unfold to read$/})).toBeInTheDocument()
+ rerender(view(true))
+ expect(screen.queryByRole('button',{name:/Unfold to read$/})).toBeNull()
+ expect(screen.getByRole('textbox',{name:'Day field'})).toBe(field)
 })
 
-// Scott, 2026-10-31: the toggle sat apart, at the page's top right. It lives
-// in the strip now, and the hidden strip keeps a tab that opens it again.
-it('keeps the show/hide toggle inside the This week strip',()=>{
- window.matchMedia=vi.fn().mockReturnValue({matches:false})
- const {container}=render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
- const strip=container.querySelector('#ad-week') as HTMLElement
- expect(strip).toContainElement(screen.getByRole('button',{name:'Hide this week'}))
- fireEvent.click(screen.getByRole('button',{name:'Hide this week'}))
- const show=screen.getByRole('button',{name:'Show this week'})
- expect(strip).toBeVisible()
- expect(strip).toContainElement(show)
- expect(show).toHaveTextContent('This week')
- expect(screen.queryByRole('button',{name:/^Add Choose picnic spot to/})).toBeNull()
- fireEvent.click(show)
- expect(screen.getByRole('button',{name:/^Add Choose picnic spot to/})).toBeVisible()
+it('the Week page’s workspace has no fold of its own',()=>{
+ render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}} weekView><p>Week</p></AlongsideDay></MemoryRouter>)
+ expect(screen.getByText('Week')).toBeInTheDocument()
+ expect(document.querySelector('.paper-fold')).toBeNull()
 })

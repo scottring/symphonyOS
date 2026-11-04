@@ -7,9 +7,13 @@
 // through `update`), reporting each placement through the canvas activity
 // strip with an Undo that puts the fields back. The rows are flat, with no
 // parent (paper-style horizons, 2026-11-04), as on Week and Today.
+//
+// Paper-style horizons (Scott, 2026-11-04: "add today with the + on the week
+// sheet"): the week no longer stands in a This week column with its own
+// show/hide. It lies folded beside the day like every horizon's level above
+// (PaperFold horizon="day"), and the one exception to "no controls on the
+// sheet above" holds: each row keeps its + and its drag onto the day.
 import { useRef, useState, useMemo, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -20,17 +24,19 @@ import { weekListTasks } from '@/lib/planning/weekList'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
-import { formatTimeCompact } from '@/lib/dateHelpers'
-import { useSideColumnSlot } from '@/shell/SideColumn'
+import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
-import { CompactWeekList, type CompactRow } from '@/components/canvas/week/CompactWeekList'
 import { dayWordFor } from '@/components/canvas/week/compactWeek'
-import { AlongsideContext } from './AlongsideContext'
+import { placedInWeek } from '@/components/canvas/week/weekShelf'
+import { PaperFold } from '@/components/plan/fold/PaperFold'
+import { AboveSheet } from '@/components/plan/fold/AboveSheet'
+import { TODAY_WEEK_FOOT } from '@/components/schedule/TodayWeekColumn'
+import { AlongsideContext, type AlongsideWorkspace } from './AlongsideContext'
 import './alongside.css'
 
 const WEEK_ACTION_MIME = 'application/x-symphony-week-action'
 
-export function AlongsideDay({ children, tasks, date, update, complete, loading, error, retry, weekView = false, onSelect, stepAside = false }: {
+export function AlongsideDay({ children, tasks, date, update, loading, error, weekView = false, onSelect, stepAside = false }: {
   children: ReactNode
   /** A session runs on the page (Today ?plan=1): the week steps aside and the
    *  day is a plain page. The shell stays, so the day under it is never
@@ -39,23 +45,20 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
   tasks: Task[]
   date: Date
   update: (id: string, patch: Partial<Task>) => Promise<boolean | void>
-  /** Toggles a task's done state and says whether it saved. Absent: rows
-   *  carry no check. */
+  /** Toggles a task's done state. The week sheet carries no check (the sheet
+   *  above has no controls but its +), so it is unused here. */
   complete?: (id: string) => Promise<boolean | void>
   loading: boolean
   error: boolean
+  /** Reloads the tasks. The day page offers its own Try again. */
   retry: () => void
   weekView?: boolean
   onSelect?: (id: string) => void
 }) {
   const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember } = useFamilyMembers()
-  const navigate = useNavigate()
   const activity = useCanvasActivity()
-  const [open, setOpen] = useState(() => !window.matchMedia('(max-width:700px)').matches)
   const [pending, setPending] = useState<string | null>(null), [message, setMessage] = useState('')
-  const companion = useSideColumnSlot()
-  const showChoices = open && !companion.open
-  const workspaceControls = useMemo(() => weekView || stepAside ? null : { showWeek: () => setOpen(true) }, [weekView, stepAside])
+  const workspace = useMemo<AlongsideWorkspace | null>(() => weekView ? null : { weekFolded: true }, [weekView])
   const lock = useRef(false)
   const wso = readCadenceConfig().weekStartsOn
   const week = weekStartAnchor(date, wso)
@@ -64,19 +67,15 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
   const weekTasks = weekListTasks(visible, week, lens.scopeId, { isCurrent: localYmd(week) === localYmd(weekStartAnchor(new Date(), wso)) })
   const ymd = localYmd(date)
   const dayLabel = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-  const { word: dayWord, tag: dayTag } = dayWordFor(date)
+  const { word: dayWord } = dayWordFor(date)
 
-  const rows: CompactRow<Task>[] = weekTasks.map((t) => {
-    const onDay = !t.completed && !!t.scheduledFor && localYmd(t.scheduledFor) === ymd
-    return {
-      key: t.id, id: t.id, title: t.title, item: t, completed: t.completed,
-      onDay: onDay ? (t.isAllDay === false ? `${dayTag} ${formatTimeCompact(t.scheduledFor!)}` : dayTag) : null,
-      context: !onDay && !t.completed && t.scheduledFor
-        ? `Currently ${t.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${t.isAllDay === false ? ` at ${t.scheduledFor.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : ''}`
-        : null,
-    }
-  })
-  const stillToPlace = rows.some((r) => !r.completed && !r.onDay)
+  // The week's open work with no day yet, as the Week page's "No day yet"
+  // reads it: not done, not on this day, not on another day of the week.
+  const now = new Date()
+  const open = weekTasks.filter((t) => !t.completed
+    && !(t.scheduledFor && localYmd(t.scheduledFor) === ymd)
+    && !placedInWeek(t, week, now))
+  const doneCount = weekTasks.filter((t) => t.completed).length
 
   const place = async (id: string) => {
     const task = weekTasks.find((t) => t.id === id && !t.completed)
@@ -92,57 +91,33 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
       setMessage(ok ? `Planned “${task.title}” for ${dayLabel}.` : 'Could not place this action. It remains available; try again.')
     } finally { lock.current = false; setPending(null) }
   }
-  const toggle = (t: Task) => {
-    if (!complete) return
-    void activity.run(t.completed ? `Reopen “${t.title}”` : `Done: “${t.title}”`, () => complete(t.id), {
-      ids: [t.id], undo: () => complete(t.id),
-    })
-  }
 
   const weekNo = weekOfYear(week, wso)
+  const range = formatWeekRangeShort(week)
+  // The day drops a week row onto itself (no time): the same placement as +.
+  const day = (
+    <div className="ad-day"
+      onDragOver={(e) => { if (e.dataTransfer.types.includes(WEEK_ACTION_MIME)) e.preventDefault() }}
+      onDropCapture={stepAside ? undefined : (e) => { const id = e.dataTransfer.getData(WEEK_ACTION_MIME); if (id) { e.preventDefault(); e.stopPropagation(); void place(id) } }}>
+      {children}
+    </div>
+  )
   return (
-    <AlongsideContext.Provider value={workspaceControls}>
+    <AlongsideContext.Provider value={workspace}>
       <section className="ad-shell">
         <p role="status" className="ad-status">{message}</p>
-        <div className={`ad-layout ${weekView || stepAside ? '' : showChoices ? 'ad-open' : companion.open ? '' : 'ad-folded'}`}>
-          <div className="ad-day"
-            onDragOver={(e) => { if (e.dataTransfer.types.includes(WEEK_ACTION_MIME)) e.preventDefault() }}
-            onDropCapture={stepAside ? undefined : (e) => { const id = e.dataTransfer.getData(WEEK_ACTION_MIME); if (id) { e.preventDefault(); e.stopPropagation(); void place(id) } }}>
-            {children}
-          </div>
-          {!weekView && !stepAside && (
-            // The strip holds its own toggle (Scott, 2026-10-31: the button sat
-            // apart from it, at the page's top right). Hidden, it folds to a
-            // slim tab that opens it again; details take its place entirely.
-            <aside id="ad-week" className={`ad-week cw-column${showChoices ? '' : ' is-folded'}`} hidden={!!companion.open} data-explain="this-week" data-explain-label="This week: tasks to give a day">
-              <div className="ad-week-head">
-                {showChoices && <h2>This week</h2>}
-                <button type="button" className="ad-week-toggle" aria-expanded={showChoices} aria-controls="ad-week-body"
-                  aria-label={showChoices ? 'Hide this week' : 'Show this week'} title={showChoices ? 'Hide this week' : 'Show this week'}
-                  data-explain="week-toggle" data-explain-label="Show or hide This week" onClick={() => setOpen((v) => !v)}>
-                  {showChoices ? <PanelLeftClose size={16} aria-hidden="true" />
-                    : <><PanelLeftOpen size={16} aria-hidden="true" /><span className="ad-week-tab">This week</span></>}
-                </button>
-              </div>
-              {showChoices && <div id="ad-week-body">
-              <p className="ad-week-hint">Drag onto the day, or press + to plan it for {dayWord}. Its connections stay with it.</p>
-              {loading ? <p>Loading this week’s tasks…</p>
-                : error ? <p role="alert">Could not load this week. <button onClick={retry}>Retry</button></p>
-                : <>
-                  {!stillToPlace && <p className="ad-week-hint">Nothing else to place this week in the current filters.</p>}
-                  <CompactWeekList rows={rows} label="This week’s tasks"
-                    addLabel={(title) => `Add ${title} to ${dayWord}`}
-                    onAdd={(t) => { void place(t.id) }}
-                    onComplete={complete ? toggle : undefined}
-                    onOpen={onSelect ? (t) => onSelect(t.id) : undefined}
-                    onDragStart={(t, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, t.id); ev.dataTransfer.effectAllowed = 'move' }}
-                    busyKey={pending} disabled={!!pending} />
-                  <button type="button" className="canvas-link cw-open" onClick={() => navigate(`/week?view=alongside&start=${localYmd(week)}`)}>Open week {weekNo} →</button>
-                </>}
-              </div>}
-            </aside>
-          )}
-        </div>
+        {weekView ? day : (
+          // A session stows the fold rather than unmounting it, so the day
+          // under it keeps its state.
+          <PaperFold horizon="day" className="today-fold ad-fold" stowed={stepAside} edgeLabel={range} edgeCount={open.length}
+            above={<AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`}
+              rows={open.map((t) => ({ id: t.id, title: t.title }))} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
+              empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
+              onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
+              onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />}>
+            {day}
+          </PaperFold>
+        )}
       </section>
     </AlongsideContext.Provider>
   )

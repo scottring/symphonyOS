@@ -181,9 +181,11 @@ describe('TodayView', () => {
     expect(screen.queryByText("Iris's month")).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'This month pool' }))
     await user.click(screen.getByRole('button', { name: 'This week pool' }))
-    // (Today opens without its week column, so only the pool shows these.)
-    expect(screen.getByText('Our week')).toBeInTheDocument()
-    expect(screen.queryByText("Iris's week")).not.toBeInTheDocument()
+    // (The week folded beside the day is the page's week, through the page's
+    // people filter, as the column was; this reads the pool's.)
+    const inPool = (text: string) => screen.queryAllByText(text).filter((el) => !el.closest('.paper-fold-front'))
+    expect(inPool('Our week')).toHaveLength(1)
+    expect(inPool("Iris's week")).toHaveLength(0)
   })
   it('keeps the routine show/hide toggle in the overflow', async () => {
     const { user } = renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true })
@@ -915,3 +917,56 @@ describe('TodayView weather', () => {
   })
 })
 
+
+// Paper-style horizons (Scott, 2026-11-04: "add today with the + on the week
+// sheet"): the week folds beside the day in place of the This week column.
+describe('Today with the week folded beside it', () => {
+  const NOV4 = new Date(2026, 10, 4, 9)
+  const SAT = new Date(2026, 9, 31) // a Saturday-start week: Oct 31 – Nov 6
+  const onWeek = [{ level: 'week', periodStart: SAT, status: 'open' }] as Task['commitments']
+  const wk = (id: string, title: string, x: Partial<Task> = {}) => createMockTask({ id, title, bucket: 'week', weekStart: SAT, commitments: onWeek, createdAt: new Date(2026, 9, 20), ...x })
+  const weekTasks = [
+    wk('a', 'Book the cabin'),
+    wk('b', 'Call the bank'),
+    wk('c', 'Fix the gate', { bucket: 'timed', scheduledFor: new Date(2026, 10, 6), isAllDay: true }),
+    wk('d', 'Buy maps', { completed: true }),
+  ]
+  const setup = () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOV4)
+    localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
+    localStorage.removeItem('symphony-fold:day')
+    // Reduced motion: the fold jumps to its state, so a tap opens it at once.
+    const media = window.matchMedia
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes('prefers-reduced-motion'), media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    })) as typeof window.matchMedia
+    onTestFinished(() => {
+      window.matchMedia = media
+      vi.useRealTimers()
+      localStorage.removeItem('symphony-cadence-config')
+      localStorage.removeItem('symphony-fold:day')
+    })
+  }
+
+  it('shows an edge named for the week’s dates and its open no-day count', () => {
+    setup()
+    renderView({ tasks: weekTasks, viewedDate: NOV4 })
+    expect(screen.getByRole('button', { name: 'Oct 31 – Nov 6, 2 open. Unfold to read' })).toBeInTheDocument()
+  })
+
+  it('unfolded, lists the week’s no-day tasks, and + plans one for today through chooseTaskDay', () => {
+    setup()
+    const onUpdateTask = vi.fn(async () => true)
+    renderView({ tasks: weekTasks, viewedDate: NOV4, onUpdateTask }, { onUpdateTask })
+    fireEvent.click(screen.getByRole('button', { name: 'Oct 31 – Nov 6, 2 open. Unfold to read' }))
+    const sheet = screen.getByRole('region', { name: 'Oct 31 – Nov 6, for reading' })
+    expect(within(within(sheet).getByRole('list', { name: /^Week \d+$/ })).getAllByRole('listitem').map((li) => li.querySelector('.above-sheet-row-title')?.textContent))
+      .toEqual(['Book the cabin', 'Call the bank'])
+    expect(within(sheet).getByText('Pick three to five for today.')).toBeInTheDocument()
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Plan Book the cabin for today' }))
+    // The old column's + : planActions.chooseTaskDay(id, today) — the day, all day, focused.
+    expect(onUpdateTask).toHaveBeenCalledWith('a', expect.objectContaining({ bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 10, 4), plannedOn: new Date(2026, 10, 4) }))
+  })
+})

@@ -389,7 +389,7 @@
   .plan-horizon-body.has-above > .plan-list { grid-column: 1; grid-row: 1; }
   .plan-above-panel {
     /* Clear of the pinned top bar, as the other reference panels sit
-       (.pv2-ref, .today-ref), and of the docked bar at the foot. */
+       (.pv2-ref), and of the docked bar at the foot. */
     grid-column: 2; grid-row: 1; position: sticky; top: 64px;
     max-height: calc(100vh - 150px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
   }

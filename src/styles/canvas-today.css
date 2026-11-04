@@ -60,11 +60,6 @@
 .cw-fold-icon { transition: transform var(--transition-base); }
 .cw-fold[aria-expanded="true"] .cw-fold-icon { transform: rotate(90deg); }
 
-/* The connected workspace's aside: the compact list, not cards. */
-.ad-week.cw-column .ad-week-hint { margin: 6px 0 4px; }
-.ad-week.cw-column .cw-list { margin-top: 10px; }
-.ad-layout aside.ad-week { padding: 20px 18px; }
-
 /* Phone: the list stacks below the day; every control is a full touch target. */
 @media (max-width: 767px) {
   .cw-check, .cw-add { min-width: 44px; min-height: 44px; margin: -8px -6px; }
@@ -404,3 +399,17 @@
 .dark .today-preview-row.is-proposed, .dark .today-scale-item.is-preview.is-proposed { border-color: #6cc4b9; background: #182b29; color: #d7efe9; }
 .dark .today-preview-row.is-leaving, .dark .today-scale-item.is-preview.is-leaving { border-color: #5b6461; color: #a5aca9; }
 .dark .today-preview-row.is-leaving .wc-proposed-note { color: #a5aca9; }
+
+/* Today with its week folded beside it (paper-style horizons, Scott
+   2026-11-04): the day is this sheet, at the width the page gives it, as the
+   Week's days are (.wc-fold). Opening the fold takes its room from the day.
+   `article` lifts these over PaperFold's own sizes in every fold mode. */
+.paper-fold.today-fold { width: 100%; margin-inline: 0; }
+.paper-fold.today-fold > article.paper-fold-current {
+  width: auto; flex: 1 1 0; min-width: 0; min-height: 320px;
+  padding: 0 0 0 20px; background: none; box-shadow: none; border-radius: 0;
+}
+.paper-fold.today-fold[data-fold-mode='v'] > article.paper-fold-current { width: 100%; flex: none; min-height: 0; padding: 10px 0 0; }
+/* Next week, on the week's last day: a second, quieter block on the sheet. */
+.today-fold-next { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--paper-fold-rule-above, var(--color-neutral-200)); }
+.today-fold-next .today-fold-next-title { font-size: 21px; }

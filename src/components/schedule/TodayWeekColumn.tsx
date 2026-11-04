@@ -1,26 +1,25 @@
 // src/components/schedule/TodayWeekColumn.tsx
 //
-// Today's reference column: the week beside the day (Scott, 2026-09-30:
-// "above all else, it has to be consistent"). It replaces the Shelves
-// drawer's tabs, search and boxed buttons. Choosing puts a row on today; it
-// stays on the week's list, marked.
+// Today's week, folded beside the day (paper-style horizons, Scott
+// 2026-11-04: "add today with the + on the week sheet"). Like every other
+// horizon, the level above lies folded behind this period's sheet: the week
+// beside the day, in place of the This week column, its hide button and the
+// header's view icons. Folding is how it goes away.
 //
-// The rows are the shared compact week list (canvas/week, 2026-10-10): the
-// connected workspace's AlongsideDay draws the same one. This file keeps
-// Today's data — DayPlan entries — and Today's writers (DayPlanPanelActions),
-// each manual command reporting through the canvas activity strip with an
-// Undo where the inverse is real.
+// The one exception to "no controls on the sheet above": week and day share
+// items, so each of the week's rows keeps its + (and its drag onto the day).
+// Giving a week task to today is the daily "pick three to five", not a copy.
+// A title tap opens the task, as the column's did.
 //
-// The rows are flat and say nothing about what they serve (paper-style
-// horizons, 2026-11-04): the same week, in the same order, as the Week page's
-// own list, since both read weekListTasks.
+// The rows are the week's open work with no day yet — the same week, in the
+// same order, as the Week page's "No day yet" (both read weekListTasks). A
+// row on this day is on the day beside it; one on another day is on that
+// day; done rows are counted, not listed.
 //
-// On the week's last day the week still ahead is here too (walkthrough
-// 2026-10-02, #24/#18: a plan made for next week was nowhere on Today). Its
-// rows are for reading — a details click, never "add to today".
-import { useState, type DragEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronRight, PanelRightClose } from 'lucide-react'
+// On the week's last day the week still ahead is on the sheet too
+// (walkthrough 2026-10-02, #24/#18: a plan made for next week was nowhere on
+// Today). Its rows are for reading — a title opens the task, nothing more.
+import type { DragEvent, ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { alreadyPlaced } from '@/lib/today/dayPlan'
@@ -28,14 +27,18 @@ import type { DayPlanPanelActions } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
 import { writePlanDrag } from '@/lib/planning/planDrag'
 import { focusSnapshot } from '@/lib/placement/model'
-import { formatTimeCompact } from '@/lib/dateHelpers'
+import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
-import { CompactWeekList, type CompactRow } from '@/components/canvas/week/CompactWeekList'
 import { dayWordFor } from '@/components/canvas/week/compactWeek'
+import { PaperFold } from '@/components/plan/fold/PaperFold'
+import { AboveSheet } from '@/components/plan/fold/AboveSheet'
 
 export interface TodayNextWeek { weekNo: number; weekStart: Date; entries: DayPlanEntry[] }
 
-export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWeek, onHide, chooseTask, restoreTask }: {
+/** "Pick three to five for today." — the sheet's foot (spec 2026-11-04). */
+export const TODAY_WEEK_FOOT = 'Pick three to five for today.'
+
+export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek, chooseTask, restoreTask, className, stowed, children }: {
   plan: DayPlan
   day: Date
   weekNo: number
@@ -43,51 +46,37 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
   actions: DayPlanPanelActions
   /** Next week's open list — passed only on the week's last day. */
   nextWeek?: TodayNextWeek | null
-  /** Folds the column away once the day is chosen (the header's view icons
-   *  bring it back). */
-  onHide?: () => void
   /** Choose a task for the day and say whether it saved (planActions'
    *  chooseTaskDay). Without it, `actions.choose` is used. */
   chooseTask?: (id: string) => Promise<boolean>
   /** The task writer, for an exact Undo of a choice. */
   restoreTask?: (id: string, prev: Partial<Task>) => Promise<unknown> | unknown
+  className?: string
+  /** A session runs on the page: the fold is put away, the day stays mounted. */
+  stowed?: boolean
+  /** The day. */
+  children: ReactNode
 }) {
-  const navigate = useNavigate()
   const activity = useCanvasActivity()
-  const [routinesOpen, setRoutinesOpen] = useState(false)
   const ymd = localYmd(day)
-  const { word: dayWord, tag: dayTag } = dayWordFor(day)
+  const { word: dayWord } = dayWordFor(day)
 
   // On the viewed day already: chosen for it, or dated to it.
-  const onDayTag = (e: DayPlanEntry): string | null => {
-    if (e.completed) return null
+  const onDay = (e: DayPlanEntry): boolean => {
     const t = e.task
-    if (t?.scheduledFor && localYmd(t.scheduledFor) === ymd) return t.isAllDay === false ? `${dayTag} ${formatTimeCompact(t.scheduledFor)}` : dayTag
-    return e.planned || e.onToday ? dayTag : null
+    if (t?.scheduledFor && localYmd(t.scheduledFor) === ymd) return true
+    return !!(e.planned || e.onToday)
   }
-  const toRow = (e: DayPlanEntry, readOnly = false): CompactRow<DayPlanEntry> => ({
-    key: e.key, id: e.id, title: e.title, item: e, completed: e.completed,
-    context: e.context, onDay: readOnly ? null : onDayTag(e), readOnly,
-  })
+  // The week's open work with no day yet: not done, not on this day, not on
+  // another day of the week.
+  const open = plan.chooserTasks.filter((e) => e.kind === 'task' && !e.completed && !onDay(e) && !alreadyPlaced(e, day))
+  const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
+  const byId = new Map(open.map((e) => [e.id, e]))
 
-  // The week's rows: still to place, or already on this day (marked, not
-  // hidden), or done (behind "Show done"). A row placed on ANOTHER day of
-  // the week is on that day, not here.
-  const taskRows = plan.chooserTasks.filter((e) => e.completed || onDayTag(e) || !alreadyPlaced(e, day)).map((e) => toRow(e))
-  const placedElsewhere = plan.chooserTasks.some((e) => !onDayTag(e) && alreadyPlaced(e, day))
-  const stillToPlace = taskRows.some((r) => !r.completed && !r.onDay)
-  const routineRows = plan.chooserRoutines.map((e) => toRow(e))
-
-  const label = (verb: string, e: DayPlanEntry) => `${verb} “${e.title}”`
   const toToday = (e: DayPlanEntry) => {
     const run = (cmd: () => Promise<boolean | void>, undo?: () => Promise<boolean | void>) =>
-      void activity.run(label(`Plan for ${dayWord}:`, e), cmd, { ids: [e.id], undo, retry: () => toToday(e) })
-    if (e.kind === 'routine' && e.routine && actions.placeRoutine) {
-      // A routine with no day of its own gets one occurrence; there is no
-      // honest inverse here, so no Undo is offered.
-      return run(async () => actions.placeRoutine!(e, day))
-    }
-    if (e.kind === 'task' && chooseTask) {
+      void activity.run(`Plan for ${dayWord}: “${e.title}”`, cmd, { ids: [e.id], undo, retry: () => toToday(e) })
+    if (chooseTask) {
       const t = e.task
       const focus = ymd === localYmd(new Date())
       const prev: Partial<Task> | null = t ? {
@@ -99,60 +88,46 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
         : !t?.scheduledFor ? async () => actions.unchoose(e) : undefined
       return run(() => chooseTask(e.id), undo)
     }
-    // Routine occurrences (and tasks without an async chooser): choose and
-    // unchoose are each other's inverse.
+    // Without an async chooser: choose and unchoose are each other's inverse.
     return run(async () => actions.choose(e), async () => actions.unchoose(e))
   }
-  const complete = (e: DayPlanEntry) => {
-    void activity.run(label(e.completed ? 'Reopen' : 'Done:', e), async () => actions.complete(e), {
-      ids: [e.id],
-      // The same writer, the other way: a task toggles back; a routine is
-      // marked with the state it had.
-      undo: async () => actions.complete({ ...e, completed: !e.completed }),
-    })
-  }
-  // A row drags onto the day (Scott, 2026-10-07): dropped on the day column
+  // A row drags onto the day (Scott, 2026-10-07): dropped on the day's hours
   // it gets the time it lands at; dropped on For today it is chosen, no time.
-  const listProps = {
-    addLabel: (title: string) => `Add ${title} to ${dayWord}`,
-    onAdd: toToday,
-    onComplete: complete,
-    onOpen: actions.open,
-    onDragStart: (e: DayPlanEntry, ev: DragEvent<HTMLLIElement>) =>
-      writePlanDrag(ev.dataTransfer, { kind: e.kind, id: e.id, date: ymd, title: e.title }),
+  const dragRow = (id: string, ev: DragEvent<HTMLLIElement>) => {
+    const e = byId.get(id)
+    if (e) writePlanDrag(ev.dataTransfer, { kind: e.kind, id: e.id, date: ymd, title: e.title })
   }
+  const pick = (id: string) => { const e = byId.get(id); if (e) toToday(e) }
+  const openRow = (id: string) => { const e = byId.get(id); if (e) actions.open?.(e) }
+
+  const range = formatWeekRangeShort(weekStart)
+  const nextById = new Map((nextWeek?.entries ?? []).map((e) => [e.id, e]))
 
   return (
-    <section className="pv2-ref today-ref cw-column" aria-label={`Week ${weekNo}, for reference`}>
-      <div className="pv2-colh">
-        Week {weekNo} <small>(for reference)</small>
-        {onHide && (
-          <button type="button" className="today-ref-hide" onClick={onHide} aria-label={`Hide week ${weekNo}`} title={`Hide week ${weekNo}`}>
-            <PanelRightClose size={16} aria-hidden="true" />
-          </button>
+    <PaperFold horizon="day" stowed={stowed} className={['today-fold', className].filter(Boolean).join(' ')} edgeLabel={range} edgeCount={open.length}
+      above={<>
+        <AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`} rows={open.map((e) => ({ id: e.id, title: e.title }))}
+          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week."
+          onPick={pick} pickLabel={(title) => `Plan ${title} for ${dayWord}`} onOpen={actions.open ? openRow : undefined} onDragRow={dragRow} />
+        {nextWeek && (
+          <section className="above-sheet today-fold-next" aria-label={`Week ${nextWeek.weekNo}, starts tomorrow`}>
+            <p className="above-sheet-kicker">Week {nextWeek.weekNo} · Starts tomorrow</p>
+            <h3 className="above-sheet-title today-fold-next-title">{formatWeekRangeShort(nextWeek.weekStart)}</h3>
+            {nextWeek.entries.length > 0 ? (
+              <ul className="above-sheet-list" aria-label={`Week ${nextWeek.weekNo}`}>
+                {nextWeek.entries.map((e) => (
+                  <li key={e.key} className="above-sheet-row">
+                    {actions.open
+                      ? <button type="button" className="above-sheet-row-title" onClick={() => { const n = nextById.get(e.id); if (n) actions.open?.(n) }}>{e.title}</button>
+                      : <span className="above-sheet-row-title">{e.title}</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="above-sheet-empty">Nothing on next week’s list yet.</p>}
+          </section>
         )}
-      </div>
-      {!stillToPlace && <p className="pv2-hint">Nothing still to place this week.</p>}
-      <CompactWeekList rows={taskRows} label={`Week ${weekNo}’s list`} {...listProps} />
-      {/* Words, not a tally (walkthrough 2026-10-02: no counts in app copy). */}
-      {placedElsewhere && <p className="pv2-hint">Some of this week’s work is already on a day.</p>}
-      {routineRows.length > 0 && (
-        <div className="cw-fold-wrap">
-          <button type="button" className="cw-fold" aria-expanded={routinesOpen} onClick={() => setRoutinesOpen((o) => !o)}>
-            Routines {dayWord} <ChevronRight size={14} aria-hidden="true" className="cw-fold-icon" />
-          </button>
-          {routinesOpen && <CompactWeekList rows={routineRows} label={`Routines ${dayWord}`} {...listProps} />}
-        </div>
-      )}
-      <button type="button" className="canvas-link cw-open" onClick={() => navigate(`/week?start=${localYmd(weekStart)}`)}>Open week {weekNo} →</button>
-      {nextWeek && (
-        <section aria-label={`Week ${nextWeek.weekNo}, starts tomorrow`}>
-          <div className="pv2-colh today-ref-sub">Week {nextWeek.weekNo} <small>· starts tomorrow</small></div>
-          <CompactWeekList rows={nextWeek.entries.map((e) => toRow(e, true))} label={`Week ${nextWeek.weekNo}’s list`} onOpen={actions.open}
-            empty={<p className="pv2-hint">Nothing on next week’s list yet.</p>} />
-          <button type="button" className="canvas-link cw-open" onClick={() => navigate(`/week?start=${localYmd(nextWeek.weekStart)}`)}>Open week {nextWeek.weekNo} →</button>
-        </section>
-      )}
-    </section>
+      </>}>
+      {children}
+    </PaperFold>
   )
 }

@@ -1,5 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { AboveSheet } from '@/components/plan/fold/AboveSheet'
 
 const FOOT = 'For reading. Write November in its own words.'
@@ -58,5 +58,47 @@ describe('AboveSheet: the level above, for reading', () => {
     expect(screen.getByText('Nothing left open from 2025.')).toBeInTheDocument()
     expect(screen.queryByRole('list')).toBeNull()
     expect(screen.getByText('For reading. Write 2026 in its own words.')).toBeInTheDocument()
+  })
+
+  it('without onPick, renders no buttons even with rows', () => {
+    render(<AboveSheet kicker="Year" title="2026" rows={[{ id: 'a', title: 'One' }, { id: 'b', title: 'Two' }]} doneCount={0} foot={FOOT} />)
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
+})
+
+// Today (Scott, 2026-11-04): the week sheet beside the day keeps its + and its
+// drag onto the day, because week and day share items.
+describe('AboveSheet with onPick: the week beside the day', () => {
+  const rows = [
+    { id: 'a', title: 'Book the cabin' },
+    { id: 'b', title: 'Call the bank' },
+  ]
+
+  it('gives each row a "+" named "Plan {title} for today" that picks it', () => {
+    const onPick = vi.fn()
+    render(<AboveSheet kicker="Week · Oct 31 – Nov 6" title="Week 45" rows={rows} doneCount={0} foot="Pick three to five for today." onPick={onPick} />)
+    const plus = screen.getByRole('button', { name: 'Plan Book the cabin for today' })
+    expect(plus).toHaveTextContent('+')
+    expect(screen.getByRole('button', { name: 'Plan Call the bank for today' })).toBeInTheDocument()
+    fireEvent.click(plus)
+    expect(onPick).toHaveBeenCalledWith('a')
+    expect(screen.getByText('Pick three to five for today.')).toBeInTheDocument()
+  })
+
+  it('names the + for another day when asked', () => {
+    render(<AboveSheet kicker="Week" title="Week 45" rows={rows} doneCount={0} foot="f" onPick={vi.fn()} pickLabel={(t) => `Plan ${t} for Friday`} />)
+    expect(screen.getByRole('button', { name: 'Plan Book the cabin for Friday' })).toBeInTheDocument()
+  })
+
+  it('rows drag onto the day, and a title tap opens the task', () => {
+    const onDragRow = vi.fn()
+    const onOpen = vi.fn()
+    render(<AboveSheet kicker="Week" title="Week 45" rows={rows} doneCount={0} foot="f" onPick={vi.fn()} onDragRow={onDragRow} onOpen={onOpen} />)
+    const row = screen.getByText('Book the cabin').closest('li')!
+    expect(row).toHaveAttribute('draggable', 'true')
+    fireEvent.dragStart(row, { dataTransfer: { setData: vi.fn(), effectAllowed: '' } })
+    expect(onDragRow).toHaveBeenCalledWith('a', expect.anything())
+    fireEvent.click(screen.getByRole('button', { name: 'Book the cabin' }))
+    expect(onOpen).toHaveBeenCalledWith('a')
   })
 })

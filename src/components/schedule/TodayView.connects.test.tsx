@@ -96,7 +96,7 @@ describe('Today rows carry no serves line', () => {
   })
 })
 
-describe('#24/#18 the week column shows the week still ahead on its last day', () => {
+describe('#24/#18 the week sheet shows the week still ahead on its last day', () => {
   const nextWeekRow = createMockTask({
     id: 'nw', title: 'Call the plumber', bucket: 'week', weekStart: NEXT_SUNDAY,
     commitments: [{ level: 'week', periodStart: NEXT_SUNDAY, status: 'open' }] as never,
@@ -105,23 +105,22 @@ describe('#24/#18 the week column shows the week still ahead on its last day', (
     id: 'nw-other', title: 'Iris’s dentist', bucket: 'week', weekStart: NEXT_SUNDAY, assignedTo: 'iris',
     commitments: [{ level: 'week', periodStart: NEXT_SUNDAY, status: 'open' }] as never,
   })
+  // The week folds beside the day (paper-style horizons, 2026-11-04); open it.
+  beforeEach(() => { localStorage.setItem('symphony-fold:day', 'open') })
+  afterEach(() => { localStorage.removeItem('symphony-fold:day') })
 
-  it('lists next week’s open rows, read-only, with a door to that week', () => {
-    localStorage.setItem('symphony-plan-v2.view.today', 'ref')
+  it('lists next week’s open rows, read-only; a title opens the task', () => {
     const { onSelectItem } = renderView({ tasks: [goal, line, step, copied, nextWeekRow] })
     const ahead = screen.getByRole('region', { name: /Week \d+, starts tomorrow/ })
-    expect(within(ahead).getByText(/starts tomorrow/)).toBeInTheDocument()
+    expect(within(ahead).getByText(/Starts tomorrow/i)).toBeInTheDocument()
     expect(within(ahead).getByText('Call the plumber')).toBeInTheDocument()
-    // Reading only: no "+ Today" for next week's rows.
-    expect(within(ahead).queryByRole('button', { name: /Add Call the plumber to today/ })).toBeNull()
+    // Reading only: no + for next week's rows.
+    expect(within(ahead).queryByRole('button', { name: /^Plan Call the plumber/ })).toBeNull()
     fireEvent.click(within(ahead).getByRole('button', { name: 'Call the plumber' }))
     expect(onSelectItem).toHaveBeenCalledWith('task-nw')
-    fireEvent.click(within(ahead).getByRole('button', { name: /Open week \d+ →/ }))
-    expect(window.location.search).toBe('?start=2026-09-20')
   })
 
   it('applies the people filter the page applies', () => {
-    localStorage.setItem('symphony-plan-v2.view.today', 'ref')
     renderView({ tasks: [nextWeekRow, othersRow], selectedAssignees: ['iris'] })
     const ahead = screen.getByRole('region', { name: /starts tomorrow/ })
     expect(within(ahead).getByText('Iris’s dentist')).toBeInTheDocument()
@@ -129,22 +128,20 @@ describe('#24/#18 the week column shows the week still ahead on its last day', (
   })
 
   it('is not there on any other day of the week', () => {
-    localStorage.setItem('symphony-plan-v2.view.today', 'ref')
     const friday = new Date(2026, 8, 18, 10, 0)
     vi.setSystemTime(friday)
     renderView({ tasks: [nextWeekRow], viewedDate: friday })
     expect(screen.queryByRole('region', { name: /starts tomorrow/ })).toBeNull()
   })
 
-  it('says placed work in words, never a count', () => {
-    localStorage.setItem('symphony-plan-v2.view.today', 'ref')
+  it('work already on another day is on that day, not on the sheet', () => {
     const friday = new Date(2026, 8, 18, 10, 0)
     vi.setSystemTime(friday)
     const placed = createMockTask({ id: 'placed', title: 'Placed', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 19), weekStart: new Date(2026, 8, 13),
       commitments: [{ level: 'week', periodStart: new Date(2026, 8, 13), status: 'open' }] as never })
     renderView({ tasks: [placed], viewedDate: friday })
-    expect(screen.getByText('Some of this week’s work is already on a day.')).toBeInTheDocument()
-    expect(screen.queryByText(/\d+ more (is|are) already on a day/)).toBeNull()
+    const sheet = screen.getByRole('region', { name: /^Sep 13 – Sep 19, for reading$/ })
+    expect(within(sheet).queryByText('Placed')).toBeNull()
   })
 })
 

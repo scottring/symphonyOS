@@ -26,7 +26,7 @@ import { detectFoldMode, foldSizes, type FoldMode } from '@/lib/fold/foldMode'
 import { paperSound } from '@/lib/fold/paperSound'
 import './paperFold.css'
 
-export type FoldHorizon = 'year' | 'season' | 'month' | 'week'
+export type FoldHorizon = 'year' | 'season' | 'month' | 'week' | 'day'
 
 export interface PaperFoldProps {
   /** Storage key and aria. */
@@ -40,6 +40,10 @@ export interface PaperFoldProps {
   /** This period's sheet. */
   children: ReactNode
   className?: string
+  /** Put away for now (Today while a session runs on the page): no edge, no
+   *  sheet above and no F key, while this sheet stays where it is, so what is
+   *  on it is never remounted. */
+  stowed?: boolean
 }
 
 const storageKey = (h: FoldHorizon) => `symphony-fold:${h}`
@@ -147,12 +151,14 @@ function PaperFoldSheet({
   above,
   children,
   className,
+  stowed = false,
 }: PaperFoldProps) {
   const [open, setOpen] = useState(() => readStored(horizon))
   const frontId = useId()
 
   const rootRef = useRef<HTMLDivElement>(null)
   const slotRef = useRef<HTMLDivElement>(null)
+  const pinRef = useRef<HTMLDivElement>(null)
   const flapRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const aboveBodyRef = useRef<HTMLDivElement>(null)
@@ -177,6 +183,10 @@ function PaperFoldSheet({
     parentW: NaN,
     aboveH: NaN,
   })
+  const stowedRef = useRef(stowed)
+  useLayoutEffect(() => {
+    stowedRef.current = stowed
+  }, [stowed])
   const horizonRef = useRef(horizon)
   useLayoutEffect(() => {
     horizonRef.current = horizon
@@ -274,6 +284,33 @@ function PaperFoldSheet({
   const toggle = useCallback(() => go(m.current.target > 0.5 ? 0 : 1), [go])
 
   // ---------- geometry ----------
+  // Beside the page ('h', 'duo') the edge and the sheet above are pinned
+  // under the top bar, as tall as the window allows, so a long page scrolls
+  // past them and only the sheet's own list scrolls under the pointer (Scott,
+  // 2026-11-04: "the week scrolls while everything else remains fixed"). The
+  // top bar's height is --paper-fold-sticky-top (76px, the planning columns'
+  // offset), with --paper-fold-sticky-gap (24px) left below. On a phone ('v')
+  // the sheet folds down from the top, capped, and is not pinned.
+  const pinSheet = useCallback((mode: FoldMode) => {
+    const pin = pinRef.current
+    const root = rootRef.current
+    if (!pin || !root) return
+    if (mode === 'v') {
+      pin.style.position = ''
+      pin.style.top = ''
+      pin.style.height = ''
+      pin.style.maxHeight = ''
+      return
+    }
+    const cs = getComputedStyle(root)
+    const top = parseFloat(cs.getPropertyValue('--paper-fold-sticky-top')) || 76
+    const gap = parseFloat(cs.getPropertyValue('--paper-fold-sticky-gap')) || 24
+    pin.style.position = 'sticky'
+    pin.style.top = `${top}px`
+    pin.style.height = `${Math.max(160, innerHeight - top - gap)}px`
+    pin.style.maxHeight = '100%'
+  }, [])
+
   const layout = useCallback(() => {
     const s = m.current
     const root = rootRef.current
@@ -288,6 +325,7 @@ function PaperFoldSheet({
     })
     s.mode = mode
     root.dataset.foldMode = mode
+    pinSheet(mode)
 
     let spread = 0
     const parent = root.parentElement
@@ -342,7 +380,7 @@ function PaperFoldSheet({
       root.style.setProperty('--paper-fold-cur', `${sizes.current}px`)
     }
     apply(s.p)
-  }, [apply, go, stop])
+  }, [apply, go, stop, pinSheet])
 
   useLayoutEffect(() => {
     const root = rootRef.current
@@ -401,6 +439,7 @@ function PaperFoldSheet({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'f' && e.key !== 'F') return
+      if (stowedRef.current) return
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.defaultPrevented) return
       const t = e.target
       if (
@@ -522,53 +561,56 @@ function PaperFoldSheet({
       className={['paper-fold', className].filter(Boolean).join(' ')}
       data-horizon={horizon}
       data-open={open ? 'true' : 'false'}
+      data-stowed={stowed ? 'true' : undefined}
     >
-      <div ref={slotRef} className="paper-fold-slot">
-        <button
-          type="button"
-          className="paper-fold-edge"
-          aria-expanded={open}
-          aria-controls={frontId}
-          aria-label={edgeName}
-          {...handlers}
-        >
-          <svg
-            className="paper-fold-chevron"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <path d="M10 3 5 8l5 5" />
-          </svg>
-          <span className="paper-fold-edge-label">{edgeLabel}</span>
-          {edgeCount !== undefined && <span className="paper-fold-edge-count">{edgeCount}</span>}
-        </button>
-        <div ref={flapRef} className="paper-fold-flap">
-          <section
-            id={frontId}
-            className="paper-fold-face paper-fold-front"
-            aria-label={`${edgeLabel}, for reading`}
-            inert={!open}
-            aria-hidden={!open}
-          >
-            <div ref={scrollRef} className="paper-fold-scroll">
-              <div ref={aboveBodyRef} className="paper-fold-above">
-                {above}
-              </div>
-            </div>
-          </section>
-          <div className="paper-fold-face paper-fold-back" aria-hidden="true" />
+      <div ref={slotRef} className="paper-fold-slot" hidden={stowed}>
+        <div ref={pinRef} className="paper-fold-pin">
           <button
             type="button"
-            className="paper-fold-grip"
-            aria-label="Fold the sheet away"
-            aria-hidden={!open}
-            tabIndex={open ? 0 : -1}
+            className="paper-fold-edge"
+            aria-expanded={open}
+            aria-controls={frontId}
+            aria-label={edgeName}
             {...handlers}
-          />
+          >
+            <svg
+              className="paper-fold-chevron"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M10 3 5 8l5 5" />
+            </svg>
+            <span className="paper-fold-edge-label">{edgeLabel}</span>
+            {edgeCount !== undefined && <span className="paper-fold-edge-count">{edgeCount}</span>}
+          </button>
+          <div ref={flapRef} className="paper-fold-flap">
+            <section
+              id={frontId}
+              className="paper-fold-face paper-fold-front"
+              aria-label={`${edgeLabel}, for reading`}
+              inert={!open}
+              aria-hidden={!open}
+            >
+              <div ref={scrollRef} className="paper-fold-scroll" style={{ overscrollBehavior: 'contain' }}>
+                <div ref={aboveBodyRef} className="paper-fold-above">
+                  {above}
+                </div>
+              </div>
+            </section>
+            <div className="paper-fold-face paper-fold-back" aria-hidden="true" />
+            <button
+              type="button"
+              className="paper-fold-grip"
+              aria-label="Fold the sheet away"
+              aria-hidden={!open}
+              tabIndex={open ? 0 : -1}
+              {...handlers}
+            />
+          </div>
         </div>
       </div>
       <article className="paper-fold-current">{children}</article>

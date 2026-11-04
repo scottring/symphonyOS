@@ -35,8 +35,7 @@ import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 import { Eye, EyeOff, Printer, GripVertical, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
-import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
-import { TodayWeekColumn } from './TodayWeekColumn'
+import { TodayWeekFold } from './TodayWeekColumn'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 import { TodayComingUp } from './TodayComingUp'
 import { nextWeekEntries } from '@/lib/today/dayPlan'
@@ -93,11 +92,7 @@ import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
 import { GuideAnchor } from '@/components/guide/GuideBar'
-import { useGuidedPlan } from '@/hooks/useGuidedPlan'
-import { currentStep } from '@/lib/guide/guidedPlan'
-import { ViewSwitch } from '@/components/plan/v2/ViewSwitch'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { WeatherChip } from './WeatherChip'
 import { parseSpecials } from '@/lib/today/specials'
@@ -368,21 +363,11 @@ export function TodayView({
     // The sheet's row titles open the same detail pane the page's rows do.
     open: (kind, id) => onSelectItem(`${kind}-${id}`),
   }), [viewedDate, planActions, onToggleTask, onCompleteRoutine, navigate, onSelectItem])
-  // The week beside the day (Scott, 2026-09-30: "above all else, it has to
-  // be consistent"): every horizon keeps the level above in a column on its
-  // right, switched by the same view icons — Today too. The Shelves drawer
-  // this replaces made Today the one page that hid what you choose from.
-  // Hidden unless chosen (Scott, 2026-09-30: Today's default stays the day
-  // alone); "Pick something for today" opens it with the week showing.
+  // The week beside the day (paper-style horizons, Scott 2026-11-04): it
+  // lies folded behind the day like every horizon's level above, in place of
+  // the This week column and its view icons. Folding is how it goes away;
+  // PaperFold remembers which way it was left (symphony-fold:day).
   const alongsideWorkspace = useAlongsideWorkspace()
-  const [todayView, setTodayViewState] = useState<PlanView>(() => readPlanView('today') === 'ref' ? 'ref' : 'list')
-  const setTodayView = (v: PlanView) => { if (alongsideWorkspace) { if (v === 'ref') alongsideWorkspace.showWeek(); return } setTodayViewState(v); writePlanView('today', v) }
-  // The guide's Today step asks you to choose from the week, so the week is
-  // beside the day for it — without changing the view you keep afterwards
-  // (walkthrough 2026-09-30: the step opened on the day alone).
-  const { state: guide } = useGuidedPlan()
-  const guideOnToday = guide?.status === 'active' && currentStep(guide) === 'today'
-  useEffect(() => { if (guideOnToday) { if (alongsideWorkspace) alongsideWorkspace.showWeek(); else setTodayViewState('ref') } }, [guideOnToday, alongsideWorkspace])
   // ── The Day session (spec 2026-11-01): ?plan=1 runs it on this page,
   // replacing Plan today / Review today. It plans today until 4 pm and
   // tomorrow from 4 pm (dayTarget); which day is fixed when it opens, so 4 pm
@@ -410,11 +395,13 @@ export function TodayView({
   const stepDayKey = sessionStep === null ? null : sessionStep === 'look-back' ? lookBackKey : targetKey
   const onSessionDay = (key: string) => key === targetKey || key === lookBackKey
   const sessionShown = planOpen && onSessionDay(localYmd(viewedDate))
-  const showWeek = !alongsideWorkspace && todayView === 'ref' && !sessionShown
-  const splitRef = useColumnsFitWindow(showWeek)
+  // The week lies folded beside the day — here, or in the connected
+  // workspace around it — except while the Day session runs: its steps rail
+  // stands beside the day instead.
+  const showWeek = !sessionShown
   const weekNo = weekOfYear(viewedDate, readCadenceConfig().weekStartsOn)
-  // The dock's Today pin showed this same list beside the page; the column
-  // holds it now, so the page never shows it twice.
+  // The dock's Today pin showed this same list beside the page; the week's
+  // fold holds it now, so the page never shows it twice.
   useEffect(() => {
     if (references?.pins.some((p) => p.kind === 'today')) references.unpin('today')
   }, [references])
@@ -1264,14 +1251,29 @@ export function TodayView({
     </div>
   )
 
+  // The day, with its week folded beside it (paper-style horizons, Scott
+  // 2026-11-04). Each week row keeps its + and its drag onto the day.
+  // In the connected workspace AlongsideDay folds the week around this page.
+  // While a session runs the fold is stowed, never unmounted, so the day
+  // under it keeps its state.
+  const withWeek = (day: ReactNode) => alongsideWorkspace ? day : (
+    <TodayWeekFold stowed={sessionShown} plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
+      weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
+      nextWeek={nextWeek}
+      chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
+      restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)}>
+      {day}
+    </TodayWeekFold>
+  )
+
   return (
-    // @container: the day and its week column split on the page's own width
-    // (no ancestor declared one, so the old decision rail never went beside).
-    // Width: the reading column (PAGE_COLUMN, 1040px of content) — or, with
-    // the week column beside the day, a planning page that fills the screen.
+    // @container: the day's own layout reads the page's width.
+    // Width: the reading column (PAGE_COLUMN, 1040px of content), the week's
+    // fold taking its room from it when open — or, with a session's steps
+    // beside the day, a planning page that fills the screen.
     // In the connected workspace Today always shares the planning frame, so
     // Today, Week, Plan and Routines have one shape (Scott, 2026-10-10).
-    <div className={`today-page @container w-full ${showWeek || alongsideWorkspace || sessionShown ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
+    <div className={`today-page @container w-full ${alongsideWorkspace || sessionShown ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}
@@ -1341,7 +1343,7 @@ export function TodayView({
         // every horizon (Scott, 2026-09-30). The masthead keeps them only where
         // there is no control row to hold them.
         controls={foldedControls
-          ? <div className="flex items-center gap-1">{dayFlowButton}{desktopToolbar}{!alongsideWorkspace && !sessionShown && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}</div>
+          ? <div className="flex items-center gap-1">{dayFlowButton}{desktopToolbar}</div>
           : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
@@ -1372,18 +1374,14 @@ export function TodayView({
       {!foldedControls && (
         <div className="pv2-toolbar today-toolbar px-4 md:px-0">
           <div className="pv2-status"><span className="pv2-hint">{weekLine}</span></div>
-          {!alongsideWorkspace && !sessionShown && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}
         </div>
       )}
-      {/* The column beside the day: the week (and anything needing a
-          decision). The day gets the full width only when there is none. */}
-      {/* With the week beside it, the day and the week each scroll on their
-          own (Scott, 2026-10-05), as Week and Month do: useColumnsFitWindow
-          sizes them to the window, layout-system.css scrolls them. */}
-      {/* While the Day session runs, this is its page: the steps rail stands
-          beside it where the week column would. */}
-      {inDaySession(<div ref={splitRef} className={`${sessionShown ? '' : 'px-4 md:px-0 '}${showWeek ? 'today-split is-colscroll @[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
-        <main className="min-w-0">
+      {/* The day, with the week folded beside it (withWeek). The sheet stays
+          in view while the day scrolls and scrolls on its own (PaperFold).
+          While the Day session runs, this is its page: the steps rail stands
+          beside it and the fold is put away. */}
+      {inDaySession(<div className={sessionShown ? '' : 'px-4 md:px-0'}>
+        {withWeek(<main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,
               and it sent you to the Inbox. Unfinished work now has one quiet
@@ -1502,9 +1500,8 @@ export function TodayView({
                 <p className="font-display text-lg text-neutral-600">{focusWork.completedCount ? 'Everything on your list is done.' : 'Nothing chosen yet.'}</p>
                 <p className="mt-1 text-[14px] text-neutral-500">
                   {showWeek
-                    ? <>Choose from week {weekNo} {isMobile ? 'below' : 'beside this list'}, or add something for {data.isToday ? 'today' : 'this day'}.</>
-                    : <>Add something for {data.isToday ? 'today' : 'this day'}, or{' '}
-                        <button type="button" className="text-primary-700 underline underline-offset-2" onClick={() => setTodayView('ref')}>show week {weekNo}</button> to choose from it.</>}
+                    ? <>Choose from week {weekNo} {isMobile ? 'above' : 'beside this list'}, or add something for {data.isToday ? 'today' : 'this day'}.</>
+                    : <>Add something for {data.isToday ? 'today' : 'this day'}.</>}
                 </p>
                 {/* Say when the view is narrowed, so an empty filtered list
                     isn't read as an empty day. No hidden counts. */}
@@ -1698,21 +1695,7 @@ export function TodayView({
         )}
 
       </div>
-        </main>
-
-        {/* Today is the day alone unless its week is asked for (Scott,
-            2026-09-30): the by-hand way to pull one task in. */}
-        {showWeek && (
-        <aside className="today-aside mt-6 @[48rem]:mt-0">
-          {showWeek && (
-            <TodayWeekColumn plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
-              weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
-              nextWeek={nextWeek} onHide={() => setTodayView('list')}
-              chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
-              restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)} />
-          )}
-        </aside>
-        )}
+        </main>)}
       </div>)}
 
       {/* Phone: the floating capture bar above the dock (native TodayView). */}

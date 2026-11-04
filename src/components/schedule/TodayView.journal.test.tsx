@@ -147,14 +147,13 @@ describe('Today as a daily journal', () => {
     expect(screen.queryByRole('button', { name: /Earlier today/ })).toBeNull()
   })
 
-  it('an empty focus offers the week to choose from — a control you can see', () => {
+  it('an empty focus points to the week folded beside it', () => {
     renderView({ tasks: tasks.filter((t) => t.id !== 'dryer') })
     expect(screen.getByText('Nothing chosen yet.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
-    // Today opens without the week; the empty state offers it.
-    fireEvent.click(screen.getByRole('button', { name: /^show week \d+$/ }))
-    expect(screen.getByRole('region', { name: /for reference$/ })).toBeInTheDocument()
-    expect(screen.getByText(/Choose from week \d+ (beside this list|below), or add something for today/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^show week \d+$/ })).toBeNull()
+    expect(screen.getByText(/Choose from week \d+ (beside this list|above), or add something for today/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Unfold to read$/ })).toBeInTheDocument()
   })
 
   it('an empty list under filters says the filters are on and offers Show everything', () => {

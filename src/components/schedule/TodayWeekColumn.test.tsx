@@ -4,152 +4,161 @@ import { MemoryRouter } from 'react-router-dom'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { PLAN_MIME } from '@/lib/planning/planDrag'
 import type { Task } from '@/types/task'
-import { TodayWeekColumn } from './TodayWeekColumn'
+import { TodayWeekFold } from './TodayWeekColumn'
 import { selectDayPlan } from '@/lib/today/dayPlan'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { buildShelf } from '@/components/canvas/week/weekShelf'
 import { ALL_LAYERS } from '@/lib/domains'
 import { createMockTask } from '@/test/mocks/factories'
 
-const day = new Date(2026, 9, 7)
-const entry: DayPlanEntry = { key: 'task:t1', kind: 'task', id: 't1', title: 'Call the bank', completed: false, planned: false, group: 'week' } as DayPlanEntry
-const plan = { chooserTasks: [entry], chooserRoutines: [] } as unknown as DayPlan
+// Today gets the fold (Scott, 2026-11-04: "add today with the + on the week
+// sheet"): the week folds beside the day, in place of the This week column.
+// Its rows keep their + and their drag onto the day.
 
-// Scott, 2026-10-07: the week beside the day should drag onto it.
-describe('TodayWeekColumn', () => {
-  it('lets a week row be dragged, carrying what it is and the day', () => {
-    render(<MemoryRouter><TodayWeekColumn plan={plan} day={day} weekNo={41} weekStart={day} actions={{ choose: vi.fn() } as never} /></MemoryRouter>)
-    const row = screen.getByText('Call the bank').closest('li')!
+const FOOT = 'Pick three to five for today.'
+const now = new Date(2026, 10, 4, 9) // Wed Nov 4
+const weekStart = new Date(2026, 9, 31) // Sat Oct 31 – Fri Nov 6
+
+const t = (id: string, title: string, x: Partial<Task> = {}) => ({ id, title, completed: false, createdAt: now, ...x }) as Task
+const e = (task: Task, x: Partial<DayPlanEntry> = {}): DayPlanEntry => ({ key: `task:${task.id}`, kind: 'task', id: task.id, title: task.title, completed: task.completed, planned: false, group: 'week', task, ...x }) as DayPlanEntry
+
+const at2 = new Date(2026, 10, 4, 14)
+const rows = [
+  e(t('a', 'Book the cabin')),
+  e(t('b', 'Pack the car', { scheduledFor: at2, isAllDay: false })), // on today already
+  e(t('c', 'Call the bank')),
+  e(t('d', 'Buy maps', { completed: true }), { completed: true }),
+  e(t('f', 'Fix the gate', { scheduledFor: new Date(2026, 10, 5), isAllDay: true })), // on Thursday
+]
+const plan = { chooserTasks: rows, chooserRoutines: [] } as unknown as DayPlan
+
+function view(props: Partial<Parameters<typeof TodayWeekFold>[0]> = {}) {
+  const actions = { choose: vi.fn(), unchoose: vi.fn(), complete: vi.fn(), open: vi.fn() }
+  const r = render(<MemoryRouter>
+    <TodayWeekFold plan={plan} day={now} weekNo={45} weekStart={weekStart} actions={actions as never} {...props}>
+      <p>The day</p>
+    </TodayWeekFold>
+  </MemoryRouter>)
+  return { ...r, actions }
+}
+const unfold = () => fireEvent.click(screen.getByRole('button', { name: /Unfold to read$/ }))
+
+// Reduced motion: the fold jumps to its state, so a tap opens it at once.
+const originalMatchMedia = window.matchMedia
+const reduceMotion = ((query: string) => ({
+  matches: query.includes('prefers-reduced-motion'), media: query, onchange: null,
+  addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+})) as typeof window.matchMedia
+beforeEach(() => { localStorage.clear(); window.matchMedia = reduceMotion; vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now) })
+afterEach(() => { vi.useRealTimers(); window.matchMedia = originalMatchMedia })
+
+describe('TodayWeekFold: the week folded beside the day', () => {
+  it('wraps the day, with an edge named for the week’s dates and its open no-day count', () => {
+    view()
+    expect(screen.getByText('The day')).toBeInTheDocument()
+    // Open with no day: Book the cabin, Call the bank. Pack the car is on
+    // today, Fix the gate on Thursday, Buy maps done.
+    expect(screen.getByRole('button', { name: 'Oct 31 – Nov 6, 2 open. Unfold to read' })).toBeInTheDocument()
+    expect(document.querySelector('.paper-fold[data-horizon="day"]')).not.toBeNull()
+  })
+
+  it('unfolded, the sheet lists the week’s no-day tasks, says what is done, and reads the foot', () => {
+    view()
+    unfold()
+    const list = screen.getByRole('list', { name: 'Week 45' })
+    expect(within(list).getAllByRole('listitem').map((li) => li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Book the cabin', 'Call the bank'])
+    expect(screen.getByText('Week · Oct 31 – Nov 6')).toBeInTheDocument()
+    expect(screen.getByText('1 done')).toBeInTheDocument()
+    expect(screen.getByText(FOOT)).toBeInTheDocument()
+    // The column's hide control is gone: folding is how it goes away.
+    expect(screen.queryByRole('button', { name: /^Hide week/ })).toBeNull()
+  })
+
+  it('remembers the fold under symphony-fold:day', () => {
+    view()
+    unfold()
+    expect(localStorage.getItem('symphony-fold:day')).toBe('open')
+  })
+
+  it('"+" plans the task for today through the page’s own chooser', async () => {
+    const chooseTask = vi.fn().mockResolvedValue(true)
+    view({ chooseTask })
+    unfold()
+    fireEvent.click(screen.getByRole('button', { name: 'Plan Book the cabin for today' }))
+    await waitFor(() => expect(chooseTask).toHaveBeenCalledWith('a'))
+  })
+
+  it('"+" falls back to the panel action when no async chooser is given', () => {
+    const { actions } = view()
+    unfold()
+    fireEvent.click(screen.getByRole('button', { name: 'Plan Call the bank for today' }))
+    expect(actions.choose).toHaveBeenCalledWith(rows[2])
+  })
+
+  it('a row drags onto the day, carrying what it is and the day', () => {
+    view()
+    unfold()
+    const row = screen.getByText('Book the cabin').closest('li')!
     expect(row).toHaveAttribute('draggable', 'true')
     const set: Record<string, string> = {}
     fireEvent.dragStart(row, { dataTransfer: { setData: (k: string, v: string) => { set[k] = v }, effectAllowed: '' } })
-    expect(JSON.parse(set[PLAN_MIME])).toEqual({ kind: 'task', id: 't1', date: '2026-10-07', title: 'Call the bank' })
+    expect(JSON.parse(set[PLAN_MIME])).toEqual({ kind: 'task', id: 'a', date: '2026-11-04', title: 'Book the cabin' })
   })
 
-  // Scott, 2026-10-07: check off a week item from Today without choosing it first.
-  it('checks a week row off from Today, through the same writer the chooser uses', () => {
-    const complete = vi.fn()
-    render(<MemoryRouter><TodayWeekColumn plan={plan} day={day} weekNo={41} weekStart={day} actions={{ choose: vi.fn(), complete } as never} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: 'Complete Call the bank' }))
-    expect(complete).toHaveBeenCalledWith(entry)
+  it('a title tap opens the task, as the column did', () => {
+    const { actions } = view()
+    unfold()
+    fireEvent.click(screen.getByRole('button', { name: 'Book the cabin' }))
+    expect(actions.open).toHaveBeenCalledWith(rows[0])
   })
 
-  // Review, 2026-10-07: the week competes with the day once you're working.
-  it('folds itself away from its own header, and says what the check does', () => {
-    const onHide = vi.fn()
-    render(<MemoryRouter><TodayWeekColumn plan={plan} day={day} weekNo={41} weekStart={day} actions={{ choose: vi.fn() } as never} onHide={onHide} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: 'Hide week 41' }))
-    expect(onHide).toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Complete Call the bank' })).toHaveAttribute('title', 'Mark done')
+  it('on another day, the + names that day', () => {
+    view({ day: new Date(2026, 10, 6) })
+    unfold()
+    expect(screen.getByRole('button', { name: 'Plan Book the cabin for Friday' })).toBeInTheDocument()
   })
 
-  // Canvas design, 2026-10-10: the compact list, shared with AlongsideDay.
-  describe('compact week list', () => {
-    const today = new Date()
-    const t = (id: string, title: string, x: Partial<Task> = {}) => ({ id, title, completed: false, createdAt: today, sourceId: 'm', ...x }) as Task
-    const e = (task: Task, x: Partial<DayPlanEntry> = {}): DayPlanEntry => ({ key: `task:${task.id}`, kind: 'task', id: task.id, title: task.title, completed: task.completed, planned: false, group: 'week', task, ...x }) as DayPlanEntry
-    const at2 = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 14)
-    const rows = [
-      e(t('a', 'Book the cabin')),
-      e(t('b', 'Pack the car', { scheduledFor: at2, isAllDay: false })),
-      e(t('c', 'Call the bank', { sourceId: undefined })),
-      e(t('d', 'Buy maps', { completed: true }), { completed: true }),
-    ]
-    const view = (props: Partial<Parameters<typeof TodayWeekColumn>[0]> = {}) => render(<MemoryRouter>
-      <TodayWeekColumn plan={{ chooserTasks: rows, chooserRoutines: [] } as unknown as DayPlan} day={today} weekNo={41} weekStart={today}
-        actions={{ choose: vi.fn(), unchoose: vi.fn(), complete: vi.fn(), open: vi.fn() } as never} {...props} />
-    </MemoryRouter>)
-
-    // Paper-style horizons (spec 2026-11-04): the week flat, as on Week —
-    // no heading for the month line, no "Unlinked", no serves line.
-    it('lists rows flat, marks what is already on today, and keeps done rows behind a reveal', () => {
-      view()
-      const list = screen.getByRole('group', { name: 'Week 41’s list' })
-      expect(within(list).getAllByRole('listitem').map((li) => li.querySelector('.cw-title')?.textContent)).toEqual(['Book the cabin', 'Pack the car', 'Call the bank'])
-      expect(screen.queryByRole('region', { name: 'Plan the autumn trip' })).toBeNull()
-      expect(screen.queryByRole('region', { name: 'Unlinked' })).toBeNull()
-      expect(screen.queryByText('Plan the autumn trip')).toBeNull()
-      expect(document.querySelector('.cw-parent, .serves-line, .today-serves')).toBeNull()
-      const onToday = screen.getByText('Pack the car').closest('li')!
-      expect(onToday).toHaveClass('is-on-today')
-      expect(within(onToday).getByText('Today 2p')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Add Pack the car to today' })).toBeNull()
-      expect(screen.queryByText('Buy maps')).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: 'Show done' }))
-      expect(screen.getByText('Buy maps')).toBeInTheDocument()
-    })
-
-    it('adds a row to today through the page’s own chooser', async () => {
-      const chooseTask = vi.fn().mockResolvedValue(true)
-      view({ chooseTask })
-      fireEvent.click(screen.getByRole('button', { name: 'Add Book the cabin to today' }))
-      await waitFor(() => expect(chooseTask).toHaveBeenCalledWith('a'))
-    })
-
-    it('falls back to the panel action when no async chooser is given', () => {
-      const choose = vi.fn()
-      view({ actions: { choose, unchoose: vi.fn(), complete: vi.fn() } as never })
-      fireEvent.click(screen.getByRole('button', { name: 'Add Book the cabin to today' }))
-      expect(choose).toHaveBeenCalledWith(rows[0])
-    })
-
-    it('folds the day’s routines to one line that opens in place', () => {
-      const routine = { key: 'routine:r', kind: 'routine', id: 'r', title: 'Water the plants', completed: false, planned: false, group: 'available' } as DayPlanEntry
-      render(<MemoryRouter><TodayWeekColumn plan={{ chooserTasks: [], chooserRoutines: [routine] } as unknown as DayPlan} day={today} weekNo={41} weekStart={today} actions={{ choose: vi.fn() } as never} /></MemoryRouter>)
-      expect(screen.queryByText('Water the plants')).toBeNull()
-      const fold = screen.getByRole('button', { name: /Routines today/ })
-      expect(fold).toHaveAttribute('aria-expanded', 'false')
-      fireEvent.click(fold)
-      expect(screen.getByText('Water the plants')).toBeInTheDocument()
-    })
-
-    it('draws next week read-only on the week’s last day', () => {
-      const next = e(t('n', 'Order firewood'))
-      view({ nextWeek: { weekNo: 42, weekStart: today, entries: [next] } })
-      const section = screen.getByRole('region', { name: 'Week 42, starts tomorrow' })
-      expect(within(section).getByText('Order firewood').closest('li')).toHaveAttribute('draggable', 'false')
-      expect(within(section).queryByRole('button', { name: /Add Order firewood/ })).toBeNull()
-      expect(within(section).getByRole('button', { name: 'Open week 42 →' })).toBeInTheDocument()
-    })
+  it('draws next week read-only on the week’s last day', () => {
+    const next = e(t('n', 'Order firewood'))
+    const { actions } = view({ nextWeek: { weekNo: 46, weekStart: new Date(2026, 10, 7), entries: [next] } })
+    unfold()
+    const section = screen.getByRole('region', { name: 'Week 46, starts tomorrow' })
+    expect(within(section).getByText('Nov 7 – Nov 13')).toBeInTheDocument()
+    expect(within(section).queryByRole('button', { name: /^Plan Order firewood/ })).toBeNull()
+    expect(within(section).getByText('Order firewood').closest('li')).not.toHaveAttribute('draggable', 'true')
+    fireEvent.click(within(section).getByRole('button', { name: 'Order firewood' }))
+    expect(actions.open).toHaveBeenCalledWith(next)
   })
 })
 
-// Finding #15 (spec 2026-11-04): Today's week column held November's own
-// lines that the Week's list did not. Both now read one week: for the same
-// tasks, Today's column and Week's "No day yet" list the same titles, in the
-// same order.
+// Finding #15 (spec 2026-11-04): Today's week and the Week page's "No day
+// yet" read one week — for the same tasks, the same titles in the same order.
 describe('Today and Week agree on the week', () => {
-  const now = new Date(2026, 10, 4, 9) // Wed Nov 4
-  const weekStart = new Date(2026, 10, 1) // Sun Nov 1 – Sat Nov 7
-  const onWeek = [{ level: 'week', periodStart: weekStart, status: 'open' }] as Task['commitments']
+  const wkStart = new Date(2026, 10, 1) // Sun Nov 1 – Sat Nov 7
+  const onWeek = [{ level: 'week', periodStart: wkStart, status: 'open' }] as Task['commitments']
   let n = 0
-  const wk = (title: string, x: Partial<Task> = {}) => createMockTask({ id: `w${++n}`, title, bucket: 'week', weekStart, commitments: onWeek, createdAt: new Date(2026, 9, n), ...x })
+  const wk = (title: string, x: Partial<Task> = {}) => createMockTask({ id: `w${++n}`, title, bucket: 'week', weekStart: wkStart, commitments: onWeek, createdAt: new Date(2026, 9, n), ...x })
   // No weekend-only and no scope-filtered tasks: both pages show them all.
   const tasks = [
     wk('Book the cabin', { sourceId: 'm1', commitments: [...onWeek!, { level: 'month', periodStart: new Date(2026, 10, 1), status: 'open' }] as Task['commitments'] }),
     wk('Plan winter vacation', { isGoal: true, bucket: 'month', monthStart: new Date(2026, 10, 1), commitments: [...onWeek!, { level: 'month', periodStart: new Date(2026, 10, 1), status: 'open' }] as Task['commitments'] }),
     wk('Call the bank'),
     wk('Service the car', { goalTaskId: 'm1' }),
+    wk('Fix the gate', { bucket: 'timed', scheduledFor: new Date(2026, 10, 6), isAllDay: true }),
   ]
 
-  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now) })
-  afterEach(() => { vi.useRealTimers() })
-
-  it('Today’s week column titles and notes equal the Week page’s No day yet titles and notes', () => {
+  it('the sheet’s titles equal the Week page’s No day yet titles', () => {
     const plan = selectDayPlan({
       tasks, routines: [], dateInstances: [], viewedDate: now, selectedAssignee: null, hideRoutines: false,
-      layers: new Set(ALL_LAYERS), weekStart, userId: 'u1', now,
+      layers: new Set(ALL_LAYERS), weekStart: wkStart, userId: 'u1', now,
     })
-    render(<MemoryRouter><TodayWeekColumn plan={plan} day={now} weekNo={45} weekStart={weekStart} actions={{ choose: vi.fn() } as never} /></MemoryRouter>)
-    const items = within(screen.getByRole('group', { name: 'Week 45’s list' })).getAllByRole('listitem')
-    const today = items.map((li) => li.querySelector('.cw-title')?.textContent)
-    const rows = buildShelf({ weekTasks: weekListTasks(tasks, weekStart, null, { isCurrent: true }), weekStart, now }).flatMap((g) => g.rows)
-    const week = rows.map((r) => r.task.title)
+    render(<MemoryRouter><TodayWeekFold plan={plan} day={now} weekNo={45} weekStart={wkStart} actions={{ choose: vi.fn() } as never}><p>day</p></TodayWeekFold></MemoryRouter>)
+    expect(screen.getByRole('button', { name: 'Nov 1 – Nov 7, 4 open. Unfold to read' })).toBeInTheDocument()
+    unfold()
+    const items = within(screen.getByRole('list', { name: 'Week 45' })).getAllByRole('listitem')
+    const today = items.map((li) => li.querySelector('.above-sheet-row-title')?.textContent)
+    const week = buildShelf({ weekTasks: weekListTasks(tasks, wkStart, null, { isCurrent: true }), weekStart: wkStart, now }).flatMap((g) => g.rows).map((r) => r.task.title)
     expect(week).toEqual(['Book the cabin', 'Plan winter vacation', 'Call the bank', 'Service the car'])
     expect(today).toEqual(week)
-    // The notes agree too: no "from November" on Today for a row that is
-    // also on the month (a tie line, ruled out 2026-11-04).
-    expect(items.map((li) => li.querySelector('.cw-sub')?.textContent ?? null)).toEqual(rows.map((r) => r.meta))
-    expect(screen.queryByText(/from November/)).toBeNull()
   })
 })
