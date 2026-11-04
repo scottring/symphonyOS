@@ -1168,6 +1168,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(within(october.getByRole('list',{name:'Open from October'})).getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['Hike Bear Mountain'])
   // The only sheet beside you that takes a choice: exactly these four.
   expect(within(october.getByRole('listitem',{name:'Hike Bear Mountain'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Done','To November','Someday','Let go'])
+  expect(october.getByText('Only here, while planning, does the sheet beside you take a choice. To and Someday act on October only. Let go takes it off every list.')).toBeInTheDocument()
   expect(document.querySelector('.ribbon-card')).toBeNull()
   expect(shell.reg).toMatchObject({level:'month',token:'2026-11',stepId:'look-back'})
   await act(async()=>{fireEvent.click(band().getByRole('button',{name:'Next'}))})

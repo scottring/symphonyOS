@@ -104,7 +104,8 @@ export function SheetFoot({ children }: { children: ReactNode }) {
 
 /** The sheet above, turned to the period before while a session looks back
  *  on it (the planning ribbon, 2026-11-04): the only time the sheet beside
- *  you takes a choice. Each choice acts on that period only. `title` is the
+ *  you takes a choice. To and Someday act on that period only; Let go takes
+ *  the item off every list. `title` is the
  *  period's word, for the foot line. */
 export function LookSheet({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -112,7 +113,7 @@ export function LookSheet({ title, children }: { title: string; children: ReactN
       {/* The look back names its period itself ("Looking back at October"). */}
       <p className="above-sheet-kicker">Looking back</p>
       {children}
-      <p className="above-sheet-foot look-sheet-foot">Only here, while planning, does the sheet beside you take a choice. Each one acts on {title} only.</p>
+      <p className="above-sheet-foot look-sheet-foot">{`Only here, while planning, does the sheet beside you take a choice. To and Someday act on ${title} only. Let go takes it off every list.`}</p>
     </div>
   )
 }

@@ -40,6 +40,15 @@ function onPhone(): boolean {
 
 const buzz = () => { try { navigator.vibrate?.(6) } catch { /* no haptics */ } }
 
+/** The satin slide, except under reduced motion (no swish there, as the
+ *  folds have none). */
+function satin() {
+  try {
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  } catch { /* play it */ }
+  paperSound.ribbon()
+}
+
 export interface GuideRibbonProps {
   level: GuideLevel
   progress: GuideProgress
@@ -83,7 +92,7 @@ export function GuideRibbon({ level, progress, titleFor, bodies, onJump, onNext,
   // The ribbon laid down: a low satin slide, once, and the band unrolls.
   const [on, setOn] = useState(false)
   useEffect(() => {
-    paperSound.ribbon()
+    satin()
     const id = requestAnimationFrame(() => setOn(true))
     return () => cancelAnimationFrame(id)
   }, [])
@@ -111,7 +120,7 @@ export function GuideRibbon({ level, progress, titleFor, bodies, onJump, onNext,
     return () => cancelAnimationFrame(id)
   }, [current, write])
 
-  const leave = () => { paperSound.ribbon(); onLeave() }
+  const leave = () => { satin(); onLeave() }
   const stateOf = (id: string) =>
     id === current ? 'current'
       : progress.done.includes(id) ? 'done'
@@ -121,7 +130,7 @@ export function GuideRibbon({ level, progress, titleFor, bodies, onJump, onNext,
   const card = step.card ? bodies[current] : undefined
 
   return (
-    <RibbonContext.Provider value={{ label: tab.label, onPull: () => { paperSound.ribbon(); tab.onPull() }, controls: bandId }}>
+    <RibbonContext.Provider value={{ label: tab.label, onPull: () => { satin(); tab.onPull() }, controls: bandId }}>
       <div className="ribbon-session" data-level={level}>
         <div className={`ribbon-band-wrap${on ? ' is-on' : ''}`}>
           <div>
@@ -178,7 +187,7 @@ export function RibbonTab({ label, onPull }: { label: string; onPull: () => void
   return (
     <button type="button" className="ribbon-tab" aria-expanded={pulled} aria-controls={session?.controls}
       aria-label={session?.label ?? label}
-      onClick={() => { if (session) session.onPull(); else { paperSound.ribbon(); onPull() } }}>
+      onClick={() => { if (session) session.onPull(); else { satin(); onPull() } }}>
       <span aria-hidden="true">Plan</span>
     </button>
   )

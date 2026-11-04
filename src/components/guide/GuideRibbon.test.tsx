@@ -105,6 +105,20 @@ describe('GuideRibbon — planning is a ribbon on the same page', () => {
     ribbon.mockRestore()
   })
 
+  // Reduced motion: no swish (the fold's own rule), so no satin slide either.
+  it('makes no satin slide under reduced motion', () => {
+    const original = window.matchMedia
+    window.matchMedia = ((query: string) => ({ matches: query.includes('prefers-reduced-motion'), media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false })) as unknown as typeof window.matchMedia
+    const ribbon = vi.spyOn(paperSound, 'ribbon')
+    try {
+      setup()
+      fireEvent.click(band().getByRole('button', { name: 'Leave' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Plan November', expanded: true }))
+      expect(ribbon).not.toHaveBeenCalled()
+    } finally { ribbon.mockRestore(); window.matchMedia = original }
+  })
+
   it('uses titleFor and the steps’ own drives by default', () => {
     render(<GuideRibbon level="week" progress={progress('read-month')} titleFor={(s) => s.id === 'read-month' ? 'Read November' : s.title}
       bodies={{}} onJump={vi.fn()} onNext={vi.fn()} onBack={vi.fn()} onLeave={vi.fn()} onFinish={vi.fn()}
