@@ -46,5 +46,13 @@
 .sheet-write:has(input:focus-visible) { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
 .sheet-write-enter { display: none; font: 500 11px/1 var(--font-family-sans); color: var(--paper-fold-ink-faint, var(--color-neutral-400)); white-space: nowrap; }
 .sheet-write:focus-within .sheet-write-enter { display: inline; }
+/* The page's space, quiet at the end of the line until the line is in use. */
+.sheet-write-extra { flex: none; display: inline-flex; align-items: center; color: var(--color-neutral-600); opacity: .55; transition: opacity .12s; }
+.sheet-write:hover .sheet-write-extra, .sheet-write:focus-within .sheet-write-extra { opacity: 1; }
+.sheet-write-extra .tag-needs-context { animation: none; box-shadow: none; outline: none; background: none; }
+/* How it read the words, and where it will land, under the line while typing. */
+.sheet-write-read { flex-basis: 100%; padding: 2px 0 6px 30px; }
+.sheet-write-read .ta-facts dd { font-size: 14px; }
+.sheet-write-read .ta-where { font-size: 13px; }
 .sheet-write-error { flex-basis: 100%; margin: 2px 0 4px 30px; font-size: 12.5px; color: var(--color-danger-600, #b42318); }
 @media (max-width: 767px) { .sheet-write input { min-height: 44px; } }

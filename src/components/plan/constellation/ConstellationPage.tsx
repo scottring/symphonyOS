@@ -60,7 +60,6 @@ import { localYmd, parseLocalYmd, readCadenceConfig, weekStartAnchor } from '@/l
 import type { TaskContext } from '@/types/task'
 import { useAddArea } from '../v2/AddArea'
 import { planNodes, type PlanNode } from './model'
-import { moveUnderPatch } from './connections'
 import { planPreview, type PeriodSpan } from './planPreview'
 import { isDone, periodRange } from '@/components/canvas/plan/planGroups'
 import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
@@ -94,6 +93,7 @@ import { RoutinesStrip, type StripRoutine } from './AboveStrip'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet } from '@/components/plan/fold/AboveSheet'
 import { WriteLine } from '@/components/plan/fold/WriteLine'
+import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 import { GuidedPeriod, type PeriodSessionTools } from '@/components/plan/guided/GuidedPeriod'
 import { reportItem, reportLine } from '@/components/plan/guided/reporting'
 import { FreshStart } from '@/components/plan/guided/month/FreshStart'
@@ -354,28 +354,11 @@ function Inner() {
     return act(`Rename “${before}” to “${title}”`, () => write(title), { ids: [node.id], undo: async () => (await write(before)) !== false })
   }
 
-  const moveUnder = (node: PlanNode, parent: PlanNode | null): Promise<boolean> => {
-    const patch = moveUnderPatch(allNodes, node, parent)
-    if (!patch) return Promise.resolve(false)
-    const label = parent ? `Move “${node.title}” under “${parent.title}”` : `Unlink “${node.title}”`
-    return act(label, () => updateTask(node.id, patch.after), {
-      ids: [node.id],
-      undo: async () => (await updateTask(node.id, patch.before)) !== false,
-      retry: () => { void moveUnder(node, parent) },
-    }).then((ok) => {
-      if (ok && parent) pageWrote()
-      return ok
-    })
-  }
-
+  // A guide's suggestion kept on the page is a plain item of this period
+  // (paper-style horizons, 2026-11-04): no parent, so no goalId or sourceId.
   const keepProposal = async (p: CanvasProposal) => {
-    const parent = level > 0 ? allNodes.find((n) => n.level === level - 1 && n.id === p.parentId) ?? null : null
-    // A suggested link moves the existing item; it never makes a copy.
-    const existing = p.itemId ? allNodes.find((n) => n.level === level && n.id === p.itemId) : undefined
-    if (p.itemId && (!existing || !parent)) { activity.setProposalState(p.key, 'failed'); return }
-    if (existing && parent && existing.parent === parent.key) { activity.removeProposal(p.key); return }
     activity.setProposalState(p.key, 'saving')
-    const ok = existing ? await moveUnder(existing, parent) : await runCreate(level, p.title, parent, `Keep “${p.title}”`)
+    const ok = await runCreate(level, p.title, null, `Keep “${p.title}”`)
     if (ok) activity.removeProposal(p.key)
     else activity.setProposalState(p.key, 'failed')
   }
@@ -432,11 +415,9 @@ function Inner() {
     const d = parseLocalYmd(ymd)
     return d >= bounds.start && d < bounds.end
   }
-  // A suggested link names the item by its own title, never the model's wording.
-  const proposals = activity.proposals.filter((p) => p.level === level && inPeriod(p.periodStart)).map((p) => {
-    const existing = p.itemId ? allNodes.find((n) => n.level === level && n.id === p.itemId) : undefined
-    return existing ? { ...p, title: existing.title } : p
-  })
+  // A suggestion that only links an existing item under one above is a tie,
+  // so these pages don't show it (paper-style horizons, 2026-11-04).
+  const proposals = activity.proposals.filter((p) => p.level === level && !p.itemId && inPeriod(p.periodStart))
   const keepAll = async () => { for (const p of proposals.filter((x) => x.state !== 'saving')) await keepProposal(p) }
 
   // On schedule (planSchedule.ts): while this horizon's talk is due — its
@@ -612,13 +593,28 @@ function Inner() {
   }
 
   // ---- Writing a goal: the next ruled line, a plain item of this period ------
-  // (paper-style horizons, 2026-11-04): no parent, no "For".
+  // (paper-style horizons, 2026-11-04): no parent, no "For", in the space
+  // chosen at the end of the line. A date in the words puts it on that day
+  // (where the week and the day hold it), as the old add box did; writing
+  // straight to a day moves nothing between lists.
   const writeLabel = `Write ${aOrAn(periodWord)} ${periodWord} goal`
   const addHere = async (text: string) => {
     const id = crypto.randomUUID()
     const ok = await runCreate(level, text, null, `Add “${text}”`, id)
     if (ok) reveal.current = `${level}:${id}`
     return ok
+  }
+  const writeLine = async (parse: HorizonParse, landing: HorizonLanding): Promise<boolean> => {
+    if (landing.kind === 'period') return addHere(parse.title)
+    const id = crypto.randomUUID()
+    const d = landing.date
+    const at = parse.hasTime && parse.date ? parse.date : new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    const people = parse.people
+    return act(`Add “${parse.title}” to ${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
+      async () => !!(await addTask(parse.title, parse.quick.contactId, parse.quick.projectId, at, {
+        id, isAllDay: !parse.hasTime, assignedTo: people[0] ?? meId ?? undefined, assignedToAll: people.length > 1 ? people : undefined,
+        location: parse.location, context: parse.quick.context ?? contextFor(null),
+      })), { ids: [id], undo: async () => { await deleteTask(id) } })
   }
 
   // One onward step: the next horizon down, for the period on screen.
@@ -1112,7 +1108,8 @@ function Inner() {
             onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />)}
         </>} />
       {openNodes.length === 0 && preview.here.length === 0 && proposals.length === 0 && <p className="plan-empty">Nothing{folded.length ? ' open' : ''} for {periodWord} yet.</p>}
-      <WriteLine placeholder={writeLabel} onWrite={addHere} />
+      <WriteLine placeholder={writeLabel} period={{ start: bounds.start, end: new Date(bounds.end.getTime() - 1) }} periodWord={periodWord}
+        onWrite={writeLine} extra={area.picker} />
       {folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => prefs.set('done', !showDone)}>
         <span className="plan-done-fold-text">{doneLine}</span>
         <span className="canvas-link plan-done-fold-go">{showDone ? 'Hide' : 'Show'}</span>

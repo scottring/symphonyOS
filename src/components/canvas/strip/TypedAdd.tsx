@@ -7,13 +7,11 @@
 // period goes to that date, and the line says so. Enter adds, Escape cancels;
 // a failed save keeps the words.
 
-import { useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { parseHorizonInput, landingFor, type HorizonLanding, type HorizonParse } from '@/lib/planning/horizonInput'
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
+import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
+import { useHorizonRead } from './useHorizonRead'
+import { HorizonReadout } from './HorizonReadout'
 import './horizonStrip.css'
-
-const day = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-const time = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(':00', '').replace(' ', '').toLowerCase()
 
 export function TypedAdd({ label, fieldLabel, period, periodWord, fallbackDay, onSave, onCancel, placeholder, extra }: {
   /** The field's own name when it differs from the heading ("New October goal"). */
@@ -32,21 +30,10 @@ export function TypedAdd({ label, fieldLabel, period, periodWord, fallbackDay, o
   onCancel: () => void
   placeholder?: string
 }) {
-  const { members: familyMembers } = useFamilyMembers()
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
-  const read = useMemo(() => {
-    if (!draft.trim()) return null
-    const parse = parseHorizonInput(draft, familyMembers)
-    return { parse, landing: landingFor(parse, period, fallbackDay) }
-  }, [draft, familyMembers, period, fallbackDay])
-
-  const names = (ids: string[]) => ids.map((id) => familyMembers.find((m) => m.id === id)?.name.split(/\s+/)[0]).filter(Boolean).join(', ')
-  const where = (l: HorizonLanding) => l.kind === 'period'
-    ? `Goes on ${periodWord}${periodWord === 'this week' ? ', no day yet' : ''}`
-    : l.inPeriod ? `Goes on ${day(l.date)}`
-      : `Goes on ${day(l.date)}. That’s outside ${periodWord}, so it waits on that day.`
+  const read = useHorizonRead(draft, period, fallbackDay)
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -67,17 +54,7 @@ export function TypedAdd({ label, fieldLabel, period, periodWord, fallbackDay, o
         <input aria-label={fieldLabel} value={draft} autoFocus disabled={busy} onChange={(e) => setDraft(e.target.value)}
           placeholder={placeholder ?? 'Say it how you’d say it, e.g. Dentist for K and E Nov 23 at 9am at Cross Keys'} />
       </label>
-      {read && (
-        <div className="ta-read" aria-live="polite">
-          <dl className="ta-facts">
-            <div><dt>What</dt><dd>{read.parse.title}</dd></div>
-            {read.parse.people.length > 0 && <div><dt>Who</dt><dd>{names(read.parse.people)}</dd></div>}
-            {read.parse.date && <div><dt>When</dt><dd>{day(read.parse.date)}{read.parse.hasTime ? ` · ${time(read.parse.date)}` : ''}</dd></div>}
-            {read.parse.location && <div><dt>Where</dt><dd>{read.parse.location}</dd></div>}
-          </dl>
-          <p className={`ta-where${read.landing.kind === 'day' && !read.landing.inPeriod ? ' is-away' : ''}`}>{where(read.landing)}</p>
-        </div>
-      )}
+      {read && <HorizonReadout read={read} periodWord={periodWord} />}
       <div className="ta-actions">
         {extra}
         <button type="submit" className="ta-add" disabled={busy || !draft.trim()}>{busy ? 'Adding…' : 'Add'}</button>

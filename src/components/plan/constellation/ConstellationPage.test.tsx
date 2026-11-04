@@ -22,8 +22,8 @@ vi.mock('@/shell/providers/SelectionProvider',()=>({useSelectionOptional:()=>sel
 vi.mock('@/hooks/useSupabaseTasks',async()=>{const {useReducer}=await import('react');return{useSupabaseTasks:()=>{const [,redraw]=useReducer((n:number)=>n+1,0);api.redraw=redraw;return{tasks:api.tasks,loading:false,error:null,...api}}}})
 // The area and people filters: pass-through, unless a test turns them on
 // (privacy), when the real rules run with the layers and people it names.
-const filters=vi.hoisted(()=>({on:false,layers:new Set<string>(),people:[] as string[]}))
-vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:filters.on?filters.layers:[],soleDomain:'personal'})}))
+const filters=vi.hoisted(()=>({on:false,layers:new Set<string>(),people:[] as string[],sole:'personal' as string|null}))
+vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:filters.on?filters.layers:[],soleDomain:filters.sole})}))
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[filters.on?filters.people:[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null,members:[{auth_user_id:'u2',name:'Iris'}]})}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'u1'}})}))
@@ -44,7 +44,10 @@ vi.mock('@/lib/today/domainFilter',async(importOriginal)=>{const real=await impo
  filterTasksForLayers:(t:any,l:any)=>filters.on?real.filterTasksForLayers(t,l):t,matchesLayers:(c:any,l:any)=>filters.on?real.matchesLayers(c,l):true}})
 vi.mock('@/lib/planning/peopleLens',async(importOriginal)=>{const real=await importOriginal<any>();return{
  planPeopleLens:(s:any,me:any)=>filters.on?real.planPeopleLens(s,me):{keep:()=>true,scopeId:null}}})
-vi.mock('../v2/AddArea',()=>({useAddArea:()=>({area:'personal',picker:null})}))
+// The space a new line is written in: 'personal' with no picker, unless a
+// test asks for the real one (the write line's space).
+const addArea=vi.hoisted(()=>({real:false}))
+vi.mock('../v2/AddArea',async(importOriginal)=>{const real=await importOriginal<typeof import('../v2/AddArea')>();return{useAddArea:()=>addArea.real?real.useAddArea():{area:'personal',picker:null}}})
 vi.mock('@/lib/planning/periodPage',async(importOriginal)=>({...await importOriginal<any>(),selectPeriodTasks:(tasks:any[],level:string,start:Date)=>tasks.filter(t=>t.bucket===(level==='season'?'quarter':'month')&&(!t.monthStart||+t.monthStart===+start))}))
 vi.mock('@/lib/placement/model',async(importOriginal)=>({...await importOriginal<any>(),committedTo:(t:any)=>t.bucket==='week'?{}:undefined}))
 const toast=vi.hoisted(()=>({showToast:vi.fn()}))
@@ -104,7 +107,7 @@ const choose=(name:string)=>{menu();fireEvent.click(screen.getByRole(/^Show done
 const at=(d:Date)=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(d)}
 const REVIEWED={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
 beforeEach(()=>{
- vi.clearAllMocks();notesStore.notes={};notesStore.patches=[];shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
+ vi.clearAllMocks();filters.sole='personal';addArea.real=false;notesStore.notes={};notesStore.patches=[];shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
  HTMLElement.prototype.scrollIntoView=vi.fn()
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
@@ -241,6 +244,37 @@ describe('a sheet: the period in its own words, the level above folded beside it
   expect(api.addGoal).toHaveBeenLastCalledWith(null,'A meaningful year','personal',expect.objectContaining({year:2026,id:expect.any(String)}))
   expect(lastRun().opts.ids).toEqual([api.addGoal.mock.calls[1][3].id])
  })
+ it('the line reads a date in the words and lands it on that day, saying so before Return',async()=>{
+  at(new Date(2026,9,20,9)); onTestFinished(()=>{vi.useRealTimers()})
+  month()
+  const line=screen.getByRole('textbox',{name:'Write an October goal'})
+  fireEvent.change(line,{target:{value:'Book trains'}})
+  expect(line.closest('form')).toHaveTextContent('Goes on October')
+  fireEvent.change(line,{target:{value:'Dentist Oct 23 at 9am'}})
+  expect(line.closest('form')).toHaveTextContent('Goes on Fri, Oct 23')
+  await act(async()=>{fireEvent.submit(line.closest('form')!)})
+  expect(api.addTask).toHaveBeenCalledTimes(1)
+  const [title,,,at9,o]=api.addTask.mock.calls[0]
+  expect(title).toBe('Dentist')
+  expect(at9).toEqual(new Date(2026,9,23,9))
+  expect(o).toMatchObject({isAllDay:false,context:'personal'})
+  // A dated task, not an October item, and tied to nothing.
+  expect(o.bucket).toBeUndefined()
+  expect(o.monthStart).toBeUndefined()
+  expect(o.sourceId).toBeUndefined()
+  expect(o.goalId).toBeUndefined()
+  expect(lastRun().label).toBe('Add “Dentist” to Fri, Oct 23')
+  await waitFor(()=>expect(line).toHaveValue(''))
+ })
+ it('the line writes in the space chosen at its end, remembered on this device',async()=>{
+  filters.sole=null;addArea.real=true
+  localStorage.setItem('symphony-plan-v2.add-area','work')
+  month()
+  const form=screen.getByRole('textbox',{name:'Write an October goal'}).closest('form')!
+  expect(within(form).getByRole('button',{name:'Set context'})).toHaveAttribute('title','Space: Work')
+  await writeOn('Write an October goal','Quarterly numbers')
+  expect(api.addTask).toHaveBeenCalledWith('Quarterly numbers',undefined,undefined,undefined,expect.objectContaining({bucket:'month',context:'work'}))
+ })
  it('rows say nothing about what is above or below them, on Month, Season and Year',()=>{
   at(new Date(2026,9,20,9)); onTestFinished(()=>{vi.useRealTimers()})
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s',
@@ -318,7 +352,7 @@ describe('the strip: routines only',()=>{
 })
 
 describe('proposals',()=>{
- it('shows suggestions in the list, keeps through the create path, and leaves out without writing',async()=>{
+ it('shows suggestions in the list, keeps them as plain items of the period, and leaves out without writing',async()=>{
   activity.proposals=[{key:'p1',title:'Visit Mom',level:1,parentId:'g',state:'proposed',reason:'You mentioned it'},{key:'p2',title:'Garden',level:1,state:'proposed'},{key:'p3',title:'Not now',level:2,state:'proposed'}]
   season()
   const visit=within(list('Fall goals')).getByText('Visit Mom').closest('li')!
@@ -331,21 +365,24 @@ describe('proposals',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Keep Visit Mom'}))
   await waitFor(()=>expect(activity.removeProposal).toHaveBeenCalledWith('p1'))
   expect(activity.setProposalState).toHaveBeenCalledWith('p1','saving')
-  expect(api.addTask).toHaveBeenCalledWith('Visit Mom',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter'}))
+  expect(api.addTask).toHaveBeenCalledWith('Visit Mom',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',seasonStart:new Date(2026,8,1)}))
+  // Kept with no tie to the year goal the guide named.
+  expect(api.addTask.mock.calls[0][4].goalId).toBeUndefined()
+  expect(api.addTask.mock.calls[0][4].sourceId).toBeUndefined()
   fireEvent.click(screen.getByRole('button',{name:'Leave out Garden'}))
   expect(activity.removeProposal).toHaveBeenCalledWith('p2')
   expect(api.addTask).toHaveBeenCalledTimes(1)
  })
- it('a kept suggested link moves the existing item, never a copy',async()=>{
+ it('a suggestion that only links an existing item under one above is not shown',()=>{
   api.tasks=[{id:'s1',title:'Yard',bucket:'quarter'},{id:'m',title:'Trim plants',bucket:'month'}]
   activity.proposals=[{key:'k',title:'Trim the plants (model wording)',level:2,parentId:'s1',itemId:'m',state:'proposed'}]
   month()
-  const suggestion=within(list('October goals')).getByText('Belongs here?').closest('li')!
-  expect(suggestion).not.toHaveTextContent('For Yard')
-  fireEvent.click(within(suggestion).getByRole('button',{name:'Link Trim plants'}))
-  await waitFor(()=>expect(activity.removeProposal).toHaveBeenCalledWith('k'))
-  expect(api.updateTask).toHaveBeenCalledWith('m',{sourceId:'s1'})
-  expect(api.addTask).not.toHaveBeenCalled()
+  expect(titles('October goals')).toEqual(['Trim plants'])
+  expect(screen.queryByText('Belongs here?')).toBeNull()
+  expect(screen.queryByText('Trim the plants (model wording)')).toBeNull()
+  expect(screen.queryByRole('button',{name:/^Link /})).toBeNull()
+  expect(screen.queryByRole('button',{name:'Keep all'})).toBeNull()
+  expect(api.updateTask).not.toHaveBeenCalled()
  })
  it('marks a failed keep and offers Retry',async()=>{
   api.addTask.mockResolvedValue(undefined)
