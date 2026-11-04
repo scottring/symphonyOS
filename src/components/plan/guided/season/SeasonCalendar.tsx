@@ -23,6 +23,9 @@ import { localYmd } from '@/lib/cadence/config'
 const DAY = 86_400_000
 const short = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const NO_TASKS: never[] = []
+/** Read a week and a day past the period (and back from today), so a weekly
+ *  series with one instance left in the period still reads as weekly. */
+const PAD_DAYS = 8
 
 export function SeasonCalendar({ date, seasons }: {
   /** Any day of the season being planned. */
@@ -52,7 +55,7 @@ export function MonthsCalendar({ start, end, label, over, allMonths = false, per
   scope?: ClaimScope
 }) {
   const connected = getCalendarConnected()
-  const cal = useSeasonEvents(start, end, connected !== false)
+  const cal = useSeasonEvents(start, end, connected !== false, PAD_DAYS)
 
   if (connected === false) return <div className="gw-body"><p className="choose-empty">No calendar connected.</p></div>
   if (cal.failed) return <div className="gw-body"><p className="choose-status is-failed" role="alert">The calendar couldn’t be read. Try again later.</p></div>

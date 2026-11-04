@@ -46,6 +46,24 @@ describe('useSeasonEvents — one read of the calendar for the season still to c
     expect(invoke.mock.calls[0][1].body.startDate).toBe(FALL.toISOString())
   })
 
+  it('padDays reads past the end, and back from today once the period has begun', async () => {
+    at(new Date(2026, 10, 20, 9))
+    ok([])
+    const { result } = renderHook(() => useSeasonEvents(FALL, WINTER, true, 8))
+    await waitFor(() => expect(result.current.available).toBe(true))
+    expect(invoke.mock.calls[0][1].body).toMatchObject({
+      startDate: new Date(2026, 10, 12).toISOString(), endDate: new Date(2026, 11, 9).toISOString(),
+    })
+  })
+
+  it('padDays does not read back before a period that has not begun', async () => {
+    at(new Date(2026, 7, 20, 9))
+    ok([])
+    const { result } = renderHook(() => useSeasonEvents(FALL, WINTER, true, 8))
+    await waitFor(() => expect(result.current.available).toBe(true))
+    expect(invoke.mock.calls[0][1].body.startDate).toBe(FALL.toISOString())
+  })
+
   // Final review (2026-11-04): a period already over asked for start > end.
   it('a period already over reads nothing and is an empty, finished read', () => {
     at(new Date(2026, 11, 5, 9))

@@ -49,15 +49,25 @@ function load(key: string, start: number, end: number): Promise<Read | null> {
   return p
 }
 
-export function useSeasonEvents(seasonStart: Date, seasonEnd: Date, enabled: boolean): SeasonEvents {
+const DAY = 86_400_000
+
+/**
+ * `padDays` reads that many days past the period's end, and back from today
+ * when the period has begun, so a reader can tell what comes round every
+ * week (weeklySeries needs two instances) in a period's last week, when only
+ * one is left inside it. The reader clips to the period itself (claimsIn).
+ */
+export function useSeasonEvents(seasonStart: Date, seasonEnd: Date, enabled: boolean, padDays = 0): SeasonEvents {
   const [account, setAccount] = useState(getCurrentAccount)
   useEffect(() => onAccountChanged(setAccount), [])
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const start = Math.max(today, seasonStart.getTime()), end = seasonEnd.getTime()
+  const begun = today > seasonStart.getTime()
   // A period already over has nothing left to read (from today it would ask
   // for start > end): no request, and an empty read of nothing.
-  const over = start >= end
+  const over = Math.max(today, seasonStart.getTime()) >= seasonEnd.getTime()
+  const start = begun ? today - padDays * DAY : seasonStart.getTime()
+  const end = seasonEnd.getTime() + padDays * DAY
   const key = enabled && account && !over ? `${account}|${start}|${end}` : null
   const [done, setDone] = useState<{ key: string; read: Read | null } | null>(null)
 
@@ -68,7 +78,7 @@ export function useSeasonEvents(seasonStart: Date, seasonEnd: Date, enabled: boo
     return () => { live = false }
   }, [key, start, end])
 
-  if (over && enabled && account) return { events: [], available: true, loading: false, failed: false, range: { start: end, end } }
+  if (over && enabled && account) return { events: [], available: true, loading: false, failed: false, range: { start: seasonEnd.getTime(), end: seasonEnd.getTime() } }
   const read = key ? held.get(key) ?? (done?.key === key ? done.read : null) : null
   const failed = !!key && !read && done?.key === key && done.read === null
   return { events: read?.events ?? [], available: !!read, loading: !!key && !read && !failed, failed, range: read?.range ?? null }

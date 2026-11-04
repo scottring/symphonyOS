@@ -120,6 +120,22 @@ describe('claimsIn — what claims a planning period', () => {
     expect(out.map((c) => c.title)).toEqual(['Beach week'])
   })
 
+  it('a weekly series with one instance left in the period, but more in the padded read, is weekly and left out', () => {
+    // The season's last week: Boxing on Tue Nov 24 is the only one before
+    // its end (Nov 26); the read runs 8 days past it, to Thu Nov 26 and on.
+    const end = new Date(2026, 10, 26)
+    const { claims, rhythm } = claimsIn([
+      ev('Boxing', '2026-11-17T18:00:00', { recurring_event_id: 'boxing' }),
+      ev('Boxing', '2026-11-24T18:00:00', { recurring_event_id: 'boxing' }),
+      ev('Boxing', '2026-11-26T18:00:00', { recurring_event_id: 'boxing' }),
+      ev('Boxing', '2026-12-01T18:00:00', { recurring_event_id: 'boxing' }),
+    ], [], new Date(2026, 10, 23), end)
+    expect(claims).toEqual([])
+    expect(rhythm).toEqual([{ title: 'Boxing', days: 'Tue' }])
+    expect(claimsIn([ev('Boxing', '2026-11-24T18:00:00', { recurring_event_id: 'boxing' })], [], new Date(2026, 10, 23), end, { scope: 'year' }).claims)
+      .toHaveLength(1) // without the padded read it could only look like a series
+  })
+
   it('a timed event of 20 hours or more is a stretch', () => {
     const [c] = claimsIn([ev('Ron (timed)', '2026-11-20T17:00:00', { end_time: '2026-11-22T15:00:00' })], [], FROM, TO).claims
     expect(c.last && localYmd(c.last)).toBe('2026-11-22')
@@ -131,6 +147,12 @@ describe('rhythmLine', () => {
     const r = ['A', 'B', 'C', 'D', 'E', 'F'].map((title) => ({ title, days: 'Mon' }))
     expect(rhythmLine(r)).toBe('Every week: A Mon · B Mon · C Mon · D Mon and 2 more')
     expect(rhythmLine([])).toBeNull()
+  })
+
+  it('names exactly four with no “more”; a fifth is counted', () => {
+    const r = ['A', 'B', 'C', 'D', 'E'].map((title) => ({ title, days: 'Tue' }))
+    expect(rhythmLine(r.slice(0, 4))).toBe('Every week: A Tue · B Tue · C Tue · D Tue')
+    expect(rhythmLine(r)).toBe('Every week: A Tue · B Tue · C Tue · D Tue and 1 more')
   })
 
   it('reads every school day as “weekdays” and every day as “daily”', () => {
