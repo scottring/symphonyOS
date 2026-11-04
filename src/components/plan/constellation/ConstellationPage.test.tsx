@@ -1150,7 +1150,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(titles('November goals')).toEqual(['Book flights'])
   expect(aboveOpen()).toBe(true)
   const october=within(screen.getByRole('region',{name:'October 2026, looking back'}))
-  expect(october.getByRole('heading',{level:2,name:'October'})).toBeInTheDocument()
+  expect(october.getByRole('article',{name:'Looking back at October'})).toBeInTheDocument()
   expect(within(october.getByRole('list',{name:'Open from October'})).getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['Hike Bear Mountain'])
   // The only sheet beside you that takes a choice: exactly these four.
   expect(within(october.getByRole('listitem',{name:'Hike Bear Mountain'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Done','To November','Someday','Let go'])
