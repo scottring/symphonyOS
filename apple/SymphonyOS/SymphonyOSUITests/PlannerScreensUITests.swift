@@ -17,6 +17,90 @@ final class PlannerScreensUITests: XCTestCase {
         try walk(prefix: "axxl", contentSize: "UICTContentSizeCategoryAccessibilityXL")
     }
 
+    /// Paper-style horizons (2026-11-04): on Month, Season, Year and Week the
+    /// sheet above lies folded at the edge; tapping it lays it beside the page,
+    /// for reading. No "Plan" menu brings anything down from it, and the
+    /// calendar folds out the same way on Month, Season and Year.
+    @MainActor func testTheSheetAboveFoldsOutAndNothingBringsItDown() throws {
+        prefix = "fold"
+        app = XCUIApplication()
+        // Start folded whatever an earlier run left.
+        app.launchArguments = ["-SymphonyDemo"]
+        for h in ["month", "season", "year", "week"] {
+            app.launchArguments += ["-planner.unfolded.\(h)", "NO", "-planner.unfolded.\(h).calendar", "NO"]
+        }
+        app.launch()
+        XCTAssertTrue(app.buttons["Today. Switch horizon"].waitForExistence(timeout: 15))
+
+        let month = monthName()
+        horizon(month)
+        // Nothing on the page brings an item down into a nearer period.
+        XCTAssertFalse(app.buttons["Plan"].exists)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label ENDSWITH 'into a nearer period'")).count, 0)
+        // The write line is the next ruled line on the sheet.
+        XCTAssertTrue(app.textFields["Write a \(month) goal"].waitForExistence(timeout: 4))
+
+        let monthFoot = app.staticTexts["For reading. Write \(month) in its own words."]
+        XCTAssertFalse(monthFoot.exists, "folded, the sheet above is out of reach")
+        shot("01-month-folded")
+        unfold("fold-edge-above", until: monthFoot)
+        XCTAssertTrue(app.staticTexts["\(seasonName()) \(seasonYear())"].exists, "the season is the sheet above")
+        shot("02-month-season-open")
+        unfold("fold-grip-above", until: nil)
+        XCTAssertFalse(monthFoot.waitForExistence(timeout: 1.5))
+
+        // One companion at a time: opening the calendar folds the sheet above.
+        unfold("fold-edge-above", until: monthFoot)
+        let calFoot = app.staticTexts["For reading. Add events the usual way."]
+        unfold("fold-edge-calendar", until: calFoot)
+        XCTAssertFalse(monthFoot.exists, "opening the calendar folds the sheet above")
+        shot("03-month-calendar-open")
+        unfold("fold-grip-calendar", until: nil)
+
+        // A frame mid-swing, for review (not asserted: timing varies).
+        let edge = app.descendants(matching: .any)["fold-edge-above"].firstMatch
+        if edge.waitForExistence(timeout: 2) {
+            edge.tap()
+            let png = XCUIScreen.main.screenshot().pngRepresentation
+            if let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] {
+                try? png.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(prefix)-02b-mid-swing.png"))
+            }
+            usleep(700_000)
+            unfold("fold-grip-above", until: nil)
+        }
+
+        horizon(seasonName())
+        XCTAssertFalse(app.buttons["Plan"].exists)
+        unfold("fold-edge-above", until: app.staticTexts["For reading. Write \(seasonName()) in its own words."])
+        shot("04-season-year-open")
+
+        horizon(yearName())
+        let lastYear = String(Int(yearName())! - 1)
+        unfold("fold-edge-above", until: app.staticTexts["For reading. Write \(yearName()) in its own words."])
+        XCTAssertTrue(app.staticTexts["Read twenty books together"].exists, "last year's open goals")
+        shot("05-year-last-year-open")
+        XCTAssertTrue(app.staticTexts[lastYear].exists)
+
+        horizon("This week")
+        unfold("fold-edge-above", until: app.staticTexts["For reading. Write this week in its own words."])
+        shot("06-week-month-open")
+    }
+
+    /// Tap a fold's edge (or grip) and wait for what it shows.
+    private func unfold(_ id: String, until shown: XCUIElement?) {
+        let edge = app.descendants(matching: .any)[id].firstMatch
+        tap(edge)
+        usleep(700_000)   // the spring settles
+        if let shown { XCTAssertTrue(shown.waitForExistence(timeout: 4), "\(id) shows \(shown.description)") }
+    }
+
+    /// The year the current season started in (a January winter began last year).
+    private func seasonYear() -> String {
+        let now = Date()
+        let y = Calendar.current.component(.year, from: now)
+        return String(Calendar.current.component(.month, from: now) <= 2 ? y - 1 : y)
+    }
+
     // MARK: -
 
     private var app: XCUIApplication!
@@ -72,14 +156,6 @@ final class PlannerScreensUITests: XCTestCase {
         shot("12-season")
         horizon(yearName())
         shot("13-year")
-        tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Add a goal'")).firstMatch)
-        let goalField = app.textFields["Goal"]
-        if goalField.waitForExistence(timeout: 4) {
-            goalField.typeText("Read twenty books together")
-            shot("13b-goal-editor")
-            tap(app.buttons["Save"], scroll: false)
-            shot("13c-year-goal-added")
-        }
         horizon("Today")
 
         // Inbox
@@ -113,7 +189,9 @@ final class PlannerScreensUITests: XCTestCase {
         let title = app.buttons.matching(NSPredicate(format: "label ENDSWITH 'Switch horizon'")).firstMatch
         tap(title, scroll: false)
         if let name2 { shot(name2) }
-        tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch, scroll: false)
+        // Inside the switcher: a folded edge ("Fall 2026, the sheet above") starts with the same word.
+        let menu = app.descendants(matching: .any)["Planning horizon"]
+        tap(menu.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch, scroll: false)
     }
 
     /// `scroll: false` for controls pinned to the bottom (dock tabs, the bulk

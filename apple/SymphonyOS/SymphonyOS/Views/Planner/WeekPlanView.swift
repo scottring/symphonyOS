@@ -1,10 +1,10 @@
 import SwiftUI
 import SwiftData
 
-/// A dated week (seven days from the household's week start): its list (any day, the weekend), the
-/// month's goals and tasks as a reference line, then each day. Last week's
-/// open commitments wait behind one review line — Keep, Done, Someday or
-/// Drop, each a deliberate decision.
+/// A dated week (seven days from the household's week start): its list (any
+/// day, the weekend) and its write line, then each day. The month folds out
+/// above it, for reading. Last week's open commitments wait behind one review
+/// line: Next week, Done, Someday or Drop, each a deliberate decision.
 struct WeekPlanView: View {
     var onTitle: () -> Void = {}
 
@@ -72,12 +72,19 @@ struct WeekPlanView: View {
         let week = plan.week(weekStart)
         let previous = PlanCalendar.addDays(weekStart, -7)
         let review = plan.reviewRows(previousWeek: previous)
-        let monthRef = plan.monthReference(for: appState.selectedDate)
+        let monthStart = PlanCalendar.monthStart(appState.selectedDate)
+        let month = plan.sheet(level: "month", start: monthStart)
+        let monthWord = monthStart.formatted(.dateTime.month(.wide))
+        let monthEnd = PlanCalendar.addDays(PlanCalendar.calendar.date(byAdding: .month, value: 1, to: monthStart) ?? monthStart, -1)
 
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
+        // The month folds out above the week, for reading (paper-style
+        // horizons, 2026-11-04). Nothing on it is a week item, and nothing
+        // moves from it onto the week: this week is written in its own words.
+        PaperFoldView(horizon: "week", aboveLabel: monthWord, aboveCount: month.open.count) {
+            VStack(alignment: .leading, spacing: 0) {
                 PlannerHeader(title: Self.title(for: weekStart), subtitle: Self.range(weekStart), onTitle: onTitle) {
                     HStack(spacing: 0) {
+                        PaperSoundToggle()
                         CircleIconButton(systemImage: "chevron.left", label: "Previous week") { appState.step(-1) }
                         CircleIconButton(systemImage: "chevron.right", label: "Next week") { appState.step(1) }
                     }
@@ -88,14 +95,19 @@ struct WeekPlanView: View {
                 DomainSwitcher()
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
-
+            }
+        } above: {
+            SheetAbove(kicker: "Month · \(PeriodPlanView.range(monthStart, monthEnd))", title: monthWord,
+                       rows: month.open.map { ($0.id, $0.title) }, doneCount: month.doneCount,
+                       foot: "For reading. Write this week in its own words.", empty: "No \(monthWord) goals yet.")
+        } sheet: {
+            VStack(alignment: .leading, spacing: 0) {
                 if !review.isEmpty {
                     CalmRow(text: "Review last week · \(Self.shortRange(previous))",
                             detail: "\(review.count) open") { showReview = true }
                 }
 
                 Eyebrow(text: "Any day", count: week.anyDay.count)
-                if week.anyDay.isEmpty { quiet("Nothing waiting for a day.") }
                 ForEach(week.anyDay, id: \.id) { task in row(task) }
 
                 if !week.weekend.isEmpty {
@@ -103,11 +115,13 @@ struct WeekPlanView: View {
                     ForEach(week.weekend, id: \.id) { task in row(task) }
                 }
 
-                if monthRef.goals + monthRef.tasks > 0 {
-                    CalmRow(text: "\(appState.selectedDate.formatted(.dateTime.month(.wide))) goals and tasks",
-                            detail: monthDetail(monthRef)) { appState.horizon = .month }
-                        .accessibilityHint("Opens the month. Reference only — not this week's list.")
+                WriteLine(placeholder: "Write a task for this week") { text in
+                    PlanWriter(context: modelContext, userId: userId)
+                        .createPeriodTask(title: text, level: "week", periodStart: weekStart,
+                                          context: appState.domainFilter.contextValue)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
 
                 Eyebrow(text: "By day")
                 ForEach(PlanCalendar.weekDays(weekStart), id: \.self) { day in
@@ -122,7 +136,6 @@ struct WeekPlanView: View {
                     .padding(.vertical, 4)
                 }
             }
-            .padding(.bottom, 16)
         }
         .background(Color.bgBase.ignoresSafeArea())
         .statusBarScrim()
@@ -174,17 +187,6 @@ struct WeekPlanView: View {
         return "\(ws.formatted(.dateTime.month(.abbreviated).day())) – \(we.formatted(.dateTime.month(.abbreviated).day()))"
     }
 
-    private func monthDetail(_ r: (goals: Int, tasks: Int)) -> String {
-        var parts: [String] = []
-        if r.goals > 0 { parts.append("\(r.goals) \(r.goals == 1 ? "goal" : "goals")") }
-        if r.tasks > 0 { parts.append("\(r.tasks) \(r.tasks == 1 ? "task" : "tasks")") }
-        return parts.joined(separator: " · ")
-    }
-
-    private func quiet(_ text: String) -> some View {
-        Text(text).font(.bodySmall).foregroundStyle(Color.textTertiary)
-            .padding(.horizontal, 20).padding(.vertical, 4)
-    }
 
     private func row(_ task: SymphonyTask) -> some View {
         PlanTaskRow(task: task) {
@@ -371,8 +373,9 @@ private struct DayCard: View {
 // MARK: - Week review
 
 /// Last week's open commitments, one deliberate verdict each:
-/// Keep (carry into this week, same task), Done, Someday, Drop (end only that
-/// week's commitment). History is preserved in the commitments themselves.
+/// Next week (carry into the week after, same task), Done, Someday (end that
+/// week's commitment; to Someday if nothing else holds it), Drop (end only
+/// that week's commitment). History is preserved in the commitments themselves.
 struct WeekReviewSheet: View {
     let previousWeek: Date
     let intoWeek: Date
@@ -398,7 +401,7 @@ struct WeekReviewSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Still open from \(WeekPlanView.shortRange(previousWeek)). Decide each one — Keep carries it into \(WeekPlanView.title(for: intoWeek).lowercased()).")
+                    Text("Still open from \(WeekPlanView.shortRange(previousWeek)). Decide each one: Next week carries it into \(WeekPlanView.title(for: intoWeek).lowercased()).")
                         .font(.bodyMedium)
                         .foregroundStyle(Color.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -458,16 +461,22 @@ struct WeekReviewSheet: View {
     @ViewBuilder
     private func verdicts(_ task: SymphonyTask, _ c: TaskCommitment) -> some View {
         let writer = PlanWriter(context: modelContext, userId: userId)
-        verdict("Keep", strong: true, for: task) {
-            toast = .init(message: "Kept “\(task.title)” for \(WeekPlanView.title(for: intoWeek).lowercased())",
+        // Named for where it goes (2026-11-04): the week after that one.
+        verdict("Next week", strong: true, for: task) {
+            toast = .init(message: "Moved “\(task.title)” to \(WeekPlanView.title(for: intoWeek).lowercased())",
                           snapshot: writer.keep(task, from: c, into: intoWeek))
         }
         verdict("Done", for: task) {
             writer.complete(task)
             toast = .init(message: "Marked “\(task.title)” done", snapshot: nil)
         }
+        // Someday ("not now") ends that week's commitment only; the task
+        // goes to Someday unless another list still holds it.
         verdict("Someday", for: task) {
-            toast = .init(message: "Moved “\(task.title)” to Someday", snapshot: writer.someday(task))
+            let snap = writer.someday(task, from: c)
+            toast = .init(message: task.bucket == "someday" ? "Moved “\(task.title)” to Someday"
+                                                            : "Took “\(task.title)” off that week",
+                          snapshot: snap)
         }
         verdict("Drop", for: task) {
             toast = .init(message: "Dropped “\(task.title)” from that week", snapshot: writer.drop(c))

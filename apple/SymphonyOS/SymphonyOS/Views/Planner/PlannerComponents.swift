@@ -193,6 +193,8 @@ struct PlanTaskRow<Trailing: View>: View {
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             #endif
+            // Checking a line off is a pencil tick (paper-style horizons).
+            if !task.completed { PaperSound.shared.pencil() }
             TaskViewModel(modelContext: modelContext).toggleComplete(task)
         }
     }
