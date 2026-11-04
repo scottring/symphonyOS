@@ -1,11 +1,11 @@
-// The season's own notes, each a step body: energy (step 4), the ideal week
-// (step 6) and the wild cards (step 7). Each saves into this person's notes
-// for the season (usePlanningNotes' patch) on an explicit change, and says so
-// when a save did not land.
+// The season's own notes, each edited in its section of the Season page
+// (planning as tooltips, Task 2): the ideal week (step 6) and the wild cards
+// (step 7). Energy (step 4) is the header's Energy chip (EnergyChip). Each
+// saves into this person's notes for the season (usePlanningNotes' patch) on
+// an explicit change, and says so when a save did not land.
 
-import type { GuideNotes, NotesPatch } from '@/hooks/usePlanningNotes'
+import type { NotesPatch } from '@/hooks/usePlanningNotes'
 import type { IdealWeek } from '@/lib/guide/idealWeek'
-import { EnergyNote } from '@/components/guide/EnergyNote'
 import { IdealWeekEditor } from '@/components/guide/IdealWeekEditor'
 import type { IdealWeekGoal } from '@/components/guide/IdealWeekSection'
 import { WildCards } from './WildCards'
@@ -19,14 +19,6 @@ export function SaveFailed({ on, retry }: { on: boolean; retry: () => void }) {
   return on
     ? <p className="choose-status is-failed" role="alert">Didn’t save. <button type="button" className="canvas-link" onClick={retry}>Try again</button></p>
     : null
-}
-
-export function SeasonEnergy({ value, patch }: { value?: GuideNotes['energy']; patch: Patch }) {
-  const note = useNoteSave(value, (energy) => patch({ energy }))
-  return <div className="gw-body">
-    <EnergyNote value={note.value} onChange={note.set} />
-    <SaveFailed on={note.failed} retry={note.retry} />
-  </div>
 }
 
 /** `goals`: the season's open goals, the ones a block can be for. */

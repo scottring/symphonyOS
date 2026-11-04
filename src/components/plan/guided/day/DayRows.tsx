@@ -73,18 +73,3 @@ export function DayTaskRow({ task, where, choices, undo, decisions, targetWord, 
     {failed === task.id && <p className="choose-status is-failed" role="alert">Didn’t save. Try again.</p>}
   </li>
 }
-
-/** The day as it stands: timed things in order, then what has no time. */
-export function DayPicture({ dayLabel, items }: { dayLabel: string; items: readonly DayPictureItem[] }) {
-  const timed = items.filter((i) => i.time)
-  const untimed = items.filter((i) => !i.time)
-  return <div className="gd-day" role="group" aria-label={`${dayLabel}, as it stands`}>
-    <p className="choose-fact">{dayLabel} · {items.length} on it</p>
-    {items.length === 0 && <p className="choose-empty">Nothing on it yet.</p>}
-    {timed.map((i) => <div key={i.key} className="choose-daypic-slot"><span className="choose-daypic-time">{i.time}</span><span className={`choose-daypic-ev is-${i.kind}`}>{i.title}</span></div>)}
-    {untimed.length > 0 && <div className="choose-daypic-untimed">
-      <p className="choose-steps-h">No set time</p>
-      {untimed.map((i) => <div key={i.key} className="choose-daypic-task">{i.title}</div>)}
-    </div>}
-  </div>
-}

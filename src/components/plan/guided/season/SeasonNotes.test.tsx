@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { SeasonEnergy, SeasonWildCards } from './SeasonNotes'
+import { SeasonWildCards } from './SeasonNotes'
 
 describe('the season’s notes, each saved on an explicit change', () => {
   it('a save that failed says so and can be sent again; once it lands the warning goes', async () => {
@@ -20,11 +20,11 @@ describe('the season’s notes, each saved on an explicit change', () => {
 
   it('a later change that saves clears an earlier failure', async () => {
     const patch = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true)
-    render(<SeasonEnergy patch={patch} />)
-    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: 'Low' })) })
+    render(<SeasonWildCards value={[]} patch={patch} />)
+    await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: 'Money' })) })
     expect(screen.getByRole('alert')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: 'High' })) })
-    expect(patch.mock.calls[1][0]).toEqual({ energy: { level: 'high' } })
+    await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: 'Travel' })) })
+    expect(patch.mock.calls[1][0]).toEqual({ wildCards: ['money', 'travel'] })
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
