@@ -637,3 +637,65 @@ describe('PaperFold: driven by the page', () => {
     expect(localStorage.getItem('symphony-fold:month:calendar')).toBeNull()
   })
 })
+
+// Fix round 1 (Task 5c): drive is declarative. Each companion's target is the
+// page's word if it gave one, else what the reader left. On a spread with room
+// for one, a driven key beats a remembered one, and with both driven the
+// calendar wins. Nothing is remembered on the way.
+describe('PaperFold: drive at 820px, one companion at a time', () => {
+  const view = (drive?: { above?: boolean; calendar?: boolean }) => (
+    <PaperFold horizon="month" edgeLabel="Fall 2026" above={<p>above</p>} drive={drive}
+      calendar={<p>Thanksgiving</p>} calendarLabel="November calendar">
+      <h1>November</h1>
+    </PaperFold>
+  )
+  const state = (c: HTMLElement) => [root(c).dataset.open, root(c).dataset.calendarOpen]
+  beforeEach(() => setViewport(820))
+
+  it('remembered open, the other driven open, then released: the remembered one opens again', () => {
+    localStorage.setItem('symphony-fold:month', 'open')
+    const { container, rerender } = render(view())
+    expect(state(container)).toEqual(['true', 'false'])
+    rerender(view({ calendar: true }))
+    expect(state(container)).toEqual(['false', 'true'])
+    rerender(view({}))
+    expect(state(container)).toEqual(['true', 'false'])
+    expect(localStorage.getItem('symphony-fold:month')).toBe('open')
+    expect(localStorage.getItem('symphony-fold:month:calendar')).toBeNull()
+  })
+
+  it('the calendar remembered open, the sheet above driven, then released: the calendar opens again', () => {
+    localStorage.setItem('symphony-fold:month:calendar', 'open')
+    const { container, rerender } = render(view())
+    expect(state(container)).toEqual(['false', 'true'])
+    rerender(view({ above: true }))
+    expect(state(container)).toEqual(['true', 'false'])
+    rerender(view(undefined))
+    expect(state(container)).toEqual(['false', 'true'])
+    expect(localStorage.getItem('symphony-fold:month')).toBeNull()
+    expect(localStorage.getItem('symphony-fold:month:calendar')).toBe('open')
+  })
+
+  it('both driven: the calendar wins; releasing it, the sheet above still driven holds', () => {
+    const { container, rerender } = render(view())
+    rerender(view({ above: true, calendar: true }))
+    expect(state(container)).toEqual(['false', 'true'])
+    rerender(view({ above: true }))
+    expect(state(container)).toEqual(['true', 'false'])
+    rerender(view({ calendar: true, above: true }))
+    rerender(view({ calendar: true }))
+    expect(state(container)).toEqual(['false', 'true'])
+    rerender(view())
+    expect(state(container)).toEqual(['false', 'false'])
+    expect(localStorage.getItem('symphony-fold:month')).toBeNull()
+    expect(localStorage.getItem('symphony-fold:month:calendar')).toBeNull()
+  })
+
+  it('an indirect fold makes no swish of its own', () => {
+    mockMedia({ reduce: false })
+    localStorage.setItem('symphony-fold:month', 'open')
+    const { rerender } = render(view())
+    rerender(view({ calendar: true }))
+    expect(paperSound.swish).toHaveBeenCalledTimes(1)
+  })
+})

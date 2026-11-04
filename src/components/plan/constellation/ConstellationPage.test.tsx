@@ -212,18 +212,39 @@ describe('this period’s calendar, folded on the right',()=>{
   expect(calSheet()).toHaveTextContent(CAL_FOOT)
   expect(calSheet().querySelectorAll('button,a,input,textarea')).toHaveLength(0)
  })
- it('Year: “2026 calendar”, the 12 months of exact-date events',()=>{
+ it('Year: “2026 calendar”: the months gone by in one row, then each month’s dates, four at most',()=>{
   at(new Date(2026,10,4,9)); onTestFinished(()=>{vi.useRealTimers()})
-  cal.events=[{id:'e1',title:'Ella and Kaleb turn 9',start_time:'2026-11-28',end_time:'2026-11-29',all_day:true}]
+  const nov=(d:number,title:string)=>({id:`n${d}`,title,start_time:`2026-11-${String(d).padStart(2,'0')}`,end_time:`2026-11-${String(d+1).padStart(2,'0')}`,all_day:true})
+  cal.events=[nov(6,'No school'),nov(11,'Veterans Day'),nov(14,'Recital'),nov(20,'Fair'),nov(26,'Thanksgiving'),nov(28,'Ella and Kaleb turn 9'),
+   {id:'d1',title:'Winter break',start_time:'2026-12-21',end_time:'2026-12-22',all_day:true}]
   open()
   expect(screen.getByRole('button',{name:'2026 calendar. Unfold to read'})).toBeInTheDocument()
+  // Folded, so out of the accessibility tree: read from the DOM.
   const months=calSheet().querySelector('ul[aria-label="2026, month by month"]')!
-  expect(Array.from(months.children).map((li)=>li.getAttribute('aria-label')))
-   .toEqual(['January','February','March','April','May','June','July','August','September','October','November','December'])
-  expect(calSheet()).toHaveTextContent('Ella and Kaleb turn 9')
-  expect(months.querySelector('li[aria-label="November"]')).toHaveAttribute('data-now')
-  expect(months.querySelector('li[aria-label="October"]')).toHaveTextContent('Past')
+  expect(Array.from(months.children).map((li)=>li.getAttribute('aria-label'))).toEqual(['Jan – Oct · Past','November','December'])
+  expect(months.children[0]).toHaveTextContent(/^Jan – Oct\s*Past$/)
+  const novRow=months.querySelector('li[aria-label="November"]')!
+  expect(novRow).toHaveAttribute('data-now')
+  expect(Array.from(novRow.querySelectorAll('.gw-days > li:not(.gw-more)')).map((li)=>li.lastElementChild?.lastElementChild?.textContent))
+   .toEqual(['No school','Veterans Day','Recital','Fair'])
+  expect(novRow).toHaveTextContent('and 2 more')
+  expect(novRow).not.toHaveTextContent('Thanksgiving')
+  expect(months.querySelector('li[aria-label="December"]')).toHaveTextContent('Winter break')
+  // No landscape written: no landscape on the sheet.
+  expect(calSheet().querySelector('section[aria-label="Landscape"]')).toBeNull()
   expect(calSheet()).toHaveTextContent(CAL_FOOT)
+  expect(calSheet().querySelectorAll('button,a,input,textarea')).toHaveLength(0)
+ })
+ it('Year: the landscape, read-only, above the calendar when the year has one',()=>{
+  at(new Date(2026,10,4,9)); onTestFinished(()=>{vi.useRealTimers()})
+  notesStore.notes={landscape:[{month:11,text:'Thanksgiving at the lake'},{month:12,text:'Winter vacation'}]}
+  open()
+  const land=calSheet().querySelector('section[aria-label="Landscape"]')!
+  expect(land).not.toBeNull()
+  expect(land).toHaveTextContent('Thanksgiving at the lake')
+  expect(land.querySelector('a')).toBeNull()
+  // The landscape first, the dates under it.
+  expect(land.compareDocumentPosition(calSheet().querySelector('ul[aria-label="2026, month by month"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(calSheet().querySelectorAll('button,a,input,textarea')).toHaveLength(0)
  })
  it('C unfolds it',()=>{

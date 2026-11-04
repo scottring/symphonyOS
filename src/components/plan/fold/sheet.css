@@ -117,3 +117,5 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .cal-sheet-grid td.is-today { color: var(--paper-fold-accent, var(--color-primary-600)); font-weight: 700; }
 .cal-sheet-dots { position: absolute; left: 3px; bottom: 5px; display: flex; gap: 3px; }
 .cal-sheet-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--paper-fold-accent, var(--color-primary-600)); opacity: .75; }
+.cal-sheet .gw-days li.gw-more span { font: 400 12px/1.4 var(--font-family-sans); }
+.cal-sheet .guide-yv { margin: 4px 0 14px; }

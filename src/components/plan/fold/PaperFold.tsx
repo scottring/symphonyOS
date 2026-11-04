@@ -125,6 +125,14 @@ export function PaperFold(props: PaperFoldProps) {
 
 type Drive = { above?: boolean; calendar?: boolean }
 
+/** On a spread with room for one companion, which stays open when both would:
+ *  the one the page drives open (with both driven, the calendar: the step
+ *  that asks for it is the later, narrower ask); with neither driven, the
+ *  sheet above, as in the prototype. */
+function keepsOpen(drive: Drive): FoldSide {
+  return drive.calendar === true ? 'calendar' : 'above'
+}
+
 function Chevron({ d }: { d: string }) {
   return (
     <svg
@@ -307,11 +315,10 @@ function PaperFoldSheet({
     patchC({ edge: sizes.edge })
     const folded = { p: 0, v: 0, target: 0, landed: true } as const
 
-    // Two open on a spread with room for one: the sheet above keeps its
-    // place (the prototype's rule), unless the page is driving the calendar.
+    // Two open on a spread with room for one: one keeps its place (keepsOpen).
     const settleOne = () => {
       if (sizes.both || a.target !== 1 || c.target !== 1) return
-      const [stop, patch] = driveRef.current.calendar === true ? [stopA, patchA] : [stopC, patchC]
+      const [stop, patch] = keepsOpen(driveRef.current) === 'calendar' ? [stopA, patchA] : [stopC, patchC]
       stop()
       patch(folded)
     }
@@ -453,26 +460,33 @@ function PaperFoldSheet({
   }, [pinSheet])
 
   // ---------- driven by the page ----------
-  // A key the page sets moves that companion there, with the sound, and is not
-  // remembered. When the page lets go, it returns to what the reader left.
+  // Declarative (fix round 1): whenever the page's word changes, each
+  // companion goes to the page's word if it gave one, else to what the reader
+  // left. On a spread with room for one, only one opens (keepsOpen): a driven
+  // key beats a remembered one, and with both driven the calendar wins. The
+  // other folds quietly first, so the only sound is the one that opens. Nothing
+  // is remembered on the way; `go` does nothing for a companion already there.
   const driveAbove = drive?.above
   const driveCal = drive?.calendar
   const prevDrive = useRef<Drive>({})
   useEffect(() => {
-    driveRef.current = { above: driveAbove, calendar: driveCal }
     const prev = prevDrive.current
+    driveRef.current = { above: driveAbove, calendar: driveCal }
     prevDrive.current = { above: driveAbove, calendar: driveCal }
-    const want = (now: boolean | undefined, before: boolean | undefined, key: string): 0 | 1 | null => {
-      if (now !== undefined) return now === before ? null : now ? 1 : 0
-      return before === undefined ? null : readStored(key) ? 1 : 0
+    // The reader's own fold: never driven, nothing to hand back.
+    if (driveAbove === undefined && driveCal === undefined && prev.above === undefined && prev.calendar === undefined) return
+    let wantA = driveAbove ?? readStored(aboveKey)
+    let wantC = hasCal && (driveCal ?? readStored(calKey))
+    if (!bothRef.current && wantA && wantC) {
+      if (keepsOpen(driveRef.current) === 'calendar') wantA = false
+      else wantC = false
     }
-    const wantA = want(driveAbove, prev.above, aboveKey)
-    let wantC = hasCal ? want(driveCal, prev.calendar, calKey) : null
-    // Back to both remembered open on a spread with room for one: the sheet above.
-    if (!bothRef.current && wantA === 1 && wantC === 1 && driveCal === undefined) wantC = 0
-    const quietly: GoOptions = { remember: false }
-    if (wantA !== null) goA(wantA, quietly)
-    if (wantC !== null) goC(wantC, quietly)
+    const fold: GoOptions = { remember: false, quiet: true }
+    const unfold: GoOptions = { remember: false }
+    if (!wantA) goA(0, fold)
+    if (!wantC) goC(0, fold)
+    if (wantA) goA(1, unfold)
+    if (wantC) goC(1, unfold)
   }, [driveAbove, driveCal, hasCal, aboveKey, calKey, goA, goC])
 
   const open = A.open

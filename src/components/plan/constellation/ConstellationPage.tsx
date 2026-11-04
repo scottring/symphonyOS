@@ -17,7 +17,8 @@
 // year's open goals beside the year. This period's calendar lies folded at
 // its right edge (CalendarSheet, Task 5c): November's weeks, Fall's fixed
 // dates by month, the year's 12 months. Both open, the page is a planner
-// spread: Fall | November | November's calendar. Nothing on these pages says what an item
+// spread: Fall | November | November's calendar. The year's sheet leads with
+// its landscape when one is written. Nothing on these pages says what an item
 // is for or what is under it, and rows carry no verbs: tapping a month or
 // season goal opens its task panel (horizonPanel.tsx), and a year goal opens
 // in place with Done, Let go and Edit wording. Month and Year keep a strip of
@@ -1110,7 +1111,11 @@ function Inner() {
         <SeasonCalendar date={bounds.start} seasons={seasons} />
       </CalendarSheet>
       : <CalendarSheet kicker="The 12 months" title={periodWord}>
-        <MonthsCalendar start={bounds.start} end={bounds.end} allMonths label={`${periodWord}, month by month`} over={`${periodWord} is over.`} />
+        {/* The year's landscape, as written in its session (read-only, no
+            Edit here), then its dates: the months gone by in one row, four
+            dates a month at most. */}
+        {hasLandscape(yearNotes.notes.landscape) && <YearLandscapeSection value={yearNotes.notes.landscape} />}
+        <MonthsCalendar start={bounds.start} end={bounds.end} allMonths perMonth={4} label={`${periodWord}, month by month`} over={`${periodWord} is over.`} />
       </CalendarSheet>
   const sheet = (
     <section className={`plan-list ${planning ? 'plan-card' : 'plan-sheet'}`} data-explain="list" data-explain-label={`Every ${periodWord} goal`}>

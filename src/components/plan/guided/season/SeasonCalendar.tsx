@@ -59,10 +59,11 @@ export function SeasonCalendar({ date, seasons }: {
 }
 
 /** A period's fixed dates month by month, in [start, end): the season's
- *  (from today on), or the year's on its calendar sheet (`allMonths`: every
- *  month listed, those gone by marked Past, this month marked now). The read
- *  runs from today (useSeasonEvents). Read-only. */
-export function MonthsCalendar({ start, end, label, over, allMonths = false }: {
+ *  (from today on), or the year's on its calendar sheet (`allMonths`: the
+ *  months gone by in one row, "Jan – Oct · Past", then every month to come,
+ *  this one marked now). `perMonth` caps each month's list, with "and N more".
+ *  The read runs from today (useSeasonEvents). Read-only. */
+export function MonthsCalendar({ start, end, label, over, allMonths = false, perMonth }: {
   start: Date
   /** Exclusive. */
   end: Date
@@ -71,6 +72,7 @@ export function MonthsCalendar({ start, end, label, over, allMonths = false }: {
   /** Said when nothing of the period is left. */
   over: string
   allMonths?: boolean
+  perMonth?: number
 }) {
   const connected = getCalendarConnected()
   const cal = useSeasonEvents(start, end, connected !== false)
@@ -91,27 +93,36 @@ export function MonthsCalendar({ start, end, label, over, allMonths = false }: {
   const range = cal.range
   const entries = seasonEntries(cal.events, from, end)
   const monthOf = (e: Entry, m: { from: Date; to: Date }) => { const d = e.at < from ? from : e.at; return d >= m.from && d < m.to }
+  // The months gone by, as one row.
+  const gone = months.filter((m) => m.to <= from)
+  const ahead = months.filter((m) => m.to > from)
+  const mon = (d: Date) => d.toLocaleDateString('en-US', { month: 'short' })
+  const goneLabel = gone.length === 0 ? '' : gone.length === 1 ? mon(gone[0].from) : `${mon(gone[0].from)} – ${mon(gone[gone.length - 1].from)}`
 
   return <div className="gw-body">
     {months.length === 0 || (!allMonths && from >= end) ? <p className="choose-empty">{over}</p>
       : <ul className="gw-rows" aria-label={label}>
-        {months.map(({ from: f, to }) => {
+        {gone.length > 0 && <li key="gone" className="gw-row gw-day" aria-label={`${goneLabel} · Past`}>
+          <span className="gw-day-label">{goneLabel}</span>
+          <span className="gw-row-note">Past</span>
+        </li>}
+        {ahead.map(({ from: f, to }) => {
           const label = f.toLocaleDateString('en-US', { month: 'long' })
-          const past = to <= from
           const isNow = f <= today && today < to
           // The read's end is exclusive: a month from it on was not read.
           const unread = !range || f.getTime() >= range.end || to.getTime() <= range.start
-          const partly = !past && !unread && range && to.getTime() > range.end
-          const here = past || unread ? [] : entries.filter((e) => monthOf(e, { from: f, to }))
+          const partly = !unread && range && to.getTime() > range.end
+          const all = unread ? [] : entries.filter((e) => monthOf(e, { from: f, to }))
+          const here = perMonth === undefined ? all : all.slice(0, perMonth)
+          const more = all.length - here.length
           return <li key={localYmd(f)} className="gw-row gw-day" aria-label={label} data-now={isNow || undefined}>
             <span className="gw-day-label">{label}</span>
-            {past ? <span className="gw-row-note">Past</span>
-              : unread ? <span className="gw-row-note">Past what the calendar was read for</span>
+            {unread ? <span className="gw-row-note">Past what the calendar was read for</span>
               : here.length === 0 ? <span className="gw-row-note">Nothing fixed</span>
               : <ul className="gw-days">{here.map((e) => <li key={e.id}>
                 <b>{e.at < f ? `From ${short(e.at)}` : `${e.at.toLocaleDateString('en-US', { weekday: 'short' })} ${e.at.getDate()}`}</b>
                 <span><span className="gw-row-note">{e.allDay ? 'All day' : e.at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}{e.last ? ` · until ${short(e.last)}` : ''}</span> <span>{e.title}</span></span>
-              </li>)}</ul>}
+              </li>)}{more > 0 && <li className="gw-more"><b /><span className="gw-row-note">and {more} more</span></li>}</ul>}
             {partly && <span className="gw-row-note">The calendar was read through {short(new Date(range.end - DAY))}</span>}
           </li>
         })}
