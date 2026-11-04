@@ -245,6 +245,14 @@ from the sheet.
   inside-screen layouts follow the existing Duo work: `DockLayout`, and
   Today's `leftColumnWidth` rule for a vertical fold.
 
+### Naming the carry (Scott, 2026-11-04: "rename it to the destination")
+
+"Carry" is never shown. The choice names where the item goes: "To November"
+on October's look back, "To Winter" on a season, "To 2027" on the year, and
+the task panel's "Later: December" becomes "To December". Week keeps "Next
+week". Underneath it is the same move: same level, next period, this
+period's commitment ended.
+
 ## Settled after the builder check
 
 - **Nothing moves up either.** "Back to <month>" for last week's leftovers,

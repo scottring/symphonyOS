@@ -273,7 +273,7 @@
 **Files:**
 - Modify:
   - `src/components/plan/guided/season/FromYear.tsx`: year goals read-only. Remove `onPick`; keep the Someday bring (`onBring`).
-  - `ConstellationPage.tsx`: `fromYearBody` 1140-1153; `choose` 896-992 (remove `backToAbove`, `bringHere`, `backUp`, the `sourceId` from `addUnder`, and `onAddStep`); `chooseBody` 1127-1136 (the level above as `AboveSheet` plus the period's add line); `lookBackBody` 1074-1097 (Month: Done / Carry / Let go; Season and Year: Done / Carry / Table / Let go; all per period).
+  - `ConstellationPage.tsx`: `fromYearBody` 1140-1153; `choose` 896-992 (remove `backToAbove`, `bringHere`, `backUp`, the `sourceId` from `addUnder`, and `onAddStep`); `chooseBody` 1127-1136 (the level above as `AboveSheet` plus the period's add line); `lookBackBody` 1074-1097 (Month: Done / To {next month} / Let go; Season and Year: Done / To {next period} / Table / Let go; all per period. "Carry" is never shown.).
   - `src/components/plan/choose/ChoosePlan.tsx` 186-235: lines from above become read-only.
   - `src/components/plan/guided/month/PeriodLookBack.tsx` 33-61.
   - `src/components/plan/guided/week/WeekLookBack.tsx` 28-31 and 118: Done / Next week / Someday / Let go.
@@ -284,7 +284,7 @@
 
 - [ ] **Step 1: Write failing tests.**
   - FromYear shows year goals with no button per goal.
-  - Month look back offers exactly ['Done', 'Carry', 'Let go'], and Season offers ['Done', 'Carry', 'Table', 'Let go']. Carry on a November item opens December's commitment and ends November's only.
+  - Month look back (Oct) offers exactly ['Done', 'To November', 'Let go'], and Season (Summer) offers ['Done', 'To Fall', 'Table', 'Let go']. "To December" on a November item opens December's commitment and ends November's only. The task panel's "Later: December" reads "To December".
   - Week look back has no "Back to November".
   - Done planning the week leaves leftovers' week commitments in place (no drop).
   - `useChooseWeek` exposes no month destination.
