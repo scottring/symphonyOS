@@ -273,7 +273,7 @@
 **Files:**
 - Modify:
   - `src/components/plan/guided/season/FromYear.tsx`: year goals read-only. Remove `onPick`; keep the Someday bring (`onBring`).
-  - `ConstellationPage.tsx`: `fromYearBody` 1140-1153; `choose` 896-992 (remove `backToAbove`, `bringHere`, `backUp`, the `sourceId` from `addUnder`, and `onAddStep`); `chooseBody` 1127-1136 (the level above as `AboveSheet` plus the period's add line); `lookBackBody` 1074-1097 (Month: Done / To {next month} / Let go; Season and Year: Done / To {next period} / Table / Let go; all per period. "Carry" is never shown.).
+  - `ConstellationPage.tsx`: `fromYearBody` 1140-1153; `choose` 896-992 (remove `backToAbove`, `bringHere`, `backUp`, the `sourceId` from `addUnder`, and `onAddStep`); `chooseBody` 1127-1136 (the level above as `AboveSheet` plus the period's add line); `lookBackBody` 1074-1097 (Month: Done / To {next month} / Someday / Let go; Season and Year: the same. To and Someday act on this period only; Let go is "not ever": every open commitment ends, bucket 'someday' and `dismissed_at` set, hidden from Someday, the Inbox and the planning lists, found by search as "Let go {date}", and Undo restores. "Carry" and "Table" are never shown.) Also change the Task 4 panel (`horizonPanel.tsx` / `periodMoves`) to To {next} · Someday · Let go with these meanings, and make the Someday page (`src/apps/tasks/SomedayPage.tsx`), the Inbox and the planning selectors hide `dismissedAt` tasks. Map `dismissed_at` in `useSupabaseTasks` if it isn't already mapped..
   - `src/components/plan/choose/ChoosePlan.tsx` 186-235: lines from above become read-only.
   - `src/components/plan/guided/month/PeriodLookBack.tsx` 33-61.
   - `src/components/plan/guided/week/WeekLookBack.tsx` 28-31 and 118: Done / Next week / Someday / Let go.
@@ -284,7 +284,9 @@
 
 - [ ] **Step 1: Write failing tests.**
   - FromYear shows year goals with no button per goal.
-  - Month look back (Oct) offers exactly ['Done', 'To November', 'Let go'], and Season (Summer) offers ['Done', 'To Fall', 'Table', 'Let go']. "To December" on a November item opens December's commitment and ends November's only. The task panel's "Later: December" reads "To December".
+  - Month look back (Oct) offers exactly ['Done', 'To November', 'Someday', 'Let go'], and Season (Summer) offers ['Done', 'To Fall', 'Someday', 'Let go'].
+  - Let go on an item open on Fall, November and this week ends all three commitments, sets dismissedAt, and hides it from the Someday page. Undo restores all three.
+  - Someday on the same item ends only November's. "To December" on a November item opens December's commitment and ends November's only. The task panel's "Later: December" reads "To December".
   - Week look back has no "Back to November".
   - Done planning the week leaves leftovers' week commitments in place (no drop).
   - `useChooseWeek` exposes no month destination.

@@ -253,6 +253,25 @@ the task panel's "Later: December" becomes "To December". Week keeps "Next
 week". Underneath it is the same move: same level, next period, this
 period's commitment ended.
 
+### Someday and Let go (Scott, 2026-11-04: "let go means not ever, rename table to someday")
+
+Two different intentions, never the same button:
+
+- **Someday** ("not now"; formerly Table): ends this period's commitment.
+  If no other list holds the item, it goes to Someday to wait for a future
+  period.
+- **Let go** ("not ever"): the item comes off **every** list. All its open
+  commitments end, it gets `bucket: 'someday'` with `dismissed_at` set, and
+  it is never shown in Someday, the Inbox or any planning list. It stays in
+  history: search finds it, marked "Let go Nov 4", and Undo clears
+  `dismissed_at` and restores the commitments. No migration is needed
+  (`tasks.dismissed_at` exists; today it means "kept, never shown" for
+  school papers). A year goal's Let go stays `status: 'archived'`.
+- **Where they appear:** Month look back: Done · To December · Someday ·
+  Let go. Season and Year look back: Done · To {next} · Someday · Let go.
+  Week look back: Done · Next week · Someday · Let go. Month and Season task
+  panel: To {next} · Someday · Let go.
+
 ## Settled after the builder check
 
 - **Nothing moves up either.** "Back to <month>" for last week's leftovers,
@@ -268,8 +287,8 @@ period's commitment ended.
   meaning there. On the planning pages, nothing filters or groups by
   `is_goal`: the week list builder (`weekShelf.ts`) stops skipping `is_goal`
   tasks if that is the cause of #15.
-- **Carry and Let go act on this period's commitment only**, never the whole
-  item. On "Plan winter vacation" (open on Fall, November and this week),
+- **To {next} and Someday act on this period's commitment only**; **Let go**
+  ends every open commitment (superseded 2026-11-04, see "Someday and Let go"). On "Plan winter vacation" (open on Fall, November and this week),
   November's Let go ends only its November commitment. Season and Year Look
   back keep **Table** (to Someday) beside Done, Carry and Let go. Table also
   ends only this period's commitment; the item goes to Someday only if no
