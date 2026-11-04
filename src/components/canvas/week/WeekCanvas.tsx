@@ -74,6 +74,7 @@ import { HorizonStrip } from '@/components/canvas/strip/HorizonStrip'
 import { TypedAdd } from '@/components/canvas/strip/TypedAdd'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, LookSheet } from '@/components/plan/fold/AboveSheet'
+import { RibbonTab } from '@/components/guide/GuideRibbon'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 
 export interface CanvasDayItem {
@@ -205,6 +206,10 @@ export interface WeekCanvasProps {
    *  step opens it (`drive`), and the look back turns it to last week with
    *  its choices (`look`). Nothing is remembered. */
   fold?: { drive?: { above?: boolean }; look?: ReactNode | null; write?: boolean }
+  /** The planning ribbon's bookmark on the top edge of the days ("Plan this
+   *  week"): pulling it starts planning the week; inside a running session it
+   *  is the ribbon already pulled. Absent: a week that can't be planned. */
+  ribbon?: { label: string; onPull: () => void }
 }
 
 type Drag = { kind: 'task' | 'routine' | 'occ' | 'event'; id: string; groupKey?: string; fromKey?: string }
@@ -257,7 +262,7 @@ const NODAY_FOLD_AT = 4
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, viewerId, month, hideStrip, fold: session }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, viewerId, month, hideStrip, fold: session, ribbon }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   // Touch first (the iPad, the wall): rows lift on a held press instead of the
   // browser's own drag, which a long press would otherwise start too.
@@ -757,6 +762,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     ? pastNote && createPortal(pastNote, slots.subline)
     : pastNote && <p className="wc-subtitle is-inline">{pastNote}</p>
 
+  const ribbonTab = ribbon && <RibbonTab label={ribbon.label} onPull={ribbon.onPull} />
   // The month above, folded beside the days for reading (paper-style
   // horizons, 2026-11-04), hinged at their left edge (the top edge on a
   // phone). While a guided session plans the week, its ribbon drives this
@@ -777,7 +783,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   if (phone) {
     const sel = days.find((d) => d.key === selectedKey)
     return withTouch(
-      <div className={`wc wc-phone${drag ? ' is-dragging' : ''}`}>
+      <div className={`wc wc-phone ribbon-host${drag ? ' is-dragging' : ''}`}>
+        {ribbonTab}
         {subtitleNode}
         <div className="wc-daychips" role="group" aria-label="Days">
           {days.map((d) => (
@@ -901,8 +908,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       {subtitleNode}
       {composerNode}
       {withMonth(
-        <section className="wc-days" aria-label="The days">
+        <section className="wc-days ribbon-host" aria-label="The days">
           <h2 className="wc-label sr-only">The days</h2>
+          {ribbonTab}
           {spans.length > 0 && (
             <ul className="wc-spans" aria-label="Across these days">
               {spans.map((sp) => (

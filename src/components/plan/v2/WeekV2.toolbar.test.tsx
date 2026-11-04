@@ -266,7 +266,7 @@ function WithDeck({ deck, ...props }: Partial<React.ComponentProps<typeof WeekV2
   const [params] = useSearchParams()
   const withMode = deck && { ...deck, mode: deck.available ? deckModeOf(params) : null }
   // The week as WeekViewV2 draws it: in a session, the look back on the sheet beside it.
-  return <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent canvas={(o) => <><p>The days</p>{o?.fold?.look}</>} {...props} deck={withMode} />
+  return <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent canvas={(o) => <><p>The days</p>{o?.ribbon && <button type="button" data-testid="ribbon-tab" onClick={o.ribbon.onPull}>{o.ribbon.label}</button>}{o?.fold?.look}</>} {...props} deck={withMode} />
 }
 const renderAt = (url: string, props: Partial<React.ComponentProps<typeof WeekV2>> = {}) => render(
   <MemoryRouter initialEntries={[url]}>
@@ -293,7 +293,10 @@ describe('WeekV2 — Review opens the deck', () => {
     expect(screen.getByRole('region', { name: 'Planning the week' })).toBeTruthy()
     expect(where().get('plan')).toBe('1')
     expect(where().get('date')).toBe('2026-10-04')
-    expect(screen.queryByRole('button', { name: /^(Review|Plan) / })).toBeNull()
+    // No Review or Plan button in the header while the session runs (the
+    // ribbon on the days is the session's own, pulled).
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
+    expect(document.querySelector('.wk-plan')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Leave' }))
     expect(screen.getByText('The days')).toBeTruthy()
     expect(where().get('plan')).toBeNull()
@@ -466,7 +469,7 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
 
   it('Plan this week opens the session on the page, beside the same week, with no mark in the bar', () => {
     renderAt('/week', { deck: makeDeck() })
-    fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
+    fireEvent.click(document.querySelector<HTMLElement>('.wk-plan')!)
     const planning = screen.getByRole('region', { name: 'Planning the week' })
     expect(within(planning).getByRole('region', { name: 'Plan the week' })).toBeTruthy()
     expect(screen.queryByRole('group', { name: 'Steps in this session' })).toBeNull()
@@ -477,6 +480,19 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Leave' }))
     expect(screen.queryByRole('region', { name: 'Planning the week' })).toBeNull()
     expect(screen.getByText('The days')).toBeTruthy()
+  })
+
+  // Fix round 1 ruling: the week's bookmark starts the same session the Plan
+  // button starts.
+  it('the bookmark on the days starts planning the week; a week that can’t be planned has none', () => {
+    renderAt('/week', { deck: makeDeck() })
+    expect(screen.getByTestId('ribbon-tab')).toHaveTextContent('Plan this week')
+    fireEvent.click(screen.getByTestId('ribbon-tab'))
+    expect(where().get('plan')).toBe('1')
+    expect(screen.getByRole('region', { name: 'Planning the week' })).toBeTruthy()
+    cleanup()
+    renderAt('/week', { deck: makeDeck({ available: false }) })
+    expect(screen.queryByTestId('ribbon-tab')).toBeNull()
   })
 
   it('a week the deck may not open on offers neither Review nor Plan, and ignores the URL', () => {

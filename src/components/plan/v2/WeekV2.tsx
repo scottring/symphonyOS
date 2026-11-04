@@ -103,7 +103,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   /** The week at rest: WeekViewV2's canvas. A guided session asks for it
    *  without its strip, with the month's fold driven by the ribbon's step
    *  (`fold`: on the look back, last week with its choices). */
-  canvas?: ReactNode | ((opts?: { hideStrip?: boolean; fold?: SessionFold }) => ReactNode)
+  canvas?: ReactNode | ((opts?: { hideStrip?: boolean; fold?: SessionFold; ribbon?: { label: string; onPull: () => void } }) => ReactNode)
   /** Today's first item, for the fact line ("Today: …"); null when there is
    *  none, the week is not this one, or it has not loaded. */
   today?: string | null
@@ -191,6 +191,9 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
     ...(plannable ? [{ id: 'plan', label: planned ? `Plan ${reviewWord} again` : `Plan ${reviewWord}`, due: !planned, run: () => setMode('plan') }] : []),
   ]
   const primary = offers.find((o) => o.due) ?? null
+  // The planning ribbon's bookmark on the days (fix round 1): the same session
+  // the Plan button starts. In a session it is the pulled ribbon (Leave).
+  const ribbon = { label: `Plan ${reviewWord}`, onPull: () => setMode('plan') }
   // The fact line: this week's count and bar, and today's first item.
   const on = deck?.onThisWeek ?? 0, doneHere = deck?.doneThisWeek ?? 0
   const countText = `${doneHere} of ${on} done`
@@ -253,14 +256,14 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
         // Drawn only once the tasks are in: no flash of an empty October.
         ? (deck.loading ? null : deckMode === 'full'
           ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} isCurrent={isCurrent} deck={deck} lastReview={lastReview}
-              canvas={(fold) => typeof canvas === 'function' ? canvas({ hideStrip: true, fold }) : canvas}
+              canvas={(fold) => typeof canvas === 'function' ? canvas({ hideStrip: true, fold, ribbon }) : canvas}
               onFinish={closeWeek} onClose={() => { setMode(null); planNotes.reload() }}
               onPlanned={() => { session.reload(); planNotes.reload() }} />
           : <section className="deck choose-flow" aria-label="Plan this week">
               <GiveThemADay days={deck.stripDays} items={deck.choose.placeItems} placedCount={deck.choose.placedCount}
                 onLeave={() => setMode(null)} primary={{ label: 'Done', run: () => setMode(null) }} />
             </section>)
-        : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
+        : <div className="wk-canvas">{typeof canvas === 'function' ? canvas(plannable ? { ribbon } : undefined) : canvas}</div>}
     </div>
   )
 }

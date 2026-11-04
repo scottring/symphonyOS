@@ -51,6 +51,7 @@ import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { rememberFolded } from '@/components/plan/fold/PaperFold'
+import { RibbonTab } from '@/components/guide/GuideRibbon'
 import { GuidedDay } from '@/components/plan/guided/day/GuidedDay'
 import type { DayPictureItem } from '@/components/plan/guided/day/DayRows'
 import { makeDayActions } from '@/lib/planning/dayActions'
@@ -1405,7 +1406,10 @@ export function TodayView({
           While the Day session runs, this is its page: the steps rail stands
           beside it and the fold is put away. */}
       {inDaySession(<div className={sessionShown ? '' : 'px-4 md:px-0'}>
-        {withWeek(<main className="min-w-0">
+        {withWeek(<main className="min-w-0 ribbon-host">
+          {/* The planning ribbon's bookmark on the day (fix round 1): the same
+              session Plan today starts; in a session, the pulled ribbon. */}
+          {(dayFlowOffer || sessionShown) && <RibbonTab label={`Plan ${dayWord}`} onPull={openDaySession} />}
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,
               and it sent you to the Inbox. Unfinished work now has one quiet

@@ -240,6 +240,16 @@ describe('WeekCanvas — filing a task under a goal', () => {
     expect(screen.getByText('Add to this week')).toBeInTheDocument()
   })
 
+  // Fix round 1 ruling: the week carries the bookmark on the top edge of its
+  // days, as Month's sheet does.
+  it('the bookmark hangs from the days; pulling it starts planning the week', () => {
+    const onPull = vi.fn()
+    show(writers(), { ribbon: { label: 'Plan this week', onPull } })
+    const tab = within(screen.getByRole('region', { name: 'The days' })).getByRole('button', { name: 'Plan this week', expanded: false })
+    fireEvent.click(tab)
+    expect(onPull).toHaveBeenCalled()
+  })
+
   it('hideStrip leaves the strip out and keeps the days', () => {
     show(writers(), { hideStrip: true })
     expect(screen.queryByRole('complementary', { name: 'Week strip' })).toBeNull()

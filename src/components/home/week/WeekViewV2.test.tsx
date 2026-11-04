@@ -1208,7 +1208,9 @@ describe('WeekViewV2 — the deck', () => {
     const next = new Date(2026, 9, 24)
     const tasks = [createMockTask({ id: 'd', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 20), isAllDay: true, completed: true, updatedAt: recent })]
     open('', tasks, { weekStart: next })
-    fireEvent.click(screen.getByRole('button', { name: 'Plan the week of Oct 24' }))
+    // The header's Plan button (the bookmark on the days starts the same session).
+    expect(screen.getAllByRole('button', { name: 'Plan the week of Oct 24' })).toHaveLength(2)
+    fireEvent.click(document.querySelector<HTMLElement>('.wk-plan')!)
     const q = new URLSearchParams(window.location.search)
     expect(q.get('plan')).toBe('1')
     expect(q.get('date')).toBeNull()

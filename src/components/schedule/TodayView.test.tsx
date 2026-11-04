@@ -727,13 +727,15 @@ describe('TodayView — the Day session', () => {
     )
     return { ...view, onDateChange }
   }
+  // The header's Plan button (the ribbon on the day carries the same name).
+  const flowButton = (name: string) => screen.getAllByRole('button', { name }).find((b) => b.classList.contains('today-flow-btn'))!
   const search = () => new URLSearchParams(window.location.search)
 
   it('in the morning the page offers Plan today, which opens the session on the page itself', async () => {
     const { user } = renderAt(10)
     expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Plan tomorrow' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Plan today' }))
+    await user.click(flowButton('Plan today'))
     const session = screen.getByRole('region', { name: 'Planning today' })
     expect(search().get('plan')).toBe('1')
     // The planning ribbon (2026-11-04): the band across the top of the day.
@@ -742,7 +744,9 @@ describe('TodayView — the Day session', () => {
     // One page: the day is still there beside the steps.
     expect(within(session).getByRole('heading', { name: 'For today' })).toBeInTheDocument()
     expect(within(session).getByRole('heading', { name: 'The day' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Plan today' })).not.toBeInTheDocument()
+    // The header's button steps aside; the ribbon on the day is the session's, pulled.
+    expect(document.querySelector('.today-flow-btn')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Plan today', expanded: true })).toBeInTheDocument()
   })
 
   it('from 4 pm it offers Plan tomorrow, which opens on today for the look back; there is no Review today', async () => {
@@ -751,7 +755,7 @@ describe('TodayView — the Day session', () => {
     expect(screen.queryByRole('button', { name: /End of day review/i })).not.toBeInTheDocument()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
+    await user.click(flowButton('Plan tomorrow'))
     expect(search().get('plan')).toBe('1')
     // Walk 2026-11-01: "Look back at today" stood beside tomorrow. The look
     // back runs on today's page; the day is not moved.
@@ -765,7 +769,7 @@ describe('TodayView — the Day session', () => {
   it('with the real date-writing parent, the page shows the day each step is about; Leave goes back to today', async () => {
     const { user } = renderAt(17, { dated: true })
     const heading = (d: Date) => ({ level: 1, name: d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })
-    await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
+    await user.click(flowButton('Plan tomorrow'))
     await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())
     // Look back at today: today on the page.
     expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument()
@@ -790,7 +794,7 @@ describe('TodayView — the Day session', () => {
   it('in the morning the look back shows yesterday, and the next step brings the page back to today', async () => {
     const { user } = renderAt(10, { dated: true })
     const heading = (d: Date) => ({ level: 1, name: d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })
-    await user.click(screen.getByRole('button', { name: 'Plan today' }))
+    await user.click(flowButton('Plan today'))
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0, -1)))).toBeInTheDocument())
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
     await user.click(within(document.querySelector<HTMLElement>('.ribbon-band')!).getByRole('button', { name: 'Next' }))
@@ -867,10 +871,21 @@ describe('TodayView — the Day session', () => {
   })
 
   // One button at most, only the one that's due (reviewed design, 2026-10-20).
+  // Fix round 1 ruling: the day carries the planning ribbon's bookmark, which
+  // starts the same session as Plan today.
+  it('the bookmark on the day starts planning it; in the session it is the ribbon pulled', async () => {
+    const { user } = renderAt(10)
+    const tab = screen.getByRole('button', { name: 'Plan today', expanded: false })
+    expect(tab).toHaveClass('ribbon-tab')
+    await user.click(tab)
+    expect(search().get('plan')).toBe('1')
+    expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Plan today', expanded: true })).toHaveClass('ribbon-tab')
+  })
+
   it('once the day is planned, Plan today steps aside for a quiet "Plan today again"', async () => {
     daySession.saved = { at: at(8), authorId: 'me', notes: {} }
     const { user } = renderAt(10)
-    expect(screen.queryByRole('button', { name: 'Plan today' })).not.toBeInTheDocument()
     expect(document.querySelectorAll('.today-flow-btn')).toHaveLength(0)
     await user.click(screen.getByRole('button', { name: 'Plan today again' }))
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()

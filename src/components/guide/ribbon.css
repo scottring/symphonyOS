@@ -139,3 +139,6 @@ li[data-state='skipped'] .ribbon-step-title { font-style: italic; }
   .ribbon-band-wrap, .ribbon-tab { transition: none; }
   .ribbon-card, .ribbon-stamp { animation: none; }
 }
+
+/* What the bookmark hangs from: this period's sheet, the week's days, the day. */
+.ribbon-host { position: relative; }

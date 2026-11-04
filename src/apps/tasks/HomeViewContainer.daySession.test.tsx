@@ -123,7 +123,8 @@ describe('HomeViewContainer — leaving the Day session', () => {
     const { user } = render(<HomeViewContainer />)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(today())
 
-    await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
+    // The header's Plan button (the ribbon on the day carries the same name).
+    await user.click(screen.getAllByRole('button', { name: 'Plan tomorrow' }).find((b) => !b.classList.contains('ribbon-tab'))!)
     expect(search().get('plan')).toBe('1')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(tomorrow())
     // The session is its own screen: the week folded beside the day is put
