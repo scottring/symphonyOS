@@ -47,7 +47,9 @@ export function usePlanningNotes(horizon: SessionHorizon, token: string) {
   const { user } = useAuth()
   const [notes, setNotes] = useState<PlanningNotes>({})
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Kept with the row it is about: one period's failed read never shows on
+  // the next while that one loads (final review).
+  const [failed, setFailed] = useState<{ key: string; message: string } | null>(null)
   const latest = useRef(0)
   // Which row the notes on hand are: until the row asked for has been read,
   // nothing from another period (or person) is handed out (fix round 1:
@@ -64,11 +66,11 @@ export function usePlanningNotes(horizon: SessionHorizon, token: string) {
     if (!token) { setNotes({}); setLoading(false); setLoadedFor(key); return }
     if (!user?.id) return
     setLoading(true)
-    setError(null)
+    setFailed(null)
     const { data, error: readError } = await supabase.from('planning_sessions')
       .select('notes').eq('author_id', user.id).eq('horizon', horizon).eq('period_token', token).maybeSingle()
     if (req !== latest.current) return
-    if (readError) { setError(readError.message); setNotes({}); setLoadedFor(key); setLoading(false); return }
+    if (readError) { setFailed({ key, message: readError.message }); setNotes({}); setLoadedFor(key); setLoading(false); return }
     setNotes(((data as { notes?: PlanningNotes | null } | null)?.notes ?? {}) as PlanningNotes)
     setLoadedFor(key)
     setLoading(false)
@@ -100,5 +102,6 @@ export function usePlanningNotes(horizon: SessionHorizon, token: string) {
   }, [user?.id, horizon, token])
 
   const current = loadedFor === key
+  const error = failed?.key === key ? failed.message : null
   return { notes: current ? notes : EMPTY, loading: loading || !current, error, patch, reload: () => { void load() } }
 }

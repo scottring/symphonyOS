@@ -146,6 +146,27 @@ describe('usePlanningNotes', () => {
     expect(result.current.notes).toEqual({})
   })
 
+  // Final review: one period's failed read never says "Couldn't load" on the
+  // next while that one is still being read.
+  it('a failed read is that period’s alone: the next period shows no error while its own row loads', async () => {
+    rows = { '2026-W44': { weekend: 'hike' }, '2026-W45': { weekend: 'rest' } }
+    readError = { message: 'boom' }
+    // Every render is seen, not only the last one after effects have run.
+    const seen: Array<{ t: string; error: string | null }> = []
+    const { result, rerender } = renderHook(({ t }) => { const n = usePlanningNotes('weekly', t); seen.push({ t, error: n.error }); return n }, { initialProps: { t: '2026-W44' } })
+    await waitFor(() => expect(result.current.error).toBe('boom'))
+    readError = null
+    readDelay = 20
+    rerender({ t: '2026-W45' })
+    expect(seen.filter((x) => x.t === '2026-W45').map((x) => x.error)).not.toContain('boom')
+    expect(result.current.error).toBeNull()
+    expect(result.current.loading).toBe(true)
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBeNull()
+    expect(result.current.notes).toEqual({ weekend: 'rest' })
+    expect(seen.filter((x) => x.t === '2026-W45').map((x) => x.error)).not.toContain('boom')
+  })
+
   // A patch that lands after the period changed writes its own row, and
   // never shows that row's notes as the new period's.
   it('a patch that resolves after the period changed leaves the new period\'s notes alone', async () => {
