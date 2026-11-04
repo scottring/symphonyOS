@@ -22,8 +22,10 @@ import { localYmd } from '@/lib/cadence/config'
  * first. Through the page's filters: `keep` (Today's people filter) and
  * `scopeId` (the workspace's people scope, as weekListTasks reads it).
  *
- * Only days already gone count: the bound is the earlier of `day` and today
- * (viewing Friday from Wednesday, Thursday's tasks are not left over). A
+ * Only days gone by count. The bound is the viewed day when it is today,
+ * tomorrow or a day gone by (tomorrow: the evening session, where today's
+ * open tasks come back marked "Wed"), and otherwise today (viewing Friday
+ * from Wednesday, Thursday's tasks are not left over). A
  * one-off event whose time has passed (a dinner, a party) is not a leftover
  * either: it happened or it didn't, there is nothing to plan.
  */
@@ -39,7 +41,8 @@ export function earlierThisWeek(tasks: readonly Task[], { weekStart, day, userId
 }): Task[] {
   const first = localYmd(weekStart)
   const ymd = localYmd(day)
-  const before = ymd < localYmd(now) ? ymd : localYmd(now)
+  const tomorrow = localYmd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1))
+  const before = ymd <= tomorrow ? ymd : localYmd(now)
   return tasks
     .filter((t) => {
       if (t.completed || t.dismissedAt || !t.scheduledFor) return false

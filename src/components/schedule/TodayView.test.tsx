@@ -1035,19 +1035,17 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe('left')
   })
 
-  // Pre-ship follow-up: only days gone by leave leftovers. In the evening,
-  // on tomorrow's page, today is not over yet: its open task is an ordinary
-  // row of the week, unmarked, and the look back points at the week's fold.
-  it('in the evening, planning tomorrow: today’s open task is not marked as left over; yesterday’s is', () => {
+  // In the evening session, on tomorrow's page, today's open tasks come back
+  // first on the week sheet, marked with today (coordinator, pre-ship).
+  it('in the evening, planning tomorrow: today’s open task is first on the week sheet, marked with today', () => {
     weekHoldsYesterday()
     const left = createMockTask({ id: 't', title: 'Pack the lunches', bucket: 'timed', scheduledFor: at(0), isAllDay: true })
-    const yest = createMockTask({ id: 'y', title: 'Call the vet', bucket: 'timed', scheduledFor: at(0, -1), isAllDay: true })
-    renderAt(17, { url: '/?plan=1', viewed: at(0, 1), tasks: [left, yest] })
-    const rows = [...document.querySelectorAll<HTMLElement>('[data-guide-anchor="leftovers"]')]
-    expect(rows.map((r) => r.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Call the vet'])
+    renderAt(17, { url: '/?plan=1', viewed: at(0, 1), tasks: [left] })
+    const row = document.querySelector<HTMLElement>('[data-guide-anchor="leftovers"]')!
+    expect(row.querySelector('.above-sheet-row-title')).toHaveTextContent('Pack the lunches')
+    expect(row.querySelector('.above-sheet-row-mark')).toHaveTextContent(at(0).toLocaleDateString('en-US', { weekday: 'short' }))
+    expect(row.querySelector('.above-sheet-pick')).toHaveAttribute('aria-label', `Plan Pack the lunches for ${at(0, 1).toLocaleDateString('en-US', { weekday: 'long' })}`)
     expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe('leftovers')
-    const marks = [...document.querySelectorAll('.above-sheet-row-mark')].map((m) => m.closest('li')?.querySelector('.above-sheet-row-title')?.textContent)
-    expect(marks).not.toContain('Pack the lunches')
   })
 
   // Every Day step's tooltip points at its home on the everyday page.

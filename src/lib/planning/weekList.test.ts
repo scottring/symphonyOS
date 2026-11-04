@@ -132,4 +132,11 @@ describe('earlierThisWeek', () => {
     // Viewing a day gone by, it stops at that day.
     expect(earlierThisWeek(tasks, { weekStart: SUN, day: new Date(2026, 10, 3), now: new Date(2026, 10, 4, 9) })).toEqual([])
   })
+  it('on tomorrow’s page (the evening session), today’s open tasks are left over too', () => {
+    const THU = new Date(2026, 10, 5)
+    const tasks = [on(3, { title: 'Tue thing' }), on(4, { title: 'Wed thing' }), on(5, { title: 'Thu thing' })]
+    const got = earlierThisWeek(tasks, { weekStart: SUN, day: THU, now: new Date(2026, 10, 4, 18) })
+    expect(got.map((t) => t.title)).toEqual(['Tue thing', 'Wed thing'])
+    expect(got.map(earlierDayMark)).toEqual(['Tue', 'Wed'])
+  })
 })
