@@ -46,7 +46,7 @@ describe('guide step catalog', () => {
     const drives = (level: GuideLevel) => Object.fromEntries(stepsFor(level).map((s) => [s.id, { ...s.drives }]))
     expect(drives('month')).toEqual({
       'fresh-start': {}, 'look-back': { above: true, look: true }, 'read-season': { above: true },
-      'next-weeks': { calendar: true }, 'by-area': { above: true, write: true }, 'upkeep-fun': {},
+      'next-weeks': { calendar: true }, 'by-area': { above: true, write: true }, 'upkeep-fun': { calendar: true },
     })
     for (const level of ['week', 'month', 'season', 'year'] as const) {
       expect(stepsFor(level).find((s) => s.id === 'look-back')?.drives).toEqual({ above: true, look: true })
@@ -64,14 +64,15 @@ describe('guide step catalog', () => {
     const at = (level: GuideLevel) => Object.fromEntries(stepsFor(level).map((s) => [s.id, s.at]))
     expect(at('day')).toEqual({ 'look-back': 'leftovers', calendar: 'day', energy: 'energy', pick: 'left', habits: 'routines' })
     expect(at('week')).toEqual({ 'look-back': 'left', calendar: 'day', 'read-month': 'left', inbox: 'inbox', choose: 'write', ops: 'dinner', family: 'family' })
-    expect(at('month')).toEqual({ 'fresh-start': 'menu', 'look-back': 'left', 'read-season': 'left', 'next-weeks': 'right', 'by-area': 'write', 'upkeep-fun': 'write' })
+    expect(at('month')).toEqual({ 'fresh-start': 'menu', 'look-back': 'left', 'read-season': 'left', 'next-weeks': 'right', 'by-area': 'write', 'upkeep-fun': 'routines' })
     expect(at('season')).toEqual({ 'look-back': 'left', 'from-year': 'left', calendar: 'right', energy: 'energy', 'by-area': 'write', 'ideal-week': 'ideal-week', 'wild-cards': 'wild-cards' })
     expect(at('year')).toEqual({ 'look-back': 'left', vision: 'vision', landscape: 'landscape', areas: 'areas', 'brain-dump': 'write', refine: 'list', 'share-book': 'list' })
-    // A step that opens the calendar points at it (Year's landscape at its
-    // own section); a writing step at the write line.
+    // A step that opens the calendar points at it, or at its routines
+    // (Month's Maintenance and fun; Year's landscape at its own section); a
+    // writing step at the write line.
     for (const level of ['day', 'week', 'month', 'season', 'year'] as const) {
       for (const s of stepsFor(level)) {
-        if (s.drives?.calendar && s.id !== 'landscape') expect(s.at).toBe('right')
+        if (s.drives?.calendar && s.id !== 'landscape') expect(['right', 'routines']).toContain(s.at)
         if (s.drives?.write) expect(s.at).toBe('write')
       }
     }

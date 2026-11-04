@@ -28,7 +28,9 @@ vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:filters.on?filters.laye
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[filters.on?filters.people:[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null,members:[{auth_user_id:'u2',name:'Iris'}]})}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'u1'}})}))
-vi.mock('@/hooks/useRoutines',()=>({useRoutines:()=>({getRoutinesForDate:()=>[]})}))
+// The routines on each day (none, unless a test gives some).
+const routines=vi.hoisted(()=>({forDate:(_d:Date)=>[] as any[]}))
+vi.mock('@/hooks/useRoutines',()=>({useRoutines:()=>({getRoutinesForDate:(d:Date)=>routines.forDate(d)})}))
 const review=vi.hoisted(()=>({reviewed:null as any,prevReviewed:null as any,loading:false,prevLoading:false,mine:null as any,finish:vi.fn(async()=>true),seen:[] as string[]}))
 // The page reads two plan records: the period on screen's (saved, loading),
 // then the next one's (next, nextLoading).
@@ -137,7 +139,7 @@ beforeEach(()=>{
 })
 afterEach(()=>{window.matchMedia=setupMatchMedia})
 beforeEach(()=>{
- vi.clearAllMocks();cal.events=[];filters.sole='personal';addArea.real=false;notesStore.notes={};notesStore.patches=[];notesStore.byToken=null;notesStore.loading=false;notesStore.error=null;shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
+ vi.clearAllMocks();cal.events=[];routines.forDate=()=>[];filters.sole='personal';addArea.real=false;notesStore.notes={};notesStore.patches=[];notesStore.byToken=null;notesStore.loading=false;notesStore.error=null;shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
  HTMLElement.prototype.scrollIntoView=vi.fn()
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
@@ -450,33 +452,54 @@ describe('a sheet: the period in its own words, the level above folded beside it
  })
 })
 
-// The strip keeps only the routines at the page's pace (Month and Year); the
-// sheet above took its first tab, and Season runs no routines of its own.
-describe('the strip: routines only',()=>{
- it('Month and Year: a Routines strip with no other tab; Season: no strip',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}]
-  month()
-  const strip=screen.getByRole('complementary',{name:'Routines strip'})
-  expect(within(strip).queryAllByRole('tab')).toHaveLength(0)
-  expect(within(strip).getByText('Routines')).toBeInTheDocument()
-  expect(within(strip).queryByText('Autumn outings')).toBeNull()
-  expect(screen.queryByRole('complementary',{name:/Fall/})).toBeNull()
-  cleanup();open()
-  expect(within(screen.getByRole('complementary',{name:'Routines strip'})).queryAllByRole('tab')).toHaveLength(0)
-  cleanup();season()
-  expect(screen.queryByRole('complementary')).toBeNull()
-  expect(document.querySelector('.hs-rail')).toBeNull()
+// Routines are dated commitments (spec 2026-11-04): Month's and Year's
+// routines sit on the calendar sheet with their dates, and the strip that
+// held them is gone, so the spread centers on the page.
+const routine=(id:string,name:string,type:string,on:(d:Date)=>boolean)=>({id,name,on,recurrence_pattern:{type},context:'personal'})
+const giveRoutines=(...rs:ReturnType<typeof routine>[])=>{routines.forDate=(d:Date)=>rs.filter(r=>r.on(d))}
+const readText=(li:HTMLElement)=>{const c=li.cloneNode(true) as HTMLElement;c.querySelectorAll('[aria-hidden="true"]').forEach(n=>n.remove());return c.textContent}
+const ymd=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+describe('routines on the calendar sheet; no strip',()=>{
+ it('Month, Season and Year: no strip beside the spread',()=>{
+  for(const go of [()=>month(),()=>open(),()=>season()]){
+   go()
+   expect(screen.queryByRole('complementary')).toBeNull()
+   expect(document.querySelector('.hs-layout, .hs-rail, .plan-with-strip')).toBeNull()
+   cleanup()
+  }
  })
- it('folds to a rail and stays folded for this viewer',()=>{
-  month()
-  fireEvent.click(within(screen.getByRole('complementary',{name:'Routines strip'})).getByRole('button',{name:'Hide routines strip'}))
-  expect(screen.queryByRole('complementary',{name:'Routines strip'})).toBeNull()
-  expect(localStorage.getItem('symphony-strip-open:month')).toBe('0')
-  cleanup()
-  month()
-  expect(screen.queryByRole('complementary',{name:'Routines strip'})).toBeNull()
-  fireEvent.click(screen.getByRole('button',{name:'Show routines strip'}))
-  expect(screen.getByRole('complementary',{name:'Routines strip'})).toBeInTheDocument()
+ it('Month: the November calendar lists “Routines this month” with each date',async()=>{
+  giveRoutines(
+   routine('w','Wash comforters','monthly',d=>['2026-11-07','2026-11-08','2026-12-05','2026-12-06'].includes(ymd(d))),
+   routine('f','Pay FFG','monthly',d=>d.getDate()===10),
+   routine('b','Boxing','weekly',d=>d.getDay()===2),
+  )
+  open(NOV)
+  fireEvent.keyDown(screen.getByRole('button',{name:'November calendar. Unfold to read'}),{key:'Enter'})
+  const sheet=await screen.findByRole('region',{name:'November calendar, for reading'})
+  const rs=within(sheet).getByRole('region',{name:'Routines this month'})
+  expect(within(rs).getAllByRole('listitem').map(readText)).toEqual(['Wash comforters · Sat Nov 7 · Sun Nov 8','Pay FFG · Tue Nov 10'])
+  // Weekly routines are the Week's.
+  expect(rs).not.toHaveTextContent('Boxing')
+  expect(sheet.querySelectorAll('button,a,input,textarea')).toHaveLength(0)
+ })
+ it('Year: “Routines this year”, its yearly routines with their dates',()=>{
+  giveRoutines(routine('tx','File taxes','yearly',d=>ymd(d)==='2026-04-15'),routine('f','Pay FFG','monthly',d=>d.getDate()===10))
+  open()
+  fireEvent.keyDown(screen.getByRole('button',{name:'2026 calendar. Unfold to read'}),{key:'Enter'})
+  const rs=within(calSheet()).getByRole('region',{name:'Routines this year'})
+  expect(within(rs).getAllByRole('listitem').map(readText)).toEqual(['File taxes · Apr 15'])
+ })
+ it('Season: “Routines this season” only when the season has its own',()=>{
+  season()
+  fireEvent.keyDown(screen.getByRole('button',{name:'Fall calendar. Unfold to read'}),{key:'Enter'})
+  expect(within(calSheet()).queryByRole('region',{name:/^Routines this/})).toBeNull()
+  cleanup();localStorage.removeItem('symphony-fold:season:calendar')
+  giveRoutines(routine('q','Change the furnace filter','quarterly',d=>ymd(d)==='2026-10-01'))
+  season()
+  fireEvent.keyDown(screen.getByRole('button',{name:'Fall calendar. Unfold to read'}),{key:'Enter'})
+  expect(within(within(calSheet()).getByRole('region',{name:'Routines this season'})).getAllByRole('listitem').map(readText))
+   .toEqual(['Change the furnace filter · Oct 1'])
  })
 })
 
@@ -1387,6 +1410,10 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   atStep('upkeep-fun')
   month('&plan=1')
   expect(stepNow()).toBe('Maintenance and fun')
+  // It opens the calendar and points at the month's routines there.
+  expect(calendarOpen()).toBe(true)
+  expect(calSheet().querySelector('[data-guide-anchor="routines"]')).not.toBeNull()
+  expect(screen.getByRole('dialog',{name:'Planning guide'})).toHaveAttribute('data-at','routines')
   await writeOn('Something fun for October','Corn maze')
   expect(api.addTask).toHaveBeenCalledWith('Corn maze',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT,isFun:true}))
   expect(lastRun().label).toBe('Add “Corn maze” for fun')
@@ -1405,7 +1432,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(screen.getByTestId('where').textContent).not.toContain('plan=1')
   expect(notesStore.patches).toHaveLength(0)
   expect(plan.save).not.toHaveBeenCalled()
-  expect(document.querySelector('.hs-layout')).not.toBeNull()
+  expect(document.querySelector('.plan-horizon-body')).not.toBeNull()
  })
  it('Year: last year’s open goals can be carried in at the look back',async()=>{
   api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
@@ -2213,6 +2240,8 @@ describe('every step’s tooltip points at its home on the everyday page',()=>{
  it.each(rows)('%s · %s → [data-guide-anchor="%s"]',(level,id,anchor)=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   open(pages[level])
+  // Month's routines are on its calendar sheet, drawn once it is unfolded.
+  if(anchor==='routines')fireEvent.keyDown(screen.getByRole('button',{name:/ calendar\. Unfold to read$/}),{key:'Enter'})
   const home=document.querySelector(`[data-guide-anchor="${anchor}"]`)
   expect(home).not.toBeNull()
   expect(home!.closest('[hidden]')).toBeNull()

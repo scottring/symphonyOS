@@ -11,6 +11,10 @@
 // dates by month (SeasonCalendar), Year the twelve months of exact-date
 // events (MonthsCalendar; the year's Landscape step is an editor, so it is
 // not drawn here).
+//
+// Routines are dated commitments (spec 2026-11-04): the routines at the
+// period's pace sit here too, each with its dates in the period
+// (SheetRoutines), where Month and Year's Routines strip used to float.
 
 import type { ReactNode } from 'react'
 import { useDayLoadEvents } from '@/hooks/useDayLoadEvents'
@@ -38,6 +42,54 @@ export function CalendarSheet({ kicker, title, children }: {
       {children}
       <SheetFoot>{CALENDAR_FOOT}</SheetFoot>
     </div>
+  )
+}
+
+/** A routine at the period's pace, with the days it falls on in the period. */
+export interface SheetRoutine { id: string; title: string; dates: Date[] }
+
+type RoutinesWord = 'month' | 'season' | 'year'
+const EMPTY_ROUTINES: Record<RoutinesWord, string> = {
+  month: 'No monthly routines.', season: 'No routines this season.', year: 'No yearly routines yet.',
+}
+/** Up to this many dates are listed; more read as their weekdays. */
+const MAX_LISTED = 3
+const and = (xs: string[]) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
+
+/** When a routine falls in the period, compactly: "Sat Nov 7 · Sun Nov 8"
+ *  (the year and season leave out the weekday: "Apr 15"). More than three
+ *  dates read as their weekdays ("every Tue", "every Sat and Sun"), or as
+ *  a count when they fall on more than three. */
+function routineWhen(dates: Date[], word: RoutinesWord): string[] {
+  if (dates.length <= MAX_LISTED) {
+    const opts: Intl.DateTimeFormatOptions = word === 'month' ? { weekday: 'short', month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric' }
+    return dates.map((d) => d.toLocaleDateString('en-US', opts).replace(',', ''))
+  }
+  const days = [...new Set(dates.map((d) => d.toLocaleDateString('en-US', { weekday: 'short' })))]
+  return [days.length <= MAX_LISTED ? `every ${and(days)}` : `${dates.length} days`]
+}
+
+/** "Routines this month" on the calendar sheet: each routine at the
+ *  period's pace with its dates, for reading. The Month session's
+ *  Maintenance and fun step points here. */
+export function SheetRoutines({ word, routines }: { word: RoutinesWord; routines: SheetRoutine[] }) {
+  const label = `Routines this ${word}`
+  return (
+    <section className="cal-sheet-routines" aria-label={label} data-guide-anchor="routines">
+      <h3 className="above-sheet-sub">{label}</h3>
+      {routines.length === 0
+        ? <p className="above-sheet-empty">{EMPTY_ROUTINES[word]}</p>
+        : <ul className="cal-sheet-routine-list">
+          {routines.map((r) => (
+            <li key={r.id}>
+              <i className="cal-sheet-rt" aria-hidden="true">↻</i>
+              <span className="cal-sheet-routine-title">{r.title}</span>
+              {/* Each date kept whole on a narrow sheet: "Sat Nov 7", never "Sat / Nov 7". */}
+              {routineWhen(r.dates, word).map((w, i) => <span key={i} className="cal-sheet-routine-when">{' · '}<span>{w}</span></span>)}
+            </li>
+          ))}
+        </ul>}
+    </section>
   )
 }
 

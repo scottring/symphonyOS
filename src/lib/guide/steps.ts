@@ -281,7 +281,8 @@ const MONTH: readonly GuideStep[] = [
   },
   {
     id: 'upkeep-fun',
-    at: 'write',
+    // The month's routines, on the calendar sheet (Routines this month).
+    at: 'routines',
     title: 'Maintenance and fun',
     minutes: 15,
     why: 'Bills, decluttering and supply orders come round again. Fun gets lost unless it\'s planned.',
@@ -289,6 +290,7 @@ const MONTH: readonly GuideStep[] = [
     guide: 'Shows the monthly routines and adds your fun lines.',
     more: 'Recurring upkeep is easy to forget between cycles, so it helps to see what is due. Fun works the same way in reverse: it rarely happens unless it has a line of its own. The lines are yours; the guide only adds what you name.',
     writes: ['plan_add'],
+    drives: { calendar: true },
   },
 ]
 

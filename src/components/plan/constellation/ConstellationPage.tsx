@@ -21,8 +21,9 @@
 // its landscape when one is written. Nothing on these pages says what an item
 // is for or what is under it, and rows carry no verbs: tapping a month or
 // season goal opens its task panel (horizonPanel.tsx), and a year goal opens
-// in place with Done, Let go and Edit wording. Month and Year keep a strip of
-// the routines at their pace. The bar's walk becomes "Plan November" while
+// in place with Done, Let go and Edit wording. The routines at the page's
+// pace sit on the calendar sheet with their dates (no strip: the spread
+// centers on the page). The bar's walk becomes "Plan November" while
 // that talk is due (planSchedule.ts), and a pending change card is drawn
 // dashed on the list (planPreview.ts).
 //
@@ -103,10 +104,9 @@ import { bootstrapCommitments } from '@/lib/placement/intentions'
 import type { Task } from '@/types/task'
 import { placementOf } from '@/lib/planning/placement'
 import { useRoutines } from '@/hooks/useRoutines'
-import { RoutinesStrip, type StripRoutine } from './AboveStrip'
 import { PaperFold, rememberFolded } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, LookSheet } from '@/components/plan/fold/AboveSheet'
-import { CalendarSheet, MonthGrid } from '@/components/plan/fold/CalendarSheet'
+import { CalendarSheet, MonthGrid, SheetRoutines, type SheetRoutine } from '@/components/plan/fold/CalendarSheet'
 import { WriteLine } from '@/components/plan/fold/WriteLine'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 import { GuidedPeriod, type PeriodSessionTools, type SessionFold } from '@/components/plan/guided/GuidedPeriod'
@@ -413,12 +413,13 @@ function Inner() {
   // The talk rides in the docked bar where there is one (desktop).
   const walkInBar = useConversationWalk(dueTalk ? { label: dueTalk.label, message: dueTalk.message } : null)
 
-  // The routines at this page's pace: monthly on Month, yearly on Year (none
-  // run by the season), each with when it falls in the period.
+  // The routines at this page's pace, each with the days it falls on in the
+  // period: monthly on Month, quarterly on Season, yearly on Year. They sit
+  // on the calendar sheet (SheetRoutines; spec 2026-11-04: routines are
+  // dated commitments), where the Routines strip used to float.
   const periodStartMs = bounds.start.getTime(), periodEndMs = bounds.end.getTime()
-  const stripRoutines = useMemo<StripRoutine[] | null>(() => {
-    if (level === 1) return null
-    const want = level === 2 ? 'monthly' : 'yearly'
+  const periodRoutines = useMemo<SheetRoutine[]>(() => {
+    const want = level === 2 ? 'monthly' : level === 1 ? 'quarterly' : 'yearly'
     const found = new Map<string, { title: string; dates: Date[] }>()
     const start = new Date(periodStartMs)
     for (let d = start; d.getTime() < periodEndMs; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
@@ -428,10 +429,9 @@ function Inner() {
         f.dates.push(d); found.set(r.id, f)
       }
     }
-    const fmt = (d: Date) => d.toLocaleDateString('en-US', level === 2 ? { weekday: 'short', month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric' })
     return [...found].sort((a, b) => a[1].dates[0].getTime() - b[1].dates[0].getTime())
-      .map(([id, f]) => ({ id, title: f.title, when: f.dates.map(fmt).join(' · '), onOpen: () => selection?.setSelection({ kind: 'routine', id }) }))
-  }, [level, periodStartMs, periodEndMs, getRoutinesForDate, layers, selection])
+      .map(([id, f]) => ({ id, title: f.title, dates: f.dates }))
+  }, [level, periodStartMs, periodEndMs, getRoutinesForDate, layers])
 
   if (requested === 3) return <Navigate replace to={`/week?view=alongside&date=${localYmd(anchor)}&start=${localYmd(weekStartAnchor(anchor, weekStartsOn))}`} />
 
@@ -873,10 +873,13 @@ function Inner() {
     ? <CalendarSheet kicker="What’s already claimed" title={periodWord}>
       <MonthGrid month={bounds.start} weekStartsOn={weekStartsOn} />
       <NextWeeks start={weekStartAnchor(bounds.start, weekStartsOn)} weeks={monthGridWeeks(bounds.start, weekStartsOn).length} />
+      <SheetRoutines word="month" routines={periodRoutines} />
     </CalendarSheet>
     : level === 1
       ? <CalendarSheet kicker={`Fixed dates · ${periodRange(bounds.start, bounds.end)}`} title={periodWord}>
         <SeasonCalendar date={bounds.start} seasons={seasons} />
+        {/* A season runs few routines of its own: the section only when it has some. */}
+        {periodRoutines.length > 0 && <SheetRoutines word="season" routines={periodRoutines} />}
       </CalendarSheet>
       : <CalendarSheet kicker="The 12 months" title={periodWord}>
         {/* The year's landscape, as written in its session (read-only, no
@@ -884,6 +887,7 @@ function Inner() {
             dates a month at most. */}
         {hasLandscape(yearNotes.notes.landscape) && <YearLandscapeSection value={yearNotes.notes.landscape} />}
         <MonthsCalendar start={bounds.start} end={bounds.end} allMonths perMonth={4} label={`${periodWord}, month by month`} over={`${periodWord} is over.`} />
+        <SheetRoutines word="year" routines={periodRoutines} />
       </CalendarSheet>
   // The life areas in view (the space filter; a legacy area with no space is
   // Personal): the guide's, and the writing step's chips.
@@ -949,7 +953,7 @@ function Inner() {
   // the look back turns the sheet above to the period before, with its
   // choices; otherwise they are the reader's, as they left them.
   const pageBody = (fold?: SessionFold) => (
-    <div className={`hs-main plan-horizon-body is-sheet${preview.next.length ? ' has-next' : ''}`}>
+    <div className={`plan-horizon-body is-sheet${preview.next.length ? ' has-next' : ''}`}>
     <div className="plan-sheet-spread">
       <PaperFold horizon={PERIODS[level]} edgeLabel={fold?.look ? prevB.label : aboveSheet.title} edgeCount={fold?.look ? undefined : aboveSheet.rows.length}
         frontLabel={fold?.look ? `${prevB.label}, looking back` : undefined}
@@ -1064,13 +1068,9 @@ function Inner() {
           <span className="pv2-saved-text"><b>{periodWord[0].toUpperCase() + periodWord.slice(1)} is planned.</b></span>
           <button type="button" className="pv2-btn wk-plan" onClick={planNext.onClick}>{planNext.label}</button>
         </div>}
-        <div className="hs-layout plan-with-strip">
-        {/* Month and Year: the routines at their pace (Season runs none of its own). */}
-        {stripRoutines && <RoutinesStrip key={`${level}:${localYmd(bounds.start)}`} id={PERIODS[level]} routines={stripRoutines}
-          empty={level === 2 ? 'No monthly routines.' : 'No yearly routines yet.'}
-          note={level === 2 ? 'Weekly routines are on the Week; every-day ones on Today.' : 'Monthly routines are on each month.'} />}
+        {/* The spread alone, centered: Month's and Year's routines are on
+            the calendar sheet, not in a strip beside it. */}
         {pageBody()}
-        </div>
       </>}
   </main>
 }

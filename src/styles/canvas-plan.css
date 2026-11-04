@@ -382,7 +382,7 @@
    folded beside it (PaperFold). The spread takes the page's full width, so
    the fold sizes itself from a width it does not feed (never shrink-to-fit);
    the cards under it keep the list's measure. */
-.plan-horizon-body.is-sheet, .plan-with-strip .plan-horizon-body.is-sheet { grid-template-columns: minmax(0, 1fr); }
+.plan-horizon-body.is-sheet { grid-template-columns: minmax(0, 1fr); }
 .plan-horizon .plan-horizon-body.is-sheet > :not(.plan-sheet-spread) { grid-column: 1; grid-row: auto; width: 100%; max-width: 46rem; justify-self: center; }
 .plan-sheet-spread { display: block; width: 100%; min-width: 0; }
 .plan-sheet { max-width: none; }

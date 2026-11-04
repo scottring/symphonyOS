@@ -15,7 +15,7 @@ export const PAGE_GUIDES: Record<string, string> = {
     'The year\'s calendar, its landscape and months, is folded at the right edge, for reading (tap the edge, drag it, or press C). ' +
     'Here the level above is last year\'s goals still open; carrying one in is the year session\'s Look back. ' +
     'Each row is a year goal: tap it for Done, Let go and Edit wording; drag it to order. Nothing says what is under it. The last line on the list, "Write a 2026 goal", writes a new one. ' +
-    'The strip on the left holds the yearly routines. Go to Fall (or the season shown) goes on to the season. The top bar moves between Today, Week, Month, Season and Year.',
+    'The yearly routines are on the year\'s calendar, under Routines this year, with their dates. Go to Fall (or the season shown) goes on to the season. The top bar moves between Today, Week, Month, Season and Year.',
   season:
     'A season is a brainstorm list for this stretch of the year: what you would like it to hold. A season goal has no date. ' +
     'The arrows beside the title step to the previous or next season. ' +
@@ -27,7 +27,7 @@ export const PAGE_GUIDES: Record<string, string> = {
     'Month answers one question: what do you want to accomplish this month? A month goal has no day; its days come in the week. ' +
     'The level above is folded at the left edge. Open it to read while you write this one in its own words (tap the edge, drag it, or press F). ' +
     'Here the level above is the season\'s goals. The month\'s calendar is folded at the right edge, for reading (tap the edge, drag it, or press C). ' +
-    'The list holds every goal for the month, written on its own: nothing says what a goal is for or what is under it. Tap one to open it; drag it to order. The strip on the left holds the monthly routines. ' +
+    'The list holds every goal for the month, written on its own: nothing says what a goal is for or what is under it. Tap one to open it; drag it to order. The monthly routines are on the month\'s calendar, under Routines this month, with their dates. ' +
     'The last line on the list, "Write a November goal", writes a new one. ' +
     'Go to this week opens Week. To turn a month goal into this week\'s tasks, tell Symphony what to do this week for a goal there.',
   week:

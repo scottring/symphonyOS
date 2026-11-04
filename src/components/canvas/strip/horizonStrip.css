@@ -110,13 +110,9 @@
   .wc-with-strip .wc-bars, .wc-with-strip .wc-dinners { display: none; }
 }
 
-/* Month and Year with their routines on the left. */
-.plan-with-strip { margin-top: 6px; }
-.plan-with-strip > .hs { position: sticky; top: 72px; max-height: calc(100vh - 96px); overflow: auto; }
-.plan-with-strip .plan-horizon-body { display: grid; grid-template-columns: minmax(0, 46rem); }
 .wc-with-strip > .hs { position: sticky; top: 72px; max-height: calc(100vh - 96px); overflow: auto; }
-/* Phones: the list first, the strip under it. */
-@media (max-width: 767px) { .plan-with-strip > .hs, .wc-with-strip > .hs { position: static; max-height: none; } .plan-with-strip > .hs { order: 1; } }
+/* Phones: the strip flows with the page. */
+@media (max-width: 767px) { .wc-with-strip > .hs { position: static; max-height: none; } }
 
 
 /* No day yet in the strip: the when-chips open under the row, wrapped, on
