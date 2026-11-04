@@ -14,7 +14,6 @@ import { createElement, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
 import { useOpenOnStep } from '@/hooks/useOpenOnStep'
 import { stepsFor, type GuideStep } from '@/lib/guide/steps'
-import { isLastStep } from '@/lib/guide/progress'
 import { weekToken } from '@/hooks/usePlanningSession'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
@@ -43,7 +42,7 @@ export function useGuidedWeek({ weekStart, count, choose, onFinish, onClose, onP
   onPlanned?: () => void
 }) {
   const token = weekToken(weekStart)
-  const { progress, loading, saveError, next, skip, jump, markPlanned, finish, setThreadId } = useGuidedProgress('week', token)
+  const { progress, loading, saveError, next, jump, markPlanned, finish, setThreadId } = useGuidedProgress('week', token)
   useOpenOnStep('week', loading, jump)
   const steps = stepsFor('week')
   const monthWord = choose.monthWord
@@ -90,8 +89,6 @@ export function useGuidedWeek({ weekStart, count, choose, onFinish, onClose, onP
       level: 'week', periodLabel, token, stepId: step.id,
       header: createElement(GuideHeader, {
         level: 'week', step: { ...step, title: stepTitle }, index, total: steps.length,
-        onNext: () => { void next() }, onSkip: () => { void skip() },
-        isLast: isLastStep(progress, 'week'), finishLabel: 'Done planning the week', onFinish: () => { void done() },
       }),
       sessionContext: {
         horizon: 'weekly', periodLabel, stepId: step.id, stepTitle,
@@ -109,7 +106,7 @@ export function useGuidedWeek({ weekStart, count, choose, onFinish, onClose, onP
       threadId: progress.threadId,
       onApplied: () => { void markPlannedOnce() },
     }
-  }, [loading, steps, progress, monthWord, weekStart, count, token, next, skip, done, aboveLines, setThreadId, markPlannedOnce])
+  }, [loading, steps, progress, monthWord, weekStart, count, token, aboveLines, setThreadId, markPlannedOnce])
   useGuidedSessionRegistration(registration)
 
   return { progress, loading, saveError, count, monthWord, choose, markPlannedOnce, jump, next, done, registration }

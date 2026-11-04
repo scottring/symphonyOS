@@ -11,7 +11,6 @@ import { createElement, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
 import { useOpenOnStep } from '@/hooks/useOpenOnStep'
 import { stepsFor } from '@/lib/guide/steps'
-import { isLastStep } from '@/lib/guide/progress'
 import { DAY_COUNT_OF, dayStepTitle } from '@/lib/guide/dayTarget'
 import { dayToken } from '@/hooks/usePlanningSession'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
@@ -37,7 +36,7 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
   onPlanned?: () => void
 }) {
   const token = dayToken(target)
-  const { progress, loading, saveError, next, skip, jump, markPlanned, finish, setThreadId } = useGuidedProgress('day', token)
+  const { progress, loading, saveError, next, jump, markPlanned, finish, setThreadId } = useGuidedProgress('day', token)
   useOpenOnStep('day', loading, jump)
   const steps = stepsFor('day')
   const dayWord = isTomorrow ? 'tomorrow' : 'today'
@@ -90,8 +89,6 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
       level: 'day', periodLabel, token, stepId: step.id,
       header: createElement(GuideHeader, {
         level: 'day', step: { ...step, title: stepTitle }, index, total: steps.length,
-        onNext: () => { void next() }, onSkip: () => { void skip() },
-        isLast: isLastStep(progress, 'day'), finishLabel: `Done planning ${dayWord}`, onFinish: () => { void done() },
       }),
       sessionContext: {
         horizon: 'daily', periodLabel, stepId: step.id, stepTitle,
@@ -108,7 +105,7 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
       threadId: progress.threadId,
       onApplied: () => { void markPlannedOnce() },
     }
-  }, [loading, steps, progress, isTomorrow, target, token, dayWord, count, next, skip, done, setThreadId, markPlannedOnce])
+  }, [loading, steps, progress, isTomorrow, target, token, dayWord, count, setThreadId, markPlannedOnce])
   useGuidedSessionRegistration(registration)
 
   return { progress, loading, saveError, actions: reported, markPlannedOnce, jump, next, done, registration }

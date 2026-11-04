@@ -189,7 +189,7 @@ describe('GuidedDay — Today while planning the day', () => {
     // On to Habits, past the steps between: the win's draft is the session's.
     await act(async () => { fireEvent.click(rail().getByRole('button', { name: /Habits/ })) })
     expect(panel().queryByRole('button', { name: 'Next step' })).toBeNull()
-    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Done planning today' })) })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Done planning today' })) })
     await waitFor(() => expect(props.onClose).toHaveBeenCalled())
     expect(review.finish).toHaveBeenCalledWith({ wentWell: 'Shipped it', didnt: '' })
     expect(store.order).toEqual(['review', 'planned', 'finished'])
@@ -198,7 +198,7 @@ describe('GuidedDay — Today while planning the day', () => {
   it('a closing write that fails keeps the session open', async () => {
     store.notes = { guide: { current: 'habits', done: [], skipped: [] } }
     const { props } = open({ isTomorrow: true, target: TUE, lookBackOn: MON, onFinish: vi.fn(async () => false) })
-    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Done planning tomorrow' })) })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Done planning tomorrow' })) })
     expect(props.onClose).not.toHaveBeenCalled()
     expect(store.order).not.toContain('finished')
   })

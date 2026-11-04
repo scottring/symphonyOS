@@ -24,7 +24,6 @@ import { useOpenOnStep } from '@/hooks/useOpenOnStep'
 import { usePlanningNotes, type NotesPatch, type PlanningNotes } from '@/hooks/usePlanningNotes'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import { HORIZON_OF, choosingStep, stepsFor } from '@/lib/guide/steps'
-import { isLastStep } from '@/lib/guide/progress'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
 import { GuideRibbon } from '@/components/guide/GuideRibbon'
@@ -92,7 +91,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   const [openedAt] = useState(() => Date.now())
   const steps = stepsFor(level)
   const CHOOSING = choosingStep(level).id
-  const { progress, loading, saveError, next, skip, jump, markPlanned, finish, setThreadId } = useGuidedProgress(level, token)
+  const { progress, loading, saveError, next, jump, markPlanned, finish, setThreadId } = useGuidedProgress(level, token)
   useOpenOnStep(level, loading, jump)
   const { notes, patch } = usePlanningNotes(HORIZON_OF[level], token)
   const [lookDraft, setLookDraft] = useState<ReviewNotes | null>(null)
@@ -144,8 +143,6 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
       level, periodLabel, token, stepId: step.id,
       header: createElement(GuideHeader, {
         level, step, index, total: steps.length,
-        onNext: () => { void next() }, onSkip: () => { void skip() },
-        isLast: isLastStep(progress, level), finishLabel, onFinish: () => { void done() },
       }),
       sessionContext: {
         horizon: HORIZON_OF[level], periodLabel, stepId: step.id, stepTitle: step.title,
@@ -157,7 +154,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
       threadId: progress.threadId,
       onApplied: () => { void markPlannedOnce() },
     }
-  }, [loading, steps, progress, level, periodLabel, token, finishLabel, next, skip, done, above, areaList, setThreadId, markPlannedOnce])
+  }, [loading, steps, progress, level, periodLabel, token, above, areaList, setThreadId, markPlannedOnce])
   useGuidedSessionRegistration(registration)
 
   const index = Math.max(0, steps.findIndex((s) => s.id === progress.current))

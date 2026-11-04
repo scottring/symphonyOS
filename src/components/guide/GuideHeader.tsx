@@ -1,7 +1,8 @@
 // What the current step is for, in three plain lines: Why, You, Guide. "Explain
 // more" opens the longer note inline. Step copy is fixed text, never model output.
-// It tops the session's conversation; the page's own controls are the
-// planning ribbon's band (GuideRibbon).
+// It tops the session's conversation. The planning ribbon's band owns the
+// session's navigation (Back, Next, Done planning, Leave): one Next, on the
+// page, never a second one here (fix round 1, 2026-11-04).
 
 import { useState } from 'react'
 import type { GuideLevel, GuideStep } from '@/lib/guide/steps'
@@ -13,15 +14,9 @@ export interface GuideHeaderProps {
   /** Zero-based position of the step. */
   index: number
   total: number
-  onNext: () => void
-  onSkip: () => void
-  isLast: boolean
-  /** "Done planning the week" */
-  finishLabel: string
-  onFinish: () => void
 }
 
-export function GuideHeader({ level, step, index, total, onNext, onSkip, isLast, finishLabel, onFinish }: GuideHeaderProps) {
+export function GuideHeader({ level, step, index, total }: GuideHeaderProps) {
   const [more, setMore] = useState(false)
   const lines = (
     <dl className="guide-header-lines">
@@ -40,10 +35,6 @@ export function GuideHeader({ level, step, index, total, onNext, onSkip, isLast,
         <button type="button" className="guide-btn" aria-expanded={more} onClick={() => setMore(m => !m)}>
           {more ? 'Show less' : 'Explain more'}
         </button>
-        {!isLast && <button type="button" className="guide-btn" onClick={onSkip}>Skip this step</button>}
-        {isLast
-          ? <button type="button" className="guide-btn guide-btn-primary" onClick={onFinish}>{finishLabel}</button>
-          : <button type="button" className="guide-btn guide-btn-primary" onClick={onNext}>Next step</button>}
       </div>
     </header>
   )

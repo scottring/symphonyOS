@@ -252,7 +252,9 @@ const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
 // Done planning the week: the step header's button (the shell shows it above
 // the conversation; Shell stands in for it).
 const finishPlanning = async () => {
-  fireEvent.click(within(await screen.findByTestId('guide-panel')).getByRole('button', { name: 'Done planning the week' }))
+  await screen.findByTestId('guide-panel')
+  // The band owns navigation (fix round 1): Done planning is on the ribbon.
+  fireEvent.click(await screen.findByRole('button', { name: 'Done planning the week' }))
 }
 function Shell() {
   const reg = useGuidedSession()
@@ -313,9 +315,8 @@ describe('WeekV2 — Review opens the deck', () => {
     fireEvent.change(await screen.findByLabelText('What went well'), { target: { value: ' Rested ' } })
     fireEvent.change(screen.getByLabelText('What didn’t'), { target: { value: 'Late nights' } })
     // Walk on to the last step: the draft outlives Look back's body.
-    const panel = within(screen.getByTestId('guide-panel'))
-    for (let i = 0; i < 8 && !panel.queryByRole('button', { name: 'Done planning the week' }); i++) {
-      fireEvent.click(panel.getByRole('button', { name: 'Next step' }))
+    for (let i = 0; i < 8 && !screen.queryByRole('button', { name: 'Done planning the week' }); i++) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
       await screen.findByTestId('guide-panel')
     }
     await finishPlanning()

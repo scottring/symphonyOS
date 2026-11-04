@@ -776,7 +776,7 @@ describe('WeekViewV2 — the deck', () => {
     onSeeAged: () => void
   }
   // What the old flow was handed, read off the deck and the session now:
-  // Done planning is the session's header (the shell's), Leave its bar.
+  // Done planning and Next are the session's band (GuidedWeek's), Leave too.
   const props = (): FlowProps => {
     const deck = deckMock.deck as unknown as FlowProps
     const mode = screen.getByTestId('deck').getAttribute('data-mode') as 'full' | 'place'
@@ -786,7 +786,7 @@ describe('WeekViewV2 — the deck', () => {
       onLeave: mode === 'full' ? (deckMock.guided as unknown as { onLeave: () => void }).onLeave : place.onLeave,
       onFinish: async () => {
         if (mode === 'place') { place.primary.run(); return }
-        fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Done planning the week' }))
+        (deckMock.guided as unknown as { onFinish: () => void }).onFinish()
         await new Promise((r) => setTimeout(r, 0))
       },
     }
@@ -1149,7 +1149,7 @@ describe('WeekViewV2 — the deck', () => {
     expect(screen.getByTestId('deck')).toHaveAttribute('data-mode', 'full')
     // It opens on the look back (?step=look-back), not where the session was left.
     expect(within(screen.getByTestId('guide-panel')).getByText('Look back at last week')).toBeInTheDocument()
-    for (let i = 0; i < 6; i++) await act(async () => { fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Next step' })) })
+    for (let i = 0; i < 6; i++) await act(async () => { (deckMock.guided as unknown as { onNext: () => void }).onNext() })
     expect(document.querySelector('.pv2-week')).toHaveAttribute('data-week', '2026-10-24')
     expect(props().choose.looseEnds.map((c) => c.key)).toEqual(['b'])
     await act(async () => { await props().onFinish() })

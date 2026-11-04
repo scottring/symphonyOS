@@ -771,7 +771,7 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument()
     expect(search().get('date')).toBeNull()
     // Tomorrow's calendar: the page goes to tomorrow, the session with it.
-    await user.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Next step' }))
+    await user.click(within(document.querySelector<HTMLElement>('.ribbon-band')!).getByRole('button', { name: 'Next' }))
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0, 1)))).toBeInTheDocument())
     expect(search().get('date')).toBe(localYmd(at(0, 1)))
     expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
@@ -793,7 +793,7 @@ describe('TodayView — the Day session', () => {
     await user.click(screen.getByRole('button', { name: 'Plan today' }))
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0, -1)))).toBeInTheDocument())
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
-    await user.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Next step' }))
+    await user.click(within(document.querySelector<HTMLElement>('.ribbon-band')!).getByRole('button', { name: 'Next' }))
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: 'Leave' }))
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
@@ -892,7 +892,7 @@ describe('TodayView — the Day session', () => {
     dayNotes.notes = { guide: { current: 'habits', done: [], skipped: [] } }
     localStorage.setItem('symphony-fold:day', 'open')
     renderAt(10, { url: '/?plan=1' })
-    await act(async () => { fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Done planning today' })) })
+    await act(async () => { fireEvent.click(within(document.querySelector<HTMLElement>('.ribbon-band')!).getByRole('button', { name: 'Done planning today' })) })
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
     // Done planning folds the week beside the day, and it stays folded.
     expect(localStorage.getItem('symphony-fold:day')).toBe('folded')

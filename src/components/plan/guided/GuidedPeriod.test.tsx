@@ -126,16 +126,25 @@ describe('GuidedPeriod — Month, Season and Year while planning: a ribbon on th
     expect(panel().getByText('The month by area')).toBeInTheDocument()
   })
 
-  it('Next, Back and Skip move and are saved; Leave writes nothing more', async () => {
+  it('Next, a step and Back move and are saved; Leave writes nothing more', async () => {
     const p = setup()
     await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
-    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Skip this step' })) })
+    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Read the season list/ })) })
     await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Back' })) })
     expect(guideSteps()).toEqual(['look-back', 'read-season', 'look-back'])
     const before = store.patches.length
     fireEvent.click(band().getByRole('button', { name: 'Leave' }))
     expect(p.onLeave).toHaveBeenCalled()
     expect(store.patches).toHaveLength(before)
+  })
+
+  // Fix round 1 ruling: the band owns navigation. One Next on the page; the
+  // conversation's header explains the step and moves nothing.
+  it('there is one Next, the band’s; the conversation’s header has no Next, Skip or Done', () => {
+    setup()
+    expect(screen.getAllByRole('button', { name: 'Next' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: /^(Next step|Skip this step)$/ })).toBeNull()
+    expect(panel().getByRole('button', { name: 'Explain more' })).toBeInTheDocument()
   })
 
   it('pulling the bookmark again is Leave', () => {
@@ -192,7 +201,7 @@ describe('GuidedPeriod — Month, Season and Year while planning: a ribbon on th
   it('a closing write that failed keeps the session open', async () => {
     store.notes = { guide: { current: 'upkeep-fun', done: [], skipped: [] } }
     const p = setup({ onFinish: vi.fn(async () => false) })
-    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Done planning November' })) })
+    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Done planning November' })) })
     expect(p.onFinish).toHaveBeenCalledWith(null)
     expect(p.onLeave).not.toHaveBeenCalled()
     expect((store.notes.guide as { finishedAt?: string }).finishedAt).toBeUndefined()
@@ -214,7 +223,8 @@ describe('GuidedPeriod — Month, Season and Year while planning: a ribbon on th
     const fall = within(screen.getByRole('region', { name: 'Plan Fall' }))
     expect(fall.getAllByRole('listitem')).toHaveLength(7)
     expect(fall.getByRole('button', { name: 'Done planning Fall' })).toBeInTheDocument()
-    expect(panel().getByRole('button', { name: 'Done planning Fall' })).toBeInTheDocument()
+    // The band owns navigation: the conversation's header has none.
+    expect(panel().queryByRole('button', { name: /Done planning|Next|Skip/ })).toBeNull()
     expect(shell.reg).toMatchObject({ level: 'season', threadKey: 'seasonal:2026-fall' })
   })
 })

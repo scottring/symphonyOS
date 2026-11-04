@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { GuideHeader } from './GuideHeader'
 import { stepsFor } from '@/lib/guide/steps'
 
 const step = stepsFor('week')[1]
-const base = { level: 'week' as const, step, index: 1, total: 7, onNext: vi.fn(), onSkip: vi.fn(), isLast: false, finishLabel: 'Done planning the week', onFinish: vi.fn() }
+const base = { level: 'week' as const, step, index: 1, total: 7 }
 
 describe('GuideHeader', () => {
   it('shows title, why, you and guide', () => {
@@ -25,19 +25,11 @@ describe('GuideHeader', () => {
     expect(screen.queryByText(step.more)).toBeNull()
   })
 
-  it('calls next and skip', () => {
+  // Fix round 1 ruling: the planning ribbon's band owns the session's
+  // navigation; the conversation's header only explains the step.
+  it('has no Next, Skip or Done: the band on the page holds them', () => {
     render(<GuideHeader {...base} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Skip this step' }))
-    expect(base.onNext).toHaveBeenCalled()
-    expect(base.onSkip).toHaveBeenCalled()
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Explain more'])
   })
 
-  it('uses the finish label on the last step', () => {
-    const onFinish = vi.fn()
-    render(<GuideHeader {...base} isLast onFinish={onFinish} />)
-    expect(screen.queryByRole('button', { name: 'Next step' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Done planning the week' }))
-    expect(onFinish).toHaveBeenCalled()
-  })
 })
