@@ -86,6 +86,7 @@ struct PlanWriter {
             task.context = lifeArea
             TaskViewModel(modelContext: context).reconcileScope(task, members: members)
         }
+        if destination != .someday { revive(task) }
         switch destination {
         case .today:
             let day = PlanCalendar.day(Date())
@@ -124,6 +125,7 @@ struct PlanWriter {
     @discardableResult
     func planTask(_ task: SymphonyTask, on date: Date) -> Snapshot {
         var snap = Snapshot(tasks: [capture(task)])
+        revive(task)
         let day = PlanCalendar.day(date)
         placeOnDay(task, day: day, allDay: true)
         if PlanCalendar.calendar.isDateInToday(day) { snap.createdFocus += focus(task, on: day) }
@@ -157,6 +159,16 @@ struct PlanWriter {
         _ = ensureCommitment(t, level: level, periodStart: start)
         save()
         return t
+    }
+
+    /// Any placement brings a task that was let go back (as the web): placing
+    /// it is changing your mind. School papers keep their "Not ours"
+    /// (`dismissed_at` means something else for them). The snapshot taken
+    /// before it keeps the old value, so Undo lets it go again.
+    private func revive(_ task: SymphonyTask) {
+        guard task.dismissedAt != nil, task.category != "paper" else { return }
+        task.dismissedAt = nil
+        task.dismissedAtDirty = true
     }
 
     private func placeOnDay(_ task: SymphonyTask, day: Date, allDay: Bool) {
@@ -361,6 +373,7 @@ struct PlanWriter {
     @discardableResult
     func keep(_ task: SymphonyTask, from old: TaskCommitment, into week: Date) -> Snapshot {
         var snap = Snapshot(tasks: [capture(task)])
+        revive(task)
         let ws = PlanCalendar.weekStart(week)
         snap.changedCommitments.append((old.id, old.status, old.endedAt, old.carriedTo))
         old.status = "carried"

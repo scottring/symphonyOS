@@ -208,6 +208,49 @@ struct WeekLookBackTests {
         #expect(week.status == "open" && nov.status == "open")
     }
 
+    @Test func placingATaskLetGoBringsItBack() throws {
+        let ctx = try makeContext()
+        let t = SymphonyTask(userId: me, title: "Plan winter vacation", context: "family")
+        t.bucket = "week"
+        ctx.insert(t)
+        let writer = PlanWriter(context: ctx, userId: me)
+        writer.letGo(t)
+        #expect(t.dismissedAt != nil)
+        try ctx.save()
+        t.dismissedAtDirty = false   // as after the push
+
+        let snap = writer.move(t, to: .thisWeek)
+        #expect(t.dismissedAt == nil && t.dismissedAtDirty)
+        let ws = PlanCalendar.weekStart(Date())
+        let plan = PlanSnapshot(tasks: [t], commitments: try ctx.fetch(FetchDescriptor<TaskCommitment>()),
+                                focus: [], routines: [], instances: [], userId: me, domain: nil)
+        #expect(plan.week(ws).anyDay.map(\.id) == [t.id])
+        let row = try #require(SyncEngine.serializeRow(table: "tasks", id: t.id, context: ctx))
+        #expect(row.keys.contains("dismissed_at") && row["dismissed_at"]?.stringValue == nil)
+
+        // Undo lets it go again.
+        writer.undo(snap)
+        #expect(t.dismissedAt != nil)
+    }
+
+    @Test func aDayBringsItBackButSomedayAndASchoolPaperDoNot() throws {
+        let ctx = try makeContext()
+        let writer = PlanWriter(context: ctx, userId: me)
+        let gone = Date()
+        let day = SymphonyTask(userId: me, title: "Day", context: "family")
+        let later = SymphonyTask(userId: me, title: "Someday", context: "family")
+        let paper = SymphonyTask(userId: me, title: "Field trip form", context: "family")
+        paper.category = "paper"
+        for t in [day, later, paper] { t.dismissedAt = gone; ctx.insert(t) }
+
+        writer.planTask(day, on: Date())
+        writer.move(later, to: .someday)
+        writer.move(paper, to: .today)
+        #expect(day.dismissedAt == nil && day.dismissedAtDirty)
+        #expect(later.dismissedAt == gone && !later.dismissedAtDirty)
+        #expect(paper.dismissedAt == gone && !paper.dismissedAtDirty)   // "Not ours" stays
+    }
+
     @Test func aPlainEditNeverSendsDismissedAt() throws {
         let ctx = try makeContext()
         let t = SymphonyTask(userId: me, title: "Let go on the web")
