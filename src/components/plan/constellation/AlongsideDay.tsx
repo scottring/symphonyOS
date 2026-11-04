@@ -61,7 +61,9 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
   // Where Today draws "Routines {day}" on this sheet (TodayView holds the
   // day's plan and its writers; fix round 2, 2026-11-04).
   const [routinesSlot, setRoutinesSlot] = useState<HTMLElement | null>(null)
-  const workspace = useMemo<AlongsideWorkspace | null>(() => weekView ? null : { weekFolded: true, routinesSlot }, [weekView, routinesSlot])
+  // Today drives the week open for the guide's Today step (PaperFold `drive`).
+  const [weekDrive, setWeekDrive] = useState<boolean | undefined>(undefined)
+  const workspace = useMemo<AlongsideWorkspace | null>(() => weekView ? null : { weekFolded: true, routinesSlot, driveWeek: setWeekDrive }, [weekView, routinesSlot])
   const lock = useRef(false)
   const wso = readCadenceConfig().weekStartsOn
   const week = weekStartAnchor(date, wso)
@@ -113,6 +115,7 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
           // A session stows the fold rather than unmounting it, so the day
           // under it keeps its state.
           <PaperFold horizon="day" className="today-fold ad-fold" stowed={stepAside} edgeLabel={range} edgeCount={open.length}
+            drive={weekDrive === undefined ? undefined : { above: weekDrive }}
             frontLabel={`${range}, to pick from`}
             above={<AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`}
               rows={open.map((t) => ({ id: t.id, title: t.title }))} doneCount={doneCount} foot={TODAY_WEEK_FOOT}

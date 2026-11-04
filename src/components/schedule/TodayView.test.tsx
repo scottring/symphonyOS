@@ -62,6 +62,9 @@ vi.mock('@/hooks/useDayLoadEvents', () => ({
   useDayLoadEvents: () => ({ events: [], available: true, loading: false, failed: false,
     range: { start: Date.now() - 30 * 86_400_000, end: Date.now() + 90 * 86_400_000 } }),
 }))
+// A guided run's step (retired, but Today still asks whether one is on its step).
+const guide = vi.hoisted(() => ({ state: null as null | Record<string, unknown> }))
+vi.mock('@/hooks/useGuidedPlan', () => ({ GuideProvider: ({ children }: { children: unknown }) => children, useGuidedPlan: () => ({ state: guide.state }) }))
 vi.mock('@/components/home/week/useWeekInstances', () => ({ useWeekInstances: () => [] }))
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
@@ -115,7 +118,11 @@ async function openOverflow(user: { click: (el: Element) => Promise<void> }) {
 }
 
 function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<string, unknown> = {}) {
-  return render(
+  return render(viewElement(props, ctxOverrides))
+}
+
+function viewElement(props: Record<string, unknown> = {}, ctxOverrides: Record<string, unknown> = {}) {
+  return (
     <ScheduleActionsProvider value={{ ...ctxValue, ...ctxOverrides } as never}>
       <TodayView
         tasks={[]} events={[]} routines={[]} dateInstances={[]}
@@ -949,6 +956,21 @@ describe('Today with the week folded beside it', () => {
       localStorage.removeItem('symphony-fold:day')
     })
   }
+
+  // The guide's Today step asks you to choose from the week, so the week is
+  // beside the day for it, without changing the fold you keep afterwards
+  // (walkthrough 2026-09-30; restored through PaperFold's drive, Task 5c).
+  it('the guide’s Today step opens the week without remembering it; leaving the step folds it back', () => {
+    setup()
+    onTestFinished(() => { guide.state = null })
+    guide.state = { v: 1, route: 'today', steps: ['week', 'today'], periods: {}, current: 1, done: [], status: 'active', updatedAt: '' }
+    const { rerender } = renderView({ tasks: weekTasks, viewedDate: NOV4 })
+    expect(screen.getByRole('button', { name: 'Fold Oct 31 – Nov 6 away' })).toHaveAttribute('aria-expanded', 'true')
+    expect(localStorage.getItem('symphony-fold:day')).toBeNull()
+    guide.state = null
+    rerender(viewElement({ tasks: weekTasks, viewedDate: NOV4 }))
+    expect(screen.getByRole('button', { name: 'Oct 31 – Nov 6, 2 open. Unfold to read' })).toHaveAttribute('aria-expanded', 'false')
+  })
 
   it('shows an edge named for the week’s dates and its open no-day count', () => {
     setup()

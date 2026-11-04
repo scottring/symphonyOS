@@ -2,6 +2,8 @@ import {fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import {MemoryRouter} from 'react-router-dom'
 import {vi,it,expect,beforeEach,onTestFinished} from 'vitest'
 import {AlongsideDay} from './AlongsideDay'
+import {useAlongsideWorkspace} from './AlongsideContext'
+import {useEffect} from 'react'
 import type {Task} from '@/types/task'
 vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[]})}))
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
@@ -104,4 +106,18 @@ it('the Week page’s workspace has no fold of its own',()=>{
  render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}} weekView><p>Week</p></AlongsideDay></MemoryRouter>)
  expect(screen.getByText('Week')).toBeInTheDocument()
  expect(document.querySelector('.paper-fold')).toBeNull()
+})
+
+// The guide's Today step (restored, Task 5c): Today asks the workspace to
+// open the week beside the day for the step, without remembering it.
+it('the day can drive the week open for a while; letting go returns it to what was remembered',()=>{
+ function Day({open}:{open?:boolean}){const ws=useAlongsideWorkspace();useEffect(()=>{ws?.driveWeek(open)},[ws,open]);return <p>The day</p>}
+ const view=(open?:boolean)=><MemoryRouter><AlongsideDay tasks={[task]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}><Day open={open}/></AlongsideDay></MemoryRouter>
+ const {rerender}=render(view())
+ expect(screen.getByRole('button',{name:/Unfold to read$/})).toHaveAttribute('aria-expanded','false')
+ rerender(view(true))
+ expect(screen.getByRole('button',{name:'Fold Oct 4 – Oct 10 away'})).toHaveAttribute('aria-expanded','true')
+ expect(localStorage.getItem('symphony-fold:day')).toBeNull()
+ rerender(view(undefined))
+ expect(screen.getByRole('button',{name:/Unfold to read$/})).toHaveAttribute('aria-expanded','false')
 })

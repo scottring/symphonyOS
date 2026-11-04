@@ -124,7 +124,7 @@ export function SheetRoutines({ plan, day, actions }: { plan: DayPlan; day: Date
   </>
 }
 
-export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek, chooseTask, restoreTask, className, stowed, children }: {
+export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek, chooseTask, restoreTask, className, stowed, drive, children }: {
   plan: DayPlan
   day: Date
   weekNo: number
@@ -140,6 +140,9 @@ export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek,
   className?: string
   /** A session runs on the page: the fold is put away, the day stays mounted. */
   stowed?: boolean
+  /** The page opens the week for now, without it being remembered (the
+   *  guide's Today step). Undefined: the reader's own fold. */
+  drive?: boolean
   /** The day. */
   children: ReactNode
 }) {
@@ -156,6 +159,7 @@ export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek,
 
   return (
     <PaperFold horizon="day" stowed={stowed} className={['today-fold', className].filter(Boolean).join(' ')} edgeLabel={range} edgeCount={open.length}
+      drive={drive === undefined ? undefined : { above: drive }}
       frontLabel={`${range}, to pick from`}
       above={<>
         <AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`} rows={rows}

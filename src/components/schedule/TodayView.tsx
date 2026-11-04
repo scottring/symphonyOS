@@ -94,6 +94,8 @@ import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { GuideAnchor } from '@/components/guide/GuideBar'
+import { useGuidedPlan } from '@/hooks/useGuidedPlan'
+import { currentStep } from '@/lib/guide/guidedPlan'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { WeatherChip } from './WeatherChip'
 import { parseSpecials } from '@/lib/today/specials'
@@ -369,6 +371,17 @@ export function TodayView({
   // the This week column and its view icons. Folding is how it goes away;
   // PaperFold remembers which way it was left (symphony-fold:day).
   const alongsideWorkspace = useAlongsideWorkspace()
+  // The guide's Today step asks you to choose from the week, so the week is
+  // beside the day for it — without changing the fold you keep afterwards
+  // (walkthrough 2026-09-30: the step opened on the day alone). PaperFold's
+  // `drive` opens it without remembering it, and hands it back after.
+  const { state: guide } = useGuidedPlan()
+  const guideOnToday = guide?.status === 'active' && currentStep(guide) === 'today'
+  useEffect(() => {
+    if (!guideOnToday || !alongsideWorkspace) return
+    alongsideWorkspace.driveWeek(true)
+    return () => alongsideWorkspace.driveWeek(undefined)
+  }, [guideOnToday, alongsideWorkspace])
   // ── The Day session (spec 2026-11-01): ?plan=1 runs it on this page,
   // replacing Plan today / Review today. It plans today until 4 pm and
   // tomorrow from 4 pm (dayTarget); which day is fixed when it opens, so 4 pm
@@ -1265,7 +1278,7 @@ export function TodayView({
     {alongsideWorkspace.routinesSlot && !sessionShown && createPortal(
       <SheetRoutines plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />, alongsideWorkspace.routinesSlot)}
   </> : (
-    <TodayWeekFold stowed={sessionShown} plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
+    <TodayWeekFold stowed={sessionShown} drive={guideOnToday ? true : undefined} plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
       weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
       nextWeek={nextWeek}
       chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
