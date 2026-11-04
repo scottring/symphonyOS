@@ -89,8 +89,18 @@ li[data-state='skipped'] .ribbon-step-title { font-style: italic; }
 .ribbon-page { min-width: 0; }
 
 /* ---- the bookmark: hanging from the top of this period's sheet ---- */
+/* The bookmark hangs ABOVE its sheet's top edge and reaches at most 18px
+   into the sheet's top padding, never over text or controls (final review,
+   2026-11-04: it covered the first row on Month and "+ Add task" on Today).
+   Its foot is pinned (`bottom`), so a hover or a pull grows it upward.
+   --ribbon-reach is how far below the host's top it may end: 0 where the
+   host's content starts at its top (the week's days), negative where the
+   sheet's padding sits above the host (a period's list). It hangs at the
+   sheet's left, where the page header above has no controls (those are at
+   the right: the primary and ⋯). */
 .ribbon-tab {
-  position: absolute; top: -6px; right: 54px; width: 30px; height: 86px; border: 0; padding: 0; cursor: pointer; z-index: 4;
+  position: absolute; top: auto; bottom: calc(100% - var(--ribbon-reach, 0px)); left: 54px; right: auto;
+  width: 30px; height: 86px; border: 0; padding: 0; cursor: pointer; z-index: 4;
   background: linear-gradient(90deg, var(--ribbon) 0%, var(--ribbon-hi) 50%, var(--ribbon) 100%);
   -webkit-font-smoothing: antialiased;
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%);
@@ -131,7 +141,9 @@ li[data-state='skipped'] .ribbon-step-title { font-style: italic; }
   .ribbon-band-nav { margin-left: 0; }
   .ribbon-band-note { grid-template-columns: 1fr; }
   .ribbon-card { width: 100%; margin-top: -8px; border-radius: 0 0 8px 8px; padding: 14px 14px 16px; }
-  .ribbon-tab { right: 18px; }
+  /* On a phone the page header puts its words at the left: the bookmark
+     hangs at the right. */
+  .ribbon-tab { left: auto; right: 18px; }
   .ribbon-stamp { right: 56px; top: 18px; width: 76px; height: 76px; }
 }
 
@@ -142,3 +154,29 @@ li[data-state='skipped'] .ribbon-step-title { font-style: italic; }
 
 /* What the bookmark hangs from: this period's sheet, the week's days, the day. */
 .ribbon-host { position: relative; }
+/* A period's list starts 34px under the sheet's top edge (its padding and
+   the list's own offset): the foot ends 18px into that, 16px above the
+   first row. */
+.plan-sheet.ribbon-host { --ribbon-reach: -16px; }
+/* Today's masthead runs the full width over the day (the title and its lines
+   at the left, the primary and ⋯ at the right), so the bookmark hangs in the
+   page's right margin, beside the day's top edge. */
+.today-ribbon-host > .ribbon-tab { left: auto; right: -38px; }
+@media (max-width: 767px) { .today-ribbon-host > .ribbon-tab { right: 0; } }
+/* On a phone nothing above a period's sheet or the week's days is free (the
+   level above stacks over the sheet; the week's header has its words at the
+   left and ⋯ at the right), so the bookmark is only its 18px foot, inside
+   the top padding: the sheet's own, or 18px the days take while it shows.
+   (The header's own primary, "Plan November" / "Plan this week", is the
+   larger way in on a phone.) */
+@media (max-width: 760px) {
+  /* A period's sheet: the bookmark hangs from the sheet itself (its padding
+     differs on a phone), at its top edge. */
+  .paper-fold-current:has(> .plan-sheet.ribbon-host > .ribbon-tab) { position: relative; }
+  .plan-sheet.ribbon-host:has(> .ribbon-tab) { position: static; }
+  .plan-sheet.ribbon-host > .ribbon-tab { top: 0; bottom: auto; }
+  .wc-phone.ribbon-host:has(> .ribbon-tab) { padding-top: 18px; --ribbon-reach: 18px; }
+  :is(.plan-sheet, .wc-phone).ribbon-host > .ribbon-tab,
+  :is(.plan-sheet, .wc-phone).ribbon-host > .ribbon-tab:hover { height: 18px; min-height: 0; min-width: 0; filter: none; }
+  :is(.plan-sheet, .wc-phone).ribbon-host > .ribbon-tab span { display: none; }
+}

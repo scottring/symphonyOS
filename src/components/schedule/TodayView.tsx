@@ -1420,7 +1420,7 @@ export function TodayView({
           While the Day session runs, this is its page: the steps rail stands
           beside it and the fold is put away. */}
       {inDaySession(<div className={sessionShown ? '' : 'px-4 md:px-0'}>
-        {withWeek(<main className="min-w-0 ribbon-host">
+        {withWeek(<main className="min-w-0 ribbon-host today-ribbon-host">
           {/* The planning ribbon's bookmark on the day (fix round 1): the same
               session Plan today starts; in a session, the pulled ribbon. */}
           {(dayFlowOffer || sessionShown) && <RibbonTab label={`Plan ${dayWord}`} onPull={openDaySession} />}

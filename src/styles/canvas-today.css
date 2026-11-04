@@ -361,7 +361,10 @@
   text-decoration: underline; text-decoration-color: var(--color-primary-200); text-underline-offset: 3px; cursor: pointer;
 }
 .today-sentence-link:hover { text-decoration-color: currentColor; }
-.today-sentence-meta { font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-500); white-space: nowrap; }
+/* It wraps within the masthead's column: kept on one line, a long dinner
+   pushed the weather under "Plan today" and ⋯ and past the page's edge
+   (visual check, 2026-11-04). Each part (the weather) keeps itself whole. */
+.today-sentence-meta { font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-500); white-space: normal; }
 /* Tonight's dinner in the day's line: quiet, but a link to the recipe or plan. */
 .today-dinner { color: inherit; text-decoration: underline; text-decoration-color: var(--color-neutral-300); text-underline-offset: 2px; }
 .today-dinner:hover { color: var(--color-neutral-800); text-decoration-color: currentColor; }
