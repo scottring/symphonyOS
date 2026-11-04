@@ -12,24 +12,37 @@ describe('TriageWhenMenu', () => {
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
-  // Paper-style horizons (spec 2026-11-04): nothing moves up from the week
-  // to a month. The When menu offers no "This month" or "Next month".
-  it('offers no This month or Next month', async () => {
-    const { user } = render(<TriageWhenMenu onPick={vi.fn()} onDelete={vi.fn()} />)
-    expect(screen.queryByRole('button', { name: 'Month' })).toBeNull()
-    for (const group of ['Today', 'Week']) {
-      await user.click(screen.getByRole('button', { name: group }))
-      expect(screen.queryByRole('menuitem', { name: 'This month' })).toBeNull()
-      expect(screen.queryByRole('menuitem', { name: 'Next month' })).toBeNull()
-    }
-    expect(screen.queryByText('This month')).toBeNull()
-    expect(screen.queryByText('Next month')).toBeNull()
+  // Final review (2026-11-04): This month and Next month were removed for
+  // every caller. They are gated like This season: a family member's list
+  // keeps them; the Week's own list (months={false} season={false}) has none.
+  it('by default offers Month: This month, Next month and This season', async () => {
+    const onPick = vi.fn()
+    const { user } = render(<TriageWhenMenu onPick={onPick} onDelete={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: 'Month' }))
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['This month', 'Next month', 'This season'])
+    await user.click(screen.getByRole('menuitem', { name: 'Next month' }))
+    expect(onPick).toHaveBeenCalledWith('next-month')
   })
 
-  it('season={false} (a planning page) leaves This season out', () => {
-    render(<TriageWhenMenu onPick={vi.fn()} season={false} />)
+  it('months={false} season={false} (the Week canvas) offers nothing above the week', async () => {
+    const { user } = render(<TriageWhenMenu onPick={vi.fn()} months={false} season={false} />)
+    expect(screen.queryByRole('button', { name: 'Month' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Season' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Week' }))
+    expect(screen.queryByRole('menuitem', { name: 'This month' })).toBeNull()
+    expect(screen.queryByText('Next month')).toBeNull()
     expect(screen.getByRole('button', { name: 'Someday' })).toBeInTheDocument()
+  })
+
+  it('season={false} alone keeps the months; months={false} alone leaves This season on its own', async () => {
+    const { user, unmount } = render(<TriageWhenMenu onPick={vi.fn()} season={false} />)
+    await user.click(screen.getByRole('button', { name: 'Month' }))
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['This month', 'Next month'])
+    unmount()
+    const onPick = vi.fn()
+    const second = render(<TriageWhenMenu onPick={onPick} months={false} />)
+    await second.user.click(screen.getByRole('button', { name: 'Season' }))
+    expect(onPick).toHaveBeenCalledWith('this-season')
   })
 
   it('Someday applies directly (single option, no fan-out)', async () => {

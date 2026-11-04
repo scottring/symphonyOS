@@ -709,7 +709,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           </p>
           <ul className="wc-noday-chips" aria-label="No day yet">
             {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d), () => writers.toggleTask(t), writers.triageTask && (
-              <TriageWhenMenu season={false}
+              <TriageWhenMenu season={false} months={false}
                 onPick={(when) => writers.triageTask!(t, when)}
                 onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
                 onDelete={writers.deleteTask ? () => writers.deleteTask!(t) : undefined}
@@ -815,7 +815,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {unplaced.length > 0
           ? <ul className="wc-noday-chips hs-noday" aria-label="No day yet">
             {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d), () => writers.toggleTask(t), writers.triageTask && (
-              <TriageWhenMenu contained season={false}
+              <TriageWhenMenu contained season={false} months={false}
                 onPick={(when) => { setWhenOpen(null); writers.triageTask!(t, when) }}
                 onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
                 onDelete={writers.deleteTask ? () => { setWhenOpen(null); writers.deleteTask!(t) } : undefined}

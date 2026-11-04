@@ -35,15 +35,10 @@ const GROUPS: WhenGroup[] = [
       { when: 'next-weekend', label: 'Next weekend' },
     ],
   },
-  // Paper-style horizons (spec 2026-11-04): nothing moves up from the week to
-  // a month, so "This month" and "Next month" are gone. This season stays
-  // for lists outside the planning pages (a family member's list); a
-  // planning page leaves it out (`season={false}`).
-  {
-    label: 'Season', primary: 'this-season', options: [
-      { when: 'this-season', label: 'This season' },
-    ],
-  },
+  // The month and season choices are built per menu (laterGroup): a list
+  // outside the planning pages (a family member's) offers This month, Next
+  // month and This season; the Week's own list offers none, since nothing
+  // moves up from the week (paper-style horizons, spec 2026-11-04).
   {
     label: 'Someday', primary: 'someday', options: [
       { when: 'someday', label: 'Someday' },
@@ -51,11 +46,30 @@ const GROUPS: WhenGroup[] = [
   },
 ]
 
+/** "Month" (This month, Next month, This season), or "Season" alone, or
+ *  nothing: what this menu offers above the week. */
+function laterGroup(months: boolean, season: boolean): WhenGroup | null {
+  const options: WhenOption[] = [
+    ...(months ? [{ when: 'this-month' as const, label: 'This month' }, { when: 'next-month' as const, label: 'Next month' }] : []),
+    ...(season ? [{ when: 'this-season' as const, label: 'This season' }] : []),
+  ]
+  if (options.length === 0) return null
+  return { label: months ? 'Month' : 'Season', primary: options[0].when, options }
+}
+
+function groupsFor(months: boolean, season: boolean): WhenGroup[] {
+  const later = laterGroup(months, season)
+  return later ? [...GROUPS.slice(0, 2), later, ...GROUPS.slice(2)] : GROUPS
+}
+
 interface TriageWhenMenuProps {
   contained?: boolean
   /** Offer "This season". Off on the planning pages (the Week's own list):
    *  nothing moves up from the week. Default on. */
   season?: boolean
+  /** Offer "This month" and "Next month". Off on the planning pages, as
+   *  `season` is; a family member's list keeps them. Default on. */
+  months?: boolean
   onPick: (when: TriageWhen) => void
   /** When provided, renders a Delete (trash) action. */
   onDelete?: () => void
@@ -86,7 +100,7 @@ interface TriageWhenMenuProps {
 // that a menu you drifted past still tidies itself away.
 const HOVER_CLOSE_MS = 600
 
-export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate, calendarAction, contained = false, season = true }: TriageWhenMenuProps) {
+export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate, calendarAction, contained = false, season = true, months = true }: TriageWhenMenuProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -139,7 +153,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
 
   return (
     <div ref={containerRef} className={contained ? "flex flex-wrap items-start gap-1" : "flex items-center gap-1"}>
-      {GROUPS.filter((g) => season || g.primary !== 'this-season').map((group) => {
+      {groupsFor(months, season).map((group) => {
         const single = group.options.length === 1
         const isOpen = openGroup === group.label
         const isPrimary = group.label === 'Today'
