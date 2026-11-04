@@ -209,4 +209,89 @@ describe('PaperFold', () => {
     expect(edge()).toHaveAttribute('aria-expanded', 'false')
     expect(aboveRegion(container)).toHaveAttribute('inert')
   })
+
+  describe('ResizeObserver', () => {
+    type Entry = { target: Element; contentRect: { width: number; height: number } }
+    let observers: { cb: (entries: Entry[]) => void; targets: Element[] }[] = []
+    const originalRO = globalThis.ResizeObserver
+
+    beforeEach(() => {
+      observers = []
+      globalThis.ResizeObserver = class {
+        targets: Element[] = []
+        constructor(cb: (entries: Entry[]) => void) {
+          observers.push({ cb, targets: this.targets })
+        }
+        observe(t: Element) {
+          this.targets.push(t)
+        }
+        unobserve() {}
+        disconnect() {}
+      } as unknown as typeof ResizeObserver
+    })
+    afterEach(() => {
+      globalThis.ResizeObserver = originalRO
+      vi.restoreAllMocks()
+    })
+
+    function countLayouts() {
+      const media = window.matchMedia
+      const spy = vi.fn((q: string) => media(q))
+      window.matchMedia = spy as unknown as typeof window.matchMedia
+      // layout() asks for the pointer type once per run.
+      return () => spy.mock.calls.filter(([q]) => q.includes('pointer: coarse')).length
+    }
+
+    it('does not re-lay out on every frame while the phone fold animates', async () => {
+      setViewport(390, 844)
+      mockMedia({ reduce: false })
+      const layouts = countLayouts()
+      const { container } = renderFold()
+      const r = root(container)
+      expect(r).toHaveAttribute('data-fold-mode', 'v')
+      const parent = r.parentElement!
+      const aboveBody = container.querySelector('.paper-fold-above')!
+      const slot = container.querySelector('.paper-fold-slot') as HTMLElement
+      const ro = observers[0]
+      expect(ro.targets).toEqual([parent, aboveBody])
+
+      // The first report after mount lays out once.
+      act(() =>
+        ro.cb([
+          { target: parent, contentRect: { width: 358, height: 400 } },
+          { target: aboveBody, contentRect: { width: 318, height: 600 } },
+        ]),
+      )
+      const before = layouts()
+
+      // As the browser would: each frame the spread grows, so the parent's height changes.
+      const raf = window.requestAnimationFrame.bind(window)
+      let frames = 0
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) =>
+        raf((ts) => {
+          cb(ts)
+          frames++
+          ro.cb([
+            {
+              target: parent,
+              contentRect: { width: 358, height: 400 + parseFloat(slot.style.height || '0') },
+            },
+          ])
+        }),
+      )
+      fireEvent.keyDown(edge(), { key: 'Enter' })
+      await waitFor(() => expect(parseFloat(r.style.getPropertyValue('--p'))).toBe(1), {
+        timeout: 3000,
+      })
+      expect(frames).toBeGreaterThan(5)
+      expect(layouts()).toBe(before)
+
+      // What the layout does read still re-lays out: the parent's width...
+      act(() => ro.cb([{ target: parent, contentRect: { width: 300, height: 900 } }]))
+      expect(layouts()).toBe(before + 1)
+      // ...and, on phones, the sheet above's content height.
+      act(() => ro.cb([{ target: aboveBody, contentRect: { width: 318, height: 700 } }]))
+      expect(layouts()).toBe(before + 2)
+    })
+  })
 })

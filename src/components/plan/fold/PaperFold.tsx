@@ -163,6 +163,9 @@ function PaperFoldSheet({
     open: open,
     drag: null as Drag | null,
     tappedAt: -Infinity,
+    // Last sizes the ResizeObserver reported, so it re-lays out only on changes that matter.
+    parentW: NaN,
+    aboveH: NaN,
   })
   const horizonRef = useRef(horizon)
   useLayoutEffect(() => {
@@ -347,10 +350,31 @@ function PaperFoldSheet({
     addEventListener('resize', onResize)
     let ro: ResizeObserver | undefined
     if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(() => layout())
       const parent = rootRef.current?.parentElement
+      const aboveBody = aboveBodyRef.current
+      // The parent grows with the spread every animation frame (in 'v' the slot's
+      // height changes; in 'h' its width), so react only to what the layout reads:
+      // the parent's width, and the sheet above's content height in 'v'. The parent
+      // must not size itself to the fold (no shrink-to-fit), or the spread would
+      // feed back into its own measure.
+      ro = new ResizeObserver((entries) => {
+        const s = m.current
+        let changed = false
+        for (const e of entries) {
+          if (e.target === parent) {
+            const w = e.contentRect.width
+            if (!(Math.abs(w - s.parentW) < 0.5)) changed = true
+            s.parentW = w
+          } else if (e.target === aboveBody) {
+            const h = e.contentRect.height
+            if (!(Math.abs(h - s.aboveH) < 0.5) && s.mode === 'v') changed = true
+            s.aboveH = h
+          }
+        }
+        if (changed) layout()
+      })
       if (parent) ro.observe(parent)
-      if (aboveBodyRef.current) ro.observe(aboveBodyRef.current)
+      if (aboveBody) ro.observe(aboveBody)
     }
     return () => {
       clearTimeout(t)
