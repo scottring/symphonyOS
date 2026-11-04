@@ -1,8 +1,8 @@
 // A guided session counts a period planned once anything saves at its
 // choosing step (spec 2026-11-01). These wrap the page's own writers so each
 // one that succeeds also tells the session — the same verbs, the same
-// receipts and Undo, one extra call on success. Shared by Week (useGuidedWeek)
-// and Month, Season and Year (GuidedPeriod).
+// receipts and Undo, one extra call on success. The Week's (useGuidedWeek);
+// Month, Season and Year hear of the page's own writes (GuidedPeriod).
 
 import type { ChooseItemView, ChooseLineView, ChooseVerb } from '@/components/plan/choose/ChoosePlan'
 

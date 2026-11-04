@@ -89,9 +89,9 @@ import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import { useDeckActions } from './useDeckActions'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
+import type { SessionFold } from '@/components/plan/guided/GuidedPeriod'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref, type PlannedMeal } from '@/lib/mealDayRecipes'
-import type { FamilyMember } from '@/types/family'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
@@ -897,22 +897,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
   ])), [dayChoices])
-  // A guided session's look back asks for the week it looks back on (walk
-  // 2026-11-01: "Look back at last week" stood beside the week being
-  // planned): the week before this one, drawn the same way (PastWeekCanvas).
-  // Nothing is added from there: a typed add lands on this week, so it is
-  // not offered on it.
-  const lookBackWriters = useMemo<WeekCanvasWriters>(() => ({ ...canvasWriters, addTyped: undefined }), [canvasWriters])
-  const weekCanvas = (opts?: { hideStrip?: boolean; period?: 'previous' }) => opts?.period === 'previous' ? (
-    <PastWeekCanvas anchor={lastWeekStart} hideStrip={opts.hideStrip} tasks={tasks} drawnTasks={drawnTasks} weekendTasks={weekendTasks}
-      events={events} routines={routines} selectedAssignees={selectedAssignees} layers={layers} userId={userId} labelFor={labelFor}
-      lens={lens} meId={meId} dailyShown={dailyShown} forecast={forecast} eventsReady={sources?.events === 'ready'} canMoveEvent={canMoveEvent}
-      writers={lookBackWriters} members={familyMembers} pointing={activity.pointing} />
-  ) : (
+  // A guided session's ribbon (2026-11-04) drives the month's fold beside
+  // the week: its look back turns that sheet to last week, with its choices.
+  const weekCanvas = (opts?: { hideStrip?: boolean; fold?: SessionFold }) => (
     <WeekCanvas weekStart={weekAnchor} hideStrip={opts?.hideStrip} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers} viewerId={meId ?? undefined}
-      pointing={activity.pointing}
+      pointing={activity.pointing} fold={opts?.fold}
       onPlaceUnplaced={deckAvailable ? openPlace : undefined} unplacedCount={placeCount} month={monthSheet} />
   )
   const todayLine = null
@@ -1311,66 +1302,3 @@ function toCanvasSpans(journalSpans: ReturnType<typeof layoutContextSpans>, jour
   }))
 }
 
-/** The week a guided session looks back on (walk 2026-11-01: "Look back at
- *  last week" stood beside the week being planned). The same canvas, built
- *  the same way from the page's own lists, for the week before: its days and
- *  what was on them, its list, and its name above it. Mounted only on the
- *  look back, so its routine occurrences and dinners are read only then. */
-function PastWeekCanvas({ anchor, tasks, drawnTasks, weekendTasks, events, routines, selectedAssignees, layers, userId, labelFor, lens, meId, dailyShown, forecast, eventsReady, canMoveEvent, writers, members, pointing, hideStrip }: {
-  /** The week looked back on: its first day. */
-  anchor: Date
-  tasks: Task[]
-  drawnTasks: Task[]
-  weekendTasks: Task[]
-  events: CalendarEvent[]
-  routines: Routine[]
-  selectedAssignees?: AssigneeFilter
-  layers: ReadonlySet<Layer>
-  userId: string | null | undefined
-  labelFor: (t: Task) => string | undefined
-  lens: ReturnType<typeof planPeopleLens>
-  meId: string | null
-  dailyShown: boolean
-  forecast: Record<string, DayForecast>
-  eventsReady: boolean
-  canMoveEvent: (id: string) => boolean
-  writers: WeekCanvasWriters
-  members: (Pick<FamilyMember, 'id' | 'name'> & Partial<FamilyMember>)[]
-  pointing?: { dates: Set<string>; taskIds: Set<string> } | null
-  hideStrip?: boolean
-}) {
-  const anchorMs = anchor.getTime()
-  const start = useMemo(() => new Date(anchorMs), [anchorMs])
-  const instances = useWeekInstances(start, 7)
-  const plannedDinners = usePlannedDinners(start, 7)
-  const isCurrent = weekIsCurrentFor(start)
-  const journal = useMemo(() => {
-    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7)
-    // Its timed events, as the page's own week takes its (weekEvents).
-    const timed = events.filter((ev) => {
-      const startStr = (ev as { start_time?: string }).start_time ?? (ev as { startTime?: string }).startTime
-      if (!startStr) return false
-      const at = new Date(startStr)
-      return at >= start && at < end && !isAllDayEvent(ev)
-    })
-    const extras = partitionWeekExtras(timed)
-    const routineItems = buildWeekRoutineItems({ routines, weekStart: start, dayCount: 7, instances, member: selectedAssignees, prefs: { hideRoutines: false, layers } })
-    return buildJournalDays({
-      weekStart: start, dayCount: 7, tasks: drawnTasks, weekendTasks, userId, eventItems: weekEventItems(extras), events,
-      dinnersByDay: extras.dinnersByDay, routineItems, instances, labelFor,
-    })
-  }, [start, events, routines, instances, selectedAssignees, layers, drawnTasks, weekendTasks, userId, labelFor])
-  const shelf = useMemo(() => weekShelf(start, weekListTasks(tasks, start, lens.scopeId, { isCurrent }).filter(lens.keep)),
-    [tasks, start, lens, isCurrent])
-  const routinesToPlace = useMemo(() => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }, { weekStart: start, instances })
-    .map((r) => ({ id: r.id, title: r.name })), [routines, selectedAssignees, layers, start, instances])
-  const canvasDays = useMemo(() => toCanvasDays({ days: journal.days, weekend: journal.weekend, shelf, dailyShown, forecast, plannedDinners, eventsReady, canMoveEvent }),
-    [journal, shelf, dailyShown, forecast, plannedDinners, eventsReady, canMoveEvent])
-  const spans = useMemo(() => toCanvasSpans(layoutContextSpans(events, journal.days.map((d) => d.date)), journal.days), [events, journal])
-  return <>
-    <h2 className="week-days-heading">{formatWeekRange(start)}</h2>
-    <WeekCanvas weekStart={start} hideStrip={hideStrip} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
-      rhythm={canvasDays.lines} isCurrent={isCurrent} writers={writers} spans={spans} members={members} viewerId={meId ?? undefined}
-      pointing={pointing} />
-  </>
-}

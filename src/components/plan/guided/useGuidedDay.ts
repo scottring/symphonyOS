@@ -111,5 +111,5 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
   }, [loading, steps, progress, isTomorrow, target, token, dayWord, count, next, skip, done, setThreadId, markPlannedOnce])
   useGuidedSessionRegistration(registration)
 
-  return { progress, loading, saveError, actions: reported, markPlannedOnce, jump, done, registration }
+  return { progress, loading, saveError, actions: reported, markPlannedOnce, jump, next, done, registration }
 }

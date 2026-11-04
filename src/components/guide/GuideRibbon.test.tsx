@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within, act } from '@testing-library/react'
+import { render, screen, fireEvent, within, act, cleanup } from '@testing-library/react'
 import { GuideRibbon, PlannedStamp, RibbonTab } from './GuideRibbon'
 import { stepsFor } from '@/lib/guide/steps'
 import { paperSound } from '@/lib/fold/paperSound'
 
-vi.mock('@/contexts/AssistantLaunchContext', () => ({ useAssistantLauncher: () => ({ openAssistant: vi.fn() }) }))
+const launcher = vi.hoisted(() => ({ openAssistant: vi.fn() }))
+vi.mock('@/contexts/AssistantLaunchContext', () => ({ useAssistantLauncher: () => launcher }))
+const mobile = vi.hoisted(() => ({ on: false }))
+vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mobile.on }))
 
 const month = stepsFor('month')
 const progress = (current: string, done: string[] = []) => ({ current, done, skipped: [] })
@@ -30,7 +33,7 @@ function setup(over: Partial<Parameters<typeof GuideRibbon>[0]> = {}) {
 const band = () => within(screen.getByRole('region', { name: 'Plan November' }))
 const chips = () => band().getAllByRole('button').filter((b) => b.closest('.ribbon-steps'))
 
-beforeEach(() => { localStorage.clear() })
+beforeEach(() => { localStorage.clear(); mobile.on = false; launcher.openAssistant.mockClear() })
 
 describe('GuideRibbon — planning is a ribbon on the same page', () => {
   it('lays a band across the page with the six Month steps, the current one marked, and its Why and You', () => {
@@ -121,6 +124,16 @@ describe('GuideRibbon — planning is a ribbon on the same page', () => {
       }) as MediaQueryList)
     })
     afterEach(() => { vi.restoreAllMocks(); Element.prototype.scrollIntoView = original })
+
+    it('“Talk to the guide” opens the conversation (on a desk it is beside the page already)', () => {
+      setup()
+      expect(band().queryByRole('button', { name: 'Talk to the guide' })).toBeNull()
+      cleanup()
+      mobile.on = true
+      setup()
+      fireEvent.click(band().getByRole('button', { name: 'Talk to the guide' }))
+      expect(launcher.openAssistant).toHaveBeenCalled()
+    })
 
     it('brings the current chip into view when the step changes', () => {
       const { rerender, props } = setup({ progress: progress('next-weeks') })

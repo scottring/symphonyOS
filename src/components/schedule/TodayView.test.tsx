@@ -736,7 +736,8 @@ describe('TodayView — the Day session', () => {
     await user.click(screen.getByRole('button', { name: 'Plan today' }))
     const session = screen.getByRole('region', { name: 'Planning today' })
     expect(search().get('plan')).toBe('1')
-    expect(within(session).getByRole('group', { name: 'Steps in this session' })).toBeInTheDocument()
+    // The planning ribbon (2026-11-04): the band across the top of the day.
+    expect(within(session).getByRole('region', { name: 'Plan today' })).toBeInTheDocument()
     expect(within(screen.getByTestId('guide-panel')).getByText('Look back at yesterday')).toBeInTheDocument()
     // One page: the day is still there beside the steps.
     expect(within(session).getByRole('heading', { name: 'For today' })).toBeInTheDocument()
@@ -776,8 +777,7 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
     expect(screen.getByText('0 of 3–5 on tomorrow')).toBeInTheDocument()
     // Back to the look back from the rail: today again.
-    await user.click(within(screen.getByRole('group', { name: 'Steps in this session' })).getByRole('button', { name: /Look back at today/ }))
-    await user.click(screen.getByRole('button', { name: 'Go to this step' }))
+    await user.click(within(screen.getByRole('region', { name: 'Plan tomorrow' })).getByRole('button', { name: /Look back at today/ }))
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
     expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Leave' }))
@@ -816,7 +816,7 @@ describe('TodayView — the Day session', () => {
     const mine = createMockTask({ id: 'm', title: 'Email Dana', bucket: 'timed', scheduledFor: y, isAllDay: true, assignedTo: 'me' })
     const hers = createMockTask({ id: 'h', title: 'Call the school', bucket: 'timed', scheduledFor: y, isAllDay: true, assignedTo: 'iris' })
     renderAt(10, { url: '/?plan=1', tasks: [mine, hers], selectedAssignees: ['me'] })
-    const rail = within(screen.getByRole('group', { name: 'Steps in this session' }))
+    const rail = within(screen.getByRole('region', { name: 'Look back at yesterday' }))
     expect(rail.getByText('Email Dana')).toBeInTheDocument()
     expect(rail.queryByText('Call the school')).toBeNull()
     expect(rail.getByText('Yesterday · 0 of 1 done')).toBeInTheDocument()
@@ -840,17 +840,17 @@ describe('TodayView — the Day session', () => {
   it('?review=1 opens on the look back even when the session was left further on', async () => {
     dayNotes.notes = { guide: { current: 'energy', done: [], skipped: [] } }
     renderAt(10, { url: '/?review=1' })
-    await vi.waitFor(() => expect(screen.getByText(/Planning today · step 1 of 5/)).toBeInTheDocument())
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: /Look back at yesterday/ })).toHaveAttribute('aria-current', 'step'))
     expect(search().get('step')).toBeNull()
   })
 
   it('?step= beside ?date= (opened on another day): the step is used and dropped, plan and the session\'s date survive', async () => {
     renderAt(10, { url: `/?plan=1&step=energy&date=${localYmd(at(0, 3))}`, dated: true })
-    await vi.waitFor(() => expect(screen.getByText(/Planning today · step 3 of 5/)).toBeInTheDocument())
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Energy' })).toHaveAttribute('aria-current', 'step'))
     await vi.waitFor(() => expect(search().get('step')).toBeNull())
     expect(search().get('plan')).toBe('1')
     expect(search().get('date')).toBe(localYmd(at(0, 0)))
-    expect(screen.getByText(/Planning today · step 3 of 5/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Energy' })).toHaveAttribute('aria-current', 'step')
   })
 
   it('a bare ?plan=1 in the evening plans tomorrow, its look back on today’s page', async () => {

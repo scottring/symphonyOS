@@ -129,5 +129,5 @@ export function useGuidedWeek({ weekStart, count, choose, onFinish, onClose, onP
   }, [loading, steps, progress, monthWord, weekStart, count, token, next, skip, done, aboveLines, setThreadId, markPlannedOnce])
   useGuidedSessionRegistration(registration)
 
-  return { progress, loading, saveError, count, monthWord, choose: reported, markPlannedOnce, jump, done, registration }
+  return { progress, loading, saveError, count, monthWord, choose: reported, markPlannedOnce, jump, next, done, registration }
 }

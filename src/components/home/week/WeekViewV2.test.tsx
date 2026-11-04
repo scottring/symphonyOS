@@ -924,7 +924,8 @@ describe('WeekViewV2 — the deck', () => {
     open('?plan=1', [gate], { onUpdateTask })
     const heard = vi.fn()
     const stop = (deckMock.deck as unknown as { listenCanvasWrites: (fn: () => void) => () => void }).listenCanvasWrites(heard)
-    const writers = ((deckMock.guided as unknown as { canvas: React.ReactElement<{ writers: import('@/components/canvas/week/WeekCanvas').WeekCanvasWriters }> }).canvas).props.writers
+    const canvasOf = (deckMock.guided as unknown as { canvas: (fold: unknown) => React.ReactElement<{ writers: import('@/components/canvas/week/WeekCanvas').WeekCanvasWriters }> }).canvas
+    const writers = canvasOf({ stepId: 'choose', drive: { above: true }, look: null }).props.writers
     await act(async () => { writers.placeTask(gate, new Date(2026, 9, 19)); await new Promise((r) => setTimeout(r, 0)) })
     expect(onUpdateTask).toHaveBeenCalledWith('gate', expect.anything())
     expect(heard).toHaveBeenCalledTimes(1)
@@ -1134,35 +1135,30 @@ describe('WeekViewV2 — the deck', () => {
   // planned. The look back's page is the week before, drawn as the week is:
   // its days and what was on them, its name above them. The next step is
   // this week again; the session's count is this week's throughout.
-  it('the session’s look back shows last week’s days and what was on them; the next step shows this week', async () => {
+  it('the session’s look back keeps this week on the page and turns the month’s sheet beside it to last week; the next step gives the month back', async () => {
     guideAt.step = 'look-back'
     const tasks = [
       createMockTask({ id: 'porch', title: 'Fix the porch', scheduledFor: new Date(2026, 9, 13), isAllDay: true, updatedAt: recent }),
       createMockTask({ id: 'garage', title: 'Clean the garage', scheduledFor: new Date(2026, 9, 19), isAllDay: true, updatedAt: recent }),
     ]
-    const dentist = mockEvent({ id: 'dentist', title: 'Dentist', start: new Date(2026, 9, 14, 9).toISOString(), end: new Date(2026, 9, 14, 10).toISOString() })
-    open('?plan=1', tasks, { events: [dentist] })
-    const guided = () => deckMock.guided as unknown as { canvas: React.ReactNode; count: number }
+    open('?plan=1', tasks)
+    const guided = () => deckMock.guided as unknown as { canvas: (fold: unknown) => React.ReactNode; count: number }
     expect(guided().count).toBe(1)
-    const lookBack = render(<>{guided().canvas}</>)
+    const lookBack = render(<>{guided().canvas({ stepId: 'look-back', drive: { above: true }, look: <p>Last week’s leftovers</p> })}</>)
     const shown = within(lookBack.container)
-    expect(shown.getByRole('heading', { level: 2, name: 'October 10–16' })).toBeInTheDocument()
-    expect(within(shown.getByTestId('journal-day-2026-10-13')).getByText('Fix the porch')).toBeInTheDocument()
-    expect(within(shown.getByTestId('journal-day-2026-10-14')).getByText('Dentist')).toBeInTheDocument()
-    expect(shown.queryByTestId('journal-day-2026-10-19')).toBeNull()
-    expect(shown.queryByText('Clean the garage')).toBeNull()
-    // It adds nothing: an add would land on this week.
-    expect(shown.queryByRole('button', { name: '+ Add to week' })).toBeNull()
+    // This week stays on the page.
+    expect(within(shown.getByTestId('journal-day-2026-10-19')).getByText('Clean the garage')).toBeInTheDocument()
+    expect(shown.queryByText('Fix the porch')).toBeNull()
+    // The sheet beside it is last week, looking back, with the step's choices.
+    // (Folded or open, it is the same sheet; the fold's motion is PaperFold's own test.)
+    expect(within(lookBack.container.querySelector<HTMLElement>('section[aria-label="Last week, looking back"]')!).getByText('Last week’s leftovers')).toBeInTheDocument()
     lookBack.unmount()
-    await act(async () => { fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Next step' })) })
-    const planned = render(<>{guided().canvas}</>)
+    const planned = render(<>{guided().canvas({ stepId: 'read-month', drive: { above: true }, look: null })}</>)
     const now = within(planned.container)
-    expect(now.queryByRole('heading', { level: 2, name: 'October 10–16' })).toBeNull()
-    expect(within(now.getByTestId('journal-day-2026-10-19')).getByText('Clean the garage')).toBeInTheDocument()
-    expect(now.queryByText('Fix the porch')).toBeNull()
+    expect(now.queryByText('Last week’s leftovers')).toBeNull()
+    expect(planned.container.querySelector('section[aria-label$=", for reading"]')).not.toBeNull()
     expect(guided().count).toBe(1)
   })
-
   // Controller ruling: the deck reviews the week that is ending, opened from the
   // week after it — so only this week, and next week on this week's last day.
   it('ignores the deck on a past week, and on next week before this week’s last day', () => {

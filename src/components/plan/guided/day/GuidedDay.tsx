@@ -1,7 +1,8 @@
-// Today while a Day session runs (spec 2026-11-01, "one page, two moments"):
-// a one-line session bar with the day's count, the steps rail beside the day,
-// and the day itself, the real page, unchanged. The step's header and the
-// conversation are the shell's (useGuidedDay registers them).
+// Today while a Day session runs: planning is a ribbon on the same page
+// (Scott, 2026-11-04). The band lies across the top of the day with the day's
+// count, each step's editor drops under it as a card, and the day itself, the
+// real page, stays below, unchanged. The step's header and the conversation
+// are the shell's (useGuidedDay registers them).
 //
 // Morning: plans today and looks back on yesterday. From 4 pm: plans tomorrow
 // and looks back on today (dayTarget). Mounted only while it runs, so its
@@ -16,9 +17,7 @@ import { dayToken } from '@/hooks/usePlanningSession'
 import { usePlanningNotes, type GuideNotes } from '@/hooks/usePlanningNotes'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { showToast } from '@/hooks/useToast'
-import { GuideRail } from '@/components/guide/GuideRail'
-import { SessionBar } from '@/components/guide/SessionBar'
-import { GuidePhoneHeader } from '@/components/guide/GuidePhoneHeader'
+import { GuideRibbon } from '@/components/guide/GuideRibbon'
 import { EnergyNote } from '@/components/guide/EnergyNote'
 import { useGuidedDay } from '../useGuidedDay'
 import { DayLookBack } from './DayLookBack'
@@ -103,21 +102,19 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, on
     </div>,
   }
 
+  // Where the session is comes first: no flash of step one before a resume.
+  // The day stays put while it loads.
+  if (guided.loading) return <section className="guide-session" aria-label={`Planning ${dayWord}`} aria-busy="true">{canvas}</section>
   return (
     <section className="guide-session" aria-label={`Planning ${dayWord}`}>
-      <p className="guide-session-line">
-        <SessionBar label={`Planning ${dayWord}`} index={index} total={steps.length} onLeave={onClose} />
-        {count !== null && <span className="guide-session-count">{count} of {DAY_COUNT_OF} on {dayWord}</span>}
-      </p>
-      {guided.saveError && <p className="guide-session-error" role="alert">{guided.saveError}</p>}
-      <GuidePhoneHeader />
-      <div className="guide-session-layout gd-layout">
-        {/* Where the session is comes first: no flash of step one before a
-            resume. The day beside it stays put while it loads. */}
-        {guided.loading ? <div className="guide-rail" aria-busy="true" />
-          : <GuideRail level="day" progress={guided.progress} titleFor={(s) => dayStepTitle(s, isTomorrow)} bodies={bodies} onJump={(id) => { void guided.jump(id) }} />}
-        <div className="guide-session-page">{canvas}</div>
-      </div>
+      <GuideRibbon level="day" progress={guided.progress} titleFor={(s) => dayStepTitle(s, isTomorrow)} bodies={bodies}
+        onJump={(id) => { void guided.jump(id) }} onNext={() => { void guided.next() }}
+        onBack={() => { if (index > 0) void guided.jump(steps[index - 1].id) }}
+        onLeave={onClose} onFinish={() => { void guided.done() }} finishLabel={`Done planning ${dayWord}`}
+        tab={{ label: `Plan ${dayWord}`, onPull: onClose }} error={guided.saveError}
+        status={count !== null ? `${count} of ${DAY_COUNT_OF} on ${dayWord}` : null}>
+        <div className="gd-page">{canvas}</div>
+      </GuideRibbon>
     </section>
   )
 }

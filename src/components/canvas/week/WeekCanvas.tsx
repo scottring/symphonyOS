@@ -73,7 +73,7 @@ import { gapAt, gapToListIndex } from '@/lib/week/dayReorder'
 import { HorizonStrip } from '@/components/canvas/strip/HorizonStrip'
 import { TypedAdd } from '@/components/canvas/strip/TypedAdd'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
-import { AboveSheet } from '@/components/plan/fold/AboveSheet'
+import { AboveSheet, LookSheet } from '@/components/plan/fold/AboveSheet'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 
 export interface CanvasDayItem {
@@ -201,6 +201,10 @@ export interface WeekCanvasProps {
    *  every day shows its whole slate, nothing behind "+N more" (Scott,
    *  2026-11-02): how full a day is is what the session is judging. */
   hideStrip?: boolean
+  /** A guided session's ribbon (2026-11-04) drives the month's fold: the
+   *  step opens it (`drive`), and the look back turns it to last week with
+   *  its choices (`look`). Nothing is remembered. */
+  fold?: { drive?: { above?: boolean }; look?: ReactNode | null }
 }
 
 type Drag = { kind: 'task' | 'routine' | 'occ' | 'event'; id: string; groupKey?: string; fromKey?: string }
@@ -253,7 +257,7 @@ const NODAY_FOLD_AT = 4
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, viewerId, month, hideStrip }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, viewerId, month, hideStrip, fold: session }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   // Touch first (the iPad, the wall): rows lift on a held press instead of the
   // browser's own drag, which a long press would otherwise start too.
@@ -747,12 +751,17 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
 
   // The month above, folded beside the days for reading (paper-style
   // horizons, 2026-11-04), hinged at their left edge (the top edge on a
-  // phone). Not while a guided session plans the week: its steps read the
-  // month.
-  const withMonth = (node: ReactNode) => month && !hideStrip ? (
-    <PaperFold horizon="week" className="wc-fold" edgeLabel={month.word} edgeCount={month.rows.length}
-      above={<AboveSheet kicker={month.kicker} title={month.word} rows={month.rows} doneCount={month.doneCount}
-        foot="For reading. Write this week in its own words." empty={`No ${month.word} goals yet.`} />}>
+  // phone). While a guided session plans the week, its ribbon drives this
+  // fold (`session`): Read November opens it, and the look back turns it to
+  // last week with its choices.
+  const look = session?.look ?? null
+  const withMonth = (node: ReactNode) => month && (!hideStrip || session) ? (
+    <PaperFold horizon="week" className="wc-fold" edgeLabel={look ? 'Last week' : month.word} edgeCount={look ? undefined : month.rows.length}
+      drive={session?.drive}
+      frontLabel={look ? 'Last week, looking back' : undefined}
+      above={look ? <LookSheet title="last week">{look}</LookSheet>
+        : <AboveSheet kicker={month.kicker} title={month.word} rows={month.rows} doneCount={month.doneCount}
+          foot="For reading. Write this week in its own words." empty={`No ${month.word} goals yet.`} />}>
       {node}
     </PaperFold>
   ) : node

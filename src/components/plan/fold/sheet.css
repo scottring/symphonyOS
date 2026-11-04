@@ -119,3 +119,11 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .cal-sheet-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--paper-fold-accent, var(--color-primary-600)); opacity: .75; }
 .cal-sheet .gw-days li.gw-more span { font: 400 12px/1.4 var(--font-family-sans); }
 .cal-sheet .guide-yv { margin: 4px 0 14px; }
+
+/* The sheet above turned to the period before, with its choices (the
+   planning ribbon's look back). Its body is the session's look back. */
+.look-sheet .gw-body { padding: 0; }
+.look-sheet .gw-rows { margin: 0; padding: 0; }
+.look-sheet .gw-row { border-bottom: 1px solid var(--paper-fold-rule-above, var(--color-neutral-200)); }
+.look-sheet .gw-row-title { font: 400 16px/1.35 var(--font-family-display); color: var(--paper-fold-ink, var(--color-neutral-900)); }
+.look-sheet-foot { display: block; }

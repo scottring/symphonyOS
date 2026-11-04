@@ -54,7 +54,9 @@ function Shell() {
   return reg ? <div data-testid="guide-panel">{reg.header}</div> : null
 }
 const panel = () => within(screen.getByTestId('guide-panel'))
-const rail = () => within(screen.getByRole('group', { name: 'Steps in this session' }))
+// The planning ribbon (2026-11-04): its band, and the card each step drops under it.
+const rail = () => within(document.querySelector<HTMLElement>('.ribbon-session')!)
+const stepNow = () => [...document.querySelectorAll('.ribbon-step')].find((b) => b.getAttribute('aria-current') === 'step')?.querySelector('.ribbon-step-title')?.textContent
 
 function Where() { return <output data-testid="where">{useLocation().search}</output> }
 function open(over: Partial<Parameters<typeof GuidedDay>[0]> = {}, url = '/today?plan=1') {
@@ -79,12 +81,13 @@ beforeEach(() => {
 })
 
 describe('GuidedDay — Today while planning the day', () => {
-  it('opens on the page: the session bar with the day’s count, five steps in the rail, and the day itself', () => {
+  it('opens on the page: the ribbon’s band with the day’s count and five steps, the step’s card, and the day itself', () => {
     open()
     const session = screen.getByRole('region', { name: 'Planning today' })
-    expect(within(session).getByText(/Planning today · step 1 of 5 ·/)).toBeInTheDocument()
+    expect(stepNow()).toBe('Look back at yesterday')
     expect(within(session).getByText('2 of 3–5 on today')).toBeInTheDocument()
-    expect([...document.querySelectorAll('.guide-rail-item .guide-rail-title')].map((el) => el.textContent))
+    expect(within(session).getByRole('region', { name: 'Look back at yesterday' })).toBeInTheDocument()
+    expect([...document.querySelectorAll('.ribbon-step-title')].map((el) => el.textContent))
       .toEqual(['Look back at yesterday', 'Today\'s calendar', 'Energy', 'Pick 3 to 5', 'Habits'])
     expect(within(session).getByRole('region', { name: 'The day itself' })).toBeInTheDocument()
     expect(panel().getByText('Look back at yesterday')).toBeInTheDocument()
@@ -108,12 +111,11 @@ describe('GuidedDay — Today while planning the day', () => {
   it('resumes on the saved step; the calendar step shows the day, habits its routines', async () => {
     store.notes = { guide: { current: 'calendar', done: ['look-back'], skipped: [] } }
     open()
-    expect(screen.getByText(/Planning today · step 2 of 5/)).toBeInTheDocument()
+    expect(stepNow()).toBe('Today\'s calendar')
     const day = within(rail().getByRole('group', { name: 'Monday, as it stands' }))
     expect(day.getByText('UPM kick-off')).toBeInTheDocument()
     expect(day.getByText('Fix the gate')).toBeInTheDocument()
-    fireEvent.click(rail().getByRole('button', { name: /Habits/ }))
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Go to this step' })) })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: /Habits/ })) })
     expect(rail().getByText('Walk the dog')).toBeInTheDocument()
     expect(rail().queryByText('UPM kick-off')).toBeNull()
   })
@@ -154,8 +156,7 @@ describe('GuidedDay — Today while planning the day', () => {
     const view = open({ listenPlacements: (fn) => { listening.fn = fn; return stop } })
     await act(async () => { listening.fn?.() })
     expect(plannedPatches()).toHaveLength(0)
-    fireEvent.click(rail().getByRole('button', { name: /Pick 3 to 5/ }))
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Go to this step' })) })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: /Pick 3 to 5/ })) })
     await act(async () => { listening.fn?.() })
     await waitFor(() => expect(plannedPatches()).toHaveLength(1))
     view.unmount()
@@ -186,8 +187,7 @@ describe('GuidedDay — Today while planning the day', () => {
     const { props } = open()
     fireEvent.change(rail().getByLabelText('A win yesterday'), { target: { value: 'Shipped it' } })
     // On to Habits, past the steps between: the win's draft is the session's.
-    fireEvent.click(rail().getByRole('button', { name: /Habits/ }))
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Go to this step' })) })
+    await act(async () => { fireEvent.click(rail().getByRole('button', { name: /Habits/ })) })
     expect(panel().queryByRole('button', { name: 'Next step' })).toBeNull()
     await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Done planning today' })) })
     await waitFor(() => expect(props.onClose).toHaveBeenCalled())
@@ -206,7 +206,7 @@ describe('GuidedDay — Today while planning the day', () => {
   it('Leave closes and keeps everything as it is', () => {
     store.notes = { guide: { current: 'energy', done: ['look-back'], skipped: ['calendar'] } }
     const { props } = open()
-    fireEvent.click(screen.getByRole('button', { name: 'Leave' }))
+    fireEvent.click(rail().getByRole('button', { name: 'Leave' }))
     expect(props.onClose).toHaveBeenCalled()
     expect(store.patches).toEqual([])
     expect(review.finish).not.toHaveBeenCalled()
@@ -217,13 +217,13 @@ describe('GuidedDay — ?step= opens the session on a step', () => {
   it('a valid step id opens on it once, and leaves the URL', async () => {
     open({}, '/today?plan=1&step=energy')
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('?plan=1'))
-    expect(screen.getByText(/Planning today · step 3 of 5/)).toBeInTheDocument()
+    expect(stepNow()).toBe('Energy')
   })
 
   it('an id that is not a step of this level is ignored', async () => {
     open({}, '/today?plan=1&step=vision')
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('?plan=1'))
-    expect(screen.getByText(/Planning today · step 1 of 5/)).toBeInTheDocument()
+    expect(stepNow()).toBe('Look back at yesterday')
     expect(store.patches).toHaveLength(0)
   })
 })

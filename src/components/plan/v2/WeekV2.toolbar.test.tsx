@@ -263,7 +263,8 @@ function Shell() {
 function WithDeck({ deck, ...props }: Partial<React.ComponentProps<typeof WeekV2>>) {
   const [params] = useSearchParams()
   const withMode = deck && { ...deck, mode: deck.available ? deckModeOf(params) : null }
-  return <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent canvas={<p>The days</p>} {...props} deck={withMode} />
+  // The week as WeekViewV2 draws it: in a session, the look back on the sheet beside it.
+  return <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent canvas={(o) => <><p>The days</p>{o?.fold?.look}</>} {...props} deck={withMode} />
 }
 const renderAt = (url: string, props: Partial<React.ComponentProps<typeof WeekV2>> = {}) => render(
   <MemoryRouter initialEntries={[url]}>
@@ -475,7 +476,8 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
     renderAt('/week', { deck: makeDeck() })
     fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
     const planning = screen.getByRole('region', { name: 'Planning the week' })
-    expect(within(planning).getByRole('group', { name: 'Steps in this session' })).toBeTruthy()
+    expect(within(planning).getByRole('region', { name: 'Plan the week' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'Steps in this session' })).toBeNull()
     // The page never disappears behind a session screen.
     expect(within(planning).getByText('The days')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()

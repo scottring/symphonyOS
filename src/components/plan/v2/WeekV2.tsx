@@ -15,9 +15,10 @@
 //
 // It is chrome AROUND the existing week: the canvas, drag and drop and
 // add-to-day are WeekViewV2's, unchanged. Review (?review=1) and Plan
-// (?plan=1) open the guided session on this same page (spec 2026-11-01): the
-// steps rail where the strip stands, the week beside it, the step's header
-// in the conversation. "Place them" (?place=1) opens Give them a day.
+// (?plan=1) open the guided session on this same page: the planning ribbon
+// across the top of the week (2026-11-04), each step driving the month's fold
+// beside it, the step's header in the conversation. "Place them" (?place=1)
+// opens Give them a day.
 
 import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
@@ -32,12 +33,11 @@ import { GiveThemADay } from '@/components/plan/choose/GiveThemADay'
 import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
 import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
 import { WeekLookBack } from '@/components/plan/guided/week/WeekLookBack'
-import { ReadMonth } from '@/components/plan/guided/week/ReadMonth'
 import { CalendarCheck, type AllDayEvent } from '@/components/plan/guided/week/CalendarCheck'
 import { InboxStep } from '@/components/plan/guided/week/InboxStep'
-import { ChooseStep } from '@/components/plan/guided/week/ChooseStep'
 import { WeeklyOps } from '@/components/plan/guided/week/WeeklyOps'
 import { TellFamily } from '@/components/plan/guided/week/TellFamily'
+import type { SessionFold } from '@/components/plan/guided/GuidedPeriod'
 import type { Routine } from '@/types/actionable'
 import type { ClashEvent } from '@/lib/guide/clashes'
 import type { FamilyMember } from '@/types/family'
@@ -107,9 +107,9 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   weekStart: Date
   isCurrent: boolean
   /** The week at rest: WeekViewV2's canvas. A guided session asks for it
-   *  without its strip (its steps stand there), and on its look back for the
-   *  week before (`period: 'previous'`), the one that step looks back on. */
-  canvas?: ReactNode | ((opts?: { hideStrip?: boolean; period?: 'previous' }) => ReactNode)
+   *  without its strip, with the month's fold driven by the ribbon's step
+   *  (`fold`: on the look back, last week with its choices). */
+  canvas?: ReactNode | ((opts?: { hideStrip?: boolean; fold?: SessionFold }) => ReactNode)
   /** Today's first item, for the fact line ("Today: …"); null when there is
    *  none, the week is not this one, or it has not loaded. */
   today?: string | null
@@ -261,7 +261,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
         // Drawn only once the tasks are in: no flash of an empty October.
         ? (deck.loading ? null : deckMode === 'full'
           ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} isCurrent={isCurrent} deck={deck} lastReview={lastReview}
-              canvas={(period) => typeof canvas === 'function' ? canvas(period === 'previous' ? { hideStrip: true, period } : { hideStrip: true }) : canvas}
+              canvas={(fold) => typeof canvas === 'function' ? canvas({ hideStrip: true, fold }) : canvas}
               onFinish={closeWeek} onClose={() => { setMode(null); planNotes.reload() }}
               onPlanned={() => { session.reload(); planNotes.reload() }} />
           : <section className="deck choose-flow" aria-label="Plan this week">
@@ -285,9 +285,8 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   deck: WeekDeck
   /** Last week's review: Look back's notes save through it. */
   lastReview: ReturnType<typeof usePeriodReview>
-  /** The week as the page draws it: the week being planned, or the week
-   *  before it (the one the look back is about). */
-  canvas: (period: 'planned' | 'previous') => ReactNode
+  /** The week as the page draws it, its month fold driven by the step. */
+  canvas: (fold: SessionFold) => ReactNode
   onFinish: (lookDraft: ReviewNotes | null) => Promise<boolean>
   onClose: () => void
   onPlanned: () => void
@@ -312,22 +311,19 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   // Where the session is comes first: no flash of step one before a resume.
   if (guided.loading) return null
   const choose = deck.choose
-  // What each step shows inside the rail. Choose binds the session's own
-  // Choose (its verbs mark the week planned); the earlier steps the page's.
+  // What each step shows: the look back on the sheet beside the week (last
+  // week, with its choices), a step with its own editor in the card under
+  // the band. Read November and Choose this week's tasks are the week's own
+  // page with the month open beside it.
   const bodies = {
     'look-back': <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
       notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} members={deck.handOffTo ?? NOBODY} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
-    'read-month': <ReadMonth monthWord={choose.monthWord} lines={choose.lines} doneLines={choose.doneLines} onOpen={deck.openTask} />,
     calendar: <CalendarCheck weekStart={weekStart} events={deck.events ?? []} allDay={deck.allDayEvents} />,
     inbox: <InboxStep cards={deck.cards.filter((c) => c.source === 'inbox')} actions={deck.actions} />,
-    choose: <ChooseStep count={guided.count} choose={guided.choose} days={deck.stripDays} />,
     ops: <WeeklyOps weekStart={weekStart} routines={deck.routines ?? NO_ROUTINES} draft={weekendDraft} onDraft={setWeekendDraft} />,
     family: <TellFamily weekStart={weekStart} familyItems={familyItems} draft={familyDraft} onDraft={setFamilyDraft} />,
   }
-  // The page shows the week each step is about (walk 2026-11-01: "Look back
-  // at last week" stood beside the week being planned): the look back the
-  // week before, every other step this one. The session, its notes and its
-  // count stay this week's.
-  return <GuidedWeek canvas={canvas(guided.progress.current === 'look-back' ? 'previous' : 'planned')} bodies={bodies} count={guided.count} monthWord={guided.monthWord}
-    progress={guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }} onLeave={onClose} />
+  return <GuidedWeek canvas={canvas} bodies={bodies} count={guided.count} monthWord={guided.monthWord}
+    progress={guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }}
+    onNext={() => { void guided.next() }} onFinish={() => { void guided.done() }} onLeave={onClose} />
 }

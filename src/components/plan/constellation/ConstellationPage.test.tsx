@@ -107,7 +107,22 @@ const menu=()=>{
 }
 const choose=(name:string)=>{menu();fireEvent.click(screen.getByRole(/^Show done$/.test(name)?'menuitemcheckbox':'menuitem',{name}))}
 const at=(d:Date)=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(d)}
+// The planning ribbon (2026-11-04): its band, the step it is on, and the
+// summary line under the header.
+const band=()=>within(document.querySelector<HTMLElement>('.ribbon-band')!)
+const stepNow=()=>Array.from(document.querySelectorAll('.ribbon-step')).find(b=>b.getAttribute('aria-current')==='step')?.querySelector('.ribbon-step-title')?.textContent
+const summary=()=>document.querySelector('.guide-summary-line')?.textContent??null
+/** The sheet above, as a reader meets it: open (data-open) and its face. */
+const aboveOpen=()=>document.querySelector('.paper-fold')?.getAttribute('data-open')==='true'
+const calendarOpen=()=>document.querySelector('.paper-fold')?.getAttribute('data-calendar-open')==='true'
 const REVIEWED={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
+// The folds land at once (reduced motion), so a step's drive shows in the
+// same tick; the page is a desk, not a phone.
+const setupMatchMedia=window.matchMedia
+beforeEach(()=>{
+ window.matchMedia=((query:string)=>({matches:query.includes('prefers-reduced-motion'),media:query,onchange:null,addListener:()=>{},removeListener:()=>{},addEventListener:()=>{},removeEventListener:()=>{},dispatchEvent:()=>false})) as unknown as typeof window.matchMedia
+})
+afterEach(()=>{window.matchMedia=setupMatchMedia})
 beforeEach(()=>{
  vi.clearAllMocks();cal.events=[];filters.sole='personal';addArea.real=false;notesStore.notes={};notesStore.patches=[];shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
@@ -581,7 +596,9 @@ describe('the fact line (calm pass, 2026-10-18)',()=>{
   expect(screen.getByRole('img',{name:'1 of 4 done'}).querySelector('span')).toHaveStyle({width:'25%'})
   cleanup();plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
   month()
-  expect(facts()).toBe('1 of 4 done · planned Oct 3')
+  // When it was planned is the summary line's (PeriodSummaryLine), not the count's.
+  expect(facts()).toBe('1 of 4 done')
+  expect(summary()).toBe('Planned Sat, Oct 3')
   // No summary sentence any more.
   expect(document.querySelector('.plan-sentence')).toBeNull()
  })
@@ -617,8 +634,8 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   fireEvent.click(within(head()).getByRole('button',{name:'Plan October'}))
   // Planning October is the guided session on this page.
   expect(screen.getByTestId('where').textContent).toContain('plan=1')
-  expect(screen.getByText(/Planning October · step 1 of 6/)).toBeInTheDocument()
-  expect(screen.getByRole('button',{name:/Look back at last month/})).toBeInTheDocument()
+  expect(stepNow()).toBe('Fresh start')
+  expect(band().getByRole('button',{name:/Look back at last month/})).toBeInTheDocument()
  })
  it('Plan {period} while it is unplanned; ⋯ offers next month early',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
@@ -766,8 +783,8 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   expect(screen.queryByRole('link',{name:/guided introduction/})).toBeNull()
   expect(head().querySelector('.page-help')).toBeNull()
   expect(screen.queryByRole('button',{name:/with me$/})).toBeNull()
-  // The date the period was planned is in the fact line instead.
-  expect(facts()).toMatch(/· planned Oct 3$/)
+  // The date the period was planned is in the summary line instead.
+  expect(summary()).toBe('Planned Sat, Oct 3')
   expect(menu()).toContain('Back to this month')
  })
  it('while reviewing or planning, the header keeps only the title and ⋯',()=>{
@@ -899,7 +916,7 @@ describe('reviewing: the session’s look back',()=>{
    fireEvent.click(screen.getByRole('button',{name:'Review October'}))
    expect(screen.getByTestId('where').textContent).toContain('plan=1')
    expect(screen.getByTestId('where').textContent).toContain('start=2026-11-01')
-   expect(screen.getByText(/Planning November · step 2 of 6/)).toBeInTheDocument()
+   expect(stepNow()).toBe('Look back at last month')
    const look=within(screen.getByRole('article',{name:'Looking back at October'}))
    fireEvent.change(look.getByRole('textbox',{name:'What went well'}),{target:{value:'Cabin booked'}})
    await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Save notes'}))})
@@ -912,7 +929,7 @@ describe('reviewing: the session’s look back',()=>{
    atStep('by-area')
    month()
    fireEvent.click(screen.getByRole('button',{name:'Review October'}))
-   expect(screen.getByText(/Planning November · step 2 of 6/)).toBeInTheDocument()
+   expect(stepNow()).toBe('Look back at last month')
    expect(screen.getByTestId('where').textContent).not.toContain('step=')
   }finally{vi.useRealTimers()}
  })
@@ -991,7 +1008,7 @@ describe('Done planning October (spec 2026-11-01)',()=>{
   plan.saved=null
   atStep('upkeep-fun')
   month('&plan=1')
-  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Done planning October'}))})
+  await act(async()=>{fireEvent.click(band().getByRole('button',{name:'Done planning October'}))})
   // September, not reviewed yet, is recorded reviewed even with nothing typed.
   expect(review.finish).toHaveBeenCalledWith({wentWell:'',didnt:''})
   expect(plan.save).toHaveBeenCalledWith({wentWell:'',didnt:''})
@@ -1006,9 +1023,26 @@ describe('Done planning October (spec 2026-11-01)',()=>{
   plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
   try{
    month()
-   expect(facts()).toMatch(/planned Oct 3$/)
+   expect(summary()).toBe('Planned Sat, Oct 3')
    expect(screen.queryByRole('button',{name:/Done planning/})).toBeNull()
   }finally{plan.saved=null}
+ })
+ // The planning ribbon (2026-11-04): Done planning stamps the sheet and the
+ // header line says when, with the review it closed.
+ it('Done planning November stamps the sheet, and the header reads Planned … · Last month’s review',async()=>{
+  at(new Date(2026,10,4,9)); onTestFinished(()=>{vi.useRealTimers();review.prevReviewed=null})
+  plan.save.mockImplementation(async()=>{plan.saved={at:new Date(2026,10,4,9),authorId:'u1',notes:{}};return true})
+  review.finish.mockImplementation(async()=>{review.prevReviewed={wentWell:'',didnt:'',at:new Date(2026,10,4),authorId:'u1'};return true})
+  atStep('upkeep-fun')
+  open('/month?view=constellation&horizon=2&start=2026-11-04&plan=1')
+  expect(band().getByRole('button',{name:'Done planning November'})).toBeInTheDocument()
+  await act(async()=>{fireEvent.click(band().getByRole('button',{name:'Done planning November'}))})
+  await waitFor(()=>expect(screen.getByTestId('where').textContent).not.toContain('plan=1'))
+  expect(screen.getByRole('img',{name:'Planned Nov 4'})).toBeInTheDocument()
+  expect(summary()).toBe('Planned Wed, Nov 4 · Last month’s review')
+  // No band any more; the bookmark hangs from the sheet again.
+  expect(document.querySelector('.ribbon-band')).toBeNull()
+  expect(screen.getByRole('button',{name:'Plan November',expanded:false})).toBeInTheDocument()
  })
  it('Done saves look back notes typed and not yet saved; a planned mark that fails keeps the session open',async()=>{
   at(new Date(2026,9,17,9)); onTestFinished(()=>{vi.useRealTimers()})
@@ -1016,8 +1050,7 @@ describe('Done planning October (spec 2026-11-01)',()=>{
   plan.save.mockResolvedValueOnce(false)
   month('&plan=1')
   fireEvent.change(screen.getByRole('textbox',{name:'What went well'}),{target:{value:'Gate fixed'}})
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:/Maintenance and fun/}))})
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Go to this step'}))})
+  await act(async()=>{fireEvent.click(band().getByRole('button',{name:/Maintenance and fun/}))})
   await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Done planning October'}))})
   expect(review.finish).toHaveBeenCalledWith({wentWell:'Gate fixed',didnt:''})
   expect(toast.showToast).toHaveBeenCalledWith('Couldn’t save that — try again.','error',5000)
@@ -1030,10 +1063,9 @@ describe('Done planning October (spec 2026-11-01)',()=>{
   atStep('upkeep-fun')
   month()
   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
-  expect(screen.getByText(/Planning November · step 2 of 6/)).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:/Maintenance and fun/}))
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Go to this step'}))})
-  expect(screen.getByText(/Planning November · step 6 of 6/)).toBeInTheDocument()
+  expect(stepNow()).toBe('Look back at last month')
+  await act(async()=>{fireEvent.click(band().getByRole('button',{name:/Maintenance and fun/}))})
+  expect(stepNow()).toBe('Maintenance and fun')
   await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Done planning November'}))})
   expect(review.finish).toHaveBeenCalledWith({wentWell:'',didnt:''})
   cleanup()
@@ -1054,8 +1086,7 @@ describe('Done planning October (spec 2026-11-01)',()=>{
   at(new Date(2026,9,17,9)); onTestFinished(()=>{vi.useRealTimers();plan.saved=null})
   plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
   month('&plan=1')
-  const line=screen.getByRole('region',{name:'Planning October'}).querySelector('.guide-session-line')!
-  expect(line).toHaveTextContent('October was planned Oct 3. You can still change it.')
+  expect(band().getByText('October was planned Oct 3. You can still change it.')).toBeInTheDocument()
   cleanup();plan.saved=null
   month('&plan=1')
   expect(screen.queryByText(/was planned/)).toBeNull()
@@ -1069,24 +1100,43 @@ describe('Done planning October (spec 2026-11-01)',()=>{
 
 describe('planning a month: the guided session (spec 2026-11-01)',()=>{
  const SEP=new Date(2026,8,1),OCT=new Date(2026,9,1)
- it('opens on the page itself: the steps rail where the strip stands, the list beside it, the step in the conversation',()=>{
+ it('the ribbon on the sheet, “Plan October”, opens a band of the six Month steps over the page itself; the step is in the conversation',()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},{id:'a',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'}]
-  month('&plan=1')
-  const session=within(screen.getByRole('region',{name:'Planning October'}))
-  expect(session.getAllByRole('listitem').filter((li)=>li.classList.contains('guide-rail-item')).map((li)=>li.querySelector('.guide-rail-title')?.textContent))
+  month()
+  const tab=screen.getByRole('button',{name:'Plan October',expanded:false})
+  expect(tab.closest('section')).toBe(list('October goals').closest('section'))
+  fireEvent.click(tab)
+  expect(screen.getByTestId('where').textContent).toContain('plan=1')
+  expect(band().getAllByRole('listitem').map((li)=>li.querySelector('.ribbon-step-title')?.textContent))
    .toEqual(['Fresh start','Look back at last month','Read the season list','Next 4–5 weeks','The month by area','Maintenance and fun'])
-   // The page's own list, without its strip.
+  expect(screen.queryByRole('group',{name:'Steps in this session'})).toBeNull()
+  // The page's own list, without its strip; the bookmark now pulled.
   expect(titles('October goals')).toEqual(['Hike Bear Mountain'])
+  expect(screen.getByRole('button',{name:'Plan October',expanded:true})).toBeInTheDocument()
   expect(screen.queryByRole('region',{name:'Fall strip'})).toBeNull()
   expect(document.querySelector('.hs-layout')).toBeNull()
   expect(guidePanel().getByText('Fresh start')).toBeInTheDocument()
   expect(shell.reg).toMatchObject({level:'month',token:'2026-10',threadKey:'monthly:2026-10'})
   expect(shell.reg?.sessionContext.guide.aboveLines).toEqual([{id:'s',title:'Get outside'}])
  })
- // Walk 2026-11-01: "Look back at October" stood beside November's list.
- // The page shows the month each step is about; the session stays November's.
- it('Review October: the look back shows October’s list, Next November’s, the rail October’s again',async()=>{
+ it('jumping to Next 4–5 weeks opens the calendar; Leave gives the folds back as they were left',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  localStorage.setItem('symphony-fold:month','open')
+  month('&plan=1')
+  expect(aboveOpen()).toBe(true)
+  await act(async()=>{fireEvent.click(band().getByRole('button',{name:/Next 4–5 weeks/}))})
+  expect(calendarOpen()).toBe(true)
+  expect(screen.getAllByRole('listitem',{name:/^Week of /}).length).toBeGreaterThan(0)
+  // Nothing is remembered on the way.
+  expect(localStorage.getItem('symphony-fold:month:calendar')).toBeNull()
+  fireEvent.click(band().getByRole('button',{name:'Leave'}))
+  expect(screen.getByTestId('where').textContent).not.toContain('plan=1')
+  expect(calendarOpen()).toBe(false)
+  expect(aboveOpen()).toBe(true)
+  expect(localStorage.getItem('symphony-fold:month')).toBe('open')
+ })
+ it('Review October: the look back turns the sheet beside November to October’s leftovers, with their choices; the next step gives it back to Fall',async()=>{
   at(new Date(2026,9,30,12)); onTestFinished(()=>{vi.useRealTimers()})
   const NOV=new Date(2026,10,1)
   api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},
@@ -1095,23 +1145,18 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
    {id:'n1',title:'Book flights',bucket:'month',monthStart:NOV}]
   month()
   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
-  expect(screen.getByText(/Planning November · step 2 of 6/)).toBeInTheDocument()
-  const october=()=>within(screen.getByRole('region',{name:'October 2026, looked back on'}))
-  expect(october().getByRole('heading',{level:2,name:'October 2026'})).toBeInTheDocument()
-  expect(titles('October goals')).toEqual(['Hike Bear Mountain'])
-  expect(october().getByText('Hike Bear Mountain',{selector:'.plan-item-title'}).closest('li')).not.toHaveTextContent('For Get outside')
-  expect(october().getByText('1 done · Pay taxes')).toBeInTheDocument()
-  expect(screen.queryByRole('list',{name:'November goals'})).toBeNull()
-  // Tapping a line opens its panel, as on October's own page.
-  fireEvent.click(october().getByRole('button',{name:'Hike Bear Mountain'}))
-  expect(selection.setSelection).toHaveBeenCalledWith({kind:'task',id:'o1'})
-  expect(shell.reg).toMatchObject({level:'month',token:'2026-11',stepId:'look-back'})
-  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Next step'}))})
-  expect(screen.queryByRole('region',{name:'October 2026, looked back on'})).toBeNull()
+  expect(stepNow()).toBe('Look back at last month')
+  // This page stays November's; the sheet beside it is October, looking back.
   expect(titles('November goals')).toEqual(['Book flights'])
-  fireEvent.click(within(screen.getByRole('group',{name:'Steps in this session'})).getByRole('button',{name:/Look back at last month/}))
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Go to this step'}))})
-  expect(titles('October goals')).toEqual(['Hike Bear Mountain'])
+  expect(aboveOpen()).toBe(true)
+  const october=within(screen.getByRole('region',{name:'October 2026, looking back'}))
+  expect(october.getByRole('heading',{level:2,name:'October'})).toBeInTheDocument()
+  expect(within(october.getByRole('list',{name:'Open from October'})).getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['Hike Bear Mountain'])
+  expect(document.querySelector('.ribbon-card')).toBeNull()
+  expect(shell.reg).toMatchObject({level:'month',token:'2026-11',stepId:'look-back'})
+  await act(async()=>{fireEvent.click(band().getByRole('button',{name:'Next'}))})
+  expect(screen.queryByRole('region',{name:'October 2026, looking back'})).toBeNull()
+  expect(within(screen.getByRole('region',{name:'Fall 2026, for reading'})).getByText('Get outside')).toBeInTheDocument()
   expect(screen.getByRole('region',{name:'Planning November'})).toBeInTheDocument()
   expect(shell.reg).toMatchObject({token:'2026-11',threadKey:'monthly:2026-11'})
  })
@@ -1145,39 +1190,31 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   // Nothing on the look back marks the month planned.
   expect(notesStore.patches.some((x)=>(x.p.guide as any)?.plannedAt)).toBe(false)
  })
- it('Read the season list and the next weeks: reading, with titles that open their panels',()=>{
+ it('Read the season list opens Fall beside the month, for reading, with nothing to press; no card',()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},{id:'a',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'}]
   atStep('read-season')
   month('&plan=1')
-  const fall=within(screen.getByRole('list',{name:'Fall goals'}))
-  expect(fall.getByRole('listitem',{name:'Get outside'})).toHaveTextContent('Hike Bear Mountain')
-  // Each title opens its panel; nothing else is offered to press but a tick.
-  expect(fall.getAllByRole('button').map((b)=>b.textContent)).toEqual(['Get outside','Hike Bear Mountain'])
-  cleanup();atStep('next-weeks')
-  month('&plan=1')
-  expect(screen.getAllByRole('listitem',{name:/^Week of /}).map((li)=>li.getAttribute('aria-label'))).toEqual(['Week of Oct 11','Week of Oct 18','Week of Oct 25','Week of Nov 1','Week of Nov 8'])
+  expect(aboveOpen()).toBe(true)
+  const fall=within(screen.getByRole('region',{name:'Fall 2026, for reading'}))
+  expect(fall.getByText('Get outside')).toBeInTheDocument()
+  expect(fall.queryAllByRole('button')).toHaveLength(0)
+  expect(document.querySelector('.ribbon-card')).toBeNull()
  })
- it('The month by area: Fall’s lines grouped by life area, the guide told the areas; the first write that saves marks October planned',async()=>{
+ it('The month by area: Fall open beside the sheet, the pencil on the write line, the guide told the areas; the first line written marks October planned',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Home',context:'family',mine:true,sortOrder:1}]
-  api.tasks=[{id:'s1',title:'Get outside',bucket:'quarter',goalId:'g',areaId:'h'},{id:'s2',title:'Get the house in order',bucket:'quarter',goalId:'g',areaId:'m'},
-   {id:'s3',title:'Sleep better',bucket:'quarter',goalId:'g',areaId:'h'},{id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP}]
-  api.keepForward.mockResolvedValue('old')
+  api.tasks=[{id:'s1',title:'Get outside',bucket:'quarter',goalId:'g',areaId:'h'}]
   atStep('by-area')
   month('&plan=1')
   expect(shell.reg?.sessionContext.guide.areas).toEqual([{id:'h',name:'Health',context:'personal'},{id:'m',name:'Home',context:'family'}])
-  const lines=screen.getByRole('list',{name:'Fall goals'})
-  expect(Array.from(lines.children).map((li)=>li.classList.contains('choose-area-head')?`# ${li.textContent}`:li.querySelector('.choose-line-title')?.textContent))
-   .toEqual(['# Health','Get outside','Sleep better','# Home','Get the house in order'])
-  const loose=within(screen.getByRole('region',{name:'Also in October'}))
-  await act(async()=>{fireEvent.click(loose.getByRole('button',{name:'October: Fix the gate'}))})
-  expect(api.keepForward).toHaveBeenCalledWith('old',{monthStart:OCT},SEP)
-  const marks=notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)
-  expect(marks).toHaveLength(1)
-  expect(marks[0].defaults).toMatchObject({savedAt:expect.any(String)})
+  expect(aboveOpen()).toBe(true)
+  expect(document.querySelector('.ribbon-card')).toBeNull()
+  await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole('textbox',{name:'Write an October goal'})))
+  await writeOn('Write an October goal','Paint the fence')
+  expect(api.addTask).toHaveBeenCalledWith('Paint the fence',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT}))
+  await waitFor(()=>expect(notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)).toHaveLength(1))
  })
- // Final review 2026-11-01: the guide is told only the areas the space filter shows.
  it('under a space filter the guide is told only the areas in view (a legacy area with no space is Personal)',()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   filters.on=true;filters.layers=new Set(['family'])
@@ -1185,43 +1222,6 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   atStep('by-area')
   month('&plan=1')
   expect(shell.reg?.sessionContext.guide.areas).toEqual([{id:'m',name:'Home',context:'family'}])
- })
- it('The month by area: a step added under a line, and a new line written on the page, count as applied',async()=>{
-  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
-  api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'}]
-  atStep('by-area')
-  month('&plan=1')
-  fireEvent.click(screen.getByRole('button',{name:/Get outside/}))
-  fireEvent.click(screen.getByRole('button',{name:'Add a step in October under Get outside'}))
-  const field=screen.getByRole('textbox',{name:'A step in October under Get outside'})
-  fireEvent.change(field,{target:{value:'Rake leaves'}})
-  await act(async()=>{fireEvent.submit(field.closest('form')!)})
-  expect(api.addTask).toHaveBeenCalledWith('Rake leaves',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT,sourceId:'s'}))
-  expect(lastRun().label).toBe('Add “Rake leaves” for “Get outside”')
-  expect(notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)).toHaveLength(1)
-  // A line written on the page itself, in a fresh session at the same step.
-  cleanup();atStep('by-area')
-  month('&plan=1')
-  await writeOn('Write an October goal','Paint the fence')
-  await waitFor(()=>expect(notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt).length).toBeGreaterThan(0))
- })
- // (This file stubs taskReviewState, so every row here reads as October; which
- // label a step wears is chooseFromAbove's own test.)
- it('The month by area: Not in October on a line already on Fall ends only October’s commitment — nothing to put back first',async()=>{
-  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
-  const FALL=new Date(2026,8,1)
-  api.tasks=[{id:'s',title:'Get the house in order',bucket:'quarter',goalId:'g',commitments:[{level:'season',periodStart:FALL,status:'open'}]},
-   {id:'p',title:'Paint the office',bucket:'quarter',sourceId:'s',commitments:[{level:'season',periodStart:FALL,status:'open'}]},
-   {id:'o',title:'Organize documents',bucket:'month',monthStart:OCT,sourceId:'s',commitments:[{level:'season',periodStart:FALL,status:'open'},{level:'month',periodStart:OCT,status:'open'}]}]
-  api.keepForward.mockResolvedValue('p');api.dropCommitment.mockResolvedValue(true)
-  atStep('by-area')
-  month('&plan=1')
-  fireEvent.click(screen.getByRole('button',{name:/Get the house in order/}))
-  expect(screen.getByRole('list',{name:'Steps of Get the house in order'})).toHaveTextContent('Paint the office')
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Not in October: Organize documents'}))})
-  expect(api.dropCommitment).toHaveBeenCalledWith('o','month',OCT)
-  expect(api.keepForward).not.toHaveBeenCalled()
-  expect(lastRun().label).toBe('Back to Fall: “Organize documents”')
  })
  it('Maintenance and fun: the monthly routines and the month’s fun lines; a fun line is added from what is typed',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
@@ -1270,28 +1270,26 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
  const SUMMER=new Date(2026,5,1),FALL=new Date(2026,8,1)
  const plannedMarks=()=>notesStore.patches.filter((x)=>(x.p.guide as any)?.plannedAt)
  const inSession=()=>{at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})}
- it('seven steps, the page beside them',()=>{
+ it('seven steps on the band; the look back turns the sheet beside Fall to Summer',()=>{
   inSession()
   season('&plan=1')
-  const session=within(screen.getByRole('region',{name:'Planning Fall'}))
-  expect(session.getAllByRole('listitem').filter((li)=>li.classList.contains('guide-rail-item')).map((li)=>li.querySelector('.guide-rail-title')?.textContent))
+  expect(within(screen.getByRole('region',{name:'Plan Fall'})).getAllByRole('listitem').map((li)=>li.querySelector('.ribbon-step-title')?.textContent))
    .toEqual(['Look back at last season','Choose from the year','Season calendar','Energy check','Season goals by area','Ideal week','Wild cards'])
-  // The look back's page is the season it looks back on (walk 2026-11-01).
-  expect(screen.getByRole('region',{name:'Summer 2026, looked back on'})).toBeInTheDocument()
-  expect(screen.getByRole('list',{name:'Summer goals'})).toBeInTheDocument()
-  expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
+  expect(screen.getByRole('region',{name:'Summer 2026, looking back'})).toBeInTheDocument()
+  expect(screen.getByRole('list',{name:'Fall goals'})).toBeInTheDocument()
   expect(shell.reg).toMatchObject({level:'season',token:'2026-fall',threadKey:'seasonal:2026-fall'})
  })
- it('the look back shows Summer’s list; the next step Fall’s',async()=>{
+ it('the look back shows Summer’s open goals beside Fall; the next step opens the year beside it, with Someday in the card',async()=>{
   inSession()
   api.tasks=[{id:'a',title:'Swim lessons',bucket:'quarter',monthStart:SUMMER},{id:'f',title:'Rake the leaves',bucket:'quarter',monthStart:FALL}]
   season('&plan=1')
-  const summer=within(screen.getByRole('region',{name:'Summer 2026, looked back on'}))
-  expect(summer.getByRole('heading',{level:2,name:'Summer 2026'})).toBeInTheDocument()
-  expect(titles('Summer goals')).toEqual(['Swim lessons'])
-  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Next step'}))})
-  expect(screen.queryByRole('region',{name:'Summer 2026, looked back on'})).toBeNull()
+  const summer=within(screen.getByRole('region',{name:'Summer 2026, looking back'}))
+  expect(summer.getByRole('listitem',{name:'Swim lessons'})).toBeInTheDocument()
   expect(titles('Fall goals')).toEqual(['Rake the leaves'])
+  await act(async()=>{fireEvent.click(band().getByRole('button',{name:'Next'}))})
+  expect(screen.queryByRole('region',{name:'Summer 2026, looking back'})).toBeNull()
+  expect(within(screen.getByRole('region',{name:'2026, for reading'})).getByText('Together')).toBeInTheDocument()
+  expect(screen.getByRole('region',{name:'Choose from the year'})).toBeInTheDocument()
   expect(shell.reg).toMatchObject({token:'2026-fall',stepId:'from-year'})
  })
  it('Look back: Summer’s open goals — Carry, Table (to Someday), Let go (off Summer only) — each through the page’s writers',async()=>{
@@ -1361,20 +1359,15 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(notesStore.patches.map((x)=>x.p)).toContainEqual({energy:{level:'medium'}})
   expect(screen.getByRole('radio',{name:'Medium'})).toBeChecked()
  })
- it('Season goals by area: the year’s goals as lines; the first write that saves marks Fall planned',async()=>{
+ it('Season goals by area: the year open beside Fall; the first line written on the sheet marks Fall planned',async()=>{
   inSession()
-  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'}]
   atStep('by-area')
   season('&plan=1')
-  expect(within(screen.getByRole('list',{name:'2026 goals'})).getAllByRole('listitem').map((li)=>li.querySelector('.choose-line-title')?.textContent).filter(Boolean))
-   .toEqual(['Together','Health'])
-  fireEvent.click(screen.getByRole('button',{name:/Health/}))
-  fireEvent.click(screen.getByRole('button',{name:'Add a step in Fall under Health'}))
-  const field=screen.getByRole('textbox',{name:'A step in Fall under Health'})
-  fireEvent.change(field,{target:{value:'Sleep by eleven'}})
-  await act(async()=>{fireEvent.submit(field.closest('form')!)})
-  expect(api.addTask).toHaveBeenCalledWith('Sleep by eleven',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',seasonStart:FALL,goalId:'other'}))
-  expect(plannedMarks()).toHaveLength(1)
+  expect(aboveOpen()).toBe(true)
+  expect(within(screen.getByRole('region',{name:'2026, for reading'})).getByText('Health')).toBeInTheDocument()
+  await writeOn('Write a Fall goal','Sleep by eleven')
+  expect(api.addTask).toHaveBeenCalledWith('Sleep by eleven',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',seasonStart:FALL}))
+  await waitFor(()=>expect(plannedMarks()).toHaveLength(1))
  })
  it('Ideal week: blocks typed here save into the season’s notes, a goal block naming one of Fall’s open goals',async()=>{
   inSession()
@@ -1438,32 +1431,30 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   expect(vision.getByRole('link',{name:'Edit'}).getAttribute('href')).toMatch(/plan=1&step=vision/)
   fireEvent.click(land.getByRole('link',{name:'Edit'}))
   expect(screen.getByRole('region',{name:'Planning 2026'})).toBeInTheDocument()
-  expect(screen.getByText(/Planning 2026 · step 3 of 7/)).toBeInTheDocument()
+  expect(stepNow()).toBe('Map the 12 months')
  })
- it('seven steps, the page beside them',()=>{
+ it('seven steps on the band; the look back turns the sheet beside 2026 to 2025',()=>{
   inSession()
   year()
-  const session=within(screen.getByRole('region',{name:'Planning 2026'}))
-  expect(session.getAllByRole('listitem').filter((li)=>li.classList.contains('guide-rail-item')).map((li)=>li.querySelector('.guide-rail-title')?.textContent))
+  expect(within(screen.getByRole('region',{name:'Plan 2026'})).getAllByRole('listitem').map((li)=>li.querySelector('.ribbon-step-title')?.textContent))
    .toEqual(['Look back at last year','Picture 5–10 years out','Map the 12 months','Choose life areas','Brain dump goals','Refine the list','Share and book the next session'])
-  // The look back's page is the year it looks back on (walk 2026-11-01).
-  expect(screen.getByRole('list',{name:'2025 goals'})).toBeInTheDocument()
-  expect(screen.queryByRole('list',{name:'2026 goals'})).toBeNull()
+  expect(screen.getByRole('region',{name:'2025, looking back'})).toBeInTheDocument()
+  expect(screen.getByRole('list',{name:'2026 goals'})).toBeInTheDocument()
   expect(shell.reg).toMatchObject({level:'year',token:'2026',threadKey:'annual:2026'})
  })
- it('the look back shows 2025’s goals, met and carried folded; the next step 2026’s',async()=>{
+ it('the look back shows 2025’s open goals beside 2026; the next step folds it back to last year, for reading',async()=>{
   inSession()
   api.goals=[...GOALS.map(g=>({...g})),{id:'sail',name:'Learn to sail',year:2025,status:'active',context:'personal'},
    {id:'run',name:'Run a 10k',year:2025,status:'completed',context:'personal'}]
   year()
-  const last=within(screen.getByRole('region',{name:'2025, looked back on'}))
-  expect(last.getByRole('heading',{level:2,name:'2025'})).toBeInTheDocument()
-  expect(titles('2025 goals')).toEqual(['Learn to sail'])
-  expect(last.getByText('1 done · Run a 10k')).toBeInTheDocument()
-  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Next step'}))})
-  expect(screen.queryByRole('list',{name:'2025 goals'})).toBeNull()
+  const last=within(screen.getByRole('region',{name:'2025, looking back'}))
+  expect(last.getByRole('listitem',{name:'Learn to sail'})).toBeInTheDocument()
+  expect(last.queryByRole('listitem',{name:'Run a 10k'})).toBeNull()
   expect(titles('2026 goals')).toEqual(['Together','Health'])
+  await act(async()=>{fireEvent.click(guidePanel().getByRole('button',{name:'Next step'}))})
+  expect(screen.queryByRole('region',{name:'2025, looking back'})).toBeNull()
   expect(shell.reg).toMatchObject({token:'2026',stepId:'vision'})
+  expect(screen.getByRole('region',{name:'Picture 5–10 years out'})).toBeInTheDocument()
  })
  it('Look back: 2025’s open goals — Carry, Someday, Let go, Done — each through the page’s writers, with Undo',async()=>{
   inSession()
@@ -1556,40 +1547,16 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   expect(lifeAreas.add).toHaveBeenCalledWith('Money','personal')
   expect(plannedMarks()).toHaveLength(0)
  })
- it('Brain dump: the year’s goals by area, an empty area pointed out; the first add that saves marks 2026 planned',async()=>{
+ it('Brain dump: last year open beside the sheet, the pencil on “Write a 2026 goal”; the first goal written marks 2026 planned',async()=>{
   inSession()
-  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Money',context:'work',mine:true,sortOrder:1}]
-  api.goals=[{...GOALS[0]},{...GOALS[1],areaId:'h'}]
   atStep('brain-dump')
   year()
-  const health=within(screen.getByRole('region',{name:'Health'}))
-  expect(health.getByText('Health',{selector:'.gw-step-title'})).toBeInTheDocument()
-  expect(within(screen.getByRole('region',{name:'Money'})).getByText('Nothing in Money yet.')).toBeInTheDocument()
-  expect(within(screen.getByRole('region',{name:'No area'})).getByText('Together')).toBeInTheDocument()
-  const field=within(screen.getByRole('region',{name:'Money'})).getByRole('textbox',{name:'New goal in Money'})
-  fireEvent.change(field,{target:{value:'Max the 401k'}})
-  await act(async()=>{fireEvent.submit(field.closest('form')!)})
-  expect(api.addGoal).toHaveBeenCalledWith('m','Max the 401k','work',expect.objectContaining({year:2026,id:expect.any(String)}))
-  expect(lastRun().label).toBe('Add “Max the 401k” to 2026')
-  expect(plannedMarks()).toHaveLength(1)
-  const more=within(screen.getByRole('region',{name:'No area'})).getByRole('textbox',{name:'New goal, no area'})
-  fireEvent.change(more,{target:{value:'Redo the will'}})
-  await act(async()=>{fireEvent.submit(more.closest('form')!)})
-  expect(api.addGoal).toHaveBeenLastCalledWith(null,'Redo the will','personal',expect.objectContaining({year:2026}))
-  expect(plannedMarks()).toHaveLength(1)
- })
- it('Brain dump: under a space filter, a goal in an area stays under its area; an area with nothing in view stays out',()=>{
-  inSession()
-  filters.on=true;filters.layers=new Set(['family'])
-  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Money',context:'personal',mine:true,sortOrder:1},{id:'f',name:'Home',context:'family',mine:true,sortOrder:2}]
-  api.goals=[{id:'fg',name:'Family hikes',year:2026,status:'active',context:'family',areaId:'h'},{id:'pg',name:'Private one',year:2026,status:'active',context:'personal',areaId:'m'}]
-  atStep('brain-dump')
-  year()
-  expect(within(screen.getByRole('region',{name:'Health'})).getByText('Family hikes')).toBeInTheDocument()
-  expect(screen.queryByRole('region',{name:'Money'})).toBeNull()
-  expect(screen.queryByText('Private one')).toBeNull()
-  expect(within(screen.getByRole('region',{name:'Home'})).getByText('Nothing in Home yet.')).toBeInTheDocument()
-  expect(within(screen.getByRole('region',{name:'No area'})).queryByText('Family hikes')).toBeNull()
+  expect(aboveOpen()).toBe(true)
+  expect(document.querySelector('.ribbon-card')).toBeNull()
+  await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole('textbox',{name:'Write a 2026 goal'})))
+  await writeOn('Write a 2026 goal','Max the 401k')
+  expect(api.addGoal).toHaveBeenCalledWith(null,'Max the 401k','personal',expect.objectContaining({year:2026}))
+  await waitFor(()=>expect(plannedMarks()).toHaveLength(1))
  })
  it('Refine: goals that overlap, with Keep both, Let go of one, Someday — nothing merges on its own',async()=>{
   inSession()
