@@ -232,7 +232,7 @@ describe('WeekCanvas — filing a task under a goal', () => {
       month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={{ drive: { above: write }, look: null, write }} /></MemoryRouter>
     const { rerender } = render(view(false))
     const col = within(weekCol())
-    expect(col.getByRole('list', { name: 'Sometime this week' })).toHaveTextContent('Call the bank')
+    expect(col.getByRole('list')).toHaveTextContent('Call the bank')
     expect(col.getByRole('button', { name: '+ Add to week' })).toHaveAttribute('data-guide-anchor', 'write')
     expect(screen.queryByRole('textbox')).toBeNull()
     rerender(view(true))
@@ -416,7 +416,7 @@ describe('WeekCanvas — calendar first', () => {
     expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
     const col = within(weekCol())
     expect(weekCol().querySelector('.wc-dayhead')).toHaveTextContent('Sometime this week')
-    const rows = within(col.getByRole('list', { name: 'Sometime this week' }))
+    const rows = within(col.getByRole('list'))
     for (const t of ['Book the cabin', 'Call the bank', 'Service the car']) expect(rows.getByText(t).closest('li')).toHaveAttribute('draggable', 'true')
     expect(rows.getByText('Mow the lawn').closest('li')).toHaveClass('is-routine')
     // The week sentence is gone (calm pass 2): "Today: …" is the header's.
@@ -432,7 +432,7 @@ describe('WeekCanvas — calendar first', () => {
 
   it('nothing without a day, nothing to place', () => {
     render(<WeekCanvas weekStart={weekStart} days={days()} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} onPlaceUnplaced={vi.fn()} />)
-    expect(screen.queryByRole('list', { name: 'Sometime this week' })).toBeNull()
+    expect(within(weekCol()).queryByRole('list')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Place them one at a time' })).toBeNull()
   })
 

@@ -43,7 +43,7 @@ describe('PlanningGuide', () => {
     expect(intro).toHaveTextContent(/Looking back/)
     expect(intro).toHaveTextContent(/choose from the level above/i)
     expect(intro).toHaveTextContent(/giving them a day/i)
-    expect(intro).toHaveTextContent(/No day yet/)
+    expect(intro).toHaveTextContent(/Sometime this week/)
     expect(intro).toHaveTextContent(/hold goals; the week and the day hold tasks/i)
   })
 

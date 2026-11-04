@@ -203,7 +203,7 @@ describe('WeekViewV2 layout', () => {
     const t = createMockTask({ id: 'w', title: 'Call the plumber', bucket: 'week', weekStart: anchor, commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] })
     render(<WeekViewV2 {...defaultProps} tasks={[t]} routines={[]} />)
     expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
-    expect(within(screen.getByRole('list', { name: 'Sometime this week' })).getByText('Call the plumber').closest('li')).toHaveAttribute('draggable', 'true')
+    expect(within(within(screen.getByRole('region', { name: 'Sometime this week' })).getByRole('list')).getByText('Call the plumber').closest('li')).toHaveAttribute('draggable', 'true')
     // This week is not the current one, so the deck may not open here: no link, no progress line.
     expect(screen.queryByRole('button', { name: 'Place them one at a time' })).toBeNull()
     expect(screen.queryByText(/done last week/)).toBeNull()
@@ -993,7 +993,7 @@ describe('WeekViewV2 — the deck', () => {
     expect(screen.getByRole('button', { name: 'October, 2 open. Unfold to read' })).toBeInTheDocument()
     expect(screen.queryByText('→ Week')).toBeNull()
     expect(screen.queryByRole('tab', { name: 'October' })).toBeNull()
-    const noDay = screen.getByRole('list', { name: 'Sometime this week' })
+    const noDay = within(screen.getByRole('region', { name: 'Sometime this week' })).getByRole('list')
     expect(within(noDay).getByText('Plan winter vacation')).toBeInTheDocument()
   })
 
@@ -1176,7 +1176,7 @@ describe('WeekViewV2 — the deck', () => {
     ]
     open('', tasks, { layers: familyOnly })
     expect(document.querySelector('.wk-facts')?.textContent).toBe('0 of 1 done')
-    expect(within(screen.getByRole('list', { name: 'Sometime this week' })).getByText('Call the plumber')).toBeInTheDocument()
+    expect(within(within(screen.getByRole('region', { name: 'Sometime this week' })).getByRole('list')).getByText('Call the plumber')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Place them one at a time' }))
     expect(new URLSearchParams(window.location.search).get('place')).toBe('1')
     expect(new URLSearchParams(window.location.search).get('date')).toBeNull()
@@ -1218,7 +1218,7 @@ describe('WeekViewV2 — the deck', () => {
       createMockTask({ id: 'hers', title: 'Pot the ferns', ...onWeek, assignedTo: 'iris' }),
     ]
     const view = open('', tasks)
-    const noday = within(screen.getByRole('list', { name: 'Sometime this week' }))
+    const noday = within(within(screen.getByRole('region', { name: 'Sometime this week' })).getByRole('list'))
     expect(noday.getByText('Call the plumber')).toBeInTheDocument()
     expect(noday.getByText('Return the drill')).toBeInTheDocument()
     view.unmount()

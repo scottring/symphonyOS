@@ -27,7 +27,7 @@ describe('page-written tours', () => {
     </div>`
     const steps = tourFor('week')
     expect(steps.map((s) => s.targets)).toEqual([['page-title'], ['region:The days'], ['still-to-place']])
-    expect(steps[2].title).toBe('No day yet')
+    expect(steps[2].title).toBe('Sometime this week')
     expect(titles()).not.toContain('The shelf')
   })
 

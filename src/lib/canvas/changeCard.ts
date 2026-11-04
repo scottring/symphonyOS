@@ -319,7 +319,7 @@ const inArea = (op: ChangeOp, where: string) => (op.areaName ? `${where} · ${op
 export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string; where: string } {
   switch (op.op) {
     case 'place': return { kind: 'MOVE', title: op.title, where: `→ ${dayWords(op, today)}` }
-    case 'unplace': return { kind: 'MOVE', title: op.title, where: '→ No day yet' }
+    case 'unplace': return { kind: 'MOVE', title: op.title, where: '→ Sometime this week' }
     case 'add': return { kind: 'ADD', title: op.title, where: inArea(op, op.date ? dayWords(op, today) : 'No day yet') }
     case 'someday': return { kind: 'LATER', title: op.title, where: '→ Someday' }
     case 'assign': return { kind: 'WHO', title: op.title, where: `→ ${op.assigneeName ?? 'someone'}` }

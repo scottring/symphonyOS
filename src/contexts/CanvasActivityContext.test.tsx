@@ -304,7 +304,7 @@ describe('change sets', () => {
     const note = activity().takeChangeCard()
     expect(note).toMatchObject({ state: 'approved', title: '2 changes', ops: [
       { op: 'someday', title: 'Paper mail', where: '→ Someday' },
-      { op: 'unplace', title: 'Call the bank', where: '→ No day yet' },
+      { op: 'unplace', title: 'Call the bank', where: '→ Sometime this week' },
     ] })
     expect(typeof note?.at).toBe('string')
     expect(activity().takeChangeCard()).toBeUndefined()

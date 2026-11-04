@@ -203,7 +203,7 @@ export function PlanningGuide() {
             <strong>choose from the level above</strong>, written on the left so this period’s
             list sits beside it: the month’s goals beside the season’s list, the week’s tasks
             beside the month’s goals. The week sheet ends the way Plan this week does, by{' '}
-            <strong>giving them a day</strong> — and what can be done any day stays in No day yet.
+            <strong>giving them a day</strong> — and what can be done any day stays in Sometime this week.
           </p>
           <p>
             Year, season and month hold <strong>goals</strong>; the week and the day hold{' '}

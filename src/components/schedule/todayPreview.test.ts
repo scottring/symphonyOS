@@ -34,7 +34,7 @@ describe('todayPreview', () => {
     ), WED, WED)
     expect(markForRow(p, 'task-a')).toEqual({ tone: 'leaving', struck: true, note: '→ Thu' })
     expect(markForRow(p, 'task-b')).toEqual({ tone: 'leaving', struck: true, note: '→ Someday' })
-    expect(markForRow(p, 'task-c')).toEqual({ tone: 'leaving', struck: true, note: '→ No day yet' })
+    expect(markForRow(p, 'task-c')).toEqual({ tone: 'leaving', struck: true, note: '→ Sometime this week' })
     expect(markForRow(p, 'task-d')).toEqual({ tone: 'leaving', struck: true, note: '→ Talk about' })
     expect(p.talk).toEqual([{ key: 'k3', title: 'Coppermine sign-up', note: 'with Iris' }])
   })

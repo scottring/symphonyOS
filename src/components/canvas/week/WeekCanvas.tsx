@@ -717,7 +717,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       <div className="wc-daybody">
         {draggingPlaced && <p className="wc-drop-hint" aria-live="polite">Drop here to take its day away</p>}
         {weekCount > 0
-          ? <ul className="cw-rows wc-items" aria-label="Sometime this week">{unplaced.map(weekTaskRow)}{routinesToPlace.map(weekRoutineRow)}</ul>
+          ? <ul className="cw-rows wc-items">{unplaced.map(weekTaskRow)}{routinesToPlace.map(weekRoutineRow)}</ul>
           : !draggingPlaced && <p className="wc-weekcol-note">Everything on this week has a day.</p>}
         {unplaced.length > 0 && onPlaceUnplaced && (
           <button type="button" className="canvas-link wc-quiet-link wc-more" onClick={onPlaceUnplaced}>Place them one at a time</button>

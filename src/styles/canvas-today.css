@@ -297,6 +297,8 @@
   .wc-strip > .wc-day { grid-row: auto; grid-column: auto !important; display: block; border-left-color: transparent; }
   .wc-strip > .wc-day.is-today { order: -1; }
   .wc-strip > .wc-day.is-past { order: 1; }
+  /* Sometime this week, the week's first column, stays first. */
+  .wc-strip > .wc-weekcol { order: -2; }
   .wc-bars { display: none; }
   .wc-spans li.has-bar { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; }
 }

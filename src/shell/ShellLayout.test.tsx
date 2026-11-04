@@ -524,7 +524,7 @@ describe('The change card reaches the next turn', () => {
     act(() => observer.changeSet?.(set))
     expect(observer.changeCard?.()).toMatchObject({ state: 'pending', title: '2 changes' })
     fireEvent.click(within(screen.getByRole('region', { name: '2 changes' })).getByRole('button', { name: 'Discard draft' }))
-    expect(observer.changeCard?.()).toMatchObject({ state: 'dismissed', ops: [{ op: 'someday', title: 'Paper mail', where: '→ Someday' }, { op: 'unplace', title: 'Call the bank', where: '→ No day yet' }] })
+    expect(observer.changeCard?.()).toMatchObject({ state: 'dismissed', ops: [{ op: 'someday', title: 'Paper mail', where: '→ Someday' }, { op: 'unplace', title: 'Call the bank', where: '→ Sometime this week' }] })
     expect(observer.changeCard?.()).toBeUndefined()
   })
 })

@@ -15,7 +15,7 @@ describe('opRow', () => {
     expect(opRow(op({ date: '2026-10-14', time: '09:00' }), today)).toEqual({ kind: 'MOVE', title: 'Reply to Christian', where: '→ Today 9:00' })
     expect(opRow(op({ date: '2026-10-15', time: '13:30' }), today).where).toBe('→ Thu 1:30')
     expect(opRow(op({ date: '2026-10-16' }), today).where).toBe('→ Fri')
-    expect(opRow(op({ op: 'unplace' }), today)).toMatchObject({ kind: 'MOVE', where: '→ No day yet' })
+    expect(opRow(op({ op: 'unplace' }), today)).toMatchObject({ kind: 'MOVE', where: '→ Sometime this week' })
     expect(opRow(op({ op: 'add', title: 'Hold for WSWMD', date: '2026-10-14', time: '13:00' }), today)).toEqual({ kind: 'ADD', title: 'Hold for WSWMD', where: 'Today 1:00' })
     expect(opRow(op({ op: 'add', title: 'Call the bank' }), today).where).toBe('No day yet')
     expect(opRow(op({ op: 'someday' }), today)).toMatchObject({ kind: 'LATER', where: '→ Someday' })
