@@ -152,7 +152,7 @@ describe('Today as a daily journal', () => {
     expect(screen.getByText('Nothing chosen yet.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^show week \d+$/ })).toBeNull()
-    expect(screen.getByText(/Choose from week \d+ (beside this list|above), or add something for today/)).toBeInTheDocument()
+    expect(screen.getByText(/Choose from [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+ (beside this list|above), or add something for today/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Unfold to read$/ })).toBeInTheDocument()
   })
 

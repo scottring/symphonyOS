@@ -182,7 +182,7 @@ describe('WeekV2 header — the fact line', () => {
     renderAt('/week', { deck: makeDeck({ doneThisWeek: 4, onThisWeek: 16 }), today: 'Kaleb’s baseball' })
     // When it was planned is the summary line's, not the facts'.
     expect(document.querySelector('.wk-facts')?.textContent).toBe('4 of 16 done · Today: Kaleb’s baseball')
-    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun')
+    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun, Sep 27')
   })
 
   // ⋯ no longer offers "Review last week" (it opened the same deck as Plan
@@ -230,7 +230,7 @@ describe('WeekV2 — the last day', () => {
     vi.setSystemTime(new Date(2026, 9, 3, 12))
     renderWeek({ canvas: <section aria-label="The days">canvas</section> })
     expect(screen.getByRole('region', { name: 'The days' })).toBeTruthy()
-    expect(screen.getByText(/ends today/)).toBeTruthy()
+    expect(screen.getByText('This week ends today.')).toBeTruthy()
     expect(screen.getByText(/Use Plan on next week to plan the week ahead/)).toBeTruthy()
     expect(screen.queryByText(/Open Chat/)).toBeNull()
     expect(screen.queryByRole('button', { name: /^Plan / })).toBeNull()
@@ -429,17 +429,17 @@ describe('WeekV2 — Review opens the deck', () => {
 describe('WeekV2 — the planning summary line', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null; review.reviewed = null })
 
-  it('says when it was planned, the energy and that it looked back', () => {
+  it('says when it was planned, the energy and last week’s review', () => {
     seed.notes = { guide: { current: 'family', done: ['look-back'], skipped: [], plannedAt: new Date(2026, 8, 27, 18).toISOString() }, energy: { level: 'medium' } }
     renderAt('/week', { deck: makeDeck() })
-    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun · energy: medium · looked back')
+    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun, Sep 27 · Last week’s review · Energy: medium')
   })
 
   it('counts last week’s recorded review as having looked back', () => {
     seed.notes = { guide: { current: 'family', done: [], skipped: [], plannedAt: new Date(2026, 8, 27, 18).toISOString() } }
     review.reviewed = { at: new Date(2026, 8, 26), authorId: 'me', wentWell: '', didnt: '' }
     renderAt('/week', { deck: makeDeck() })
-    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun · looked back')
+    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun, Sep 27 · Last week’s review')
   })
 
   it('with nothing saved there is no line', () => {
@@ -463,7 +463,7 @@ describe('WeekV2 — the planning summary line', () => {
         </PlanMastheadSlotsContext.Provider>
       </MemoryRouter>,
     )
-    expect(slots.subline.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun')
+    expect(slots.subline.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun, Sep 27')
     slots.done()
   })
 })

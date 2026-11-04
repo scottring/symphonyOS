@@ -111,7 +111,7 @@ describe('#24/#18 the week sheet shows the week still ahead on its last day', ()
 
   it('lists next week’s open rows, read-only; a title opens the task', () => {
     const { onSelectItem } = renderView({ tasks: [goal, line, step, copied, nextWeekRow] })
-    const ahead = screen.getByRole('region', { name: /Week \d+, starts tomorrow/ })
+    const ahead = screen.getByRole('region', { name: /^[A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+, starts tomorrow$/ })
     expect(within(ahead).getByText(/Starts tomorrow/i)).toBeInTheDocument()
     expect(within(ahead).getByText('Call the plumber')).toBeInTheDocument()
     // Reading only: no + for next week's rows.

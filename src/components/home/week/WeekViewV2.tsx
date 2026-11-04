@@ -92,7 +92,6 @@ import { usePlannedDinners } from '@/hooks/usePlannedDinners'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref, type PlannedMeal } from '@/lib/mealDayRecipes'
 import type { FamilyMember } from '@/types/family'
-import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
@@ -1369,7 +1368,7 @@ function PastWeekCanvas({ anchor, tasks, drawnTasks, weekendTasks, events, routi
     [journal, shelf, dailyShown, forecast, plannedDinners, eventsReady, canMoveEvent])
   const spans = useMemo(() => toCanvasSpans(layoutContextSpans(events, journal.days.map((d) => d.date)), journal.days), [events, journal])
   return <>
-    <h2 className="week-days-heading">Week {weekOfYear(start, readCadenceConfig().weekStartsOn)} · {formatWeekRange(start)}</h2>
+    <h2 className="week-days-heading">{formatWeekRange(start)}</h2>
     <WeekCanvas weekStart={start} hideStrip={hideStrip} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={isCurrent} writers={writers} spans={spans} members={members} viewerId={meId ?? undefined}
       pointing={pointing} />

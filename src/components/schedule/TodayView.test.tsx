@@ -876,11 +876,11 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
   })
 
-  it('the shown day’s line under the title: when it was planned, its energy, looked back', () => {
+  it('the shown day’s line under the title: when it was planned, yesterday’s review, its energy', () => {
     dayNotes.notes = { guide: { current: 'habits', done: ['look-back'], skipped: [], plannedAt: at(8).toISOString() }, energy: { level: 'medium' } }
     renderAt(10)
-    const day = at(8).toLocaleDateString('en-US', { weekday: 'short' })
-    expect(screen.getByText(`Planned ${day}`).closest('p')).toHaveTextContent(`Planned ${day} · energy: medium · looked back`)
+    const day = at(8).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    expect(screen.getByText(`Planned ${day}`).closest('p')).toHaveTextContent(`Planned ${day} · Yesterday’s review · Energy: medium`)
   })
 
   it('with nothing saved for the day, no line', () => {
@@ -984,7 +984,7 @@ describe('Today with the week folded beside it', () => {
     renderView({ tasks: weekTasks, viewedDate: NOV4, onUpdateTask }, { onUpdateTask })
     fireEvent.click(screen.getByRole('button', { name: 'Oct 31 – Nov 6, 2 open. Unfold to read' }))
     const sheet = screen.getByRole('region', { name: 'Oct 31 – Nov 6, to pick from' })
-    expect(within(within(sheet).getByRole('list', { name: /^Week \d+$/ })).getAllByRole('listitem').map((li) => li.querySelector('.above-sheet-row-title')?.textContent))
+    expect(within(within(sheet).getByRole('list', { name: 'Oct 31 – Nov 6' })).getAllByRole('listitem').map((li) => li.querySelector('.above-sheet-row-title')?.textContent))
       .toEqual(['Book the cabin', 'Call the bank'])
     expect(within(sheet).getByText('Pick three to five for today.')).toBeInTheDocument()
     fireEvent.click(within(sheet).getByRole('button', { name: 'Plan Book the cabin for today' }))

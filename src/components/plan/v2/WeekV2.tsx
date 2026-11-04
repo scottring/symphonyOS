@@ -48,8 +48,7 @@ import { REVIEW_WINDOW_DAYS, reviewTarget, weekPhrase, weekReviewState } from '@
 import { showToast } from '@/hooks/useToast'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
 import { WeekMenu } from './WeekMenu'
-import { readCadenceConfig, localYmd } from '@/lib/cadence/config'
-import { weekOfYear } from '@/lib/planning/horizonNumerals'
+import { localYmd } from '@/lib/cadence/config'
 
 const DAY = 86_400_000
 
@@ -154,7 +153,6 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
     } catch { return false }
   }
 
-  const weekNo = weekOfYear(weekStart, readCadenceConfig().weekStartsOn)
   const endsToday = isCurrent && localYmd(new Date(weekStart.getTime() + 6 * DAY)) === localYmd(new Date())
   // A week that is over, or ends today, is reviewed, not planned.
   const plannable = !!deck?.available && !endsToday && weekStart.getTime() + 7 * DAY > new Date().getTime()
@@ -217,7 +215,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   const guide = planNotes.notes.guide
   const line = !deckMode && !planNotes.error ? (
     <PeriodSummaryLine plannedAt={guide?.plannedAt ?? (!session.loading && !session.error ? session.saved?.at.toISOString() : undefined)} energy={planNotes.notes.energy}
-      reviewed={!!guide?.done?.includes('look-back') || !!lastReview.reviewed} />
+      reviewed={!!guide?.done?.includes('look-back') || !!lastReview.reviewed} level="week" />
   ) : null
   const controls = (
     <>
@@ -256,7 +254,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
         // The week's last day: nothing left in it to plan, so say so and
         // point at the next week's Plan button.
         <div className="pv2-saved pv2-endsweek" role="note">
-          <span className="pv2-saved-text"><b>Week {weekNo} ends today.</b> Use Plan on next week to plan the week ahead.</span>
+          <span className="pv2-saved-text"><b>This week ends today.</b> Use Plan on next week to plan the week ahead.</span>
         </div>
       )}
       {deckMode && deck

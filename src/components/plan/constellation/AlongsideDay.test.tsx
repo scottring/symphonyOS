@@ -43,9 +43,9 @@ it('unfolded, lists the week’s no-day tasks only, counts the done, and reads t
  const done={id:'done',title:'Pick a date',createdAt:date,completed:true} as Task
  render(<MemoryRouter><AlongsideDay tasks={[task,onDay,elsewhere,done]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
  unfold()
- const list=screen.getByRole('list',{name:'Week 41'})
+ const list=screen.getByRole('list',{name:'Oct 4 – Oct 10'})
  expect(within(list).getAllByRole('listitem').map((li)=>li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Choose picnic spot'])
- expect(screen.getByText('Week · Oct 4 – Oct 10')).toBeInTheDocument()
+ expect(screen.getByText('Week')).toBeInTheDocument()
  expect(screen.getByText('1 done')).toBeInTheDocument()
  expect(screen.getByText('Pick three to five for today.')).toBeInTheDocument()
  expect(localStorage.getItem('symphony-fold:day')).toBe('open')

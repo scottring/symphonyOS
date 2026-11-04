@@ -89,6 +89,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { placementFate } from '@/lib/planning/lineage'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
@@ -96,7 +97,6 @@ import { MastheadCard } from '@/components/layout/MastheadCard'
 import { GuideAnchor } from '@/components/guide/GuideBar'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
 import { currentStep } from '@/lib/guide/guidedPlan'
-import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { WeatherChip } from './WeatherChip'
 import { parseSpecials } from '@/lib/today/specials'
 import { DEFAULT_START } from '@/lib/today/dayScale'
@@ -413,7 +413,7 @@ export function TodayView({
   // workspace around it — except while the Day session runs: its steps rail
   // stands beside the day instead.
   const showWeek = !sessionShown
-  const weekNo = weekOfYear(viewedDate, readCadenceConfig().weekStartsOn)
+  const weekRange = formatWeekRangeShort(weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn))
   // The dock's Today pin showed this same list beside the page; the week's
   // fold holds it now, so the page never shows it twice.
   useEffect(() => {
@@ -421,7 +421,7 @@ export function TodayView({
   }, [references])
   // No count on Today (Scott, 2026-10-06, "Today, calmer"): the week's
   // number places the day; how much is left to place is the column's job.
-  const weekLine = `Week ${weekNo}`
+  const weekLine = weekRange
   // Tonight's dinner beside the week and weather (Scott, 2026-10-14): the
   // meal plan's, the same the kitchen wall shows; else a "Dinner: …"
   // calendar event. It opens the recipe, or the meal plan.
@@ -450,7 +450,7 @@ export function TodayView({
     const last = new Date(start); last.setDate(last.getDate() + 6)
     if (localYmd(last) !== localYmd(viewedDate)) return null
     const next = new Date(start); next.setDate(next.getDate() + 7)
-    return { weekNo: weekOfYear(next, wso), weekStart: next, entries: nextWeekEntries(tasks, selectedAssignees ?? [], next, localYmd(viewedDate), userId) }
+    return { weekStart: next, entries: nextWeekEntries(tasks, selectedAssignees ?? [], next, localYmd(viewedDate), userId) }
   }, [tasks, selectedAssignees, viewedDate, userId])
   // "Coming up" under Schedule: open work dated in the seven days after this
   // one (walkthrough 2026-10-02, #28). The page's own filtered tasks, through
@@ -801,7 +801,7 @@ export function TodayView({
   const shownSavedAt = typeof shownNotes.notes.savedAt === 'string' ? shownNotes.notes.savedAt : undefined
   const dayLine = !sessionShown && !shownNotes.error ? (
     <PeriodSummaryLine plannedAt={shownGuide?.plannedAt ?? shownSavedAt} energy={shownNotes.notes.energy}
-      reviewed={!!shownGuide?.done?.includes('look-back') || !!shownDayBefore.reviewed} />
+      reviewed={!!shownGuide?.done?.includes('look-back') || !!shownDayBefore.reviewed} level="day" />
   ) : null
   const reloadShownNotes = shownNotes.reload
 
@@ -1278,7 +1278,7 @@ export function TodayView({
     {alongsideWorkspace.routinesSlot && !sessionShown && createPortal(
       <SheetRoutines plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />, alongsideWorkspace.routinesSlot)}
   </> : (
-    <TodayWeekFold stowed={sessionShown} drive={guideOnToday ? true : undefined} plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
+    <TodayWeekFold stowed={sessionShown} drive={guideOnToday ? true : undefined} plan={data.dayPlan} day={viewedDate}
       weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
       nextWeek={nextWeek}
       chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
@@ -1521,7 +1521,7 @@ export function TodayView({
                 <p className="font-display text-lg text-neutral-600">{focusWork.completedCount ? 'Everything on your list is done.' : 'Nothing chosen yet.'}</p>
                 <p className="mt-1 text-[14px] text-neutral-500">
                   {showWeek
-                    ? <>Choose from week {weekNo} {isMobile ? 'above' : 'beside this list'}, or add something for {data.isToday ? 'today' : 'this day'}.</>
+                    ? <>Choose from {weekRange} {isMobile ? 'above' : 'beside this list'}, or add something for {data.isToday ? 'today' : 'this day'}.</>
                     : <>Add something for {data.isToday ? 'today' : 'this day'}.</>}
                 </p>
                 {/* Say when the view is narrowed, so an empty filtered list

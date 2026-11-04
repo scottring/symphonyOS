@@ -23,7 +23,6 @@ import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { lineDropUpdates } from '@/lib/planning/v2/planV2'
-import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { dayWordFor } from '@/components/canvas/week/compactWeek'
@@ -97,7 +96,6 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
     } finally { lock.current = false; setPending(null) }
   }
 
-  const weekNo = weekOfYear(week, wso)
   const range = formatWeekRangeShort(week)
   // The day drops a week row onto itself (no time): the same placement as +.
   const day = (
@@ -117,7 +115,7 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
           <PaperFold horizon="day" className="today-fold ad-fold" stowed={stepAside} edgeLabel={range} edgeCount={open.length}
             drive={weekDrive === undefined ? undefined : { above: weekDrive }}
             frontLabel={`${range}, to pick from`}
-            above={<AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`}
+            above={<AboveSheet kicker="Week" title={range}
               rows={open.map((t) => ({ id: t.id, title: t.title }))} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}

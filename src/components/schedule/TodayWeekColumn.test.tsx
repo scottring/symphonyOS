@@ -35,7 +35,7 @@ const plan = { chooserTasks: rows, chooserRoutines: [] } as unknown as DayPlan
 function view(props: Partial<Parameters<typeof TodayWeekFold>[0]> = {}) {
   const actions = { choose: vi.fn(), unchoose: vi.fn(), complete: vi.fn(), open: vi.fn() }
   const r = render(<MemoryRouter>
-    <TodayWeekFold plan={plan} day={now} weekNo={45} weekStart={weekStart} actions={actions as never} {...props}>
+    <TodayWeekFold plan={plan} day={now} weekStart={weekStart} actions={actions as never} {...props}>
       <p>The day</p>
     </TodayWeekFold>
   </MemoryRouter>)
@@ -65,9 +65,9 @@ describe('TodayWeekFold: the week folded beside the day', () => {
   it('unfolded, the sheet lists the week’s no-day tasks, says what is done, and reads the foot', () => {
     view()
     unfold()
-    const list = screen.getByRole('list', { name: 'Week 45' })
+    const list = screen.getByRole('list', { name: 'Oct 31 – Nov 6' })
     expect(within(list).getAllByRole('listitem').map((li) => li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Book the cabin', 'Call the bank'])
-    expect(screen.getByText('Week · Oct 31 – Nov 6')).toBeInTheDocument()
+    expect(screen.getByText('Week')).toBeInTheDocument()
     expect(screen.getByText('1 done')).toBeInTheDocument()
     expect(screen.getByText(FOOT)).toBeInTheDocument()
     // The column's hide control is gone: folding is how it goes away.
@@ -140,7 +140,7 @@ describe('TodayWeekFold: the week folded beside the day', () => {
       const list = screen.getByRole('list', { name: 'Routines today' })
       expect(within(list).getAllByRole('listitem').map((li) => li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Water the plants', 'Mow the lawn'])
       // Below the week's tasks, above the foot.
-      const tasks = screen.getByRole('list', { name: 'Week 45' })
+      const tasks = screen.getByRole('list', { name: 'Oct 31 – Nov 6' })
       expect(tasks.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(list.compareDocumentPosition(screen.getByText(FOOT)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       fireEvent.click(within(list).getByRole('button', { name: 'Plan Water the plants for today' }))
@@ -169,10 +169,12 @@ describe('TodayWeekFold: the week folded beside the day', () => {
 
   it('draws next week read-only on the week’s last day', () => {
     const next = e(t('n', 'Order firewood'))
-    const { actions } = view({ nextWeek: { weekNo: 46, weekStart: new Date(2026, 10, 7), entries: [next] } })
+    const { actions } = view({ nextWeek: { weekStart: new Date(2026, 10, 7), entries: [next] } })
     unfold()
-    const section = screen.getByRole('region', { name: 'Week 46, starts tomorrow' })
+    const section = screen.getByRole('region', { name: 'Nov 7 – Nov 13, starts tomorrow' })
     expect(within(section).getByText('Nov 7 – Nov 13')).toBeInTheDocument()
+    expect(within(section).getByText('Starts tomorrow')).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/Week \d+/)
     expect(within(section).queryByRole('button', { name: /^Plan Order firewood/ })).toBeNull()
     expect(within(section).getByText('Order firewood').closest('li')).not.toHaveAttribute('draggable', 'true')
     fireEvent.click(within(section).getByRole('button', { name: 'Order firewood' }))
@@ -201,10 +203,10 @@ describe('Today and Week agree on the week', () => {
       tasks, routines: [], dateInstances: [], viewedDate: now, selectedAssignee: null, hideRoutines: false,
       layers: new Set(ALL_LAYERS), weekStart: wkStart, userId: 'u1', now,
     })
-    render(<MemoryRouter><TodayWeekFold plan={plan} day={now} weekNo={45} weekStart={wkStart} actions={{ choose: vi.fn() } as never}><p>day</p></TodayWeekFold></MemoryRouter>)
+    render(<MemoryRouter><TodayWeekFold plan={plan} day={now} weekStart={wkStart} actions={{ choose: vi.fn() } as never}><p>day</p></TodayWeekFold></MemoryRouter>)
     expect(screen.getByRole('button', { name: 'Nov 1 – Nov 7, 4 open. Unfold to read' })).toBeInTheDocument()
     unfold()
-    const items = within(screen.getByRole('list', { name: 'Week 45' })).getAllByRole('listitem')
+    const items = within(screen.getByRole('list', { name: 'Nov 1 – Nov 7' })).getAllByRole('listitem')
     const today = items.map((li) => li.querySelector('.above-sheet-row-title')?.textContent)
     const week = buildShelf({ weekTasks: weekListTasks(tasks, wkStart, null, { isCurrent: true }), weekStart: wkStart, now }).flatMap((g) => g.rows).map((r) => r.task.title)
     expect(week).toEqual(['Book the cabin', 'Plan winter vacation', 'Call the bank', 'Service the car'])

@@ -33,7 +33,7 @@ import { dayWordFor } from '@/components/canvas/week/compactWeek'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows } from '@/components/plan/fold/AboveSheet'
 
-export interface TodayNextWeek { weekNo: number; weekStart: Date; entries: DayPlanEntry[] }
+export interface TodayNextWeek { weekStart: Date; entries: DayPlanEntry[] }
 
 /** "Pick three to five for today." — the sheet's foot (spec 2026-11-04). */
 export const TODAY_WEEK_FOOT = 'Pick three to five for today.'
@@ -124,10 +124,9 @@ export function SheetRoutines({ plan, day, actions }: { plan: DayPlan; day: Date
   </>
 }
 
-export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek, chooseTask, restoreTask, className, stowed, drive, children }: {
+export function TodayWeekFold({ plan, day, weekStart, actions, nextWeek, chooseTask, restoreTask, className, stowed, drive, children }: {
   plan: DayPlan
   day: Date
-  weekNo: number
   weekStart: Date
   actions: DayPlanPanelActions
   /** Next week's open list — passed only on the week's last day. */
@@ -162,16 +161,16 @@ export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek,
       drive={drive === undefined ? undefined : { above: drive }}
       frontLabel={`${range}, to pick from`}
       above={<>
-        <AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`} rows={rows}
+        <AboveSheet kicker="Week" title={range} rows={rows}
           doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps}>
           <SheetRoutines plan={plan} day={day} actions={actions} />
         </AboveSheet>
         {nextWeek && (
-          <section className="above-sheet today-fold-next" aria-label={`Week ${nextWeek.weekNo}, starts tomorrow`}>
-            <p className="above-sheet-kicker">Week {nextWeek.weekNo} · Starts tomorrow</p>
+          <section className="above-sheet today-fold-next" aria-label={`${formatWeekRangeShort(nextWeek.weekStart)}, starts tomorrow`}>
+            <p className="above-sheet-kicker">Starts tomorrow</p>
             <h3 className="above-sheet-title today-fold-next-title">{formatWeekRangeShort(nextWeek.weekStart)}</h3>
             {nextWeek.entries.length > 0 ? (
-              <ul className="above-sheet-list" aria-label={`Week ${nextWeek.weekNo}`}>
+              <ul className="above-sheet-list" aria-label={formatWeekRangeShort(nextWeek.weekStart)}>
                 {nextWeek.entries.map((e) => (
                   <li key={e.key} className="above-sheet-row">
                     {actions.open
