@@ -60,8 +60,6 @@ interface TapContextPanelProps {
   timingControl?: ReactNode
   /** The goal this task serves — the value of the Goal row under the title. */
   purpose?: ReactNode
-  /** Opened over a Month or Season page: what it is for there, under the facts. */
-  horizonLine?: ReactNode
   /** "Make it a goal", offered in the ⋯. Omitted where it can't apply. */
   onMakeGoal?: () => void
   task: Task
@@ -392,7 +390,6 @@ export function TapContextPanel(props: TapContextPanelProps) {
               },
             ]}
           />
-          {props.horizonLine && <div className="mt-2">{props.horizonLine}</div>}
           {props.whyChain}
         </>
       }

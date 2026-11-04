@@ -266,9 +266,9 @@ function TaskPanelBody({ id }: { id: string }) {
   const dateParam = searchParams.get('date');
   const viewedDay = useMemo(() => viewedDayFromParam(dateParam), [dateParam]);
   const { run } = useCanvasActivity();
-  // Opened over a Month or Season page: which goal it serves there, and
-  // Move to / Remove from that period (the row's ⋯ menu is gone, 2026-10-14).
-  const horizon = useHorizonPanel(task, { tasks, goals, seasons, updateTask, keepForward, dropCommitment });
+  // Opened over a Month or Season page: Later / Let go for that period only
+  // (paper-style horizons, 2026-11-04).
+  const horizon = useHorizonPanel(task, { tasks, seasons, updateTask, keepForward, dropCommitment });
 
   if (!task) return <PanelLoading />;
 
@@ -324,7 +324,6 @@ function TaskPanelBody({ id }: { id: string }) {
           onOpenGoal={(gid) => navigate(`/task/${gid}`)}
         />
       )}
-      horizonLine={horizon.forLine}
       // "Make it a goal" changes the same row into a goal, and says why when
       // it cannot (Scott, 2026-09-25) — offered in the ⋯ rather than as a
       // link beside the goal it would stop being part of.

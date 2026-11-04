@@ -477,9 +477,6 @@
   .plan-horizon-body.has-next > .plan-above-panel { grid-column: 3; }
 }
 /* The task panel opened from a Month or Season page: what it serves. */
-.plan-panel-for { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; margin: 4px 0 0; max-width: 100%; font-size: 13px; color: var(--color-neutral-700); }
-.plan-panel-for-kind { color: var(--color-neutral-400); }
-.plan-panel-for-title { overflow-wrap: anywhere; }
 /* Today's header line: the Month / Season / Year talk, on schedule
    (PlanTalkChip.tsx). One quiet chip; wraps rather than scrolling sideways. */
 .plan-talk-chip { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; max-width: 100%; vertical-align: baseline; font-family: var(--font-family-sans); }

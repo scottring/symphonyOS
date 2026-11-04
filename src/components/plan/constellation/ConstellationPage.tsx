@@ -73,7 +73,7 @@ import { PlanOrderList, type RowOrder } from './PlanOrderList'
 import { useLifeAreas } from '@/hooks/useLifeAreas'
 import { groupByArea } from '@/lib/guide/byArea'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
-import { aboveOf, periodMoves } from './horizonPanel'
+import { periodMoves } from './horizonPanel'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 import { monthToken, usePlanningSession, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
@@ -400,8 +400,7 @@ function Inner() {
     const task = node.task
     const lvl = PERIODS[level] as 'season' | 'month'
     const toggle = async () => (await toggleTask(task.id)) !== false
-    const above = aboveOf(task, lvl, !!node.parent, lvl === 'month' ? seasonWord : String(year), seasonB.start)
-    const [carry, off] = periodMoves(task, lvl, bounds, seasons, { updateTask, keepForward, dropCommitment }, activity.run, above)
+    const [carry, off] = periodMoves(task, lvl, bounds, seasons, { updateTask, keepForward, dropCommitment }, activity.run)
     return [
       { label: 'Done', run: () => act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) },
       { label: 'Later', run: async () => true, menu: [{ label: LATER_WORD[lvl], run: carry.onClick }, somedayOf(task)] },
@@ -640,8 +639,7 @@ function Inner() {
         // The period's own moves, aimed from the one before: carry it here,
         // later, or off that period — Back to Fall, or Off September when
         // nothing above holds it (it was mislabeled "Let go").
-        const above = aboveOf(t, lvl, lvl === 'month' ? !!t.sourceId : !!t.goalId, lvl === 'month' ? seasonWord : String(year), seasonB.start)
-        const [carry, off] = periodMoves(t, lvl, prevB, seasons, { updateTask, keepForward, dropCommitment }, activity.run, above)
+        const [carry, off] = periodMoves(t, lvl, prevB, seasons, { updateTask, keepForward, dropCommitment }, activity.run)
         const toggle = async () => (await toggleTask(t.id)) !== false
         const later = () => act(`Move “${t.title}” to ${nextWord}`, async () => !!(await keepForward(t.id, lvl === 'month' ? { monthStart: bounds.next } : { seasonStart: bounds.next }, prevB.start)), { ids: [t.id], undo: restoreOf(t) })
         return [{ key: t.id, title: t.title, state: 'open', verbs: [
@@ -865,8 +863,7 @@ function Inner() {
     }
     const lvl = PERIODS[level] as 'season' | 'month'
     const open = prevTasks.filter((x) => taskReviewState(x, lvl, prevB.start, { isCurrent: isCurrentPeriod(prevB, now), seasons }) === 'open')
-    const moves = (x: Task) => periodMoves(x, lvl, prevB, seasons, { updateTask, keepForward, dropCommitment }, activity.run,
-      aboveOf(x, lvl, lvl === 'month' ? !!x.sourceId : !!x.goalId, lvl === 'month' ? seasonWord : String(year), seasonB.start))
+    const moves = (x: Task) => periodMoves(x, lvl, prevB, seasons, { updateTask, keepForward, dropCommitment }, activity.run)
     const carry = (x: Task) => moves(x)[0].onClick()
     return lvl === 'month'
       ? <PeriodLookBack {...common} open={open} upLabel={`Back to ${seasonWord}`}
