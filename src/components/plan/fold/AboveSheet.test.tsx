@@ -102,3 +102,22 @@ describe('AboveSheet with onPick: the week beside the day', () => {
     expect(onOpen).toHaveBeenCalledWith('a')
   })
 })
+
+// Final review (2026-11-04): on the iPad the week sheet's + was a 28px
+// target. jsdom lays nothing out and reads no media queries, so the rule is
+// read from the stylesheet: on a coarse pointer the press reaches 44px.
+describe('the + on a coarse pointer', () => {
+  it('takes a press of at least 44px', async () => {
+    const { readFileSync } = await import('node:fs')
+    const css = readFileSync('src/components/plan/fold/sheet.css', 'utf8')
+    const base = /\.above-sheet-pick \{[^}]*?width: (\d+)px; height: (\d+)px;/.exec(css)
+    expect(base).not.toBeNull()
+    const coarse = /@media \(pointer: coarse\) \{\s*\.above-sheet-pick::before \{([^}]*)\}/.exec(css)
+    expect(coarse).not.toBeNull()
+    const inset = Number(/inset: -(\d+)px/.exec(coarse![1])?.[1])
+    expect(coarse![1]).toContain('position: absolute')
+    expect(Number(base![1]) + 2 * inset).toBeGreaterThanOrEqual(44)
+    expect(Number(base![2]) + 2 * inset).toBeGreaterThanOrEqual(44)
+    expect(css).toMatch(/\.above-sheet-pick \{ position: relative; \}/)
+  })
+})

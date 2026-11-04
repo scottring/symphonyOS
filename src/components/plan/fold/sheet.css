@@ -36,6 +36,12 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .above-sheet-pick:hover { border-color: var(--paper-fold-accent, var(--color-primary-600)); background: var(--color-primary-50); }
 .above-sheet-pick:focus-visible, button.above-sheet-row-title:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
 @media (max-width: 767px) { .above-sheet-pick { width: 36px; height: 36px; } }
+/* A finger (the iPad): the + stays a 28px circle but takes a 44px press,
+   reaching 8px past its ring on every side. */
+.above-sheet-pick { position: relative; }
+@media (pointer: coarse) {
+  .above-sheet-pick::before { content: ''; position: absolute; inset: -8px; border-radius: 999px; }
+}
 /* A second list on the sheet (Today's "Routines today"), under the first. */
 .above-sheet-sub {
   margin: 22px 0 4px; font: 600 10.5px/1 var(--font-family-sans); letter-spacing: .16em; text-transform: uppercase;
