@@ -112,7 +112,6 @@
 
 .plan-items { list-style: none; margin: 0; padding: 0; }
 .plan-empty { margin: 6px 0 2px; font-size: 13px; color: var(--color-neutral-500); }
-.plan-add { margin-top: 4px; }
 
 /* ---- Items ------------------------------------------------------------------ */
 .plan-item { padding: 4px 0 6px; border-bottom: 1px solid var(--color-neutral-100); }
@@ -182,7 +181,7 @@
   .plan-groups, .plan-groups.is-year { grid-template-columns: minmax(0, 1fr); }
   .plan-group .canvas-group-head { position: sticky; top: 0; z-index: 2; background: var(--color-bg-elevated); }
   .plan-group.is-unlinked .canvas-group-head { background: var(--color-bg-base); }
-  .plan-add, .plan-group-folded { min-height: 44px; }
+  .plan-group-folded { min-height: 44px; }
   .plan-step { width: 44px; height: 44px; }
   .plan-period h1 { font-size: 28px; }
   .plan-move-menu > button { min-height: 44px; }
@@ -304,8 +303,6 @@
 .plan-month-list > .plan-item > .plan-item-tools, .plan-month-list > .plan-item > .plan-proposal-reason { padding: 0 12px 8px; }
 .plan-month-list > .plan-item:has(> .canvas-item.is-proposed) { border: 1.5px dashed var(--color-primary-500); }
 .plan-month-list > .plan-item > .canvas-item.is-proposed { border: 0; background: transparent; }
-.plan-item-parent { margin: auto 0 0; padding: 0 12px 9px; font-size: 12.5px; line-height: 1.35; color: var(--color-neutral-600); overflow-wrap: anywhere; border-radius: 0 0 var(--radius-md) var(--radius-md); }
-.plan-item-parent-kind { margin-right: 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-500); }
 .plan-month-list > .plan-item.is-related { border-color: var(--color-primary-500); box-shadow: inset 3px 0 0 var(--color-primary-500); background: var(--color-primary-50); }
 .plan-month-goals > .plan-add { display: inline-flex; margin-top: 12px; }
 .plan-month-goals > .plan-composer { margin-top: 10px; }
@@ -313,22 +310,14 @@
 .plan-month-next { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--color-neutral-200); }
 .plan-month-next > span { font-size: 13px; color: var(--color-neutral-600); }
 
-/* A link just made: the goal's parent label and its season card light up
-   together, then settle. */
+/* A link just made: its season card lights up, then settles. */
 .plan-source.is-linked { animation: plan-linked 1.8s ease-out; }
-.plan-item.is-linked > .plan-item-parent { animation: plan-linked-label 1.8s ease-out; }
 @keyframes plan-linked {
   0%, 30% { box-shadow: 0 0 0 3px var(--color-primary-300); }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
-@keyframes plan-linked-label {
-  0%, 30% { background: var(--color-primary-100); color: var(--color-primary-800); }
-  100% { background: transparent; }
-}
 @media (prefers-reduced-motion: reduce) {
-  .plan-source.is-linked, .plan-item.is-linked > .plan-item-parent { animation: none; }
-  .plan-source.is-linked { box-shadow: 0 0 0 3px var(--color-primary-300); }
-  .plan-item.is-linked > .plan-item-parent { background: var(--color-primary-100); }
+  .plan-source.is-linked { animation: none; box-shadow: 0 0 0 3px var(--color-primary-300); }
   .plan-month-list > .plan-item { transition: none; }
 }
 
@@ -407,6 +396,19 @@
 }
 
 .plan-list { max-width: 46rem; min-width: 0; }
+/* Paper-style horizons (2026-11-04): the period's sheet with the level above
+   folded beside it (PaperFold). The spread takes the page's full width, so
+   the fold sizes itself from a width it does not feed (never shrink-to-fit);
+   the cards under it keep the list's measure. */
+.plan-horizon-body.is-sheet, .plan-with-strip .plan-horizon-body.is-sheet { grid-template-columns: minmax(0, 1fr); }
+.plan-horizon .plan-horizon-body.is-sheet > :not(.plan-sheet-spread) { grid-column: 1; grid-row: auto; width: 100%; max-width: 46rem; justify-self: center; }
+.plan-sheet-spread { display: block; width: 100%; min-width: 0; }
+.plan-sheet { max-width: none; }
+.plan-sheet .plan-goal-list > .plan-item { padding: 6px 0 7px; border-bottom-color: var(--color-neutral-200); }
+.plan-sheet .plan-goal-list > .plan-item:last-child { border-bottom: 1px solid var(--color-neutral-200); }
+.plan-sheet .plan-goal-list .plan-item-title { font-size: 18.5px; line-height: 1.35; }
+.plan-sheet .plan-empty { margin: 4px 0; font-family: var(--font-family-display); font-style: italic; font-size: 17px; color: var(--color-neutral-400); }
+.plan-sheet > .plan-done-fold { margin-top: 14px; }
 .plan-goal-list > .plan-item { padding: 5px 0 6px; border-bottom: 1px solid var(--color-neutral-100); }
 .plan-goal-list > .plan-item:last-child { border-bottom: 0; }
 .plan-goal-list .plan-item-title { font-family: var(--font-family-display); font-size: 17px; line-height: 1.25; }
@@ -422,30 +424,15 @@
   .plan-grip { display: none; }
   .plan-goal-list > .plan-item[data-order-id] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 }
-/* "+11 more" / "Show less": the rest of a list, opened in place. */
-.plan-more { display: block; margin: 0; padding: 8px 6px 2px 1.5px; font-size: 12.5px; font-weight: 500; color: var(--color-primary-700); }
-@media (max-width: 767px) { .plan-more { min-height: 44px; } }
-.plan-goal-list > .plan-item > .plan-item-parent { margin: 0; padding: 0 6px 0 1.5px; font-size: 12.5px; line-height: 1.4; color: var(--color-neutral-600); overflow-wrap: anywhere; }
-/* Where a goal stands one horizon down ("This week · 2", "Thu"): quiet blue,
-   never green, which means planned or done. */
-.plan-tag-below { font-weight: 500; font-size: 12px; color: var(--color-primary-700); background: var(--color-primary-50); border-color: var(--color-primary-200); }
-.plan-goal-list > .plan-item > .plan-item-parent .plan-item-parent-kind { font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--color-neutral-600); }
 .plan-goal-list > .plan-item:has(> .canvas-item.is-proposed) { border-bottom-style: dashed; }
 .plan-list > .plan-composer { margin-top: 8px; }
 .plan-list > .plan-composer input { font-family: var(--font-family-display); font-size: 18px; }
-.plan-for { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-neutral-600); }
-.plan-for select {
-  max-width: min(22rem, 100%); padding: 3px 6px; border: 1px solid var(--color-neutral-300); border-radius: var(--radius-sm);
-  background: var(--color-bg-elevated); font: inherit; color: var(--color-neutral-800);
-}
 .plan-list-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 12px; }
-.plan-list-foot > .plan-add { margin-top: 0; font-family: var(--font-family-display); font-size: 17px; font-weight: 400; color: var(--color-neutral-600); text-decoration: none; }
-.plan-list-foot > .plan-add:hover { color: var(--color-primary-700); }
 .plan-list-foot > .plan-next { margin-left: auto; }
 @media (max-width: 767px) {
   .plan-horizon .plan-period h1 { font-size: 28px; }
   .plan-card { padding: 10px 12px 12px; }
-  .plan-above-line, .plan-list-foot > .plan-add, .plan-list-foot > .canvas-link { min-height: 44px; }
+  .plan-above-line, .plan-list-foot > .canvas-link { min-height: 44px; }
   .plan-list-foot > .plan-next { margin-left: 0; }
 }
 
@@ -512,30 +499,9 @@
   .plan-talk-chip-quiet { min-height: 32px; display: inline-flex; align-items: center; }
 }
 
-/* One-tap triage on a goal row (2026-10-13, back 2026-10-16): with a mouse, on
-   hover or keyboard focus; on touch (no hover) always, wrapping under the title. */
-/* The title keeps room to read; short of it, the verbs wrap to their own line. */
+/* The title keeps room to read; short of it, its tags wrap to their own line. */
 .plan-goal-list .plan-item > .canvas-item { flex-wrap: wrap; }
 .plan-goal-list .plan-item > .canvas-item > .plan-item-title { flex: 1 1 14rem; }
-.plan-item-quick { display: none; flex: none; flex-wrap: wrap; align-items: center; gap: 2px; margin-left: auto; }
-@media (hover: hover) and (pointer: fine) {
-  .plan-item:hover .plan-item-quick, .plan-item:focus-within .plan-item-quick { display: inline-flex; }
-}
-@media (hover: none), (pointer: coarse) {
-  .plan-item-quick { display: inline-flex; }
-  .plan-quick { min-height: 36px; }
-}
-.plan-quick {
-  all: unset; box-sizing: border-box; cursor: pointer; padding: 2px 8px; border-radius: var(--radius-sm);
-  font-family: var(--font-family-sans); font-size: 12px; font-weight: 500; color: var(--color-neutral-600); white-space: nowrap;
-}
-.plan-quick:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
-.plan-quick:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }
-.plan-quick:disabled { opacity: .5; cursor: default; }
-.plan-item-quick.is-opened { display: inline-flex; }
-.plan-quick-ask { padding: 0 4px; font-family: var(--font-family-sans); font-size: 12.5px; color: var(--color-neutral-800); }
-.plan-quick.is-strong { background: var(--color-primary-600); color: #fff; }
-.plan-quick.is-strong:hover { background: var(--color-primary-700); color: #fff; }
 
 /* ---- The review by hand (PeriodReview, 2026-10-17) -------------------------
    Week, Month, Season and Year alike: open lines with their verbs always in

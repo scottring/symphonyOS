@@ -1,8 +1,8 @@
 // src/components/plan/constellation/PlanOrderList.tsx
 //
-// The period's lines as a compact card (calm pass, mockup approved
-// 2026-10-18): the list never runs off the page — 8, then "+N more"
-// (useFold). A line Symphony is pointing at stays in sight.
+// The period's lines, every one of them (paper-style horizons, 2026-11-04:
+// a list above the week shows whole, with no "+N more"; the fold of done
+// lines is the page's own).
 //
 // The order is the priority, as on the Week (Task 13): an open line drops
 // into the gap between two lines (dayReorder's gap maths). The desk drags
@@ -18,7 +18,6 @@ import {
 import { createPortal } from 'react-dom'
 import { gapAt, gapToListIndex } from '@/lib/week/dayReorder'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { useFold, type FoldToggleState } from './useFold'
 
 // The Week's constraints (WeekCanvas): a held press on touch, a 5px move for
 // a mouse or trackpad on a touch device.
@@ -31,12 +30,6 @@ export interface RowOrder {
   onDragStart?: (e: DragEvent) => void
   onDragEnd?: () => void
   liProps: HTMLAttributes<HTMLLIElement> & { ref?: Ref<HTMLLIElement>; 'data-order-id'?: string; 'data-group'?: string }
-}
-
-/** "+N more" / "Show less", when the list folds. */
-export function FoldToggle({ toggle, className = '' }: { toggle: FoldToggleState | null; className?: string }) {
-  if (!toggle) return null
-  return <button type="button" className={`canvas-link plan-more ${className}`.trim()} aria-expanded={toggle.open} onClick={toggle.onClick}>{toggle.label}</button>
 }
 
 interface Lift { id: string; title: string }
@@ -56,8 +49,6 @@ export interface PlanOrderListProps<T> {
   titleOf: (t: T) => string
   /** The id a line orders by; null when it does not order (done, moved on). */
   orderIdOf: (t: T) => string | null
-  /** Kept in sight while folded (a line just saved, or a change card marks). */
-  pinnedOf?: (t: T) => boolean
   renderRow: (t: T, order: RowOrder) => ReactNode
   /** Put `id` in the gap at `toIndex` of `orderedIds` (`reorderTasksToIndex`'s terms). */
   onReorder: (id: string, orderedIds: string[], toIndex: number) => void
@@ -69,7 +60,7 @@ export interface PlanOrderListProps<T> {
   groupOf?: (t: T) => string
 }
 
-export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinnedOf, renderRow, onReorder, tail, headingOf, groupOf }: PlanOrderListProps<T>) {
+export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, renderRow, onReorder, tail, headingOf, groupOf }: PlanOrderListProps<T>) {
   const coarse = useMediaQuery('(pointer: coarse)')
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: MOUSE_MOVE }),
@@ -79,9 +70,8 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinn
   const [dragId, setDragId] = useState<string | null>(null)
   const [gap, setGap] = useState<number | null>(null)
   const [lifted, setLifted] = useState<string | null>(null)
-  const { shown, toggle } = useFold(items, pinnedOf)
 
-  // ── the gap, read from the shown open lines ─────────────────────────────
+  // ── the gap, read from the open lines ───────────────────────────────────
   // Grouped, a line orders only among its own group's lines: the gap and the
   // drop ignore the other groups, and a pointer outside its group is no drop.
   const groupOfId = (id: string | null) => {
@@ -158,9 +148,9 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinn
     else endDrag()
   }
 
-  // The shown open lines, numbered for the gap marker.
+  // The open lines, numbered for the gap marker.
   const dragGroup = groupOfId(dragId)
-  const orderable = shown.filter((t) => orderIdOf(t) !== null && (dragGroup === null || groupOf!(t) === dragGroup))
+  const orderable = items.filter((t) => orderIdOf(t) !== null && (dragGroup === null || groupOf!(t) === dragGroup))
   const row = (t: T) => {
     const id = orderIdOf(t)
     const index = id ? orderable.indexOf(t) : -1
@@ -190,17 +180,16 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, pinn
   return <DndContext sensors={sensors} onDragStart={onTouchStart} onDragMove={onTouchMove} onDragEnd={onTouchEnd} onDragCancel={endDrag}>
     <ul ref={listRef} className={`plan-items plan-goal-list${dragId ? ' is-ordering' : ''}`} aria-label={label} {...listDrop}>
       {headingOf && groupOf
-        ? shown.map((t, i) => {
+        ? items.map((t, i) => {
           const h = headingOf(t)
           return <Fragment key={keyOf(t)}>
-            {h !== null && (i === 0 || groupOf(shown[i - 1]) !== groupOf(t)) && <li className="plan-area-head" role="presentation">{h}</li>}
+            {h !== null && (i === 0 || groupOf(items[i - 1]) !== groupOf(t)) && <li className="plan-area-head" role="presentation">{h}</li>}
             {row(t)}
           </Fragment>
         })
-        : shown.map(row)}
+        : items.map(row)}
       {tail}
     </ul>
-    <FoldToggle toggle={toggle} />
     {typeof document !== 'undefined' && createPortal(
       <DragOverlay dropAnimation={null}>{lifted && <div className="wc-lift plan-lift">{lifted}</div>}</DragOverlay>,
       document.body,

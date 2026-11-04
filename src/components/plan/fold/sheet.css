@@ -1,0 +1,50 @@
+/* Paper-style horizons (Scott, 2026-11-04): what is written on the sheets.
+   From the prototype (docs/superpowers/specs/2026-11-04-paper-fold-prototype.html:
+   .kicker, .title, .list, .donefold, .empty, .reading, .add), with its literals
+   swapped for the app's tokens. Inside PaperFold the --paper-fold-* tokens
+   apply; elsewhere (a guided session's page) the app's own. */
+
+/* ---- the sheet above, for reading ---- */
+.above-sheet { color: var(--paper-fold-ink-soft, var(--color-neutral-600)); }
+.above-sheet-kicker {
+  margin: 0; font: 600 10.5px/1 var(--font-family-sans); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--paper-fold-ink-faint, var(--color-neutral-400));
+}
+.above-sheet-title {
+  margin: 8px 0 6px; font: 500 28px/1.05 var(--font-family-display); letter-spacing: -.01em; text-wrap: balance;
+  color: var(--paper-fold-ink, var(--color-neutral-900));
+}
+.above-sheet-list { list-style: none; margin: 0; padding: 0; }
+.above-sheet-list > li {
+  padding: 7px 0 8px; border-bottom: 1px solid var(--paper-fold-rule-above, var(--color-neutral-200));
+  font: 400 16px/1.35 var(--font-family-display); overflow-wrap: anywhere;
+}
+.above-sheet-empty {
+  margin: 0; padding: 8px 0; font: italic 400 17px/1.4 var(--font-family-display);
+  color: var(--paper-fold-ink-faint, var(--color-neutral-400));
+}
+.above-sheet-done { margin: 14px 0 0; font-size: 13px; color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
+.above-sheet-foot {
+  display: flex; align-items: center; gap: 6px; margin: 16px 0 0; font-size: 12px;
+  color: var(--paper-fold-ink-faint, var(--color-neutral-400));
+}
+.above-sheet-foot svg { flex: none; width: 14px; height: 14px; }
+
+/* ---- the next ruled line on this period's sheet ---- */
+.sheet-write {
+  position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; margin-top: 2px; padding: 4px 0;
+  border-bottom: 1px solid var(--color-neutral-200); color: var(--paper-fold-accent, var(--color-primary-500));
+}
+.sheet-write > svg { flex: none; width: 18px; height: 18px; }
+.sheet-write input {
+  flex: 1; min-width: 0; padding: 6px 0; border: 0; border-radius: 0; background: none;
+  font: 400 18.5px/1.35 var(--font-family-display); color: var(--paper-fold-ink, var(--color-neutral-900));
+}
+.sheet-write input::placeholder { color: var(--paper-fold-accent, var(--color-primary-500)); opacity: .75; }
+.sheet-write input:focus { outline: none; }
+.sheet-write:focus-within { border-bottom-color: var(--paper-fold-accent, var(--color-primary-500)); }
+.sheet-write:has(input:focus-visible) { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
+.sheet-write-enter { display: none; font: 500 11px/1 var(--font-family-sans); color: var(--paper-fold-ink-faint, var(--color-neutral-400)); white-space: nowrap; }
+.sheet-write:focus-within .sheet-write-enter { display: inline; }
+.sheet-write-error { flex-basis: 100%; margin: 2px 0 4px 30px; font-size: 12.5px; color: var(--color-danger-600, #b42318); }
+@media (max-width: 767px) { .sheet-write input { min-height: 44px; } }

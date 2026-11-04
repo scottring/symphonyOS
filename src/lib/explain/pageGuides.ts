@@ -11,20 +11,23 @@ import { collectTargets } from './targets'
 export const PAGE_GUIDES: Record<string, string> = {
   year:
     'Year is reference: the few goals you want this year to hold, a list for looking, not doing. ' +
-    'The strip on the left holds last year\'s goals still open: → and the year (or a drag onto the list) carries one in. Each row is a year goal; one with a season goal under it names it ("Fall: …"). ' +
-    '+ Add a goal at the foot writes a new one. Go to Fall (or the season shown) goes on to the season. The top bar moves between Today, Week, Month, Season and Year.',
+    'The level above is folded at the left edge. Open it to read while you write this one in its own words (tap the edge, drag it, or press F). ' +
+    'Here the level above is last year\'s goals still open; carrying one in is the year session\'s Look back. ' +
+    'Each row is a year goal: tap it for Done, Let go and Edit wording; drag it to order. Nothing says what is under it. The last line on the list, "Write a 2026 goal", writes a new one. ' +
+    'The strip on the left holds the yearly routines. Go to Fall (or the season shown) goes on to the season. The top bar moves between Today, Week, Month, Season and Year.',
   season:
     'A season is a brainstorm list for this stretch of the year: what you would like it to hold. Nothing here is on a calendar. ' +
     'The arrows beside the title step to the previous or next season. ' +
-    'The strip on the left holds this year\'s goals: drag one onto a season goal to put it under, or onto the list (or press →) to write something new under it. The list holds every season goal, drawn one way. ' +
-    'A goal written for a year goal says "For …" under it, and one with a month goal under it names it ("October: …"). A goal on its own says nothing more; that is fine. ' +
-    '+ Add a goal at the foot writes one, with an optional "For" to choose a year goal. To change what a goal is for, use Move under in its ⋯ menu. ' +
-    'Go to the month goes on to Month.',
+    'The level above is folded at the left edge. Open it to read while you write this one in its own words (tap the edge, drag it, or press F). ' +
+    'Here the level above is this year\'s goals. ' +
+    'The list holds every season goal, written on its own: nothing says what a goal is for or what is under it. Tap one to open it; drag it to order. ' +
+    'The last line on the list, "Write a Fall goal", writes a new one. Go to the month goes on to Month.',
   month:
     'Month answers one question: what do you want to accomplish this month? Nothing here is on a calendar yet. ' +
-    'The strip on the left holds the season\'s goals: drag one onto a month goal to put it under, or onto the list (or press →) to write something new under it; its Routines tab holds the monthly routines. The list holds every goal for the month, drawn one way. ' +
-    'A goal written for a season goal says "For …" under it, and one with tasks this week names them ("This week: …"). A goal on its own says nothing more; that is fine. ' +
-    '+ Add a goal at the foot writes one, with an optional "For" to choose a season goal. To change what a goal is for, use Move under in its ⋯ menu. ' +
+    'The level above is folded at the left edge. Open it to read while you write this one in its own words (tap the edge, drag it, or press F). ' +
+    'Here the level above is the season\'s goals. ' +
+    'The list holds every goal for the month, written on its own: nothing says what a goal is for or what is under it. Tap one to open it; drag it to order. The strip on the left holds the monthly routines. ' +
+    'The last line on the list, "Write a November goal", writes a new one. ' +
     'Go to this week opens Week. To turn a month goal into this week\'s tasks, tell Symphony what to do this week for a goal there.',
   week:
     'Week is for doing: this week\'s tasks and when they happen. ' +

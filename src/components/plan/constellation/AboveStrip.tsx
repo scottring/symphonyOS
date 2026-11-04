@@ -1,76 +1,18 @@
 // src/components/plan/constellation/AboveStrip.tsx
 //
-// Month, Season and Year's strip (Scott's wireframe, 2026-10-25): the level
-// above on the left — Fall beside October, 2026 beside Fall, last year beside
-// the year — and, where they exist, the routines at this page's pace.
+// Month and Year's strip (Scott's wireframe, 2026-10-25): the routines that
+// run at this page's pace, with when each falls in the period. The level
+// above that used to be its first tab now lies folded beside the page
+// (PaperFold and AboveSheet, paper-style horizons 2026-11-04), for reading.
+// Season runs no routines of its own, so it has no strip.
 //
-// A goal above can be dragged onto a line of this period to put that line
-// under it, or onto the list to write something new under it; "→ Oct" does
-// the same without a drag. On Year the goals beside it are last year's open
-// ones, and "→ 2026" (or a drag) carries one into the year.
-//
-// The two tabs' contents are exported (AboveGoalList, StripRoutineList) so a
-// guided session's steps can show them while the rail stands where the strip does.
+// StripRoutineList is exported so Month's Maintenance and fun step shows it too.
 
-import { useState, type DragEvent } from 'react'
-import { HorizonStrip, type StripTab } from '@/components/canvas/strip/HorizonStrip'
-import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
-import { ABOVE_MIME } from './aboveDrag'
-
-
-export interface AboveGoal {
-  key: string
-  title: string
-  /** "2 on October", "Nothing on October", "Open from 2025". */
-  meta: string
-  /** This period already holds something under it. */
-  here: boolean
-  goLabel: string
-  goAria: string
-  onGo: () => void
-}
+import { HorizonStrip } from '@/components/canvas/strip/HorizonStrip'
 
 export interface StripRoutine { id: string; title: string; when: string; onOpen?: () => void }
 
-/** The strip's first tab: the goals above, each draggable, with "→ Oct". */
-export function AboveGoalList({ aboveLabel, goals, empty, hint, addLabel, onAddGoal }: {
-  aboveLabel: string
-  goals: AboveGoal[]
-  empty: string
-  hint: string
-  addLabel?: string
-  onAddGoal?: (title: string) => Promise<boolean>
-}) {
-  const [adding, setAdding] = useState(false)
-  const drag = (g: AboveGoal) => (e: DragEvent) => {
-    e.dataTransfer.setData(ABOVE_MIME, g.key)
-    e.dataTransfer.setData('text/plain', g.title)
-    e.dataTransfer.effectAllowed = 'link'
-  }
-  return (
-    <>
-      {goals.length === 0 ? <p className="hs-empty">{empty}</p> : <p className="hs-row-meta">{hint}</p>}
-      <ul className="hs-list" aria-label={`${aboveLabel} goals`}>
-        {goals.map((g) => (
-          <li key={g.key} className="hs-row" draggable onDragStart={drag(g)}>
-            <span className="hs-row-body">
-              <span className="hs-row-title">{g.title}</span>
-              <span className={`hs-row-meta${g.here ? ' is-here' : ''}`}>{g.meta}</span>
-            </span>
-            <button type="button" className="hs-row-go" aria-label={g.goAria} onClick={g.onGo}>{g.goLabel}</button>
-          </li>
-        ))}
-      </ul>
-      {onAddGoal && addLabel && (adding
-        ? <InlineComposer label={addLabel.replace(/^\+\s*/, '')} saveLabel="Add"
-          onSave={async (t) => { const ok = await onAddGoal(t); if (ok) setAdding(false); return ok }} onCancel={() => setAdding(false)} />
-        : <button type="button" className="hs-add" onClick={() => setAdding(true)}>{addLabel}</button>)}
-    </>
-  )
-}
-
-/** The strip's Routines tab: the routines at this page's pace, with when each
- *  falls in the period. Month's Maintenance and fun step shows it too. */
+/** The routines at this page's pace, with when each falls in the period. */
 export function StripRoutineList({ routines, empty, note, label }: {
   routines: StripRoutine[]
   empty?: string
@@ -94,28 +36,16 @@ export function StripRoutineList({ routines, empty, note, label }: {
   </>
 }
 
-export function AboveStrip({ id, aboveLabel, goals, empty, hint, addLabel, onAddGoal, routines, routinesEmpty, routinesNote }: {
+/** The strip with its one tab, Routines. */
+export function RoutinesStrip({ id, routines, empty, note }: {
+  /** Remembers this page's open/closed ("month", "year"). */
   id: string
-  /** The tab: "Fall", "2026", "2025". */
-  aboveLabel: string
-  goals: AboveGoal[]
-  empty: string
-  hint: string
-  /** "+ Add a Fall goal"; absent where nothing is added (last year). */
-  addLabel?: string
-  onAddGoal?: (title: string) => Promise<boolean>
-  /** The routines at this pace; null draws no Routines tab. */
-  routines: StripRoutine[] | null
-  routinesEmpty?: string
-  routinesNote?: string
+  routines: StripRoutine[]
+  empty?: string
+  note?: string
 }) {
-  const tabs: StripTab[] = [{ id: 'above', label: aboveLabel, count: goals.length || undefined,
-    content: <AboveGoalList aboveLabel={aboveLabel} goals={goals} empty={empty} hint={hint} addLabel={addLabel} onAddGoal={onAddGoal} /> }]
-  if (routines) {
-    tabs.push({
-      id: 'routines', label: 'Routines', count: routines.length || undefined,
-      content: <StripRoutineList routines={routines} empty={routinesEmpty} note={routinesNote} />,
-    })
-  }
-  return <HorizonStrip id={id} label={`${aboveLabel} strip`} railLabel={`${aboveLabel} · ${goals.length}`} tabs={tabs} />
+  return <HorizonStrip id={id} label="Routines strip" railLabel={`Routines · ${routines.length}`} tabs={[{
+    id: 'routines', label: 'Routines', count: routines.length || undefined,
+    content: <StripRoutineList routines={routines} empty={empty} note={note} />,
+  }]} />
 }

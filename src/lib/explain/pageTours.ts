@@ -18,25 +18,26 @@ export interface TourPart {
   text: string
 }
 
-const PLAN_LIST_HINT = 'Point at a row for Done, Someday or Delete; its ⋯ menu has the rest.'
+const PLAN_LIST_HINT = 'Tap a row to open it; drag it to order. The last line on the list writes a new one.'
+const FOLD_HINT = 'Open it to read while you write this one in its own words: tap the edge, drag it, or press F.'
 
 export const PAGE_TOURS: Record<string, TourPart[]> = {
   year: [
     { target: 'period', title: 'This year', text: 'Year is reference: the few goals you want this year to hold. A list for looking, not doing.' },
-    { target: 'above', title: 'Last year, for reference', text: 'Last year’s goals, folded to one line. Show opens them.' },
-    { target: 'list', title: 'This year’s goals', text: 'One row per year goal. A goal with a season goal under it names it (“Fall: …”). + Add a goal at the foot writes one. Point at a row for Done or Delete.' },
+    { target: 'above', title: 'Last year, for reference', text: `Last year’s goals still open, folded at the left edge. ${FOLD_HINT}` },
+    { target: 'list', title: 'This year’s goals', text: `One row per year goal, written in its own words. Tap one for Done, Let go and Edit wording. ${PLAN_LIST_HINT}` },
     { target: 'next', title: 'On to the season', text: 'Goes on to the season, the brainstorm list for this stretch of the year.' },
   ],
   season: [
     { target: 'period', title: 'This season', text: 'A brainstorm list for this stretch of the year: what you would like it to hold. Nothing here is on a calendar. The arrows beside the title step to the previous or next season.' },
-    { target: 'above', title: 'The year, for reference', text: 'This year’s goals, folded to one line. Show opens them.' },
-    { target: 'list', title: 'Every season goal', text: `One list, drawn one way. A goal written for a year goal says “For …” under it. + Add a goal at the foot writes one, with an optional “For”. ${PLAN_LIST_HINT}` },
+    { target: 'above', title: 'The year, for reference', text: `This year’s goals, folded at the left edge. ${FOLD_HINT}` },
+    { target: 'list', title: 'Every season goal', text: `One list, written in its own words. ${PLAN_LIST_HINT}` },
     { target: 'next', title: 'On to the month', text: 'Goes on to the month, where you choose what this month holds.' },
   ],
   month: [
     { target: 'period', title: 'This month', text: 'One question: what do you want to accomplish this month? Nothing here is on a calendar yet.' },
-    { target: 'above', title: 'The season, for reference', text: 'The season’s goals, folded to one line. Show opens them; nothing on it has to come down.' },
-    { target: 'list', title: 'Every month goal', text: `One list, drawn one way. A goal written for a season goal says “For …” under it; one with tasks this week names them. + Add a goal at the foot writes one. ${PLAN_LIST_HINT}` },
+    { target: 'above', title: 'The season, for reference', text: `The season’s goals, folded at the left edge; nothing on it has to come down. ${FOLD_HINT}` },
+    { target: 'list', title: 'Every month goal', text: `One list, written in its own words. ${PLAN_LIST_HINT}` },
     { target: 'next', title: 'On to the week', text: 'Opens Week. There, tell Symphony what to do this week for a goal.' },
   ],
   week: [
