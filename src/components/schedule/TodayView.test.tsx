@@ -12,6 +12,7 @@ import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { TodayView } from './TodayView'
 import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
 import { GuidedSessionProvider, useGuidedSession } from '@/contexts/GuidedSessionContext'
+import { paperSound } from '@/lib/fold/paperSound'
 
 // File-wide mock: every test in this file renders TodayView's mobile branch.
 // This affects the EveningMealCard branch (TodayView.tsx ~line 651) and WHERE
@@ -361,16 +362,34 @@ describe('TodayView', () => {
     })
   })
 
-  it('the ⋯ menu holds only Hide daily and Print list', async () => {
+  it('the ⋯ menu holds only Hide daily, Print list and Paper sounds', async () => {
     const { user } = renderView({
       tasks: [{ id: 'd', title: 'Talk', completed: false, createdAt: TODAY, updatedAt: TODAY, needsDiscussion: true }],
     })
     await openOverflow(user)
     const menu = screen.getByRole('menu')
     expect(within(menu).getAllByRole('button').map((b) => b.textContent?.replace('Show daily', 'Hide daily'))).toEqual(['Hide daily', 'Print list'])
+    expect(within(menu).getByRole('menuitemcheckbox', { name: /Paper sounds/ })).toBeInTheDocument()
     for (const gone of [/suggestions/i, /carried-over/i, /end of day review/i, /clarity/i, /to discuss/i, /duplicate/i, /suggested order/i]) {
       expect(within(menu).queryByText(gone)).toBeNull()
     }
+  })
+
+  // The one mute control (spec 2026-11-04), remembered per device.
+  it('Paper sounds in the ⋯ shows the current state and turns the sounds off and on', async () => {
+    paperSound.setOn(true)
+    const { user } = renderView({ tasks: [] })
+    await openOverflow(user)
+    const item = screen.getByRole('menuitemcheckbox', { name: /Paper sounds/ })
+    expect(item).toHaveAttribute('aria-checked', 'true')
+    expect(item).toHaveTextContent('On')
+    await user.click(item)
+    expect(paperSound.on).toBe(false)
+    expect(localStorage.getItem('symphony-paper-sound')).toBe('off')
+    await openOverflow(user)
+    expect(screen.getByRole('menuitemcheckbox', { name: /Paper sounds/ })).toHaveAttribute('aria-checked', 'false')
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /Paper sounds/ }))
+    expect(paperSound.on).toBe(true)
   })
 
   describe('Up next (in place)', () => {

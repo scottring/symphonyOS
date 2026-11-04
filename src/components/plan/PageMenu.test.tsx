@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PageMenu } from './PageMenu'
+import { paperSound } from '@/lib/fold/paperSound'
 
 function setup(talk?: () => void) {
   const tick = vi.fn(), act = vi.fn()
@@ -13,6 +14,22 @@ function setup(talk?: () => void) {
 }
 
 describe('PageMenu', () => {
+  // The one mute control (spec 2026-11-04) on Year, Season, Month and Week.
+  it('Paper sounds is a tick that shows the state and calls paperSound.setOn', () => {
+    paperSound.setOn(true)
+    const spy = vi.spyOn(paperSound, 'setOn')
+    setup()
+    const item = screen.getByRole('menuitemcheckbox', { name: 'Paper sounds' })
+    expect(item).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(item)
+    expect(spy).toHaveBeenLastCalledWith(false)
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Paper sounds' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Paper sounds' }))
+    expect(spy).toHaveBeenLastCalledWith(true)
+    spy.mockRestore()
+  })
+
   it('opens on the first choice and shows ticks', () => {
     setup()
     expect(screen.getByRole('menu', { name: 'Month options' })).toBeInTheDocument()
@@ -51,6 +68,8 @@ describe('PageMenu', () => {
     const menu = screen.getByRole('menu')
     fireEvent.keyDown(menu, { key: 'ArrowDown' })
     expect(screen.getByRole('menuitem', { name: 'Hide Fall list' })).toHaveFocus()
+    fireEvent.keyDown(menu, { key: 'ArrowDown' })
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Paper sounds' })).toHaveFocus()
     fireEvent.keyDown(menu, { key: 'ArrowDown' })
     expect(screen.getByRole('menuitemcheckbox', { name: 'Show done' })).toHaveFocus()
     fireEvent.keyDown(menu, { key: 'Escape' })

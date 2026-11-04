@@ -756,7 +756,7 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
   month()
   // No talk is due, so ⋯ offers none: planning is the Plan button's session.
-  expect(menu()).toEqual(['Plan November early','Show done','Start with a goal · guided introduction','How this page works'])
+  expect(menu()).toEqual(['Plan November early','Show done','Start with a goal · guided introduction','Paper sounds','How this page works'])
   // Show done: a tick, remembered on this device, and the list agrees.
   const done=screen.getByRole('menuitemcheckbox',{name:'Show done'})
   expect(done).toHaveAttribute('aria-checked','false')

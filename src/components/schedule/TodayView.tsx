@@ -33,7 +33,8 @@ import { useDomain } from '@/hooks/useDomain'
 import { MobilePlanControls } from '@/components/layout/PlanNavigation'
 import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 
-import { Eye, EyeOff, Printer, GripVertical, ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { Eye, EyeOff, Printer, GripVertical, ChevronDown, ChevronRight, Plus, Volume2, VolumeX } from 'lucide-react'
+import { usePaperSound } from '@/components/plan/fold/usePaperSound'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { TodayWeekFold, SheetRoutines } from './TodayWeekColumn'
@@ -266,6 +267,7 @@ export function TodayView({
 
   // ── Hide-routines toggle (localStorage parity) ────────────────────────────────
   const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
+  const paperSounds = usePaperSound()
 
   useEffect(() => onHideRoutinesChange(setHideRoutines), [])
 
@@ -1092,6 +1094,18 @@ export function TodayView({
       >
         <Printer className="w-5 h-5" />
         <span>Print list</span>
+      </button>
+      {/* The one mute control for the paper sounds (spec 2026-11-04). */}
+      <button
+        type="button"
+        role="menuitemcheckbox"
+        aria-checked={paperSounds.on}
+        onClick={paperSounds.toggle}
+        className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+      >
+        {createElement(paperSounds.on ? Volume2 : VolumeX, { className: 'w-5 h-5' })}
+        <span>Paper sounds</span>
+        <span className="ml-auto text-[13px] text-neutral-400">{paperSounds.on ? 'On' : 'Off'}</span>
       </button>
     </TodayOverflowMenu>
   )

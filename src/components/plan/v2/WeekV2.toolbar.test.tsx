@@ -107,7 +107,7 @@ describe('WeekV2 header — one primary button and the ⋯ menu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
     const menu = within(screen.getByRole('menu', { name: 'Week options' }))
     const items = menu.getAllByRole('menuitemcheckbox').map((i) => i.getAttribute('aria-label') ?? i.textContent)
-    expect(items).toEqual(['Show free time', 'Show weather', 'Show done', 'Show daily routines in each day'])
+    expect(items).toEqual(['Show free time', 'Show weather', 'Show done', 'Show daily routines in each day', 'Paper sounds'])
     for (const [name, key] of [['Show free time', WEEK_PREF_KEYS.freeTime], ['Show weather', WEEK_PREF_KEYS.weather], ['Show done', WEEK_PREF_KEYS.done], ['Show daily routines in each day', WEEK_PREF_KEYS.dailyInDays]] as const) {
       const item = menu.getByRole('menuitemcheckbox', { name })
       expect(item).toHaveAttribute('aria-checked', 'false')

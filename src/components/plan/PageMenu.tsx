@@ -4,13 +4,15 @@
 // own choices, then its help. A choice with `checked` is a tick that keeps the
 // menu open; one without is an action that closes it. "How this page works" is
 // the title's old ?, "Watch the guide" its ▷. On a phone, which has no Chat
-// bar, a page passes `talk` to offer "Talk it through".
+// bar, a page passes `talk` to offer "Talk it through". "Paper sounds" (the
+// one mute control) ends every page's choices.
 
 import { useContext, useEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import { usePageHelp } from '@/components/explain/PageHelp'
 import { LearnPageContext, LearnVideoDialog } from '@/components/learn/LearnVideoChip'
 import { LEARN_VIDEOS, PAGE_VIDEOS, markSeen, readSeen, videoForPage, type LearnVideo } from '@/lib/learn/learnVideos'
+import { usePaperSound } from '@/components/plan/fold/usePaperSound'
 
 export type PageMenuChoice = {
   id: string
@@ -33,6 +35,9 @@ export function PageMenu({ label, choices, talk }: { label: string; choices: Pag
   const video = videoForPage(page, readSeen()) ?? (page && PAGE_VIDEOS[page]?.[0] ? LEARN_VIDEOS[PAGE_VIDEOS[page][0]] ?? null : null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // Every calm page's ⋯ carries the one mute control for the paper sounds.
+  const sound = usePaperSound()
+  const all: PageMenuChoice[] = [...choices, { id: 'paper-sounds', label: 'Paper sounds', checked: sound.on, onSelect: sound.toggle }]
 
   useEffect(() => {
     if (!open) return
@@ -70,7 +75,7 @@ export function PageMenu({ label, choices, talk }: { label: string; choices: Pag
             const at = items.indexOf(document.activeElement as HTMLElement)
             items[e.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length]?.focus()
           }}>
-          {choices.map((c) => {
+          {all.map((c) => {
             const tick = c.checked !== undefined
             return (
               <button key={c.id} type="button" role={tick ? 'menuitemcheckbox' : 'menuitem'} aria-checked={tick ? c.checked : undefined}
@@ -81,7 +86,7 @@ export function PageMenu({ label, choices, talk }: { label: string; choices: Pag
               </button>
             )
           })}
-          {(choices.length > 0 && (talk || help || video)) && <hr className="wk-menu-rule" />}
+          {(talk || help || video) && <hr className="wk-menu-rule" />}
           {talk && (
             <button type="button" role="menuitem" className="wk-menu-item" onClick={() => { close(false); talk() }}>
               <span className="wk-menu-check" aria-hidden="true" /><span>Talk it through</span>
