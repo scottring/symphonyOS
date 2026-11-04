@@ -968,7 +968,7 @@ describe('reviewing: the session’s look back',()=>{
    open('/year?view=constellation&start=2026-10-09&review=1')
    expect(screen.getByTestId('where').textContent).toContain('start=2027-01-01')
    const together=within(screen.getByRole('listitem',{name:'Together'}))
-   await act(async()=>{fireEvent.click(together.getByRole('button',{name:'Carry: Together'}))})
+   await act(async()=>{fireEvent.click(together.getByRole('button',{name:'To 2027: Together'}))})
    expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g'}))
    expect(lastRun().label).toBe('Bring “Together” into 2027')
   }finally{vi.useRealTimers()}
@@ -1152,6 +1152,8 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   const october=within(screen.getByRole('region',{name:'October 2026, looking back'}))
   expect(october.getByRole('heading',{level:2,name:'October'})).toBeInTheDocument()
   expect(within(october.getByRole('list',{name:'Open from October'})).getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['Hike Bear Mountain'])
+  // The only sheet beside you that takes a choice: exactly these four.
+  expect(within(october.getByRole('listitem',{name:'Hike Bear Mountain'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Done','To November','Someday','Let go'])
   expect(document.querySelector('.ribbon-card')).toBeNull()
   expect(shell.reg).toMatchObject({level:'month',token:'2026-11',stepId:'look-back'})
   await act(async()=>{fireEvent.click(band().getByRole('button',{name:'Next'}))})
@@ -1167,26 +1169,30 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(place.setPlace).toHaveBeenCalledWith('urban')
   expect(notesStore.patches.some((x)=>x.p.scenery==='urban')).toBe(true)
  })
- it('Look back: September’s open lines — carry, back to Fall, drop — each through the page’s writers',async()=>{
+ it('Look back: September’s open lines — Done, To October, Someday, Let go — each through the page’s writers; nothing goes back to Fall',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   api.tasks=[{id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP},{id:'gone',title:'Pay taxes',bucket:'month',monthStart:SEP,completed:true},
-   {id:'up',title:'Clear the garage',bucket:'month',monthStart:SEP},{id:'drop',title:'Learn the banjo',bucket:'month',monthStart:SEP}]
-  api.keepForward.mockResolvedValue('x');api.dropCommitment.mockResolvedValue(true);api.setBucket.mockResolvedValue(true)
+   {id:'later',title:'Clear the garage',bucket:'month',monthStart:SEP},{id:'never',title:'Learn the banjo',bucket:'month',monthStart:SEP}]
+  api.keepForward.mockResolvedValue('x');api.dropCommitment.mockResolvedValue(true)
   atStep('look-back')
   month('&plan=1')
   const open=within(screen.getByRole('list',{name:'Open from September'}))
   expect(open.queryByText('Pay taxes')).toBeNull()
-  expect(within(open.getByRole('listitem',{name:'Fix the gate'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Carry','Back to Fall','Drop','Done'])
-  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Carry: Fix the gate'}))})
+  expect(within(open.getByRole('listitem',{name:'Fix the gate'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Done','To October','Someday','Let go'])
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'To October: Fix the gate'}))})
   expect(api.keepForward).toHaveBeenCalledWith('old',{monthStart:OCT},SEP)
   expect(lastRun().label).toBe('Move “Fix the gate” to October')
-  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Back to Fall: Clear the garage'}))})
-  // Fall never held it: put on Fall first, then off September.
-  expect(api.keepForward).toHaveBeenCalledWith('up',{seasonStart:SEP})
-  expect(api.dropCommitment).toHaveBeenCalledWith('up','month',SEP)
-  expect(lastRun().label).toBe('Back to Fall: “Clear the garage”')
-  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Drop: Learn the banjo'}))})
-  expect(api.setBucket.mock.calls[0].slice(0,2)).toEqual(['drop','someday'])
+  // Someday: September only; with nothing else holding it, it waits on Someday.
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Someday: Clear the garage'}))})
+  expect(api.updateTask).toHaveBeenLastCalledWith('later',{bucket:'someday',scheduledFor:undefined})
+  expect(lastRun().label).toBe('Someday: “Clear the garage”')
+  // Let go: not ever.
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Let go: Learn the banjo'}))})
+  expect(api.updateTask).toHaveBeenLastCalledWith('never',{bucket:'someday',dismissedAt:expect.any(Date)})
+  expect(lastRun().label).toBe('Let go: “Learn the banjo”')
+  expect(lastRun().opts.undo).toEqual(expect.any(Function))
+  expect(api.dropCommitment).not.toHaveBeenCalled()
+  expect(screen.queryByRole('button',{name:/^Back to /})).toBeNull()
   // Nothing on the look back marks the month planned.
   expect(notesStore.patches.some((x)=>(x.p.guide as any)?.plannedAt)).toBe(false)
  })
@@ -1250,7 +1256,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   api.goals=[...GOALS.map(g=>({...g})),{id:'old',name:'Learn to sail',year:2025,status:'active',context:'personal'}]
   atStep('look-back')
   open('/year?view=constellation&start=2026-10-09&plan=1')
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Carry: Learn to sail'}))})
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'To 2026: Learn to sail'}))})
   expect(api.addGoal).toHaveBeenCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old'}))
   expect(lastRun().label).toBe('Bring “Learn to sail” into 2026')
   fireEvent.click(screen.getByRole('button',{name:'Leave'}))
@@ -1292,43 +1298,47 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(screen.getByRole('region',{name:'Choose from the year'})).toBeInTheDocument()
   expect(shell.reg).toMatchObject({token:'2026-fall',stepId:'from-year'})
  })
- it('Look back: Summer’s open goals — Carry, Table (to Someday), Let go (off Summer only) — each through the page’s writers',async()=>{
+ it('Look back: Summer’s open goals — Done, To Fall, Someday (off Summer only), Let go (not ever) — each through the page’s writers',async()=>{
   inSession()
   api.tasks=[{id:'a',title:'Swim lessons',bucket:'quarter',monthStart:SUMMER},{id:'b',title:'Learn the banjo',bucket:'quarter',monthStart:SUMMER},
    {id:'c',title:'Run a 10k block',bucket:'quarter',monthStart:SUMMER,goalId:'g'},{id:'d',title:'Camp booked',bucket:'quarter',monthStart:SUMMER,completed:true}]
-  api.keepForward.mockResolvedValue('x');api.dropCommitment.mockResolvedValue(true);api.setBucket.mockResolvedValue(true)
+  api.keepForward.mockResolvedValue('x');api.dropCommitment.mockResolvedValue(true)
   atStep('look-back')
   season('&plan=1')
   const open=within(screen.getByRole('list',{name:'Open from Summer'}))
   expect(open.queryByText('Camp booked')).toBeNull()
-  expect(within(open.getByRole('listitem',{name:'Swim lessons'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Carry','Table','Let go','Done'])
-  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Carry: Swim lessons'}))})
+  expect(within(open.getByRole('listitem',{name:'Swim lessons'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Done','To Fall','Someday','Let go'])
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'To Fall: Swim lessons'}))})
   expect(api.keepForward).toHaveBeenCalledWith('a',{seasonStart:FALL},SUMMER)
-  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Table: Learn the banjo'}))})
-  expect(api.setBucket.mock.calls[0].slice(0,2)).toEqual(['b','someday'])
-  expect(lastRun().label).toBe('Moved to Someday: “Learn the banjo”')
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Someday: Learn the banjo'}))})
+  expect(api.updateTask).toHaveBeenLastCalledWith('b',{bucket:'someday',scheduledFor:undefined})
+  expect(lastRun().label).toBe('Someday: “Learn the banjo”')
   await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Let go: Run a 10k block'}))})
-  expect(api.dropCommitment).toHaveBeenCalledWith('c','season',SUMMER)
+  expect(api.updateTask).toHaveBeenLastCalledWith('c',{bucket:'someday',dismissedAt:expect.any(Date)})
   expect(lastRun().label).toBe('Let go: “Run a 10k block”')
   expect(lastRun().opts.undo).toEqual(expect.any(Function))
   // The year goal it was for stays on the year.
   expect(api.updateGoal).not.toHaveBeenCalled()
   expect(plannedMarks()).toHaveLength(0)
  })
- it('Choose from the year: a year goal with nothing on Fall is brought in under it; Someday can be put on Fall; neither marks Fall planned',async()=>{
+ it('Choose from the year: the year beside Fall to read, its goals with nothing to press; Someday (not what was let go) can be put on Fall; neither marks Fall planned',async()=>{
   inSession()
-  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'sd',title:'Learn to sail',bucket:'someday'}]
+  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'sd',title:'Learn to sail',bucket:'someday'},
+   {id:'lg',title:'Buy a boat',bucket:'someday',dismissedAt:new Date(2026,9,1)}]
   api.keepForward.mockResolvedValue('sd')
   atStep('from-year')
   season('&plan=1')
-  const year=within(screen.getByRole('list',{name:'2026 goals'}))
-  expect(within(year.getByRole('listitem',{name:'Together'})).getByText('On Fall: Unhurried weekends')).toBeInTheDocument()
-  await act(async()=>{fireEvent.click(year.getByRole('button',{name:'Fall: Health'}))})
-  expect(api.addTask).toHaveBeenCalledWith('Health',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',seasonStart:FALL,goalId:'other'}))
-  expect(lastRun().label).toBe('Fall: “Health”')
-  fireEvent.click(screen.getByRole('button',{name:'Someday · 1'}))
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Fall: Learn to sail'}))})
+  expect(aboveOpen()).toBe(true)
+  const card=within(screen.getByRole('region',{name:'Choose from the year'}))
+  const year=within(card.getByRole('list',{name:'2026 goals'}))
+  expect(year.getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['Together','Health'])
+  expect(year.queryAllByRole('button')).toHaveLength(0)
+  expect(card.queryByText(/On Fall/)).toBeNull()
+  fireEvent.click(card.getByRole('button',{name:'Someday · 1'}))
+  expect(card.queryByText('Buy a boat')).toBeNull()
+  await act(async()=>{fireEvent.click(card.getByRole('button',{name:'Fall: Learn to sail'}))})
   expect(api.keepForward).toHaveBeenCalledWith('sd',{seasonStart:FALL})
+  expect(api.addTask).not.toHaveBeenCalled()
   expect(plannedMarks()).toHaveLength(0)
  })
  it('Choose from the year reads the year the season is named for, however it was opened (walk 2026-11-02)',()=>{
@@ -1456,7 +1466,7 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   expect(shell.reg).toMatchObject({token:'2026',stepId:'vision'})
   expect(screen.getByRole('region',{name:'Picture 5–10 years out'})).toBeInTheDocument()
  })
- it('Look back: 2025’s open goals — Carry, Someday, Let go, Done — each through the page’s writers, with Undo',async()=>{
+ it('Look back: 2025’s open goals — Done, To 2026, Someday, Let go — each through the page’s writers, with Undo',async()=>{
   inSession()
   api.goals=[...GOALS.map(g=>({...g})),
    {id:'a',name:'Learn to sail',year:2025,status:'active',context:'personal'},{id:'b',name:'Write the book',year:2025,status:'active',context:'work',areaId:'h',notes:'Two pages a day'},
@@ -1467,9 +1477,9 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   year()
   const open=within(screen.getByRole('list',{name:'Open from 2025'}))
   expect(open.queryByText('Met already')).toBeNull()
-  expect(within(open.getByRole('listitem',{name:'Learn to sail'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Carry','Someday','Let go','Done'])
-  // Carry: the strip's own "→ 2026", a copy that remembers it.
-  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Carry: Learn to sail'}))})
+  expect(within(open.getByRole('listitem',{name:'Learn to sail'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Done','To 2026','Someday','Let go'])
+  // To 2026: a copy in 2026 that remembers it.
+  await act(async()=>{fireEvent.click(open.getByRole('button',{name:'To 2026: Learn to sail'}))})
   expect(api.addGoal).toHaveBeenCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'a'}))
   expect(lastRun().label).toBe('Bring “Learn to sail” into 2026')
   // Someday: goals have no Someday, so its words go on the Someday list and the goal is put away.
@@ -1769,13 +1779,13 @@ describe('the list, ordered by drag',()=>{
   // Into 2027, from reviewing 2026 (which plans 2027).
   atStep('look-back')
   open('/year?view=constellation&start=2026-10-09&review=1')
-  fireEvent.click(screen.getByRole('button',{name:'Carry: Together'}))
+  fireEvent.click(screen.getByRole('button',{name:'To 2027: Together'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenCalledWith(null,'Together','personal',expect.objectContaining({year:2027,carriedFrom:'g',sortOrder:5000})))
   cleanup()
   // Bring into 2026, while planning it.
   atStep('look-back')
   open('/year?view=constellation&start=2026-10-09&plan=1')
-  fireEvent.click(screen.getByRole('button',{name:'Carry: Learn to sail'}))
+  fireEvent.click(screen.getByRole('button',{name:'To 2026: Learn to sail'}))
   await waitFor(()=>expect(api.addGoal).toHaveBeenLastCalledWith(null,'Learn to sail','personal',expect.objectContaining({year:2026,carriedFrom:'old',sortOrder:2000})))
  })
  it('privacy: with the area and people filters on, a private line from another area is not listed, counted, marked or reordered',async()=>{

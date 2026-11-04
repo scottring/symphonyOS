@@ -82,8 +82,6 @@ import { staleForDrain } from '@/lib/planning/drain'
 import { withPlacedSubtasks } from '@/lib/planning/plannedSubtasks'
 import { useChooseWeek } from './useChooseWeek'
 import { restoreDeleted } from '@/lib/planning/restoreDeleted'
-import { openCommitment } from '@/lib/placement/model'
-import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { doableBy } from '@/lib/planning/poolViews'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
@@ -1058,7 +1056,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
       return [{ id: `event-${ev.google_event_id || ev.id}`, title: ev.title.trim(), first: span.first, last: span.last }]
     })
   }, [events, weekAnchor])
-  const handOffTo = useMemo(() => familyMembers.filter((m) => m.id !== meId), [familyMembers, meId])
   // Weekly ops lists the routines the page shows: the same space filter and
   // people lens (the ladder without its one-day rung; the step asks each day).
   const opsRoutines = useMemo(() => routines.filter((r) => resolveRoutineEligible(r, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }).shows),
@@ -1068,25 +1065,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
     openTask: (id) => onSelectItem(`task-${id}`),
     cards: deckCards, doneLastWeek, plannedLastWeek, alsoDoneLastWeek, doneThisWeek, onThisWeek, aged, actions: deckActions, stripDays,
     loading: !tasksLoaded, lastReview,
-    // Last week's leftovers nobody answered: one on October goes back to
-    // October (its week ends, its line keeps it); any other goes to Later,
-    // together, one Undo. "Place them" never drains.
-    onFinish: async () => {
-      if (deckMode !== 'full') return true
-      const left = chooseWeek.unanswered.filter(drainable)
-      const backUp = left.filter((t) => openCommitment({ commitments: bootstrapCommitments(t) }, 'month'))
-      const rest = left.filter((t) => !backUp.includes(t))
-      let ok = true
-      for (const t of backUp) ok = (await dropCommitment(t.id, 'week', lastWeekStart)) && ok
-      if (rest.length > 0) ok = (await deckActions.drain(rest, `Move ${rest.length} left from last week to Later`)) && ok
-      return ok
-    },
+    // Done planning the week moves nothing (settled after the builder check,
+    // 2026-11-04: nothing moves up). A leftover nobody answered keeps its
+    // week commitment; the look back is where it is answered (Done, Next
+    // week, Someday, Let go).
+    onFinish: async () => true,
     onSeeAged: () => navigate('/someday'),
     choose: chooseWeek,
     tasks: deckTasks,
     events: clashEvents,
     allDayEvents,
-    handOffTo,
     routines: opsRoutines,
     listenCanvasWrites,
   }

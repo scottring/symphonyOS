@@ -189,7 +189,7 @@ describe('GuidedWeek — the Week page while planning', () => {
     expect(shell.reg?.stepId).toBe('inbox')
   })
   it('the look back on the sheet beside the week; the calendar check and the inbox in the card under the band; Read October is the month itself', async () => {
-    const gate = { key: 'gate', title: 'Fix the gate', who: [], canHandOff: true, thisWeek: vi.fn(async () => true), smaller: vi.fn(async () => true), handOff: vi.fn(async () => true), drop: vi.fn(async () => true), done: vi.fn(async () => true) }
+    const gate = { key: 'gate', title: 'Fix the gate', done: vi.fn(async () => true), nextWeek: vi.fn(async () => true), someday: vi.fn(async () => true), letGo: vi.fn(async () => true) }
     const vet = createMockTask({ id: 'vet', title: 'Book the vet', bucket: 'inbox' })
     const deck = makeDeck({
       aged: 2, doneLastWeek: 3, plannedLastWeek: 4,
@@ -202,8 +202,10 @@ describe('GuidedWeek — the Week page while planning', () => {
     fireEvent.change(lookSheet().getByLabelText('What went well'), { target: { value: 'Rested' } })
     await act(async () => { fireEvent.click(lookSheet().getByRole('button', { name: 'Save notes' })) })
     expect(review.finish).toHaveBeenCalledWith({ wentWell: 'Rested', didnt: '' })
-    await act(async () => { fireEvent.click(lookSheet().getByRole('button', { name: 'Drop: Fix the gate' })) })
-    expect(gate.drop).toHaveBeenCalled()
+    expect(within(lookSheet().getByRole('listitem', { name: 'Fix the gate' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Done', 'Next week', 'Someday', 'Let go'])
+    expect(lookSheet().queryByRole('button', { name: /^Back to / })).toBeNull()
+    await act(async () => { fireEvent.click(lookSheet().getByRole('button', { name: 'Let go: Fix the gate' })) })
+    expect(gate.letGo).toHaveBeenCalled()
     expect(lookSheet().getByText(/Moved 2 untouched things to Later/)).toBeInTheDocument()
     // 2 · Calendar check, before the month (Scott, 2026-11-02): the clash, flagged on its day.
     await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })

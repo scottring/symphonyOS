@@ -42,52 +42,27 @@ const renderChoose = (over: Partial<ChoosePlanProps> = {}) => {
 }
 
 describe('ChoosePlan — one October goal per card', () => {
-  it('says where the goal stands and offers three plain choices', () => {
+  // Paper-style horizons (2026-11-04): the lines from above are for reading.
+  // Nothing on them commits a month line to the week or adds a step under it.
+  it('says where the goal stands, with nothing to press on the line itself, whatever verbs it is handed', () => {
     renderChoose()
     expect(screen.getByText('October goals → this week')).toBeTruthy()
     expect(screen.getByText('1 of 2')).toBeTruthy()
     const card = within(screen.getByRole('article', { name: 'Plan a winter vacation' }))
     expect(card.getByText('On October · no steps yet')).toBeTruthy()
-    expect(card.getAllByRole('button').map((b) => b.textContent)).toEqual(['This week', 'Done', '+ Add a step'])
+    expect(card.queryAllByRole('button')).toEqual([])
+    expect(screen.queryByRole('button', { name: /^This week: Plan a winter vacation/ })).toBeNull()
   })
-
-  it('This week saves, stamps the card and offers Undo, which sends it back', async () => {
-    const g = goal()
-    const back = { label: 'Back to October', role: 'back' as const, run: vi.fn(async () => true) }
-    g.verbs.push(back)
-    renderChoose({ lines: [g] })
-    fireEvent.click(screen.getByRole('button', { name: 'This week: Plan a winter vacation' }))
-    await waitFor(() => expect(screen.getByRole('img', { name: /this week/i })).toBeTruthy())
-    expect(g.verbs[0].run).toHaveBeenCalledTimes(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Undo: Plan a winter vacation' }))
-    await waitFor(() => expect(back.run).toHaveBeenCalledTimes(1))
-    expect(screen.getByRole('button', { name: 'This week: Plan a winter vacation' })).toBeTruthy()
-  })
-
   it('a goal never on a week has no button for staying — leaving it alone keeps it on October (walk 2026-11-02)', () => {
     renderChoose({ lines: [goal()] })
     expect(screen.queryByRole('button', { name: /Leave on October/ })).toBeNull()
   })
 
-  it('last week’s leftover goal offers Back to October, which sends it up', async () => {
+  it('last week’s leftover line offers no Back to October: nothing goes up', () => {
     const v = verbs()
     renderChoose({ lines: [goal({ planned: { kind: 'last', label: 'Last week' }, verbs: [v.here, v.back, v.done, v.reopen] })] })
-    fireEvent.click(screen.getByRole('button', { name: 'Back to October: Plan a winter vacation' }))
-    await waitFor(() => expect(v.back.run).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('button', { name: /Back to October/ })).toBeNull()
   })
-
-  it('in the list, a goal decided this sitting is one line — what happened and Undo — with no stamp (walk 2026-11-02)', async () => {
-    const g = goal()
-    renderChoose({ lines: [g], view: 'all' })
-    fireEvent.click(screen.getByRole('button', { name: /Plan a winter vacation/, expanded: false }))
-    fireEvent.click(screen.getByRole('button', { name: 'Done: Plan a winter vacation' }))
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Done'))
-    expect(screen.queryByRole('img', { name: /done/i })).toBeNull()
-    expect(screen.queryByText(/no steps yet/)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Undo: Plan a winter vacation' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Done: Plan a winter vacation' })).toBeTruthy())
-  })
-
   it('a goal’s steps are on its card: done struck, one on this week stamped, the rest with their own choices', async () => {
     renderChoose()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -134,12 +109,13 @@ describe('ChoosePlan — Also this week', () => {
 })
 
 describe('ChoosePlan — All at once', () => {
-  it('folds each goal to a row with its counts; opening one shows the same card body', () => {
+  it('folds each goal to a row with its counts; opening one shows the same read-only body', () => {
     const { props } = renderChoose({ view: 'all' })
     const row = screen.getByRole('button', { name: /Organize important family documents/ })
     expect(row).toHaveTextContent('1 done · 1 this week · 1 on October')
     fireEvent.click(row)
-    expect(screen.getByRole('button', { name: 'This week: Organize important family documents' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'This week: Organize important family documents' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Add a step/ })).toBeNull()
     fireEvent.click(screen.getByRole('radio', { name: 'One at a time' }))
     expect(props.onViewChange).toHaveBeenCalledWith('one')
   })

@@ -859,9 +859,9 @@ describe('WeekViewV2 — the deck', () => {
     expect(shown()).toEqual(['mine', 'staleShared'])
     expect(deckActions.drain).toHaveBeenCalledTimes(1)
     expect((deckActions.drain.mock.calls[0] as unknown as [Task[]])[0].map((t) => t.id)).toEqual(['staleShared'])
+    // Done planning moves nothing: the leftovers keep their week.
     await act(async () => { await props().onFinish() })
-    expect(deckActions.drain).toHaveBeenCalledTimes(2)
-    expect((deckActions.drain.mock.calls[1] as unknown as [Task[]])[0].map((t) => t.id)).toEqual(['mine'])
+    expect(deckActions.drain).toHaveBeenCalledTimes(1)
   })
 
   // Choosing Iris shows her tasks, but the drains still never move them.
@@ -1045,17 +1045,18 @@ describe('WeekViewV2 — the deck', () => {
     expect(props().stripDays[0].lines).toEqual([])
   })
 
-  it('a week step sits under its October line, and says so when it gets a day', () => {
+  // Paper-style horizons (2026-11-04): nothing says what a week task is for.
+  it('a week step tied to an October line is listed as the week’s own; the line is for reading', () => {
     const goal = createMockTask({ id: 'g', title: 'Get the house ready for winter', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), updatedAt: recent })
     const step = createMockTask({ id: 's', title: 'Clean the gutters', bucket: 'week', weekStart: sat, goalTaskId: 'g', commitments: [{ level: 'week', periodStart: sat, status: 'open' }], updatedAt: recent })
     open('?review=1', [goal, step])
     const [line] = props().choose.lines
     expect(line.title).toBe('Get the house ready for winter')
-    expect(line.steps.map((x) => [x.key, x.planned.label])).toEqual([['s', 'This week']])
-    expect(props().choose.loose).toEqual([])
-    expect(props().choose.placeItems).toEqual([expect.objectContaining({ key: 's', from: 'October goal · Get the house ready for winter' })])
+    expect(line.steps).toEqual([])
+    expect(line.verbs).toEqual([])
+    expect(props().choose.loose.map((x) => [x.key, x.planned.label])).toEqual([['s', 'This week']])
+    expect(props().choose.placeItems).toEqual([expect.objectContaining({ key: 's', from: 'This week' })])
   })
-
   // Spec 2026-10-19: a step of an October line, still a subtask, put on this
   // week is week work — the planner shows it under its line and the days draw it.
   it('a subtask step put on this week is drawn under its line and offered a day', () => {
@@ -1068,69 +1069,31 @@ describe('WeekViewV2 — the deck', () => {
           commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }] }),
       ] })
     open('?plan=1', [line])
-    expect(props().choose.lines[0].steps.map((x) => [x.key, x.planned.label])).toEqual([['inv', 'This week'], ['scan', 'October']])
+    // October's line is for reading; the week's step is listed with the week's own.
+    expect(props().choose.lines[0].steps).toEqual([])
+    expect(props().choose.loose.map((x) => [x.key, x.planned.label])).toEqual([['inv', 'This week']])
     expect(props().choose.placeItems.map((x) => x.key)).toEqual(['inv'])
   })
 
-  it('finishing sends a leftover that is on October back to October, not to Later', async () => {
+  // Settled after the builder check (2026-11-04): nothing moves up. A week
+  // leftover is Done, Next week, Someday or Let go, answered at the look back.
+  it('Done planning the week leaves leftovers’ week commitments in place: nothing back to October, nothing to Later', async () => {
     const oct = new Date(2026, 9, 1)
     const tasks = [
       createMockTask({ id: 'm', title: 'Identify missing documents', bucket: 'week', weekStart: new Date(2026, 9, 10), updatedAt: recent,
         commitments: [{ level: 'month', periodStart: oct, status: 'open' }, { level: 'week', periodStart: new Date(2026, 9, 10), status: 'open' }] }),
-    ]
-    open('?review=1', tasks)
-    await act(async () => { await props().onFinish() })
-    expect(dropCommitmentMock).toHaveBeenCalledWith('m', 'week', new Date(2026, 9, 10))
-    expect(deckActions.drain).not.toHaveBeenCalled()
-    expect(periodReview.finish).toHaveBeenCalledTimes(1)
-  })
-
-  it('finishing the full deck sends what was left from last week to Later in one go, then records last week reviewed', async () => {
-    const tasks = [
       createMockTask({ id: 'a', title: 'Fix the gate', scheduledFor: new Date(2026, 9, 12), isAllDay: true, updatedAt: recent }),
-      createMockTask({ id: 'b', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 13), isAllDay: true, updatedAt: recent }),
-      createMockTask({ id: 'c', title: 'New capture', bucket: 'inbox', updatedAt: recent }),
     ]
     open('?review=1', tasks)
     await act(async () => { await props().onFinish() })
-    expect(deckActions.drain).toHaveBeenCalledTimes(1)
-    expect((deckActions.drain.mock.calls[0] as unknown as [Task[]])[0].map((t) => t.id)).toEqual(['a', 'b'])
+    expect(dropCommitmentMock).not.toHaveBeenCalled()
+    expect(deckActions.drain).not.toHaveBeenCalled()
     expect(deckActions.later).not.toHaveBeenCalled()
     expect(periodReview.finish).toHaveBeenCalledWith({ wentWell: '', didnt: '' })
     expect(periodReview.token).toBe('2026-10-10')
-    expect(deckActions.drain.mock.invocationCallOrder[0]).toBeLessThan(periodReview.finish.mock.invocationCallOrder[0])
     await waitFor(() => expect(screen.queryByTestId('deck')).toBeNull())
     expect(new URLSearchParams(window.location.search).get('review')).toBeNull()
   })
-
-  it('the end drain is labelled for what it moves, and leaves a last-week task due today', async () => {
-    const tasks = [
-      createMockTask({ id: 'b', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 13), isAllDay: true, updatedAt: recent }),
-      // Committed to last week, but given today: it still has a home.
-      createMockTask({ id: 'today', title: 'Pick up the cake', bucket: 'week', weekStart: new Date(2026, 9, 10), scheduledFor: new Date(2026, 9, 17), isAllDay: true,
-        commitments: [{ level: 'week', periodStart: new Date(2026, 9, 10), status: 'open' }], updatedAt: recent }),
-    ]
-    open('?review=1', tasks)
-    expect(shown()).toEqual(expect.arrayContaining(['b', 'today']))
-    // Given today, it is this week's now.
-    expect(props().choose.loose.find((x) => x.key === 'today')?.planned.label).toBe('This week · Sat')
-    await act(async () => { await props().onFinish() })
-    expect(deckActions.drain).toHaveBeenCalledTimes(1)
-    const [moved, label] = deckActions.drain.mock.calls[0] as unknown as [Task[], string]
-    expect(moved.map((t) => t.id)).toEqual(['b'])
-    expect(label).toBe('Move 1 left from last week to Later')
-  })
-
-  it('an end drain that fails records no review and keeps the deck open', async () => {
-    open('?review=1', [createMockTask({ id: 'b', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 13), isAllDay: true, updatedAt: recent })])
-    deckActions.drain.mockResolvedValueOnce(false)
-    await act(async () => { await props().onFinish() })
-    expect(deckActions.drain).toHaveBeenCalledTimes(1)
-    expect(periodReview.finish).not.toHaveBeenCalled()
-    expect(screen.getByTestId('deck')).toBeInTheDocument()
-    expect(new URLSearchParams(window.location.search).get('review')).toBe('1')
-  })
-
   // Walk 2026-11-01: "Look back at last week" stood beside the week being
   // planned. The look back's page is the week before, drawn as the week is:
   // its days and what was on them, its name above them. The next step is

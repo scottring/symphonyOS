@@ -2,16 +2,11 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import { useState } from 'react'
 import { WeekLookBack, type LooseEnd } from './WeekLookBack'
-import type { FamilyMember } from '@/types/family'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 
-const member = (id: string, name: string) => ({ id, name, initials: name[0], color: 'blue' }) as unknown as FamilyMember
-const iris = member('iris', 'Iris')
-
 const end = (title: string, over: Partial<LooseEnd> = {}): LooseEnd => ({
-  key: title, title, note: 'Not done', who: [], canHandOff: true,
-  thisWeek: vi.fn(async () => true), smaller: vi.fn(async () => true), handOff: vi.fn(async () => true),
-  drop: vi.fn(async () => true), done: vi.fn(async () => true),
+  key: title, title, note: 'Carried 1 week',
+  done: vi.fn(async () => true), nextWeek: vi.fn(async () => true), someday: vi.fn(async () => true), letGo: vi.fn(async () => true),
   ...over,
 })
 const review = () => ({ mine: null as ReviewNotes | null, reviewed: null, loading: false, finish: vi.fn(async () => true) })
@@ -22,7 +17,7 @@ function WithDraft(p: Omit<Props, 'draft' | 'onDraft'>) {
   return <WeekLookBack {...p} draft={draft} onDraft={setDraft} />
 }
 const setup = (over: Partial<Omit<Props, 'draft' | 'onDraft'>> = {}) => {
-  const props = { review: review(), done: 3, outOf: 5, notDone: 2, looseEnds: [end('Fix the gate'), end('Call the bank')], members: [iris], aged: 0, onSeeAged: vi.fn(), ...over }
+  const props = { review: review(), done: 3, outOf: 5, notDone: 2, looseEnds: [end('Fix the gate'), end('Call the bank')], aged: 0, onSeeAged: vi.fn(), ...over }
   const r = render(<WithDraft {...props} />)
   return { ...props, rerender: (looseEnds: LooseEnd[]) => r.rerender(<WithDraft {...props} looseEnds={looseEnds} />) }
 }
@@ -46,82 +41,58 @@ describe('WeekLookBack — step 1, look back at last week', () => {
     expect(screen.getByLabelText('What went well')).toHaveValue('Rested')
   })
 
-  it('each loose end offers This week, Smaller, Hand off and Drop, and each runs its own write', async () => {
+  // A week leftover is Done, Next week, Someday or Let go (settled after the
+  // builder check, 2026-11-04): nothing goes back to the month.
+  it('each loose end offers exactly Done, Next week, Someday and Let go, and each runs its own write', async () => {
     const p = setup()
     for (const t of ['Fix the gate', 'Call the bank']) {
-      for (const v of ['This week', 'Smaller', 'Hand off', 'Drop']) expect(row(t).getByRole('button', { name: `${v}: ${t}` })).toBeInTheDocument()
+      expect(row(t).getAllByRole('button').map((b) => b.textContent)).toEqual(['Done', 'Next week', 'Someday', 'Let go'])
     }
-    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'This week: Fix the gate' })) })
-    expect(p.looseEnds[0].thisWeek).toHaveBeenCalledTimes(1)
-    await act(async () => { fireEvent.click(row('Call the bank').getByRole('button', { name: 'Drop: Call the bank' })) })
-    expect(p.looseEnds[1].drop).toHaveBeenCalledTimes(1)
-    expect(p.looseEnds[0].drop).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Back to|Smaller|Hand off/)).toBeNull()
+    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Next week: Fix the gate' })) })
+    expect(p.looseEnds[0].nextWeek).toHaveBeenCalledTimes(1)
+    await act(async () => { fireEvent.click(row('Call the bank').getByRole('button', { name: 'Someday: Call the bank' })) })
+    expect(p.looseEnds[1].someday).toHaveBeenCalledTimes(1)
+    expect(p.looseEnds[0].someday).not.toHaveBeenCalled()
   })
 
-  it('Smaller opens the break-down line and adds a step under it', async () => {
+  it('Let go and Done say what happened on the row', async () => {
     const p = setup()
-    fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Smaller: Fix the gate' }))
-    fireEvent.change(screen.getByRole('textbox', { name: 'A smaller step under Fix the gate' }), { target: { value: 'Buy a hinge' } })
-    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Add' })) })
-    expect(p.looseEnds[0].smaller).toHaveBeenCalledWith('Buy a hinge')
-  })
-
-  it('Hand off lists the household; a name hands it to them', async () => {
-    const p = setup()
-    fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Hand off: Fix the gate' }))
-    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Iris' })) })
-    expect(p.looseEnds[0].handOff).toHaveBeenCalledWith(iris)
+    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Let go: Fix the gate' })) })
+    expect(p.looseEnds[0].letGo).toHaveBeenCalledTimes(1)
+    expect(row('Fix the gate').getByText('Let go')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(row('Call the bank').getByRole('button', { name: 'Done: Call the bank' })) })
+    expect(p.looseEnds[1].done).toHaveBeenCalledTimes(1)
+    expect(row('Call the bank').getByText('Marked done')).toBeInTheDocument()
   })
 
   it('a write that did not save says so on its row', async () => {
-    setup({ looseEnds: [end('Fix the gate', { drop: vi.fn(async () => false) })] })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Drop: Fix the gate' })) })
+    setup({ looseEnds: [end('Fix the gate', { someday: vi.fn(async () => false) })] })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Someday: Fix the gate' })) })
     expect(row('Fix the gate').getByRole('alert')).toHaveTextContent('Didn’t save. Try again.')
-  })
-
-  it('a Personal or Work loose end is never handed off: assigning it would share it', () => {
-    setup({ looseEnds: [end('See the doctor', { canHandOff: false }), end('Fix the gate')] })
-    expect(screen.queryByRole('button', { name: 'Hand off: See the doctor' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Hand off: Fix the gate' })).toBeInTheDocument()
   })
 
   it('while a row saves, its other buttons wait too', async () => {
     let finish!: (ok: boolean) => void
-    setup({ looseEnds: [end('Fix the gate', { thisWeek: vi.fn(() => new Promise<boolean>((r) => { finish = r })) })] })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'This week: Fix the gate' })) })
-    for (const v of ['Smaller', 'Hand off', 'Drop', 'Done']) expect(screen.getByRole('button', { name: `${v}: Fix the gate` })).toBeDisabled()
+    setup({ looseEnds: [end('Fix the gate', { nextWeek: vi.fn(() => new Promise<boolean>((r) => { finish = r })) })] })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Next week: Fix the gate' })) })
+    for (const v of ['Done', 'Someday', 'Let go']) expect(screen.getByRole('button', { name: `${v}: Fix the gate` })).toBeDisabled()
     await act(async () => { finish(true) })
     // Saved: the row says so in place, and Change brings the calls back.
-    expect(screen.getByText('On this week')).toBeInTheDocument()
+    expect(screen.getByText('On next week')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Change' }))
-    expect(screen.getByRole('button', { name: 'Smaller: Fix the gate' })).toBeEnabled()
-  })
-
-  it('a smaller step that saved is said on its row, with what was typed (walk 2026-11-02)', async () => {
-    const smaller = vi.fn(async () => true)
-    setup({ looseEnds: [end('Frame the posters', { smaller, backTo: 'November' })] })
-    fireEvent.click(screen.getByRole('button', { name: 'Smaller: Frame the posters' }))
-    fireEvent.change(row('Frame the posters').getByRole('textbox'), { target: { value: 'Buy frames' } })
-    await act(async () => { fireEvent.click(row('Frame the posters').getByRole('button', { name: 'Add' })) })
-    expect(smaller).toHaveBeenCalledWith('Buy frames')
-    expect(screen.getByText('“Buy frames” on this week · “Frame the posters” back to November')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Drop: Frame the posters' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Someday: Fix the gate' })).toBeEnabled()
   })
 
   it('a row the call took off the list stays in its place as what happened', async () => {
     const p = setup({ looseEnds: [end('Fix the gate'), end('Call the bank')] })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Drop: Fix the gate' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Someday: Fix the gate' })) })
     p.rerender([end('Call the bank')])
     const rows = within(screen.getByRole('list', { name: 'Not done last week' })).getAllByRole('listitem')
     expect(rows[0]).toHaveTextContent('Fix the gate')
-    expect(rows[0]).toHaveTextContent('Dropped')
+    expect(rows[0]).toHaveTextContent('Moved to Someday')
     expect(within(rows[0]).queryByRole('button', { name: 'Change' })).toBeNull()
     expect(rows[1]).toHaveTextContent('Call the bank')
-  })
-
-  it('with no one to hand to, Hand off is not offered', () => {
-    setup({ members: [] })
-    expect(screen.queryByRole('button', { name: 'Hand off: Fix the gate' })).toBeNull()
   })
 
   it('says what the opening sweep moved to Later, with a way to see them', () => {

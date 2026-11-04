@@ -75,12 +75,11 @@ import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
-import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { describeTriageWhen } from '@/lib/triage/applyWhen'
 import { compareSortOrder, nextTaskSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
 import { PlanOrderList, type RowOrder } from './PlanOrderList'
 import { useLifeAreas } from '@/hooks/useLifeAreas'
 import { groupByArea } from '@/lib/guide/byArea'
-import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { periodMoves } from './horizonPanel'
 import { isLetGo } from '@/lib/planning/letGo'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
@@ -90,7 +89,7 @@ import { showToast } from '@/hooks/useToast'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { nextSeasonStart, seasonLabel, seasonToken } from '@/lib/cadence/seasons'
 import { REVIEW_WINDOW_DAYS, alsoDoneIn, movedOn, reviewTarget, taskReviewState, weekPhrase, yearGoalReviewState } from '@/lib/planning/periodReview'
-import { liveCommitments, openCommitment } from '@/lib/placement/model'
+import { liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import type { Task } from '@/types/task'
 import { placementOf } from '@/lib/planning/placement'
@@ -133,17 +132,13 @@ const aOrAn = (word: string) => /^[aeiou8]/i.test(word) ? 'an' : 'a'
 /** A year goal's wording, edited in place. */
 type Composer = { kind: 'edit'; key: string }
 
-/** One line the period before left, with the verbs that answer it. */
-interface ReviewVerb { label: string; run: () => Promise<boolean>; menu?: ReviewVerb[]; confirm?: string }
 
 function Inner() {
   const selection = useSelectionOptional()
   const { goals, loading: goalsLoading, error: goalsError, addGoal, updateGoal, deleteGoal } = useGoalsContext()
   // `tasks` is what the page draws, so its own `updateTaskOrders` (optimistic)
   // moves a dropped line at once — never another hook instance's.
-  const { tasks, loading, error, addTask, updateTask, refetch, deleteTask, toggleTask, pushTask, setBucket, updateTasksBulk, keepForward, dropCommitment, updateTaskOrders } = useSupabaseTasks()
-  // Someday asks for a domain first on an Unsorted item, as every triage does.
-  const gated = useGatedTaskActions({ updateTask, pushTask, setBucket, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
+  const { tasks, loading, error, addTask, updateTask, refetch, deleteTask, toggleTask, keepForward, dropCommitment, updateTaskOrders } = useSupabaseTasks()
   const activity = useCanvasActivity()
   const updateGoalRef = useRef(updateGoal)
   useEffect(() => { updateGoalRef.current = updateGoal }, [updateGoal])
@@ -386,18 +381,6 @@ function Inner() {
     }).then((made) => !!made), { ids: [id], undo: async () => { await deleteGoal(id) } })
   }
 
-  // The row as it was, for Undo: its list of periods (planPlacement's stated list).
-  const restoreOf = (t: Task) => {
-    const before = liveCommitments({ commitments: bootstrapCommitments(t) })
-    return async () => (await updateTask(t.id, { commitments: before })) !== false
-  }
-  // Someday, with the way back: where it was and its periods (2026-10-25: it
-  // saved with no Undo).
-  const somedayOf = (t: Task): ReviewVerb => {
-    const before = { ...placementOf(t), commitments: liveCommitments({ commitments: bootstrapCommitments(t) }) }
-    return { label: 'Someday', run: () => act(`${describeTriageWhen('someday')}: “${t.title}”`, () => applyTriageWhen('someday', t.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! }),
-      { ids: [t.id], undo: async () => (await updateTask(t.id, before)) !== false }) }
-  }
   // ---- Proposals for this horizon -----------------------------------------
   const inPeriod = (ymd?: string) => {
     if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return true
@@ -456,7 +439,6 @@ function Inner() {
 
   // ---- The level above (folded beside the sheet; planning reads it too) -----
   const above = level > 0 ? inOrder(allNodes.filter((n) => n.level === level - 1 && isOpen(n))) : []
-  const aboveWord = level === 2 ? seasonWord : String(year)
 
   // ---- The period's goals: open first, done folded into one line -----------
   // With life areas, the lines gather under their area's name ("No area" last).
@@ -640,12 +622,6 @@ function Inner() {
       doneCount: allNodes.filter((n) => n.level === level - 1 && isDone(n)).length,
       empty: level === 2 ? `No ${seasonWord} goals yet.` : `No ${year} goals yet.`,
     }
-  // Back to Fall: ends this period's commitment (from `from`) and leaves the
-  // rest. A row the season never held is put on it first.
-  const backToAbove = (t: Task, lvl: 'season' | 'month', from: Date) => act(`Back to ${aboveWord}: “${t.title}”`, async () => {
-    if (lvl === 'month' && !openCommitment({ commitments: bootstrapCommitments(t) }, 'season') && !(await keepForward(t.id, { seasonStart: seasonB.start }))) return false
-    return dropCommitment(t.id, lvl, from)
-  }, { ids: [t.id], undo: restoreOf(t) })
   // Planned, the next horizon down is next: Year → Season → Month → Week.
   // This month's next week is this one; a coming month's, its first.
   const planWeek = weekStartAnchor(current ? now : bounds.start, weekStartsOn)
@@ -670,12 +646,12 @@ function Inner() {
     + prevTasks.filter((t) => taskReviewState(t, PERIODS[level] as 'season' | 'month', prevB.start, { isCurrent: isCurrentPeriod(prevB, now), seasons }) === 'done').length
 
   // ---- The guided session (spec 2026-11-01) ------------------------------------
-  // The look back's open lines, each with the level's calls. Month: carry
-  // into this month, back to the season, drop (to Someday), or done. Season:
-  // Carry into this season, Table (to Someday), Let go (off that season; a
-  // year goal it was for stays on the year), or done. Year: Carry (a
-  // copy in this year that remembers it), Someday, Let go (archived),
-  // or done.
+  // The look back's open lines, each with the same four calls on every level
+  // (Scott, 2026-11-04): Done · To {this period} · Someday (not now) · Let go
+  // (not ever). Month and Season: To and Someday act on the period before's
+  // commitment only, Let go takes the item off every list (periodMoves). Year:
+  // To 2027 is a copy in that year that remembers it, Someday puts its words
+  // on Someday, Let go archives it. Nothing goes back up to the level above.
   const toggleOf = (t: Task) => async () => (await toggleTask(t.id)) !== false
   // A year goal to Someday: goals have no Someday of their own, so its words
   // go on the Someday list (a task, with its space, area and notes; a task
@@ -714,9 +690,6 @@ function Inner() {
       async () => !!(await addTask(title, undefined, undefined, day, { id, isAllDay: true, context: 'personal', assignedTo: meId ?? undefined })),
       { ids: [id], undo: async () => { await deleteTask(id) } })
   }
-  // Let go of a season goal the season before left open: only that season's
-  // commitment ends. The goal it was for is a goals row and stays on the year.
-  const letGoOf = (t: Task) => act(`Let go: “${t.title}”`, () => dropCommitment(t.id, 'season', prevB.start), { ids: [t.id], undo: restoreOf(t) })
   const doneOf = (t: Task) => act(`Complete “${t.title}”`, toggleOf(t), { ids: [t.id], undo: toggleOf(t) })
   const lookBackBody = (t: PeriodSessionTools) => {
     if (!planning) return null
@@ -724,22 +697,22 @@ function Inner() {
     if (level === 0) {
       const open = goalsOf(year - 1).filter((g) => yearGoalReviewState(g, thisYearGoals) === 'open')
         .map((g) => ({ id: g.id, title: g.name, node: { key: `0:${g.id}`, id: g.id, title: g.name, level: 0, parent: null, goal: g } as PlanNode }))
-      return <PeriodLookBack {...common} open={open} labels={{ drop: 'Let go' }} verbs={{
-        carry: (l) => carryGoal(l.node, year, `Bring “${l.title}” into ${year}`),
-        table: (l) => goalToSomeday(l.node),
-        drop: (l) => setGoalStatus(l.node, 'archived', `Let go of “${l.title}”`),
+      return <PeriodLookBack {...common} open={open} toLabel={`To ${year}`} verbs={{
         done: (l) => setGoalStatus(l.node, 'completed', `Complete “${l.title}”`),
+        to: (l) => carryGoal(l.node, year, `Bring “${l.title}” into ${year}`),
+        someday: (l) => goalToSomeday(l.node),
+        letGo: (l) => setGoalStatus(l.node, 'archived', `Let go of “${l.title}”`),
       }} />
     }
     const lvl = PERIODS[level] as 'season' | 'month'
     const open = prevTasks.filter((x) => taskReviewState(x, lvl, prevB.start, { isCurrent: isCurrentPeriod(prevB, now), seasons }) === 'open')
     const moves = (x: Task) => periodMoves(x, lvl, prevB, seasons, { updateTask, keepForward, dropCommitment }, activity.run)
-    const carry = (x: Task) => moves(x)[0].onClick()
-    return lvl === 'month'
-      ? <PeriodLookBack {...common} open={open} upLabel={`Back to ${seasonWord}`}
-          verbs={{ carry, up: (x) => backToAbove(x, 'month', prevB.start), drop: (x) => somedayOf(x).run(), done: doneOf }} />
-      : <PeriodLookBack {...common} open={open} labels={{ table: 'Table', drop: 'Let go' }}
-          verbs={{ carry, table: (x) => somedayOf(x).run(), drop: (x) => letGoOf(x), done: doneOf }} />
+    return <PeriodLookBack {...common} open={open} toLabel={`To ${periodWord}`} verbs={{
+      done: doneOf,
+      to: (x) => moves(x)[0].onClick(),
+      someday: (x) => moves(x)[1].onClick(),
+      letGo: (x) => moves(x)[2].onClick(),
+    }} />
   }
   // Done planning, as the Week's: the period before is recorded reviewed
   // (with the look back's notes as typed — Done is an explicit tap — or what
@@ -758,18 +731,17 @@ function Inner() {
     if (ok) { setMarkedKey(periodKey); setJustMarkedAt(new Date()); periodNotes.reload() }
     return ok
   }
-  // Season, choose from the year: each year goal with what the season holds
-  // under it, and Someday. Bringing one in is a write, not choosing: only the
+  // Season, choose from the year: the year's goals to read (beside the sheet,
+  // and in the card), and Someday. Nothing is picked from the year: the
+  // season is written in its own words. A Someday item can be brought in (a
+  // holding list, not a horizon); that is a write, not choosing: only the
   // goals by area mark the season planned (the session checks the step).
   const fromYearBody = () => {
     if (!planning || level !== 1) return null
-    const yearGoals = above.filter((n) => n.goal).map((n) => ({
-      id: n.id, title: n.title, node: n, here: levelNodes.filter((c) => c.parent === n.key && isOpen(c)).map((c) => c.title),
-    }))
+    const yearGoals = above.filter((n) => n.goal).map((n) => ({ id: n.id, title: n.title }))
     // Someday is "not now"; what was let go is "not ever" and is not offered.
     const someday = visible.filter((t) => t.bucket === 'someday' && !t.completed && !t.parentTaskId && !isLetGo(t)).map((t) => ({ id: t.id, title: t.title, task: t }))
     return <FromYear yearWord={String(year)} seasonWord={periodWord} goals={yearGoals} someday={someday}
-      onPick={(g) => runCreate(1, g.title, g.node, `${periodWord}: “${g.title}”`)}
       onBring={({ task }) => {
         const before = { ...placementOf(task), commitments: liveCommitments({ commitments: bootstrapCommitments(task) }) }
         return act(`${periodWord}: “${task.title}”`, async () => !!(await keepForward(task.id, { seasonStart: bounds.start })),

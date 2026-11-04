@@ -1,10 +1,11 @@
 // Planning a month, season or year, step 1 or 2 (spec 2026-11-01): look back
-// at the period before. Its count and the two notes (Looking back, compact; a
-// month's energy goes in these notes), then each line it left open with the
-// level's calls: Month carry / back to the season / drop; Season Carry /
-// Table (Someday) / Let go; Year Carry / Someday / Let go. Every call saves
-// through the page's writers (receipt and Undo); nothing writes until a
-// button is pressed. What a call did is said on its row (receipts.tsx).
+// at the period before, on the sheet beside this one (the planning ribbon,
+// 2026-11-04). Its count and the two notes (Looking back, compact; a month's
+// energy goes in these notes), then each line it left open with the same four
+// calls on every level (Scott, 2026-11-04): Done · To {next} · Someday (not
+// now) · Let go (not ever). Nothing goes back up to the level above. Every
+// call saves through the page's writers (receipt and Undo); nothing writes
+// until a button is pressed. What a call did is said on its row (receipts.tsx).
 
 import { useState } from 'react'
 import type { ReviewNotes, Reviewed } from '@/hooks/usePeriodReview'
@@ -14,7 +15,7 @@ import { ReceiptLine } from '../ReceiptLine'
 
 type Write<T> = (line: T) => Promise<boolean>
 
-export function PeriodLookBack<T extends { id: string; title: string }>({ prevLabel, review, draft, onDraft, done, outOf, alsoDone, open, verbs, upLabel, labels }: {
+export function PeriodLookBack<T extends { id: string; title: string }>({ prevLabel, review, draft, onDraft, done, outOf, alsoDone, open, verbs, toLabel }: {
   /** "October", "Summer", "2025" */
   prevLabel: string
   /** The period before's review (usePeriodReview): what was said, and its save. */
@@ -29,11 +30,11 @@ export function PeriodLookBack<T extends { id: string; title: string }>({ prevLa
   alsoDone?: readonly { id: string; title: string }[]
   /** What the period before left open, as the page lists it. */
   open: readonly T[]
-  verbs: { carry: Write<T>; up?: Write<T>; table?: Write<T>; drop: Write<T>; done?: Write<T> }
-  /** "Back to Fall" (Month's `up`). */
-  upLabel?: string
-  /** The level's own words for table and drop (Season: "Table", "Let go"). */
-  labels?: { table?: string; drop?: string }
+  /** Done; To the next period (this period's commitment carried on); Someday
+   *  (this period only); Let go (off every list). */
+  verbs: { done: Write<T>; to: Write<T>; someday: Write<T>; letGo: Write<T> }
+  /** The carry, named by where it goes: "To November", "To Fall", "To 2027". */
+  toLabel: string
 }) {
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
@@ -54,14 +55,11 @@ export function PeriodLookBack<T extends { id: string; title: string }>({ prevLa
     return ok
   }
   const reviewedOn = review.reviewed ? `Reviewed ${review.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
-  const tableWord = labels?.table ?? 'Someday'
-  const dropWord = labels?.drop ?? 'Drop'
   const calls = (line: T) => [
-    { label: 'Carry', write: verbs.carry, quiet: false, text: 'Carried forward' },
-    ...(verbs.up ? [{ label: upLabel ?? 'Back up', write: verbs.up, quiet: true, text: upLabel ?? 'Moved back up' }] : []),
-    ...(verbs.table ? [{ label: tableWord, write: verbs.table, quiet: true, text: tableWord === 'Someday' ? 'Moved to Someday' : 'Tabled' }] : []),
-    { label: dropWord, write: verbs.drop, quiet: true, text: dropWord === 'Let go' ? 'Let go' : 'Dropped' },
-    ...(verbs.done ? [{ label: 'Done', write: verbs.done, quiet: true, text: 'Marked done' }] : []),
+    { label: 'Done', write: verbs.done, quiet: true, text: 'Marked done' },
+    { label: toLabel, write: verbs.to, quiet: false, text: toLabel },
+    { label: 'Someday', write: verbs.someday, quiet: true, text: 'Moved to Someday' },
+    { label: 'Let go', write: verbs.letGo, quiet: true, text: 'Let go' },
   ].map((c) => <button key={c.label} type="button" className={`choose-verb${c.quiet ? ' is-quiet' : ''}`} disabled={pending !== null}
     aria-label={`${c.label}: ${line.title}`} onClick={() => { void run(line, () => c.write(line), c.text) }}>{c.label}</button>)
 

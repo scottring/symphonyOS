@@ -40,7 +40,6 @@ import { TellFamily } from '@/components/plan/guided/week/TellFamily'
 import type { SessionFold } from '@/components/plan/guided/GuidedPeriod'
 import type { Routine } from '@/types/actionable'
 import type { ClashEvent } from '@/lib/guide/clashes'
-import type { FamilyMember } from '@/types/family'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import type { DeckCard, DeckMode } from '@/lib/planning/deck'
 import type { DeckActions } from '@/components/home/week/useDeckActions'
@@ -76,9 +75,9 @@ export interface WeekDeck {
   /** Last week's review, the page's own record (the header's fact line reads
    *  it): finishing the deck writes through it, so the line updates. */
   lastReview?: ReturnType<typeof usePeriodReview>
-  /** The deck's own closing writes (the full deck's end-of-deck drain),
-   *  resolving false when they failed. The review is recorded and the deck
-   *  left here, in WeekV2. */
+  /** The deck's own closing writes, resolving false when they failed (the
+   *  session's Done moves no leftover: nothing moves up, 2026-11-04). The
+   *  review is recorded and the deck left here, in WeekV2. */
   onFinish: (decided: ReadonlySet<string>) => Promise<boolean>
   onSeeAged: () => void
   /** Plan this week (spec 2026-10-19): Choose from the month, then Give them a day. */
@@ -91,8 +90,6 @@ export interface WeekDeck {
   /** The week's all-day events, each with the days it covers (YYYY-MM-DD,
    *  inclusive): the calendar check lists them on each of those days. */
   allDayEvents?: readonly AllDayEvent[]
-  /** Who a loose end can be handed to: the household, but not the viewer. */
-  handOffTo?: readonly FamilyMember[]
   /** The routines the page shows under its filters (Weekly ops lists them by day). */
   routines?: readonly Routine[]
   /** Hear of each write the week canvas saves (a drag onto a day, an add):
@@ -160,12 +157,12 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   // cards) and records that week's review. So reviewing this week opens the
   // deck on the week after it, and last week's review opens it here.
   const target = reviewTarget({ start: weekStart, end: nextWeek }, new Date(), REVIEW_WINDOW_DAYS.week)
-  // Done planning the week (the guided session's last step): the undealt
-  // last-week leftovers go to Later or back to the month (WeekViewV2's drain),
-  // then last week is recorded reviewed (what its look back said), then this
-  // week is marked planned — unless it ends today: a week on its last day is
-  // not marked planned. A drain that failed records nothing and keeps the
-  // session open: the activity strip says why, and Done tries again.
+  // Done planning the week (the guided session's last step): the deck's own
+  // closing writes (none move a leftover: it keeps its week until the look
+  // back answers it), then last week is recorded reviewed (what its look back
+  // said), then this week is marked planned — unless it ends today: a week on
+  // its last day is not marked planned. A closing write that failed records
+  // nothing and keeps the session open.
   const closeWeek = async (lookDraft?: ReviewNotes | null): Promise<boolean> => {
     if (!deck) return true
     let drained = false
@@ -274,7 +271,6 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
 }
 
 const NO_TASKS: readonly Task[] = []
-const NOBODY: readonly FamilyMember[] = []
 const NO_ROUTINES: readonly Routine[] = []
 
 /** Planning the week (spec 2026-11-01): the guided session on this page.
@@ -317,7 +313,7 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   // page with the month open beside it.
   const bodies = {
     'look-back': <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
-      notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} members={deck.handOffTo ?? NOBODY} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
+      notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
     calendar: <CalendarCheck weekStart={weekStart} events={deck.events ?? []} allDay={deck.allDayEvents} />,
     inbox: <InboxStep cards={deck.cards.filter((c) => c.source === 'inbox')} actions={deck.actions} />,
     ops: <WeeklyOps weekStart={weekStart} routines={deck.routines ?? NO_ROUTINES} draft={weekendDraft} onDraft={setWeekendDraft} />,

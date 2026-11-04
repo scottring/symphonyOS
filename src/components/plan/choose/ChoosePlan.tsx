@@ -8,12 +8,16 @@
 // last goal, what isn't under a goal. All at once lays the same goals out as
 // one list instead; the switch is remembered by the page.
 //
+// Paper-style horizons (2026-11-04): the goals of the level above are for
+// reading. A line shows where it stands and the steps listed under it, but
+// nothing on the line itself: no This week, no Back to October, no "+ Add a
+// step". Each period is written in its own words.
+//
 // Presentational: the page builds the goals and binds every verb. Each verb
 // saves through the page's canvas activity (receipt and Undo); this view says
 // which one is saving, whether it failed, and stamps what was decided here.
 
 import { Fragment, useRef, useState, type ReactNode } from 'react'
-import { Check } from 'lucide-react'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { Stamp } from '@/components/plan/v2/Stamp'
 import type { Planned } from '@/lib/planning/chooseFromAbove'
@@ -50,8 +54,11 @@ export interface ChooseLineView {
   note?: string
   /** "1 done · 2 this week · 4 on October" */
   counts: string
+  /** Not offered: a line from above is for reading (kept for the page's own
+   *  data shape). */
   verbs: ChooseVerb[]
   steps: ChooseItemView[]
+  /** Not offered: nothing is added under a line from above. */
   onAddStep?: (title: string) => Promise<boolean>
 }
 
@@ -168,42 +175,6 @@ export function ChoosePlan(p: ChoosePlanProps) {
       onClick={() => { void run(key, m) }}>{m.label}</button>)}
   </div>
 
-  // ---- A goal's choices: three plain ones, or Undo once decided here.
-  const choices = (key: string, title: string, pl: Planned, verbs: ChooseVerb[]) => {
-    const d = decided[key]
-    const doIt = role(verbs, 'here'), back = role(verbs, 'back'), done = role(verbs, 'done'), reopen = role(verbs, 'reopen')
-    const others = verbs.filter((v) => !v.role || v.role === 'other')
-    if (d) {
-      const undo = d === 'stay' ? NOOP : d === 'done' ? reopen : back
-      return undo ? <div className="choose-choices is-one"><button type="button" className="deck-btn is-quiet" disabled={pending !== null}
-        aria-label={`Undo: ${title}`} onClick={() => { void run(key, undo, null) }}>Undo</button></div> : null
-    }
-    // A year goal on the Season page is planned through its steps, never placed itself.
-    if (pl.kind === 'done' || verbs.length === 0) return null
-    const onHere = pl.kind === 'here' || pl.kind === 'day'
-    const list: { label: string; v: ChooseVerb; then: Decision | null; primary?: boolean }[] = [
-      ...(!onHere && doIt ? [{ label: cap(here), v: doIt, then: 'here' as Decision, primary: true }] : []),
-      ...(onHere && back ? [{ label: `Not ${inHere}`, v: back, then: null }] : []),
-      // Last week's leftover goes back up. A goal never on a week gets no
-      // button for staying: leaving it alone already does that, and a button
-      // that saves nothing read as a decision (walk 2026-11-02).
-      ...(pl.kind === 'last' && back && above ? [{ label: `Back to ${above}`, v: back, then: 'stay' as Decision }] : []),
-      ...(done ? [{ label: 'Done', v: done, then: 'done' as Decision }] : []),
-    ]
-    return <>
-      {list.length > 0 && <div className={`choose-choices${list.length === 1 ? ' is-one' : ''}`} role="group" aria-label={`Plan ${title}`}>
-        {list.map((c) => <button key={c.label} type="button" className={`deck-btn${c.primary ? '' : ' is-quiet'}`} disabled={pending !== null}
-          aria-label={`${c.label}: ${title}`} onClick={() => { void run(key, c.v, c.then) }}>{c.label}</button>)}
-      </div>}
-      {others.length > 0 && <div className="choose-more" role="group" aria-label={`More for ${title}`}>
-        {others.map((v) => v.menu
-          ? <button key={v.label} type="button" className="canvas-link" aria-expanded={menuOpen === key} onClick={() => setMenuOpen(menuOpen === key ? null : key)}>{v.label} ▸</button>
-          : <button key={v.label} type="button" className="canvas-link" disabled={pending !== null} aria-label={`${v.label}: ${title}`} onClick={() => { void run(key, v) }}>{v.label}</button>)}
-      </div>}
-      {menuRow(key, title, others)}
-    </>
-  }
-
   // ---- A step row: title, where it stands, its own choices (or a small stamp).
   const step = (it: ChooseItemView, depth: number): ReactNode => {
     const d = decided[it.key]
@@ -252,31 +223,13 @@ export function ChoosePlan(p: ChoosePlanProps) {
     </li>
   }
 
-  // In the list, a goal decided this sitting is one line: what happened and
-  // Undo — not a fact line, a full-width Undo box and a stamp (walk
-  // 2026-11-02). The one-at-a-time card keeps its stamp.
-  const decidedLine = (line: ChooseLineView) => {
-    const d = decided[line.key]
-    const undo = d === 'stay' ? NOOP : d === 'done' ? role(line.verbs, 'reopen') : role(line.verbs, 'back')
-    return <p className="choose-receipt" role="status">
-      <Check size={13} strokeWidth={2.5} aria-hidden="true" />
-      <span>{whereNow(line.planned, d)}</span>
-      {undo && <button type="button" className="choose-receipt-undo" disabled={pending !== null} aria-label={`Undo: ${line.title}`}
-        onClick={() => { void run(line.key, undo, null) }}>Undo</button>}
-    </p>
-  }
-  const goalBody = (line: ChooseLineView, inList = false) => <>
-    {inList && decided[line.key] ? decidedLine(line) : <>
-      <p className="choose-fact">{whereNow(line.planned, decided[line.key])}{line.steps.length ? '' : ' · no steps yet'}</p>
-      {choices(line.key, line.title, line.planned, line.verbs)}
-    </>}
-    {status(line.key)}
-    {(line.steps.length > 0 || line.onAddStep) && <div className="choose-steps-box">
-      {line.steps.length > 0 && <h4 className="choose-steps-h">Steps</h4>}
-      {line.steps.length > 0 && <ul className="choose-rows" aria-label={`Steps of ${line.title}`}>{line.steps.map((s) => step(s, 0))}</ul>}
-      {line.onAddStep && (adding === `step:${line.key}`
-        ? <InlineComposer key={added} label={`A step ${inHere} under ${line.title}`} saveLabel="Add" onSave={add(`step:${line.key}`, line.onAddStep)} onCancel={() => setAdding(null)} />
-        : <button type="button" className="canvas-link choose-add" aria-label={`Add a step ${inHere} under ${line.title}`} onClick={() => setAdding(`step:${line.key}`)}>+ Add a step</button>)}
+  // A line from above: where it stands, and the steps listed under it (each
+  // with its own choices). Nothing on the line itself.
+  const goalBody = (line: ChooseLineView) => <>
+    <p className="choose-fact">{whereNow(line.planned)}{line.steps.length ? '' : ' · no steps yet'}</p>
+    {line.steps.length > 0 && <div className="choose-steps-box">
+      <h4 className="choose-steps-h">Steps</h4>
+      <ul className="choose-rows" aria-label={`Steps of ${line.title}`}>{line.steps.map((s) => step(s, 0))}</ul>
     </div>}
   </>
 
@@ -329,7 +282,6 @@ export function ChoosePlan(p: ChoosePlanProps) {
           ? <article key={current.key} className="deck-card choose-card" aria-label={current.title}>
             <h3 className="choose-card-title">{current.title}</h3>
             {goalBody(current)}
-            {stampFor(current.key, current.planned)}
           </article>
           : <article className="deck-card choose-card" aria-label={looseTitle}>
             <h3 className="choose-card-title">{looseTitle}</h3>
@@ -355,7 +307,7 @@ export function ChoosePlan(p: ChoosePlanProps) {
                 <span className="choose-counts">{line.counts}</span>
                 <span className="choose-chev" aria-hidden="true">{open ? '▾' : '▸'}</span>
               </button>
-              {open && <div className="choose-line-body">{goalBody(line, true)}</div>}
+              {open && <div className="choose-line-body">{goalBody(line)}</div>}
             </li></Fragment>
           })}
         </ul>)}

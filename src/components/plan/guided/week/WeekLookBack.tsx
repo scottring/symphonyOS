@@ -1,16 +1,15 @@
-// Planning the week, step 1 (spec 2026-11-01): look back at last week. Its
-// count and the two notes (Looking back, compact), what the opening sweep
-// moved to Later, then each loose end from last week with four plain calls:
-// This week, Smaller (a step under it), Hand off (to someone in the
-// household), Drop. Every call saves through the page's writers (receipt and
-// Undo); nothing writes until a button is pressed. What a call did is said on
-// its row (receipts.tsx).
+// Planning the week, step 1 (spec 2026-11-01): look back at last week, on the
+// sheet beside the week (the planning ribbon, 2026-11-04). Its count and the
+// two notes (Looking back, compact), what the opening sweep moved to Later,
+// then each loose end from last week with four plain calls (Scott,
+// 2026-11-04): Done · Next week · Someday (not now) · Let go (not ever).
+// Nothing goes back up to the month. Every call saves through the page's
+// writers (receipt and Undo); nothing writes until a button is pressed. What
+// a call did is said on its row (receipts.tsx).
 
 import { useState } from 'react'
-import type { FamilyMember } from '@/types/family'
 import type { ReviewNotes, Reviewed } from '@/hooks/usePeriodReview'
 import { LookingBack } from '@/components/plan/choose/LookingBack'
-import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { useReceipts, withReceipts } from '../receipts'
 import { ReceiptLine } from '../ReceiptLine'
 
@@ -18,24 +17,18 @@ import { ReceiptLine } from '../ReceiptLine'
 export interface LooseEnd {
   key: string
   title: string
-  /** "Not done · carried 2 weeks" */
+  /** "Carried 2 weeks" */
   note?: string
-  /** Who has it now (household member ids). */
-  who: readonly string[]
-  /** Only a Family item: assigning anything else would share it. */
-  canHandOff: boolean
-  thisWeek: () => Promise<boolean>
-  /** A smaller step under it, on this week; it goes back to its month. */
-  smaller: (title: string) => Promise<boolean>
-  /** The month it goes back to ("November"). */
-  backTo?: string
-  /** Assigned to them instead. Assignment is not permission. */
-  handOff: (to: FamilyMember) => Promise<boolean>
-  drop: () => Promise<boolean>
   done: () => Promise<boolean>
+  /** On to the week being planned. */
+  nextWeek: () => Promise<boolean>
+  /** Last week's commitment ends; with nothing else holding it, it waits on Someday. */
+  someday: () => Promise<boolean>
+  /** Not ever: off every list (letGo.ts). */
+  letGo: () => Promise<boolean>
 }
 
-export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, alsoDone, looseEnds, members, aged, onSeeAged }: {
+export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, alsoDone, looseEnds, aged, onSeeAged }: {
   /** Last week's review (usePeriodReview): what was said, and its save. */
   review: { mine: ReviewNotes | null; reviewed: Reviewed | null; loading: boolean; finish: (notes: ReviewNotes) => Promise<boolean> }
   /** What is typed and not yet saved, kept by the session so it survives
@@ -47,15 +40,12 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
   notDone: number
   alsoDone?: readonly { id: string; title: string }[]
   looseEnds: readonly LooseEnd[]
-  /** Who a loose end can be handed to. */
-  members: readonly FamilyMember[]
   /** Untouched things the opening sweep moved to Later, and where to see them. */
   aged: number
   onSeeAged: () => void
 }) {
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
-  const [open, setOpen] = useState<{ key: string; what: 'smaller' | 'hand' } | null>(null)
   const { said, record, clear } = useReceipts()
 
   const run = async (e: LooseEnd, write: () => Promise<boolean>, text: string) => {
@@ -63,10 +53,9 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
     const ok = await write().catch(() => false)
     setPending(null)
     if (!ok) setFailed(e.key)
-    else { setOpen(null); record(e.key, { title: e.title, text, at: looseEnds.findIndex((x) => x.key === e.key) }) }
+    else record(e.key, { title: e.title, text, at: looseEnds.findIndex((x) => x.key === e.key) })
     return ok
   }
-  const toggle = (key: string, what: 'smaller' | 'hand') => setOpen(open?.key === key && open.what === what ? null : { key, what })
   const savedNotes = review.mine ?? { wentWell: '', didnt: '' }
   const notes = draft ?? savedNotes
   const unsaved = !!draft && (draft.wentWell.trim() !== savedNotes.wentWell || draft.didnt.trim() !== savedNotes.didnt)
@@ -106,20 +95,11 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
             <span className="gw-row-title">{e.title}</span>
             {e.note && <span className="gw-row-note">{e.note}</span>}
             <span className="gw-row-acts" role="group" aria-label={`Decide ${e.title}`}>
-              {verb('This week', e.thisWeek, 'On this week', false)}
-              <button type="button" className="choose-verb is-quiet" disabled={busy} aria-expanded={open?.key === e.key && open.what === 'smaller'}
-                aria-label={`Smaller: ${e.title}`} onClick={() => toggle(e.key, 'smaller')}>Smaller</button>
-              {e.canHandOff && members.length > 0 && <button type="button" className="choose-verb is-quiet" disabled={busy} aria-expanded={open?.key === e.key && open.what === 'hand'}
-                aria-label={`Hand off: ${e.title}`} onClick={() => toggle(e.key, 'hand')}>Hand off</button>}
-              {verb('Drop', e.drop, 'Dropped')}
               {verb('Done', e.done, 'Marked done')}
+              {verb('Next week', e.nextWeek, 'On next week', false)}
+              {verb('Someday', e.someday, 'Moved to Someday')}
+              {verb('Let go', e.letGo, 'Let go')}
             </span>
-            {open?.key === e.key && open.what === 'smaller' && <InlineComposer label={`A smaller step under ${e.title}`} saveLabel="Add"
-              onSave={async (title) => run(e, () => e.smaller(title), `“${title.trim()}” on this week${e.backTo ? ` · “${e.title}” back to ${e.backTo}` : ''}`)} onCancel={() => setOpen(null)} />}
-            {open?.key === e.key && open.what === 'hand' && <div className="choose-menu" role="group" aria-label={`Hand off ${e.title} to`}>
-              {members.map((m) => <button key={m.id} type="button" className="choose-when" disabled={busy} aria-pressed={e.who.includes(m.id)}
-                onClick={() => { void run(e, () => e.handOff(m), `Handed to ${m.name}`) }}>{m.name}</button>)}
-            </div>}
             {pending === e.key && <p className="choose-status" role="status">Saving…</p>}
             {failed === e.key && <p className="choose-status is-failed" role="alert">Didn’t save. Try again.</p>}
           </li>
