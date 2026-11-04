@@ -890,9 +890,12 @@ describe('TodayView — the Day session', () => {
 
   it('"Done planning today" marks the day planned and the page comes back as every day', async () => {
     dayNotes.notes = { guide: { current: 'habits', done: [], skipped: [] } }
+    localStorage.setItem('symphony-fold:day', 'open')
     renderAt(10, { url: '/?plan=1' })
     await act(async () => { fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Done planning today' })) })
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
+    // Done planning folds the week beside the day, and it stays folded.
+    expect(localStorage.getItem('symphony-fold:day')).toBe('folded')
     expect(daySession.save).toHaveBeenCalledWith({ wentWell: '', didnt: '' })
     expect(screen.queryByRole('region', { name: 'Planning today' })).not.toBeInTheDocument()
     expect(dayNotes.patches.some((p) => (p.guide as { finishedAt?: string } | undefined)?.finishedAt)).toBe(true)

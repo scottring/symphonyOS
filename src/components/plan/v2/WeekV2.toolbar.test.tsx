@@ -244,7 +244,7 @@ describe('WeekV2 — the last day', () => {
 function Where() { return <output data-testid="where">{useLocation().search}</output> }
 const where = () => new URLSearchParams(screen.getByTestId('where').textContent ?? '')
 const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
-  mode: null, available: true, cards: [], doneLastWeek: 3, aged: 0, stripDays: [], onSeeAged: vi.fn(), onFinish: vi.fn(async () => true),
+  mode: null, available: true, cards: [], doneLastWeek: 3, aged: 0, stripDays: [], onSeeAged: vi.fn(),
   actions: { done: vi.fn(), placeOnDay: vi.fn(), keepThisWeek: vi.fn(), later: vi.fn(), laterOnDate: vi.fn(), someday: vi.fn(), letGo: vi.fn(), drain: vi.fn() },
   choose: { monthWord: 'October', monthLines: [], placeItems: [], placedCount: 0, notDoneLastWeek: 0 },
   ...over,
@@ -295,7 +295,6 @@ describe('WeekV2 — Review opens the deck', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Leave' }))
     expect(screen.getByText('The days')).toBeTruthy()
     expect(where().get('plan')).toBeNull()
-    expect(deck.onFinish).not.toHaveBeenCalled()
     expect(review.finish).not.toHaveBeenCalled()
   })
 
@@ -342,7 +341,6 @@ describe('WeekV2 — Review opens the deck', () => {
     expect(where().get('date')).toBeNull()
     await finishPlanning()
     await vi.waitFor(() => expect(review.finish).toHaveBeenCalledWith({ wentWell: '', didnt: '' }))
-    expect(deck.onFinish).toHaveBeenCalledTimes(1)
     await vi.waitFor(() => expect(where().get('plan')).toBeNull())
     expect(screen.queryByRole('region', { name: 'Planning the week' })).toBeNull()
     expect(screen.getByText('The days')).toBeTruthy()
@@ -350,19 +348,18 @@ describe('WeekV2 — Review opens the deck', () => {
 
   // Calm pass 2: the full deck's end is the week's planning, so it marks the
   // week planned (the record "I’m happy with this week" wrote; Home's
-  // checklist reads it) — only once the drain and the review both held.
-  it('finishing the full deck marks the week planned, after the drain and the review', async () => {
+  // checklist reads it) — once the review held. Nothing is drained (2026-11-04).
+  it('finishing the full deck marks the week planned, after the review', async () => {
     session.save.mockReset(); session.save.mockResolvedValue(true)
     const order: string[] = []
     review.finish.mockImplementation(async () => { order.push('review'); return true })
     session.save.mockImplementationOnce(async () => { order.push('planned'); return true })
-    const deck = makeDeck({ onFinish: vi.fn(async () => { order.push('drain'); return true }) })
-    renderAt('/week?plan=1', { deck })
+    renderAt('/week?plan=1', { deck: makeDeck() })
     await finishPlanning()
     await vi.waitFor(() => expect(session.save).toHaveBeenCalledTimes(1))
     expect(session.save).toHaveBeenCalledWith({ wentWell: '', didnt: '', focus: undefined })
-    // The close records last week's review after the drain, then marks this week.
-    expect(order).toEqual(['drain', 'review', 'planned'])
+    // The close records last week's review, then marks this week.
+    expect(order).toEqual(['review', 'planned'])
     review.finish.mockImplementation(async () => true)
     await vi.waitFor(() => expect(where().get('plan')).toBeNull())
   })
@@ -380,14 +377,8 @@ describe('WeekV2 — Review opens the deck', () => {
     expect(session.save).not.toHaveBeenCalled()
   })
 
-  it('a failed drain or review leaves the week unmarked; Place them never marks it', async () => {
+  it('a failed review leaves the week unmarked; Place them never marks it', async () => {
     session.save.mockReset()
-    renderAt('/week?plan=1', { deck: makeDeck({ onFinish: vi.fn(async () => false) }) })
-    await finishPlanning()
-    await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning the week' })).toBeTruthy())
-    expect(where().get('plan')).toBe('1')
-    expect(session.save).not.toHaveBeenCalled()
-    cleanup()
     // Last week's review fails to save: it says so and marks nothing.
     review.finish.mockImplementationOnce(async () => false)
     renderAt('/week?review=1', { deck: makeDeck() })
@@ -515,7 +506,6 @@ describe('WeekV2 — Plan and Place them open the deck', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(await screen.findByText('The days')).toBeTruthy()
     expect(where().get('place')).toBeNull()
-    expect(deck.onFinish).not.toHaveBeenCalled()
     expect(review.finish).not.toHaveBeenCalled()
   })
 })

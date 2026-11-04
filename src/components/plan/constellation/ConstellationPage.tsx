@@ -95,7 +95,7 @@ import type { Task } from '@/types/task'
 import { placementOf } from '@/lib/planning/placement'
 import { useRoutines } from '@/hooks/useRoutines'
 import { RoutinesStrip, type StripRoutine } from './AboveStrip'
-import { PaperFold } from '@/components/plan/fold/PaperFold'
+import { PaperFold, rememberFolded } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, LookSheet } from '@/components/plan/fold/AboveSheet'
 import { CalendarSheet, MonthGrid } from '@/components/plan/fold/CalendarSheet'
 import { WriteLine } from '@/components/plan/fold/WriteLine'
@@ -741,7 +741,7 @@ function Inner() {
       showToast(`Couldn’t mark ${prevWord} reviewed — try again.`, 'error', 5000)
     }
     const ok = await markPlanned()
-    if (ok) { setMarkedKey(periodKey); setJustMarkedAt(new Date()); periodNotes.reload() }
+    if (ok) { setMarkedKey(periodKey); setJustMarkedAt(new Date()); periodNotes.reload(); rememberFolded(PERIODS[level]) }
     return ok
   }
   // Season, choose from the year: the year's goals to read (beside the sheet,

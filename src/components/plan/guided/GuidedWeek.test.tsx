@@ -59,7 +59,6 @@ const makeChoose = (over: Partial<WeekChoose> = {}): WeekChoose => ({
 })
 const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
   mode: null, available: true, cards: [], doneLastWeek: 0, aged: 0, stripDays: [], onSeeAged: vi.fn(),
-  onFinish: vi.fn(async () => { store.order.push('drain'); return true }),
   actions: { done: vi.fn(), placeOnDay: vi.fn(), keepThisWeek: vi.fn(async () => true), later: vi.fn(), laterOnDate: vi.fn(), letGo: vi.fn(), drain: vi.fn() } as unknown as WeekDeck['actions'],
   choose: makeChoose(), tasks: [],
   ...over,
@@ -301,20 +300,23 @@ describe('GuidedWeek — the Week page while planning', () => {
     expect(panel().queryByRole('button', { name: 'Next step' })).toBeNull()
     await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Done planning the week' })) })
     await waitFor(() => expect(where().get('plan')).toBeNull())
-    expect(store.order).toEqual(['drain', 'review', 'planned', 'finished'])
+    expect(store.order).toEqual(['review', 'planned', 'finished'])
     expect((store.notes.guide as { finishedAt?: string }).finishedAt).toEqual(expect.any(String))
     expect(screen.queryByRole('region', { name: 'Planning the week' })).toBeNull()
     expect(screen.getByText('days with the strip')).toBeInTheDocument()
     expect(shell.reg).toBeNull()
   })
 
-  it('a failed drain keeps the session open and finishes nothing', async () => {
+  // Fix round 1 ruling: Done planning folds the month beside the week and
+  // remembers it folded.
+  it('"Done planning the week" leaves the month’s fold folded, remembered', async () => {
+    localStorage.setItem('symphony-fold:week', 'open')
     store.notes = { guide: { current: 'family', done: [], skipped: [] } }
-    open('/week?plan=1', makeDeck({ onFinish: vi.fn(async () => false) }))
-    await act(async () => { fireEvent.click(panel().getByRole('button', { name: 'Done planning the week' })) })
-    expect(where().get('plan')).toBe('1')
-    expect(review.finish).not.toHaveBeenCalled()
-    expect(store.patches.some((x) => (x.p.guide as { finishedAt?: string }).finishedAt)).toBe(false)
+    open('/week?plan=1')
+    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Done planning the week' })) })
+    await waitFor(() => expect(where().get('plan')).toBeNull())
+    expect(localStorage.getItem('symphony-fold:week')).toBe('folded')
+    localStorage.removeItem('symphony-fold:week')
   })
 
   it('Leave closes without finishing and keeps where the session is', async () => {
@@ -324,7 +326,6 @@ describe('GuidedWeek — the Week page while planning', () => {
     fireEvent.click(band().getByRole('button', { name: 'Leave' }))
     expect(where().get('plan')).toBeNull()
     expect(screen.getByText('days with the strip')).toBeInTheDocument()
-    expect(deck.onFinish).not.toHaveBeenCalled()
     expect(review.finish).not.toHaveBeenCalled()
     expect(store.patches).toEqual([])
     expect(store.notes.guide).toEqual({ current: 'calendar', done: ['look-back'], skipped: ['read-month'] })

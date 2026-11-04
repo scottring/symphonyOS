@@ -26,7 +26,7 @@ import {
   type ReactNode,
 } from 'react'
 import { detectFoldMode, foldSizes, type FoldMode } from '@/lib/fold/foldMode'
-import { hasStored, readStored, useFoldMotion, type FoldMotion, type FoldSide, type GoOptions } from './useFoldMotion'
+import { hasStored, readStored, writeStored, useFoldMotion, type FoldMotion, type FoldSide, type GoOptions } from './useFoldMotion'
 import './paperFold.css'
 
 export type FoldHorizon = 'year' | 'season' | 'month' | 'week' | 'day'
@@ -117,6 +117,15 @@ function paperGrain(alphaRaw: string): string | null {
   return url
 }
 
+
+/** Done planning (the planning ribbon, 2026-11-04) folds both companions and
+ *  remembers them folded: once the session lets go of the folds, they land
+ *  there. Leaving a session writes nothing, so the folds return to what the
+ *  reader left. */
+export function rememberFolded(horizon: FoldHorizon): void {
+  writeStored(storageKey(horizon), false)
+  writeStored(`${storageKey(horizon)}:calendar`, false)
+}
 
 /** A different horizon in the same spot starts fresh with that horizon's remembered state. */
 export function PaperFold(props: PaperFoldProps) {

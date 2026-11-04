@@ -1065,11 +1065,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
     openTask: (id) => onSelectItem(`task-${id}`),
     cards: deckCards, doneLastWeek, plannedLastWeek, alsoDoneLastWeek, doneThisWeek, onThisWeek, aged, actions: deckActions, stripDays,
     loading: !tasksLoaded, lastReview,
-    // Done planning the week moves nothing (settled after the builder check,
-    // 2026-11-04: nothing moves up). A leftover nobody answered keeps its
-    // week commitment; the look back is where it is answered (Done, Next
-    // week, Someday, Let go).
-    onFinish: async () => true,
     onSeeAged: () => navigate('/someday'),
     choose: chooseWeek,
     tasks: deckTasks,

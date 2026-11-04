@@ -48,7 +48,7 @@ export function hasStored(key: string): boolean {
   }
 }
 
-function writeStored(key: string, open: boolean) {
+export function writeStored(key: string, open: boolean) {
   try {
     localStorage.setItem(key, open ? 'open' : 'folded')
   } catch {

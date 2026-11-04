@@ -1029,6 +1029,20 @@ describe('Done planning October (spec 2026-11-01)',()=>{
  })
  // The planning ribbon (2026-11-04): Done planning stamps the sheet and the
  // header line says when, with the review it closed.
+ // Fix round 1 ruling: Done planning folds both companions and remembers
+ // them folded; Leave gives back what the reader left.
+ it('Done planning folds the sheet above and the calendar, and they stay folded',async()=>{
+  at(new Date(2026,9,17,9)); onTestFinished(()=>{vi.useRealTimers()})
+  localStorage.setItem('symphony-fold:month','open');localStorage.setItem('symphony-fold:month:calendar','open')
+  atStep('upkeep-fun')
+  month('&plan=1')
+  await act(async()=>{fireEvent.click(band().getByRole('button',{name:'Done planning October'}))})
+  await waitFor(()=>expect(screen.getByTestId('where').textContent).not.toContain('plan=1'))
+  expect(localStorage.getItem('symphony-fold:month')).toBe('folded')
+  expect(localStorage.getItem('symphony-fold:month:calendar')).toBe('folded')
+  expect(aboveOpen()).toBe(false)
+  expect(calendarOpen()).toBe(false)
+ })
  it('Done planning November stamps the sheet, and the header reads Planned … · Last month’s review',async()=>{
   at(new Date(2026,10,4,9)); onTestFinished(()=>{vi.useRealTimers();review.prevReviewed=null})
   plan.save.mockImplementation(async()=>{plan.saved={at:new Date(2026,10,4,9),authorId:'u1',notes:{}};return true})

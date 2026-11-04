@@ -50,6 +50,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { rememberFolded } from '@/components/plan/fold/PaperFold'
 import { GuidedDay } from '@/components/plan/guided/day/GuidedDay'
 import type { DayPictureItem } from '@/components/plan/guided/day/DayRows'
 import { makeDayActions } from '@/lib/planning/dayActions'
@@ -780,6 +781,8 @@ export function TodayView({
   // Done planning: the day is stamped planned (the existing savedAt).
   const finishDay = async () => {
     if (!(await dayPlan.save({ wentWell: dayPlan.mine?.wentWell ?? '', didnt: dayPlan.mine?.didnt ?? '' }))) showToast(`Couldn’t mark ${dayWord} planned — try again.`, 'error', 5000)
+    // Done planning folds the week beside the day, and it stays folded.
+    rememberFolded('day')
     return true
   }
   // One button at most: "Plan today" (until 4 pm) or "Plan tomorrow" (from

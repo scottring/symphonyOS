@@ -47,6 +47,7 @@ import { REVIEW_WINDOW_DAYS, reviewTarget, weekPhrase, weekReviewState } from '@
 import { showToast } from '@/hooks/useToast'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
 import { WeekMenu } from './WeekMenu'
+import { rememberFolded } from '@/components/plan/fold/PaperFold'
 import { localYmd } from '@/lib/cadence/config'
 
 const DAY = 86_400_000
@@ -75,10 +76,6 @@ export interface WeekDeck {
   /** Last week's review, the page's own record (the header's fact line reads
    *  it): finishing the deck writes through it, so the line updates. */
   lastReview?: ReturnType<typeof usePeriodReview>
-  /** The deck's own closing writes, resolving false when they failed (the
-   *  session's Done moves no leftover: nothing moves up, 2026-11-04). The
-   *  review is recorded and the deck left here, in WeekV2. */
-  onFinish: (decided: ReadonlySet<string>) => Promise<boolean>
   onSeeAged: () => void
   /** Plan this week (spec 2026-10-19): Choose from the month, then Give them a day. */
   choose: WeekChoose
@@ -157,22 +154,20 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   // cards) and records that week's review. So reviewing this week opens the
   // deck on the week after it, and last week's review opens it here.
   const target = reviewTarget({ start: weekStart, end: nextWeek }, new Date(), REVIEW_WINDOW_DAYS.week)
-  // Done planning the week (the guided session's last step): the deck's own
-  // closing writes (none move a leftover: it keeps its week until the look
-  // back answers it), then last week is recorded reviewed (what its look back
-  // said), then this week is marked planned — unless it ends today: a week on
-  // its last day is not marked planned. A closing write that failed records
-  // nothing and keeps the session open.
+  // Done planning the week (the guided session's last step) moves no leftover
+  // (2026-11-04: nothing moves up; it keeps its week until the look back
+  // answers it). Last week is recorded reviewed (what its look back said),
+  // then this week is marked planned — unless it ends today: a week on its
+  // last day is not marked planned.
   const closeWeek = async (lookDraft?: ReviewNotes | null): Promise<boolean> => {
     if (!deck) return true
-    let drained = false
-    try { drained = await deck.onFinish(new Set()) } catch { drained = false }
-    if (!drained) return false
     // Done is an explicit tap: Look back notes typed and not yet saved are
     // saved as the review, not dropped.
     const draft = lookDraft ? { wentWell: lookDraft.wentWell.trim(), didnt: lookDraft.didnt.trim() } : null
     if (!(await lastReview.finish(draft ?? lastReview.mine ?? { wentWell: '', didnt: '' }))) showToast('Couldn’t mark last week reviewed — try again.', 'error', 5000)
     else if (!endsToday && !(await markPlanned())) showToast('Couldn’t mark this week planned — try again.', 'error', 5000)
+    // Done planning folds the month beside the week, and it stays folded.
+    rememberFolded('week')
     return true
   }
 
