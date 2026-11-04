@@ -251,6 +251,49 @@ struct WeekLookBackTests {
         #expect(paper.dismissedAt == gone && !paper.dismissedAtDirty)   // "Not ours" stays
     }
 
+    @Test func theDetailDatePickerBringsALetGoTaskBack() throws {
+        let ctx = try makeContext()
+        let gone = Date()
+        let t = SymphonyTask(userId: me, title: "Book the dentist", context: "family")
+        t.bucket = "someday"
+        t.dismissedAt = gone
+        ctx.insert(t)
+        try ctx.save()
+        let vm = TaskViewModel(modelContext: ctx)
+
+        // Clearing the date is not a placement.
+        vm.schedule(t, for: nil)
+        #expect(t.dismissedAt == gone && !t.dismissedAtDirty)
+
+        // The task detail's date picker gives it a day: it's back.
+        let thu = PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 12))!
+        vm.schedule(t, for: thu, isAllDay: true)
+        #expect(t.dismissedAt == nil && t.dismissedAtDirty)
+        #expect(t.bucket == "timed")
+        let row = try #require(SyncEngine.serializeRow(table: "tasks", id: t.id, context: ctx))
+        #expect(row.keys.contains("dismissed_at") && row["dismissed_at"]?.stringValue == nil)
+    }
+
+    @Test func theDetailBucketMenuBringsItBackExceptToSomedayOrTheInbox() throws {
+        let ctx = try makeContext()
+        let gone = Date()
+        let week = SymphonyTask(userId: me, title: "This week", context: "family")
+        let later = SymphonyTask(userId: me, title: "Someday", context: "family")
+        let inbox = SymphonyTask(userId: me, title: "Inbox", context: "family")
+        let paper = SymphonyTask(userId: me, title: "Picture day form", context: "family")
+        paper.category = "paper"
+        for t in [week, later, inbox, paper] { t.dismissedAt = gone; ctx.insert(t) }
+        let vm = TaskViewModel(modelContext: ctx)
+
+        vm.moveToBucket(week, bucket: "week")
+        vm.moveToBucket(later, bucket: "someday")
+        vm.moveToBucket(inbox, bucket: "inbox")
+        vm.schedule(paper, for: Date(), isAllDay: true)
+        #expect(week.dismissedAt == nil && week.dismissedAtDirty)
+        #expect(later.dismissedAt == gone && inbox.dismissedAt == gone)
+        #expect(paper.dismissedAt == gone && !paper.dismissedAtDirty)   // "Not ours" stays
+    }
+
     @Test func aPlainEditNeverSendsDismissedAt() throws {
         let ctx = try makeContext()
         let t = SymphonyTask(userId: me, title: "Let go on the web")

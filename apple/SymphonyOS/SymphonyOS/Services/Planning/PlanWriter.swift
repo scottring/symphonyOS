@@ -165,11 +165,7 @@ struct PlanWriter {
     /// it is changing your mind. School papers keep their "Not ours"
     /// (`dismissed_at` means something else for them). The snapshot taken
     /// before it keeps the old value, so Undo lets it go again.
-    private func revive(_ task: SymphonyTask) {
-        guard task.dismissedAt != nil, task.category != "paper" else { return }
-        task.dismissedAt = nil
-        task.dismissedAtDirty = true
-    }
+    private func revive(_ task: SymphonyTask) { task.bringBackIfLetGo() }
 
     private func placeOnDay(_ task: SymphonyTask, day: Date, allDay: Bool) {
         task.bucket = "timed"

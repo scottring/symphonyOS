@@ -237,3 +237,25 @@ extension SymphonyTask {
         completedAtDirty = true
     }
 }
+
+// MARK: - Let go, and back
+
+extension SymphonyTask {
+    /// Any placement brings a task that was let go back (as the web's
+    /// planPlacement): a day, a bucket other than Someday or the Inbox, a
+    /// period. The one rule every placement path calls (PlanWriter,
+    /// TaskViewModel). A school paper keeps its "Not ours" (`dismissed_at`
+    /// means something else there). Let go and its Undo set the field
+    /// themselves.
+    func bringBackIfLetGo() {
+        guard dismissedAt != nil, category != "paper" else { return }
+        dismissedAt = nil
+        dismissedAtDirty = true
+    }
+
+    /// Does this bucket place a task on a list (not Someday, not the Inbox)?
+    static func bucketPlaces(_ bucket: String?) -> Bool {
+        guard let bucket else { return false }
+        return bucket != "someday" && bucket != "inbox"
+    }
+}

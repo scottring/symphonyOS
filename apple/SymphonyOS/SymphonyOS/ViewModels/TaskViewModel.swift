@@ -56,6 +56,8 @@ final class TaskViewModel {
     }
 
     func schedule(_ task: SymphonyTask, for date: Date?, isAllDay: Bool = false) {
+        // A date places it: a task that was let go comes back (unscheduling doesn't).
+        if date != nil { task.bringBackIfLetGo() }
         task.scheduledFor = date
         task.isAllDay = isAllDay
         task.isSomeday = false
@@ -109,6 +111,7 @@ final class TaskViewModel {
     /// Move a task to a horizon bucket (week/month/someday/inbox). Mirrors the
     /// web invariant: only bucket=="timed" carries a scheduled_for value.
     func moveToBucket(_ task: SymphonyTask, bucket: String) {
+        if SymphonyTask.bucketPlaces(bucket) { task.bringBackIfLetGo() }
         task.bucket = bucket
         task.scheduledFor = nil
         task.isSomeday = bucket == "someday"
