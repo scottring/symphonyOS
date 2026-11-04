@@ -15,17 +15,20 @@
 //                    back and a weekend that is over folded to a line; done
 //                    work hidden until "Show done" (useWeekViewPrefs, set
 //                    from the header's ⋯ menu in WeekV2).
-//   No day yet       what is chosen for this week with no day, under the
-//                    days: a few as draggable rows, more folded to one line
-//                    (2026-10-14). Inbox, last week and the month's goals
-//                    are the planning session's.
+//   Sometime this    the week's first column, before its first day (Scott,
+//   week             2026-11-04: "why the duplicate ribbons?" — the strip
+//                    is gone, the month's fold is the only band): what is
+//                    chosen for this week with no day (When ▾, drag onto a
+//                    day), the weekly routines that still need a day, and
+//                    "+ Add to week". Routines with a day are on their day.
+//                    On the phone it is the first section above the days.
 //   The month        folded beside the days (paper-style horizons, Scott
 //                    2026-11-04): a read-only sheet hinged at the days' left
 //                    edge (PaperFold + AboveSheet). Nothing on it moves onto
 //                    the week: no "→ Week", no drag onto a day.
 //
 // Drag a row onto a day to place it, a day's row onto another day to move
-// it, back onto the No day yet line to take its day away. While dragging, the
+// it, back onto Sometime this week to take its day away. While dragging, the
 // target day says where it will land.
 //
 // Within its own day a task drops into the gap between two rows: the order is
@@ -41,8 +44,8 @@
 // Every write is the caller's (WeekViewV2 routes them through the canvas
 // activity strip with Undo); this component draws and asks.
 //
-// Phone (<768px): a row of day chips, the chosen day, then No day yet;
-// tap opens a chip's task; press and hold orders the day.
+// Phone (<768px): Sometime this week, a row of day chips, then the chosen
+// day; tap opens a chip's task; press and hold orders the day.
 
 import { useContext, useState, type ButtonHTMLAttributes, type DragEvent, type HTMLAttributes, type ReactNode } from 'react'
 import {
@@ -55,7 +58,6 @@ import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { Link } from 'react-router-dom'
-import { Check } from 'lucide-react'
 import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu'
 import { formatTimeCompact } from '@/lib/dateHelpers'
 import { isPlanDrag, readPlanDrag, writePlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
@@ -70,7 +72,6 @@ import { useWeekViewPrefs } from '@/hooks/useWeekViewPrefs'
 import { isWeekend } from '@/lib/dateUtils'
 import { dragPointerY } from '@/lib/today/dragPointer'
 import { gapAt, gapToListIndex } from '@/lib/week/dayReorder'
-import { HorizonStrip } from '@/components/canvas/strip/HorizonStrip'
 import { TypedAdd } from '@/components/canvas/strip/TypedAdd'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, LookSheet } from '@/components/plan/fold/AboveSheet'
@@ -225,7 +226,7 @@ function readEventDrag(dt: DataTransfer | null): EventDrag | null {
 const TOUCH_HOLD = { delay: 250, tolerance: 5 }
 const MOUSE_MOVE = { distance: 5 }
 
-/** A day (or the No day yet line) a touch drag can land on. */
+/** A day (or Sometime this week) a touch drag can land on. */
 function DropZone({ id, as: Tag = 'div', ...rest }: { id: string; as?: 'div' | 'section' } & HTMLAttributes<HTMLElement> & Record<`data-${string}`, string | undefined>) {
   const { setNodeRef } = useDroppable({ id })
   return <Tag ref={setNodeRef as (el: HTMLElement | null) => void} {...rest} />
@@ -247,9 +248,6 @@ function EventButton({ liftId, lift, className, ...rest }: { liftId: string; lif
   return <button type="button" ref={setNodeRef} {...(lift ? listeners : undefined)} {...rest} className={`${className ?? ''}${isDragging ? ' is-lifted' : ''}`} />
 }
 
-/** More than this many with no day fold to one line under the days. */
-const NODAY_FOLD_AT = 4
-
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
 export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, viewerId, month, fold: session }: WeekCanvasProps) {
@@ -265,10 +263,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // The page's view choices, remembered on this device (calm pass 2).
   const prefs = useWeekViewPrefs()
   const showDone = prefs.done
-  // The desk and tablet draw the strip on the left (Scott's wireframe,
-  // 2026-10-25): the week's own list and its routines. The days hold what
-  // happens on each day, routines included; the month folds beside them.
-  const stripMode = !phone
   const [drag, setDrag] = useState<Drag | null>(null)
   const [overDay, setOverDay] = useState<string | null>(null)
   const [overShelf, setOverShelf] = useState(false)
@@ -277,7 +271,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [lifted, setLifted] = useState<string | null>(null)
   const [picker, setPicker] = useState<Picker>(null)
   const [weekendOpen, setWeekendOpen] = useState(false)
-  const [nodayOpen, setNodayOpen] = useState<boolean | null>(null)
   // The typed add above the days: for the week, or for one day.
   const [composer, setComposer] = useState<{ key: string | null } | null>(null)
   // A writing step of a guided session (Choose this week's tasks) puts the
@@ -288,8 +281,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     setWroteFor(writeStep)
     if (writeStep && !composer) setComposer({ key: null })
   }
-  // In the strip, a row's when-chips open under it on asking (the floating
-  // hover bar overran the narrow strip and covered the rows above).
+  // In Sometime this week, a row's when-chips open under it on asking (a
+  // floating hover bar would overrun the narrow column and cover the rows above).
   const [whenOpen, setWhenOpen] = useState<string | null>(null)
   // The days opened past their few ("+3 more"), by key.
   const [openDays, setOpenDays] = useState<ReadonlySet<string>>(() => new Set())
@@ -475,10 +468,11 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // pointing at stays in sight. The rest wait behind "+N more", in a planning
   // session too: the week never changes shape in one (final review, 2026-11-04).
   const dayLists = (day: CanvasDay) => {
-    // A routine on a day shows on that day (2026-10-26: dragging one onto
-    // Monday left the grid unchanged); the strip's Routines tab is the
-    // week's overview of them. Every-day and weekday ones were already
-    // lifted into the rhythm line before the days came here.
+    // A routine on a day shows on that day, with its time and its check
+    // (2026-10-26: dragging one onto Monday left the grid unchanged; the
+    // strip that also listed them by day is gone, 2026-11-04). Every-day and
+    // weekday ones were already lifted into the rhythm line before the days
+    // came here.
     const all = day.items.filter((it) => showDone || !it.completed)
     const fold = foldDay([
       ...day.events.map(() => ({ event: true, it: null })),
@@ -599,7 +593,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             {dayOpen ? 'Show less' : `+${fold.hidden} more`}
           </button>
         )}
-        {!stripMode && (day.dinners ?? []).length > 0 && (
+        {phone && (day.dinners ?? []).length > 0 && (
           <p className="wc-dinner" data-guide-anchor="dinner"><span className="wc-dinner-label">Dinner</span>{' '}
             {day.dinners!.map((d, i) => <span key={d.id}>{i > 0 && ' · '}{d.href
               ? <Link to={d.href} className="wc-rhythm-item">{d.label}</Link>
@@ -613,7 +607,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           </div>
         )}
         {prefs.freeTime && day.free && <p className="wk-free">{day.free}</p>}
-        {stripMode && writers.addTyped && (
+        {!phone && writers.addTyped && (
           <button type="button" className="canvas-link wc-quiet-link wc-addday" onClick={() => setComposer({ key: day.key })}>+ Add to day</button>
         )}
         </div>
@@ -644,78 +638,98 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     <b>Past week</b> · <Link className="canvas-link" to="/week?view=alongside">Back to this week</Link>
   </span>
   const unplaced = shelf.flatMap((g) => g.rows.map((r) => r.task))
-  // Dragging a day's task: the line shows (even empty) so it can be dropped back.
+  // Dragging a day's task: the column says so (even empty), so it can be dropped back.
   const draggingPlaced = drag?.kind === 'task' && !!drag.fromKey
-  // A row: the title is what the pointer grabs (desktop) and what opens the
-  // item; on the phone a + beside it gives the day, since touch can't drag.
-  const nodayRow = (kind: 'task' | 'routine', id: string, title: string, onPlace: (d: Date) => void, onComplete?: () => void, triage?: ReactNode) => {
-    const lit = kind === 'task' && pointedTask(id)
-    const key = `noday:${kind}:${id}`
+  // ── Sometime this week ────────────────────────────────────────────────
+  // The week's first column (Scott, 2026-11-04: "why the duplicate
+  // ribbons?"): what the strip's Week tab held — the tasks chosen for this
+  // week with no day, each with When ▾, dragged onto a day — and the weekly
+  // routines that still need a day. Rows read as a day's rows do. On the
+  // phone, touch can't drag: a + beside each gives it a day.
+  const weekKey = localYmd(weekStart)
+  const everyDay = rhythm.flatMap((r) => r.items.map((it) => it.title))
+  const weekTaskRow = (t: Task) => {
+    const key = `noday:task:${t.id}`
+    const payload: PlanDragPayload = { kind: 'task', id: t.id, date: weekKey, title: t.title }
+    const lift: Lift | null = coarse && !phone ? { payload, drag: { kind: 'task', id: t.id }, title: t.title } : null
+    const triage = writers.triageTask && (
+      <TriageWhenMenu contained season={false} months={false}
+        onPick={(when) => { setWhenOpen(null); writers.triageTask!(t, when) }}
+        onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
+        onDelete={writers.deleteTask ? () => { setWhenOpen(null); writers.deleteTask!(t) } : undefined}
+      />
+    )
     return (
-      <li key={key} className={`wc-noday-chip${kind === 'routine' ? ' is-routine' : ''}${lit ? ' is-pointed' : ''}${stripMode && whenOpen === key ? ' is-when-open' : ''}`}>
-        {/* A task with no day can still be done (Scott, 2026-10-14): its ring
-            is the check. A routine needs a day, so its square stays a mark. */}
-        {onComplete
-          ? <button type="button" className="wc-noday-check" onClick={onComplete} aria-label={`Complete ${title}`} title="Mark done">
-              <span className="wc-noday-glyph" aria-hidden="true"><Check size={9} strokeWidth={3} /></span>
-            </button>
-          : <span className="wc-noday-glyph" aria-hidden="true" />}
-        <button type="button" className="wc-noday-open" draggable={!phone}
-          onDragStart={(ev) => startDrag(ev, { kind, id, date: localYmd(weekStart), title }, { kind, id })}
-          onDragEnd={endDrag}
-          onClick={() => writers.open(`${kind}-${id}`)}>{title}</button>
-        {phone && (
-          <button type="button" className="wc-noday-add" aria-label={`Give ${title} a day`} aria-expanded={picker?.key === key}
-            onClick={() => { setPicker(picker?.key === key ? null : { key }) }}>+</button>
-        )}
-        {/* Triage on hover (Scott, 2026-10-14: no Triage mode — "just add the
-            triage actions on hover for each individual item"): the Inbox's
-            when-chips and a date, over the row, on hover or keyboard focus. */}
-        {triage && stripMode && (
-          <button type="button" className="hs-when" aria-expanded={whenOpen === key} aria-label={`When for ${title}`}
+      <LiftableRow key={key} liftId={key} lift={lift} row={{ key, id: t.id, title: t.title, item: t, completed: t.completed }}
+        className={`wc-dayrow wc-weekrow${pointedTask(t.id) ? ' is-pointed' : ''}${whenOpen === key ? ' is-when-open' : ''}`}
+        onComplete={() => writers.toggleTask(t)}
+        onOpen={() => writers.open(`task-${t.id}`)}
+        onDragStart={phone || coarse ? undefined : (_, ev) => startDrag(ev, payload, { kind: 'task', id: t.id })}
+        onDragEnd={endDrag}
+        extra={triage && (
+          <button type="button" className="wc-when" aria-expanded={whenOpen === key} aria-label={`When for ${t.title}`}
             onClick={() => setWhenOpen(whenOpen === key ? null : key)}>When ▾</button>
         )}
-        {triage && (!stripMode || whenOpen === key) && <div className="wc-noday-actions" role="group" aria-label={`When for ${title}`}>{triage}</div>}
-        {pick(key, title, onPlace)}
-      </li>
+        trailing={phone ? (
+          <button type="button" className="wc-noday-add" aria-label={`Give ${t.title} a day`} aria-expanded={picker?.key === key}
+            onClick={() => setPicker(picker?.key === key ? null : { key })}>+</button>
+        ) : undefined}>
+        {/* The Inbox's when-chips and a date (Scott, 2026-10-14: no Triage
+            mode), under the row on asking: on the phone too, where the
+            section sits above the days and must stay short. */}
+        {triage && whenOpen === key && <div className="wc-noday-actions" role="group" aria-label={`When for ${t.title}`}>{triage}</div>}
+        {pick(key, t.title, (d) => writers.placeTask(t, d))}
+      </LiftableRow>
     )
   }
-  // No day yet sits under the days (Scott, 2026-10-14: the chips across the
-  // top were busy and overwhelming). A few show as they are; more fold to one
-  // line, like a weekend gone by, until asked for or pointed at.
-  const nodayCount = unplaced.length + routinesToPlace.length
-  const nodayTitles = [...unplaced.map((t) => t.title), ...routinesToPlace.map((r) => r.title)]
-  const nodayPointed = unplaced.some((t) => pointedTask(t.id))
-  const nodayShown = nodayPointed || (nodayOpen ?? nodayCount <= NODAY_FOLD_AT)
-  const nodayTray = (nodayCount > 0 || draggingPlaced) && (
-    <DropZone id="noday" className={`wc-noday${overShelf ? ' is-over' : ''}${nodayShown ? ' is-open' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
-      {nodayShown || nodayCount === 0 ? (
-        <>
-          <p className="wc-noday-head">
-            <span className="wc-noday-label">No day yet</span>
-            {nodayCount > 0 && <span className="wc-noday-count">{nodayCount}</span>}
-            {draggingPlaced && <span className="wc-noday-hint">Drop here to take its day away</span>}
-            {nodayCount > NODAY_FOLD_AT && <button type="button" className="canvas-link wc-quiet-link wc-noday-toggle" aria-expanded onClick={() => setNodayOpen(false)}>Fold</button>}
-          </p>
-          <ul className="wc-noday-chips" aria-label="No day yet">
-            {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d), () => writers.toggleTask(t), writers.triageTask && (
-              <TriageWhenMenu season={false} months={false}
-                onPick={(when) => writers.triageTask!(t, when)}
-                onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
-                onDelete={writers.deleteTask ? () => writers.deleteTask!(t) : undefined}
-              />
-            )))}
-            {routinesToPlace.map((r) => nodayRow('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
-          </ul>
-        </>
-      ) : (
-        <button type="button" className="wc-noday-fold" aria-expanded={false} onClick={() => setNodayOpen(true)}>
-          <span className="wc-noday-label">No day yet</span>
-          <span className="wc-noday-count">{nodayCount}</span>
-          <span className="wc-noday-peek">{nodayTitles.slice(0, 2).join(', ')}{nodayCount > 2 ? `, and ${nodayCount - 2} more` : ''}</span>
-          <span className="wc-noday-show">{draggingPlaced ? 'Drop here to take its day away' : 'Show'}</span>
-        </button>
-      )}
+  // A weekly routine with no day yet needs one before it can be done: its
+  // square is a mark, not a check.
+  const weekRoutineRow = (r: ShelfRoutine) => {
+    const key = `noday:routine:${r.id}`
+    const payload: PlanDragPayload = { kind: 'routine', id: r.id, date: weekKey, title: r.title }
+    const lift: Lift | null = coarse && !phone ? { payload, drag: { kind: 'routine', id: r.id }, title: r.title } : null
+    return (
+      <LiftableRow key={key} liftId={key} lift={lift} row={{ key, id: r.id, title: r.title, item: r }}
+        className="wc-dayrow wc-weekrow is-routine"
+        onOpen={() => writers.open(`routine-${r.id}`)}
+        onDragStart={phone || coarse ? undefined : (_, ev) => startDrag(ev, payload, { kind: 'routine', id: r.id })}
+        onDragEnd={endDrag}
+        trailing={phone ? (
+          <button type="button" className="wc-noday-add" aria-label={`Give ${r.title} a day`} aria-expanded={picker?.key === key}
+            onClick={() => setPicker(picker?.key === key ? null : { key })}>+</button>
+        ) : undefined}>
+        {pick(key, r.title, (d) => writers.placeRoutine(r, d))}
+      </LiftableRow>
+    )
+  }
+  const weekCount = unplaced.length + routinesToPlace.length
+  // The phone draws it only when it holds something (or takes a drop), as its
+  // No day yet tray did; the desk always, as the week's first column.
+  const weekColumn = (!phone || weekCount > 0 || draggingPlaced) && (
+    <DropZone as="section" id="noday" className={`wc-day wc-weekcol${overShelf ? ' is-over' : ''}${weekCount === 0 ? ' is-empty' : ''}`}
+      aria-label="Sometime this week" data-testid="week-sometime" data-explain="still-to-place" data-explain-label="Sometime this week"
+      style={phone ? undefined : { gridColumn: 1 }} {...shelfDrop}>
+      <header className="wc-dayhead">
+        {/* As a day reads "Mon 2": the small word, then the large one. */}
+        <span className="wc-dayname">Sometime</span> <span className="wc-weekcol-word">this week</span>
+        {weekCount > 0 && <span className="wc-weekcol-count">{weekCount}</span>}
+      </header>
+      <div className="wc-daybody">
+        {draggingPlaced && <p className="wc-drop-hint" aria-live="polite">Drop here to take its day away</p>}
+        {weekCount > 0
+          ? <ul className="cw-rows wc-items" aria-label="Sometime this week">{unplaced.map(weekTaskRow)}{routinesToPlace.map(weekRoutineRow)}</ul>
+          : !draggingPlaced && <p className="wc-weekcol-note">Everything on this week has a day.</p>}
+        {unplaced.length > 0 && onPlaceUnplaced && (
+          <button type="button" className="canvas-link wc-quiet-link wc-more" onClick={onPlaceUnplaced}>Place them one at a time</button>
+        )}
+        {/* The Week session's Choose step points at the week's line to write on. */}
+        {!phone && writers.addTyped && (
+          <button type="button" className="canvas-link wc-quiet-link wc-addday" data-guide-anchor="write" onClick={() => setComposer({ key: null })}>+ Add to week</button>
+        )}
+        {!phone && everyDay.length > 0 && (
+          <p className="wc-weekcol-note">Every-day routines are on <Link to="/today">Today</Link>: {everyDay.slice(0, 3).join(', ')}{everyDay.length > 3 ? ` and ${everyDay.length - 3} more` : ''}.</p>
+        )}
+      </div>
     </DropZone>
   )
   // This week's weekend, once over, folds to one line: when it was, what
@@ -736,7 +750,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   )
   // A stay across several days: one bar over the columns it covers, under
   // their headers. Where the days wrap (narrower desks), the line above says it.
-  const colOf = new Map(stripDays.map((d, i) => [d.key, i + 1]))
+  // The first column is Sometime this week; the days follow it.
+  const colOf = new Map(stripDays.map((d, i) => [d.key, i + 2]))
   const bars = spans.flatMap((sp) => {
     if (!sp.from || !sp.to) return []
     const cols = stripDays.filter((d) => d.key >= sp.from! && d.key <= sp.to!).map((d) => colOf.get(d.key)!)
@@ -744,7 +759,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   })
   // The weekend's days are wider: family and household plans live there. Set
   // from the days themselves, so a Saturday-first week widens its first two.
-  const stripCols = stripDays.map((d) => (isWeekend(d.date) ? 'minmax(0,1.5fr)' : 'minmax(0,1fr)')).join(' ')
+  // Sometime this week a little wider than a weekday: its rows carry When ▾.
+  const stripCols = ['minmax(0,1.25fr)', ...stripDays.map((d) => (isWeekend(d.date) ? 'minmax(0,1.5fr)' : 'minmax(0,1fr)'))].join(' ')
   const barTail = (sp: CanvasSpan) => sp.tail?.replace(/^,\s*/, '')
   // Last week's progress and "Today: …" are the header's fact line (WeekV2,
   // calm pass 2); the canvas keeps only a past week's note.
@@ -774,97 +790,26 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     return withTouch(
       <div className={`wc wc-phone${drag ? ' is-dragging' : ''}`}>
         {subtitleNode}
-        <div className="wc-daychips" role="group" aria-label="Days" data-guide-anchor="day">
-          {days.map((d) => (
-            <button key={d.key} type="button" className={`wc-daychip${d.key === todayKey ? ' is-today' : ''}${pointedDay(d.key) ? ' is-pointed' : ''}`} aria-pressed={d.key === selectedKey}
-              aria-label={longDay(d.date)} onClick={() => setChosenDay(d.key)}>
-              <span className="wc-daychip-name">{d.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-              <span className="wc-daychip-num">{d.date.getDate()}</span>
-            </button>
-          ))}
-        </div>
         {withMonth(<>
+          {weekColumn}
+          <div className="wc-daychips" role="group" aria-label="Days" data-guide-anchor="day">
+            {days.map((d) => (
+              <button key={d.key} type="button" className={`wc-daychip${d.key === todayKey ? ' is-today' : ''}${pointedDay(d.key) ? ' is-pointed' : ''}`} aria-pressed={d.key === selectedKey}
+                aria-label={longDay(d.date)} onClick={() => setChosenDay(d.key)}>
+                <span className="wc-daychip-name">{d.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                <span className="wc-daychip-num">{d.date.getDate()}</span>
+              </button>
+            ))}
+          </div>
           {sel && dayColumn(sel)}
-          {nodayTray}
           {rhythmNode}
         </>)}
       </div>,
     )
   }
-  // ── the strip (desk and tablet) ───────────────────────────────────────
+  // ── the desk and tablet ───────────────────────────────────────────────
   const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6)
   const dayShort = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-  // The week's own list: what has no day yet. A day's task dropped here loses its day.
-  const weekTab = (
-    <>
-      <DropZone id="noday" className={`hs-drop${overShelf ? ' is-over' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
-        <p className="hs-eyebrow">No day yet{unplaced.length > 0 ? ` · ${unplaced.length}` : ''}</p>
-        {draggingPlaced && <p className="hs-row-meta">Drop here to take its day away</p>}
-        {unplaced.length > 0
-          ? <ul className="wc-noday-chips hs-noday" aria-label="No day yet">
-            {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d), () => writers.toggleTask(t), writers.triageTask && (
-              <TriageWhenMenu contained season={false} months={false}
-                onPick={(when) => { setWhenOpen(null); writers.triageTask!(t, when) }}
-                onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
-                onDelete={writers.deleteTask ? () => { setWhenOpen(null); writers.deleteTask!(t) } : undefined}
-              />
-            )))}
-          </ul>
-          : !draggingPlaced && <p className="hs-empty">Everything on this week has a day.</p>}
-      </DropZone>
-      {unplaced.length > 0 && <p className="hs-row-meta">Drag one onto a day.{onPlaceUnplaced && <> Or <button type="button" className="canvas-link wc-quiet-link" onClick={onPlaceUnplaced}>place them one at a time</button>.</>}</p>}
-      {/* The Week session's Choose step points at the week's line to write on. */}
-      {writers.addTyped && <button type="button" className="hs-add" data-guide-anchor="write" onClick={() => setComposer({ key: null })}>+ Add to week</button>}
-    </>
-  )
-  // The week's routines: the ones that run on a day or two of it, by day, done
-  // from here; every-day ones are on Today. A row drags to another day.
-  const routineGroups = days.map((d) => ({ day: d, items: d.items.filter((it) => it.kind === 'routine' && !!it.routineId && !it.proposed) }))
-    .filter((g) => g.items.length > 0)
-  const routineCount = routineGroups.reduce((n, g) => n + g.items.length, 0) + routinesToPlace.length
-  const everyDay = rhythm.flatMap((r) => r.items.map((it) => it.title))
-  const routinesTab = (
-    <>
-      {routineGroups.length === 0 && routinesToPlace.length === 0 && <p className="hs-empty">No weekly routines this week.</p>}
-      {routineGroups.map(({ day, items }) => (
-        <section key={day.key} className="hs-group" aria-label={`${longDay(day.date)} routines`}>
-          <h3 className={`hs-eyebrow${day.key === todayKey ? ' is-today' : ''}`}>{dayShort(day.date)}{day.key === todayKey ? ' · today' : ''}</h3>
-          <ul className="hs-list">
-            {items.map((it) => (
-              <li key={`${day.key}:${it.id}`} className={`hs-row${it.completed ? ' is-done' : ''}`} draggable={!coarse && !it.completed}
-                onDragStart={(ev) => startDrag(ev, { kind: 'routine', id: it.routineId!, date: day.key, title: it.title }, { kind: 'occ', id: it.routineId!, fromKey: day.key })}
-                onDragEnd={endDrag}>
-                <button type="button" className="hs-check" aria-pressed={it.completed} aria-label={`${it.completed ? 'Reopen' : 'Done:'} ${it.title}`} onClick={() => writers.toggleRoutine(it, day.date)} />
-                <span className="hs-row-body">
-                  <button type="button" className="hs-row-title" onClick={() => writers.open(it.id)}>
-                    {it.time && <span className="hs-row-time">{formatTimeCompact(it.time)}</span>}{it.title}
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-      {routinesToPlace.length > 0 && (
-        <section className="hs-group" aria-label="Sometime this week">
-          <h3 className="hs-eyebrow">Sometime this week</h3>
-          <ul className="hs-list">
-            {routinesToPlace.map((r) => (
-              <li key={r.id} className="hs-row" draggable={!coarse}
-                onDragStart={(ev) => startDrag(ev, { kind: 'routine', id: r.id, date: localYmd(weekStart), title: r.title }, { kind: 'routine', id: r.id })}
-                onDragEnd={endDrag}>
-                <span className="hs-row-body">
-                  <button type="button" className="hs-row-title" onClick={() => writers.open(`routine-${r.id}`)}>{r.title}</button>
-                  <span className="hs-row-meta">Drag onto a day</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {everyDay.length > 0 && <p className="hs-note">Every-day routines are on <Link to="/today">Today</Link>: {everyDay.slice(0, 3).join(', ')}{everyDay.length > 3 ? ` and ${everyDay.length - 3} more` : ''}.</p>}
-    </>
-  )
   const composerDay = composer?.key ? days.find((d) => d.key === composer.key) : undefined
   const composerNode = composer && writers.addTyped && (
     <div className="wc-composer" data-guide-anchor="write">
@@ -883,6 +828,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     </p>
   ) : (
     <div className="wc-dinners" style={{ gridTemplateColumns: stripCols }} aria-label="Dinners" data-guide-anchor="dinner">
+      {/* under Sometime this week: no dinner */}
+      <p className="wc-dinner" aria-hidden="true" />
       {stripDays.map((d) => (
         <p key={d.key} className="wc-dinner">
           {(d.dinners ?? []).length > 0 && <><span className="wc-dinner-label">Dinner</span>{' '}
@@ -893,15 +840,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       ))}
     </div>
   )
-  const nodayN = unplaced.length
   return withTouch(
-    <div className={`wc wc-with-strip hs-layout${drag ? ' is-dragging' : ''}`}>
-      <HorizonStrip id="week" label="Week strip" railLabel={`This week${nodayN ? ` · ${nodayN} without a day` : ''}`}
-        tabs={[
-          { id: 'week', label: 'Week', count: nodayN || undefined, content: weekTab },
-          { id: 'routines', label: 'Routines', count: routineCount || undefined, content: routinesTab },
-        ]} />
-      <div className="hs-main">
+    <div className={`wc wc-sheet${drag ? ' is-dragging' : ''}`}>
       {subtitleNode}
       {composerNode}
       {withMonth(
@@ -917,8 +857,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             </ul>
           )}
           {weekendFold}
-          <div className={`wc-strip${bars.length ? ' has-bars' : ''}`} style={{ ['--wc-days' as string]: stripDays.length, gridTemplateColumns: stripCols }}>
-            {stripDays.map((d, i) => dayColumn(d, i + 1))}
+          <div className={`wc-strip${bars.length ? ' has-bars' : ''}`} style={{ ['--wc-days' as string]: stripDays.length + 1, gridTemplateColumns: stripCols }}>
+            {weekColumn}
+            {stripDays.map((d, i) => dayColumn(d, i + 2))}
             {bars.length > 0 && (
               <div className="wc-bars" aria-hidden="true" style={{ gridTemplateColumns: stripCols }}>
                 {bars.map(({ sp, start, end }) => (
@@ -932,7 +873,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           {dinnerRow}
         </section>
       )}
-      </div>
     </div>,
   )
 }

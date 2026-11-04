@@ -22,10 +22,10 @@ import { DesktopNavigation } from '@/components/layout/DesktopNavigation'
 // 2026-10-08, so they make the device's choice explicit.
 beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists') })
 // The Week page's view choices (useWeekViewPrefs) are per device: none leaks between tests.
-afterEach(() => { for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.removeItem(k); for (const k of ['symphony-strip-tab:week', 'symphony-strip-open:week']) localStorage.removeItem(k) })
-// The week's routines live in the strip's Routines tab (2026-10-25), by day.
-const routinesTab = () => { const t = screen.queryByRole('tab', { name: /Routines/ }); if (t && t.getAttribute('aria-selected') !== 'true') fireEvent.click(t) }
-const routinesOn = (day: string) => { routinesTab(); return within(screen.getByRole('region', { name: `${day} routines` })) }
+afterEach(() => { for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.removeItem(k) })
+// A routine with a day is on its day (2026-11-04: the strip that also listed
+// them by day is gone).
+const onDay = (key: string) => within(screen.getByTestId(`journal-day-${key}`))
 
 
 // The Planning sheet (narrow screens) computes its own plan from the shared
@@ -198,14 +198,14 @@ describe('WeekViewV2 layout', () => {
     expect(screen.queryByRole('button', { name: 'Shelves' })).not.toBeInTheDocument()
   })
 
-  it('a week task with no day is listed in the strip, ready to drag onto a day', () => {
+  it('a week task with no day is listed in Sometime this week, ready to drag onto a day', () => {
     const anchor = weekStartAnchor(monday, readCadenceConfig().weekStartsOn)
     const t = createMockTask({ id: 'w', title: 'Call the plumber', bucket: 'week', weekStart: anchor, commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] })
     render(<WeekViewV2 {...defaultProps} tasks={[t]} routines={[]} />)
     expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
-    expect(within(screen.getByRole('list', { name: 'No day yet' })).getByText('Call the plumber')).toHaveAttribute('draggable', 'true')
+    expect(within(screen.getByRole('list', { name: 'Sometime this week' })).getByText('Call the plumber').closest('li')).toHaveAttribute('draggable', 'true')
     // This week is not the current one, so the deck may not open here: no link, no progress line.
-    expect(screen.queryByRole('button', { name: 'place them one at a time' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Place them one at a time' })).toBeNull()
     expect(screen.queryByText(/done last week/)).toBeNull()
   })
 })
@@ -259,9 +259,7 @@ describe('WeekViewV2 routine visibility', () => {
       />
     )
 
-    // Scott's own routine still renders (once per day it recurs on), in the
-    // strip's Routines tab.
-    routinesTab()
+    // Scott's own routine still renders (once per day it recurs on).
     expect((await screen.findAllByText('Scott Routine')).length).toBeGreaterThan(0)
     // Iris's routine — not owned by the selected member — is gone entirely.
     expect(screen.queryByText('Iris Routine')).toBeNull()
@@ -492,7 +490,6 @@ describe('WeekViewV2 journal spread', () => {
   it('always shows routines, with no Routines switch', () => {
     const routines = [createMockRoutine({ name: 'Morning stretch', recurrence_pattern: { type: 'weekly', days: ['mon', 'wed'] } as RecurrencePattern })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
-    routinesTab()
     expect(screen.getAllByText('Morning stretch').length).toBeGreaterThan(0)
     expect(screen.queryByRole('switch', { name: 'Routines' })).toBeNull()
   })
@@ -504,7 +501,7 @@ describe('WeekViewV2 journal spread', () => {
     const onSelectItem = vi.fn()
     const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
     render(<WeekViewV2 {...defaultProps} onSelectItem={onSelectItem} routines={routines} weekStart={sunday} />)
-    fireEvent.click(routinesOn('Sunday, September 13').getByRole('button', { name: 'Water houseplants' }))
+    fireEvent.click(onDay('2026-09-13').getByRole('button', { name: 'Water houseplants' }))
     expect(onSelectItem).toHaveBeenLastCalledWith('routine-wp')
   })
 
@@ -513,11 +510,10 @@ describe('WeekViewV2 journal spread', () => {
   it('a due routine with Show in Today on is a Sunday entry, untimed', () => {
     const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
-    // A day's own routine is on that day and under it in the strip's
-    // Routines tab (2026-10-26: a drop onto a day must show there).
-    expect(within(screen.getByTestId('journal-day-2026-09-13')).getByText('Water houseplants')).toBeInTheDocument()
-    expect(routinesOn('Sunday, September 13').getByText('Water houseplants')).toBeInTheDocument()
-    expect(screen.getAllByText('Water houseplants')).toHaveLength(2)
+    // A day's own routine is on that day, once (2026-10-26: a drop onto a
+    // day must show there; 2026-11-04: no strip listing it again).
+    expect(onDay('2026-09-13').getByText('Water houseplants')).toBeInTheDocument()
+    expect(screen.getAllByText('Water houseplants')).toHaveLength(1)
   })
 
   describe('on a narrow screen', () => {
@@ -563,10 +559,12 @@ describe('WeekViewV2 — untimed placements', () => {
       id: 'done', user_id: 'u', entity_type: 'routine', entity_id: 'read', date: '2026-09-19', status: 'completed',
       assignee: null, assigned_to_override: null, deferred_to: null, completed_at: '2026-09-19T12:00:00Z', skipped_at: null, progress: null, created_at: '', updated_at: '',
     }]
+    // Done waits behind Show done (the header's ⋯), as a done task does.
+    localStorage.setItem(WEEK_PREF_KEYS.done, 'shown')
     render(<WeekViewV2 {...defaultProps} routines={[createMockRoutine({ id: 'read', name: 'Read', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } })]} weekStart={sunday} />)
-    // Done stays in the day's record, ticked, under Saturday in the strip.
+    // Done stays in the day's record, ticked, on Saturday.
     await waitFor(() => expect(instancesMock.rows.length).toBe(1))
-    const saturday = routinesOn('Saturday, September 19')
+    const saturday = onDay('2026-09-19')
     expect(await saturday.findByText('Read')).toBeInTheDocument()
     expect(saturday.getByText('Read').closest('li')).toHaveClass('is-done')
   })
@@ -583,14 +581,14 @@ describe('WeekViewV2 — untimed placements', () => {
       createMockRoutine({ id: 'waiting', name: 'Kids clean rooms', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] }, show_on_timeline: null as unknown as boolean }),
     ]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
-    await screen.findByRole('tab', { name: /Routines/ })
-    const saturday = routinesOn('Saturday, September 19')
+    await screen.findByTestId('journal-day-2026-09-19')
+    const saturday = onDay('2026-09-19')
     expect(await saturday.findByText('Family reading time')).toBeInTheDocument()
     expect(saturday.queryByText('Kids clean rooms')).toBeNull()
     expect(saturday.queryByLabelText('Available')).toBeNull()
 
     // Ticking the entry completes THAT occurrence — Saturday's instance.
-    fireEvent.click(saturday.getByRole('button', { name: 'Done: Family reading time' }))
+    fireEvent.click(saturday.getByRole('button', { name: 'Complete Family reading time' }))
     expect(instancesMock.markDone).toHaveBeenCalledWith('routine', 'chosen', new Date(2026, 8, 19))
   })
 })
@@ -650,14 +648,13 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   it('every-day routines are written once until "Show daily routines in each day" (⋯), which is remembered', () => {
     const daily = createMockRoutine({ id: 'dog', name: 'Walk the dog', time_of_day: '07:00:00', recurrence_pattern: { type: 'daily' } as RecurrencePattern, show_on_timeline: true })
     render(<WeekViewV2 {...defaultProps} routines={[daily]} weekStart={sunday} />)
-    // Written once, with its time (rhythmLines), as Today's (the strip, 2026-10-25).
-    routinesTab()
+    // Written once, with its time (rhythmLines), as Today's, under Sometime
+    // this week (the strip's footer, 2026-11-04).
     expect(screen.getAllByText(/Walk the dog/)).toHaveLength(1)
     expect(screen.getByText(/Every-day routines are on/)).toHaveTextContent('7a Walk the dog')
     expect(screen.queryByRole('button', { name: /^(Show|Hide) daily$/ })).toBeNull()
     const item = turnOn('Show daily routines in each day')
     expect(localStorage.getItem('symphony-week-daily')).toBe('shown')
-    routinesTab()
     expect(screen.getAllByText('Walk the dog').length).toBeGreaterThan(1)
     expect(item).toHaveAttribute('aria-checked', 'true')
   })
@@ -667,13 +664,11 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   it('a Mon–Thu routine is written once as "Mon–Thu" until "Show daily routines in each day"', () => {
     const home = createMockRoutine({ id: 'home', name: 'Home from school', time_of_day: '17:45:00', recurrence_pattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu'] } as RecurrencePattern, show_on_timeline: true })
     render(<WeekViewV2 {...defaultProps} routines={[home]} weekStart={sunday} />)
-    routinesTab()
     expect(screen.getAllByText(/Home from school/)).toHaveLength(1)
     expect(screen.getByText(/Every-day routines are on/)).toHaveTextContent('5:45p Home from school')
     turnOn('Show daily routines in each day')
-    routinesTab()
-    // Four in the days, four in the Routines tab under each day.
-    expect(screen.getAllByText('Home from school')).toHaveLength(8)
+    // Four in the days, once each.
+    expect(screen.getAllByText('Home from school')).toHaveLength(4)
   })
 })
 
@@ -998,7 +993,7 @@ describe('WeekViewV2 — the deck', () => {
     expect(screen.getByRole('button', { name: 'October, 2 open. Unfold to read' })).toBeInTheDocument()
     expect(screen.queryByText('→ Week')).toBeNull()
     expect(screen.queryByRole('tab', { name: 'October' })).toBeNull()
-    const noDay = screen.getByRole('list', { name: 'No day yet' })
+    const noDay = screen.getByRole('list', { name: 'Sometime this week' })
     expect(within(noDay).getByText('Plan winter vacation')).toBeInTheDocument()
   })
 
@@ -1113,14 +1108,16 @@ describe('WeekViewV2 — the deck', () => {
     expect(count()).toBe(1)
   })
   // Final review (2026-11-04): the Week page never changes shape in a
-  // session. The strip stays; the Choose step's line (+ Add to week, then the
-  // line itself) is where its tooltip points.
-  it('in a session the week keeps its strip, and the Choose step’s write anchor resolves', () => {
+  // session. Sometime this week stays (the strip is gone, 2026-11-04); the
+  // Choose step's line (+ Add to week, then the line itself) is where its
+  // tooltip points.
+  it('in a session the week keeps Sometime this week, and the Choose step’s write anchor resolves', () => {
     guideAt.step = 'choose'
     open('?plan=1', [])
     const guided = () => deckMock.guided as unknown as { canvas: (fold: unknown) => React.ReactNode }
     const choose = render(<>{guided().canvas({ stepId: 'choose', drive: { above: true }, look: null, write: true })}</>)
-    expect(within(choose.container).getByRole('complementary', { name: 'Week strip' })).toBeInTheDocument()
+    expect(within(choose.container).getByRole('region', { name: 'Sometime this week' })).toBeInTheDocument()
+    expect(within(choose.container).queryAllByRole('tab')).toEqual([])
     expect(choose.container.querySelector('[data-guide-anchor="write"]')).not.toBeNull()
     expect(choose.container.querySelector('.wc-session-week')).toBeNull()
   })
@@ -1179,8 +1176,8 @@ describe('WeekViewV2 — the deck', () => {
     ]
     open('', tasks, { layers: familyOnly })
     expect(document.querySelector('.wk-facts')?.textContent).toBe('0 of 1 done')
-    expect(within(screen.getByRole('list', { name: 'No day yet' })).getByText('Call the plumber')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'place them one at a time' }))
+    expect(within(screen.getByRole('list', { name: 'Sometime this week' })).getByText('Call the plumber')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Place them one at a time' }))
     expect(new URLSearchParams(window.location.search).get('place')).toBe('1')
     expect(new URLSearchParams(window.location.search).get('date')).toBeNull()
   })
@@ -1209,8 +1206,8 @@ describe('WeekViewV2 — the deck', () => {
     expect(screen.queryByText('fix the light in the kitchen')).toBeNull()
   })
 
-  // I3: the strip lists what "Place them" deals, a passed day included.
-  it('the strip lists what Place them deals, including a day that passed undone', () => {
+  // I3: Sometime this week lists what "Place them" deals, a passed day included.
+  it('Sometime this week lists what Place them deals, including a day that passed undone', () => {
     vi.setSystemTime(new Date(2026, 9, 20, 9)) // Tuesday of the week of Oct 17
     viewer.me = { id: 'scott' }
     const onWeek = { bucket: 'week' as const, weekStart: sat, commitments: [{ level: 'week' as const, periodStart: sat, status: 'open' as const }], updatedAt: recent }
@@ -1221,7 +1218,7 @@ describe('WeekViewV2 — the deck', () => {
       createMockTask({ id: 'hers', title: 'Pot the ferns', ...onWeek, assignedTo: 'iris' }),
     ]
     const view = open('', tasks)
-    const noday = within(screen.getByRole('list', { name: 'No day yet' }))
+    const noday = within(screen.getByRole('list', { name: 'Sometime this week' }))
     expect(noday.getByText('Call the plumber')).toBeInTheDocument()
     expect(noday.getByText('Return the drill')).toBeInTheDocument()
     view.unmount()
@@ -1275,7 +1272,7 @@ describe('WeekViewV2 — the deck', () => {
 
   // Paper-style horizons (2026-11-04): one rule for the week's own list, the
   // deck and last week's counts. A task marked is_goal is not left out.
-  it('a goal-marked week task is dealt by "place them one at a time", as the No day yet list shows it', () => {
+  it('a goal-marked week task is dealt by "Place them one at a time", as Sometime this week shows it', () => {
     const goal = createMockTask({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'week', weekStart: sat, commitments: [{ level: 'week', periodStart: sat, status: 'open' }], updatedAt: recent })
     open('?place=1', [goal])
     expect(props().choose.placeItems.map((c) => c.key)).toEqual(['g'])
