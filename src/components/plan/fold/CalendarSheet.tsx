@@ -7,7 +7,7 @@
 //
 // What it holds comes from the guided sessions' own read-only steps, so the
 // sheet and the session never disagree: Month the month at a glance
-// (MonthGrid) over five weeks of fixed dates (NextWeeks), Season its fixed
+// (MonthGrid) over its weeks of fixed dates (NextWeeks, one per grid row), Season its fixed
 // dates by month (SeasonCalendar), Year the twelve months of exact-date
 // events (MonthsCalendar; the year's Landscape step is an editor, so it is
 // not drawn here).
@@ -16,7 +16,8 @@ import type { ReactNode } from 'react'
 import { useDayLoadEvents } from '@/hooks/useDayLoadEvents'
 import { getCalendarConnected } from '@/lib/calendarConnection'
 import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
-import { localYmd, type WeekStart, weekStartAnchor } from '@/lib/cadence/config'
+import { localYmd, type WeekStart } from '@/lib/cadence/config'
+import { monthGridWeeks } from '@/lib/planning/monthGrid'
 import { SheetFoot } from './AboveSheet'
 import './sheet.css'
 
@@ -50,7 +51,6 @@ export function MonthGrid({ month, weekStartsOn }: { month: Date; weekStartsOn: 
   const cal = useDayLoadEvents(connected !== false)
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
   const next = new Date(month.getFullYear(), month.getMonth() + 1, 1)
-  const gridStart = weekStartAnchor(first, weekStartsOn)
   const todayKey = localYmd(new Date())
   const perDay = new Map<string, number>()
   if (cal.available && connected !== false) {
@@ -59,15 +59,7 @@ export function MonthGrid({ month, weekStartsOn }: { month: Date; weekStartsOn: 
       perDay.set(k, (perDay.get(k) ?? 0) + 1)
     }
   }
-  const weeks: Date[][] = []
-  for (let d = gridStart; d < next; ) {
-    const row: Date[] = []
-    for (let i = 0; i < 7; i++) {
-      row.push(d)
-      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
-    }
-    weeks.push(row)
-  }
+  const weeks = monthGridWeeks(first, weekStartsOn)
   const heads = weeks[0].map((d) => d.toLocaleDateString('en-US', { weekday: 'narrow' }))
   return (
     <table className="cal-sheet-grid" aria-label={first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}>

@@ -55,7 +55,10 @@ export function useSeasonEvents(seasonStart: Date, seasonEnd: Date, enabled: boo
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const start = Math.max(today, seasonStart.getTime()), end = seasonEnd.getTime()
-  const key = enabled && account ? `${account}|${start}|${end}` : null
+  // A period already over has nothing left to read (from today it would ask
+  // for start > end): no request, and an empty read of nothing.
+  const over = start >= end
+  const key = enabled && account && !over ? `${account}|${start}|${end}` : null
   const [done, setDone] = useState<{ key: string; read: Read | null } | null>(null)
 
   useEffect(() => {
@@ -65,6 +68,7 @@ export function useSeasonEvents(seasonStart: Date, seasonEnd: Date, enabled: boo
     return () => { live = false }
   }, [key, start, end])
 
+  if (over && enabled && account) return { events: [], available: true, loading: false, failed: false, range: { start: end, end } }
   const read = key ? held.get(key) ?? (done?.key === key ? done.read : null) : null
   const failed = !!key && !read && done?.key === key && done.read === null
   return { events: read?.events ?? [], available: !!read, loading: !!key && !read && !failed, failed, range: read?.range ?? null }

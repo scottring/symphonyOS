@@ -46,6 +46,14 @@ describe('useSeasonEvents — one read of the calendar for the season still to c
     expect(invoke.mock.calls[0][1].body.startDate).toBe(FALL.toISOString())
   })
 
+  // Final review (2026-11-04): a period already over asked for start > end.
+  it('a period already over reads nothing and is an empty, finished read', () => {
+    at(new Date(2026, 11, 5, 9))
+    const { result } = renderHook(() => useSeasonEvents(FALL, WINTER, true))
+    expect(invoke).not.toHaveBeenCalled()
+    expect(result.current).toMatchObject({ events: [], available: true, loading: false, failed: false })
+  })
+
   it('reads nothing while disabled or before anyone is signed in', async () => {
     renderHook(() => useSeasonEvents(FALL, WINTER, false))
     __resetCurrentAccount()

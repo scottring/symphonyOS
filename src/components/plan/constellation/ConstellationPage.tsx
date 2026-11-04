@@ -62,6 +62,7 @@ import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { periodBounds, selectPeriodTasks, isCurrentPeriod, isUndatedLegacyDone } from '@/lib/planning/periodPage'
+import { monthGridWeeks } from '@/lib/planning/monthGrid'
 import { talkFor, listIsEmpty, isPutOff, readDismissals } from '@/lib/planning/planSchedule'
 import { committedTo } from '@/lib/placement/model'
 import { localYmd, parseLocalYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
@@ -887,12 +888,12 @@ function Inner() {
   const footer = proposals.length > 0 || openNodes.length > 0
   // This period's calendar, folded at the sheet's right edge, for reading
   // (Task 5c). It reuses the sessions' read-only steps: Month the month at a
-  // glance over five weeks from its first, Season its fixed dates by month,
+  // glance over its weeks from its first (four to six, the grid's rows), Season its fixed dates by month,
   // Year its 12 months of exact-date events.
   const calendarSheet = level === 2
     ? <CalendarSheet kicker="What’s already claimed" title={periodWord}>
       <MonthGrid month={bounds.start} weekStartsOn={weekStartsOn} />
-      <NextWeeks start={weekStartAnchor(bounds.start, weekStartsOn)} weeks={5} />
+      <NextWeeks start={weekStartAnchor(bounds.start, weekStartsOn)} weeks={monthGridWeeks(bounds.start, weekStartsOn).length} />
     </CalendarSheet>
     : level === 1
       ? <CalendarSheet kicker={`Fixed dates · ${periodRange(bounds.start, bounds.end)}`} title={periodWord}>

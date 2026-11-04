@@ -23,6 +23,7 @@ import {
   useId,
   useLayoutEffect,
   useRef,
+  useState,
   type ReactNode,
 } from 'react'
 import { detectFoldMode, foldSizes, type FoldMode } from '@/lib/fold/foldMode'
@@ -203,6 +204,12 @@ function PaperFoldSheet({
     hasCalRef.current = hasCal
   }, [stowed, hasCal])
 
+  // The calendar's contents mount on its first opening (a tap, C, a drag
+  // past a sliver, a remembered open state or the page's drive) and then stay
+  // mounted: folded and never opened, it reads nothing (final review,
+  // 2026-11-04).
+  const [calMounted, setCalMounted] = useState(false)
+
   // Each companion, when it opens, folds the other unless the spread holds both.
   const motions = useRef<Partial<Record<FoldSide, FoldMotion>>>({})
   const foldOther = useCallback((other: FoldSide, o: { remember: boolean }) => {
@@ -233,7 +240,7 @@ function PaperFoldSheet({
     flapRef: calFlapRef,
     keyName: 'c',
     keyEnabled: () => hasCalRef.current && !stowedRef.current,
-    onOpen: (o) => foldOther('above', o),
+    onOpen: (o) => { setCalMounted(true); foldOther('above', o) },
   })
   useLayoutEffect(() => {
     motions.current = { above: A, calendar: C }
@@ -500,6 +507,8 @@ function PaperFoldSheet({
 
   const open = A.open
   const calOpen = hasCal && C.open
+  // Opened before this render could see onOpen (remembered, driven): mount now.
+  if (hasCal && !calMounted && (calOpen || drive?.calendar === true)) setCalMounted(true)
   useLayoutEffect(markDuoPage, [markDuoPage, calOpen])
   const countPart = edgeCount === undefined ? '' : `, ${edgeCount} open`
   const edgeName = open ? `Fold ${edgeLabel} away` : `${edgeLabel}${countPart}. Unfold to read`
@@ -590,7 +599,7 @@ function PaperFoldSheet({
               >
                 <div ref={calScrollRef} className="paper-fold-scroll" style={{ overscrollBehavior: 'contain' }}>
                   <div ref={calBodyRef} className="paper-fold-cal-body">
-                    {calendar}
+                    {calMounted ? calendar : null}
                   </div>
                 </div>
               </section>

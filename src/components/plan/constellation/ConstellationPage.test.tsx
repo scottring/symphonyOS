@@ -219,10 +219,33 @@ describe('this period’s calendar, folded on the right',()=>{
   expect(sheet.querySelectorAll('button,a,input,textarea,[draggable="true"]')).toHaveLength(0)
   expect(localStorage.getItem('symphony-fold:month:calendar')).toBe('open')
  })
+ // Final review (2026-11-04): a fixed five weeks lost the end of six-row months.
+ it('Month: a six-row month lists all six weeks (August 2026)',async()=>{
+  open('/month?view=constellation&horizon=2&start=2026-08-04')
+  fireEvent.keyDown(screen.getByRole('button',{name:'August calendar. Unfold to read'}),{key:'Enter'})
+  const sheet=await screen.findByRole('region',{name:'August calendar, for reading'})
+  const weeks=within(within(sheet).getByRole('list',{name:'The next weeks'})).getAllByRole('listitem',{name:/^Week of/})
+  expect(weeks).toHaveLength(6)
+  expect(weeks[5]).toHaveAccessibleName('Week of Aug 30')
+  expect(within(sheet).getByRole('table',{name:'August 2026'}).querySelectorAll('tbody tr')).toHaveLength(6)
+ })
+ // Final review (2026-11-04): folded and never opened, the calendar is not
+ // mounted, so it reads nothing; opened once, it stays.
+ it('the calendar mounts on its first opening and stays mounted when folded again',()=>{
+  open(NOV)
+  expect(calSheet().querySelector('table')).toBeNull()
+  const edge=screen.getByRole('button',{name:'November calendar. Unfold to read'})
+  fireEvent.keyDown(edge,{key:'Enter'})
+  expect(calSheet().querySelector('table')).not.toBeNull()
+  fireEvent.keyDown(screen.getByRole('button',{name:'Fold November calendar away'}),{key:'Enter'})
+  expect(calSheet()).toHaveAttribute('inert')
+  expect(calSheet().querySelector('table')).not.toBeNull()
+ })
  it('Season: “Fall calendar”, its fixed dates by month',()=>{
   season()
-  expect(screen.getByRole('button',{name:'Fall calendar. Unfold to read'})).toBeInTheDocument()
-  // Folded, so out of the accessibility tree: read from the DOM.
+  // Folded and never opened, it is not drawn (nothing read).
+  expect(calSheet().querySelector('ul[aria-label="The season’s fixed dates"]')).toBeNull()
+  fireEvent.keyDown(screen.getByRole('button',{name:'Fall calendar. Unfold to read'}),{key:'Enter'})
   expect(calSheet().querySelector('ul[aria-label="The season’s fixed dates"]')).not.toBeNull()
   expect(calSheet()).toHaveTextContent(CAL_FOOT)
   expect(calSheet().querySelectorAll('button,a,input,textarea')).toHaveLength(0)
@@ -233,8 +256,7 @@ describe('this period’s calendar, folded on the right',()=>{
   cal.events=[nov(6,'No school'),nov(11,'Veterans Day'),nov(14,'Recital'),nov(20,'Fair'),nov(26,'Thanksgiving'),nov(28,'Ella and Kaleb turn 9'),
    {id:'d1',title:'Winter break',start_time:'2026-12-21',end_time:'2026-12-22',all_day:true}]
   open()
-  expect(screen.getByRole('button',{name:'2026 calendar. Unfold to read'})).toBeInTheDocument()
-  // Folded, so out of the accessibility tree: read from the DOM.
+  fireEvent.keyDown(screen.getByRole('button',{name:'2026 calendar. Unfold to read'}),{key:'Enter'})
   const months=calSheet().querySelector('ul[aria-label="2026, month by month"]')!
   expect(Array.from(months.children).map((li)=>li.getAttribute('aria-label'))).toEqual(['Jan – Oct · Past','November','December'])
   expect(months.children[0]).toHaveTextContent(/^Jan – Oct\s*Past$/)
@@ -254,6 +276,7 @@ describe('this period’s calendar, folded on the right',()=>{
   at(new Date(2026,10,4,9)); onTestFinished(()=>{vi.useRealTimers()})
   notesStore.notes={landscape:[{month:11,text:'Thanksgiving at the lake'},{month:12,text:'Winter vacation'}]}
   open()
+  fireEvent.keyDown(screen.getByRole('button',{name:'2026 calendar. Unfold to read'}),{key:'Enter'})
   const land=calSheet().querySelector('section[aria-label="Landscape"]')!
   expect(land).not.toBeNull()
   expect(land).toHaveTextContent('Thanksgiving at the lake')
