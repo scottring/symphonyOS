@@ -111,6 +111,18 @@ export function staysOnSharedPlan(t: Task, byId: ReadonlyMap<string, Task>): boo
  * rows are INCLUDED — the list is the record, and the look-back needs them.
  * Year lists are goals, not tasks; see the page.
  */
+/**
+ * A completion with no time at all: done, with no completed_at, no day, no
+ * period stamp and no commitment (legacy rows such as bucket 'month' with no
+ * month_start). The legacy rule would file it on the CURRENT period, so every
+ * month read "24 of 36 done" from old work (visual check, 2026-11-04). Its
+ * time is unknown, so it is on no period's list, fold or count; search still
+ * finds it.
+ */
+export function isUndatedLegacyDone(t: Pick<Task, 'completed' | 'completedAt' | 'scheduledFor' | 'weekStart' | 'monthStart' | 'seasonStart' | 'commitments'>): boolean {
+  return !!t.completed && !t.completedAt && !t.scheduledFor && !t.weekStart && !t.monthStart && !t.seasonStart && !(t.commitments?.length)
+}
+
 export function selectPeriodTasks(
   tasks: readonly Task[],
   level: 'month' | 'season',
@@ -128,6 +140,7 @@ export function selectPeriodTasks(
   return tasks
     .filter((t) => {
       if (meId && !doableBy(t, meId) && !staysOnSharedPlan(t, byId)) return false
+      if (isUndatedLegacyDone(t)) return false
       return committedTo(t, level, start, { isCurrent, seasons }) !== undefined
     })
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())

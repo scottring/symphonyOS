@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { periodBounds, isCurrentPeriod, selectPeriodTasks, intoMonthChoices, selectDatedInPeriod, actionsFor, railLevel, planningPeriod, offerableFromAbove } from './periodPage'
+import { isUndatedLegacyDone, periodBounds, isCurrentPeriod, selectPeriodTasks, intoMonthChoices, selectDatedInPeriod, actionsFor, railLevel, planningPeriod, offerableFromAbove } from './periodPage'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 import type { Task } from '@/types/task'
 
@@ -239,5 +239,24 @@ describe('intoMonthChoices — a season row\'s "Into a month…"', () => {
     const c = intoMonthChoices({ start: new Date(2027, 0, 1), end: new Date(2027, 3, 1), label: 'Winter 2027' })
     expect(c[0]).toMatchObject({ label: 'December 2026 (before Winter)', beforeSeason: true })
     expect(c[0].date).toEqual(new Date(2026, 11, 1))
+  })
+})
+
+// Visual check on real data (2026-11-04): an undated legacy completion (done,
+// no completed_at, no day, stamp or commitment) is on no period's list.
+describe('selectPeriodTasks — undated legacy completions', () => {
+  const nov = d(2026, 10, 1), fall = d(2026, 8, 1)
+  it('leaves them off the current Month and Season; dated or stamped done rows stay', () => {
+    const legacyMonth = task({ bucket: 'month', completed: true })
+    const legacySeason = task({ bucket: 'quarter', completed: true })
+    const openLegacy = task({ bucket: 'month' })
+    const doneWhen = task({ bucket: 'month', completed: true, completedAt: d(2026, 10, 3) })
+    const doneStamped = task({ bucket: 'month', monthStart: nov, completed: true })
+    expect(isUndatedLegacyDone(legacyMonth)).toBe(true)
+    expect(isUndatedLegacyDone(doneStamped)).toBe(false)
+    expect(isUndatedLegacyDone(task({ bucket: 'month', completed: true, commitments: [{ level: 'month', periodStart: nov, status: 'done' }] }))).toBe(false)
+    const month = selectPeriodTasks([legacyMonth, openLegacy, doneWhen, doneStamped], 'month', nov, true, null, DEFAULT_SEASONS)
+    expect(month.map((t) => t.id).sort()).toEqual([openLegacy.id, doneWhen.id, doneStamped.id].sort())
+    expect(selectPeriodTasks([legacySeason], 'season', fall, true, null, DEFAULT_SEASONS)).toEqual([])
   })
 })

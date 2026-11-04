@@ -64,7 +64,7 @@ import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { weekListTasks, weekShownTasks } from '@/lib/planning/weekList'
-import { selectPeriodTasks } from '@/lib/planning/periodPage'
+import { selectPeriodTasks, isUndatedLegacyDone } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { weekRhythm, rhythmLines } from '@/lib/week/weekRhythm'
 import { densityDescription } from '@/lib/planning/dayDensity'
@@ -964,7 +964,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // A week's done is what was done in it: a row finished before the week
   // began, or let go, is not on the count.
   const countedThisWeek = useMemo(
-    () => weekShown.filter((t) => !t.dismissedAt && !(t.completed && t.completedAt && t.completedAt < weekAnchor)),
+    // An undated legacy completion (no completed_at, day, stamp or
+    // commitment) is on no week (isUndatedLegacyDone).
+    () => weekShown.filter((t) => !t.dismissedAt && !isUndatedLegacyDone(t) && !(t.completed && t.completedAt && t.completedAt < weekAnchor)),
     [weekShown, weekAnchor],
   )
   const doneThisWeek = useMemo(

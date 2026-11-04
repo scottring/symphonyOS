@@ -11,12 +11,14 @@ import { weekendLabel } from './weekend'
 import type { Task } from '@/types/task'
 import { committedTo, isFocused, sameDay } from '@/lib/placement/model'
 import { doableBy } from './poolViews'
+import { isUndatedLegacyDone } from './periodPage'
 import { localYmd } from '@/lib/cadence/config'
 
 export function weekListTasks(tasks: readonly Task[], weekStart: Date, meId: string | null, opts: { isCurrent?: boolean } = {}): Task[] {
   const out: Task[] = []
   for (const t of tasks) {
     if (meId && !doableBy(t, meId)) continue
+    if (isUndatedLegacyDone(t)) continue
     const c = committedTo(t, 'week', weekStart, { isCurrent: opts.isCurrent ?? true })
     if (!c) continue
     if (c !== 'legacy' && (c.status === 'carried' || c.status === 'removed')) continue

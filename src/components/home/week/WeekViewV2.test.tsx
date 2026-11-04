@@ -1190,6 +1190,16 @@ describe('WeekViewV2 — the deck', () => {
     expect(document.querySelector('.wk-facts')?.textContent).toBe('1 of 2 done')
   })
 
+  // Visual check on real data (2026-11-04): an undated legacy completion (no
+  // completed_at, stamp or commitment) is on no week's list or count.
+  it('an undated legacy completion is not on the week or its count', () => {
+    const wk = (id: string, extra: object) => createMockTask({ id, title: id, context: 'family', bucket: 'week', weekStart: sat, commitments: [{ level: 'week', periodStart: sat, status: 'open' }], updatedAt: recent, ...extra })
+    const legacy = createMockTask({ id: 'legacy', title: 'fix the light in the kitchen', context: 'family', bucket: 'week', completed: true, completedAt: undefined, weekStart: undefined, commitments: [], updatedAt: recent })
+    open('', [wk('open', {}), wk('doneNow', { completed: true, completedAt: new Date(2026, 9, 19) }), legacy], { layers: familyOnly })
+    expect(document.querySelector('.wk-facts')?.textContent).toBe('1 of 2 done')
+    expect(screen.queryByText('fix the light in the kitchen')).toBeNull()
+  })
+
   // I3: the strip lists what "Place them" deals, a passed day included.
   it('the strip lists what Place them deals, including a day that passed undone', () => {
     vi.setSystemTime(new Date(2026, 9, 20, 9)) // Tuesday of the week of Oct 17

@@ -75,3 +75,13 @@ describe('weekShownTasks', () => {
     expect(weekShownTasks({ listed: [listed], drawn: [listed, dated], weekStart: WEEK }).map((t) => t.id)).toEqual(['g', 'h'])
   })
 })
+
+// Visual check on real data (2026-11-04): an undated legacy completion is on
+// no week, even one recorded with no week stamp and no commitments.
+describe('weekListTasks — undated legacy completions', () => {
+  it('leaves out a done week row with no completed_at, stamp or commitment', () => {
+    const legacy = createMockTask({ id: 'l', title: 'fix the light', bucket: 'week', completed: true, commitments: [] })
+    const open = createMockTask({ id: 'o', title: 'Open', bucket: 'week', commitments: [] })
+    expect(weekListTasks([legacy, open], WEEK, null, { isCurrent: true }).map((t) => t.id)).toEqual(['o'])
+  })
+})

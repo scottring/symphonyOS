@@ -61,7 +61,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
-import { periodBounds, selectPeriodTasks, isCurrentPeriod } from '@/lib/planning/periodPage'
+import { periodBounds, selectPeriodTasks, isCurrentPeriod, isUndatedLegacyDone } from '@/lib/planning/periodPage'
 import { talkFor, listIsEmpty, isPutOff, readDismissals } from '@/lib/planning/planSchedule'
 import { committedTo } from '@/lib/placement/model'
 import { localYmd, parseLocalYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
@@ -233,7 +233,7 @@ function Inner() {
   const allNodes = planNodes(goalsOf(year), [
     selectPeriodTasks(visible, 'season', seasonB.start, isCurrentPeriod(seasonB, now), lens.scopeId, seasons),
     selectPeriodTasks(visible, 'month', monthB.start, isCurrentPeriod(monthB, now), lens.scopeId, seasons),
-    visible.filter((t) => committedTo(t, 'week', week, { isCurrent: thisWeek }) !== undefined),
+    visible.filter((t) => !isUndatedLegacyDone(t) && committedTo(t, 'week', week, { isCurrent: thisWeek }) !== undefined),
   ])
 
   // Show done and the level above: this viewer's choices, shared with the
@@ -459,7 +459,9 @@ function Inner() {
   // began (it only carries a later commitment) is "done earlier", and a line
   // let go never counts. The header's count and the fold read the same lists.
   const shapeList = (all: PlanNode[], movedOf: (n: PlanNode) => string | null, b: { start: Date }) => {
-    const nodes = all.filter((n) => !n.task?.dismissedAt)
+    // Let go is off the list; so is an undated legacy completion (no
+    // completed_at, day, stamp or commitment: its time is unknown).
+    const nodes = all.filter((n) => !n.task?.dismissedAt && !(n.task && isUndatedLegacyDone(n.task)))
     const earlier = (n: PlanNode) => isDone(n) && !!n.task?.completedAt && n.task.completedAt < b.start
     const open = (n: PlanNode) => !isDone(n) && !movedOf(n)
     const openNodes = inOrder(nodes.filter(open))

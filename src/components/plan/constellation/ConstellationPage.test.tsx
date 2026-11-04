@@ -533,8 +533,8 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
   expect(api.updateGoal).toHaveBeenLastCalledWith('g',{name:'Together'})
  })
  it('done goals fold into one line, open first, and open again on Show',()=>{
-  api.tasks=[{id:'s',title:'Finished season',bucket:'quarter',completed:true},{id:'m',title:'Still open',bucket:'month',sourceId:'s'},
-   {id:'d1',title:'Signed up for Built with Science',bucket:'month',completed:true},{id:'d2',title:'Talked with Kami',bucket:'month',completed:true},{id:'d3',title:'Third done',bucket:'month',completed:true}]
+  api.tasks=[{id:'s',title:'Finished season',bucket:'quarter',completed:true,completedAt:new Date(2026,9,9)},{id:'m',title:'Still open',bucket:'month',sourceId:'s'},
+   {id:'d1',title:'Signed up for Built with Science',bucket:'month',completed:true,completedAt:new Date(2026,9,9)},{id:'d2',title:'Talked with Kami',bucket:'month',completed:true,completedAt:new Date(2026,9,9)},{id:'d3',title:'Third done',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
   month()
   expect(titles('October goals')).toEqual(['Still open'])
   const fold=screen.getByRole('button',{name:/^3 done · Signed up for Built with Science, Talked with Kami… Show$/})
@@ -547,13 +547,13 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
   expect(screen.queryByText('Third done')).toBeNull()
  })
  it('with only done goals, the list says nothing is open and the fold holds them',()=>{
-  api.tasks=[{id:'d',title:'Done milestone',bucket:'month',completed:true}]
+  api.tasks=[{id:'d',title:'Done milestone',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
   month()
   expect(screen.getByText('Nothing open for October yet.')).toBeInTheDocument()
   expect(screen.getByRole('button',{name:/^1 done · Done milestone Show$/})).toBeInTheDocument()
  })
  it('keeps what an item carries on the row; the panel holds the rest',()=>{
-  api.tasks=[{id:'s',title:'Back to school',bucket:'quarter',links:[{url:'https://supplies.test'}]},{id:'m',title:'Call Cami',bucket:'month',sourceId:'s',contactId:'cami',subtasks:[{id:'q1',title:'Pickup?'},{id:'q2',title:'Forms?',completed:true}]}]
+  api.tasks=[{id:'s',title:'Back to school',bucket:'quarter',links:[{url:'https://supplies.test'}]},{id:'m',title:'Call Cami',bucket:'month',sourceId:'s',contactId:'cami',subtasks:[{id:'q1',title:'Pickup?'},{id:'q2',title:'Forms?',completed:true,completedAt:new Date(2026,9,9)}]}]
   month()
   const r=row('Call Cami')
   expect(within(r).getByRole('img',{name:'Has contact, steps 1 of 2'})).toBeInTheDocument()
@@ -588,7 +588,7 @@ describe('the fact line (calm pass, 2026-10-18)',()=>{
  afterEach(()=>{plan.saved=null})
  it('Month: {done} of {all} done, a bar · planned {date}',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'a',title:'Picnic',bucket:'month',sourceId:'s'},{id:'b',title:'Leaves',bucket:'month',sourceId:'s'},
-   {id:'c',title:'Taxes',bucket:'month'},{id:'d',title:'Done one',bucket:'month',completed:true}]
+   {id:'c',title:'Taxes',bucket:'month'},{id:'d',title:'Done one',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
   month()
   // One count on every horizon (reviewed design, 2026-10-20): done out of
   // everything on the period, as Looking back counts it, with its bar.
@@ -603,7 +603,7 @@ describe('the fact line (calm pass, 2026-10-18)',()=>{
   expect(document.querySelector('.plan-sentence')).toBeNull()
  })
  it('Season: its dates · {done} of {all} done',()=>{
-  api.tasks=[{id:'a',title:'Autumn outings',bucket:'quarter'},{id:'b',title:'Strength',bucket:'quarter'},{id:'c',title:'Fix the gate',bucket:'quarter',completed:true}]
+  api.tasks=[{id:'a',title:'Autumn outings',bucket:'quarter'},{id:'b',title:'Strength',bucket:'quarter'},{id:'c',title:'Fix the gate',bucket:'quarter',completed:true,completedAt:new Date(2026,9,9)}]
   season()
   expect(facts()).toBe('Sep 1 – Nov 30 · 1 of 3 done')
  })
@@ -753,7 +753,7 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
  })
  it('⋯ holds the page’s choices, the way in, and its help',()=>{
   at(new Date(2026,9,17,12));review.prevReviewed=REVIEWED
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
   month()
   // No talk is due, so ⋯ offers none: planning is the Plan button's session.
   expect(menu()).toEqual(['Plan November early','Show done','Start with a goal · guided introduction','Paper sounds','How this page works'])
@@ -909,7 +909,7 @@ describe('on schedule (spec 2026-10-14, "The schedule")',()=>{
 // back saves October's review and deals what October left open.
 describe('reviewing: the session’s look back',()=>{
  it('Review October opens planning November; its look back saves October’s review',async()=>{
-  api.tasks=[{id:'a',title:'Book the cabin',bucket:'month'},{id:'b',title:'Pay taxes',bucket:'month',completed:true}]
+  api.tasks=[{id:'a',title:'Book the cabin',bucket:'month'},{id:'b',title:'Pay taxes',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,30,12))
   try{
    month()
@@ -992,10 +992,42 @@ describe('a period’s done is what was done in it (2026-11-04)',()=>{
  })
 })
 
+// Visual check on real data (2026-11-04): November read "24 of 36 done" from
+// 24 legacy rows (done, bucket 'month', no month_start, no completed_at, no
+// commitments). Their time is unknown: on no period's list, fold or count.
+describe('an undated legacy completion is on no period (2026-11-04)',()=>{
+ const legacy=(id:string,title:string,bucket:string)=>({id,title,bucket,completed:true})
+ it('Month: out of the list, the fold and the count; the expanded fold lists done and done earlier',()=>{
+  at(new Date(2026,10,4,12))
+  api.tasks=[{id:'o1',title:'Open one',bucket:'month'},
+   {id:'d',title:'Done in Nov',bucket:'month',completed:true,completedAt:new Date(2026,10,3,9)},
+   {id:'e',title:'Done in Oct',bucket:'month',completed:true,completedAt:new Date(2026,9,20,9)},
+   legacy('l1','fix the light in the kitchen','month'),legacy('l2','old errand','month')]
+  try{
+   open('/month?view=constellation&horizon=2&start=2026-11-04')
+   expect(facts()).toBe('1 of 2 done')
+   const fold=screen.getByRole('button',{name:/^1 done, 1 done earlier · Done in Nov, Done in Oct Show$/})
+   fireEvent.click(fold)
+   expect(titles('November goals')).toEqual(['Open one','Done in Nov','Done in Oct'])
+   expect(row('Done in Oct')).toHaveTextContent('Done')
+   expect(screen.queryByText('fix the light in the kitchen')).toBeNull()
+   expect(screen.queryByText('old errand')).toBeNull()
+  }finally{vi.useRealTimers()}
+ })
+ it('Season (bucket quarter): out of the list and the count',()=>{
+  api.tasks=[{id:'s',title:'Plan winter vacation',bucket:'quarter'},{id:'sd',title:'Booked flights',bucket:'quarter',completed:true,completedAt:new Date(2026,9,9)},
+   legacy('l','old season thing','quarter')]
+  season()
+  expect(facts()).toBe('Sep 1 – Nov 30 · 1 of 2 done')
+  fireEvent.click(screen.getByRole('button',{name:/^1 done · Booked flights Show$/}))
+  expect(screen.queryByText('old season thing')).toBeNull()
+ })
+})
+
 describe('a line moved on is not open here (2026-10-17)',()=>{
  it('Month: out of the count and the verbs, folded with the done, named where it went',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'a',title:'Come up with October business plan',bucket:'month',sourceId:'s',carried:true,carriedTo:new Date(2026,10,1)},
-   {id:'b',title:'Book the cabin',bucket:'month'},{id:'c',title:'Pay taxes',bucket:'month',completed:true}]
+   {id:'b',title:'Book the cabin',bucket:'month'},{id:'c',title:'Pay taxes',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
   month()
   // Moved on is out of the "of" (2026-11-04): 1 of 2 done.
   expect(facts()).toBe('1 of 2 done')
@@ -1172,7 +1204,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   const NOV=new Date(2026,10,1)
   api.tasks=[{id:'s',title:'Get outside',bucket:'quarter',goalId:'g'},
    {id:'o1',title:'Hike Bear Mountain',bucket:'month',monthStart:OCT,sourceId:'s'},
-   {id:'o2',title:'Pay taxes',bucket:'month',monthStart:OCT,completed:true},
+   {id:'o2',title:'Pay taxes',bucket:'month',monthStart:OCT,completed:true,completedAt:new Date(2026,9,9)},
    {id:'n1',title:'Book flights',bucket:'month',monthStart:NOV}]
   month()
   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
@@ -1203,7 +1235,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
  })
  it('Look back: September’s open lines — Done, To October, Someday, Let go — each through the page’s writers; nothing goes back to Fall',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
-  api.tasks=[{id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP},{id:'gone',title:'Pay taxes',bucket:'month',monthStart:SEP,completed:true},
+  api.tasks=[{id:'old',title:'Fix the gate',bucket:'month',monthStart:SEP},{id:'gone',title:'Pay taxes',bucket:'month',monthStart:SEP,completed:true,completedAt:new Date(2026,9,9)},
    {id:'later',title:'Clear the garage',bucket:'month',monthStart:SEP},{id:'never',title:'Learn the banjo',bucket:'month',monthStart:SEP}]
   api.keepForward.mockResolvedValue('x');api.dropCommitment.mockResolvedValue(true)
   atStep('look-back')
@@ -1364,7 +1396,7 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
  it('Look back: Summer’s open goals — Done, To Fall, Someday (off Summer only), Let go (not ever) — each through the page’s writers',async()=>{
   inSession()
   api.tasks=[{id:'a',title:'Swim lessons',bucket:'quarter',monthStart:SUMMER},{id:'b',title:'Learn the banjo',bucket:'quarter',monthStart:SUMMER},
-   {id:'c',title:'Run a 10k block',bucket:'quarter',monthStart:SUMMER,goalId:'g'},{id:'d',title:'Camp booked',bucket:'quarter',monthStart:SUMMER,completed:true}]
+   {id:'c',title:'Run a 10k block',bucket:'quarter',monthStart:SUMMER,goalId:'g'},{id:'d',title:'Camp booked',bucket:'quarter',monthStart:SUMMER,completed:true,completedAt:new Date(2026,9,9)}]
   api.keepForward.mockResolvedValue('x');api.dropCommitment.mockResolvedValue(true)
   atStep('look-back')
   season('&plan=1')
@@ -1444,7 +1476,7 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
  })
  it('Ideal week: blocks typed here save into the season’s notes, a goal block naming one of Fall’s open goals',async()=>{
   inSession()
-  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'d',title:'Paint the porch',bucket:'quarter',completed:true}]
+  api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'d',title:'Paint the porch',bucket:'quarter',completed:true,completedAt:new Date(2026,9,9)}]
   atStep('ideal-week')
   season('&plan=1')
   expect(screen.getByText(/of 168h left/)).toBeInTheDocument()
@@ -1870,10 +1902,10 @@ describe('the list, ordered by drag',()=>{
    {id:'sw',title:'Ship the release',bucket:'quarter',context:'work',...iris},
    {id:'a',title:'Picnic',bucket:'month',context:'family',sortOrder:0,...iris},
    {id:'b',title:'Leaf pile',bucket:'month',context:'family',sortOrder:0,...iris},
-   {id:'d',title:'Pumpkins',bucket:'month',context:'family',completed:true,...iris},
+   {id:'d',title:'Pumpkins',bucket:'month',context:'family',completed:true,completedAt:new Date(2026,9,9),...iris},
    // Private: Work, under the family season goal, open and done.
    {id:'w',title:'Board deck',bucket:'month',context:'work',sortOrder:0,sourceId:'s',...iris},
-   {id:'wd',title:'Quarterly numbers',bucket:'month',context:'work',completed:true,...iris},
+   {id:'wd',title:'Quarterly numbers',bucket:'month',context:'work',completed:true,completedAt:new Date(2026,9,9),...iris},
    // Family but someone else's: the people filter leaves it out too.
    {id:'o',title:'Bob’s errand',bucket:'month',context:'family',sortOrder:0,sourceId:'s',assignedTo:'m-bob'},
   ]
@@ -1907,7 +1939,7 @@ describe('the list, ordered by drag',()=>{
   expect(api.updateGoal.mock.calls.map((c:any[])=>c[0]).every((id:string)=>id==='f1'||id==='f2')).toBe(true)
  })
  it('an open row drags to order, with no verbs on it; a done line does not drag',()=>{
-  api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'},{id:'d',title:'Pay taxes',bucket:'month',completed:true}]
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'},{id:'d',title:'Pay taxes',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
   localStorage.setItem('symphony-plan-done','shown')
   month()
   expect(row('Picnic')).toHaveAttribute('draggable','true')
