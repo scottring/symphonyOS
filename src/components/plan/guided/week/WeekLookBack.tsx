@@ -22,8 +22,9 @@ export interface LooseEnd {
   done: () => Promise<boolean>
   /** On to the week being planned. */
   nextWeek: () => Promise<boolean>
-  /** Last week's commitment ends; with nothing else holding it, it waits on Someday. */
-  someday: () => Promise<boolean>
+  /** Last week's commitment ends; with nothing else holding it, it waits on
+   *  Someday ('someday'), else it stays on that list ('kept'). */
+  someday: () => Promise<'someday' | 'kept' | false>
   /** Not ever: off every list (letGo.ts). */
   letGo: () => Promise<boolean>
 }
@@ -48,13 +49,15 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
   const [failed, setFailed] = useState<string | null>(null)
   const { said, record, clear } = useReceipts()
 
-  const run = async (e: LooseEnd, write: () => Promise<boolean>, text: string) => {
+  // A write resolves false when it did not save; anything else is what it
+  // did, which picks the row's words (Someday: into Someday, or off last week).
+  const run = async <R,>(e: LooseEnd, write: () => Promise<R | false>, text: string | ((r: R) => string)) => {
     setPending(e.key); setFailed(null)
-    const ok = await write().catch(() => false)
+    const r = await write().catch(() => false as const)
     setPending(null)
-    if (!ok) setFailed(e.key)
-    else record(e.key, { title: e.title, text, at: looseEnds.findIndex((x) => x.key === e.key) })
-    return ok
+    if (r === false) setFailed(e.key)
+    else record(e.key, { title: e.title, text: typeof text === 'function' ? text(r) : text, at: looseEnds.findIndex((x) => x.key === e.key) })
+    return r !== false
   }
   const savedNotes = review.mine ?? { wentWell: '', didnt: '' }
   const notes = draft ?? savedNotes
@@ -88,7 +91,7 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
             <ReceiptLine text={receipt.text} onChange={() => clear(e.key)} />
           </li>
           const busy = pending !== null
-          const verb = (label: string, write: () => Promise<boolean>, text: string, quiet = true) =>
+          const verb = <R,>(label: string, write: () => Promise<R | false>, text: string | ((r: R) => string), quiet = true) =>
             <button type="button" className={`choose-verb${quiet ? ' is-quiet' : ''}`} disabled={busy} aria-label={`${label}: ${e.title}`}
               onClick={() => { void run(e, write, text) }}>{label}</button>
           return <li key={e.key} className="gw-row" aria-label={e.title}>
@@ -97,7 +100,7 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
             <span className="gw-row-acts" role="group" aria-label={`Decide ${e.title}`}>
               {verb('Done', e.done, 'Marked done')}
               {verb('Next week', e.nextWeek, 'On next week', false)}
-              {verb('Someday', e.someday, 'Moved to Someday')}
+              {verb('Someday', e.someday, (r) => r === 'kept' ? 'Off last week' : 'Moved to Someday')}
               {verb('Let go', e.letGo, 'Let go')}
             </span>
             {pending === e.key && <p className="choose-status" role="status">Saving…</p>}

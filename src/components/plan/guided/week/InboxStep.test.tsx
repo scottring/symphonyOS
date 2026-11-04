@@ -5,22 +5,26 @@ import type { DeckCard } from '@/lib/planning/deck'
 import { InboxStep } from './InboxStep'
 
 const card = (title: string): DeckCard => ({ key: title, task: createMockTask({ id: title, title, bucket: 'inbox' }), source: 'inbox', facts: 'Captured Monday' })
-const actions = () => ({ keepThisWeek: vi.fn(async () => true), later: vi.fn(async () => true), letGo: vi.fn(async () => true) })
+const actions = () => ({ keepThisWeek: vi.fn(async () => true), later: vi.fn(async () => true), someday: vi.fn(async () => 'someday' as const), letGo: vi.fn(async () => true) })
 const row = (title: string) => within(screen.getByRole('listitem', { name: title }))
 
 describe('InboxStep — step 4, clear the inbox', () => {
-  it('each capture offers This week, Later and Let go', async () => {
+  // Someday is "not now", Let go "not ever" (Scott, 2026-11-04).
+  it('each capture offers This week, Later, Someday and Let go', async () => {
     const a = actions()
     const cards = [card('Book the vet'), card('Gutter quote')]
     render(<InboxStep cards={cards} actions={a} />)
     for (const t of ['Book the vet', 'Gutter quote']) {
-      expect(row(t).getAllByRole('button').map((b) => b.textContent)).toEqual(['This week', 'Later ▸', 'Let go'])
+      expect(row(t).getAllByRole('button').map((b) => b.textContent)).toEqual(['This week', 'Later ▸', 'Someday', 'Let go'])
     }
     expect(row('Book the vet').getByText('Captured Monday')).toBeInTheDocument()
     await act(async () => { fireEvent.click(row('Book the vet').getByRole('button', { name: 'This week: Book the vet' })) })
     expect(a.keepThisWeek).toHaveBeenCalledWith(cards[0])
     await act(async () => { fireEvent.click(row('Gutter quote').getByRole('button', { name: 'Let go: Gutter quote' })) })
     expect(a.letGo).toHaveBeenCalledWith(cards[1])
+    expect(a.someday).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(row('Book the vet').getByRole('button', { name: 'Someday: Book the vet' })) })
+    expect(a.someday).toHaveBeenCalledWith(cards[0])
   })
 
   // Paper-style horizons (spec 2026-11-04): nothing goes up to a month from

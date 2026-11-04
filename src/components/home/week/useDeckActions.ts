@@ -1,6 +1,8 @@
 // The deck's writers: the existing week writers behind one interface, each
 // wrapped in the canvas activity so it saves, shows a receipt and offers Undo.
-// Nothing here deletes; "Later" is the Someday bucket.
+// Nothing here deletes. Someday is "not now": the week's commitment only (a
+// month still holding it keeps it; with nothing broader it waits on Someday).
+// Let go is "not ever" (lib/planning/letGo.ts): off every list, with Undo.
 
 import { useMemo } from 'react'
 import type { Task, TaskBucket } from '@/types/task'
@@ -12,8 +14,13 @@ import { lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { letGoUpdates, unletGoUpdates } from '@/lib/planning/letGo'
 
 export type LaterWhen = 'next-week' | 'this-month' | 'next-month' | 'this-season' | 'someday'
+
+/** What Someday did: into Someday, or only off the week (a month or season
+ *  still holds it). False: it did not save. */
+export type SomedayOutcome = 'someday' | 'kept'
 
 export interface DeckActions {
   done(c: DeckCard): Promise<boolean>
@@ -21,6 +28,7 @@ export interface DeckActions {
   keepThisWeek(c: DeckCard): Promise<boolean>
   later(c: DeckCard, when: LaterWhen): Promise<boolean>
   laterOnDate(c: DeckCard, date: Date): Promise<boolean>
+  someday(c: DeckCard): Promise<SomedayOutcome | false>
   letGo(c: DeckCard): Promise<boolean>
   /** One run, one Undo. `label` names the run; by default the stale drain's. */
   drain(tasks: Task[], label?: string): Promise<boolean>
@@ -119,12 +127,12 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
         return activity.run(`Later: “${t.title}”`, async () => ok(await gated.pushTask(t.id, date)), { ids: [t.id], undo: undoFor(t) })
       },
 
-      letGo: (c) => {
+      someday: (c) => {
         const t = c.task
-        // The receipt says where it went when that is Someday.
-        const toSomeday = `Let go of “${t.title}” · it’s in Someday`
+        const label = `Someday: “${t.title}”`
         if (c.source === 'inbox') {
-          return activity.run(toSomeday, async () => ok(await setBucket(t.id, 'someday')), { ids: [t.id], undo: undoFor(t) })
+          return activity.run(label, async () => ok(await setBucket(t.id, 'someday')), { ids: [t.id], undo: undoFor(t) })
+            .then((done) => (done ? 'someday' : false))
         }
         // The week goes. A month or season still holding it keeps it on that
         // list; with nothing broader it would fall to the Inbox and be dealt
@@ -133,11 +141,18 @@ export function useDeckActions(deps: DeckDeps): DeckActions {
         // weekend); a row with no commitments at all is restored from its
         // placement.
         const off = timingRemoval(t, 'all')
-        const broader = (off.updates.commitments ?? []).some((c) => c.status === 'open' && c.level !== 'week')
+        const broader = (off.updates.commitments ?? []).some((x) => x.status === 'open' && x.level !== 'week')
         const snapshot = (off.previous.commitments ?? []).length > 0
-        return activity.run(broader ? `Let go of “${t.title}”` : toSomeday,
+        return activity.run(broader ? `Off ${c.source === 'last-week' ? 'last' : 'this'} week: “${t.title}”` : label,
           async () => ok(broader ? await updateTask(t.id, off.updates) : await setBucket(t.id, 'someday')),
           { ids: [t.id], undo: snapshot ? async () => ok(await updateTask(t.id, off.previous)) : restorePlacement(t) })
+          .then((done) => (done ? (broader ? 'kept' : 'someday') : false))
+      },
+
+      letGo: (c) => {
+        const t = c.task
+        return activity.run(`Let go: “${t.title}”`, async () => ok(await updateTask(t.id, letGoUpdates())),
+          { ids: [t.id], undo: async () => ok(await updateTask(t.id, unletGoUpdates(t))) })
       },
 
       // Ungated: the drain is one deliberate sweep, not a question per task.

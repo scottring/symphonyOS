@@ -245,8 +245,8 @@ function Where() { return <output data-testid="where">{useLocation().search}</ou
 const where = () => new URLSearchParams(screen.getByTestId('where').textContent ?? '')
 const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
   mode: null, available: true, cards: [], doneLastWeek: 3, aged: 0, stripDays: [], onSeeAged: vi.fn(), onFinish: vi.fn(async () => true),
-  actions: { done: vi.fn(), placeOnDay: vi.fn(), keepThisWeek: vi.fn(), later: vi.fn(), laterOnDate: vi.fn(), letGo: vi.fn(), drain: vi.fn() },
-  choose: { monthWord: 'October', lines: [], doneLines: [], loose: [], onAddLoose: vi.fn(async () => true), onDropIn: vi.fn(async () => false as const), placeItems: [], placedCount: 0 },
+  actions: { done: vi.fn(), placeOnDay: vi.fn(), keepThisWeek: vi.fn(), later: vi.fn(), laterOnDate: vi.fn(), someday: vi.fn(), letGo: vi.fn(), drain: vi.fn() },
+  choose: { monthWord: 'October', monthLines: [], placeItems: [], placedCount: 0, notDoneLastWeek: 0 },
   ...over,
 })
 // Done planning the week: the step header's button (the shell shows it above

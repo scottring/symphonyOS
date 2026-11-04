@@ -202,7 +202,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // Create-gesture wiring
   const navigate = useNavigate()
-  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, updateTaskOrders, pushTask, userId, keepForward, dropCommitment } = useSupabaseTasks()
+  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, updateTaskOrders, pushTask, userId, keepForward } = useSupabaseTasks()
   // Orders go through the rendered list's own writer, so a drop moves the row
   // at once; this page's hook instance is only the fallback (its optimistic
   // state is not what the page draws).
@@ -1037,7 +1037,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   }, [deckTasks, planLines])
   const chooseWeek = useChooseWeek({
     lines: planLines, pool: planPool, weekAnchor, lastWeekStart, monthStart: planMonth, isCurrent: weekIsCurrent,
-    actions: deckActions, keepForward, dropCommitment, updateTask, addTask, deleteTask,
+    actions: deckActions,
   })
   // The guided session's calendar check reads the timed events the days draw
   // (the page's space filter); Look back hands a loose end to anyone else.

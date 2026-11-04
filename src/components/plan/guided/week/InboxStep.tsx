@@ -1,7 +1,7 @@
 // Planning the week, step 4 (spec 2026-11-01): clear the inbox. Each capture
-// gets one of three answers: This week, Later (next week; paper-style
-// horizons, 2026-11-04: nothing goes up to a month from here) or Let go (out
-// of the way, in Someday: nothing here deletes). The captures are the page's
+// gets one of four answers: This week, Later (next week; paper-style
+// horizons, 2026-11-04: nothing goes up to a month from here), Someday (not
+// now) or Let go (not ever: off every list, with Undo; nothing here deletes). The captures are the page's
 // own (its space filter and people lens), and every answer saves through the
 // deck's writers, with a receipt and Undo.
 
@@ -16,15 +16,15 @@ const LATER: { label: string; when: LaterWhen }[] = [
 export function InboxStep({ cards, actions }: {
   /** The Inbox, as the page shows it (the deck's inbox cards). */
   cards: readonly DeckCard[]
-  actions: Pick<DeckActions, 'keepThisWeek' | 'later' | 'letGo'>
+  actions: Pick<DeckActions, 'keepThisWeek' | 'later' | 'someday' | 'letGo'>
 }) {
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const [later, setLater] = useState<string | null>(null)
 
-  const run = async (key: string, write: () => Promise<boolean>) => {
+  const run = async (key: string, write: () => Promise<unknown>) => {
     setPending(key); setFailed(null); setLater(null)
-    const ok = await write().catch(() => false)
+    const ok = (await write().catch(() => false)) !== false
     setPending(null)
     if (!ok) setFailed(key)
   }
@@ -43,6 +43,8 @@ export function InboxStep({ cards, actions }: {
               onClick={() => { void run(c.key, () => actions.keepThisWeek(c)) }}>This week</button>
             <button type="button" className="choose-verb is-quiet" disabled={busy} aria-expanded={later === c.key} aria-label={`Later: ${t}`}
               onClick={() => setLater(later === c.key ? null : c.key)}>Later ▸</button>
+            <button type="button" className="choose-verb is-quiet" disabled={busy} aria-label={`Someday: ${t}`}
+              onClick={() => { void run(c.key, () => actions.someday(c)) }}>Someday</button>
             <button type="button" className="choose-verb is-quiet" disabled={busy} aria-label={`Let go: ${t}`}
               onClick={() => { void run(c.key, () => actions.letGo(c)) }}>Let go</button>
           </span>

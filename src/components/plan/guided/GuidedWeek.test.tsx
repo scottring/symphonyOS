@@ -51,11 +51,10 @@ import type { SessionFold } from './GuidedPeriod'
 const weekStart = new Date(2026, 8, 27) // Sunday
 const onWeek = (id: string, extra = {}) => createMockTask({ id, title: id, bucket: 'week', weekStart, commitments: [{ level: 'week', periodStart: weekStart, status: 'open' }], ...extra })
 
-const verb = (ok = true) => ({ label: 'This week', role: 'here' as const, run: vi.fn(async () => ok) })
 const makeChoose = (over: Partial<WeekChoose> = {}): WeekChoose => ({
   monthWord: 'October', notDoneLastWeek: 0,
-  lines: [{ key: 'L', title: 'Get the house ready', planned: { kind: 'above', label: 'October' }, counts: '', verbs: [verb()], steps: [] }] as unknown as WeekChoose['lines'],
-  doneLines: [], loose: [], onAddLoose: vi.fn(async () => true), placeItems: [], placedCount: 0,
+  monthLines: [{ id: 'L', title: 'Get the house ready' }],
+  placeItems: [], placedCount: 0,
   ...over,
 })
 const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
@@ -342,37 +341,27 @@ describe('GuidedWeek — the Week page while planning', () => {
 
 describe('useGuidedWeek — planned once something is applied at Choose', () => {
   const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter><GuidedSessionProvider>{children}</GuidedSessionProvider></MemoryRouter>
-  const hook = (choose: WeekChoose, onPlanned = vi.fn()) => renderHook(() => useGuidedWeek({
-    weekStart, count: 0, choose, onFinish: async () => true, onClose: vi.fn(), onPlanned,
+  const hook = (onPlanned = vi.fn()) => renderHook(() => useGuidedWeek({
+    weekStart, count: 0, choose: makeChoose(), onFinish: async () => true, onClose: vi.fn(), onPlanned,
   }), { wrapper })
   const plannedPatches = () => store.patches.filter((x) => (x.p.guide as { plannedAt?: string }).plannedAt)
 
-  it('the first applied Choose verb on the choosing step marks the week planned, once', async () => {
+  it('the first write applied on the choosing step marks the week planned, once', async () => {
     store.notes = { guide: { current: 'choose', done: [], skipped: [] } }
     const onPlanned = vi.fn()
-    const loose = { key: 'x', title: 'Fix the gate', planned: { kind: 'none', label: '' }, verbs: [verb(false), verb()], children: [] }
-    const choose = makeChoose({ loose: [loose] as unknown as WeekChoose['loose'] })
-    const { result } = hook(choose, onPlanned)
-    // A verb that did not save marks nothing.
-    await act(async () => { await result.current.choose.loose[0].verbs[0].run() })
-    expect(plannedPatches()).toHaveLength(0)
-    await act(async () => { await result.current.choose.lines[0].verbs[0].run() })
-    await act(async () => { await result.current.choose.loose[0].verbs[1].run() })
-    await act(async () => { await result.current.choose.onAddLoose('Call the plumber') })
+    const { result } = hook(onPlanned)
+    await act(async () => { await result.current.markPlannedOnce() })
+    await act(async () => { await result.current.markPlannedOnce() })
     expect(plannedPatches()).toHaveLength(1)
     // markPlanned also stamps the row's savedAt (the existing "planned" mark).
     expect(plannedPatches()[0].defaults).toEqual({ savedAt: expect.any(String) })
     expect(onPlanned).toHaveBeenCalledTimes(1)
-    // The page's own writers still did the work.
-    expect(choose.lines[0].verbs[0].run).toHaveBeenCalledTimes(1)
-    expect(choose.onAddLoose).toHaveBeenCalledWith('Call the plumber')
   })
 
   it('a change card applied on the choosing step marks it too; on any other step nothing', async () => {
     store.notes = { guide: { current: 'inbox', done: [], skipped: [] } }
-    const { result } = hook(makeChoose())
+    const { result } = hook()
     act(() => { result.current.registration?.onApplied?.() })
-    await act(async () => { await result.current.choose.lines[0].verbs[0].run() })
     expect(plannedPatches()).toHaveLength(0)
     await act(async () => { await result.current.jump('choose') })
     await act(async () => { result.current.registration?.onApplied?.() })
@@ -384,21 +373,21 @@ describe('useGuidedWeek — planned once something is applied at Choose', () => 
   it('a planned mark that did not save tells nobody, and the next applied write tries again', async () => {
     store.notes = { guide: { current: 'choose', done: [], skipped: [] } }
     const onPlanned = vi.fn()
-    const { result } = hook(makeChoose(), onPlanned)
+    const { result } = hook(onPlanned)
     store.fail = true
-    await act(async () => { await result.current.choose.lines[0].verbs[0].run() })
+    await act(async () => { await result.current.markPlannedOnce() })
     expect(plannedPatches()).toHaveLength(0)
     expect(onPlanned).not.toHaveBeenCalled()
     store.fail = false
-    await act(async () => { await result.current.choose.lines[0].verbs[0].run() })
+    await act(async () => { await result.current.markPlannedOnce() })
     await waitFor(() => expect(plannedPatches()).toHaveLength(1))
     expect(onPlanned).toHaveBeenCalledTimes(1)
   })
 
   it('a week already planned in this session is not marked again', async () => {
     store.notes = { guide: { current: 'choose', done: [], skipped: [], plannedAt: '2026-09-27T10:00:00Z' } }
-    const { result } = hook(makeChoose())
-    await act(async () => { await result.current.choose.lines[0].verbs[0].run() })
+    const { result } = hook()
+    await act(async () => { await result.current.markPlannedOnce() })
     expect(store.patches).toEqual([])
   })
 })

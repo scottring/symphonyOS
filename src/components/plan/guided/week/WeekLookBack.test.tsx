@@ -6,7 +6,7 @@ import type { ReviewNotes } from '@/hooks/usePeriodReview'
 
 const end = (title: string, over: Partial<LooseEnd> = {}): LooseEnd => ({
   key: title, title, note: 'Carried 1 week',
-  done: vi.fn(async () => true), nextWeek: vi.fn(async () => true), someday: vi.fn(async () => true), letGo: vi.fn(async () => true),
+  done: vi.fn(async () => true), nextWeek: vi.fn(async () => true), someday: vi.fn(async () => 'someday' as const), letGo: vi.fn(async () => true),
   ...over,
 })
 const review = () => ({ mine: null as ReviewNotes | null, reviewed: null, loading: false, finish: vi.fn(async () => true) })
@@ -56,6 +56,16 @@ describe('WeekLookBack — step 1, look back at last week', () => {
     expect(p.looseEnds[0].someday).not.toHaveBeenCalled()
   })
 
+  // Fix round 1 (Task 7): Someday says what it did — into Someday, or only
+  // off last week while a month still holds it.
+  it('Someday says on its row whether the item went to Someday or only came off last week', async () => {
+    setup({ looseEnds: [end('Fix the gate', { someday: vi.fn(async () => 'kept' as const) }), end('Call the bank')] })
+    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Someday: Fix the gate' })) })
+    expect(row('Fix the gate').getByText('Off last week')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(row('Call the bank').getByRole('button', { name: 'Someday: Call the bank' })) })
+    expect(row('Call the bank').getByText('Moved to Someday')).toBeInTheDocument()
+  })
+
   it('Let go and Done say what happened on the row', async () => {
     const p = setup()
     await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Let go: Fix the gate' })) })
@@ -67,7 +77,7 @@ describe('WeekLookBack — step 1, look back at last week', () => {
   })
 
   it('a write that did not save says so on its row', async () => {
-    setup({ looseEnds: [end('Fix the gate', { someday: vi.fn(async () => false) })] })
+    setup({ looseEnds: [end('Fix the gate', { someday: vi.fn(async () => false as const) })] })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Someday: Fix the gate' })) })
     expect(row('Fix the gate').getByRole('alert')).toHaveTextContent('Didn’t save. Try again.')
   })

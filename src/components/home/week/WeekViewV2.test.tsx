@@ -760,14 +760,14 @@ describe('WeekViewV2 — the deck', () => {
   const recent = new Date(2026, 9, 15)
   const old = new Date(2026, 8, 1)
   const familyOnly = new Set(['family']) as unknown as typeof ALL_LAYERS
-  type Item = { key: string; title: string; planned: { kind: string; label: string }; children: Item[] }
   type FlowProps = {
     mode: 'full' | 'place'
     aged: number
+    cards: { key: string; source: string }[]
     choose: {
       monthWord: string
-      lines: (Item & { steps: Item[] })[]
-      loose: Item[]
+      monthLines: { id: string; title: string }[]
+      looseEnds: { key: string; title: string }[]
       placeItems: { key: string; title: string; from?: string }[]
     }
     stripDays: { key: string; date: Date; label: string; isWeekend: boolean; lines: string[]; more: number }[]
@@ -791,11 +791,9 @@ describe('WeekViewV2 — the deck', () => {
       },
     }
   }
-  // What the planner shows: each line's steps, then Not under a line.
-  const shown = () => {
-    const walk = (xs: Item[]): string[] => xs.flatMap((x) => [x.key, ...walk(x.children)])
-    return [...props().choose.lines.flatMap((l) => walk(l.steps)), ...props().choose.loose.map((x) => x.key)]
-  }
+  // What the session deals: last week's leftovers (the look back), then the
+  // Inbox's captures (Clear the inbox).
+  const shown = () => [...props().choose.looseEnds.map((x) => x.key), ...props().cards.filter((c) => c.source === 'inbox').map((c) => c.key)]
 
   beforeEach(() => {
     localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
@@ -1016,7 +1014,7 @@ describe('WeekViewV2 — the deck', () => {
       createMockTask({ id: 'prevFri', title: 'Too old', scheduledFor: new Date(2026, 9, 9), isAllDay: true, updatedAt: recent }),
     ]
     open('?review=1', tasks)
-    expect(props().choose.loose.map((c) => [c.key, c.planned.label])).toEqual([['lastSat', 'Last week']])
+    expect(props().choose.looseEnds.map((c) => c.key)).toEqual(['lastSat'])
     const days = props().stripDays
     expect(days).toHaveLength(7)
     expect(days.map((d) => d.date.getDate())).toEqual([17, 18, 19, 20, 21, 22, 23])
@@ -1050,11 +1048,7 @@ describe('WeekViewV2 — the deck', () => {
     const goal = createMockTask({ id: 'g', title: 'Get the house ready for winter', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), updatedAt: recent })
     const step = createMockTask({ id: 's', title: 'Clean the gutters', bucket: 'week', weekStart: sat, goalTaskId: 'g', commitments: [{ level: 'week', periodStart: sat, status: 'open' }], updatedAt: recent })
     open('?review=1', [goal, step])
-    const [line] = props().choose.lines
-    expect(line.title).toBe('Get the house ready for winter')
-    expect(line.steps).toEqual([])
-    expect(line.verbs).toEqual([])
-    expect(props().choose.loose.map((x) => [x.key, x.planned.label])).toEqual([['s', 'This week']])
+    expect(props().choose.monthLines).toEqual([{ id: 'g', title: 'Get the house ready for winter' }])
     expect(props().choose.placeItems).toEqual([expect.objectContaining({ key: 's', from: 'This week' })])
   })
   // Spec 2026-10-19: a step of an October line, still a subtask, put on this
@@ -1069,9 +1063,8 @@ describe('WeekViewV2 — the deck', () => {
           commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }] }),
       ] })
     open('?plan=1', [line])
-    // October's line is for reading; the week's step is listed with the week's own.
-    expect(props().choose.lines[0].steps).toEqual([])
-    expect(props().choose.loose.map((x) => [x.key, x.planned.label])).toEqual([['inv', 'This week']])
+    // October's line is for the guide to read; the week's step is the week's own.
+    expect(props().choose.monthLines).toEqual([{ id: 'L', title: 'Organize family documents' }])
     expect(props().choose.placeItems.map((x) => x.key)).toEqual(['inv'])
   })
 
@@ -1158,7 +1151,7 @@ describe('WeekViewV2 — the deck', () => {
     expect(within(screen.getByTestId('guide-panel')).getByText('Look back at last week')).toBeInTheDocument()
     for (let i = 0; i < 6; i++) await act(async () => { fireEvent.click(within(screen.getByTestId('guide-panel')).getByRole('button', { name: 'Next step' })) })
     expect(document.querySelector('.pv2-week')).toHaveAttribute('data-week', '2026-10-24')
-    expect(props().choose.loose.map((c) => [c.key, c.planned.label])).toEqual([['b', 'Last week']])
+    expect(props().choose.looseEnds.map((c) => c.key)).toEqual(['b'])
     await act(async () => { await props().onFinish() })
     expect(periodReview.finish).toHaveBeenCalledTimes(1)
     expect(periodReview.token).toBe('2026-10-17')
