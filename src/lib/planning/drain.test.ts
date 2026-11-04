@@ -33,10 +33,12 @@ describe('staleForDrain', () => {
     expect(staleForDrain(tasks, NOW)).toEqual([])
   })
 
-  // Paper-style horizons (2026-11-04): is_goal is not a reason to keep it.
-  it('drains a stale task marked is_goal like any other', () => {
+  // Final review (2026-11-04): the drain keeps its old is_goal skip, so an
+  // existing goal row is never quietly swept to Later.
+  it('leaves a stale row marked is_goal where it is; a stale task beside it drains', () => {
     const goal = createMockTask({ id: 'goal', bucket: 'inbox', isGoal: true, updatedAt: daysAgo(22) })
-    expect(staleForDrain([goal], NOW).map((t) => t.id)).toEqual(['goal'])
+    const plain = createMockTask({ id: 'plain', bucket: 'inbox', updatedAt: daysAgo(22) })
+    expect(staleForDrain([goal, plain], NOW).map((t) => t.id)).toEqual(['plain'])
   })
 
   // Every placement reader goes through the cached stamps when the records
