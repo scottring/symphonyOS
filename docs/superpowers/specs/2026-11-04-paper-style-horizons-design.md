@@ -315,6 +315,53 @@ behavior.
 - **Phones and the Duo's outside screen:** the band is a sideways-scrolling
   row of step chips under the header. The drop card sits under it.
 
+### Planning is a few tooltips on the everyday page (Scott, 2026-11-04; supersedes "Planning is a ribbon")
+
+Scott saw the shipped ribbon (a red band, a drop-down card and the guide panel
+taking over the right side, all repeating the same guidance) and said:
+"terrible … would be much better served by doing what we said we were going to
+do and just having the one interface for planning and for 'everyday'
+interactions. Perhaps this would be best accomplished with tooltips rather
+than this big, invasive modal". He approved the prototype
+(`2026-11-04-paper-fold-prototype.html`, the Today tab) with "yes, rebuild it
+and ship".
+
+- **The page never changes shape for planning.** There is no band, no drop
+  card, no bookmark tab, and the guide panel never opens by itself. The
+  docked conversation stays as it is every day.
+- **A plan chip in the page header** ("Plan November" / "Plan today") starts
+  a session. While planning it reads "Planning November · 2 of 6" with an
+  ✕ to stop. Tapping it shows the current tooltip again. It replaces the
+  header's Plan buttons and the ribbon tab on every horizon.
+- **Each step is one paper tooltip** anchored to the real thing on the page.
+  It shows "Step N of M", the step title, Why and You (one line each), dots,
+  Back, Next ("Done planning {period}" on the last step) and an ✕ that hides
+  it without stopping the session. Escape hides it. It follows its anchor
+  while folds move, on scroll and on resize. The anchored element gets a soft
+  highlight. It is paper-coloured with an arrow, sized about 290px, and on
+  phones it sits under its anchor.
+- **Steps still drive the folds** (left: the level above or last period's
+  look back; right: the calendar) and focus the write line, as before.
+- **Step editors live on the page permanently**, quietly, and the tooltip
+  points at them:
+  - Energy: an "Energy" chip in the page header (Today, Season).
+  - Ideal week: the Season page's section.
+  - Vision, landscape and life areas: sections on the Year page.
+  - Wild cards, upkeep and fun, brain dump, refine: the write line and the list.
+  - Clear the inbox: the top bar's Inbox.
+  - Weekly ops: the week's dinner row.
+  - Tell the family: a quiet "For the family this week" line on the Week page.
+  - Fresh start: the page ⋯ menu.
+  - Look back at yesterday: a permanent **From yesterday** section at the top
+    of Today (unfinished items from yesterday with Today · Back to the week ·
+    Done), shown until each is decided.
+- **Done planning** folds both companions, stamps the sheet and writes the
+  header line, as before.
+- **Routines are dated commitments.** On Month and Year the floating Routines
+  strip is removed. That period's routines appear on its calendar sheet under
+  "Routines this month" / "Routines this year", with their dates. With no
+  strip, the spread centers.
+
 ## Settled after the builder check
 
 - **Nothing moves up either.** "Back to <month>" for last week's leftovers,

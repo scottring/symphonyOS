@@ -242,6 +242,7 @@ li.done .txt { color: var(--ink-faint); text-decoration: line-through; }
 .cal td .dots i.fam { background: var(--ribbon); }
 .claimed { list-style: none; margin: 0; padding: 0; }
 .claimed li { display: grid; grid-template-columns: 52px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--rule); font: 400 15px/1.3 var(--f-display); color: var(--ink-soft); }
+.claimed .rt { font-style: normal; color: var(--ink-faint); margin-right: 2px; }
 .claimed li b { font: 600 11px/1.6 var(--f-sans); color: var(--ink-faint); letter-spacing: .04em; }
 .months { list-style: none; margin: 0; padding: 0; }
 .months li { display: grid; grid-template-columns: 44px 1fr; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--rule); font: 400 14.5px/1.3 var(--f-display); color: var(--ink-soft); }
@@ -307,6 +308,59 @@ body.duo .hint .wide { display: none; }
 .hint .duo-only { display: none; }
 body.duo .hint .duo-only { display: inline; }
 
+
+/* ---- planning is a few paper tooltips on the everyday page ---- */
+.current .title { padding-right: 150px; }
+.plan-chip { position: absolute; top: 24px; right: 26px; z-index: 3; display: inline-flex; align-items: center; gap: 2px;
+  font: 500 12.5px/1 var(--f-sans); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+.plan-chip:hover { background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.plan-chip.on { padding: 0; }
+.plan-chip.on button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 7px 6px 7px 12px; }
+.plan-chip.on button + button { padding: 7px 10px 7px 4px; opacity: .7; }
+.plan-chip .pip { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; margin-right: 7px; vertical-align: 1px; animation: pip 2.4s ease-in-out infinite; }
+@keyframes pip { 50% { opacity: .35; } }
+.coach { position: absolute; top: 0; left: 0; z-index: 60; width: min(292px, calc(100vw - 24px));
+  background-color: var(--paper-above); background-image: var(--grain); color: var(--ink);
+  border-radius: 12px; padding: 13px 16px 12px; box-shadow: 0 1px 0 var(--rule-above) inset, 0 14px 34px -12px hsl(var(--shadow) / .35), 0 2px 6px hsl(var(--shadow) / .08);
+  will-change: transform; }
+.coach[hidden] { display: none; }
+.coach::before { content: ""; position: absolute; width: 12px; height: 12px; background: inherit; transform: rotate(45deg); box-shadow: -1px -1px 0 var(--rule-above); }
+.coach[data-side="top"]::before { top: -6px; left: 26px; }
+.coach[data-side="bottom"]::before { bottom: -6px; left: 26px; transform: rotate(225deg); }
+.coach[data-side="left"]::before { left: -6px; top: 22px; transform: rotate(-45deg); }
+.coach[data-side="right"]::before { right: -6px; top: 22px; transform: rotate(135deg); }
+.coach.in { animation: coach-in .26s cubic-bezier(.2,.8,.2,1); }
+@keyframes coach-in { from { opacity: 0; filter: blur(1px); } }
+.coach-k { font: 600 10px/1 var(--f-sans); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-faint); }
+.coach-t { font: 500 19px/1.2 var(--f-display); margin: 6px 0 6px; padding-right: 18px; }
+.coach p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
+.coach .coach-why { color: var(--ink-soft); }
+.coach-nav { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.coach-nav button { border: 0; background: none; color: var(--ink-soft); font: 500 12.5px/1 var(--f-sans); padding: 7px 8px; border-radius: 999px; cursor: pointer; }
+.coach-nav button[disabled] { opacity: .35; cursor: default; }
+.coach-nav button.primary { margin-left: auto; background: var(--accent); color: var(--paper); padding: 7px 13px; }
+.coach-nav .dots { display: flex; gap: 4px; }
+.coach-nav .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--rule); }
+.coach-nav .dots i.past { background: var(--ink-faint); }
+.coach-nav .dots i.on { background: var(--accent); }
+.coach-x { position: absolute; top: 8px; right: 8px; border: 0; background: none; color: var(--ink-faint); font-size: 13px; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; }
+.coach-x:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.lit { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 6px; transition: box-shadow .3s; }
+
+/* Today: the everyday page, with yesterday's leftovers kept on it */
+.energy { border: 0; background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink-soft); font: 500 12px/1 var(--f-sans); padding: 5px 9px; border-radius: 999px; cursor: pointer; }
+.energy b { font-weight: 600; color: var(--ink); }
+.dayline { list-style: none; margin: 0; padding: 0; }
+.dayline li { display: grid; grid-template-columns: 50px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--rule); font: 400 16px/1.35 var(--f-display); color: var(--ink-soft); }
+.dayline li b { font: 600 11.5px/1.7 var(--f-sans); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.kidchips { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
+.kidchips span { font: 500 11.5px/1 var(--f-sans); background: hsl(36 70% 92%); color: hsl(30 45% 35%); padding: 5px 9px; border-radius: 999px; }
+.pick-list li { align-items: center; }
+.pick { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--rule-above); background: var(--paper); color: var(--accent); cursor: pointer; font: 500 16px/1 var(--f-sans); display: grid; place-items: center; margin-left: auto; }
+@media (pointer: coarse) { .pick { width: 40px; height: 40px; } }
+.pick:hover { background: color-mix(in srgb, var(--accent) 10%, var(--paper)); }
+
 @media (prefers-reduced-motion: reduce) {
   .swap, .list li.new, .stamp.hit, .spine.cue { animation: none; }
   .band-wrap, .ribbon-tab { transition: none; }
@@ -320,6 +374,7 @@ body.duo .hint .duo-only { display: inline; }
     <button type="button" data-h="season" aria-pressed="false">Season</button>
     <button type="button" data-h="month" aria-pressed="true">Month</button>
     <button type="button" data-h="week" aria-pressed="false">Week</button>
+    <button type="button" data-h="today" aria-pressed="false">Today</button>
   </nav>
   <button type="button" class="icon-btn" id="sound" aria-pressed="true" aria-label="Paper sounds" title="Paper sounds">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -328,20 +383,7 @@ body.duo .hint .duo-only { display: inline; }
   </button>
 </header>
 
-<div class="band-wrap" id="bandWrap"><div>
-  <section class="band" id="band" aria-label="Planning session">
-    <div class="band-top">
-      <span class="band-title" id="bandTitle">Plan November</span>
-      <nav class="steps" id="steps" aria-label="Steps"></nav>
-      <div class="band-nav">
-        <button type="button" id="bandBack">Back</button>
-        <button type="button" id="bandNext" class="primary">Next</button>
-        <button type="button" id="bandLeave">Leave</button>
-      </div>
-    </div>
-    <div class="band-note" id="bandNote"></div>
-  </section>
-</div></div>
+
 
 <main class="stage" id="stage">
   <div class="spread" id="spread">
@@ -370,7 +412,7 @@ body.duo .hint .duo-only { display: inline; }
     </div>
   </div>
 </main>
-<p class="hint"><span class="wide">Left edge: the level above. Right edge: this period’s calendar. <kbd>F</kbd> and <kbd>C</kbd> fold them. Pull the ribbon to plan. </span><span class="duo-only">Two pages at a time: this period, and whichever sheet you open. </span>Nothing here saves.</p>
+<p class="hint"><span class="wide">Left edge: the level above. Right edge: this period’s calendar. <kbd>F</kbd> and <kbd>C</kbd> fold them. Tap Plan for the guided steps; it’s the same page. </span><span class="duo-only">Two pages at a time: this period, and whichever sheet you open. </span>Nothing here saves.</p>
 
 <script>
 (() => {
@@ -387,9 +429,18 @@ body.duo .hint .duo-only { display: inline; }
       done: 24, doneNames: 'Fix the light in the kitchen, Make it easy to weed…', add: 'Write a November goal' },
     week: { name: 'Oct 31 – Nov 6', short: 'This week', kicker: 'Week', planned: 'Planned Mon, Nov 2 · Last week’s review', doing: true,
       items: ['Confirm chosen dates with Iris', 'Reserve Amtrak tickets', 'Look at NE Corridor train cost, schedule and lodging for winter break', 'Clean up and trim the plants in the backyard', 'Print out Kaleb’s checklist', 'Look for Michaels on the way from Coppermine', 'Draft up what the kids need', 'Reschedule the kids’ dentist appointment', 'Kids’ birthday plan', 'Plan one hour for winter-break findings'],
-      done: 6, doneNames: '', add: 'Write a task for this week' }
+      done: 6, doneNames: '', add: 'Write a task for this week' },
+    today: { name: 'Wednesday, November 4', short: 'today', kicker: 'Today', planned: '', doing: true,
+      items: [], done: 0, doneNames: '', add: 'Write a task for today' }
   };
-  const ABOVE = { year: null, season: 'year', month: 'season', week: 'month' };
+  const TODAY = {
+    leftovers: ['Drive to Coppermine / take 1 Sinemet', 'Find 2–3 potential therapists for Kaleb'],
+    chips: ['Ella · Music', 'Kaleb · Library'],
+    events: [['7:00', 'Feed Jax AM meal'], ['5:15', 'Pick up from FFG and walk home'], ['7:30', 'Kids bedtime routine']],
+    routines: ['Go to the library with the kids', 'Weekly financial review'],
+    energy: null, picked: new Set()
+  };
+  const ABOVE = { year: null, season: 'year', month: 'season', week: 'month', today: 'week' };
   // What is already claimed (from the calendar on the Week page; later dates marked as examples).
   const NOV = [
     { d: 3, t: 'Election Day · no school', fam: true }, { d: 3, t: 'Boxing 9a' }, { d: 5, t: 'Picture day', fam: true }, { d: 5, t: 'Boxing 9a' },
@@ -435,9 +486,16 @@ body.duo .hint .duo-only { display: inline; }
       { t: 'Choose this week’s tasks', left: 'above', write: true, why: 'About fifteen things a week is plenty.', you: 'Write this week’s tasks on the sheet.' },
       { t: 'Weekly ops', why: 'Meals, workouts and the weekend.', you: 'Say them; they go where they belong.' },
       { t: 'Tell the family', why: 'What everyone should know this week.', you: 'Say what to post on the wall.' }
+    ],
+    today: [
+      { t: 'Look back at yesterday', at: 'leftovers', why: 'Nothing left from yesterday should quietly vanish.', you: 'For each one: Today, back to the week, or done.' },
+      { t: 'Today’s calendar', at: 'dayline', why: 'The fixed points decide how much else fits.', you: 'Read the day. Anything missing, add it the usual way.' },
+      { t: 'Energy', at: 'energy', why: 'A low day holds less, and that’s fine.', you: 'Tap the energy chip: low, medium or high.' },
+      { t: 'Pick 3 to 5', left: 'above', at: 'left', why: 'A few chosen things get done; a long list doesn’t.', you: 'On the week beside you, tap + on three to five.' },
+      { t: 'Habits', left: 'above', at: 'routines', why: 'Routines without a time still need a place in the day.', you: 'Tap + on the routines you’ll do today.' }
     ]
   };
-  const added = { year: [], season: [], month: [], week: [] };
+  const added = { year: [], season: [], month: [], week: [], today: [] };
   const ticked = new Set();
   const decisions = {};
   const planned = {};
@@ -617,7 +675,52 @@ body.duo .hint .duo-only { display: inline; }
       return `<li class="${isNew ? 'new' : ''}"><span class="txt">${esc(t)}</span></li>`;
     }).join('');
   }
+  function planWord() { return level === 'week' ? 'the week' : level === 'today' ? 'today' : LEVELS[level].short; }
+  function planChip() {
+    if (!session) return `<button type="button" class="plan-chip" id="planChip">Plan ${esc(planWord())}</button>`;
+    const n = STEPS[level].length;
+    return `<div class="plan-chip on"><button type="button" id="planChip"><span class="pip"></span>Planning ${esc(planWord())} · ${session.i + 1} of ${n}</button><button type="button" id="planStop" aria-label="Stop planning">✕</button></div>`;
+  }
+  function wireChip() {
+    const c = $('planChip'); if (c) c.addEventListener('click', () => session ? showCoach() : startSession());
+    const x = $('planStop'); if (x) x.addEventListener('click', leaveSession);
+  }
+  function renderToday(fresh) {
+    const Lv = LEVELS.today;
+    const forToday = [...TODAY.picked, ...added.today];
+    const done = forToday.filter((t) => ticked.has('today:' + t)).length;
+    const plannedLine = planned.today || 'Not planned yet';
+    current.innerHTML = `
+      ${planChip()}
+      ${planned.today ? '<div class="stamp" id="stamp">Planned<br>Wed</div>' : ''}
+      <div class="kicker">Today</div>
+      <h1 class="title">${esc(Lv.name)}</h1>
+      <div class="meta"><span>${forToday.length - done} for today · ${done} done</span>
+        <button type="button" class="energy" id="energyChip">Energy: <b>${TODAY.energy || '—'}</b></button>
+        <span class="planned">${esc(plannedLine)}</span></div>
+      ${TODAY.leftovers.length ? `<div class="section-h">From yesterday</div>
+      <ul class="list rv" id="leftovers">${TODAY.leftovers.map((t) => `<li data-t="${esc(t)}"><span class="txt">${esc(t)}</span><span class="choices"><button type="button" data-v="today">Today</button><button type="button" data-v="week">Back to the week</button><button type="button" data-v="done">Done</button></span></li>`).join('')}</ul>` : '<div id="leftovers"></div>'}
+      <div class="section-h">The day</div>
+      <div id="dayline"><div class="kidchips">${TODAY.chips.map((c) => `<span>${esc(c)}</span>`).join('')}</div>
+      <ul class="dayline">${TODAY.events.map(([h, t]) => `<li><b>${h}</b><span>${esc(t)}</span></li>`).join('')}</ul></div>
+      <div class="section-h">For today</div>
+      <ul class="list">${forToday.map((t) => { const id = 'today:' + t, d = ticked.has(id); return `<li class="${d ? 'done' : ''}${t === fresh ? ' new' : ''}" data-id="${esc(id)}"><button type="button" class="check" aria-pressed="${d}" aria-label="Done: ${esc(t)}"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 8.6l4.6-5.2"/></svg></button><span class="txt">${esc(t)}</span></li>`; }).join('')}</ul>
+      <form class="add" id="addForm" autocomplete="off">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/><path d="m14.5 5.5 3 3"/></svg>
+        <input id="addInput" placeholder="${esc(Lv.add)}" aria-label="${esc(Lv.add)}"><span class="enter">Return to add</span></form>`;
+    $('addForm').addEventListener('submit', (e) => { e.preventDefault(); const v = $('addInput').value.trim(); if (!v) return; added.today.push(v); Sound.pencil(); renderToday(v); });
+    $('energyChip').addEventListener('click', () => { const o = [null, 'low', 'medium', 'high']; TODAY.energy = o[(o.indexOf(TODAY.energy) + 1) % o.length] || 'low'; Sound.pencil(); renderToday(); placeCoachSoon(); });
+    const lo = $('leftovers'); lo && lo.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-v]'); if (!b) return;
+      const t = b.closest('li').dataset.t; TODAY.leftovers = TODAY.leftovers.filter((x) => x !== t);
+      if (b.dataset.v === 'today') TODAY.picked.add(t);
+      if (b.dataset.v === 'week') LEVELS.week.items.push(t);
+      Sound.pencil(); renderToday(); renderLeft(); placeCoachSoon();
+    });
+    wireChip();
+  }
   function renderCurrent(fresh) {
+    if (level === 'today') return renderToday(fresh);
     const Lv = LEVELS[level];
     const items = Lv.items.length + added[level].length;
     const doneNow = Lv.done + [...ticked].filter((x) => x.startsWith(level + ':')).length;
@@ -626,7 +729,7 @@ body.duo .hint .duo-only { display: inline; }
     const step = session && STEPS[level][session.i];
     const ph = step && step.write === 'fun' ? `Something fun for ${Lv.short === 'This week' ? 'this week' : Lv.short}` : Lv.add;
     current.innerHTML = `
-      <button type="button" class="ribbon-tab" id="ribbonTab" aria-expanded="${!!session}" aria-controls="band" aria-label="Plan ${esc(Lv.name)}"><span>Plan</span></button>
+      ${planChip()}
       ${planned[level] ? '<div class="stamp" id="stamp">Planned<br>' + esc(planned[level].split(',')[0].replace('Planned ', '')) + '</div>' : ''}
       <div class="kicker">${esc(Lv.kicker)}</div>
       <h1 class="title">${esc(Lv.name)}</h1>
@@ -638,7 +741,7 @@ body.duo .hint .duo-only { display: inline; }
         <input id="addInput" placeholder="${esc(ph)}" aria-label="${esc(ph)}"><span class="enter">Return to add</span></form>
       ${Lv.done ? `<div class="donefold">${Lv.done} done earlier${Lv.doneNames ? ' · ' + esc(Lv.doneNames) : ''}</div>` : ''}`;
     $('addForm').addEventListener('submit', (e) => { e.preventDefault(); const v = $('addInput').value.trim(); if (!v) return; added[level].push(v); Sound.pencil(); renderCurrent(v); const inp = $('addInput'); inp && inp.focus(); });
-    $('ribbonTab').addEventListener('click', () => session ? leaveSession() : startSession());
+    wireChip();
   }
   function renderLeft() {
     const sp = $('spineLLbl'), cnt = $('spineLCnt');
@@ -652,6 +755,18 @@ body.duo .hint .duo-only { display: inline; }
         <div class="reading">Only here, while planning, does the sheet beside you take a choice. Each one acts on ${esc(lb.name)} only.</div>`;
       return;
     }
+    if (level === 'today') {
+      const W = LEVELS.week; const open = [...W.items, ...added.week].filter((t) => !TODAY.picked.has(t));
+      const rs = TODAY.routines.filter((t) => !TODAY.picked.has(t));
+      sp.textContent = W.name; cnt.textContent = String(open.length);
+      const row = (t) => `<li data-t="${esc(t)}"><span class="txt">${esc(t)}</span><button type="button" class="pick" aria-label="Plan ${esc(t)} for today">+</button></li>`;
+      $('bodyL').innerHTML = `<div class="kicker">Week</div><h2 class="title">${esc(W.name)}</h2>
+        <ul class="list pick-list">${open.map(row).join('')}</ul>
+        <div class="section-h" id="routinesSheet">Routines today</div>
+        <ul class="list pick-list">${rs.map(row).join('')}</ul>
+        <div class="reading">${eye} Pick three to five for today.</div>`;
+      return;
+    }
     const k = ABOVE[level];
     if (!k) { sp.textContent = '2025'; cnt.textContent = '0'; $('bodyL').innerHTML = `<div class="kicker">Last year</div><h2 class="title">2025</h2><p class="empty">Nothing left open from 2025.</p><div class="reading">${eye} For reading.</div>`; return; }
     const A = LEVELS[k]; const n = A.items.length + added[k].length;
@@ -660,7 +775,7 @@ body.duo .hint .duo-only { display: inline; }
     $('bodyL').innerHTML = `<div class="kicker">${esc(A.kicker)}</div><h2 class="title">${esc(A.name)}</h2><ul class="list">${rowsHtml(k)}</ul>${A.done ? `<div class="donefold">${A.done} done</div>` : ''}<div class="reading">${eye} For reading. Write ${esc(word)} in its own words.</div>`;
   }
   function renderRight() {
-    const has = level !== 'week';
+    const has = level !== 'week' && level !== 'today';
     $('slotR').hidden = !has;
     if (!has) return;
     const lbl = { year: '2026 calendar', season: 'Fall calendar', month: 'November calendar' }[level];
@@ -672,6 +787,8 @@ body.duo .hint .duo-only { display: inline; }
       $('bodyR').innerHTML = `<div class="kicker">What’s already claimed</div><h2 class="title">November</h2>
         <table class="cal" aria-label="November 2026"><thead><tr>${days.map((x) => `<th>${x}</th>`).join('')}</tr></thead><tbody>${cells}</tbody></table>
         <ul class="claimed">${claimed.map((e) => `<li><b>Nov ${e.d}</b><span>${esc(e.t.startsWith('Boxing') ? 'Boxing, Tue and Thu 9a' : e.t)}</span></li>`).join('')}</ul>
+        <div class="section-h">Routines this month</div>
+        <ul class="claimed routines">${[['Nov 1', 'Monthly financial review'], ['Nov 7–8', 'Wash comforters'], ['Nov 10', 'Pay FFG']].map(([d, t]) => `<li><b>${d}</b><span><i class="rt" aria-hidden="true">↻</i> ${esc(t)}</span></li>`).join('')}</ul>
         <div class="reading">${eye} For reading. Add events the usual way.</div>`;
     } else if (level === 'season') {
       $('bodyR').innerHTML = `<div class="kicker">Fixed dates · Oct 1 – Dec 31</div><h2 class="title">Fall</h2>
@@ -690,9 +807,11 @@ body.duo .hint .duo-only { display: inline; }
     const b = e.target.closest('.check'); if (!b) return;
     const li = b.closest('li'); const id = li.dataset.id;
     if (ticked.has(id)) ticked.delete(id); else { ticked.add(id); Sound.pencil(); buzz(); }
-    renderCurrent();
+    renderCurrent(); placeCoachSoon();
   });
   $('bodyL').addEventListener('click', (e) => {
+    const pk = e.target.closest('.pick');
+    if (pk) { TODAY.picked.add(pk.closest('li').dataset.t); Sound.pencil(); buzz(); renderLeft(); renderToday(); placeCoachSoon(); return; }
     const b = e.target.closest('.choices button'); if (!b) return;
     const t = b.closest('li').dataset.t; decisions[level + ':' + t] = b.textContent; Sound.pencil(); renderLeft();
   });
@@ -701,7 +820,7 @@ body.duo .hint .duo-only { display: inline; }
   function layout() {
     const was = mode; mode = detectMode();
     document.body.classList.toggle('v', mode === 'v'); document.body.classList.toggle('h', mode !== 'v'); document.body.classList.toggle('duo', mode === 'duo');
-    const hasR = level !== 'week';
+    const hasR = level !== 'week' && level !== 'today';
     for (const f of [L, R]) { f.flap.style.height = ''; f.flap.style.width = ''; }
     if (mode === 'v') {
       both = false;
@@ -738,72 +857,93 @@ body.duo .hint .duo-only { display: inline; }
     if ((e.key === 'c' || e.key === 'C') && level !== 'week') R.toggle();
   });
 
-  // ---------- the ribbon: planning, on the same page ----------
+  // ---------- planning: a few paper tooltips on the same page ----------
   let session = null;
-  const bandWrap = $('bandWrap');
-  function startSession() {
-    session = { i: 0, done: new Set() };
-    Sound.ribbon();
-    bandWrap.classList.add('on');
-    renderBand(); applyStep(); renderCurrent();
+  const coach = document.createElement('div');
+  coach.className = 'coach'; coach.hidden = true; coach.setAttribute('role', 'dialog'); coach.setAttribute('aria-label', 'Planning guide');
+  document.body.appendChild(coach);
+  let follow = 0;
+  function anchorOf(s) {
+    const at = s.at || (s.right ? 'right' : s.write ? 'write' : s.left ? 'left' : 'title');
+    const el = at === 'left' ? $('slotL') : at === 'right' ? $('slotR') : at === 'write' ? $('addForm')
+      : at === 'leftovers' ? $('leftovers') : at === 'dayline' ? $('dayline') : at === 'energy' ? $('energyChip')
+      : at === 'routines' ? ($('slotL').classList.contains('is-open') ? $('routinesSheet') : $('slotL')) : current.querySelector('.title');
+    return { at, el };
   }
-  function leaveSession() {
-    session = null; Sound.ribbon(); bandWrap.classList.remove('on');
-    leftView = 'above'; renderLeft(); renderCurrent();
+  function placeCoach() {
+    if (!session || coach.hidden) return;
+    const { at, el } = anchorOf(STEPS[level][session.i]); if (!el) return;
+    const r = el.getBoundingClientRect(), cw = coach.offsetWidth, ch = coach.offsetHeight;
+    let x, y, side;
+    if (mode !== 'v' && (at === 'left' || at === 'routines')) { x = r.right + 14; y = at === 'routines' ? r.top - 10 : r.top + 96; side = 'left'; }
+    else if (mode !== 'v' && at === 'right') { x = r.left - 14 - cw; y = r.top + 96; side = 'right'; }
+    else { x = r.left + 8; y = r.bottom + 12; side = 'top'; if (y + ch > innerHeight - 12 && r.top - ch - 12 > 12) { y = r.top - 12 - ch; side = 'bottom'; } }
+    x = Math.max(12, Math.min(innerWidth - cw - 12, x)); y = Math.max(12, Math.min(innerHeight - ch - 12, y));
+    coach.style.transform = `translate(${Math.round(x + scrollX)}px, ${Math.round(y + scrollY)}px)`;
+    coach.dataset.side = side;
+    document.querySelectorAll('.lit').forEach((n) => n.classList.remove('lit'));
+    if (at !== 'left' && at !== 'right' && at !== 'title') el.classList.add('lit');
   }
-  function renderBand() {
-    const Lv = LEVELS[level], steps = STEPS[level];
-    $('bandTitle').textContent = 'Plan ' + (level === 'week' ? 'the week' : Lv.short === '2026' ? '2026' : Lv.short);
-    $('steps').innerHTML = steps.map((s, i) => `<button type="button" data-i="${i}" class="${session.done.has(i) ? 'done' : ''}" ${i === session.i ? 'aria-current="step"' : ''}><span class="n">${session.done.has(i) ? '✓' : i + 1}</span>${esc(s.t)}</button>`).join('');
-    const s = steps[session.i];
-    $('bandNote').innerHTML = `<b>Why</b><span>${esc(s.why)}</span><b>You</b><span>${esc(s.you)}</span>`;
-    $('bandBack').disabled = session.i === 0;
-    const last = session.i === steps.length - 1;
-    $('bandNext').textContent = last ? 'Done planning ' + (level === 'week' ? 'the week' : Lv.short) : 'Next';
+  function placeCoachSoon() {
+    // Folds take ~0.6s to settle; follow them.
+    cancelAnimationFrame(follow); const t0 = performance.now();
+    const tick = () => { placeCoach(); if (performance.now() - t0 < 900) follow = requestAnimationFrame(tick); };
+    follow = requestAnimationFrame(tick);
   }
+  addEventListener('scroll', placeCoach, { passive: true });
+  function showCoach() {
+    const steps = STEPS[level], s = steps[session.i], last = session.i === steps.length - 1;
+    coach.innerHTML = `<div class="coach-k">Step ${session.i + 1} of ${steps.length}</div>
+      <div class="coach-t">${esc(s.t)}</div>
+      <p class="coach-why">${esc(s.why)}</p><p class="coach-you">${esc(s.you)}</p>
+      <div class="coach-nav"><button type="button" data-a="back" ${session.i === 0 ? 'disabled' : ''}>Back</button>
+        <span class="dots">${steps.map((_, i) => `<i class="${i === session.i ? 'on' : i < session.i ? 'past' : ''}"></i>`).join('')}</span>
+        <button type="button" data-a="next" class="primary">${last ? 'Done planning' : 'Next'}</button></div>
+      <button type="button" class="coach-x" data-a="hide" aria-label="Hide the guide">✕</button>`;
+    coach.hidden = false; coach.classList.remove('in'); void coach.offsetWidth; coach.classList.add('in');
+    placeCoachSoon();
+  }
+  function hideCoach() { coach.hidden = true; document.querySelectorAll('.lit').forEach((n) => n.classList.remove('lit')); }
   function applyStep() {
     const s = STEPS[level][session.i];
     const wantL = s.left ? 1 : 0, wantR = s.right ? 1 : 0;
     const newView = s.left === 'look' ? 'look' : 'above';
     if (newView !== leftView) { leftView = newView; renderLeft(); if (mode === 'v') layout(); }
-    // Open what this step needs; fold what it doesn't. On a narrow spread, one at a time.
     if (wantR && !both) { L.go(0, true); R.go(1); }
     else { if (L.target !== wantL) L.go(wantL); if (R.target !== wantR) R.go(wantR); }
-    const sp = wantL ? L.spine : wantR ? R.spine : null;
-    if (s.write) {
-      requestAnimationFrame(() => { const a = $('addForm'); if (!a) return; a.classList.add('glow'); $('addInput').focus({ preventScroll: true }); setTimeout(() => a.classList.remove('glow'), 1400); });
-    }
-  }
-  $('steps').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || !session) return; session.i = +b.dataset.i; Sound.crinkle(3, .1, .6); renderBand(); renderCurrent(); applyStep(); });
-  $('bandBack').addEventListener('click', () => { if (session && session.i > 0) { session.i--; Sound.crinkle(3, .1, .6); renderBand(); renderCurrent(); applyStep(); } });
-  $('bandLeave').addEventListener('click', leaveSession);
-  $('bandNext').addEventListener('click', () => {
-    if (!session) return;
-    const steps = STEPS[level];
-    session.done.add(session.i);
-    if (session.i < steps.length - 1) { session.i++; Sound.crinkle(3, .1, .6); renderBand(); renderCurrent(); applyStep(); return; }
-    // Done planning: fold everything, stamp the sheet.
-    planned[level] = 'Planned Wed, Nov 4' + (level === 'year' ? '' : ' · Last ' + (level === 'week' ? 'week' : level === 'month' ? 'month' : 'season') + '’s review');
-    session = null; bandWrap.classList.remove('on'); leftView = 'above'; renderLeft();
-    L.go(0, true); R.go(0, true);
     renderCurrent();
+    if (s.write) requestAnimationFrame(() => { const i = $('addInput'); i && i.focus({ preventScroll: true }); });
+    showCoach();
+  }
+  function startSession() { session = { i: 0 }; Sound.crinkle(4, .12, .7); applyStep(); }
+  function leaveSession() { session = null; hideCoach(); leftView = 'above'; renderLeft(); renderCurrent(); }
+  coach.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-a]'); if (!b || !session) return;
+    const steps = STEPS[level];
+    if (b.dataset.a === 'hide') { hideCoach(); return; }
+    if (b.dataset.a === 'back' && session.i > 0) { session.i--; Sound.crinkle(3, .1, .6); applyStep(); return; }
+    if (b.dataset.a !== 'next') return;
+    if (session.i < steps.length - 1) { session.i++; Sound.crinkle(3, .1, .6); applyStep(); return; }
+    planned[level] = 'Planned Wed, Nov 4' + ({ year: '', today: ' · Yesterday’s review', week: ' · Last week’s review', month: ' · Last month’s review', season: ' · Last season’s review' }[level]);
+    session = null; hideCoach(); leftView = 'above'; renderLeft(); L.go(0, true); R.go(0, true); renderCurrent();
     const st = $('stamp'); if (st) { st.classList.add('hit'); setTimeout(() => { Sound.stamp(); buzz(); }, 120); }
   });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !coach.hidden) hideCoach(); });
 
   // ---------- horizons ----------
   const tabs = document.querySelectorAll('.horizons button');
   function setLevel(k) {
-    if (session) { session = null; bandWrap.classList.remove('on'); }
+    if (session) { session = null; hideCoach(); }
     level = k; leftView = 'above';
     tabs.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.h === k)));
     renderCurrent(); renderLeft(); renderRight();
     current.classList.remove('swap'); void current.offsetWidth; current.classList.add('swap');
-    if (k === 'week') { R.p = R.target = 0; }
+    if (k === 'week' || k === 'today') { R.p = R.target = 0; }
     layout();
     try { history.replaceState(null, '', '#' + k + (forceDuo ? '-duo' : '')); } catch (e) {}
   }
   tabs.forEach((b) => b.addEventListener('click', () => { if (b.dataset.h !== level) { Sound.crinkle(4, .14, .7); setLevel(b.dataset.h); } }));
-  let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(layout, 80); });
+  let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { layout(); placeCoach(); }, 80); });
   setLevel(level);
 })();
 </script>
