@@ -184,6 +184,16 @@ function perFrame(fn: () => void): { run: () => void; cancel: () => void } {
 
 const buzz = () => { try { navigator.vibrate?.(6) } catch { /* no haptics */ } }
 
+/** A step's one action, carried in its tooltip (Year's Share and book: "Book
+ *  the first Winter session", the existing booking). It runs on a tap and
+ *  says when it is done. */
+export interface CoachAction {
+  label: string
+  /** Said once it has run ("Booked: Plan Winter, Tue, Dec 1"). */
+  done: string
+  run: () => Promise<boolean>
+}
+
 export interface GuideCoachProps {
   level: GuideLevel
   /** The current step's id. */
@@ -199,9 +209,11 @@ export interface GuideCoachProps {
   onStop: () => void
   /** Where the session is could not be saved. */
   error?: string | null
+  /** The current step's one action, if it has one. */
+  action?: CoachAction
 }
 
-export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onFinish, onStop, error }: GuideCoachProps) {
+export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onFinish, onStop, error, action }: GuideCoachProps) {
   const steps = stepsFor(level)
   const index = Math.max(0, steps.findIndex((s) => s.id === current))
   const step = steps[index]
@@ -288,6 +300,16 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
     return () => cancelAnimationFrame(id)
   }, [step.id, write])
 
+  // The step's action: once running, once done (for this step), or failed.
+  const [acted, setActed] = useState<{ step: string; state: 'running' | 'done' | 'failed' } | null>(null)
+  const actState = acted?.step === step.id ? acted.state : null
+  const runAction = async () => {
+    if (!action || actState === 'running') return
+    setActed({ step: step.id, state: 'running' })
+    const ok = await action.run().catch(() => false)
+    setActed({ step: step.id, state: ok ? 'done' : 'failed' })
+  }
+
   const title = titleFor ? titleFor(step) : step.title
   return createPortal(
     <div ref={ref} className="coach" role="dialog" aria-label="Planning guide" hidden={hidden} data-level={level}>
@@ -295,6 +317,10 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
       <div className="coach-t">{title}</div>
       <p className="coach-why">{step.why}</p>
       <p className="coach-you">{step.you}</p>
+      {action && (actState === 'done'
+        ? <p className="coach-done" role="status">{action.done}</p>
+        : <button type="button" className="coach-action" disabled={actState === 'running'} onClick={() => { void runAction() }}>{action.label}</button>)}
+      {action && actState === 'failed' && <p className="coach-error" role="alert">Didn’t save. Try again.</p>}
       {error && <p className="coach-error" role="alert">{error}</p>}
       <div className="coach-nav">
         <button type="button" disabled={index === 0} onClick={onBack}>Back</button>

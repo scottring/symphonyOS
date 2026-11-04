@@ -33,7 +33,7 @@ const sound = vi.hoisted(() => ({ crinkle: vi.fn(), stamp: vi.fn() }))
 vi.mock('@/lib/fold/paperSound', () => ({ paperSound: { crinkle: sound.crinkle, stamp: sound.stamp } }))
 
 import { GuidedPeriod, type SessionFold } from '@/components/plan/guided/GuidedPeriod'
-import { PlanChip, PlannedStamp } from './GuideCoach'
+import { GuideCoach, PlanChip, PlannedStamp } from './GuideCoach'
 
 // November as the page draws it: the header with its title and plan chip,
 // the sheet with the calendar's edge at its right and the write line on a
@@ -56,7 +56,7 @@ function MonthPage({ titled = true, stacked = false }: { titled?: boolean; stack
       <PlanChip level="month" word="November" onStart={() => setPlanning(true)} />
     </header>
     {planning
-      ? <GuidedPeriod level="month" token="2026-11" periodLabel="November" page={sheet} bodies={() => ({ 'fresh-start': <p>Pick a scenery</p> })}
+      ? <GuidedPeriod level="month" token="2026-11" periodLabel="November" page={sheet} look={() => <p>Pick a scenery</p>}
           onFinish={async () => { setMarked(true); return true }} onLeave={() => setPlanning(false)} />
       : sheet()}
   </>
@@ -257,5 +257,27 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
       await start()
       expect(coach()).not.toHaveClass('is-in')
     } finally { window.matchMedia = mm }
+  })
+
+  // Share and book (Year): the tooltip carries the step's one action, the
+  // existing booking; sharing is each goal's own space.
+  it('a step with one action carries its button in the tooltip; it runs once and says it is done; a failure says so', async () => {
+    const run = vi.fn(async () => false)
+    const coachFor = () => <MemoryRouter><GuideCoach level="year" current="share-book" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()}
+      action={{ label: 'Book the first Winter session', done: 'Booked: Plan Winter, Tue, Dec 1', run }} /></MemoryRouter>
+    const { rerender } = render(coachFor())
+    await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Book the first Winter session' })) })
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(tip().getByRole('alert')).toHaveTextContent('Didn’t save. Try again.')
+    run.mockResolvedValue(true)
+    rerender(coachFor())
+    await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Book the first Winter session' })) })
+    expect(tip().getByRole('status')).toHaveTextContent('Booked: Plan Winter, Tue, Dec 1')
+    expect(tip().queryByRole('button', { name: 'Book the first Winter session' })).toBeNull()
+    expect(tip().queryByRole('alert')).toBeNull()
+  })
+  it('a step with no action has no extra button', () => {
+    render(<MemoryRouter><GuideCoach level="year" current="refine" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()} /></MemoryRouter>)
+    expect(tip().getAllByRole('button').map((b) => b.textContent)).toEqual(['Back', 'Next', '✕'])
   })
 })

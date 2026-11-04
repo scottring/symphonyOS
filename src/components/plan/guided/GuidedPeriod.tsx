@@ -15,32 +15,30 @@
 // closing writes, then the session's own finish, then leaves. Stopping (the
 // chip's ✕) writes nothing and keeps where the session is.
 //
-// The look back's notes as typed are held here, so they outlive their step's
-// body (only the current step's body is drawn); Done hands them to the
-// closing writes, which save what is still unsaved.
+// The look back's notes as typed are held here, so they outlive their step
+// (the look back is drawn only on its own step); Done hands them to the
+// closing writes, which save what is still unsaved. No step draws a card of
+// its own: each step's editor is a permanent section of the page (2026-11-04),
+// and a step with one action (Year's Share and book) carries it in its tooltip.
 
 import { createElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
 import { useOpenOnStep } from '@/hooks/useOpenOnStep'
-import { usePlanningNotes, type NotesPatch, type PlanningNotes } from '@/hooks/usePlanningNotes'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import { HORIZON_OF, choosingStep, stepsFor } from '@/lib/guide/steps'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
-import { GuideCoach, usePlanSessionLoading } from '@/components/guide/GuideCoach'
+import { GuideCoach, usePlanSessionLoading, type CoachAction } from '@/components/guide/GuideCoach'
 import type { TaskContext } from '@/types/task'
 import '@/components/guide/guide.css'
 
 export type PeriodLevel = 'month' | 'season' | 'year'
 
-/** What the session hands the page's step bodies. */
+/** What the session hands the page's look back. */
 export interface PeriodSessionTools {
   /** The look back's notes as typed and not yet saved (null: nothing typed). */
   lookDraft: ReviewNotes | null
   setLookDraft: (notes: ReviewNotes | null) => void
-  /** This person's notes for the period (the scenery, the energy…) and their save. */
-  notes: PlanningNotes
-  patch: (p: NotesPatch) => Promise<boolean>
 }
 
 /** What the current step asks of the page's folds (PaperFold's `drive`), and
@@ -59,7 +57,7 @@ type Line = { id: string; title: string }
 type Area = { id: string; name: string; context: TaskContext | null }
 const NONE: readonly never[] = []
 
-export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites }: {
+export function GuidedPeriod({ level, token, periodLabel, page, look, actions, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites }: {
   level: PeriodLevel
   /** The period's planning token (monthToken, seasonToken, yearToken). */
   token: string
@@ -68,10 +66,10 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   /** The period's page itself, without its strip, drawn with the folds the
    *  current step asks for. */
   page: ReactNode | ((fold: SessionFold) => ReactNode)
-  /** What each step shows, by step id: the look back's in the sheet above.
-   *  The other steps' editors are not drawn in a session (their place is the
-   *  page itself; 2026-11-04 tooltips). */
-  bodies: (tools: PeriodSessionTools) => Partial<Record<string, ReactNode>>
+  /** The look back, drawn in the sheet above on its step. */
+  look: (tools: PeriodSessionTools) => ReactNode
+  /** A step's one action, by step id, carried in its tooltip. */
+  actions?: Partial<Record<string, CoachAction>>
   /** The period's closing writes, with the look back's unsaved notes; false
    *  keeps the session open. */
   onFinish: (lookDraft: ReviewNotes | null) => Promise<boolean>
@@ -92,7 +90,6 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   const { progress, loading, saveError, next, jump, markPlanned, finish, setThreadId } = useGuidedProgress(level, token)
   useOpenOnStep(level, loading, jump)
   usePlanSessionLoading(level, loading)
-  const { notes, patch } = usePlanningNotes(HORIZON_OF[level], token)
   const [lookDraft, setLookDraft] = useState<ReviewNotes | null>(null)
 
   const latest = useRef({ progress, onFinish, onLeave, onPlanned, lookDraft })
@@ -156,13 +153,12 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   useGuidedSessionRegistration(registration)
 
   const index = Math.max(0, steps.findIndex((s) => s.id === progress.current))
-  const drawn = bodies({ lookDraft, setLookDraft, notes, patch })
   const step = loading ? null : steps[index]
   const drives = step?.drives
   const fold: SessionFold = {
     stepId: step?.id ?? null,
     drive: drives ? { above: drives.above || drives.look || undefined, calendar: drives.calendar } : {},
-    look: drives?.look ? drawn[step!.id] ?? null : null,
+    look: drives?.look ? look({ lookDraft, setLookDraft }) : null,
     write: !!drives?.write,
   }
   const pageNode = typeof page === 'function' ? page(fold) : page
@@ -174,7 +170,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
       {pageNode}
       <GuideCoach level={level} current={progress.current} word={periodLabel}
         onNext={() => { void next() }} onBack={() => { if (index > 0) void jump(steps[index - 1].id) }}
-        onStop={onLeave} onFinish={() => { void done() }} error={saveError} />
+        onStop={onLeave} onFinish={() => { void done() }} error={saveError} action={actions?.[progress.current]} />
     </section>
   )
 }

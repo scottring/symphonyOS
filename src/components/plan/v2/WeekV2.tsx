@@ -295,11 +295,9 @@ function WeekSession({ weekStart, deck, lastReview, canvas, onFinish, onClose, o
   // tooltip; the steps' old editors (calendar check, inbox, weekly ops, tell
   // the family) are not drawn in a session (2026-11-04: their place is the
   // week itself).
-  const bodies = {
-    'look-back': <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
-      notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
-  }
-  return <GuidedWeek canvas={canvas} bodies={bodies} monthWord={guided.monthWord}
+  const look = <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
+    notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} aged={deck.aged} onSeeAged={deck.onSeeAged} />
+  return <GuidedWeek canvas={canvas} look={look} monthWord={guided.monthWord}
     progress={guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }}
     onNext={() => { void guided.next() }} onFinish={() => { void guided.done() }} onLeave={onClose} />
 }

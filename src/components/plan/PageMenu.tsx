@@ -23,7 +23,13 @@ export type PageMenuChoice = {
   onSelect: () => void
 }
 
-export function PageMenu({ label, choices, talk }: { label: string; choices: PageMenuChoice[]; talk?: () => void }) {
+export function PageMenu({ label, choices, talk, anchor }: {
+  label: string
+  choices: PageMenuChoice[]
+  talk?: () => void
+  /** A planning step's anchor (steps.ts `at`): Month's Fresh start lives here. */
+  anchor?: string
+}) {
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-')
   const menuId = `${slug}-menu`
   const [open, setOpen] = useState(false)
@@ -54,7 +60,7 @@ export function PageMenu({ label, choices, talk }: { label: string; choices: Pag
   }
 
   return (
-    <div className="wk-more-wrap" ref={wrapRef}>
+    <div className="wk-more-wrap" ref={wrapRef} data-guide-anchor={anchor}>
       <button ref={buttonRef} type="button" className="wk-more" aria-label={label} aria-haspopup="menu"
         aria-expanded={open} aria-controls={menuId} data-explain={slug} data-explain-label={label}
         onClick={() => setOpen((v) => !v)}>

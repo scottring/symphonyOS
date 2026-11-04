@@ -144,3 +144,24 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .sheet-area:hover { border-color: var(--paper-fold-accent, var(--color-primary-500)); }
 .sheet-area.is-on { background: color-mix(in srgb, var(--paper-fold-accent, var(--color-primary-500)) 14%, transparent); border-color: var(--paper-fold-accent, var(--color-primary-500)); color: var(--paper-fold-ink, var(--color-neutral-900)); }
 .sheet-area:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
+
+/* ---- a planning step's permanent home on the page (PageSection) ----
+   Quiet: the sheet's own small-caps heading and plain lines, no card. */
+.plan-sections { display: grid; gap: 26px; margin-top: 10px; }
+.page-section { min-width: 0; }
+.page-section-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--color-neutral-200);
+}
+.page-section-title {
+  margin: 0; font: 600 10.5px/1 var(--font-family-sans); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--color-neutral-500);
+}
+.page-section-edit { font-size: 12.5px; }
+.page-section-empty {
+  margin: 0; padding: 8px 0; font: italic 400 16px/1.4 var(--font-family-display);
+  color: var(--color-neutral-400);
+}
+.page-section-line { margin: 0; padding: 8px 0; font: 400 16px/1.4 var(--font-family-display); color: var(--color-neutral-700); }
+/* The step editors drawn here were made for a card: no card around them. */
+.page-section .gw-body { padding: 8px 0 0; border: 0; background: none; }

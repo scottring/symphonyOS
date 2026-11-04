@@ -4,14 +4,8 @@
 // them under a goal or a month. Nothing here writes a line or suggests one,
 // and no line is tagged with a card: there is no such tag to read back.
 
+import { WILD_CARDS } from '@/lib/guide/wildCards'
 import '@/components/guide/guide.css'
-
-const WILD_CARDS = [
-  { id: 'money', label: 'Money' },
-  { id: 'childcare', label: 'Childcare and camps' },
-  { id: 'travel', label: 'Travel' },
-  { id: 'house', label: 'The house' },
-] as const
 
 export function WildCards({ value, onChange }: {
   /** The cards turned on (ids from WILD_CARDS). */

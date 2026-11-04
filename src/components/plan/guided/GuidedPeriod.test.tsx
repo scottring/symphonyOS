@@ -57,13 +57,9 @@ const setup = (over: Partial<Parameters<typeof GuidedPeriod>[0]> = {}, url = '/p
   const props = {
     level: 'month' as const, token: '2026-11', periodLabel: 'November',
     page: (fold: SessionFold) => <Page fold={fold} />,
-    bodies: (t: PeriodSessionTools) => ({
-      'fresh-start': <p>Pick a scenery</p>,
-      'look-back': <div>
-        <label>Went well<input value={t.lookDraft?.wentWell ?? ''} onChange={(e) => t.setLookDraft({ wentWell: e.target.value, didnt: '' })} /></label>
-      </div>,
-      'by-area': <p>Never drawn: the month by area writes on the sheet</p>,
-    }),
+    look: (t: PeriodSessionTools) => <div>
+      <label>Went well<input value={t.lookDraft?.wentWell ?? ''} onChange={(e) => t.setLookDraft({ wentWell: e.target.value, didnt: '' })} /></label>
+    </div>,
     onFinish: vi.fn(async () => true),
     onLeave: vi.fn(),
     onPlanned: vi.fn(),

@@ -44,12 +44,16 @@ export function IdealWeekBar({ value }: { value: IdealWeek }) {
   )
 }
 
-export function IdealWeekSection({ value, goals }: { value: IdealWeek; goals: IdealWeekGoal[] }) {
+/** `headless`: inside the Season page's own section (PageSection), which
+ *  names it: the hours left, the bar and the blocks. */
+export function IdealWeekSection({ value, goals, headless }: { value: IdealWeek; goals: IdealWeekGoal[]; headless?: boolean }) {
   if (value.blocks.length === 0) return null
   const title = (id?: string) => (id ? goals.find(g => g.id === id)?.title : undefined)
+  const Tag = headless ? 'div' : 'section'
   return (
-    <section className="guide-iw" aria-label="Ideal week">
-      <div className="guide-iw-top"><h3 className="guide-iw-title">Ideal week</h3><IdealWeekLeft value={value} /></div>
+    <Tag className={`guide-iw${headless ? ' is-headless' : ''}`} aria-label={headless ? undefined : 'Ideal week'}>
+      {headless ? <IdealWeekLeft value={value} />
+        : <div className="guide-iw-top"><h3 className="guide-iw-title">Ideal week</h3><IdealWeekLeft value={value} /></div>}
       <IdealWeekBar value={value} />
       <ul className="guide-iw-rows" aria-label="Blocks">
         {value.blocks.map(b => (
@@ -62,6 +66,6 @@ export function IdealWeekSection({ value, goals }: { value: IdealWeek; goals: Id
           </li>
         ))}
       </ul>
-    </section>
+    </Tag>
   )
 }

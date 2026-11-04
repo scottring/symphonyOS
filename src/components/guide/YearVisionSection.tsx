@@ -11,22 +11,20 @@ export function hasVision(value?: GuideNotes['vision']): boolean {
   return !!value?.tenYears?.trim() || !!value?.success?.trim()
 }
 
-export function YearVisionSection({ value, yearWord, editTo }: {
+export function YearVisionSection({ value, yearWord, editTo, headless }: {
   value?: GuideNotes['vision']
   /** "2027" */
   yearWord: string
   /** The session on the Vision step; omitted where the year can no longer be planned. */
   editTo?: string
+  /** Inside the Year page's own section (PageSection), which names it: the
+   *  two answers alone. */
+  headless?: boolean
 }) {
   if (!hasVision(value)) return null
   const tenYears = value?.tenYears?.trim() ?? ''
   const success = value?.success?.trim() ?? ''
-  return (
-    <section className="guide-yv" aria-label="Vision">
-      <div className="guide-yv-top">
-        <h3 className="guide-yv-title">Vision</h3>
-        {editTo && <Link to={editTo} className="canvas-link">Edit</Link>}
-      </div>
+  const answers = <>
       {tenYears && <>
         <h4 className="guide-yv-h">An ordinary day ten years from now</h4>
         <p className="guide-yv-text">{tenYears}</p>
@@ -35,6 +33,15 @@ export function YearVisionSection({ value, yearWord, editTo }: {
         <h4 className="guide-yv-h">What would make {yearWord} a success</h4>
         <p className="guide-yv-text">{success}</p>
       </>}
+  </>
+  if (headless) return <div className="guide-yv is-headless">{answers}</div>
+  return (
+    <section className="guide-yv" aria-label="Vision">
+      <div className="guide-yv-top">
+        <h3 className="guide-yv-title">Vision</h3>
+        {editTo && <Link to={editTo} className="canvas-link">Edit</Link>}
+      </div>
+      {answers}
     </section>
   )
 }

@@ -41,13 +41,10 @@ export interface GuideStep {
   choosing?: true
   /** The parts of the page this step opens. None: the page as it is. */
   drives?: StepDrives
-  /** The step has its own editor. It used to drop in a card under the
-   *  ribbon; the tooltips (2026-11-04) draw no card, and each editor gets a
-   *  permanent place on its page (anchored by `at`). */
-  card?: true
   /** Where the step's tooltip points: the element on the page marked
-   *  `data-guide-anchor="<at>"`. Missing on the page, the tooltip points at
-   *  the page title (`title`). */
+   *  `data-guide-anchor="<at>"`, the step's permanent home on the everyday
+   *  page (planning as tooltips, 2026-11-04: no step has a card of its own).
+   *  Missing on the page, the tooltip points at the page title (`title`). */
   at: GuideAnchor
 }
 
@@ -55,7 +52,7 @@ export interface GuideStep {
 export type GuideAnchor =
   | 'left' | 'right' | 'write' | 'list' | 'title' | 'leftovers' | 'day' | 'energy'
   | 'routines' | 'inbox' | 'dinner' | 'family' | 'menu' | 'ideal-week' | 'vision'
-  | 'landscape' | 'areas'
+  | 'landscape' | 'areas' | 'wild-cards'
 
 export const SESSION_LENGTH: Record<GuideLevel, string> = {
   day: '10 to 15 minutes',
@@ -84,7 +81,6 @@ const DAY: readonly GuideStep[] = [
     guide: 'Shows what\'s left and moves it where you say.',
     more: 'An item that slips off the end of a busy day does not announce itself. A quick look puts it in front of you while it still matters. Then it gets a deliberate answer instead of resurfacing days later.',
     writes: ['triage', 'review'],
-    card: true,
   },
   {
     id: 'calendar',
@@ -96,7 +92,6 @@ const DAY: readonly GuideStep[] = [
     guide: 'Shows the day as a timeline.',
     more: 'The gaps between fixed things are the only time you really have. Seeing the day laid out shows how much room there is between commitments. That is easier to judge before anything is placed in it.',
     writes: ['none'],
-    card: true,
   },
   {
     id: 'energy',
@@ -108,7 +103,6 @@ const DAY: readonly GuideStep[] = [
     guide: 'Notes it beside the day. Nothing else changes.',
     more: 'The same task feels different depending on how rested you are. Saying plainly how the day ahead feels lets the choices that follow be honest ones. Nothing is decided by it; it is just a note beside the day.',
     writes: ['note'],
-    card: true,
   },
   {
     id: 'pick',
@@ -122,7 +116,6 @@ const DAY: readonly GuideStep[] = [
     writes: ['place'],
     // The week opens beside the day: + on three to five (the prototype's Pick).
     drives: { above: true },
-    card: true,
     choosing: true,
   },
   {
@@ -136,7 +129,6 @@ const DAY: readonly GuideStep[] = [
     more: 'Small routines rarely feel urgent, so they tend to drop first. A glance at them while the day is still ahead is often enough to keep them from slipping. They are only listed here, never added for you.',
     writes: ['none'],
     drives: { above: true },
-    card: true,
   },
 ]
 
@@ -163,7 +155,6 @@ const WEEK: readonly GuideStep[] = [
     guide: 'Points out overlaps and back-to-back moves. You decide what changes.',
     more: 'A busy week has less room than an empty one, and that should set how much you take on. Clashes and tight changeovers are cheap to fix before the week begins and cost a scramble once the day arrives. You decide what changes; the guide only points out what it sees.',
     writes: ['place'],
-    card: true,
   },
   {
     id: 'read-month',
@@ -187,7 +178,6 @@ const WEEK: readonly GuideStep[] = [
     guide: 'Shows each Inbox item and files it where you say.',
     more: 'Captures made in a hurry sit in the Inbox until they matter too late. Giving each one a quick answer keeps the pile from growing into something you avoid. Each is either this week, later, or gone.',
     writes: ['inbox'],
-    card: true,
   },
   {
     id: 'choose',
@@ -212,7 +202,6 @@ const WEEK: readonly GuideStep[] = [
     guide: 'Puts workouts on their days and keeps your weekend note.',
     more: 'The ordinary structure of the week decides how it feels more than any single task. Settling the repeating pieces once saves a lot of small decisions later. The weekend is worth a line of its own so it does not get filled by accident.',
     writes: ['place', 'note'],
-    card: true,
   },
   {
     id: 'family',
@@ -224,7 +213,6 @@ const WEEK: readonly GuideStep[] = [
     guide: 'Posts what you say to mention on the wall for the week.',
     more: 'A plan that only one person has seen tends to surprise everyone else. Putting the week where the household can see it lets others plan around it too. Talking it through together turns it from your plan into the family\'s.',
     writes: ['scratchpad'],
-    card: true,
   },
 ]
 
@@ -239,7 +227,6 @@ const MONTH: readonly GuideStep[] = [
     guide: 'Changes Symphony\'s scenery for you.',
     more: 'A small visible change marks the turn of the month. Opening the app to a different scene tells you that the last month is closed and this one has not been spent yet. It is a gentle signal, nothing more.',
     writes: ['note'],
-    card: true,
   },
   {
     id: 'look-back',
@@ -300,7 +287,6 @@ const MONTH: readonly GuideStep[] = [
     guide: 'Shows the monthly routines and adds your fun lines.',
     more: 'Recurring upkeep is easy to forget between cycles, so it helps to see what is due. Fun works the same way in reverse: it rarely happens unless it has a line of its own. The lines are yours; the guide only adds what you name.',
     writes: ['plan_add'],
-    card: true,
   },
 ]
 
@@ -328,7 +314,6 @@ const SEASON: readonly GuideStep[] = [
     more: 'The year list already holds what you decided mattered. Reading it first means the season is written with the year in view, in its own words. Someday holds what was set aside until its time came.',
     writes: ['commit'],
     drives: { above: true },
-    card: true,
   },
   {
     id: 'calendar',
@@ -352,7 +337,6 @@ const SEASON: readonly GuideStep[] = [
     guide: 'Keeps your note at the top of the season.',
     more: 'A season with unusual demands on your health or attention has less room in it than the calendar suggests. Writing that down once lets the later choices respect it. A plan that ignores how tired you are tends to fall apart partway through.',
     writes: ['note'],
-    card: true,
   },
   {
     id: 'by-area',
@@ -377,11 +361,10 @@ const SEASON: readonly GuideStep[] = [
     guide: 'Adds up the hours as you go and shows what\'s left.',
     more: 'After the fixed parts of a week are blocked out, fewer free hours remain than it feels like. Adding up the time each goal needs shows whether it fits beside the rest. If it does not, that is useful to learn now rather than in the middle of the season.',
     writes: ['note'],
-    card: true,
   },
   {
     id: 'wild-cards',
-    at: 'write',
+    at: 'wild-cards',
     title: 'Wild cards',
     minutes: 20,
     why: 'Seasonal logistics sneak up: money, camps, travel, the house.',
@@ -389,7 +372,6 @@ const SEASON: readonly GuideStep[] = [
     guide: 'Turns each to-do into a line on the season, or the month it\'s due.',
     more: 'Some obligations have deadlines that arrive quietly and then become urgent. Going through the usual categories once a season catches them while there is still time. Each one you name becomes a line where it belongs.',
     writes: ['plan_add'],
-    card: true,
   },
 ]
 
@@ -416,7 +398,6 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Writes it down in your words. Adds nothing.',
     more: 'Goals chosen without a direction tend to be whatever was loudest. Describing an ordinary day far in the future gives the year something to be measured against. It is written down in your words and nothing is added.',
     writes: ['note'],
-    card: true,
   },
   {
     id: 'landscape',
@@ -429,7 +410,6 @@ const YEAR: readonly GuideStep[] = [
     more: 'A year looks open until the fixed dates go on it. Once they are marked, it is clear which months have room for something large and which do not. A crowded month is worth seeing before goals are set.',
     writes: ['note', 'place'],
     drives: { calendar: true },
-    card: true,
   },
   {
     id: 'areas',
@@ -441,7 +421,6 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Asks which space each area belongs in when it isn\'t obvious.',
     more: 'Areas act as a checklist for the whole of life, so that no part is forgotten. Placing each one inside a space also settles who can see it. The areas are yours to choose; the guide does not propose any.',
     writes: ['area'],
-    card: true,
   },
   {
     id: 'brain-dump',
@@ -466,7 +445,6 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Shows goals that overlap or repeat. You decide what happens to them.',
     more: 'A raw list usually has goals that overlap and a few that can wait. Merging the ones that say the same thing and moving others to Someday leaves a list you will want to reread. Each decision stays with you.',
     writes: ['triage'],
-    card: true,
   },
   {
     id: 'share-book',
@@ -478,7 +456,6 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Moves shared goals to Family and puts the season session on the calendar.',
     more: 'A goal that affects others works best when they know about it. Booking the next session while the year is fresh means the plan gets revisited rather than forgotten. You choose what the family sees.',
     writes: ['triage', 'place'],
-    card: true,
   },
 ]
 

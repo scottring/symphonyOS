@@ -14,14 +14,13 @@ import type { SessionFold } from './GuidedPeriod'
 import { weekStepTitle } from './useGuidedWeek'
 import '@/components/guide/guide.css'
 
-export function GuidedWeek({ canvas, bodies, monthWord, progress, saveError, onJump, onNext, onFinish, onLeave }: {
+export function GuidedWeek({ canvas, look, monthWord, progress, saveError, onJump, onNext, onFinish, onLeave }: {
   /** The week itself, without its strip, drawn with the fold the current
    *  step asks for. */
   canvas: ReactNode | ((fold: SessionFold) => ReactNode)
-  /** What each step shows, by step id: the look back's in the sheet beside
-   *  the week. The other steps' editors are not drawn in a session (their
-   *  place is the week itself; 2026-11-04 tooltips). */
-  bodies: Partial<Record<string, ReactNode>>
+  /** The look back, drawn in the sheet beside the week on its step. No other
+   *  step draws a card: each has a permanent place on the week (2026-11-04). */
+  look: ReactNode
   /** The month above ("November"), for "Read November". */
   monthWord: string
   progress: GuideProgress
@@ -41,7 +40,7 @@ export function GuidedWeek({ canvas, bodies, monthWord, progress, saveError, onJ
   const fold: SessionFold = {
     stepId: step.id,
     drive: drives ? { above: drives.above || drives.look || undefined } : {},
-    look: drives?.look ? bodies[step.id] ?? null : null,
+    look: drives?.look ? look : null,
     write: !!drives?.write,
   }
   return (

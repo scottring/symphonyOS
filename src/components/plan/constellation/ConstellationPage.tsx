@@ -44,6 +44,14 @@
 // before with its choices, the reading steps open the level above, the
 // calendar steps this period's calendar, the writing steps the write line.
 // Done planning stamps the sheet and the header line says when.
+//
+// Every step's editor has a permanent, quiet home on this page (Task 2,
+// 2026-11-04), where its tooltip points: Month's Fresh start in ⋯ and its
+// fun lines on the write line; Season's Energy chip in the header, its ideal
+// week and wild cards under the sheet, and Someday on the year's sheet while
+// choosing from the year; Year's vision, landscape and life areas under the
+// sheet, the overlapping pairs on its list while refining, and the booking in
+// the Share and book tooltip. A section's step opens its editor; Edit does too.
 
 import { PageHelpContext, usePageHelp } from '@/components/explain/PageHelp'
 import { PageMenu, type PageMenuChoice } from '@/components/plan/PageMenu'
@@ -102,15 +110,16 @@ import { CalendarSheet, MonthGrid } from '@/components/plan/fold/CalendarSheet'
 import { WriteLine } from '@/components/plan/fold/WriteLine'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 import { GuidedPeriod, type PeriodSessionTools, type SessionFold } from '@/components/plan/guided/GuidedPeriod'
-import { PlanChip, PlannedStamp } from '@/components/guide/GuideCoach'
+import { PlanChip, PlannedStamp, type CoachAction } from '@/components/guide/GuideCoach'
+import { PageSection } from '@/components/plan/fold/PageSection'
+import { EnergyChip } from '@/components/guide/EnergyChip'
+import { WILD_CARDS } from '@/lib/guide/wildCards'
 import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
 import { FreshStart } from '@/components/plan/guided/month/FreshStart'
 import { PeriodLookBack } from '@/components/plan/guided/month/PeriodLookBack'
 import { NextWeeks } from '@/components/plan/guided/month/NextWeeks'
-import { UpkeepFun } from '@/components/plan/guided/month/UpkeepFun'
-import { FromYear } from '@/components/plan/guided/season/FromYear'
 import { MonthsCalendar, SeasonCalendar } from '@/components/plan/guided/season/SeasonCalendar'
-import { SeasonEnergy, SeasonIdealWeek, SeasonWildCards } from '@/components/plan/guided/season/SeasonNotes'
+import { SeasonIdealWeek, SeasonWildCards } from '@/components/plan/guided/season/SeasonNotes'
 import { IdealWeekSection } from '@/components/guide/IdealWeekSection'
 import { YearVisionSection, hasVision } from '@/components/guide/YearVisionSection'
 import { YearLandscapeSection, hasLandscape } from '@/components/guide/YearLandscapeSection'
@@ -118,9 +127,7 @@ import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { YearVision } from '@/components/plan/guided/year/Vision'
 import { YearLandscape } from '@/components/plan/guided/year/Landscape'
 import { YearRefine } from '@/components/plan/guided/year/Refine'
-import { ShareBook } from '@/components/plan/guided/year/ShareBook'
 import { AreasEditor } from '@/components/guide/AreasEditor'
-import { useAuth } from '@/hooks/useAuth'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
 
 const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
@@ -150,7 +157,6 @@ function Inner() {
   const navigate = useNavigate()
   const area = useAddArea()
   const { areas: lifeAreas, add: addArea, rename: renameArea, setContext: setAreaContext, remove: removeArea } = useLifeAreas()
-  const { user } = useAuth()
   const { getRoutinesForDate } = useRoutines()
   // The shell's "How this page works", or the page's own ask where it offers none.
   const shellHelp = usePageHelp()
@@ -208,17 +214,9 @@ function Inner() {
   const seasonNotes = usePlanningNotes('seasonal', level === 1 ? sessionToken : '')
   // The period's own planning notes (the summary line's planned day).
   const periodNotes = usePlanningNotes(SESSION_HORIZONS[level], sessionToken)
-  // The year's notes, for its everyday page (the vision and the landscape),
-  // read the same way.
-  const yearNotes = usePlanningNotes('annual', level === 0 && !planning ? sessionToken : '')
-  // "Edit" on one of them: the year's session, opened on that step (only on a
-  // year not yet over, as ?plan=1 itself).
-  const editStep = (step: string) => {
-    if (!plannable) return undefined
-    const q = new URLSearchParams(params)
-    q.delete('review'); q.delete('focus'); q.set('plan', '1'); q.set('step', step)
-    return `${pathname}?${q.toString()}`
-  }
+  // The year's notes, for its everyday page (the vision, the landscape and
+  // the refine step's kept pairs), read the same way.
+  const yearNotes = usePlanningNotes('annual', level === 0 ? sessionToken : '')
   const markPlanned = async (): Promise<boolean> => {
     const mine = planSession.mine
     const ok = await planSession.save({ wentWell: mine?.wentWell ?? '', didnt: mine?.didnt ?? '', ...(mine?.focus ? { focus: mine.focus } : {}) })
@@ -243,6 +241,8 @@ function Inner() {
   const showDone = prefs.done
   const [expanded, setExpanded] = useState<string | null>(null)
   const [composer, setComposer] = useState<Composer | null>(null)
+  // Month's Fresh start, opened from ⋯.
+  const [freshOpen, setFreshOpen] = useState(false)
   // The life area a session's writing step writes in (by area, brain dump).
   const [writeAreaId, setWriteAreaId] = useState<string | null>(null)
   // Marked planned in this sitting (the period's key): the way on is the next
@@ -586,17 +586,18 @@ function Inner() {
   // (where the week and the day hold it), as the old add box did; writing
   // straight to a day moves nothing between lists.
   const writeLabel = `Write ${aOrAn(periodWord)} ${periodWord} goal`
-  const addHere = async (text: string, lifeArea?: WriteArea | null) => {
+  const addHere = async (text: string, lifeArea?: WriteArea | null, isFun?: boolean) => {
     const id = crypto.randomUUID()
-    const ok = await runCreate(level, text, `Add “${text}”`, id, { lifeArea })
+    const ok = await runCreate(level, text, isFun ? `Add “${text}” for fun` : `Add “${text}”`, id, { lifeArea, isFun })
     if (ok) reveal.current = `${level}:${id}`
     return ok
   }
   // In a session's writing step (by area, brain dump) the line is written in
   // the life area picked beside it (`lifeArea`). A dated line goes to its
   // day, which is a placement the session counts too.
-  const writeLineIn = (lifeArea: WriteArea | null) => async (parse: HorizonParse, landing: HorizonLanding): Promise<boolean> => {
-    if (landing.kind === 'period') return addHere(parse.title, lifeArea)
+  // Month's Maintenance and fun: the line written then is marked fun.
+  const writeLineIn = (lifeArea: WriteArea | null, isFun = false) => async (parse: HorizonParse, landing: HorizonLanding): Promise<boolean> => {
+    if (landing.kind === 'period') return addHere(parse.title, lifeArea, isFun)
     const id = crypto.randomUUID()
     const d = landing.date
     const at = parse.hasTime && parse.date ? parse.date : new Date(d.getFullYear(), d.getMonth(), d.getDate())
@@ -604,7 +605,7 @@ function Inner() {
     const ok = await act(`Add “${parse.title}” to ${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
       async () => !!(await addTask(parse.title, parse.quick.contactId, parse.quick.projectId, at, {
         id, isAllDay: !parse.hasTime, assignedTo: people[0] ?? meId ?? undefined, assignedToAll: people.length > 1 ? people : undefined,
-        location: parse.location, context: parse.quick.context ?? contextFor(lifeArea), ...(lifeArea ? { areaId: lifeArea.id } : {}),
+        location: parse.location, context: parse.quick.context ?? contextFor(lifeArea), ...(lifeArea ? { areaId: lifeArea.id } : {}), ...(isFun ? { isFun: true } : {}),
       })), { ids: [id], undo: async () => { await deleteTask(id) } })
     if (ok) pageWrote()
     return ok
@@ -696,13 +697,6 @@ function Inner() {
       return true
     }, opts)
   }
-  // Share: a Work or Personal year goal moved to Family (who sees it follows
-  // the space, as updateGoal derives it).
-  const shareGoal = (node: PlanNode): Promise<boolean> => {
-    const before = node.goal!.context ?? null
-    return act(`Share “${node.title}” with the family`, () => updateGoal(node.id, { context: 'family' }),
-      { ids: [node.id], undo: async () => (await updateGoal(node.id, { context: before })) !== false })
-  }
   // Book the first season session: a personal, all-day "Plan {Season}" on
   // the day picked, for the next season to start.
   const nextSeasonWord = periodWordOf({ label: seasonLabel(nextSeasonStart(now, seasons), seasons) })
@@ -753,22 +747,31 @@ function Inner() {
     if (ok) { setMarkedKey(periodKey); setJustMarkedAt(new Date()); periodNotes.reload(); rememberFolded(PERIODS[level]) }
     return ok
   }
-  // Season, choose from the year: the year's goals to read (beside the sheet,
-  // and in the card), and Someday. Nothing is picked from the year: the
-  // season is written in its own words. A Someday item can be brought in (a
-  // holding list, not a horizon); that is a write, not choosing: only the
-  // goals by area mark the season planned (the session checks the step).
-  const fromYearBody = () => {
-    if (!planning || level !== 1) return null
-    const yearGoals = above.filter((n) => n.goal).map((n) => ({ id: n.id, title: n.title }))
+  // Season, choose from the year (Task 2): the year's goals on the sheet
+  // beside Fall, for reading, and while the step is on, Someday under them:
+  // each line with "To Fall" (a holding list, not a horizon; a session-only
+  // choice, as the look back's). Nothing is picked from the year: the season
+  // is written in its own words. Bringing one in is a write, not choosing:
+  // only the goals by area mark the season planned.
+  const somedayRows = () => {
     // Someday is "not now"; what was let go is "not ever" and is not offered.
-    const someday = visible.filter((t) => t.bucket === 'someday' && !t.completed && !t.parentTaskId && !isLetGo(t)).map((t) => ({ id: t.id, title: t.title, task: t }))
-    return <FromYear yearWord={String(year)} seasonWord={periodWord} goals={yearGoals} someday={someday}
-      onBring={({ task }) => {
-        const before = { ...placementOf(task), commitments: liveCommitments({ commitments: bootstrapCommitments(task) }) }
-        return act(`${periodWord}: “${task.title}”`, async () => !!(await keepForward(task.id, { seasonStart: bounds.start })),
-          { ids: [task.id], undo: async () => (await updateTask(task.id, before)) !== false })
-      }} />
+    const someday = visible.filter((t) => t.bucket === 'someday' && !t.completed && !t.parentTaskId && !isLetGo(t))
+    const bring = (task: Task) => {
+      const before = { ...placementOf(task), commitments: liveCommitments({ commitments: bootstrapCommitments(task) }) }
+      return act(`${periodWord}: “${task.title}”`, async () => !!(await keepForward(task.id, { seasonStart: bounds.start })),
+        { ids: [task.id], undo: async () => (await updateTask(task.id, before)) !== false })
+    }
+    return <>
+      <h3 className="above-sheet-sub">Someday</h3>
+      {someday.length === 0 ? <p className="above-sheet-empty">Nothing on Someday.</p>
+        : <ul className="above-sheet-list" aria-label="Someday">
+          {someday.map((t) => <li key={t.id} className="above-sheet-row">
+            <span className="above-sheet-row-title">{t.title}</span>
+            <button type="button" className="canvas-link above-sheet-to" aria-label={`To ${periodWord}: ${t.title}`}
+              onClick={() => { void bring(t) }}>To {periodWord}</button>
+          </li>)}
+        </ul>}
+    </>
   }
   // The season's goals, for the ideal week: its blocks name them (any goal
   // of the season), and a new block can be for an open one.
@@ -776,40 +779,17 @@ function Inner() {
   const openSeasonGoals = level === 1 ? openNodes.map((n) => ({ id: n.id, title: n.title })) : []
   // The year's open goals, for the refine and share steps.
   const yearOpen = level === 0 ? openNodes.filter((n) => n.goal) : []
-  // What each step shows: the look back on the sheet above. The reading,
-  // calendar and writing steps are this page itself, its folds opened by the
-  // step (steps.ts `drives`). The other editors here are no longer drawn in a
-  // session (planning as tooltips, 2026-11-04: no drop card); each gets a
-  // permanent place on the page, where its step's tooltip points.
-  const sessionBodies = (t: PeriodSessionTools) => level === 2 ? {
-    'fresh-start': <FreshStart monthWord={periodWord} value={t.notes.scenery} patch={t.patch} />,
-    'look-back': lookBackBody(t),
-    'upkeep-fun': <UpkeepFun monthWord={periodWord} routines={stripRoutines}
-      fun={openNodes.filter((n) => n.task?.isFun).map((n) => ({ id: n.id, title: n.title }))}
-      onAddFun={(title) => runCreate(2, title, `Add “${title}” for fun`, undefined, { isFun: true })} />,
-  } : level === 1 ? {
-    'look-back': lookBackBody(t),
-    'from-year': fromYearBody(),
-    energy: <SeasonEnergy value={t.notes.energy} patch={t.patch} />,
-    'ideal-week': <SeasonIdealWeek value={t.notes.idealWeek} goals={openSeasonGoals} patch={t.patch} />,
-    'wild-cards': <SeasonWildCards value={t.notes.wildCards} patch={t.patch} />,
-  } : {
-    'look-back': lookBackBody(t),
-    vision: <YearVision yearWord={periodWord} value={t.notes.vision} patch={t.patch} />,
-    landscape: <YearLandscape value={t.notes.landscape} patch={t.patch} />,
-    areas: <div className="gw-body"><AreasEditor areas={lifeAreas} onAdd={addArea} onRename={renameArea} onSetContext={setAreaContext} onRemove={removeArea} /></div>,
-    // Keep both is kept in the year's notes, so a pair set aside stays so.
-    refine: <YearRefine goals={yearOpen.map((n) => ({ id: n.id, title: n.title, node: n }))} value={t.notes.keptPairs} patch={t.patch}
-      onLetGo={(g) => setGoalStatus(g.node, 'archived', `Let go of “${g.title}”`)} onSomeday={(g) => goalToSomeday(g.node)} />,
-    'share-book': <ShareBook seasonWord={nextSeasonWord} onShare={(g) => shareGoal(g.node)} onBook={bookSeason}
-      goals={yearOpen.flatMap((n) => {
-        const g = n.goal!
-        // Scott's own: a partner's goal is theirs to share. A goal just
-        // added has no owner on it yet, and is his.
-        if ((g.context !== 'work' && g.context !== 'personal') || (g.userId && g.userId !== user?.id)) return []
-        return [{ id: n.id, title: n.title, context: g.context, node: n }]
-      })} />,
-  }
+  // Share and book (Year): sharing is each goal's own space (its panel); the
+  // step's tooltip carries the one action, booking the first session of the
+  // next season, on the day it starts.
+  const winterDay = nextSeasonStart(now, seasons)
+  const sessionActions: Partial<Record<string, CoachAction>> = level === 0 ? {
+    'share-book': {
+      label: `Book the first ${nextSeasonWord} session`,
+      done: `Booked: Plan ${nextSeasonWord}, ${winterDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
+      run: () => bookSeason(new Date(winterDay.getFullYear(), winterDay.getMonth(), winterDay.getDate())),
+    },
+  } : {}
 
   // ---- The header (calm pass, 2026-10-18) ------------------------------------
   // Planning this period is the plan chip ("Plan October"; while a session
@@ -862,10 +842,12 @@ function Inner() {
     ?? (!planSession.loading && !planSession.error ? planSession.saved?.at.toISOString() : undefined)
   const summary = !reviewing && dataReady && !error && !goalsError
     ? <PeriodSummaryLine level={PERIODS[level]} plannedAt={plannedAt} reviewed={!prevReview.error && !!prevReview.reviewed}
-      energy={level === 1 ? seasonNotes.notes.energy : undefined} />
+      />
     : null
   const menuChoices: PageMenuChoice[] = [
     ...(dataReady ? offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run })) : []),
+    // Month's Fresh start lives here, every day (its step points at ⋯).
+    ...(level === 2 ? [{ id: 'fresh-start', label: 'Fresh start', onSelect: () => setFreshOpen(true) }] : []),
     ...(!current ? [{ id: 'back', label: `Back to this ${PERIODS[level]}`, onSelect: () => setStart(null) }] : []),
     ...(inFlow ? [] : [
       { id: 'done', label: 'Show done', checked: showDone, onSelect: () => prefs.set('done', !showDone) },
@@ -903,11 +885,22 @@ function Inner() {
   // The life areas in view (the space filter; a legacy area with no space is
   // Personal): the guide's, and the writing step's chips.
   const areasInView = lifeAreas.filter((x) => matchesLayers(x.context ?? 'personal', layers))
+  // The season's wild cards turned on, by name ("Money · Travel").
+  const wildCards = WILD_CARDS.filter((c) => seasonNotes.notes.wildCards?.includes(c.id)).map((c) => c.label)
   const sheetFor = (fold?: SessionFold) => {
     // A writing step (by area, brain dump) writes area by area: the areas as
     // chips beside the line, the new line in the one picked.
     const byArea = !!fold?.write && areasInView.length > 0
     const picked = byArea ? areasInView.find((a) => a.id === writeAreaId) ?? null : null
+    // Month's Maintenance and fun: the line asks for something fun.
+    const fun = level === 2 && fold?.stepId === 'upkeep-fun'
+    // Year's Refine: the overlapping pairs on the list, with their calls
+    // (session-only). Keep both is kept in the year's notes, so a pair set
+    // aside stays so.
+    const refine = level === 0 && fold?.stepId === 'refine' && <div className="sheet-refine">
+      <YearRefine goals={yearOpen.map((n) => ({ id: n.id, title: n.title, node: n }))} value={yearNotes.notes.keptPairs} patch={yearNotes.patch}
+        onLetGo={(g) => setGoalStatus(g.node, 'archived', `Let go of “${g.title}”`)} onSomeday={(g) => goalToSomeday(g.node)} />
+    </div>
     const areaChips = byArea && <div className="sheet-areas" role="radiogroup" aria-label="Life area">
       {areasInView.map((a) => <button key={a.id} type="button" role="radio" aria-checked={picked?.id === a.id}
         className={`sheet-area${picked?.id === a.id ? ' is-on' : ''}`} onClick={() => setWriteAreaId(picked?.id === a.id ? null : a.id)}>{a.name}</button>)}
@@ -925,10 +918,11 @@ function Inner() {
           {proposals.map((p) => <ProposalRow key={p.key} proposal={p}
             onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />)}
         </>} />
+      {refine}
       {openNodes.length === 0 && preview.here.length === 0 && proposals.length === 0 && <p className="plan-empty">Nothing{folded.length ? ' open' : ''} for {periodWord} yet.</p>}
       {areaChips}
-      <WriteLine placeholder={picked ? `${writeLabel} for ${picked.name}` : writeLabel} period={{ start: bounds.start, end: new Date(bounds.end.getTime() - 1) }} periodWord={periodWord}
-        onWrite={writeLineIn(picked ? { id: picked.id, context: picked.context ?? null } : null)} extra={picked ? null : area.picker} />
+      <WriteLine placeholder={fun ? `Something fun for ${periodWord}` : picked ? `${writeLabel} for ${picked.name}` : writeLabel} period={{ start: bounds.start, end: new Date(bounds.end.getTime() - 1) }} periodWord={periodWord}
+        onWrite={writeLineIn(picked ? { id: picked.id, context: picked.context ?? null } : null, fun)} extra={picked ? null : area.picker} />
       {folded.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => prefs.set('done', !showDone)}>
         <span className="plan-done-fold-text">{doneLine}</span>
         <span className="canvas-link plan-done-fold-go">{showDone ? 'Hide' : 'Show'}</span>
@@ -949,21 +943,43 @@ function Inner() {
       <PaperFold horizon={PERIODS[level]} edgeLabel={fold?.look ? prevB.label : aboveSheet.title} edgeCount={fold?.look ? undefined : aboveSheet.rows.length}
         frontLabel={fold?.look ? `${prevB.label}, looking back` : undefined}
         above={fold?.look ? <LookSheet title={prevWord}>{fold.look}</LookSheet>
-          : <AboveSheet {...aboveSheet} foot={`For reading. Write ${periodWord} in its own words.`} />}
+          : <AboveSheet {...aboveSheet} foot={`For reading. Write ${periodWord} in its own words.`}>
+            {level === 1 && fold?.stepId === 'from-year' && somedayRows()}
+          </AboveSheet>}
         calendar={calendarSheet} calendarLabel={`${periodWord} calendar`} drive={fold?.drive}>
         {sheetFor(fold)}
       </PaperFold>
     </div>
-    {/* The season's ideal week, made in its session (read-only here). */}
-    {level === 1 && !planning && !!seasonNotes.notes.idealWeek?.blocks.length && <div className="plan-card plan-ideal-week">
-      <IdealWeekSection value={seasonNotes.notes.idealWeek} goals={seasonGoals} />
+    {/* Each planning step's home on the page (Task 2): quiet sections under
+        the sheet, there every day; the step that asks for one opens it. */}
+    {level === 1 && <div className="plan-sections">
+      <PageSection title="Ideal week" anchor="ideal-week" open={fold?.stepId === 'ideal-week'}
+        empty={seasonNotes.notes.idealWeek?.blocks.length ? null : `No ideal week for ${periodWord} yet.`}
+        editor={<SeasonIdealWeek value={seasonNotes.notes.idealWeek} goals={openSeasonGoals} patch={seasonNotes.patch} />}>
+        {seasonNotes.notes.idealWeek && <IdealWeekSection headless value={seasonNotes.notes.idealWeek} goals={seasonGoals} />}
+      </PageSection>
+      <PageSection title="Wild cards" anchor="wild-cards" open={fold?.stepId === 'wild-cards'}
+        empty={wildCards.length ? null : `No wild cards for ${periodWord} yet.`}
+        editor={<SeasonWildCards value={seasonNotes.notes.wildCards} patch={seasonNotes.patch} />}>
+        <p className="page-section-line">{wildCards.join(' · ')}</p>
+      </PageSection>
     </div>}
-    {/* The year's vision and landscape, made in its session (read-only here). */}
-    {level === 0 && !planning && hasVision(yearNotes.notes.vision) && <div className="plan-card plan-year-vision">
-      <YearVisionSection value={yearNotes.notes.vision} yearWord={periodWord} editTo={editStep('vision')} />
-    </div>}
-    {level === 0 && !planning && hasLandscape(yearNotes.notes.landscape) && <div className="plan-card plan-year-landscape">
-      <YearLandscapeSection value={yearNotes.notes.landscape} editTo={editStep('landscape')} />
+    {level === 0 && <div className="plan-sections">
+      <PageSection title="Vision" anchor="vision" open={fold?.stepId === 'vision'}
+        empty={hasVision(yearNotes.notes.vision) ? null : `No vision for ${periodWord} yet.`}
+        editor={<YearVision yearWord={periodWord} value={yearNotes.notes.vision} patch={yearNotes.patch} />}>
+        <YearVisionSection headless value={yearNotes.notes.vision} yearWord={periodWord} />
+      </PageSection>
+      <PageSection title="Landscape" anchor="landscape" open={fold?.stepId === 'landscape'}
+        empty={hasLandscape(yearNotes.notes.landscape) ? null : 'No months mapped yet.'}
+        editor={<YearLandscape value={yearNotes.notes.landscape} patch={yearNotes.patch} />}>
+        <YearLandscapeSection headless value={yearNotes.notes.landscape} />
+      </PageSection>
+      <PageSection title="Life areas" anchor="areas" open={fold?.stepId === 'areas'}
+        empty={areasInView.length ? null : 'No life areas yet.'}
+        editor={<div className="gw-body"><AreasEditor areas={lifeAreas} onAdd={addArea} onRename={renameArea} onSetContext={setAreaContext} onRemove={removeArea} /></div>}>
+        <p className="page-section-line">{areasInView.map((x) => x.name).join(' · ')}</p>
+      </PageSection>
     </div>}
     {preview.next.length > 0 && <section className="plan-list plan-next-list" aria-label={`${nextWord}, proposed`}>
       <p className="plan-next-list-title">{nextWord}</p>
@@ -989,16 +1005,25 @@ function Inner() {
         {summary}
       </div>
       <div className="plan-head-tools">
+        {/* Season's energy: the Energy step's home, every day. */}
+        {level === 1 && <EnergyChip value={seasonNotes.notes.energy} save={(energy) => seasonNotes.patch({ energy })} />}
         {plannable && !reviewing && <PlanChip level={PERIODS[level]} word={periodWord} onStart={() => setMode('plan')} disabled={!dataReady} />}
         {primary && <button type="button" className="pv2-btn wk-plan plan-primary" disabled={!dataReady} onClick={primary.run}
           data-explain="plan-primary" data-explain-label={primary.label}>{primary.label}</button>}
         {/* Without the docked bar (phones), ⋯ offers the talk that is due. */}
         <PageHelpContext.Provider value={help}>
-          <PageMenu label={menuLabel} choices={menuChoices}
+          <PageMenu label={menuLabel} choices={menuChoices} anchor={level === 2 ? 'menu' : undefined}
             talk={walkInBar || !dueTalk ? undefined : () => openAssistant({ message: dueTalk.message, autoSend: true })} />
         </PageHelpContext.Provider>
       </div>
     </header>
+    {freshOpen && level === 2 && <div className="plan-fresh" role="dialog" aria-label="Fresh start">
+      <div className="page-section-head">
+        <h3 className="page-section-title">Fresh start · {periodWord}</h3>
+        <button type="button" className="canvas-link page-section-edit" onClick={() => setFreshOpen(false)}>Close</button>
+      </div>
+      <FreshStart monthWord={periodWord} value={periodNotes.notes.scenery} patch={periodNotes.patch} />
+    </div>}
 
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
     {(error || goalsError)
@@ -1010,7 +1035,7 @@ function Inner() {
       // Planning: this same page, one tooltip per step, each step driving
       // the sheet's folds.
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
-          page={pageBody} bodies={sessionBodies} onFinish={closePeriod}
+          page={pageBody} look={lookBackBody} actions={sessionActions} onFinish={closePeriod}
           onLeave={() => { setMode(null); periodNotes.reload(); seasonNotes.reload() }}
           onPlanned={() => { planSession.reload(); periodNotes.reload() }} listenPageWrites={listenPageWrites}
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}

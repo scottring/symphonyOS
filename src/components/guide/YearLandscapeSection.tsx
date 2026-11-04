@@ -14,19 +14,17 @@ export function hasLandscape(value?: GuideNotes['landscape']): boolean {
   return !!value?.some((x) => x.text.trim())
 }
 
-export function YearLandscapeSection({ value, editTo }: {
+export function YearLandscapeSection({ value, editTo, headless }: {
   value?: GuideNotes['landscape']
   /** The session on the Landscape step; omitted where the year can no longer be planned. */
   editTo?: string
+  /** Inside the Year page's own section (PageSection), which names it: the
+   *  months alone. */
+  headless?: boolean
 }) {
   const textOf = (m: number) => value?.find((x) => x.month === m)?.text ?? ''
   if (!hasLandscape(value)) return null
-  return (
-    <section className="guide-yv" aria-label="Landscape">
-      <div className="guide-yv-top">
-        <h3 className="guide-yv-title">Landscape</h3>
-        {editTo && <Link to={editTo} className="canvas-link">Edit</Link>}
-      </div>
+  const months = (
       <ul className="guide-yl" aria-label="The 12 months">
         {MONTHS.map((name, i) => {
           const lines = textOf(i + 1).split('\n').map((l) => l.trim()).filter(Boolean)
@@ -40,6 +38,15 @@ export function YearLandscapeSection({ value, editTo }: {
           </li>
         })}
       </ul>
+  )
+  if (headless) return <div className="guide-yv is-headless">{months}</div>
+  return (
+    <section className="guide-yv" aria-label="Landscape">
+      <div className="guide-yv-top">
+        <h3 className="guide-yv-title">Landscape</h3>
+        {editTo && <Link to={editTo} className="canvas-link">Edit</Link>}
+      </div>
+      {months}
     </section>
   )
 }

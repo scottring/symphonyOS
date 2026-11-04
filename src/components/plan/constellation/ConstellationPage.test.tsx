@@ -4,6 +4,7 @@ import {afterEach,beforeEach,describe,it,expect,onTestFinished,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
 import {ConversationWalkContext} from '@/components/canvas/conversationWalk'
 import {GuidedSessionProvider,useGuidedSession} from '@/contexts/GuidedSessionContext'
+import {stepsFor} from '@/lib/guide/steps'
 const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),updateTaskOrders:vi.fn(),redraw:(()=>{}) as ()=>void,tasks:[] as any[],goals:[] as any[]}))
 const activity=vi.hoisted(()=>({calls:[] as {label:string;ok:boolean;opts:any}[],proposals:[] as any[],changeSet:null as any,setProposalState:vi.fn(),removeProposal:vi.fn()}))
 const lifeAreas=vi.hoisted(()=>({list:[] as any[],add:vi.fn(async()=>null),rename:vi.fn(async()=>true),setContext:vi.fn(async()=>true),remove:vi.fn(async()=>true)}))
@@ -790,7 +791,7 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
   month()
   // No talk is due, so ⋯ offers none: planning is the Plan button's session.
-  expect(menu()).toEqual(['Plan November early','Show done','Start with a goal · guided introduction','Paper sounds','How this page works'])
+  expect(menu()).toEqual(['Plan November early','Fresh start','Show done','Start with a goal · guided introduction','Paper sounds','How this page works'])
   // Show done: a tick, remembered on this device, and the list agrees.
   const done=screen.getByRole('menuitemcheckbox',{name:'Show done'})
   expect(done).toHaveAttribute('aria-checked','false')
@@ -1259,15 +1260,25 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(screen.getByRole('region',{name:'Planning November'})).toBeInTheDocument()
   expect(shell.reg).toMatchObject({token:'2026-11',threadKey:'monthly:2026-11'})
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Fresh start changes the app’s scenery and keeps it as the month’s',async()=>{
+ // Planning as tooltips (Task 2): Fresh start lives in the page's ⋯, every day.
+ it('Fresh start is in the month’s ⋯ (its anchor): it changes the app’s scenery and keeps it as the month’s',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   month('&plan=1')
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:/Densely Urban/}))})
+  expect(stepNow()).toBe('Fresh start')
+  expect(head().querySelector('[data-guide-anchor="menu"]')?.querySelector('button[aria-label="Month options"]')).not.toBeNull()
+  expect(coach().getByText('Fresh start')).toBeInTheDocument()
+  choose('Fresh start')
+  const fresh=within(screen.getByRole('dialog',{name:'Fresh start'}))
+  await act(async()=>{fireEvent.click(fresh.getByRole('button',{name:/Densely Urban/}))})
   expect(place.setPlace).toHaveBeenCalledWith('urban')
   expect(notesStore.patches.some((x)=>x.p.scenery==='urban')).toBe(true)
+  fireEvent.click(fresh.getByRole('button',{name:'Close'}))
+  expect(screen.queryByRole('dialog',{name:'Fresh start'})).toBeNull()
+  // Every day too, outside a session; only the month has one.
+  cleanup();month()
+  expect(menu()).toContain('Fresh start')
+  cleanup();season()
+  expect(menu()).not.toContain('Fresh start')
  })
  it('Look back: September’s open lines — Done, To October, Someday, Let go — each through the page’s writers; nothing goes back to Fall',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
@@ -1360,21 +1371,22 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   month('&plan=1')
   expect(shell.reg?.sessionContext.guide.areas).toEqual([{id:'m',name:'Home',context:'family'}])
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Maintenance and fun: the monthly routines and the month’s fun lines; a fun line is added from what is typed',async()=>{
+ // Planning as tooltips (Task 2): Maintenance and fun is the write line,
+ // asking for something fun while the step is on.
+ it('Maintenance and fun: the write line asks for something fun for October; a line written then is marked fun',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
-  api.tasks=[{id:'f',title:'Ice skating downtown',bucket:'month',monthStart:OCT,isFun:true},{id:'w',title:'File the taxes',bucket:'month',monthStart:OCT}]
   atStep('upkeep-fun')
   month('&plan=1')
-  expect(within(screen.getByRole('list',{name:'Fun in October'})).getAllByRole('listitem').map((li)=>li.textContent)).toEqual(['Ice skating downtown'])
-  expect(screen.getByText('No monthly routines.')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'+ Add something fun'}))
-  const field=screen.getByRole('textbox',{name:'Something fun in October'})
-  fireEvent.change(field,{target:{value:'Corn maze'}})
-  await act(async()=>{fireEvent.submit(field.closest('form')!)})
+  expect(stepNow()).toBe('Maintenance and fun')
+  await writeOn('Something fun for October','Corn maze')
   expect(api.addTask).toHaveBeenCalledWith('Corn maze',undefined,undefined,undefined,expect.objectContaining({bucket:'month',monthStart:OCT,isFun:true}))
+  expect(lastRun().label).toBe('Add “Corn maze” for fun')
+  // Any other step, and every day, the line is the month's own.
+  cleanup();atStep('by-area')
+  month('&plan=1')
+  expect(screen.queryByRole('textbox',{name:'Something fun for October'})).toBeNull()
+  await writeOn('Write an October goal','Paint the fence')
+  expect(api.addTask).toHaveBeenLastCalledWith('Paint the fence',undefined,undefined,undefined,expect.not.objectContaining({isFun:true}))
  })
  it('Stop planning writes nothing and keeps where the session is',async()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
@@ -1456,10 +1468,9 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(api.updateGoal).not.toHaveBeenCalled()
   expect(plannedMarks()).toHaveLength(0)
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Choose from the year: the year beside Fall to read, its goals with nothing to press; Someday (not what was let go) can be put on Fall; neither marks Fall planned',async()=>{
+ // Planning as tooltips (Task 2): the year's sheet beside Fall, with a
+ // Someday section while the step is on (a session-only choice, as the look back's).
+ it('Choose from the year: the year beside Fall to read, its goals with nothing to press; Someday (not what was let go) can be put on Fall; neither marks Fall planned',async()=>{
   inSession()
   api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'sd',title:'Learn to sail',bucket:'someday'},
    {id:'lg',title:'Buy a boat',bucket:'someday',dismissedAt:new Date(2026,9,1)}]
@@ -1467,30 +1478,32 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   atStep('from-year')
   season('&plan=1')
   expect(aboveOpen()).toBe(true)
-  const card=within(screen.getByRole('region',{name:'Choose from the year'}))
-  const year=within(card.getByRole('list',{name:'2026 goals'}))
-  expect(year.getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['Together','Health'])
+  const sheet=within(screen.getByRole('region',{name:'2026, for reading'}))
+  const year=within(sheet.getByRole('list',{name:'2026'}))
+  expect(year.getAllByRole('listitem').map((li)=>li.textContent)).toEqual(['Together','Health'])
   expect(year.queryAllByRole('button')).toHaveLength(0)
-  expect(card.queryByText(/On Fall/)).toBeNull()
-  fireEvent.click(card.getByRole('button',{name:'Someday · 1'}))
-  expect(card.queryByText('Buy a boat')).toBeNull()
-  await act(async()=>{fireEvent.click(card.getByRole('button',{name:'Fall: Learn to sail'}))})
+  const someday=within(sheet.getByRole('list',{name:'Someday'}))
+  expect(someday.getAllByRole('listitem').map((li)=>li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Learn to sail'])
+  expect(sheet.queryByText('Buy a boat')).toBeNull()
+  await act(async()=>{fireEvent.click(someday.getByRole('button',{name:'To Fall: Learn to sail'}))})
   expect(api.keepForward).toHaveBeenCalledWith('sd',{seasonStart:FALL})
+  expect(lastRun().label).toBe('Fall: “Learn to sail”')
   expect(api.addTask).not.toHaveBeenCalled()
   expect(plannedMarks()).toHaveLength(0)
+  // Only on its step: the year's sheet is for reading otherwise.
+  cleanup();atStep('by-area')
+  season('&plan=1')
+  expect(screen.queryByRole('list',{name:'Someday'})).toBeNull()
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Choose from the year reads the year the season is named for, however it was opened (walk 2026-11-02)',()=>{
+ it('Choose from the year reads the year the season is named for, however it was opened (walk 2026-11-02)',()=>{
   at(new Date(2027,0,15,12)); onTestFinished(()=>{vi.useRealTimers()})
   api.goals=[{id:'g26',name:'Calmer mornings',year:2026,status:'active',context:'personal'},{id:'g27',name:'Learn Spanish',year:2027,status:'active',context:'personal'}]
   for(const start of ['2026-12-01','2027-01-15']){
    atStep('from-year')
    open(`/season?view=constellation&horizon=1&start=${start}&plan=1`)
-   const year=within(screen.getByRole('list',{name:'2026 goals'}))
-   expect(year.getByRole('listitem',{name:'Calmer mornings'})).toBeInTheDocument()
-   expect(year.queryByRole('listitem',{name:'Learn Spanish'})).toBeNull()
+   const year=within(within(screen.getByRole('region',{name:'2026, for reading'})).getByRole('list',{name:'2026'}))
+   expect(year.getByText('Calmer mornings')).toBeInTheDocument()
+   expect(year.queryByText('Learn Spanish')).toBeNull()
    cleanup()
   }
  })
@@ -1502,16 +1515,30 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(months.getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['October','November'])
   expect(months.queryAllByRole('button')).toHaveLength(0)
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Energy check saves the season’s energy note',async()=>{
+ // Planning as tooltips (Task 2): the Energy chip in the season's header, every day.
+ it('Energy check: the Energy chip in the header cycles low, medium, high and saves the season’s energy note',async()=>{
   inSession()
-  atStep('energy')
+  notesStore.notes={guide:{current:'energy',done:[],skipped:[]},energy:{level:'high',words:'New baby'}}
   season('&plan=1')
-  await act(async()=>{fireEvent.click(screen.getByRole('radio',{name:'Medium'}))})
-  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({energy:{level:'medium'}})
-  expect(screen.getByRole('radio',{name:'Medium'})).toBeChecked()
+  const chipEl=head().querySelector('[data-guide-anchor="energy"]') as HTMLElement
+  expect(chipEl).toHaveTextContent('Energy: high')
+  await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
+  // The words already said stay with it.
+  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({energy:{level:'low',words:'New baby'}})
+  expect(chipEl).toHaveTextContent('Energy: low')
+  await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
+  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({energy:{level:'medium',words:'New baby'}})
+  // Not said twice in the header.
+  expect(summary()??'').not.toMatch(/Energy/)
+  // Every day, unset: a dash.
+  cleanup();notesStore.notes={};notesStore.patches=[]
+  season()
+  expect(within(head()).getByRole('button',{name:/^Energy/})).toHaveTextContent('Energy: —')
+  await act(async()=>{fireEvent.click(within(head()).getByRole('button',{name:/^Energy/}))})
+  expect(notesStore.patches.map((x)=>x.p)).toEqual([{energy:{level:'low'}}])
+  // Month and Year have none.
+  cleanup();month()
+  expect(within(head()).queryByRole('button',{name:/^Energy/})).toBeNull()
  })
  it('Season goals by area: the year open beside Fall; the first line written on the sheet marks Fall planned',async()=>{
   inSession()
@@ -1523,48 +1550,65 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(api.addTask).toHaveBeenCalledWith('Sleep by eleven',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',seasonStart:FALL}))
   await waitFor(()=>expect(plannedMarks()).toHaveLength(1))
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Ideal week: blocks typed here save into the season’s notes, a goal block naming one of Fall’s open goals',async()=>{
+ // Planning as tooltips (Task 2): the ideal week is a section of the Season
+ // page; on its step its editor is open.
+ it('Ideal week: blocks typed here save into the season’s notes, a goal block naming one of Fall’s open goals',async()=>{
   inSession()
   api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'d',title:'Paint the porch',bucket:'quarter',completed:true,completedAt:new Date(2026,9,9)}]
   atStep('ideal-week')
   season('&plan=1')
-  expect(screen.getByText(/of 168h left/)).toBeInTheDocument()
-  expect(within(screen.getByLabelText('Goal for new block')).getAllByRole('option').map((o)=>o.textContent)).toEqual(['Not a goal','Unhurried weekends'])
-  fireEvent.change(screen.getByLabelText('Label for new block'),{target:{value:'Long walks'}})
-  fireEvent.change(screen.getByLabelText('Hours for new block'),{target:{value:'4h'}})
-  fireEvent.change(screen.getByLabelText('Goal for new block'),{target:{value:'s'}})
-  await act(async()=>{fireEvent.blur(screen.getByLabelText('Goal for new block'))})
+  const iw=within(screen.getByRole('region',{name:'Ideal week'}))
+  expect(screen.getByRole('region',{name:'Ideal week'})).toHaveAttribute('data-guide-anchor','ideal-week')
+  expect(iw.getByText(/of 168h left/)).toBeInTheDocument()
+  expect(within(iw.getByLabelText('Goal for new block')).getAllByRole('option').map((o)=>o.textContent)).toEqual(['Not a goal','Unhurried weekends'])
+  fireEvent.change(iw.getByLabelText('Label for new block'),{target:{value:'Long walks'}})
+  fireEvent.change(iw.getByLabelText('Hours for new block'),{target:{value:'4h'}})
+  fireEvent.change(iw.getByLabelText('Goal for new block'),{target:{value:'s'}})
+  await act(async()=>{fireEvent.blur(iw.getByLabelText('Goal for new block'))})
   const saved=notesStore.patches.map((x)=>x.p.idealWeek).filter(Boolean)
   expect(saved).toEqual([{blocks:[expect.objectContaining({label:'Long walks',hours:4,goalId:'s'})]}])
-  expect(screen.getByLabelText('Label for Long walks')).toBeInTheDocument()
+  expect(iw.getByLabelText('Label for Long walks')).toBeInTheDocument()
+  // Done reads it back, quietly.
+  fireEvent.click(iw.getByRole('button',{name:'Done'}))
+  expect(iw.queryByRole('textbox')).toBeNull()
+  expect(within(iw.getByRole('list',{name:'Blocks'})).getByText(/Long walks/)).toBeInTheDocument()
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Wild cards: the cards turned on are kept in the season’s notes; no lines are written for them',async()=>{
+ // Planning as tooltips (Task 2): a quiet Wild cards section on the Season
+ // page, kept in the season's notes; on its step it is open to change.
+ it('Wild cards: the cards turned on are kept in the season’s notes; no lines are written for them',async()=>{
   inSession()
   atStep('wild-cards')
   season('&plan=1')
-  await act(async()=>{fireEvent.click(screen.getByRole('checkbox',{name:'Travel'}))})
-  await act(async()=>{fireEvent.click(screen.getByRole('checkbox',{name:'Money'}))})
+  const wc=within(screen.getByRole('region',{name:'Wild cards'}))
+  expect(screen.getByRole('region',{name:'Wild cards'})).toHaveAttribute('data-guide-anchor','wild-cards')
+  await act(async()=>{fireEvent.click(wc.getByRole('checkbox',{name:'Travel'}))})
+  await act(async()=>{fireEvent.click(wc.getByRole('checkbox',{name:'Money'}))})
   expect(notesStore.patches.map((x)=>x.p.wildCards).filter(Boolean)).toEqual([['travel'],['money','travel']])
   expect(api.addTask).not.toHaveBeenCalled()
+  fireEvent.click(wc.getByRole('button',{name:'Done'}))
+  expect(wc.queryByRole('checkbox')).toBeNull()
+  expect(wc.getByText('Money · Travel')).toBeInTheDocument()
  })
- it('the everyday Season page shows the ideal week once it has blocks',()=>{
+ // Planning as tooltips (Task 2): the ideal week is a permanent, quiet
+ // section of the Season page: one faint line until it has blocks; Edit opens
+ // its editor in place.
+ it('the everyday Season page keeps its ideal week: a faint line when empty, the blocks once made, Edit in place',async()=>{
   inSession()
   api.tasks=[{id:'s',title:'Unhurried weekends',bucket:'quarter',goalId:'g'}]
   season()
-  expect(screen.queryByRole('region',{name:'Ideal week'})).toBeNull()
+  let iw=within(screen.getByRole('region',{name:'Ideal week'}))
+  expect(iw.getByText('No ideal week for Fall yet.')).toBeInTheDocument()
+  expect(iw.queryByRole('textbox')).toBeNull()
   cleanup()
   notesStore.notes={idealWeek:{blocks:[{id:'b1',label:'Sleep',hours:56},{id:'b2',label:'Long walks',hours:4,goalId:'s'}]}}
   season()
-  const iw=within(screen.getByRole('region',{name:'Ideal week'}))
+  iw=within(screen.getByRole('region',{name:'Ideal week'}))
   expect(iw.getByText(/Unhurried weekends/)).toBeInTheDocument()
   expect(iw.getByText('108h')).toBeInTheDocument()
   expect(iw.queryByRole('textbox')).toBeNull()
+  expect(document.querySelector('.plan-card')).toBeNull()
+  fireEvent.click(iw.getByRole('button',{name:'Edit'}))
+  expect(iw.getByLabelText('Label for Long walks')).toBeInTheDocument()
  })
 })
 
@@ -1575,23 +1619,35 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
  const inSession=()=>{at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})}
  const year=()=>open('/year?view=constellation&start=2026-10-09&plan=1')
  const everyday=()=>open('/year?view=constellation&start=2026-10-09')
- it('the everyday Year page shows the vision and the landscape only once saved; Edit opens the session on that step',()=>{
+ // Planning as tooltips (Task 2): the vision, the landscape and the life
+ // areas are permanent, quiet sections of the Year page, edited in place.
+ it('the everyday Year page keeps its vision, landscape and life areas: faint lines when empty, Edit in place',async()=>{
   inSession()
   everyday()
-  expect(screen.queryByRole('region',{name:'Vision'})).toBeNull()
-  expect(screen.queryByRole('region',{name:'Landscape'})).toBeNull()
+  expect(within(screen.getByRole('region',{name:'Vision'})).getByText('No vision for 2026 yet.')).toBeInTheDocument()
+  expect(within(screen.getByRole('region',{name:'Landscape'})).getByText('No months mapped yet.')).toBeInTheDocument()
+  expect(within(screen.getByRole('region',{name:'Life areas'})).getByText('No life areas yet.')).toBeInTheDocument()
+  expect(screen.queryByRole('textbox',{name:'An ordinary day ten years from now'})).toBeNull()
   cleanup()
   notesStore.notes={vision:{tenYears:'A slow morning by the lake'},landscape:[{month:3,text:'a\nb\nc'}]}
+  lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0},{id:'m',name:'Home',context:'family',mine:true,sortOrder:1}]
   everyday()
   const vision=within(screen.getByRole('region',{name:'Vision'}))
   expect(vision.getByText('A slow morning by the lake')).toBeInTheDocument()
   expect(vision.queryByRole('textbox')).toBeNull()
   const land=within(screen.getByRole('region',{name:'Landscape'}))
   expect(land.getByText('Crowded')).toBeInTheDocument()
-  expect(vision.getByRole('link',{name:'Edit'}).getAttribute('href')).toMatch(/plan=1&step=vision/)
-  fireEvent.click(land.getByRole('link',{name:'Edit'}))
-  expect(screen.getByRole('region',{name:'Planning 2026'})).toBeInTheDocument()
-  expect(stepNow()).toBe('Map the 12 months')
+  expect(within(screen.getByRole('region',{name:'Life areas'})).getByText('Health · Home')).toBeInTheDocument()
+  expect(document.querySelector('.plan-card')).toBeNull()
+  // Edit opens it in place: no session.
+  fireEvent.click(vision.getByRole('button',{name:'Edit'}))
+  const success=vision.getByRole('textbox',{name:'What would make 2026 a success'})
+  fireEvent.change(success,{target:{value:'Calm'}})
+  await act(async()=>{fireEvent.blur(success)})
+  expect(notesStore.patches.map((x)=>x.p)).toContainEqual({vision:{tenYears:'A slow morning by the lake',success:'Calm'}})
+  expect(screen.queryByRole('region',{name:'Planning 2026'})).toBeNull()
+  fireEvent.click(within(screen.getByRole('region',{name:'Life areas'})).getByRole('button',{name:'Edit'}))
+  expect(within(screen.getByRole('region',{name:'Life areas'})).getByRole('textbox',{name:'New area'})).toBeInTheDocument()
  })
  it('seven steps, one tooltip each; the look back turns the sheet beside 2026 to 2025',()=>{
   inSession()
@@ -1615,7 +1671,7 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   await act(async()=>{fireEvent.click(coach().getByRole('button',{name:'Next'}))})
   expect(screen.queryByRole('region',{name:'2025, looking back'})).toBeNull()
   expect(shell.reg).toMatchObject({token:'2026',stepId:'vision'})
-  // Its editor has no card in the session (Task 2 gives it the Year page).
+  // Its editor has no card in the session: its home is the Year page's Vision.
   expect(stepNow()).toBe('Picture 5–10 years out')
   expect(screen.queryByRole('region',{name:'Picture 5–10 years out'})).toBeNull()
  })
@@ -1678,44 +1734,47 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   expect(lastRun().ok).toBe(false)
   expect(lastRun().opts).toMatchObject({failureState:'partial',failureSummary:'Didn’t put “Learn to sail” away. Its line is still on Someday.'})
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Picture 5–10 years out saves the vision into the year’s notes, in Scott’s words',async()=>{
+ // Planning as tooltips (Task 2): the vision is a section of the Year page;
+ // on its step its fields are open.
+ it('Picture 5–10 years out saves the vision into the year’s notes, in Scott’s words',async()=>{
   inSession()
   atStep('vision')
   year()
-  const day=screen.getByRole('textbox',{name:'An ordinary day ten years from now'})
+  const vision=within(screen.getByRole('region',{name:'Vision'}))
+  expect(screen.getByRole('region',{name:'Vision'})).toHaveAttribute('data-guide-anchor','vision')
+  const day=vision.getByRole('textbox',{name:'An ordinary day ten years from now'})
   expect(day).toHaveValue('')
   fireEvent.change(day,{target:{value:'Coffee on the porch, then the workshop'}})
   await act(async()=>{fireEvent.blur(day)})
   expect(notesStore.patches.map((x)=>x.p)).toContainEqual({vision:{tenYears:'Coffee on the porch, then the workshop'}})
-  expect(screen.getByRole('textbox',{name:'What would make 2026 a success'})).toHaveValue('')
+  expect(vision.getByRole('textbox',{name:'What would make 2026 a success'})).toHaveValue('')
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Map the 12 months saves each month’s lines, and marks a month crowded',async()=>{
+ // Planning as tooltips (Task 2): the landscape is a section of the Year
+ // page; on its step its months are open.
+ it('Map the 12 months saves each month’s lines, and marks a month crowded',async()=>{
   inSession()
   atStep('landscape')
   year()
-  const july=screen.getByRole('textbox',{name:'July'})
+  const land=within(screen.getByRole('region',{name:'Landscape'}))
+  expect(screen.getByRole('region',{name:'Landscape'})).toHaveAttribute('data-guide-anchor','landscape')
+  const july=land.getByRole('textbox',{name:'July'})
   fireEvent.change(july,{target:{value:'Beach week\nCamp\nWedding'}})
   await act(async()=>{fireEvent.blur(july)})
   expect(notesStore.patches.map((x)=>x.p)).toContainEqual({landscape:[{month:7,text:'Beach week\nCamp\nWedding'}]})
-  expect(within(screen.getByRole('listitem',{name:'July'})).getByText('Crowded')).toBeInTheDocument()
+  expect(within(land.getByRole('listitem',{name:'July'})).getByText('Crowded')).toBeInTheDocument()
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Choose life areas: the areas editor, writing through the life areas’ own writers',async()=>{
+ // Planning as tooltips (Task 2): the life areas are a section of the Year
+ // page; on its step the areas editor is open.
+ it('Choose life areas: the areas editor, writing through the life areas’ own writers',async()=>{
   inSession()
   lifeAreas.list=[{id:'h',name:'Health',context:'personal',mine:true,sortOrder:0}]
   atStep('areas')
   year()
-  expect(screen.getByText(/3 to 8 is typical/)).toBeInTheDocument()
-  fireEvent.change(screen.getByRole('textbox',{name:'New area'}),{target:{value:'Money'}})
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Add'}))})
+  const areas=within(screen.getByRole('region',{name:'Life areas'}))
+  expect(screen.getByRole('region',{name:'Life areas'})).toHaveAttribute('data-guide-anchor','areas')
+  expect(areas.getByText(/3 to 8 is typical/)).toBeInTheDocument()
+  fireEvent.change(areas.getByRole('textbox',{name:'New area'}),{target:{value:'Money'}})
+  await act(async()=>{fireEvent.click(areas.getByRole('button',{name:'Add'}))})
   expect(lifeAreas.add).toHaveBeenCalledWith('Money','personal')
   expect(plannedMarks()).toHaveLength(0)
  })
@@ -1740,15 +1799,15 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   expect(api.addGoal).toHaveBeenCalledWith(null,'Max the 401k','personal',expect.objectContaining({year:2026}))
   await waitFor(()=>expect(plannedMarks()).toHaveLength(1))
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Refine: goals that overlap, with Keep both, Let go of one, Someday — nothing merges on its own',async()=>{
+ // Planning as tooltips (Task 2): on the Refine step the year's list itself
+ // carries the overlapping pairs and their calls (session-only).
+ it('Refine: goals that overlap, with Keep both, Let go of one, Someday — nothing merges on its own',async()=>{
   inSession()
   api.goals=[...GOALS.map(g=>({...g})),{id:'r1',name:'Family trip to Maine',year:2026,status:'active',context:'personal'},{id:'r2',name:'Maine family trip',year:2026,status:'active',context:'personal'}]
   atStep('refine')
   year()
-  const pair=()=>within(screen.getByRole('listitem',{name:'Family trip to Maine and Maine family trip'}))
+  const sheet=()=>within(document.querySelector<HTMLElement>('.plan-sheet')!)
+  const pair=()=>within(sheet().getByRole('listitem',{name:'Family trip to Maine and Maine family trip'}))
   fireEvent.click(pair().getByRole('button',{name:'Let go of one'}))
   await act(async()=>{fireEvent.click(pair().getByRole('button',{name:'Maine family trip'}))})
   expect(api.updateGoal).toHaveBeenLastCalledWith('r2',{status:'archived'})
@@ -1760,16 +1819,17 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   const writes=api.updateGoal.mock.calls.length+api.addTask.mock.calls.length
   // Keep both: no goal is written; the pair is kept in the year's notes.
   await act(async()=>{fireEvent.click(pair().getByRole('button',{name:'Keep both'}))})
-  expect(screen.getByText('Nothing on the list looks alike.')).toBeInTheDocument()
+  expect(sheet().getByText('Nothing on the list looks alike.')).toBeInTheDocument()
   expect(api.updateGoal.mock.calls.length+api.addTask.mock.calls.length).toBe(writes)
   expect(notesStore.patches.map((x)=>x.p)).toContainEqual({keptPairs:[['r1','r2']]})
   expect(api.deleteGoal).not.toHaveBeenCalled()
   expect(plannedMarks()).toHaveLength(0)
+  // Session-only: every day the list carries no pairs.
+  cleanup();everyday()
+  expect(screen.queryByRole('list',{name:'May overlap'})).toBeNull()
+  expect(screen.queryByText('Nothing on the list looks alike.')).toBeNull()
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Refine: a pair kept in an earlier session does not come back',()=>{
+ it('Refine: a pair kept in an earlier session does not come back',()=>{
   inSession()
   api.goals=[...GOALS.map(g=>({...g})),{id:'r1',name:'Family trip to Maine',year:2026,status:'active',context:'personal'},{id:'r2',name:'Maine family trip',year:2026,status:'active',context:'personal'}]
   notesStore.notes={guide:{current:'refine',done:[],skipped:[]},keptPairs:[['r1','r2']]}
@@ -1777,38 +1837,27 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   expect(screen.queryByRole('listitem',{name:'Family trip to Maine and Maine family trip'})).toBeNull()
   expect(screen.getByText('Nothing on the list looks alike.')).toBeInTheDocument()
  })
- // Task 2 (planning as tooltips): this step's editor drew in the ribbon's drop card,
- // which is gone; it comes back as a permanent section on the page. Re-point this
- // test there.
- it.skip('Share and book: Scott’s own Work and Personal goals can go to Family after a confirm on the page; the season session is booked on the day he picks',async()=>{
+ // Planning as tooltips (Task 2): sharing is each goal's own space (its
+ // panel); the step's tooltip carries the one action, the booking.
+ it('Share and book: the tooltip books the first Winter session, on the day Winter starts; nothing is shared from the page',async()=>{
   inSession()
-  api.goals=[...GOALS.map(g=>({...g})),{id:'w',name:'Ship the site',year:2026,status:'active',context:'work',userId:'u1'},
-   {id:'f',name:'Family trip',year:2026,status:'active',context:'family'},{id:'p2',name:'Iris’s own',year:2026,status:'active',context:'personal',userId:'u2'},
-   {id:'x',name:'Finished',year:2026,status:'completed',context:'personal'}]
+  api.goals=[...GOALS.map(g=>({...g})),{id:'w',name:'Ship the site',year:2026,status:'active',context:'work',userId:'u1'}]
   atStep('share-book')
   year()
-  const goals=within(screen.getByRole('list',{name:'Work and Personal goals'}))
-  expect(goals.getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['Together','Health','Ship the site'])
-  fireEvent.click(goals.getByRole('button',{name:'Share with the family: Together'}))
-  expect(api.updateGoal).not.toHaveBeenCalled()
-  expect(screen.queryByRole('dialog')).toBeNull()
-  expect(goals.getByText('Everyone in the family will see it. Its steps stay yours.')).toBeInTheDocument()
-  await act(async()=>{fireEvent.click(goals.getByRole('button',{name:'Share it'}))})
-  expect(api.updateGoal).toHaveBeenCalledWith('g',{context:'family'})
-  expect(lastRun().label).toBe('Share “Together” with the family')
-  await act(async()=>{await lastRun().opts.undo()})
-  expect(api.updateGoal).toHaveBeenLastCalledWith('g',{context:'personal'})
-  // The season session: nothing but the title is filled in.
-  const date=screen.getByLabelText('First season session')
-  expect(date).toHaveValue('')
-  expect(screen.getByText('Adds “Plan Winter” to that day, for you.')).toBeInTheDocument()
+  expect(screen.queryByRole('list',{name:'Work and Personal goals'})).toBeNull()
+  expect(screen.queryByRole('button',{name:/^Share with the family/})).toBeNull()
+  expect(coach().getByText('Share and book the next session')).toBeInTheDocument()
   expect(api.addTask).not.toHaveBeenCalled()
-  fireEvent.change(date,{target:{value:'2026-12-05'}})
-  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Book it'}))})
-  expect(api.addTask).toHaveBeenCalledWith('Plan Winter',undefined,undefined,new Date(2026,11,5),expect.objectContaining({isAllDay:true,context:'personal',id:expect.any(String)}))
-  expect(lastRun().label).toBe('Add “Plan Winter” to Sat, Dec 5')
+  await act(async()=>{fireEvent.click(coach().getByRole('button',{name:'Book the first Winter session'}))})
+  expect(api.addTask).toHaveBeenCalledWith('Plan Winter',undefined,undefined,new Date(2026,11,1),expect.objectContaining({isAllDay:true,context:'personal',id:expect.any(String)}))
+  expect(lastRun().label).toBe('Add “Plan Winter” to Tue, Dec 1')
   expect(lastRun().opts.undo).toEqual(expect.any(Function))
+  expect(coach().getByRole('status')).toHaveTextContent('Booked: Plan Winter, Tue, Dec 1')
+  expect(api.updateGoal).not.toHaveBeenCalled()
   expect(plannedMarks()).toHaveLength(0)
+  // Only that step carries an action.
+  await act(async()=>{fireEvent.click(coach().getByRole('button',{name:'Back'}))})
+  expect(coach().queryByRole('button',{name:/^Book the first/})).toBeNull()
  })
 })
 
@@ -2138,3 +2187,22 @@ describe('grouped by life area',()=>{
  })
 })
 
+// Planning as tooltips (Task 2): every planning step has a permanent, quiet
+// home on the everyday page, and its tooltip points at it. One row per step
+// of Month, Season and Year: the anchor is on the page every day (not hidden),
+// and in a session the step's tooltip points at it, not at the title.
+describe('every step’s tooltip points at its home on the everyday page',()=>{
+ const pages={month:'/month?view=constellation&horizon=2&start=2026-10-09',season:'/season?view=constellation&horizon=1&start=2026-10-09',year:'/year?view=constellation&start=2026-10-09'} as const
+ const rows=(['month','season','year'] as const).flatMap((level)=>stepsFor(level).map((st)=>[level,st.id,st.at] as const))
+ it.each(rows)('%s · %s → [data-guide-anchor="%s"]',(level,id,anchor)=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  open(pages[level])
+  const home=document.querySelector(`[data-guide-anchor="${anchor}"]`)
+  expect(home).not.toBeNull()
+  expect(home!.closest('[hidden]')).toBeNull()
+  cleanup()
+  atStep(id)
+  open(pages[level]+'&plan=1')
+  expect(screen.getByRole('dialog',{name:'Planning guide'}).dataset.at).toBe(anchor)
+ })
+})

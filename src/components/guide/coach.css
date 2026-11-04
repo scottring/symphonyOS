@@ -71,6 +71,15 @@ button.plan-chip:disabled { opacity: .5; cursor: default; }
 .coach p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
 .coach .coach-why { color: var(--coach-ink-soft); }
 .coach .coach-error { color: var(--color-danger-600, hsl(0 60% 42%)); }
+/* A step's one action (Share and book: "Book the first Winter session"). */
+.coach-action {
+  display: inline-flex; margin: 4px 0 2px; border: 1px solid color-mix(in srgb, var(--coach-accent) 45%, transparent);
+  background: none; color: var(--coach-accent); font: 500 12.5px/1 var(--font-family-sans);
+  padding: 8px 12px; min-height: 32px; border-radius: 999px; cursor: pointer;
+}
+.coach-action:hover { background: color-mix(in srgb, var(--coach-accent) 8%, transparent); }
+.coach-action[disabled] { opacity: .5; cursor: default; }
+.coach .coach-done { color: var(--coach-sage); font-weight: 500; }
 .coach-nav { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .coach-nav button {
   border: 0; background: none; color: var(--coach-ink-soft); font: 500 12.5px/1 var(--font-family-sans);

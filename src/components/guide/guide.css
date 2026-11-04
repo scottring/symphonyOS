@@ -258,3 +258,15 @@
 .guide-yl-name { font: 600 10.5px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-600); }
 .guide-yl-crowded { font-size: 11px; font-weight: 600; color: var(--g-accent); }
 .guide-yl-lines { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+
+/* The Energy chip in a page header (Today, Season): the prototype's .energy. */
+.energy-chip-wrap { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; }
+.energy-chip {
+  border: 0; border-radius: 999px; padding: 5px 9px; cursor: pointer; white-space: nowrap;
+  background: color-mix(in srgb, var(--color-neutral-900) 5%, transparent); color: var(--color-neutral-600);
+  font: 500 12px/1 var(--font-family-sans);
+}
+.energy-chip b { font-weight: 600; color: var(--color-neutral-900); }
+.energy-chip:hover { background: color-mix(in srgb, var(--color-neutral-900) 9%, transparent); }
+.energy-chip:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+.energy-chip-failed { font-size: 12px; color: var(--color-danger-600, hsl(0 60% 42%)); }
