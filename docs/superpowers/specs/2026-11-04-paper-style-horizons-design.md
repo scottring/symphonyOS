@@ -216,6 +216,8 @@ from the sheet.
   same spring, sound, shading, drag, F-key equivalent (C), memory
   (`symphony-fold:<horizon>:calendar`) and reduced-motion rules. The edge
   reads "{period} calendar", e.g. "November calendar".
+- **Sizes with a calendar:** on pages that have both companions, each takes
+  clamp(220, 26%, 320) px. Pages with only the sheet above keep 36% (220–340).
 - **Wide screens:** both folds can be open when the spread fits (sheet above,
   this sheet and calendar at their minimum widths). Otherwise opening one
   folds the other.
