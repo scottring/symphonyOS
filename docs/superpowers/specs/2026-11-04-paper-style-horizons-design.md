@@ -138,6 +138,74 @@ after it are links only when there is a note to open: "Last week's review",
   one-tap "use the same words" shortcut is the failure mode.
 - Hiding the level above so it can't be read while writing.
 
+## The fold (Scott, 2026-11-04)
+
+Scott: "let's make the UI for this super compelling and self-evident. There
+should literally be a fold and it should be beautiful both in terms of visual
+aesthetics as well as UX 'feel' and sound." He approved the prototype
+(https://claude.ai/artifact/GRQsgUEXxNk7sXki8nun2S): "this is great, i think we
+have finally tied everything together in a beautiful way."
+
+The prototype is the reference for look, motion and sound. Build what it does:
+
+- **Folded:** the sheet above sits behind this period's sheet. Only its edge
+  shows at the left: a paper strip with the period's name set vertically
+  ("FALL 2026"), its open count and a chevron, with the edge of a second layer
+  of paper behind it.
+- **Unfolding:** tap the edge, drag it, or press F. The sheet swings out on a
+  hinge at this sheet's left edge (3D rotate, perspective about 2200px) and
+  lies flat beside it like an open journal. Light falls across it as it turns
+  (darkest at the hinge). The page widens as it opens, so the spread stays
+  centered. The motion is a spring that settles with about a 2% overshoot.
+  When it lands, a soft crease shadow appears on this sheet's left edge.
+  Dragging follows the finger. On release it snaps open or closed by
+  position plus velocity. A tap is any press that moves less than 4px.
+- **Sound** (generated with Web Audio; no audio files): a paper swish and
+  crinkle while it moves, small crinkles while dragging (by distance moved),
+  and a soft landing thump with a few grains. Checking off a task gives a
+  pencil tick. One mute control, remembered per device. Six-millisecond
+  haptic on landing where the device supports it.
+- **The sheet above:** warmer paper, smaller type, no controls of any kind.
+  Its foot reads "For reading. Write November in its own words."
+- **This period's sheet:** its list, then the next ruled line, with a pencil
+  icon and "Write a November goal" ("Write a Fall goal", "Write a 2026 goal",
+  "Write a task for this week") in the accent color. Return adds the line in
+  ink.
+- **Remembered:** open or folded, per person and per horizon.
+- **Reduced motion:** no spring and no swish. It switches state with a short
+  crossfade and the landing sound only.
+- **Sizes:** the sheet above takes a reading column of about 36% of the
+  spread (220–340px). This sheet keeps the rest, up to 560px, and never
+  shrinks below the sheet above.
+- **Phones under 760px wide (and the Duo's outside screen):** the sheet above
+  hangs from this sheet's top edge as a horizontal strip ("FALL 2026 · 17 ›").
+  It folds down toward you and lies above the list, up to 62% of the screen
+  high, scrolling inside itself.
+- **iPhone Duo, open (the inside screen):** both sheets fill the screen as a
+  two-page spread. The sheet above takes about 38% on the left and this
+  period the rest. Opening the phone unfolds the sheet with the sound;
+  closing it folds the sheet away. Use the fold position the system reports
+  (the existing iOS `DockLayout.fold`, `DockEdge.swift`; web: the viewport
+  segments API, then a shape fallback of a coarse pointer, 560–900px wide and
+  1.2–1.65 tall per unit width). Because the Duo's screen is crease-free, the
+  split follows the content, not the hinge. The one exception is when the
+  phone is half-open like a book (a reported vertical fold): then the split
+  sits on the fold, as Today's columns already do.
+
+### Where it applies
+
+- **Web:** Year, Season and Month pages (the sheet above: last year's open
+  goals, the year, the season) and the Week page (the month). The fold
+  replaces the strip's first tab on those pages. Routines and Week's "No day
+  yet" stay as tabs. Today keeps its This week column (doing, not reading).
+- **iPhone app (TestFlight):** the same on the Planner's Month, Season, Year
+  and Week (`PeriodPlanView`, `WeekPlanView`), in SwiftUI (rotation3DEffect
+  with the same spring and sounds as small bundled sounds or AVAudioEngine
+  noise). Its triage (`TriageController`, `ChooserSheet`, bring-down and copy
+  verbs) follows the paper-style rules above. Its outside-screen and
+  inside-screen layouts follow the existing Duo work: `DockLayout`, and
+  Today's `leftColumnWidth` rule for a vertical fold.
+
 ## Settled after the builder check
 
 - **Nothing moves up either.** "Back to <month>" for last week's leftovers,
