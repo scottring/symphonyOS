@@ -902,7 +902,7 @@ function Inner() {
             Edit here), then its dates: the months gone by in one row, four
             dates a month at most. */}
         {hasLandscape(yearNotes.notes.landscape) && <YearLandscapeSection value={yearNotes.notes.landscape} />}
-        <MonthsCalendar start={bounds.start} end={bounds.end} allMonths perMonth={4} label={`${periodWord}, month by month`} over={`${periodWord} is over.`} />
+        <MonthsCalendar start={bounds.start} end={bounds.end} allMonths perMonth={4} scope="year" label={`${periodWord}, month by month`} over={`${periodWord} is over.`} />
         <CalendarRoutines word="year" routines={periodRoutines} />
       </CalendarSheet>
   // The life areas in view (the space filter; a legacy area with no space is

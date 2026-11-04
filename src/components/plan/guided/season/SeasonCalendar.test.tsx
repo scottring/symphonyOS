@@ -12,7 +12,7 @@ vi.mock('@/hooks/useSeasonEvents', () => ({
 const conn = vi.hoisted(() => ({ connected: true as boolean | null }))
 vi.mock('@/lib/calendarConnection', () => ({ getCalendarConnected: () => conn.connected }))
 
-import { SeasonCalendar } from './SeasonCalendar'
+import { MonthsCalendar, SeasonCalendar } from './SeasonCalendar'
 
 const ev = (id: string, title: string, at: string, over: Partial<CalendarEvent> = {}): CalendarEvent => ({ id, title, start_time: at, ...over })
 const at = (d: Date) => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(d); onTestFinished(() => { vi.useRealTimers() }) }
@@ -92,6 +92,29 @@ describe('SeasonCalendar — the season’s fixed dates, month by month', () => 
     expect(screen.queryByText('Gone before')).toBeNull()
     expect(within(months()[0]).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['From Aug 29All day · until Sep 3 Beach week', 'Sat 5All day Tuition due'])
     expect(within(months()[1]).getByText('Tuition due')).toBeInTheDocument()
+  })
+
+  it('the specials are out and the weekly series is one line; the year keeps only its landmarks', () => {
+    at(new Date(2026, 9, 1, 9))
+    cal.events = [
+      ev('s1', 'Specials — Ella: PE · Kaleb: Music', '2026-10-05', { all_day: true }),
+      ev('s2', 'Specials — Ella: Art · Kaleb: PE', '2026-10-06', { all_day: true }),
+      ev('b1', 'Boxing', '2026-10-06T18:00:00', { recurring_event_id: 'boxing' }),
+      ev('b2', 'Boxing', '2026-10-08T18:00:00', { recurring_event_id: 'boxing' }),
+      ev('p', 'Birthday party', '2026-10-10T14:00:00'),
+      ev('h', 'Halloween', '2026-10-31', { all_day: true }),
+      ev('f1', 'Pay FFG', '2026-10-10T09:00:00', { recurring_event_id: 'ffg' }),
+      ev('f2', 'Pay FFG', '2026-11-10T09:00:00', { recurring_event_id: 'ffg' }),
+    ]
+    const season = render(<SeasonCalendar date={new Date(2026, 9, 1)} seasons={DEFAULT_SEASONS} />)
+    expect(document.body.textContent).not.toMatch(/Specials/)
+    expect(screen.getByText('Every week: Boxing Tue & Thu')).toBeInTheDocument()
+    expect(screen.getByText('Birthday party')).toBeInTheDocument()
+    season.unmount()
+    render(<MonthsCalendar start={new Date(2026, 0, 1)} end={new Date(2027, 0, 1)} allMonths scope="year" label="2026, month by month" over="2026 is over." />)
+    expect(screen.queryByText('Birthday party')).toBeNull()
+    expect(screen.getByText('Halloween')).toBeInTheDocument()
+    expect(screen.getAllByText('Pay FFG')).toHaveLength(2)
   })
 
   it('loading, a read that failed, and no calendar connected each say so', () => {

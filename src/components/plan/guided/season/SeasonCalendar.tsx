@@ -8,46 +8,21 @@
 // trips, breaks and deadlines not there yet are Scott's to say in the
 // conversation. A month the calendar was not read that far for says so
 // rather than reading as an empty month.
+//
+// What it lists is what claims the period (claimsIn, the Month sheet's own
+// selector): no specials rotation, the weekly series named once above the
+// months. The year's sheet (scope 'year') lists only its landmarks:
+// all-day dates, stretches, monthly and yearly series.
 
 import { useSeasonEvents } from '@/hooks/useSeasonEvents'
-import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { getCalendarConnected } from '@/lib/calendarConnection'
-import { eventDensityKey } from '@/lib/planning/weekDensity'
-import { weeklySeries } from '@/lib/planning/v2/planV2'
+import { claimsIn, rhythmLine, type Claim, type ClaimScope } from '@/lib/planning/periodClaims'
 import { seasonBounds, type Seasons } from '@/lib/cadence/seasons'
-import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
+import { localYmd } from '@/lib/cadence/config'
 
 const DAY = 86_400_000
 const short = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-const dayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
-
-interface Entry { id: string; title: string; at: Date; allDay: boolean; last?: Date }
-
-/** The season's dated entries in [from, end): each event once, the weekly
- *  series left out, one that started earlier and runs into `from` kept. */
-function seasonEntries(events: readonly CalendarEvent[], from: Date, end: Date): Entry[] {
-  const weekly = weeklySeries(events)
-  const seen = new Set<string>()
-  const out: Entry[] = []
-  for (const e of events) {
-    const series = e.recurring_event_id ?? e.recurringEventId
-    if (series && weekly.has(series)) continue
-    const allDay = !!(e.all_day ?? e.allDay)
-    // A bare date is a LOCAL day (periodCalendar.ts); an all-day end is exclusive.
-    const read = (raw?: string) => !raw ? null : allDay || /^\d{4}-\d{2}-\d{2}$/.test(raw) ? parseLocalYmd(raw.slice(0, 10)) : new Date(raw)
-    const at = read(e.start_time ?? e.startTime)
-    if (!at || Number.isNaN(at.getTime())) continue
-    const rawEnd = read(e.end_time ?? e.endTime)
-    const stop = rawEnd && !Number.isNaN(rawEnd.getTime()) && rawEnd > at ? rawEnd : new Date(at.getTime() + (allDay ? DAY : 1))
-    if (at >= end || stop <= from) continue
-    const key = eventDensityKey(e.title ?? '', allDay ? null : at, localYmd(at))
-    if (seen.has(key)) continue
-    seen.add(key)
-    const last = dayOf(new Date(stop.getTime() - 1))
-    out.push({ id: e.id, title: e.title || '(no title)', at, allDay, ...(last > dayOf(at) ? { last } : {}) })
-  }
-  return out.sort((a, b) => dayOf(a.at).getTime() - dayOf(b.at).getTime() || (a.allDay === b.allDay ? a.at.getTime() - b.at.getTime() : a.allDay ? -1 : 1))
-}
+const NO_TASKS: never[] = []
 
 export function SeasonCalendar({ date, seasons }: {
   /** Any day of the season being planned. */
@@ -63,7 +38,7 @@ export function SeasonCalendar({ date, seasons }: {
  *  months gone by in one row, "Jan – Oct · Past", then every month to come,
  *  this one marked now). `perMonth` caps each month's list, with "and N more".
  *  The read runs from today (useSeasonEvents). Read-only. */
-export function MonthsCalendar({ start, end, label, over, allMonths = false, perMonth }: {
+export function MonthsCalendar({ start, end, label, over, allMonths = false, perMonth, scope = 'season' }: {
   start: Date
   /** Exclusive. */
   end: Date
@@ -73,6 +48,8 @@ export function MonthsCalendar({ start, end, label, over, allMonths = false, per
   over: string
   allMonths?: boolean
   perMonth?: number
+  /** 'year' keeps only landmarks, stretches and monthly/yearly series. */
+  scope?: ClaimScope
 }) {
   const connected = getCalendarConnected()
   const cal = useSeasonEvents(start, end, connected !== false)
@@ -91,8 +68,9 @@ export function MonthsCalendar({ start, end, label, over, allMonths = false, per
     months.push({ from: m < first ? first : m, to: next > end ? end : next })
   }
   const range = cal.range
-  const entries = seasonEntries(cal.events, from, end)
-  const monthOf = (e: Entry, m: { from: Date; to: Date }) => { const d = e.at < from ? from : e.at; return d >= m.from && d < m.to }
+  const { claims: entries, rhythm } = claimsIn(cal.events, NO_TASKS, from, end, { scope })
+  const line = rhythmLine(rhythm)
+  const monthOf = (e: Claim, m: { from: Date; to: Date }) => { const d = e.at < from ? from : e.at; return d >= m.from && d < m.to }
   // The months gone by, as one row.
   const gone = months.filter((m) => m.to <= from)
   const ahead = months.filter((m) => m.to > from)
@@ -100,6 +78,7 @@ export function MonthsCalendar({ start, end, label, over, allMonths = false, per
   const goneLabel = gone.length === 0 ? '' : gone.length === 1 ? mon(gone[0].from) : `${mon(gone[0].from)} – ${mon(gone[gone.length - 1].from)}`
 
   return <div className="gw-body">
+    {line && from < end && <p className="cal-sheet-rhythm">{line}</p>}
     {months.length === 0 || (!allMonths && from >= end) ? <p className="choose-empty">{over}</p>
       : <ul className="gw-rows" aria-label={label}>
         {gone.length > 0 && <li key="gone" className="gw-row gw-day" aria-label={`${goneLabel} · Past`}>

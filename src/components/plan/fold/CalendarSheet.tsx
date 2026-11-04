@@ -19,7 +19,7 @@
 import type { ReactNode } from 'react'
 import { useDayLoadEvents } from '@/hooks/useDayLoadEvents'
 import { getCalendarConnected } from '@/lib/calendarConnection'
-import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
+import { claimsIn, claimDays } from '@/lib/planning/periodClaims'
 import { localYmd, type WeekStart } from '@/lib/cadence/config'
 import { monthGridWeeks } from '@/lib/planning/monthGrid'
 import { SheetFoot } from './AboveSheet'
@@ -96,8 +96,11 @@ export function CalendarRoutines({ word, routines }: { word: RoutinesWord; routi
 const NO_TASKS: never[] = []
 
 /** The month at a glance (the prototype's .cal): its weeks as rows, today
- *  marked, a dot for each event on a day (up to three), from the same
- *  calendar read as NextWeeks below it. Days the read does not reach have no dots. */
+ *  marked, a dot for each claim on a day (up to three), from the same
+ *  calendar read and the same selector (claimsIn) as NextWeeks below it, so
+ *  a dense day means something: the specials rotation and the weekly series
+ *  draw no dots, and a stretch dots each of its days. Days the read does not
+ *  reach have no dots. */
 export function MonthGrid({ month, weekStartsOn }: { month: Date; weekStartsOn: WeekStart }) {
   const connected = getCalendarConnected()
   const cal = useDayLoadEvents(connected !== false)
@@ -106,9 +109,8 @@ export function MonthGrid({ month, weekStartsOn }: { month: Date; weekStartsOn: 
   const todayKey = localYmd(new Date())
   const perDay = new Map<string, number>()
   if (cal.available && connected !== false) {
-    for (const e of periodCalendarEntries(NO_TASKS, cal.events, first, next)) {
-      const k = localYmd(e.at)
-      perDay.set(k, (perDay.get(k) ?? 0) + 1)
+    for (const c of claimsIn(cal.events, NO_TASKS, first, next).claims) {
+      for (const k of claimDays(c, first, next)) perDay.set(k, (perDay.get(k) ?? 0) + 1)
     }
   }
   const weeks = monthGridWeeks(first, weekStartsOn)

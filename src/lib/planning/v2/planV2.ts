@@ -106,11 +106,13 @@ function readTime(raw: string | undefined): Date | null {
 
 /** The school's specials rotation ("Specials — Ella: PE · Kaleb: Music"): a
  *  reminder for the bag, read on the wall and the week, never a fixed date. */
-const SPECIALS = /^specials?\s*[—–:-]/i
+export const SPECIALS = /^specials?\s*[—–:-]/i
 
-/** All-day series that come round every week or more often ("Trash day"):
- *  the rhythm of the week, not a date in it. A monthly or yearly series
- *  (tuition due, a birthday) stays. */
+/** Series that come round every week or more often, all-day ("Trash day")
+ *  or timed (Boxing Tue & Thu, an every-school-day drop-off): the rhythm of
+ *  the week, not a date in it. A monthly or yearly series (tuition due, a
+ *  birthday) stays. Read off the instances given, so the read must reach
+ *  past one occurrence. */
 export function weeklySeries(events: readonly CalendarEvent[]): Set<string> {
   const days = new Map<string, number[]>()
   for (const e of events) {
