@@ -318,6 +318,26 @@ describe('GuidedWeek — the Week page while planning', () => {
   })
 })
 
+// Planning as tooltips (Task 2): Tell the family's home is a quiet line on
+// the Week page, there every day and through the session; its step points at it.
+describe('GuidedWeek — For the family this week', () => {
+  it('is on the week every day, and through the session, where the Tell the family tooltip points at it', () => {
+    open('/')
+    expect(screen.getByRole('region', { name: 'For the family this week' })).toHaveAttribute('data-guide-anchor', 'family')
+  })
+  it('on the Tell the family step the tooltip points at it', () => {
+    store.notes = { guide: { current: 'family', done: [], skipped: [] } }
+    open('/?plan=1')
+    expect(stepNow()).toBe('Tell the family')
+    expect(screen.getByRole('region', { name: 'For the family this week' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe('family')
+  })
+  it('Give them a day (?place=1) has none', () => {
+    open('/?place=1')
+    expect(screen.queryByRole('region', { name: 'For the family this week' })).toBeNull()
+  })
+})
+
 describe('useGuidedWeek — planned once something is applied at Choose', () => {
   const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter><GuidedSessionProvider>{children}</GuidedSessionProvider></MemoryRouter>
   const hook = (onPlanned = vi.fn()) => renderHook(() => useGuidedWeek({

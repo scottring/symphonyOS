@@ -85,7 +85,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     {/* Inbox opens the rail, just before Today (Scott, 2026-10-17): the
         captures not yet planned come before the smallest horizon. */}
     <NavLink to={connectedDestination('/inbox', search)} className="page-navigation-icon" title="Inbox"
-      aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}>
+      data-guide-anchor="inbox" aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}>
       <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}
     </NavLink>
     {centerRef && <div ref={centerRef} className="page-navigation-center" />}

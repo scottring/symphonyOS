@@ -24,6 +24,8 @@ describe('DesktopNavigation — one bar on every page (2026-09-29)', () => {
     const inbox = within(mid).getByRole('link', { name: 'Inbox, 3 items' })
     expect(inbox.textContent).toBe('3')
     expect(inbox.nextElementSibling?.className).toBe('page-navigation-center')
+    // The Week session's Clear the inbox step points at it (planning as tooltips, Task 2).
+    expect(inbox).toHaveAttribute('data-guide-anchor', 'inbox')
     const right = nav.querySelector('.page-navigation-utilities') as HTMLElement
     const order = [...right.querySelectorAll('a, button')].map((el) => el.getAttribute('aria-label') ?? el.textContent)
     expect(order).toEqual(['Discussions, 1 waiting on you', 'Search', 'Account'])

@@ -15,6 +15,8 @@ import { ConversationWalkContext } from '@/components/canvas/conversationWalk'
 import { CanvasActivityProvider, useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { GuidedSessionProvider, useGuidedSession } from '@/contexts/GuidedSessionContext'
 import { WEEK_PREF_KEYS } from '@/hooks/useWeekViewPrefs'
+import { stepsFor } from '@/lib/guide/steps'
+import { DesktopNavigation } from '@/components/layout/DesktopNavigation'
 
 // These tests cover the Lists view; Open journal is the default since
 // 2026-10-08, so they make the device's choice explicit.
@@ -1291,5 +1293,19 @@ describe('WeekViewV2 — the deck', () => {
     open('?review=1', [])
     act(() => { props().onSeeAged() })
     expect(window.location.pathname).toBe('/someday')
+  })
+})
+
+// Planning as tooltips (Task 2): every Week step's tooltip points at its
+// home on the everyday week (the top bar's Inbox is the shell's).
+describe('every Week step has its home on the everyday page', () => {
+  it.each(stepsFor('week').map((st) => [st.id, st.at]))('week · %s → [data-guide-anchor="%s"]', (_id, anchor) => {
+    render(<>
+      <DesktopNavigation inboxCount={2} discussionsUnread={0} onSearch={vi.fn()} onSignOut={vi.fn()} paused={false} controlsRef={() => {}} />
+      <WeekViewV2 {...defaultProps} routines={[]} weekStart={weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)} />
+    </>)
+    const home = document.querySelector(`[data-guide-anchor="${anchor}"]`)
+    expect(home).not.toBeNull()
+    expect(home!.closest('[hidden]')).toBeNull()
   })
 })

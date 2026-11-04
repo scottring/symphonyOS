@@ -6,11 +6,9 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { addScratchpadNote, ownMemberId } from '@/lib/wall/addScratchpadNote'
+import { LONGEST_FAMILY_NOTE as LONGEST, postFamilyNotes } from '@/lib/wall/tellFamily'
 
 const notes = (n: number) => `${n} ${n === 1 ? 'note' : 'notes'}`
-/** The wall's longest note (addScratchpadNote keeps 500 characters). */
-const LONGEST = 500
 
 export function TellFamily({ weekStart, familyItems, draft, onDraft }: {
   weekStart: Date
@@ -33,20 +31,7 @@ export function TellFamily({ weekStart, familyItems, draft, onDraft }: {
   const post = async () => {
     if (!user?.id || lines.length === 0 || tooLong) return
     setPosting(true); setResult(null)
-    // The wall keeps a note until the week is over: the next week's start.
-    const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
-    // Not knowing who wrote it does not stop the notes: they post unsigned.
-    const author = await ownMemberId(user.id).catch((e: unknown) => {
-      console.error('[tell the family] could not tell who wrote it:', e)
-      return null
-    })
-    const left: string[] = []
-    let posted = 0
-    for (const line of lines) {
-      const ok = await addScratchpadNote(user.id, line, 'note', author, end).catch(() => false)
-      if (ok) posted++
-      else left.push(line)
-    }
+    const { posted, left } = await postFamilyNotes(user.id, lines, weekStart)
     setPosting(false)
     setResult({ posted, failed: left.length })
     // What did not post stays to try again; what did is not posted twice.

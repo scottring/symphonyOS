@@ -599,6 +599,32 @@ describe('the dinner row', () => {
   })
 })
 
+// Planning as tooltips (Task 2): the Week session's steps point at their
+// homes on the week itself.
+describe('the week’s planning homes', () => {
+  it('the dinner row is Weekly ops’ anchor; a week with no dinners keeps one faint line', async () => {
+    const { MemoryRouter } = await import('react-router-dom')
+    const withDinners = days().map((d, i) => (i === 0 ? { ...d, dinners: [{ id: 'meal-a', label: 'Soup', href: '/meals/cook/r-soup' }] } : d))
+    const { unmount } = render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={withDinners} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} /></MemoryRouter>)
+    expect(screen.getByLabelText('Dinners')).toHaveAttribute('data-guide-anchor', 'dinner')
+    unmount()
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} /></MemoryRouter>)
+    const empty = screen.getByLabelText('Dinners')
+    expect(empty).toHaveAttribute('data-guide-anchor', 'dinner')
+    expect(empty).toHaveTextContent('Dinner No dinners planned yet')
+  })
+
+  it('the week’s line to write on is the Choose step’s anchor: + Add to week, and the line once open', async () => {
+    const { MemoryRouter } = await import('react-router-dom')
+    const w = { ...writers(), addTyped: vi.fn(async () => true) }
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w}
+      hideStrip month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={{ drive: {}, look: null }} /></MemoryRouter>)
+    expect(screen.getByRole('button', { name: '+ Add to week' })).toHaveAttribute('data-guide-anchor', 'write')
+    fireEvent.click(screen.getByRole('button', { name: '+ Add to week' }))
+    expect(screen.getByRole('textbox').closest('[data-guide-anchor="write"]')).not.toBeNull()
+  })
+})
+
 // The phone keeps its No day yet list this stage.
 describe('No day yet (phone)', () => {
   const original = window.matchMedia

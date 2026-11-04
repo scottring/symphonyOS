@@ -605,7 +605,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           </button>
         )}
         {!stripMode && (day.dinners ?? []).length > 0 && (
-          <p className="wc-dinner"><span className="wc-dinner-label">Dinner</span>{' '}
+          <p className="wc-dinner" data-guide-anchor="dinner"><span className="wc-dinner-label">Dinner</span>{' '}
             {day.dinners!.map((d, i) => <span key={d.id}>{i > 0 && ' · '}{d.href
               ? <Link to={d.href} className="wc-rhythm-item">{d.label}</Link>
               : <button type="button" className="wc-rhythm-item" onClick={() => writers.open(d.id)}>{d.label}</button>}</span>)}
@@ -818,7 +818,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           : !draggingPlaced && <p className="hs-empty">Everything on this week has a day.</p>}
       </DropZone>
       {unplaced.length > 0 && <p className="hs-row-meta">Drag one onto a day.{onPlaceUnplaced && <> Or <button type="button" className="canvas-link wc-quiet-link" onClick={onPlaceUnplaced}>place them one at a time</button>.</>}</p>}
-      {writers.addTyped && <button type="button" className="hs-add" onClick={() => setComposer({ key: null })}>+ Add to week</button>}
+      {/* The Week session's Choose step points at the week's line to write on. */}
+      {writers.addTyped && <button type="button" className="hs-add" data-guide-anchor="write" onClick={() => setComposer({ key: null })}>+ Add to week</button>}
     </>
   )
   // The week's routines: the ones that run on a day or two of it, by day, done
@@ -871,14 +872,22 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   )
   const composerDay = composer?.key ? days.find((d) => d.key === composer.key) : undefined
   const composerNode = composer && writers.addTyped && (
-    <TypedAdd key={composer.key ?? 'week'} label={composerDay ? `Add to ${dayShort(composerDay.date)}` : 'Add to this week'}
-      period={{ start: weekStart, end: weekEnd }} periodWord="this week" fallbackDay={composerDay?.date}
-      onSave={async (parse, landing) => { const ok = await writers.addTyped!(parse, landing); if (ok) setComposer(null); return ok }}
-      onCancel={() => setComposer(null)} />
+    <div className="wc-composer" data-guide-anchor="write">
+      <TypedAdd key={composer.key ?? 'week'} label={composerDay ? `Add to ${dayShort(composerDay.date)}` : 'Add to this week'}
+        period={{ start: weekStart, end: weekEnd }} periodWord="this week" fallbackDay={composerDay?.date}
+        onSave={async (parse, landing) => { const ok = await writers.addTyped!(parse, landing); if (ok) setComposer(null); return ok }}
+        onCancel={() => setComposer(null)} />
+    </div>
   )
   // Dinner, one row across the days, so the meal plan reads straight across.
-  const dinnerRow = stripDays.some((d) => (d.dinners ?? []).length > 0) && (
-    <div className="wc-dinners" style={{ gridTemplateColumns: stripCols }} aria-label="Dinners">
+  // It is the Week session's Weekly ops home (planning as tooltips, Task 2):
+  // a week with no dinners keeps one faint line.
+  const dinnerRow = !stripDays.some((d) => (d.dinners ?? []).length > 0) ? (
+    <p className="wc-dinners is-empty" aria-label="Dinners" data-guide-anchor="dinner">
+      <span className="wc-dinner-label">Dinner</span> No dinners planned yet
+    </p>
+  ) : (
+    <div className="wc-dinners" style={{ gridTemplateColumns: stripCols }} aria-label="Dinners" data-guide-anchor="dinner">
       {stripDays.map((d) => (
         <p key={d.key} className="wc-dinner">
           {(d.dinners ?? []).length > 0 && <><span className="wc-dinner-label">Dinner</span>{' '}

@@ -44,6 +44,7 @@ import { REVIEW_WINDOW_DAYS, reviewTarget, weekPhrase } from '@/lib/planning/per
 import { showToast } from '@/hooks/useToast'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
 import { WeekMenu } from './WeekMenu'
+import { FamilyWeekLine } from './FamilyWeekLine'
 import { rememberFolded } from '@/components/plan/fold/PaperFold'
 import { localYmd } from '@/lib/cadence/config'
 
@@ -259,6 +260,9 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
                 onLeave={() => setMode(null)} primary={{ label: 'Done', run: () => setMode(null) }} />
             </section>)
         : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
+      {/* Tell the family's home (planning as tooltips, Task 2): a quiet line
+          under the week, every day and through the session. */}
+      {deckMode !== 'place' && <FamilyWeekLine weekStart={weekStart} />}
     </div>
   )
 }

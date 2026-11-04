@@ -99,6 +99,8 @@
 .wc-dinners { display: grid; column-gap: 0; padding-top: 8px; border-top: 1px solid var(--color-neutral-200); }
 .wc-dinners > .wc-dinner { margin: 0; padding: 0 12px; min-width: 0; border-left: 1px solid var(--color-neutral-200); line-height: 1.4; }
 .wc-dinners > .wc-dinner:first-child { border-left-color: transparent; }
+/* A week with no dinners: one faint line, the Weekly ops step's home (Task 2). */
+.wc-dinners.is-empty { display: block; margin: 0; padding: 8px 12px 0; font-size: 13px; color: var(--color-neutral-400); }
 /* Less room beside the strip: the days stack as they do on a narrow desk. */
 @container (max-width: 820px) {
   .wc-with-strip .wc-strip { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: none; row-gap: 12px; }
