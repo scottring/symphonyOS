@@ -1,0 +1,188 @@
+/* Scott, 2026-11-04: paper-style horizons. The sheet above is hinged to the
+   left edge of this period's sheet (the top edge on phones). Folded, only its
+   edge shows; unfolded, it lies beside the page, for reading only. Ported from
+   docs/superpowers/specs/2026-11-04-paper-fold-prototype.html, with the
+   prototype's literals swapped for the app's tokens. --p (0 folded, 1 open),
+   the slot size and the flap transform are written per frame by PaperFold. */
+
+.paper-fold {
+  --p: 0;
+  --paper-fold-paper: var(--color-bg-elevated);
+  /* warmer paper for the level above, mixed from the page's own paper so the
+     night colours follow */
+  --paper-fold-paper-above: color-mix(in srgb, var(--color-bg-elevated) 93%, hsl(38 48% 62%));
+  --paper-fold-paper-back: color-mix(in srgb, var(--paper-fold-paper-above) 88%, var(--color-neutral-500));
+  --paper-fold-ink: var(--color-neutral-900);
+  --paper-fold-ink-soft: var(--color-neutral-500);
+  --paper-fold-ink-faint: var(--color-neutral-400);
+  --paper-fold-rule-above: color-mix(in srgb, var(--color-neutral-200) 85%, hsl(38 40% 60%));
+  --paper-fold-accent: var(--color-primary-500);
+  --paper-fold-shadow: 215 32% 14%;
+  --paper-fold-grain-alpha: .055;
+
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  color: var(--paper-fold-ink);
+}
+[data-scenery-lighting='nighttime'] .paper-fold,
+.dark .paper-fold {
+  --paper-fold-shadow: 220 40% 2%;
+  --paper-fold-grain-alpha: .08;
+}
+
+.paper-fold-slot {
+  position: relative; flex: none; width: 34px;
+  perspective: 2200px; perspective-origin: 100% 40%; z-index: 1;
+}
+
+/* this period's sheet */
+.paper-fold-current {
+  position: relative; z-index: 2; flex: none;
+  width: var(--paper-fold-cur, min(560px, calc(100vw - 32px - 34px)));
+  min-height: min(720px, 86vh);
+  padding: 30px 38px 28px 40px;
+  background-color: var(--paper-fold-paper);
+  background-image: var(--paper-fold-grain, none);
+  border-radius: 3px 10px 10px 3px;
+  box-shadow:
+    0 1px 1px hsl(var(--paper-fold-shadow) / .06),
+    0 10px 30px -8px hsl(var(--paper-fold-shadow) / .18),
+    0 30px 60px -30px hsl(var(--paper-fold-shadow) / .22);
+}
+/* the crease where the sheet above is hinged */
+.paper-fold-current::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 26px; pointer-events: none;
+  background: linear-gradient(to right, hsl(var(--paper-fold-shadow) / .16), hsl(var(--paper-fold-shadow) / 0));
+  opacity: clamp(0, var(--p), 1); border-radius: 3px 0 0 3px;
+}
+
+/* the folded edge of the sheet above, with a second layer of paper behind it */
+.paper-fold-edge {
+  position: absolute; inset: 10px 0 10px 4px; border: 0; cursor: pointer; padding: 0;
+  background-color: var(--paper-fold-paper-above); background-image: var(--paper-fold-grain, none);
+  border-radius: 8px 0 0 8px;
+  box-shadow:
+    -1px 0 0 var(--paper-fold-rule-above),
+    -4px 0 0 -1px var(--paper-fold-paper-above),
+    -5px 0 0 -1px var(--paper-fold-rule-above),
+    0 8px 18px -10px hsl(var(--paper-fold-shadow) / .3);
+  color: var(--paper-fold-ink-soft);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  opacity: clamp(0, calc(1 - var(--p) * 3.2), 1);
+  pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
+  transition: background-color .2s;
+}
+.paper-fold-edge:hover { background-color: color-mix(in srgb, var(--paper-fold-paper-above) 80%, var(--color-neutral-200)); }
+.paper-fold-edge-label {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font: 600 11px/1 var(--font-family-sans); letter-spacing: .2em; text-transform: uppercase;
+}
+.paper-fold-edge-count { font: 500 12px/1 var(--font-family-sans); color: var(--paper-fold-ink-faint); font-variant-numeric: tabular-nums; }
+.paper-fold-chevron { width: 14px; height: 14px; opacity: .7; }
+.paper-fold[data-open='true'] .paper-fold-edge { pointer-events: none; }
+
+.paper-fold-edge:focus-visible,
+.paper-fold-grip:focus-visible { outline: 2px solid var(--paper-fold-accent); outline-offset: 2px; }
+
+/* the sheet above, on its hinge */
+.paper-fold-flap {
+  position: absolute; top: 0; bottom: 0; right: 0; width: 340px;
+  transform-origin: 100% 50%; transform-style: preserve-3d;
+  will-change: transform;
+}
+.paper-fold-face {
+  position: absolute; inset: 0;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  border-radius: 10px 3px 3px 10px; overflow: hidden;
+}
+.paper-fold-front {
+  background-color: var(--paper-fold-paper-above); background-image: var(--paper-fold-grain, none);
+  box-shadow: 0 10px 30px -10px hsl(var(--paper-fold-shadow) / .2);
+  display: flex; flex-direction: column;
+  color: var(--paper-fold-ink-soft);
+}
+.paper-fold-back {
+  background-color: var(--paper-fold-paper-back); background-image: var(--paper-fold-grain, none);
+  transform: rotateY(180deg);
+}
+/* light falling across the sheet as it turns; deepest at the hinge */
+.paper-fold-front::after,
+.paper-fold-back::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to left, hsl(var(--paper-fold-shadow) / .55), hsl(var(--paper-fold-shadow) / .12) 45%, hsl(var(--paper-fold-shadow) / 0));
+}
+.paper-fold-front::after { opacity: calc((1 - var(--p)) * .9 + .06); }
+.paper-fold-back::after { opacity: .5; }
+.paper-fold-scroll {
+  overflow-y: auto; padding: 26px 30px 24px 30px; flex: 1;
+  scrollbar-width: thin; scrollbar-color: var(--paper-fold-rule-above) transparent;
+}
+
+.paper-fold-grip {
+  position: absolute; z-index: 3; cursor: grab; border: 0; background: none; padding: 0;
+  touch-action: none;
+  top: 0; bottom: 0; right: -6px; width: 16px;
+}
+.paper-fold-grip:active { cursor: grabbing; }
+.paper-fold-grip::before {
+  content: ""; position: absolute; border-radius: 4px; background: var(--paper-fold-ink-faint);
+  opacity: 0; transition: opacity .2s;
+  top: 50%; left: 6px; width: 4px; height: 44px; margin-top: -22px;
+}
+.paper-fold-grip:hover::before,
+.paper-fold-grip:focus-visible::before { opacity: .35; }
+
+/* ---- phones: the sheet above folds down from the top edge ---- */
+.paper-fold[data-fold-mode='v'] { flex-direction: column; align-items: stretch; width: 100%; }
+.paper-fold[data-fold-mode='v'] .paper-fold-slot { width: auto; height: 46px; perspective-origin: 50% 100%; }
+.paper-fold[data-fold-mode='v'] .paper-fold-current {
+  width: 100%; min-height: 0; padding: 24px 20px 22px; border-radius: 3px 3px 12px 12px;
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-current::before {
+  inset: 0 0 auto 0; width: auto; height: 22px;
+  background: linear-gradient(to bottom, hsl(var(--paper-fold-shadow) / .14), hsl(var(--paper-fold-shadow) / 0));
+  border-radius: 3px 3px 0 0;
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-edge {
+  inset: 4px 8px 0 8px; border-radius: 10px 10px 0 0; flex-direction: row; gap: 10px;
+  box-shadow:
+    0 -1px 0 var(--paper-fold-rule-above),
+    0 -4px 0 -1px var(--paper-fold-paper-above),
+    0 -5px 0 -1px var(--paper-fold-rule-above);
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-edge-label { writing-mode: horizontal-tb; transform: none; }
+.paper-fold[data-fold-mode='v'] .paper-fold-chevron { transform: rotate(90deg); }
+.paper-fold[data-fold-mode='v'] .paper-fold-flap {
+  top: auto; left: 0; right: 0; bottom: 0; width: auto; height: 300px; transform-origin: 50% 100%;
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-face { border-radius: 12px 12px 3px 3px; }
+.paper-fold[data-fold-mode='v'] .paper-fold-back { transform: rotateX(180deg); }
+.paper-fold[data-fold-mode='v'] .paper-fold-front::after,
+.paper-fold[data-fold-mode='v'] .paper-fold-back::after {
+  background: linear-gradient(to top, hsl(var(--paper-fold-shadow) / .55), hsl(var(--paper-fold-shadow) / .12) 45%, hsl(var(--paper-fold-shadow) / 0));
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-scroll { padding: 22px 20px 18px; }
+.paper-fold[data-fold-mode='v'] .paper-fold-grip { top: auto; left: 0; right: 0; bottom: -6px; width: auto; height: 16px; }
+.paper-fold[data-fold-mode='v'] .paper-fold-grip::before { top: 6px; left: 50%; height: 4px; width: 44px; margin-top: 0; margin-left: -22px; }
+
+/* ---- iPhone Duo, open: the phone's hinge is the page's crease. Left: the
+   sheet above. Right: this period. ---- */
+.paper-fold[data-fold-mode='duo'] .paper-fold-current {
+  width: var(--paper-fold-half); min-height: calc(100vh - 92px);
+  padding: 22px 22px 20px 24px; border-radius: 2px 12px 12px 2px;
+}
+.paper-fold[data-fold-mode='duo'] .paper-fold-face { border-radius: 12px 2px 2px 12px; }
+.paper-fold[data-fold-mode='duo'] .paper-fold-scroll { padding: 22px 18px 20px 22px; }
+.paper-fold[data-fold-mode='duo'] .paper-fold-edge { inset: 14px 0 14px 2px; }
+.paper-fold[data-fold-mode='duo'] .paper-fold-edge-count { display: none; }
+
+/* Reduced motion: no spring. The state jumps, and the sheets crossfade. */
+@media (prefers-reduced-motion: reduce) {
+  .paper-fold-flap { opacity: clamp(0, var(--p), 1); transition: opacity .16s, visibility .16s; }
+  .paper-fold-edge { transition: background-color .2s, opacity .16s; }
+  .paper-fold-current::before { transition: opacity .16s; }
+}
