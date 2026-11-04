@@ -14,7 +14,10 @@
 //
 // The level above lies folded at the sheet's left edge (PaperFold), for
 // reading only (AboveSheet): Fall beside November, the year beside Fall, last
-// year's open goals beside the year. Nothing on these pages says what an item
+// year's open goals beside the year. This period's calendar lies folded at
+// its right edge (CalendarSheet, Task 5c): November's weeks, Fall's fixed
+// dates by month, the year's 12 months. Both open, the page is a planner
+// spread: Fall | November | November's calendar. Nothing on these pages says what an item
 // is for or what is under it, and rows carry no verbs: tapping a month or
 // season goal opens its task panel (horizonPanel.tsx), and a year goal opens
 // in place with Done, Let go and Edit wording. Month and Year keep a strip of
@@ -92,6 +95,7 @@ import { useRoutines } from '@/hooks/useRoutines'
 import { RoutinesStrip, type StripRoutine } from './AboveStrip'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet } from '@/components/plan/fold/AboveSheet'
+import { CalendarSheet, MonthGrid } from '@/components/plan/fold/CalendarSheet'
 import { WriteLine } from '@/components/plan/fold/WriteLine'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 import { GuidedPeriod, type PeriodSessionTools } from '@/components/plan/guided/GuidedPeriod'
@@ -102,7 +106,7 @@ import { ReadAbove } from '@/components/plan/guided/month/ReadAbove'
 import { NextWeeks } from '@/components/plan/guided/month/NextWeeks'
 import { UpkeepFun } from '@/components/plan/guided/month/UpkeepFun'
 import { FromYear } from '@/components/plan/guided/season/FromYear'
-import { SeasonCalendar } from '@/components/plan/guided/season/SeasonCalendar'
+import { MonthsCalendar, SeasonCalendar } from '@/components/plan/guided/season/SeasonCalendar'
 import { SeasonEnergy, SeasonIdealWeek, SeasonWildCards } from '@/components/plan/guided/season/SeasonNotes'
 import { IdealWeekSection } from '@/components/guide/IdealWeekSection'
 import { YearVisionSection, hasVision } from '@/components/guide/YearVisionSection'
@@ -1092,6 +1096,22 @@ function Inner() {
   // while planning it stands beside the steps rail, whose steps read the
   // level above.
   const footer = proposals.length > 0 || openNodes.length > 0
+  // This period's calendar, folded at the sheet's right edge, for reading
+  // (Task 5c). It reuses the sessions' read-only steps: Month the month at a
+  // glance over five weeks from its first, Season its fixed dates by month,
+  // Year its 12 months of exact-date events.
+  const calendarSheet = level === 2
+    ? <CalendarSheet kicker="What’s already claimed" title={periodWord}>
+      <MonthGrid month={bounds.start} weekStartsOn={weekStartsOn} />
+      <NextWeeks start={weekStartAnchor(bounds.start, weekStartsOn)} weeks={5} />
+    </CalendarSheet>
+    : level === 1
+      ? <CalendarSheet kicker={`Fixed dates · ${periodRange(bounds.start, bounds.end)}`} title={periodWord}>
+        <SeasonCalendar date={bounds.start} seasons={seasons} />
+      </CalendarSheet>
+      : <CalendarSheet kicker="The 12 months" title={periodWord}>
+        <MonthsCalendar start={bounds.start} end={bounds.end} allMonths label={`${periodWord}, month by month`} over={`${periodWord} is over.`} />
+      </CalendarSheet>
   const sheet = (
     <section className={`plan-list ${planning ? 'plan-card' : 'plan-sheet'}`} data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
       <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items} headingOf={headingOf} groupOf={groupOf}
@@ -1121,7 +1141,8 @@ function Inner() {
     <div className={`hs-main plan-horizon-body${planning ? '' : ' is-sheet'}${preview.next.length ? ' has-next' : ''}`}>
     {planning ? sheet : <div className="plan-sheet-spread">
       <PaperFold horizon={PERIODS[level]} edgeLabel={aboveSheet.title} edgeCount={aboveSheet.rows.length}
-        above={<AboveSheet {...aboveSheet} foot={`For reading. Write ${periodWord} in its own words.`} />}>
+        above={<AboveSheet {...aboveSheet} foot={`For reading. Write ${periodWord} in its own words.`} />}
+        calendar={calendarSheet} calendarLabel={`${periodWord} calendar`}>
         {sheet}
       </PaperFold>
     </div>}

@@ -84,13 +84,20 @@ export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick
       ) : null}
       {doneCount > 0 && <p className="above-sheet-done">{doneCount} done</p>}
       {children}
-      <p className="above-sheet-foot">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-        <span>{foot}</span>
-      </p>
+      <SheetFoot>{foot}</SheetFoot>
     </div>
+  )
+}
+
+/** A sheet's foot line, with the eye: "For reading. …". */
+export function SheetFoot({ children }: { children: ReactNode }) {
+  return (
+    <p className="above-sheet-foot">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+      <span>{children}</span>
+    </p>
   )
 }

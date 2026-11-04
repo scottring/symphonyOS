@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { paperSound } from '@/lib/fold/paperSound'
@@ -425,5 +425,215 @@ describe('PaperFold: the sheet above stays in view and scrolls on its own', () =
     expect(root(container)).toHaveAttribute('data-fold-mode', 'v')
     expect(pin(container).style.position).toBe('')
     expect(scrollBox(container).style.overscrollBehavior).toBe('contain')
+  })
+})
+
+// Task 5c (Scott, 2026-11-04: "yes, add the calendar fold on the right"): this
+// period's calendar folds out on the right edge, mirrored, with its own
+// memory (symphony-fold:<horizon>:calendar) and key (C). Both open when the
+// spread fits; otherwise opening one folds the other.
+describe('PaperFold: the calendar on the right', () => {
+  function renderCal(props: Partial<Parameters<typeof PaperFold>[0]> = {}) {
+    return renderFold({
+      calendar: <ul><li>Thanksgiving</li></ul>,
+      calendarLabel: 'November calendar',
+      ...props,
+    })
+  }
+  const calEdge = () => screen.getByRole('button', { name: /November calendar/ })
+  const calRegion = (c: HTMLElement) => c.querySelector('.paper-fold-slot--calendar .paper-fold-front') as HTMLElement
+  const calFlap = (c: HTMLElement) => c.querySelector('.paper-fold-slot--calendar .paper-fold-flap') as HTMLElement
+
+  it('shows a second edge; folded, the calendar is unreachable', () => {
+    const { container } = renderCal()
+    expect(calEdge()).toHaveAccessibleName('November calendar. Unfold to read')
+    expect(calEdge()).toHaveAttribute('aria-expanded', 'false')
+    expect(calRegion(container)).toHaveAttribute('inert')
+    expect(calRegion(container)).toHaveAttribute('aria-hidden', 'true')
+    expect(calRegion(container)).toHaveAttribute('aria-label', 'November calendar, for reading')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
+    // Mirrored: hinged on this sheet's right edge, after it.
+    const current = container.querySelector('.paper-fold-current')!
+    expect(current.compareDocumentPosition(calEdge()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(calFlap(container).style.transform).toBe('rotateY(180.00deg)')
+  })
+
+  it('Enter unfolds it, revealing what it holds, and remembers it apart from the sheet above', () => {
+    const { container } = renderCal()
+    fireEvent.keyDown(calEdge(), { key: 'Enter' })
+    expect(calEdge()).toHaveAccessibleName('Fold November calendar away')
+    expect(calRegion(container)).not.toHaveAttribute('inert')
+    expect(within(calRegion(container)).getByText('Thanksgiving')).toBeVisible()
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+    expect(localStorage.getItem('symphony-fold:month:calendar')).toBe('open')
+    expect(localStorage.getItem('symphony-fold:month')).toBeNull()
+    expect(paperSound.land).toHaveBeenCalledWith(0.6)
+  })
+
+  it('mounts open when remembered', () => {
+    localStorage.setItem('symphony-fold:month:calendar', 'open')
+    const { container } = renderCal()
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+  })
+
+  it('C toggles it, but not while typing; F still folds the sheet above', () => {
+    const { container } = renderCal()
+    fireEvent.keyDown(document, { key: 'c' })
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+    fireEvent.keyDown(document, { key: 'C' })
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
+    const input = screen.getByRole('textbox', { name: 'Write a November goal' })
+    input.focus()
+    fireEvent.keyDown(input, { key: 'c' })
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
+    fireEvent.keyDown(document, { key: 'f' })
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
+  })
+
+  it('without a calendar there is no second edge, and C does nothing', () => {
+    const { container } = renderFold()
+    expect(container.querySelector('.paper-fold-slot--calendar')).toBeNull()
+    fireEvent.keyDown(document, { key: 'c' })
+    expect(root(container)).not.toHaveAttribute('data-calendar-open', 'true')
+    expect(localStorage.getItem('symphony-fold:month:calendar')).toBeNull()
+  })
+
+  it('a drag to the right opens it (the mirror of the sheet above)', () => {
+    const { container } = renderCal()
+    const b = calEdge()
+    fireEvent.pointerDown(b, { pointerId: 1, button: 0, clientX: 200, clientY: 300 })
+    fireEvent.pointerMove(b, { pointerId: 1, clientX: 220, clientY: 300 })
+    fireEvent.pointerMove(b, { pointerId: 1, clientX: 240, clientY: 300 })
+    fireEvent.pointerUp(b, { pointerId: 1, clientX: 240, clientY: 300 })
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+  })
+
+  it('at 1316px both can be open: a planner spread', () => {
+    setViewport(1316)
+    const { container } = renderCal()
+    fireEvent.keyDown(edge(), { key: 'Enter' })
+    fireEvent.keyDown(calEdge(), { key: 'Enter' })
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+  })
+
+  it('at 820px opening the calendar folds the sheet above, and the other way round', () => {
+    setViewport(820)
+    const { container } = renderCal()
+    fireEvent.keyDown(edge(), { key: 'Enter' })
+    fireEvent.keyDown(calEdge(), { key: 'Enter' })
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+    // The reader's choice: what it folded is remembered folded.
+    expect(localStorage.getItem('symphony-fold:month')).toBe('folded')
+    fireEvent.keyDown(edge(), { key: 'Enter' })
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
+  })
+
+  it('at 820px, both remembered open: the sheet above keeps its place', () => {
+    setViewport(820)
+    localStorage.setItem('symphony-fold:month', 'open')
+    localStorage.setItem('symphony-fold:month:calendar', 'open')
+    const { container } = renderCal()
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
+  })
+
+  it('v: the calendar folds up from below the sheet', () => {
+    setViewport(390, 844)
+    const { container } = renderCal()
+    expect(root(container)).toHaveAttribute('data-fold-mode', 'v')
+    const current = container.querySelector('.paper-fold-current')!
+    expect(current.compareDocumentPosition(calEdge()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(calFlap(container).style.transform).toBe('rotateX(-180.00deg)')
+    fireEvent.keyDown(edge(), { key: 'Enter' })
+    fireEvent.keyDown(calEdge(), { key: 'Enter' })
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+  })
+
+  it('duo: one companion at a time; with the calendar open this sheet takes the left page', () => {
+    localStorage.setItem('symphony-fold:month', 'open')
+    mockMedia({ reduce: true, segments: true })
+    const { container } = renderCal()
+    const current = container.querySelector('.paper-fold-current')!
+    expect(root(container)).toHaveAttribute('data-fold-mode', 'duo')
+    expect(current).not.toHaveAttribute('data-duo-page', 'left')
+    fireEvent.keyDown(calEdge(), { key: 'Enter' })
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+    expect(current).toHaveAttribute('data-duo-page', 'left')
+  })
+
+  it('duo, the calendar remembered open: the book does not open the sheet above over it', () => {
+    localStorage.setItem('symphony-fold:month:calendar', 'open')
+    mockMedia({ reduce: true, segments: true })
+    const { container } = renderCal()
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+  })
+
+  it('leaving Duo folds both', async () => {
+    localStorage.setItem('symphony-fold:month:calendar', 'open')
+    mockMedia({ reduce: true, segments: true })
+    const { container } = renderCal()
+    act(() => {
+      mockMedia({ reduce: true })
+      window.dispatchEvent(new Event('resize'))
+    })
+    await waitFor(() => expect(root(container)).toHaveAttribute('data-fold-mode', 'h'))
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
+    expect(calRegion(container)).toHaveAttribute('inert')
+  })
+})
+
+// The page can open a companion for a while (the planning ribbon's steps, the
+// guide's Today step) without touching what the reader left: `drive`.
+describe('PaperFold: driven by the page', () => {
+  const view = (drive?: { above?: boolean; calendar?: boolean }) => (
+    <PaperFold horizon="month" edgeLabel="Fall 2026" above={<p>above</p>} drive={drive}
+      calendar={<p>Thanksgiving</p>} calendarLabel="November calendar">
+      <h1>November</h1>
+    </PaperFold>
+  )
+
+  it('opens what it is told to, with sound, without remembering it; letting go returns to what was remembered', () => {
+    mockMedia({ reduce: true })
+    const { container, rerender } = render(view())
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    rerender(view({ above: true }))
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    expect(paperSound.land).toHaveBeenCalledWith(0.6)
+    expect(localStorage.getItem('symphony-fold:month')).toBeNull()
+    rerender(view({ above: false, calendar: true }))
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
+    expect(localStorage.getItem('symphony-fold:month:calendar')).toBeNull()
+    rerender(view(undefined))
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
+    expect(localStorage.getItem('symphony-fold:month')).toBeNull()
+  })
+
+  it('letting go returns to a remembered open sheet', () => {
+    localStorage.setItem('symphony-fold:month', 'open')
+    const { container, rerender } = render(view())
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    rerender(view({ above: false }))
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(localStorage.getItem('symphony-fold:month')).toBe('open')
+    rerender(view({}))
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+  })
+
+  it('with motion, a driven open swishes and springs', async () => {
+    mockMedia({ reduce: false })
+    const { container, rerender } = render(view())
+    rerender(view({ calendar: true }))
+    expect(paperSound.swish).toHaveBeenCalledWith(0.34)
+    await waitFor(() => expect(root(container)).toHaveAttribute('data-calendar-open', 'true'), { timeout: 3000 })
+    expect(localStorage.getItem('symphony-fold:month:calendar')).toBeNull()
   })
 })

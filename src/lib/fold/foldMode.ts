@@ -18,28 +18,71 @@ export function detectFoldMode(i: {
   return i.width < 760 ? 'v' : 'h'
 }
 
+/** The narrowest each sheet may be when both companions lie open in 'h':
+ *  the sheet above, this sheet, and the calendar. */
+const MIN_COMPANION = 220
+const MIN_CURRENT = 420
+
+/** Can the sheet above and the calendar both lie open beside this sheet?
+ *  Only in 'h', when the spread holds all three at their minimum widths
+ *  (220 + 420 + 220). Otherwise opening one folds the other. */
+export function spreadFits(mode: FoldMode, spreadWidth: number): { both: boolean } {
+  return { both: mode === 'h' && spreadWidth >= MIN_COMPANION + MIN_CURRENT + MIN_COMPANION }
+}
+
+export interface FoldSizes {
+  /** The sheet above's width (its height cap in 'v' is maxAboveHeight). */
+  above: number
+  /** The calendar's width (same as the sheet above's). */
+  calendar: number
+  /** This sheet's width. */
+  current: number
+  edge: number
+  maxAboveHeight: number
+  /** Both companions may lie open at once. */
+  both: boolean
+}
+
 export function foldSizes(
   mode: FoldMode,
   spreadWidth: number,
   viewportHeight: number,
-): { above: number; current: number; edge: number; maxAboveHeight: number } {
+  opts: { calendar?: boolean } = {},
+): FoldSizes {
   if (mode === 'v') {
     return {
       above: spreadWidth,
+      calendar: spreadWidth,
       current: spreadWidth,
       edge: 46,
       maxAboveHeight: Math.round(0.62 * viewportHeight),
+      both: false,
     }
   }
   if (mode === 'duo') {
+    // Two pages: this sheet and whichever companion is open. The other one
+    // keeps its folded edge.
     const above = Math.round(0.38 * spreadWidth)
-    return { above, current: spreadWidth - above, edge: 22, maxAboveHeight: viewportHeight }
+    const current = spreadWidth - above - (opts.calendar ? 22 : 0)
+    return { above, calendar: above, current, edge: 22, maxAboveHeight: viewportHeight, both: false }
   }
-  const above = Math.round(Math.min(340, Math.max(220, 0.36 * spreadWidth)))
-  return {
-    above,
-    current: Math.min(560, spreadWidth - above),
-    edge: 34,
-    maxAboveHeight: viewportHeight,
+  if (!opts.calendar) {
+    const above = Math.round(Math.min(340, Math.max(220, 0.36 * spreadWidth)))
+    return {
+      above,
+      calendar: above,
+      current: Math.min(560, spreadWidth - above),
+      edge: 34,
+      maxAboveHeight: viewportHeight,
+      both: false,
+    }
   }
+  // Three pages (the prototype's layout()): each companion about a quarter
+  // of the spread (220–320). With room for all three, this sheet keeps at
+  // least 420; otherwise one companion is open and the other folded at its edge.
+  const { both } = spreadFits(mode, spreadWidth)
+  let comp = Math.round(Math.min(320, Math.max(MIN_COMPANION, 0.26 * spreadWidth)))
+  if (both) comp = Math.max(MIN_COMPANION, Math.min(comp, Math.floor((spreadWidth - MIN_CURRENT) / 2)))
+  const current = Math.min(560, both ? spreadWidth - 2 * comp : spreadWidth - comp - 34)
+  return { above: comp, calendar: comp, current, edge: 34, maxAboveHeight: viewportHeight, both }
 }

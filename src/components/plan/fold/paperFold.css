@@ -3,7 +3,11 @@
    edge shows; unfolded, it lies beside the page, for reading only. Ported from
    docs/superpowers/specs/2026-11-04-paper-fold-prototype.html, with the
    prototype's literals swapped for the app's tokens. --p (0 folded, 1 open),
-   the slot size and the flap transform are written per frame by PaperFold. */
+   the slot size and the flap transform are written per frame by PaperFold.
+
+   Task 5c: this period's calendar is hinged to the right edge (the bottom
+   on phones), the mirror of the sheet above (.paper-fold-slot--calendar).
+   Its slot carries its own --p; --pc on the root is the crease it casts. */
 
 .paper-fold {
   --p: 0;
@@ -12,6 +16,9 @@
      night colours follow */
   --paper-fold-paper-above: color-mix(in srgb, var(--color-bg-elevated) 93%, hsl(38 48% 62%));
   --paper-fold-paper-back: color-mix(in srgb, var(--paper-fold-paper-above) 88%, var(--color-neutral-500));
+  /* cooler paper for the calendar (the prototype's --paper-cal) */
+  --paper-fold-paper-cal: color-mix(in srgb, var(--color-bg-elevated) 94%, hsl(205 40% 66%));
+  --paper-fold-rule: var(--color-neutral-200);
   --paper-fold-ink: var(--color-neutral-900);
   --paper-fold-ink-soft: var(--color-neutral-500);
   --paper-fold-ink-faint: var(--color-neutral-400);
@@ -66,10 +73,18 @@
   background: linear-gradient(to right, hsl(var(--paper-fold-shadow) / .16), hsl(var(--paper-fold-shadow) / 0));
   opacity: clamp(0, var(--p), 1); border-radius: 3px 0 0 3px;
 }
+/* and where the calendar is hinged, on the right */
+.paper-fold:has(> .paper-fold-slot--calendar) > .paper-fold-current { border-radius: 3px; }
+.paper-fold-current::after {
+  content: ""; position: absolute; inset: 0 0 0 auto; width: 26px; pointer-events: none;
+  background: linear-gradient(to left, hsl(var(--paper-fold-shadow) / .16), hsl(var(--paper-fold-shadow) / 0));
+  opacity: clamp(0, var(--pc, 0), 1); border-radius: 0 3px 3px 0;
+}
 
 /* stowed (a session runs on the page): no edge, no sheet above, no hinge shadow */
 .paper-fold[data-stowed='true'] > .paper-fold-slot { display: none; }
-.paper-fold[data-stowed='true'] > .paper-fold-current::before { display: none; }
+.paper-fold[data-stowed='true'] > .paper-fold-current::before,
+.paper-fold[data-stowed='true'] > .paper-fold-current::after { display: none; }
 
 /* the folded edge of the sheet above, with a second layer of paper behind it */
 .paper-fold-edge {
@@ -94,7 +109,7 @@
 }
 .paper-fold-edge-count { font: 500 12px/1 var(--font-family-sans); color: var(--paper-fold-ink-faint); font-variant-numeric: tabular-nums; }
 .paper-fold-chevron { width: 14px; height: 14px; opacity: .7; }
-.paper-fold[data-open='true'] .paper-fold-edge { pointer-events: none; }
+.paper-fold-slot[data-open='true'] .paper-fold-edge { pointer-events: none; }
 
 .paper-fold-edge:focus-visible,
 .paper-fold-grip:focus-visible { outline: 2px solid var(--paper-fold-accent); outline-offset: 2px; }
@@ -148,6 +163,30 @@
 .paper-fold-grip:hover::before,
 .paper-fold-grip:focus-visible::before { opacity: .35; }
 
+/* ---- the calendar, hinged to the right edge: the mirror of the above ---- */
+.paper-fold-slot--calendar { --p: 0; }
+.paper-fold-slot--calendar .paper-fold-pin { perspective-origin: 0% 40%; }
+.paper-fold-slot--calendar .paper-fold-edge {
+  inset: 10px 4px 10px 0; border-radius: 0 8px 8px 0;
+  background-color: var(--paper-fold-paper-cal);
+  box-shadow:
+    1px 0 0 var(--paper-fold-rule),
+    4px 0 0 -1px var(--paper-fold-paper-cal),
+    5px 0 0 -1px var(--paper-fold-rule),
+    0 8px 18px -10px hsl(var(--paper-fold-shadow) / .3);
+}
+.paper-fold-slot--calendar .paper-fold-edge:hover { background-color: color-mix(in srgb, var(--paper-fold-paper-cal) 80%, var(--color-neutral-200)); }
+.paper-fold-slot--calendar .paper-fold-edge-label { transform: none; }
+.paper-fold-slot--calendar .paper-fold-flap { right: auto; left: 0; transform-origin: 0% 50%; }
+.paper-fold-slot--calendar .paper-fold-face { border-radius: 3px 10px 10px 3px; }
+.paper-fold-slot--calendar .paper-fold-front { background-color: var(--paper-fold-paper-cal); }
+.paper-fold-slot--calendar .paper-fold-front::after,
+.paper-fold-slot--calendar .paper-fold-back::after {
+  background: linear-gradient(to right, hsl(var(--paper-fold-shadow) / .55), hsl(var(--paper-fold-shadow) / .12) 45%, hsl(var(--paper-fold-shadow) / 0));
+}
+.paper-fold-slot--calendar .paper-fold-scroll { scrollbar-color: var(--paper-fold-rule) transparent; }
+.paper-fold-slot--calendar .paper-fold-grip { right: auto; left: -6px; }
+
 /* ---- phones: the sheet above folds down from the top edge ---- */
 .paper-fold[data-fold-mode='v'] { flex-direction: column; align-items: stretch; width: 100%; }
 .paper-fold[data-fold-mode='v'] .paper-fold-slot { width: auto; height: 46px; }
@@ -181,6 +220,29 @@
 .paper-fold[data-fold-mode='v'] .paper-fold-scroll { padding: 22px 20px 18px; }
 .paper-fold[data-fold-mode='v'] .paper-fold-grip { top: auto; left: 0; right: 0; bottom: -6px; width: auto; height: 16px; }
 .paper-fold[data-fold-mode='v'] .paper-fold-grip::before { top: 6px; left: 50%; height: 4px; width: 44px; margin-top: 0; margin-left: -22px; }
+/* the calendar folds up from the bottom edge */
+.paper-fold[data-fold-mode='v']:has(> .paper-fold-slot--calendar) .paper-fold-current { border-radius: 3px; }
+.paper-fold[data-fold-mode='v'] .paper-fold-current::after {
+  inset: auto 0 0 0; width: auto; height: 22px;
+  background: linear-gradient(to top, hsl(var(--paper-fold-shadow) / .14), hsl(var(--paper-fold-shadow) / 0));
+  border-radius: 0 0 3px 3px;
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-pin { perspective-origin: 50% 0%; }
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-edge {
+  inset: 0 8px 4px 8px; border-radius: 0 0 10px 10px;
+  box-shadow:
+    0 1px 0 var(--paper-fold-rule),
+    0 4px 0 -1px var(--paper-fold-paper-cal),
+    0 5px 0 -1px var(--paper-fold-rule);
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-chevron { transform: rotate(-90deg); }
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-flap { top: 0; bottom: auto; transform-origin: 50% 0%; }
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-face { border-radius: 3px 3px 12px 12px; }
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-front::after,
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-back::after {
+  background: linear-gradient(to bottom, hsl(var(--paper-fold-shadow) / .55), hsl(var(--paper-fold-shadow) / .12) 45%, hsl(var(--paper-fold-shadow) / 0));
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-grip { top: -6px; bottom: auto; }
 
 /* ---- iPhone Duo, open: the phone's hinge is the page's crease. Left: the
    sheet above. Right: this period. ---- */
@@ -192,10 +254,15 @@
 .paper-fold[data-fold-mode='duo'] .paper-fold-scroll { padding: 22px 18px 20px 22px; }
 .paper-fold[data-fold-mode='duo'] .paper-fold-edge { inset: 14px 0 14px 2px; }
 .paper-fold[data-fold-mode='duo'] .paper-fold-edge-count { display: none; }
+.paper-fold[data-fold-mode='duo'] .paper-fold-slot--calendar .paper-fold-face { border-radius: 2px 12px 12px 2px; }
+.paper-fold[data-fold-mode='duo'] .paper-fold-slot--calendar .paper-fold-edge { inset: 14px 2px 14px 0; }
+/* With the calendar open this sheet is the left page (November | calendar). */
+.paper-fold[data-fold-mode='duo'] .paper-fold-current[data-duo-page='left'] { border-radius: 12px 2px 2px 12px; }
 
 /* Reduced motion: no spring. The state jumps, and the sheets crossfade. */
 @media (prefers-reduced-motion: reduce) {
   .paper-fold-flap { opacity: clamp(0, var(--p), 1); transition: opacity .16s, visibility .16s; }
   .paper-fold-edge { transition: background-color .2s, opacity .16s; }
-  .paper-fold-current::before { transition: opacity .16s; }
+  .paper-fold-current::before,
+  .paper-fold-current::after { transition: opacity .16s; }
 }

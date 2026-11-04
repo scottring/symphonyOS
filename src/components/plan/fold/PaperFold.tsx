@@ -4,26 +4,29 @@
 // sounds to lie beside the page, for reading. Ported from the approved
 // prototype, docs/superpowers/specs/2026-11-04-paper-fold-prototype.html.
 //
-// The fold position p (0 folded, 1 open) changes every frame, so it lives in
-// refs and is written straight to the DOM (--p, the slot size, the flap's
-// rotation). React re-renders only when the sheet crosses halfway (open/closed
-// for aria, inert and data-open).
+// Task 5c (Scott, 2026-11-04: "yes, add the calendar fold on the right"):
+// Year, Season and Month also carry this period's calendar, folded on the
+// right edge, mirrored (key C, remembered as symphony-fold:<horizon>:calendar).
+// With both open the page is a planner spread: Fall | November | November's
+// calendar. When the spread has no room for three (spreadFits), opening one
+// folds the other; in Duo it is one companion at a time, and with the calendar
+// open this sheet takes the left page.
+//
+// The motion of each companion (spring, drag, keys, sounds) is useFoldMotion;
+// this file lays them out. The page can also drive a companion open or folded
+// for a while (`drive`: the planning ribbon's steps, the guide's Today step)
+// without touching what the reader left; letting go returns it there.
 
 import {
   useCallback,
   useEffect,
   useId,
   useLayoutEffect,
-  useMemo,
   useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
-import { springSettled, springStep, releaseTarget } from '@/lib/fold/foldSpring'
 import { detectFoldMode, foldSizes, type FoldMode } from '@/lib/fold/foldMode'
-import { paperSound } from '@/lib/fold/paperSound'
+import { hasStored, readStored, useFoldMotion, type FoldMotion, type FoldSide, type GoOptions } from './useFoldMotion'
 import './paperFold.css'
 
 export type FoldHorizon = 'year' | 'season' | 'month' | 'week' | 'day'
@@ -47,35 +50,18 @@ export interface PaperFoldProps {
   /** The sheet above's accessible name. Default "{edgeLabel}, for reading";
    *  Today's week sheet, which has a + on each row, is "…, to pick from". */
   frontLabel?: string
+  /** This period's calendar, for reading, folded on the right edge (Year,
+   *  Season and Month; the Week and Today pages are the calendar already). */
+  calendar?: ReactNode
+  /** The calendar's name on its edge, e.g. "November calendar". */
+  calendarLabel?: string
+  /** The page drives a companion for now: true opens it, false folds it,
+   *  with the sound, and nothing is remembered. A key left undefined (or no
+   *  `drive`) is the reader's: it returns to what they left. */
+  drive?: { above?: boolean; calendar?: boolean }
 }
 
 const storageKey = (h: FoldHorizon) => `symphony-fold:${h}`
-
-function readStored(h: FoldHorizon): boolean {
-  try {
-    return localStorage.getItem(storageKey(h)) === 'open'
-  } catch {
-    return false
-  }
-}
-
-/** Has the reader ever opened or folded this horizon here? */
-function hasStored(h: FoldHorizon): boolean {
-  try {
-    const v = localStorage.getItem(storageKey(h))
-    return v === 'open' || v === 'folded'
-  } catch {
-    return false
-  }
-}
-
-function writeStored(h: FoldHorizon, open: boolean) {
-  try {
-    localStorage.setItem(storageKey(h), open ? 'open' : 'folded')
-  } catch {
-    /* private browsing: the fold still works, it just isn't remembered */
-  }
-}
 
 function mm(query: string): boolean {
   try {
@@ -85,8 +71,6 @@ function mm(query: string): boolean {
   }
 }
 
-const reducedMotion = () => mm('(prefers-reduced-motion: reduce)')
-
 /** The nearest ancestor that scrolls (the shell's .scenery-scroll), or null
  *  when the window does. */
 function scrollParent(el: HTMLElement): HTMLElement | null {
@@ -95,14 +79,6 @@ function scrollParent(el: HTMLElement): HTMLElement | null {
     if (overflowY === 'auto' || overflowY === 'scroll') return p
   }
   return null
-}
-
-function buzz() {
-  try {
-    navigator.vibrate?.(6)
-  } catch {
-    /* no haptics */
-  }
 }
 
 // ---------- paper grain: made once per page, the prototype's way ----------
@@ -141,20 +117,28 @@ function paperGrain(alphaRaw: string): string | null {
   return url
 }
 
-interface Drag {
-  x: number
-  y: number
-  p0: number
-  moved: number
-  lastPos: number
-  lastT: number
-  vel: number
-  acc: number
-}
 
 /** A different horizon in the same spot starts fresh with that horizon's remembered state. */
 export function PaperFold(props: PaperFoldProps) {
   return <PaperFoldSheet key={props.horizon} {...props} />
+}
+
+type Drive = { above?: boolean; calendar?: boolean }
+
+function Chevron({ d }: { d: string }) {
+  return (
+    <svg
+      className="paper-fold-chevron"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d={d} />
+    </svg>
+  )
 }
 
 function PaperFoldSheet({
@@ -166,9 +150,15 @@ function PaperFoldSheet({
   className,
   stowed = false,
   frontLabel,
+  calendar,
+  calendarLabel = 'Calendar',
+  drive,
 }: PaperFoldProps) {
-  const [open, setOpen] = useState(() => readStored(horizon))
+  const hasCal = calendar !== undefined && calendar !== null && calendar !== false
+  const aboveKey = storageKey(horizon)
+  const calKey = `${aboveKey}:calendar`
   const frontId = useId()
+  const calId = useId()
 
   const rootRef = useRef<HTMLDivElement>(null)
   const slotRef = useRef<HTMLDivElement>(null)
@@ -176,147 +166,96 @@ function PaperFoldSheet({
   const flapRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const aboveBodyRef = useRef<HTMLDivElement>(null)
+  const calSlotRef = useRef<HTMLDivElement>(null)
+  const calPinRef = useRef<HTMLDivElement>(null)
+  const calFlapRef = useRef<HTMLDivElement>(null)
+  const calScrollRef = useRef<HTMLDivElement>(null)
+  const calBodyRef = useRef<HTMLDivElement>(null)
+  const currentRef = useRef<HTMLElement>(null)
 
-  // The fold's motion state, outside React.
-  const initial = open ? 1 : 0
-  const m = useRef({
-    p: initial,
-    v: 0,
-    target: initial as 0 | 1,
-    raf: 0,
-    landed: true,
-    last: 0,
-    mode: '' as FoldMode | '',
-    W: 340,
-    H: 300,
-    edge: 34,
-    open: open,
-    drag: null as Drag | null,
-    tappedAt: -Infinity,
-    // Last sizes the ResizeObserver reported, so it re-lays out only on changes that matter.
-    parentW: NaN,
-    aboveH: NaN,
-  })
+  // The layout, outside React: the mode and whether both companions fit.
+  const modeRef = useRef<FoldMode | ''>('')
+  const bothRef = useRef(false)
+  // Last sizes the ResizeObserver reported, so it re-lays out only on changes that matter.
+  const seen = useRef({ parentW: NaN, aboveH: NaN, calH: NaN })
   const stowedRef = useRef(stowed)
+  const hasCalRef = useRef(hasCal)
+  const driveRef = useRef<Drive>({ above: drive?.above, calendar: drive?.calendar })
   useLayoutEffect(() => {
     stowedRef.current = stowed
-  }, [stowed])
-  const horizonRef = useRef(horizon)
+    hasCalRef.current = hasCal
+  }, [stowed, hasCal])
+
+  // Each companion, when it opens, folds the other unless the spread holds both.
+  const motions = useRef<Partial<Record<FoldSide, FoldMotion>>>({})
+  const foldOther = useCallback((other: FoldSide, o: { remember: boolean }) => {
+    const f = motions.current[other]
+    if (!f || bothRef.current || f.m.current.target !== 1) return
+    f.go(0, { quiet: true, remember: o.remember })
+  }, [])
+
+  const A = useFoldMotion({
+    side: 'above',
+    storageKey: aboveKey,
+    initialOpen: readStored(aboveKey),
+    mode: modeRef,
+    rootRef,
+    slotRef,
+    flapRef,
+    keyName: 'f',
+    keyEnabled: () => !stowedRef.current,
+    onOpen: (o) => foldOther('calendar', o),
+  })
+  const C = useFoldMotion({
+    side: 'calendar',
+    storageKey: calKey,
+    initialOpen: hasCal && readStored(calKey),
+    mode: modeRef,
+    rootRef,
+    slotRef: calSlotRef,
+    flapRef: calFlapRef,
+    keyName: 'c',
+    keyEnabled: () => hasCalRef.current && !stowedRef.current,
+    onOpen: (o) => foldOther('above', o),
+  })
   useLayoutEffect(() => {
-    horizonRef.current = horizon
-  }, [horizon])
+    motions.current = { above: A, calendar: C }
+  })
+  const { m: mA, apply: applyA, go: goA, stop: stopA, patch: patchA } = A
+  const { m: mC, apply: applyC, go: goC, stop: stopC, patch: patchC } = C
 
-  const apply = useCallback((x: number) => {
-    const s = m.current
-    const root = rootRef.current
-    const slot = slotRef.current
-    const flap = flapRef.current
-    if (!root || !slot || !flap) return
-    const q = Math.max(-0.04, Math.min(1.04, x))
-    root.style.setProperty('--p', q.toFixed(4))
-    const ang = (1 - q) * 180
-    if (s.mode === 'v') {
-      slot.style.width = ''
-      slot.style.height = `${s.edge + Math.max(0, q) * (s.H - s.edge)}px`
-      flap.style.transform = `rotateX(${ang.toFixed(2)}deg)`
-    } else {
-      slot.style.height = ''
-      slot.style.width = `${s.edge + Math.max(0, q) * (s.W - s.edge)}px`
-      flap.style.transform = `rotateY(${(-ang).toFixed(2)}deg)`
-    }
-    flap.style.visibility = q < 0.002 ? 'hidden' : 'visible'
-    const isOpen = q > 0.5
-    if (isOpen !== s.open) {
-      s.open = isOpen
-      setOpen(isOpen)
-    }
-  }, [])
-
-  // One spring frame; it schedules the next itself until the sheet settles.
-  const step = useMemo(() => {
-    const frame = (ts: number) => {
-      const s = m.current
-      const dt = Math.min(0.032, (ts - (s.last || ts)) / 1000 || 0.016)
-      s.last = ts
-      const next = springStep({ p: s.p, v: s.v }, s.target, dt)
-      s.p = next.p
-      s.v = next.v
-      apply(s.p)
-      if (!s.landed && Math.abs(s.target - s.p) < 0.03) {
-        s.landed = true
-        paperSound.land(s.target ? 1 : 0.8)
-        buzz()
-      }
-      if (springSettled({ p: s.p, v: s.v }, s.target)) {
-        s.p = s.target
-        s.v = 0
-        apply(s.p)
-        s.raf = 0
-        s.last = 0
-        return
-      }
-      s.raf = requestAnimationFrame(frame)
-    }
-    return frame
-  }, [apply])
-
-  const stop = useCallback(() => {
-    const s = m.current
-    if (s.raf) cancelAnimationFrame(s.raf)
-    s.raf = 0
-    s.last = 0
-  }, [])
-
-  /** Send the sheet toward `to`. `remember` is false when the layout (not the reader) moved it. */
-  const go = useCallback(
-    (to: 0 | 1, opts: { fromDrag?: boolean; remember?: boolean } = {}) => {
-      const s = m.current
-      s.target = to
-      s.landed = false
-      if (opts.remember !== false) writeStored(horizonRef.current, to === 1)
-      if (reducedMotion()) {
-        stop()
-        s.p = to
-        s.v = 0
-        apply(s.p)
-        paperSound.land(0.6)
-        s.landed = true
-        return
-      }
-      if (!opts.fromDrag) {
-        paperSound.swish(0.34)
-        paperSound.crinkle(7, 0.3)
-      }
-      if (!s.raf) {
-        s.last = 0
-        s.raf = requestAnimationFrame(step)
-      }
-    },
-    [apply, step, stop],
-  )
-
-  const toggle = useCallback(() => go(m.current.target > 0.5 ? 0 : 1), [go])
+  // In Duo, with the calendar open, this sheet turns to the left page
+  // (November | calendar). Written like data-fold-mode: from the layout, and
+  // when the calendar crosses halfway.
+  const markDuoPage = useCallback(() => {
+    const el = currentRef.current
+    if (!el) return
+    if (modeRef.current === 'duo' && hasCalRef.current && mC.current.open) el.dataset.duoPage = 'left'
+    else delete el.dataset.duoPage
+  }, [mC])
 
   // ---------- geometry ----------
-  // Beside the page ('h', 'duo') the edge and the sheet above are pinned
+  // Beside the page ('h', 'duo') the edges and the companions are pinned
   // under the top bar, as tall as the room allows, so a long page scrolls
-  // past them and only the sheet's own list scrolls under the pointer (Scott,
+  // past them and only a sheet's own list scrolls under the pointer (Scott,
   // 2026-11-04: "the week scrolls while everything else remains fixed"). The
   // room is the scroller's: its height, less the landscape standing at its
   // foot (--scenery-clearance) and the bar docked under it (--dock-clearance),
   // as useColumnsFitWindow measures the planning columns. The top bar's height
   // is --paper-fold-sticky-top (72px, level with the horizon strip), with
-  // --paper-fold-sticky-gap (24px) left below. On a phone ('v') the sheet
-  // folds down from the top, capped, and is not pinned.
+  // --paper-fold-sticky-gap (24px) left below. On a phone ('v') the companions
+  // fold from the top and bottom edges, capped, and are not pinned.
   const pinSheet = useCallback((mode: FoldMode | '') => {
-    const pin = pinRef.current
     const root = rootRef.current
-    if (!pin || !root || !mode) return
+    if (!root || !mode) return
+    const pins = [pinRef.current, calPinRef.current].filter((x): x is HTMLDivElement => !!x)
     if (mode === 'v') {
-      pin.style.position = ''
-      pin.style.top = ''
-      pin.style.height = ''
-      pin.style.maxHeight = ''
+      for (const pin of pins) {
+        pin.style.position = ''
+        pin.style.top = ''
+        pin.style.height = ''
+        pin.style.maxHeight = ''
+      }
       return
     }
     const cs = getComputedStyle(root)
@@ -328,25 +267,29 @@ function PaperFoldSheet({
       return parseFloat(scroller.style.getPropertyValue(name) || getComputedStyle(scroller).getPropertyValue(name)) || 0
     }
     const room = (scroller?.clientHeight || innerHeight) - top - prop('--scenery-clearance') - prop('--dock-clearance') - gap
-    pin.style.position = 'sticky'
-    pin.style.top = `${top}px`
-    pin.style.height = `${Math.max(160, Math.round(room))}px`
-    pin.style.maxHeight = '100%'
+    for (const pin of pins) {
+      pin.style.position = 'sticky'
+      pin.style.top = `${top}px`
+      pin.style.height = `${Math.max(160, Math.round(room))}px`
+      pin.style.maxHeight = '100%'
+    }
   }, [])
 
   const layout = useCallback(() => {
-    const s = m.current
     const root = rootRef.current
     const flap = flapRef.current
     if (!root || !flap) return
-    const was = s.mode
+    const calFlap = hasCalRef.current ? calFlapRef.current : null
+    const a = mA.current
+    const c = mC.current
+    const was = modeRef.current
     const mode = detectFoldMode({
       width: innerWidth,
       height: innerHeight,
       coarse: mm('(pointer: coarse)'),
       segments: mm('(horizontal-viewport-segments: 2)'),
     })
-    s.mode = mode
+    modeRef.current = mode
     root.dataset.foldMode = mode
     pinSheet(mode)
 
@@ -358,52 +301,84 @@ function PaperFoldSheet({
         parent.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
     }
     if (!(spread > 0)) spread = innerWidth - 32
-    const sizes = foldSizes(mode, spread, innerHeight)
-    s.edge = sizes.edge
+    const sizes = foldSizes(mode, spread, innerHeight, { calendar: !!calFlap })
+    bothRef.current = sizes.both
+    patchA({ edge: sizes.edge })
+    patchC({ edge: sizes.edge })
+    const folded = { p: 0, v: 0, target: 0, landed: true } as const
+
+    // Two open on a spread with room for one: the sheet above keeps its
+    // place (the prototype's rule), unless the page is driving the calendar.
+    const settleOne = () => {
+      if (sizes.both || a.target !== 1 || c.target !== 1) return
+      const [stop, patch] = driveRef.current.calendar === true ? [stopA, patchA] : [stopC, patchC]
+      stop()
+      patch(folded)
+    }
+    const applyBoth = () => {
+      applyA(a.p)
+      applyC(c.p)
+    }
 
     if (mode === 'duo') {
       flap.style.height = ''
-      s.W = sizes.above
-      flap.style.width = `${s.W}px`
+      patchA({ W: sizes.above })
+      flap.style.width = `${sizes.above}px`
+      if (calFlap) {
+        calFlap.style.height = ''
+        patchC({ W: sizes.calendar })
+        calFlap.style.width = `${sizes.calendar}px`
+      }
       root.style.setProperty('--paper-fold-half', `${sizes.current}px`)
       // Opening the phone opens the sheet; closing it folds the sheet away.
       if (was && was !== 'duo') {
-        apply(s.p)
-        go(1, { remember: false })
+        applyBoth()
+        goA(1, { remember: false })
+        markDuoPage()
         return
       }
-      // Mounting in Duo keeps what the reader left; with nothing remembered,
-      // the book opens.
-      if (!was && !hasStored(horizonRef.current)) {
-        s.p = 1
-        s.target = 1
-      }
-      apply(s.p)
+      // Mounting in Duo keeps what the reader left; with nothing remembered
+      // (and the calendar not open), the book opens on the sheet above.
+      if (!was && !hasStored(aboveKey) && c.target !== 1) patchA({ p: 1, target: 1 })
+      settleOne()
+      applyBoth()
+      markDuoPage()
       return
     }
     if (was === 'duo') {
-      stop()
-      s.p = 0
-      s.v = 0
-      s.target = 0
-      s.landed = true
+      stopA()
+      stopC()
+      patchA(folded)
+      patchC(folded)
     }
     if (mode === 'v') {
-      flap.style.width = ''
       // Faces are absolutely placed, so an auto-height flap collapses and the
       // scroll box reports its content's full height.
-      flap.style.height = 'auto'
-      const inner = scrollRef.current?.scrollHeight ?? 0
-      s.H = Math.max(s.edge + 1, Math.min(inner + 2, sizes.maxAboveHeight))
-      flap.style.height = `${s.H}px`
+      const measure = (fl: HTMLDivElement, box: HTMLDivElement | null, patch: typeof patchA) => {
+        fl.style.width = ''
+        fl.style.height = 'auto'
+        const inner = box?.scrollHeight ?? 0
+        const H = Math.max(sizes.edge + 1, Math.min(inner + 2, sizes.maxAboveHeight))
+        patch({ H })
+        fl.style.height = `${H}px`
+      }
+      measure(flap, scrollRef.current, patchA)
+      if (calFlap) measure(calFlap, calScrollRef.current, patchC)
     } else {
       flap.style.height = ''
-      s.W = sizes.above
-      flap.style.width = `${s.W}px`
+      patchA({ W: sizes.above })
+      flap.style.width = `${sizes.above}px`
+      if (calFlap) {
+        calFlap.style.height = ''
+        patchC({ W: sizes.calendar })
+        calFlap.style.width = `${sizes.calendar}px`
+      }
       root.style.setProperty('--paper-fold-cur', `${sizes.current}px`)
     }
-    apply(s.p)
-  }, [apply, go, stop, pinSheet])
+    settleOne()
+    applyBoth()
+    markDuoPage()
+  }, [aboveKey, mA, mC, applyA, applyC, goA, stopA, stopC, patchA, patchC, pinSheet, markDuoPage])
 
   useLayoutEffect(() => {
     const root = rootRef.current
@@ -412,7 +387,7 @@ function PaperFoldSheet({
       if (grain) root.style.setProperty('--paper-fold-grain', grain)
     }
     layout()
-  }, [layout])
+  }, [layout, hasCal])
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | undefined
@@ -425,45 +400,48 @@ function PaperFoldSheet({
     if (typeof ResizeObserver !== 'undefined') {
       const parent = rootRef.current?.parentElement
       const aboveBody = aboveBodyRef.current
+      const calBody = calBodyRef.current
       // The parent grows with the spread every animation frame (in 'v' the slot's
       // height changes; in 'h' its width), so react only to what the layout reads:
-      // the parent's width, and the sheet above's content height in 'v'. The parent
+      // the parent's width, and each companion's content height in 'v'. The parent
       // must not size itself to the fold (no shrink-to-fit), or the spread would
       // feed back into its own measure.
       ro = new ResizeObserver((entries) => {
-        const s = m.current
+        const r = seen.current
         let changed = false
         for (const e of entries) {
           if (e.target === parent) {
             const w = e.contentRect.width
-            if (!(Math.abs(w - s.parentW) < 0.5)) changed = true
-            s.parentW = w
-          } else if (e.target === aboveBody) {
+            if (!(Math.abs(w - r.parentW) < 0.5)) changed = true
+            r.parentW = w
+          } else if (e.target === aboveBody || e.target === calBody) {
             const h = e.contentRect.height
-            if (!(Math.abs(h - s.aboveH) < 0.5) && s.mode === 'v') changed = true
-            s.aboveH = h
+            const k = e.target === aboveBody ? 'aboveH' : 'calH'
+            if (!(Math.abs(h - r[k]) < 0.5) && modeRef.current === 'v') changed = true
+            r[k] = h
           }
         }
         if (changed) layout()
       })
       if (parent) ro.observe(parent)
       if (aboveBody) ro.observe(aboveBody)
+      if (calBody) ro.observe(calBody)
     }
     return () => {
       clearTimeout(t)
       removeEventListener('resize', onResize)
       ro?.disconnect()
     }
-  }, [layout])
+  }, [layout, hasCal])
 
-  // The pinned sheet's room changes with its scroller: the scroller resizing,
+  // The pinned sheets' room changes with their scroller: the scroller resizing,
   // and the landscape writing its height (--scenery-clearance) onto the
   // scroller's style after it lays out, and again when the place changes.
   useEffect(() => {
     const root = rootRef.current
     const scroller = root && scrollParent(root)
     if (!scroller) return
-    const repin = () => pinSheet(m.current.mode)
+    const repin = () => pinSheet(modeRef.current)
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(repin) : null
     ro?.observe(scroller)
     const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(repin) : null
@@ -474,127 +452,35 @@ function PaperFoldSheet({
     }
   }, [pinSheet])
 
-  useEffect(() => stop, [stop])
-
-  // F folds and unfolds, except while typing.
+  // ---------- driven by the page ----------
+  // A key the page sets moves that companion there, with the sound, and is not
+  // remembered. When the page lets go, it returns to what the reader left.
+  const driveAbove = drive?.above
+  const driveCal = drive?.calendar
+  const prevDrive = useRef<Drive>({})
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'f' && e.key !== 'F') return
-      if (stowedRef.current) return
-      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.defaultPrevented) return
-      const t = e.target
-      if (
-        t instanceof HTMLInputElement ||
-        t instanceof HTMLTextAreaElement ||
-        t instanceof HTMLSelectElement ||
-        (t instanceof HTMLElement && t.isContentEditable)
-      )
-        return
-      toggle()
+    driveRef.current = { above: driveAbove, calendar: driveCal }
+    const prev = prevDrive.current
+    prevDrive.current = { above: driveAbove, calendar: driveCal }
+    const want = (now: boolean | undefined, before: boolean | undefined, key: string): 0 | 1 | null => {
+      if (now !== undefined) return now === before ? null : now ? 1 : 0
+      return before === undefined ? null : readStored(key) ? 1 : 0
     }
-    addEventListener('keydown', onKey)
-    return () => removeEventListener('keydown', onKey)
-  }, [toggle])
+    const wantA = want(driveAbove, prev.above, aboveKey)
+    let wantC = hasCal ? want(driveCal, prev.calendar, calKey) : null
+    // Back to both remembered open on a spread with room for one: the sheet above.
+    if (!bothRef.current && wantA === 1 && wantC === 1 && driveCal === undefined) wantC = 0
+    const quietly: GoOptions = { remember: false }
+    if (wantA !== null) goA(wantA, quietly)
+    if (wantC !== null) goC(wantC, quietly)
+  }, [driveAbove, driveCal, hasCal, aboveKey, calKey, goA, goC])
 
-  // ---------- drag ----------
-  const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    if (e.button !== undefined && e.button !== 0) return
-    const s = m.current
-    s.drag = {
-      x: e.clientX,
-      y: e.clientY,
-      p0: s.p,
-      moved: 0,
-      lastPos: s.p,
-      lastT: performance.now(),
-      vel: 0,
-      acc: 0,
-    }
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId)
-    } catch {
-      /* capture is a nicety */
-    }
-    stop()
-    s.v = 0
-  }
-
-  const onPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    const s = m.current
-    const drag = s.drag
-    if (!drag) return
-    const vertical = s.mode === 'v'
-    const span = Math.max(1, vertical ? s.H - s.edge : s.W - s.edge)
-    const d = vertical ? (e.clientY - drag.y) / span : (drag.x - e.clientX) / span
-    drag.moved = Math.max(drag.moved, Math.abs(vertical ? e.clientY - drag.y : e.clientX - drag.x))
-    const np = Math.max(-0.05, Math.min(1.05, drag.p0 + d))
-    const now = performance.now()
-    const dt = Math.max(1, now - drag.lastT)
-    drag.vel = ((np - drag.lastPos) / dt) * 1000
-    drag.lastPos = np
-    drag.lastT = now
-    drag.acc += Math.abs(np - s.p)
-    if (drag.acc > 0.05) {
-      paperSound.crinkle(1 + Math.round(Math.random() * 2), 0.04, 0.8)
-      drag.acc = 0
-    }
-    s.p = np
-    apply(s.p)
-  }
-
-  const onPointerUp = () => {
-    const s = m.current
-    const drag = s.drag
-    if (!drag) return
-    s.drag = null
-    s.tappedAt = performance.now()
-    if (drag.moved < 4) {
-      toggle()
-      return
-    }
-    s.v = drag.vel
-    go(releaseTarget(s.p, s.v), { fromDrag: true })
-  }
-
-  const onPointerCancel = () => {
-    const s = m.current
-    const drag = s.drag
-    if (!drag) return
-    s.drag = null
-    if (drag.moved < 4) {
-      // nothing moved: let it settle where it was headed, quietly
-      go(s.target, { fromDrag: true, remember: false })
-      return
-    }
-    s.v = drag.vel
-    go(releaseTarget(s.p, s.v), { fromDrag: true })
-  }
-
-  // A click that follows a handled pointer gesture is ignored; a click with no
-  // gesture (VoiceOver, Switch Control) toggles.
-  const onClick = () => {
-    if (performance.now() - m.current.tappedAt < 500) return
-    toggle()
-  }
-
-  const onKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      toggle()
-    }
-  }
-
-  const handlers = {
-    onPointerDown,
-    onPointerMove,
-    onPointerUp,
-    onPointerCancel,
-    onClick,
-    onKeyDown,
-  }
-
+  const open = A.open
+  const calOpen = hasCal && C.open
+  useLayoutEffect(markDuoPage, [markDuoPage, calOpen])
   const countPart = edgeCount === undefined ? '' : `, ${edgeCount} open`
   const edgeName = open ? `Fold ${edgeLabel} away` : `${edgeLabel}${countPart}. Unfold to read`
+  const calName = calOpen ? `Fold ${calendarLabel} away` : `${calendarLabel}. Unfold to read`
 
   return (
     <div
@@ -602,9 +488,10 @@ function PaperFoldSheet({
       className={['paper-fold', className].filter(Boolean).join(' ')}
       data-horizon={horizon}
       data-open={open ? 'true' : 'false'}
+      data-calendar-open={hasCal ? (calOpen ? 'true' : 'false') : undefined}
       data-stowed={stowed ? 'true' : undefined}
     >
-      <div ref={slotRef} className="paper-fold-slot" hidden={stowed}>
+      <div ref={slotRef} className="paper-fold-slot" data-open={open ? 'true' : 'false'} hidden={stowed}>
         <div ref={pinRef} className="paper-fold-pin">
           <button
             type="button"
@@ -612,19 +499,9 @@ function PaperFoldSheet({
             aria-expanded={open}
             aria-controls={frontId}
             aria-label={edgeName}
-            {...handlers}
+            {...A.handlers}
           >
-            <svg
-              className="paper-fold-chevron"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M10 3 5 8l5 5" />
-            </svg>
+            <Chevron d="M10 3 5 8l5 5" />
             <span className="paper-fold-edge-label">{edgeLabel}</span>
             {edgeCount !== undefined && <span className="paper-fold-edge-count">{edgeCount}</span>}
           </button>
@@ -649,12 +526,60 @@ function PaperFoldSheet({
               aria-label="Fold the sheet away"
               aria-hidden={!open}
               tabIndex={open ? 0 : -1}
-              {...handlers}
+              {...A.handlers}
             />
           </div>
         </div>
       </div>
-      <article className="paper-fold-current">{children}</article>
+      <article ref={currentRef} className="paper-fold-current">
+        {children}
+      </article>
+      {hasCal && (
+        <div
+          ref={calSlotRef}
+          className="paper-fold-slot paper-fold-slot--calendar"
+          data-open={calOpen ? 'true' : 'false'}
+          hidden={stowed}
+        >
+          <div ref={calPinRef} className="paper-fold-pin">
+            <button
+              type="button"
+              className="paper-fold-edge"
+              aria-expanded={calOpen}
+              aria-controls={calId}
+              aria-label={calName}
+              {...C.handlers}
+            >
+              <Chevron d="M6 3l5 5-5 5" />
+              <span className="paper-fold-edge-label">{calendarLabel}</span>
+            </button>
+            <div ref={calFlapRef} className="paper-fold-flap">
+              <section
+                id={calId}
+                className="paper-fold-face paper-fold-front"
+                aria-label={`${calendarLabel}, for reading`}
+                inert={!calOpen}
+                aria-hidden={!calOpen}
+              >
+                <div ref={calScrollRef} className="paper-fold-scroll" style={{ overscrollBehavior: 'contain' }}>
+                  <div ref={calBodyRef} className="paper-fold-cal-body">
+                    {calendar}
+                  </div>
+                </div>
+              </section>
+              <div className="paper-fold-face paper-fold-back" aria-hidden="true" />
+              <button
+                type="button"
+                className="paper-fold-grip"
+                aria-label="Fold the calendar away"
+                aria-hidden={!calOpen}
+                tabIndex={calOpen ? 0 : -1}
+                {...C.handlers}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

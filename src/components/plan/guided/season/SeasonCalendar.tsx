@@ -54,8 +54,25 @@ export function SeasonCalendar({ date, seasons }: {
   date: Date
   seasons: Seasons
 }) {
-  const connected = getCalendarConnected()
   const { start, end } = seasonBounds(date, seasons)
+  return <MonthsCalendar start={start} end={end} label="The season’s fixed dates" over="This season is over." />
+}
+
+/** A period's fixed dates month by month, in [start, end): the season's
+ *  (from today on), or the year's on its calendar sheet (`allMonths`: every
+ *  month listed, those gone by marked Past, this month marked now). The read
+ *  runs from today (useSeasonEvents). Read-only. */
+export function MonthsCalendar({ start, end, label, over, allMonths = false }: {
+  start: Date
+  /** Exclusive. */
+  end: Date
+  /** The list's accessible name. */
+  label: string
+  /** Said when nothing of the period is left. */
+  over: string
+  allMonths?: boolean
+}) {
+  const connected = getCalendarConnected()
   const cal = useSeasonEvents(start, end, connected !== false)
 
   if (connected === false) return <div className="gw-body"><p className="choose-empty">No calendar connected.</p></div>
@@ -65,27 +82,31 @@ export function SeasonCalendar({ date, seasons }: {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const from = today > start ? today : start
+  const first = allMonths ? start : from
   const months: { from: Date; to: Date }[] = []
-  for (let m = new Date(from.getFullYear(), from.getMonth(), 1); m < end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+  for (let m = new Date(first.getFullYear(), first.getMonth(), 1); m < end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
     const next = new Date(m.getFullYear(), m.getMonth() + 1, 1)
-    months.push({ from: m < from ? from : m, to: next > end ? end : next })
+    months.push({ from: m < first ? first : m, to: next > end ? end : next })
   }
   const range = cal.range
   const entries = seasonEntries(cal.events, from, end)
   const monthOf = (e: Entry, m: { from: Date; to: Date }) => { const d = e.at < from ? from : e.at; return d >= m.from && d < m.to }
 
   return <div className="gw-body">
-    {months.length === 0 ? <p className="choose-empty">This season is over.</p>
-      : <ul className="gw-rows" aria-label="The season’s fixed dates">
+    {months.length === 0 || (!allMonths && from >= end) ? <p className="choose-empty">{over}</p>
+      : <ul className="gw-rows" aria-label={label}>
         {months.map(({ from: f, to }) => {
           const label = f.toLocaleDateString('en-US', { month: 'long' })
+          const past = to <= from
+          const isNow = f <= today && today < to
           // The read's end is exclusive: a month from it on was not read.
           const unread = !range || f.getTime() >= range.end || to.getTime() <= range.start
-          const partly = !unread && range && to.getTime() > range.end
-          const here = unread ? [] : entries.filter((e) => monthOf(e, { from: f, to }))
-          return <li key={localYmd(f)} className="gw-row gw-day" aria-label={label}>
+          const partly = !past && !unread && range && to.getTime() > range.end
+          const here = past || unread ? [] : entries.filter((e) => monthOf(e, { from: f, to }))
+          return <li key={localYmd(f)} className="gw-row gw-day" aria-label={label} data-now={isNow || undefined}>
             <span className="gw-day-label">{label}</span>
-            {unread ? <span className="gw-row-note">Past what the calendar was read for</span>
+            {past ? <span className="gw-row-note">Past</span>
+              : unread ? <span className="gw-row-note">Past what the calendar was read for</span>
               : here.length === 0 ? <span className="gw-row-note">Nothing fixed</span>
               : <ul className="gw-days">{here.map((e) => <li key={e.id}>
                 <b>{e.at < f ? `From ${short(e.at)}` : `${e.at.toLocaleDateString('en-US', { weekday: 'short' })} ${e.at.getDate()}`}</b>

@@ -64,8 +64,10 @@ vi.mock('@/hooks/usePlanningNotes',async()=>{const {useState,useCallback}=await 
 const atStep=(current:string)=>{notesStore.notes={guide:{current,done:[],skipped:[]}}}
 const place=vi.hoisted(()=>({setPlace:vi.fn()}))
 vi.mock('@/hooks/usePlace',async(importOriginal)=>({...await importOriginal<any>(),usePlace:()=>({place:'cabin',setPlace:place.setPlace})}))
-vi.mock('@/hooks/useDayLoadEvents',()=>({useDayLoadEvents:()=>({events:[],available:true,loading:false,failed:false,range:{start:0,end:Number.MAX_SAFE_INTEGER}})}))
-vi.mock('@/hooks/useSeasonEvents',()=>({useSeasonEvents:()=>({events:[],available:true,loading:false,failed:false,range:{start:0,end:Number.MAX_SAFE_INTEGER}})}))
+// The calendar's events (the month's fold and the session's steps read the same).
+const cal=vi.hoisted(()=>({events:[] as any[]}))
+vi.mock('@/hooks/useDayLoadEvents',()=>({useDayLoadEvents:()=>({events:cal.events,available:true,loading:false,failed:false,range:{start:0,end:Number.MAX_SAFE_INTEGER}})}))
+vi.mock('@/hooks/useSeasonEvents',()=>({useSeasonEvents:()=>({events:cal.events,available:true,loading:false,failed:false,range:{start:0,end:Number.MAX_SAFE_INTEGER}})}))
 
 // Year, Season and Month, one page shape (2026-10-13): the period's goals as
 // one plain list, written in its own words (paper-style, 2026-11-04), with the
@@ -107,7 +109,7 @@ const choose=(name:string)=>{menu();fireEvent.click(screen.getByRole(/^Show done
 const at=(d:Date)=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(d)}
 const REVIEWED={wentWell:'',didnt:'',at:new Date(2026,9,2),authorId:'u1'}
 beforeEach(()=>{
- vi.clearAllMocks();filters.sole='personal';addArea.real=false;notesStore.notes={};notesStore.patches=[];shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
+ vi.clearAllMocks();cal.events=[];filters.sole='personal';addArea.real=false;notesStore.notes={};notesStore.patches=[];shell.reg=null;review.seen=[];review.prevReviewed=null;plan.n=0;plan.seen=[];plan.next=null;plan.nextLoading=false;filters.on=false;api.tasks=[];lifeAreas.list=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[];activity.changeSet=null
  localStorage.clear()
  HTMLElement.prototype.scrollIntoView=vi.fn()
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
@@ -175,6 +177,61 @@ const writeOn=async(name:string,text:string)=>{
  return line
 }
 const ROW_VERB=/^(This week|Done|Later|Let go|Off |Back to|Delete|Someday|November|October|Fall|Next )/
+
+// Task 5c (Scott, 2026-11-04: "yes, add the calendar fold on the right"):
+// this period's calendar lies folded at the sheet's right edge, for reading.
+// Events are added the usual way, never from the sheet.
+const calSheet=()=>document.querySelector<HTMLElement>('.paper-fold-slot--calendar .paper-fold-front')!
+const CAL_FOOT='For reading. Add events the usual way.'
+describe('this period’s calendar, folded on the right',()=>{
+ it('Month: “November calendar”; unfolding it shows the month’s events, five weeks from its first',async()=>{
+  cal.events=[{id:'e1',title:'Thanksgiving',start_time:'2026-11-26',end_time:'2026-11-27',all_day:true},
+   {id:'e2',title:'Dentist',start_time:'2026-11-10T15:00:00',end_time:'2026-11-10T16:00:00',all_day:false}]
+  open(NOV)
+  expect(calSheet()).toHaveAttribute('inert')
+  fireEvent.keyDown(screen.getByRole('button',{name:'November calendar. Unfold to read'}),{key:'Enter'})
+  const sheet=await screen.findByRole('region',{name:'November calendar, for reading'})
+  expect(within(sheet).getByRole('heading',{name:'November'})).toBeInTheDocument()
+  const weeks=within(within(sheet).getByRole('list',{name:'The next weeks'})).getAllByRole('listitem',{name:/^Week of/})
+  expect(weeks).toHaveLength(5)
+  expect(weeks[0]).toHaveAccessibleName(/^Week of (Oct|Nov) /)
+  expect(within(sheet).getAllByText('Thanksgiving').length).toBeGreaterThan(0)
+  expect(within(sheet).getAllByText('Dentist').length).toBeGreaterThan(0)
+  // The month at a glance: a grid, its days with events marked.
+  expect(within(sheet).getByRole('table',{name:'November 2026'})).toBeInTheDocument()
+  expect(sheet.querySelector('td[data-day="2026-11-26"] .cal-sheet-dots')).not.toBeNull()
+  expect(sheet).toHaveTextContent(CAL_FOOT)
+  expect(sheet.querySelectorAll('button,a,input,textarea,[draggable="true"]')).toHaveLength(0)
+  expect(localStorage.getItem('symphony-fold:month:calendar')).toBe('open')
+ })
+ it('Season: “Fall calendar”, its fixed dates by month',()=>{
+  season()
+  expect(screen.getByRole('button',{name:'Fall calendar. Unfold to read'})).toBeInTheDocument()
+  // Folded, so out of the accessibility tree: read from the DOM.
+  expect(calSheet().querySelector('ul[aria-label="The season’s fixed dates"]')).not.toBeNull()
+  expect(calSheet()).toHaveTextContent(CAL_FOOT)
+  expect(calSheet().querySelectorAll('button,a,input,textarea')).toHaveLength(0)
+ })
+ it('Year: “2026 calendar”, the 12 months of exact-date events',()=>{
+  at(new Date(2026,10,4,9)); onTestFinished(()=>{vi.useRealTimers()})
+  cal.events=[{id:'e1',title:'Ella and Kaleb turn 9',start_time:'2026-11-28',end_time:'2026-11-29',all_day:true}]
+  open()
+  expect(screen.getByRole('button',{name:'2026 calendar. Unfold to read'})).toBeInTheDocument()
+  const months=calSheet().querySelector('ul[aria-label="2026, month by month"]')!
+  expect(Array.from(months.children).map((li)=>li.getAttribute('aria-label')))
+   .toEqual(['January','February','March','April','May','June','July','August','September','October','November','December'])
+  expect(calSheet()).toHaveTextContent('Ella and Kaleb turn 9')
+  expect(months.querySelector('li[aria-label="November"]')).toHaveAttribute('data-now')
+  expect(months.querySelector('li[aria-label="October"]')).toHaveTextContent('Past')
+  expect(calSheet()).toHaveTextContent(CAL_FOOT)
+  expect(calSheet().querySelectorAll('button,a,input,textarea')).toHaveLength(0)
+ })
+ it('C unfolds it',()=>{
+  open(NOV)
+  fireEvent.keyDown(document,{key:'c'})
+  return waitFor(()=>expect(document.querySelector('.paper-fold')).toHaveAttribute('data-calendar-open','true'))
+ })
+})
 
 describe('a sheet: the period in its own words, the level above folded beside it',()=>{
  it('Month: Fall folded at the edge, the list on its own with no ties, no verbs, no pieces, and a line to write on',()=>{
