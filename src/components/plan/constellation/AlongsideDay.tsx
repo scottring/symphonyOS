@@ -31,6 +31,7 @@ import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet } from '@/components/plan/fold/AboveSheet'
 import { TODAY_WEEK_FOOT } from '@/components/schedule/TodayWeekColumn'
 import { AlongsideContext, type AlongsideWorkspace } from './AlongsideContext'
+import { writePlanDrag } from '@/lib/planning/planDrag'
 import './alongside.css'
 
 const WEEK_ACTION_MIME = 'application/x-symphony-week-action'
@@ -97,11 +98,15 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
   }
 
   const range = formatWeekRangeShort(week)
-  // The day drops a week row onto itself (no time): the same placement as +.
+  // A week row dropped on the day's hours gets the time it lands at: the
+  // row carries the plan-drag payload too, and the grid (TodayDayScale) takes
+  // that drop and stops it there (Scott, 2026-11-04: "drag directly from the
+  // week strip to the calendar grid"). Dropped anywhere else on the day it
+  // bubbles here and is placed for the day with no time, the same as +.
   const day = (
     <div className="ad-day"
       onDragOver={(e) => { if (e.dataTransfer.types.includes(WEEK_ACTION_MIME)) e.preventDefault() }}
-      onDropCapture={stepAside ? undefined : (e) => { const id = e.dataTransfer.getData(WEEK_ACTION_MIME); if (id) { e.preventDefault(); e.stopPropagation(); void place(id) } }}>
+      onDrop={stepAside ? undefined : (e) => { const id = e.dataTransfer.getData(WEEK_ACTION_MIME); if (id) { e.preventDefault(); e.stopPropagation(); void place(id) } }}>
       {children}
     </div>
   )
@@ -119,7 +124,13 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
               rows={open.map((t) => ({ id: t.id, title: t.title }))} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-              onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }}>
+              onOpen={onSelect} onDragRow={(id, ev) => {
+                const t = open.find((x) => x.id === id)
+                // The plan payload is what the day's hours read (TodayView's
+                // own sheet writes the same); ours places it anywhere else.
+                if (t) writePlanDrag(ev.dataTransfer, { kind: 'task', id, date: ymd, title: t.title })
+                ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move'
+              }}>
               <div ref={setRoutinesSlot} className="ad-routines" />
             </AboveSheet>}>
             {day}

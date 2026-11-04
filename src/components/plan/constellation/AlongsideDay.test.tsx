@@ -1,4 +1,7 @@
-import {fireEvent,render,screen,waitFor,within} from '@testing-library/react'
+import {createEvent,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
+import {DndContext} from '@dnd-kit/core'
+import {TodayDayScale} from '@/components/schedule/TodayDayScale'
+import {PLAN_MIME} from '@/lib/planning/planDrag'
 import {MemoryRouter} from 'react-router-dom'
 import {vi,it,expect,beforeEach,onTestFinished} from 'vitest'
 import {AlongsideDay} from './AlongsideDay'
@@ -11,6 +14,7 @@ vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMe
 vi.mock('@/lib/today/domainFilter',()=>({filterTasksForLayers:(t:Task[])=>t}))
 vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,scopeId:null})}))
 vi.mock('@/lib/planning/weekList',()=>({weekListTasks:(t:Task[])=>t}))
+vi.mock('@/hooks/useTravelTime',()=>({useTravelTime:()=>null}))
 // Fri Oct 9, 2026, in the Sunday-start week Oct 4 – Oct 10.
 const date=new Date(2026,9,9)
 const task={id:'same-id',title:'Choose picnic spot',createdAt:date,completed:false,sourceId:'month'} as Task
@@ -73,7 +77,9 @@ it('a row drags onto the day with the same payload, and the day places it; unrel
  const row=screen.getByText('Choose picnic spot').closest('li')!
  expect(row).toHaveAttribute('draggable','true')
  fireEvent.dragStart(row,{dataTransfer:{setData:(k:string,v:string)=>{set[k]=v},effectAllowed:''}})
- expect(set).toEqual({'application/x-symphony-week-action':'same-id'})
+ // Its own payload, and the plan payload the day's hours read (TodayView's sheet writes the same).
+ expect(set['application/x-symphony-week-action']).toBe('same-id')
+ expect(JSON.parse(set[PLAN_MIME])).toEqual({kind:'task',id:'same-id',date:'2026-10-09',title:'Choose picnic spot'})
  const target=screen.getByText('Day drop area')
  fireEvent.drop(target,{dataTransfer:{getData:()=>''}})
  expect(update).not.toHaveBeenCalled()
@@ -120,4 +126,53 @@ it('the day can drive the week open for a while; letting go returns it to what w
  expect(localStorage.getItem('symphony-fold:day')).toBeNull()
  rerender(view(undefined))
  expect(screen.getByRole('button',{name:/Unfold to read$/})).toHaveAttribute('aria-expanded','false')
+})
+
+// Scott, 2026-11-04: "we need to be able to drag directly from the week strip
+// to the calendar grid in Today." A row dropped on the day's hours gets the
+// time it lands at (the grid takes the drop); anywhere else on the day it is
+// placed for the day with no time, as before.
+it('a week row dropped on the day’s hours at 3pm is timed at 3pm; dropped elsewhere on the day it is placed untimed',async()=>{
+ const update=vi.fn().mockResolvedValue(true),onPlanDrop=vi.fn()
+ render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={update} loading={false} error={false} retry={()=>{}}>
+  <p>Elsewhere on the day</p>
+  <DndContext><TodayDayScale items={[]} viewedDate={date} now={null} isMobile={false} selectedItemId={null} peopleOf={()=>[]} isReadOnlyEvent={()=>false} onSelect={vi.fn()} onPlanDrop={onPlanDrop}/></DndContext>
+ </AlongsideDay></MemoryRouter>)
+ unfold()
+ const data:Record<string,string>={}
+ fireEvent.dragStart(screen.getByText('Choose picnic spot').closest('li')!,{dataTransfer:{setData:(k:string,v:string)=>{data[k]=v},effectAllowed:''}})
+ const dataTransfer={types:Object.keys(data),getData:(k:string)=>data[k]??'',dropEffect:'none'}
+ const track=screen.getByTestId('today-day-scale')
+ track.getBoundingClientRect=()=>({top:100,left:0,right:400,bottom:800,width:400,height:700,x:0,y:100,toJSON:()=>({})})
+ // 7a at the top, 48px an hour: 100 + 8 × 48 is 3:00 PM.
+ const drop=createEvent.drop(track,{dataTransfer})
+ Object.defineProperty(drop,'clientY',{value:100+8*48})
+ fireEvent(track,drop)
+ expect(onPlanDrop).toHaveBeenCalledOnce()
+ const [payload,when]=onPlanDrop.mock.calls[0]
+ expect(payload).toEqual({kind:'task',id:'same-id',date:'2026-10-09',title:'Choose picnic spot'})
+ expect([when.getHours(),when.getMinutes()]).toEqual([15,0])
+ // The grid kept the drop: the day did not place it untimed as well.
+ await new Promise((r)=>setTimeout(r,0))
+ expect(update).not.toHaveBeenCalled()
+ fireEvent.drop(screen.getByText('Elsewhere on the day'),{dataTransfer})
+ await waitFor(()=>expect(update).toHaveBeenCalledWith('same-id',{isAllDay:true,scheduledFor:date,bucket:'timed'}))
+ expect(onPlanDrop).toHaveBeenCalledOnce()
+})
+
+it('a routine row (plan payload) dropped on the day’s hours reaches the grid’s timed placement, not the day’s untimed one',()=>{
+ const update=vi.fn(),onPlanDrop=vi.fn()
+ render(<MemoryRouter><AlongsideDay tasks={[]} date={date} update={update} loading={false} error={false} retry={()=>{}}>
+  <DndContext><TodayDayScale items={[]} viewedDate={date} now={null} isMobile={false} selectedItemId={null} peopleOf={()=>[]} isReadOnlyEvent={()=>false} onSelect={vi.fn()} onPlanDrop={onPlanDrop}/></DndContext>
+ </AlongsideDay></MemoryRouter>)
+ const payload={kind:'routine',id:'r-walk',date:'2026-10-09',title:'Walk Jax'}
+ const dataTransfer={types:[PLAN_MIME],getData:(k:string)=>k===PLAN_MIME?JSON.stringify(payload):'',dropEffect:'none'}
+ const track=screen.getByTestId('today-day-scale')
+ track.getBoundingClientRect=()=>({top:100,left:0,right:400,bottom:800,width:400,height:700,x:0,y:100,toJSON:()=>({})})
+ const drop=createEvent.drop(track,{dataTransfer})
+ Object.defineProperty(drop,'clientY',{value:100+8*48})
+ fireEvent(track,drop)
+ expect(onPlanDrop.mock.calls[0][0]).toEqual(payload)
+ expect(onPlanDrop.mock.calls[0][1].getHours()).toBe(15)
+ expect(update).not.toHaveBeenCalled()
 })
