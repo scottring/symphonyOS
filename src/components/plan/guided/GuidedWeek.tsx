@@ -15,7 +15,7 @@ import { weekStepTitle } from './useGuidedWeek'
 import '@/components/guide/guide.css'
 
 export function GuidedWeek({ canvas, look, monthWord, progress, saveError, onJump, onNext, onFinish, onLeave }: {
-  /** The week itself, without its strip, drawn with the fold the current
+  /** The week itself, as it is every day, drawn with the fold the current
    *  step asks for. */
   canvas: ReactNode | ((fold: SessionFold) => ReactNode)
   /** The look back, drawn in the sheet beside the week on its step. No other
@@ -23,7 +23,8 @@ export function GuidedWeek({ canvas, look, monthWord, progress, saveError, onJum
   look: ReactNode
   /** The month above ("November"), for "Read November". */
   monthWord: string
-  progress: GuideProgress
+  /** Null while where the session is still loads: the week, and no tooltip. */
+  progress: GuideProgress | null
   /** Where the session is could not be saved. */
   saveError?: string | null
   onJump: (id: string) => void
@@ -34,21 +35,21 @@ export function GuidedWeek({ canvas, look, monthWord, progress, saveError, onJum
   onLeave: () => void
 }) {
   const steps = stepsFor('week')
-  const index = Math.max(0, steps.findIndex((s) => s.id === progress.current))
-  const step = steps[index]
-  const drives = step.drives
+  const index = progress ? Math.max(0, steps.findIndex((s) => s.id === progress.current)) : -1
+  const step = index >= 0 ? steps[index] : null
+  const drives = step?.drives
   const fold: SessionFold = {
-    stepId: step.id,
+    stepId: step?.id ?? null,
     drive: drives ? { above: drives.above || drives.look || undefined } : {},
     look: drives?.look ? look : null,
     write: !!drives?.write,
   }
   return (
-    <section className="guide-session" aria-label="Planning the week">
+    <section className="guide-session" aria-label="Planning the week" aria-busy={progress ? undefined : true}>
       {typeof canvas === 'function' ? canvas(fold) : canvas}
-      <GuideCoach level="week" current={progress.current} word="the week" titleFor={(s) => weekStepTitle(s, monthWord)}
+      {progress && <GuideCoach level="week" current={progress.current} word="the week" titleFor={(s) => weekStepTitle(s, monthWord)}
         onNext={onNext} onBack={() => { if (index > 0) onJump(steps[index - 1].id) }}
-        onStop={onLeave} onFinish={onFinish} error={saveError} />
+        onStop={onLeave} onFinish={onFinish} error={saveError} />}
     </section>
   )
 }

@@ -1119,6 +1119,18 @@ describe('WeekViewV2 — the deck', () => {
     expect(planned.container.querySelector('section[aria-label$=", for reading"]')).not.toBeNull()
     expect(count()).toBe(1)
   })
+  // Final review (2026-11-04): the Week page never changes shape in a
+  // session. The strip stays; the Choose step's line (+ Add to week, then the
+  // line itself) is where its tooltip points.
+  it('in a session the week keeps its strip, and the Choose step’s write anchor resolves', () => {
+    guideAt.step = 'choose'
+    open('?plan=1', [])
+    const guided = () => deckMock.guided as unknown as { canvas: (fold: unknown) => React.ReactNode }
+    const choose = render(<>{guided().canvas({ stepId: 'choose', drive: { above: true }, look: null, write: true })}</>)
+    expect(within(choose.container).getByRole('complementary', { name: 'Week strip' })).toBeInTheDocument()
+    expect(choose.container.querySelector('[data-guide-anchor="write"]')).not.toBeNull()
+    expect(choose.container.querySelector('.wc-session-week')).toBeNull()
+  })
   // Controller ruling: the deck reviews the week that is ending, opened from the
   // week after it — so only this week, and next week on this week's last day.
   it('ignores the deck on a past week, and on next week before this week’s last day', () => {

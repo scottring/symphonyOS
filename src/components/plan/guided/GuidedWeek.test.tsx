@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
 import { render, screen, fireEvent, within, act, renderHook, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom'
 import { useEffect, type ReactNode } from 'react'
@@ -8,7 +8,7 @@ import { GuidedSessionProvider, useGuidedSession, type GuidedSessionRegistration
 
 // The person's notes row for the week, in memory: what usePlanningNotes reads
 // and patch merges into (the real merge is usePlanningNotes' own test).
-const store = vi.hoisted(() => ({ notes: {} as Record<string, unknown>, patches: [] as { p: Record<string, unknown>; defaults?: Record<string, unknown> }[], order: [] as string[], fail: false }))
+const store = vi.hoisted(() => ({ notes: {} as Record<string, unknown>, patches: [] as { p: Record<string, unknown>; defaults?: Record<string, unknown> }[], order: [] as string[], fail: false, loading: false }))
 vi.mock('@/hooks/usePlanningNotes', async () => {
   const { useState, useCallback } = await import('react')
   return {
@@ -22,7 +22,7 @@ vi.mock('@/hooks/usePlanningNotes', async () => {
         setNotes(store.notes)
         return true
       }, [])
-      return { notes, loading: false, error: null, patch, reload: () => undefined }
+      return { notes, loading: store.loading, error: null, patch, reload: () => undefined }
     },
   }
 })
@@ -70,7 +70,7 @@ function Shell() {
 }
 function Where() { return <output data-testid="where">{useLocation().search}</output> }
 const where = () => new URLSearchParams(screen.getByTestId('where').textContent ?? '')
-type CanvasOpts = { hideStrip?: boolean; fold?: SessionFold }
+type CanvasOpts = { fold?: SessionFold }
 function WithDeck({ deck, canvas }: { deck: WeekDeck; canvas: (o?: CanvasOpts) => ReactNode }) {
   const [params] = useSearchParams()
   return <WeekV2 weekStart={weekStart} isCurrent canvas={canvas} deck={{ ...deck, mode: deckModeOf(params) }} />
@@ -78,7 +78,7 @@ function WithDeck({ deck, canvas }: { deck: WeekDeck; canvas: (o?: CanvasOpts) =
 // The week as the page draws it: the month's fold driven by the step, and on
 // the look back that sheet turned to last week with its choices.
 const canvas = vi.fn((o?: CanvasOpts) => <section aria-label="The days" data-drive={JSON.stringify(o?.fold?.drive ?? null)}>
-  {o?.hideStrip ? 'days without the strip' : 'days with the strip'}
+  {'days with the strip'}
   {o?.fold?.look && <aside aria-label="Last week, looking back">{o.fold.look}</aside>}
 </section>)
 const drive = () => JSON.parse(screen.getByRole('region', { name: 'The days' }).getAttribute('data-drive') ?? 'null')
@@ -111,13 +111,15 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); phone.on = false })
 
 describe('GuidedWeek — the Week page while planning', () => {
-  it('?plan=1 shows the first step’s tooltip over the week without its strip; the look back on the sheet beside it; the chip counts the steps', () => {
+  it('?plan=1 shows the first step’s tooltip over the week, strip and all; the look back on the sheet beside it; the chip counts the steps', () => {
     open('/week?plan=1')
     const session = screen.getByRole('region', { name: 'Planning the week' })
     expect(coach().getByText('Step 1 of 7')).toBeInTheDocument()
     expect(stepNow()).toBe('Look back at last week')
     expect(screen.getByRole('button', { name: 'Planning the week · 1 of 7' })).toBeInTheDocument()
-    expect(within(session).getByText('days without the strip')).toBeInTheDocument()
+    // Final review: the Week page never changes shape in a session.
+    expect(within(session).getByText('days with the strip')).toBeInTheDocument()
+    for (const [o] of canvas.mock.calls) expect(o).not.toHaveProperty('hideStrip')
     // Step 1 looks back: the month's sheet beside the week turns to last week.
     expect(drive()).toEqual({ above: true })
     expect(lookSheet().getByLabelText('What went well')).toBeInTheDocument()
@@ -125,8 +127,16 @@ describe('GuidedWeek — the Week page while planning', () => {
     expect(within(session).queryByRole('button', { name: 'Next step' })).toBeNull()
     expect(panel().getByText('Look back at last week')).toBeInTheDocument()
     expect(shell.reg).toMatchObject({ level: 'week', token: '2026-9-27', threadKey: 'weekly:2026-9-27', stepId: 'look-back' })
-    // No band, no bookmark, no drop card.
-    expect(document.querySelector('.ribbon-band, .ribbon-tab, .ribbon-card')).toBeNull()
+  })
+  it('while where the session is still loads, the week is drawn as it is (no blank page) and no tooltip shows', () => {
+    store.loading = true
+    onTestFinished(() => { store.loading = false })
+    open('/week?plan=1')
+    const session = screen.getByRole('region', { name: 'Planning the week' })
+    expect(session).toHaveAttribute('aria-busy', 'true')
+    expect(within(session).getByText('days with the strip')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Planning guide' })).toBeNull()
+    expect(drive()).toEqual({})
   })
   it('phone: the same tooltip and chip; no Talk to the guide button', async () => {
     phone.on = true

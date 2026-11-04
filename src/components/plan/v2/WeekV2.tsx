@@ -98,10 +98,11 @@ export interface WeekDeck {
 export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   weekStart: Date
   isCurrent: boolean
-  /** The week at rest: WeekViewV2's canvas. A guided session asks for it
-   *  without its strip, with the month's fold driven by the session's step
-   *  (`fold`: on the look back, last week with its choices). */
-  canvas?: ReactNode | ((opts?: { hideStrip?: boolean; fold?: SessionFold }) => ReactNode)
+  /** The week at rest: WeekViewV2's canvas. A guided session asks for the
+   *  same week, strip and all (the page never changes shape in a session;
+   *  final review, 2026-11-04), with the month's fold driven by the
+   *  session's step (`fold`: on the look back, last week with its choices). */
+  canvas?: ReactNode | ((opts?: { fold?: SessionFold }) => ReactNode)
   /** Today's first item, for the fact line ("Today: …"); null when there is
    *  none, the week is not this one, or it has not loaded. */
   today?: string | null
@@ -255,7 +256,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
         // Drawn only once the tasks are in: no flash of an empty October.
         ? (deck.loading ? null : deckMode === 'full'
           ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} deck={deck} lastReview={lastReview}
-              canvas={(fold) => typeof canvas === 'function' ? canvas({ hideStrip: true, fold }) : canvas}
+              canvas={(fold) => typeof canvas === 'function' ? canvas({ fold }) : canvas}
               onFinish={closeWeek} onClose={() => { setMode(null); planNotes.reload() }}
               onPlanned={() => { session.reload(); planNotes.reload() }} />
           : <section className="deck choose-flow" aria-label="Plan this week">
@@ -294,8 +295,6 @@ function WeekSession({ weekStart, deck, lastReview, canvas, onFinish, onClose, o
   const listen = deck.listenCanvasWrites
   useEffect(() => listen?.(() => { void markPlannedOnce() }), [listen, markPlannedOnce])
   usePlanSessionLoading('week', guided.loading)
-  // Where the session is comes first: no flash of step one before a resume.
-  if (guided.loading) return null
   const choose = deck.choose
   // The look back is on the sheet beside the week (last week, with its
   // choices). Every other step is the week's own page, pointed at by its
@@ -304,7 +303,10 @@ function WeekSession({ weekStart, deck, lastReview, canvas, onFinish, onClose, o
   // week itself).
   const look = <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
     notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} aged={deck.aged} onSeeAged={deck.onSeeAged} />
+  // Where the session is comes first: no flash of step one before a resume.
+  // The week stays drawn, as it is, while that loads (final review: the page
+  // never changes shape in a session).
   return <GuidedWeek canvas={canvas} look={look} monthWord={guided.monthWord}
-    progress={guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }}
+    progress={guided.loading ? null : guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }}
     onNext={() => { void guided.next() }} onFinish={() => { void guided.done() }} onLeave={onClose} />
 }

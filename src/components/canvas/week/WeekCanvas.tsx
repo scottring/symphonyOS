@@ -196,11 +196,6 @@ export interface WeekCanvasProps {
   /** The month above this week, folded beside the days for reading. Absent
    *  (a week looked back on): no fold. */
   month?: WeekMonthSheet
-  /** A guided session's steps stand where the strip does (spec 2026-11-01:
-   *  the strip's lists appear inside the steps that use them). Planning,
-   *  every day shows its whole slate, nothing behind "+N more" (Scott,
-   *  2026-11-02): how full a day is is what the session is judging. */
-  hideStrip?: boolean
   /** A guided session's step (2026-11-04) drives the month's fold: the
    *  step opens it (`drive`), and the look back turns it to last week with
    *  its choices (`look`). Nothing is remembered. */
@@ -257,7 +252,7 @@ const NODAY_FOLD_AT = 4
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, viewerId, month, hideStrip, fold: session }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], pointing, onPlaceUnplaced, viewerId, month, fold: session }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   // Touch first (the iPad, the wall): rows lift on a held press instead of the
   // browser's own drag, which a long press would otherwise start too.
@@ -477,8 +472,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // A few things a day (foldDay, calm pass 2): the calendar events always
   // show, and beside them two things, timed or not, routines included, in the
   // day's order (the top two are the priority). A row Symphony is proposing or
-  // pointing at stays in sight. The rest wait behind "+N more" — except while
-  // a guided session plans the week (hideStrip): then every day is whole.
+  // pointing at stays in sight. The rest wait behind "+N more", in a planning
+  // session too: the week never changes shape in one (final review, 2026-11-04).
   const dayLists = (day: CanvasDay) => {
     // A routine on a day shows on that day (2026-10-26: dragging one onto
     // Monday left the grid unchanged); the strip's Routines tab is the
@@ -489,7 +484,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       ...day.events.map(() => ({ event: true, it: null })),
       ...all.map((it) => ({ event: false, pinned: !!it.proposed || pointedTask(it.task?.id), it })),
     ])
-    const shown = hideStrip || openDays.has(day.key) ? all : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
+    const shown = openDays.has(day.key) ? all : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
     return { all, fold, shown }
   }
   const tasksOf = (items: CanvasDayItem[]) => items.flatMap((it) => (it.task && !it.proposed ? [it.task] : []))
@@ -599,7 +594,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           </ul>
         )}
         {items.length > 0 && <ul className="cw-rows wc-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{items.map((it) => dayRow(it, day, orderOf(it)))}</ul>}
-        {!hideStrip && fold.hidden > 0 && (
+        {fold.hidden > 0 && (
           <button type="button" className="canvas-link wc-quiet-link wc-more" aria-expanded={dayOpen} onClick={() => toggleDayOpen(day.key)}>
             {dayOpen ? 'Show less' : `+${fold.hidden} more`}
           </button>
@@ -763,7 +758,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // fold (`session`): Read November opens it, and the look back turns it to
   // last week with its choices.
   const look = session?.look ?? null
-  const withMonth = (node: ReactNode) => month && (!hideStrip || session) ? (
+  const withMonth = (node: ReactNode) => month ? (
     <PaperFold horizon="week" className="wc-fold" edgeLabel={look ? 'Last week' : month.word} edgeCount={look ? undefined : month.rows.length}
       drive={session?.drive}
       frontLabel={look ? 'Last week, looking back' : undefined}
@@ -901,11 +896,11 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const nodayN = unplaced.length
   return withTouch(
     <div className={`wc wc-with-strip hs-layout${drag ? ' is-dragging' : ''}`}>
-      {!hideStrip && <HorizonStrip id="week" label="Week strip" railLabel={`This week${nodayN ? ` · ${nodayN} without a day` : ''}`}
+      <HorizonStrip id="week" label="Week strip" railLabel={`This week${nodayN ? ` · ${nodayN} without a day` : ''}`}
         tabs={[
           { id: 'week', label: 'Week', count: nodayN || undefined, content: weekTab },
           { id: 'routines', label: 'Routines', count: routineCount || undefined, content: routinesTab },
-        ]} />}
+        ]} />
       <div className="hs-main">
       {subtitleNode}
       {composerNode}
@@ -935,9 +930,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             )}
           </div>
           {dinnerRow}
-          {/* While a guided session plans the week the strip steps aside;
-              its week list (No day yet, + Add to week) stays under the days. */}
-          {hideStrip && <section className="wc-session-week" aria-label="This week, no day yet">{weekTab}</section>}
         </section>
       )}
       </div>

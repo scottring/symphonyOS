@@ -897,8 +897,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
   ])), [dayChoices])
   // A guided session's step (2026-11-04) drives the month's fold beside
   // the week: its look back turns that sheet to last week, with its choices.
-  const weekCanvas = (opts?: { hideStrip?: boolean; fold?: SessionFold }) => (
-    <WeekCanvas weekStart={weekAnchor} hideStrip={opts?.hideStrip} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
+  const weekCanvas = (opts?: { fold?: SessionFold }) => (
+    <WeekCanvas weekStart={weekAnchor} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers} viewerId={meId ?? undefined}
       pointing={activity.pointing} fold={opts?.fold}

@@ -183,9 +183,10 @@ describe('WeekCanvas — the month folds beside the week', () => {
     for (const li of lines) expect(li).not.toHaveAttribute('draggable', 'true')
   })
 
-  it('no fold while a guided session plans the week (its steps read the month)', () => {
-    show(writers(), { hideStrip: true, month })
-    expect(screen.queryByRole('button', { name: /November, 2 open/ })).toBeNull()
+  it('the month’s fold stays while a guided session plans the week; the step drives it', () => {
+    show(writers(), { month, fold: { drive: {}, look: null } })
+    expect(screen.getByRole('button', { name: 'November, 2 open. Unfold to read' })).toBeInTheDocument()
+    expect(document.querySelector('.paper-fold.wc-fold')).toContainElement(screen.getByRole('region', { name: 'The days' }))
   })
 })
 
@@ -220,24 +221,23 @@ describe('WeekCanvas — filing a task under a goal', () => {
     expect(screen.queryByRole('button', { name: /Show October goals/ })).toBeNull()
   })
 
-  // Guided planning (spec 2026-11-01): while a session runs, its steps stand
-  // where the strip does; the days stay.
-  // Fix round 1 (Task 7): planning the week, the week's own list (No day yet,
-  // + Add to week) stays on the page under the days, and Choose this week's
-  // tasks opens the week's line to write on.
-  it('in a session (hideStrip and a fold): the no-day tasks and + Add to week are under the days; a writing step opens the line', async () => {
+  // Final review (2026-11-04): the Week page never changes shape in a
+  // session. The strip stays, with No day yet and + Add to week, and Choose
+  // this week's tasks opens the week's line to write on.
+  it('in a session (a fold): the strip keeps the no-day tasks and + Add to week; a writing step opens the line, the Choose step’s anchor', async () => {
     const { MemoryRouter } = await import('react-router-dom')
     const w = { ...writers(), addTyped: vi.fn(async () => true) }
     const view = (write: boolean) => <MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w}
-      hideStrip month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={{ drive: { above: write }, look: null, write }} /></MemoryRouter>
+      month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={{ drive: { above: write }, look: null, write }} /></MemoryRouter>
     const { rerender } = render(view(false))
-    const tray = within(screen.getByRole('region', { name: 'This week, no day yet' }))
-    expect(tray.getByRole('list', { name: 'No day yet' })).toHaveTextContent('Call the bank')
-    expect(tray.getByRole('button', { name: '+ Add to week' })).toBeInTheDocument()
+    const strip = within(screen.getByRole('complementary', { name: 'Week strip' }))
+    expect(strip.getByRole('list', { name: 'No day yet' })).toHaveTextContent('Call the bank')
+    expect(strip.getByRole('button', { name: '+ Add to week' })).toHaveAttribute('data-guide-anchor', 'write')
     expect(screen.queryByRole('textbox')).toBeNull()
     rerender(view(true))
     expect(screen.getByRole('textbox')).toHaveFocus()
     expect(screen.getByText('Add to this week')).toBeInTheDocument()
+    expect(screen.getByRole('textbox').closest('[data-guide-anchor="write"]')).not.toBeNull()
   })
 
   // Fix round 1 ruling: the week carries the bookmark on the top edge of its
@@ -249,10 +249,27 @@ describe('WeekCanvas — filing a task under a goal', () => {
     expect(within(days).queryByRole('button', { name: /^Plan / })).toBeNull()
   })
 
-  it('hideStrip leaves the strip out and keeps the days', () => {
-    show(writers(), { hideStrip: true })
-    expect(screen.queryByRole('complementary', { name: 'Week strip' })).toBeNull()
-    expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
+  // Final review (2026-11-04): the strip and the days are the same in and out
+  // of a session.
+  it('the strip and the days are laid out the same in and out of a session', async () => {
+    const { MemoryRouter } = await import('react-router-dom')
+    const d = days()
+    d[3] = { ...d[3], items: Array.from({ length: 6 }, (_, i) => ({ id: `task-x${i}`, kind: 'task' as const, title: `Errand ${i + 1}`, completed: false, task: task({ id: `x${i}`, title: `Errand ${i + 1}` }) })) }
+    const shape = (fold?: { drive: { above?: boolean }; look: null }) => {
+      const { container, unmount: done } = render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
+        month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={fold} /></MemoryRouter>)
+      const out = {
+        strip: screen.queryByRole('complementary', { name: 'Week strip' })?.textContent ?? null,
+        days: screen.getByRole('region', { name: 'The days' }).querySelector('.wc-strip')?.innerHTML,
+        layout: container.firstElementChild?.className,
+      }
+      done()
+      return out
+    }
+    const everyDay = shape()
+    expect(everyDay.strip).not.toBeNull()
+    expect(shape({ drive: {}, look: null })).toEqual(everyDay)
+    expect(shape({ drive: { above: true }, look: null })).toEqual(everyDay)
   })
 })
 
@@ -618,7 +635,7 @@ describe('the week’s planning homes', () => {
     const { MemoryRouter } = await import('react-router-dom')
     const w = { ...writers(), addTyped: vi.fn(async () => true) }
     render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w}
-      hideStrip month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={{ drive: {}, look: null }} /></MemoryRouter>)
+      month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={{ drive: {}, look: null }} /></MemoryRouter>)
     expect(screen.getByRole('button', { name: '+ Add to week' })).toHaveAttribute('data-guide-anchor', 'write')
     fireEvent.click(screen.getByRole('button', { name: '+ Add to week' }))
     expect(screen.getByRole('textbox').closest('[data-guide-anchor="write"]')).not.toBeNull()
@@ -680,13 +697,13 @@ describe('WeekCanvas — a few things a day', () => {
     expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
   })
 
-  it('planning the week (a guided session), every day shows its whole slate, with no "+N more" (Scott, 2026-11-02)', () => {
+  it('planning the week (a guided session), a day keeps its few and its "+N more", as every day (final review, 2026-11-04)', () => {
     const d = days()
     d[3] = { ...d[3], items: untimed(7) }
-    render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} hideStrip />)
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} fold={{ drive: {}, look: null }} />)
     const day = screen.getByTestId('journal-day-2026-10-06')
-    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(7)
-    expect(within(day).queryByRole('button', { name: /more|Show less/ })).toBeNull()
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
+    expect(within(day).getByRole('button', { name: '+5 more' })).toBeInTheDocument()
   })
 
   it('a day with 2 events and 5 tasks shows both events, 2 tasks and "+3 more"', () => {
