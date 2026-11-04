@@ -119,7 +119,8 @@ export interface Task {
   assignedToAll?: string[] // Multi-member assignment
   /** A school paper's holder: the parent who has it (null/undefined = not found yet). */
   heldBy?: string
-  /** A school paper marked "Not ours": kept, never shown. */
+  /** Kept, never shown: a school paper marked "Not ours", or an item let go
+   *  ("not ever", lib/planning/letGo.ts). Search still finds a let-go item. */
   dismissedAt?: Date
   projectId?: string // Linked project
   parentTaskId?: string // If set, this is a subtask

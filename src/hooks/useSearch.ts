@@ -8,6 +8,7 @@ import type { List } from '@/types/list'
 import type { Note } from '@/types/note'
 import { getCategoryLabel } from '@/types/list'
 import { parseFieldIntent } from '@/lib/search/fieldIntent'
+import { letGoNote } from '@/lib/planning/letGo'
 import { noteHeading } from '@/lib/noteHeading'
 import { hasMonthlyPosition, describeMonthlyPosition } from '@/lib/cadence/monthlyPosition'
 
@@ -248,6 +249,9 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [], not
         subtitle = r.item.phoneNumber
       } else if (intent === 'email' && r.item.email) {
         subtitle = r.item.email
+      } else if (letGoNote(r.item)) {
+        // Let go ("not ever") is off every list; search is where it is found.
+        subtitle = letGoNote(r.item) ?? undefined
       }
       return {
         type: 'task' as const,

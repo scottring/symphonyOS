@@ -54,49 +54,67 @@ describe('horizonOnScreen', () => {
 })
 
 describe('the task panel over a horizon page', () => {
-  it('a month item shows Later: November and Let go, and no ties or move to the level above', () => {
+  // Naming the carry and Someday vs Let go (Scott, 2026-11-04): the choice
+  // names where the item goes; Someday is "not now", Let go "not ever".
+  it('a month item shows To November, Someday and Let go, and no ties or move to the level above', () => {
     show('/month?view=constellation&horizon=2&start=2026-10-09')
-    expect(verbs()).toEqual(['Later: November', 'Let go'])
+    expect(verbs()).toEqual(['To November', 'Someday', 'Let go'])
+    expect(screen.queryByText(/Carry|Table|Later/)).toBeNull()
     expect(screen.queryByText('For')).toBeNull()
     expect(screen.queryByRole('button', { name: /Move .* under/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Back to Fall' })).toBeNull()
   })
-  it('Later: November carries it on, and Undo puts back the periods it was on', async () => {
+  it('To November carries it on, and Undo puts back the periods it was on', async () => {
     show('/month?view=constellation&horizon=2&start=2026-10-09')
-    fireEvent.click(screen.getByRole('button', { name: 'Later: November' }))
+    fireEvent.click(screen.getByRole('button', { name: 'To November' }))
     await waitFor(() => expect(deps.keepForward).toHaveBeenCalledWith('m', { monthStart: NOV }, OCT))
     expect(last()).toMatchObject({ label: 'Move “Picnic” to November', ok: true })
     await last().opts.undo!()
     expect(deps.updateTask).toHaveBeenLastCalledWith('m', { commitments: [{ level: 'month', periodStart: OCT, status: 'open' }] })
   })
-  it('a season item: Later: Winter and Let go', () => {
+  it('a season item: To Winter, Someday and Let go', () => {
     show('/season?view=constellation&horizon=1&start=2026-10-09', 's1')
-    expect(verbs()).toEqual(['Later: Winter', 'Let go'])
+    expect(verbs()).toEqual(['To Winter', 'Someday', 'Let go'])
   })
   // Review focus 4: one task on a season, a month and a week list.
-  it('Let go on November ends only the November commitment of an item on several lists', async () => {
-    const SEASON = new Date(2026, 9, 1), WEEK = new Date(2026, 9, 31)
-    const multi = t({ id: 'multi', title: 'Plan Thanksgiving', bucket: 'month', monthStart: NOV, commitments: [
+  describe('an item open on Fall, November and this week', () => {
+    const SEASON = new Date(2026, 8, 1), WEEK = new Date(2026, 10, 1)
+    const commitments = [
       { level: 'season', periodStart: SEASON, status: 'open' }, { level: 'month', periodStart: NOV, status: 'open' }, { level: 'week', periodStart: WEEK, status: 'open' },
-    ] as Task['commitments'] })
-    deps.tasks = [multi]
-    show('/month?view=constellation&horizon=2&start=2026-11-01', 'multi')
-    expect(verbs()).toEqual(['Later: December', 'Let go'])
-    fireEvent.click(screen.getByRole('button', { name: 'Let go' }))
-    await waitFor(() => expect(deps.dropCommitment).toHaveBeenCalledWith('multi', 'month', NOV))
-    expect(deps.dropCommitment).toHaveBeenCalledTimes(1)
-    expect(deps.updateTask).not.toHaveBeenCalled()
-    expect(deps.keepForward).not.toHaveBeenCalled()
-    expect(last()).toMatchObject({ label: 'Let go: “Plan Thanksgiving”', ok: true })
-    await last().opts.undo!()
-    expect(deps.updateTask).toHaveBeenLastCalledWith('multi', { commitments: multi.commitments })
+    ] as Task['commitments']
+    const multi = () => t({ id: 'multi', title: 'Plan winter vacation', bucket: 'week', monthStart: NOV, seasonStart: SEASON, weekStart: WEEK, commitments })
+    beforeEach(() => { deps.tasks = [multi()] })
+
+    it('Someday ends only November’s commitment', async () => {
+      show('/month?view=constellation&horizon=2&start=2026-11-01', 'multi')
+      expect(verbs()).toEqual(['To December', 'Someday', 'Let go'])
+      fireEvent.click(screen.getByRole('button', { name: 'Someday' }))
+      await waitFor(() => expect(deps.dropCommitment).toHaveBeenCalledWith('multi', 'month', NOV))
+      expect(deps.dropCommitment).toHaveBeenCalledTimes(1)
+      expect(deps.updateTask).not.toHaveBeenCalled()
+      expect(last()).toMatchObject({ label: 'Someday: “Plan winter vacation”', ok: true })
+      await last().opts.undo!()
+      expect(deps.updateTask).toHaveBeenLastCalledWith('multi', { commitments })
+    })
+
+    it('Let go ends all three commitments and marks it let go; Undo restores all three and where it was', async () => {
+      show('/month?view=constellation&horizon=2&start=2026-11-01', 'multi')
+      fireEvent.click(screen.getByRole('button', { name: 'Let go' }))
+      await waitFor(() => expect(deps.updateTask).toHaveBeenCalledWith('multi', { bucket: 'someday', dismissedAt: new Date(2026, 9, 9, 9) }))
+      expect(deps.dropCommitment).not.toHaveBeenCalled()
+      expect(last()).toMatchObject({ label: 'Let go: “Plan winter vacation”', ok: true })
+      await last().opts.undo!()
+      expect(deps.updateTask).toHaveBeenLastCalledWith('multi', expect.objectContaining({
+        commitments, dismissedAt: undefined, bucket: 'week', monthStart: NOV, seasonStart: SEASON, weekStart: WEEK,
+      }))
+    })
   })
-  it('Let go of the last open commitment sends the item to Someday, with Undo', async () => {
+  it('Someday on the last open commitment sends the item to Someday, with Undo', async () => {
     show('/month?view=constellation&horizon=2&start=2026-10-09')
-    fireEvent.click(screen.getByRole('button', { name: 'Let go' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Someday' }))
     await waitFor(() => expect(deps.updateTask).toHaveBeenCalledWith('m', { bucket: 'someday', scheduledFor: undefined }))
     expect(deps.dropCommitment).not.toHaveBeenCalled()
-    expect(last()).toMatchObject({ label: 'Let go: “Picnic”', ok: true })
+    expect(last()).toMatchObject({ label: 'Someday: “Picnic”', ok: true })
     await last().opts.undo!()
     expect(deps.updateTask).toHaveBeenLastCalledWith('m', expect.objectContaining({ commitments: [{ level: 'month', periodStart: OCT, status: 'open' }] }))
   })

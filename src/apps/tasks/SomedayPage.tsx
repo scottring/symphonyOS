@@ -6,7 +6,8 @@
 // This page is the way back. It lists what was set aside, and offers the
 // same verbs the review offers — today, tomorrow, this week, drop — through
 // the same handlers, so a verdict here cannot diverge from one given
-// anywhere else. Nothing here is counted or nagged.
+// anywhere else. Nothing here is counted or nagged. What was let go ("not
+// ever", letGo.ts) is kept but never listed here.
 import { useMemo } from 'react'
 import { usePendingDelete } from '@/hooks/usePendingDelete'
 import { UndoToast } from '@/components/undo/UndoToast'
@@ -19,6 +20,7 @@ import { MastheadCard } from '@/components/layout/MastheadCard'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { TriageRow, applyTriageVerdict, type Verdict } from '@/components/schedule/TriageRow'
 import type { Task } from '@/types/task'
+import { isLetGo } from '@/lib/planning/letGo'
 
 export function SomedayPage() {
   const { tasks, loading, error, refetch, toggleTask, updateTask, deleteTask, pushTask, updateTasksBulk } = useSupabaseTasks()
@@ -29,7 +31,7 @@ export function SomedayPage() {
   const pendingDelete = usePendingDelete((id) => { void deleteTask(id) })
   const pendingIds = pendingDelete.pendingIds
   const setAside = useMemo(
-    () => tasks.filter((t) => t.bucket === 'someday' && !t.completed && !pendingIds.includes(t.id)),
+    () => tasks.filter((t) => t.bucket === 'someday' && !t.completed && !isLetGo(t) && !pendingIds.includes(t.id)),
     [tasks, pendingIds],
   )
   const rows = useMemo(

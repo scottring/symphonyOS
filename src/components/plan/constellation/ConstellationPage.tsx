@@ -82,6 +82,7 @@ import { useLifeAreas } from '@/hooks/useLifeAreas'
 import { groupByArea } from '@/lib/guide/byArea'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { periodMoves } from './horizonPanel'
+import { isLetGo } from '@/lib/planning/letGo'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 import { monthToken, usePlanningSession, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
@@ -765,7 +766,8 @@ function Inner() {
     const yearGoals = above.filter((n) => n.goal).map((n) => ({
       id: n.id, title: n.title, node: n, here: levelNodes.filter((c) => c.parent === n.key && isOpen(c)).map((c) => c.title),
     }))
-    const someday = visible.filter((t) => t.bucket === 'someday' && !t.completed && !t.parentTaskId).map((t) => ({ id: t.id, title: t.title, task: t }))
+    // Someday is "not now"; what was let go is "not ever" and is not offered.
+    const someday = visible.filter((t) => t.bucket === 'someday' && !t.completed && !t.parentTaskId && !isLetGo(t)).map((t) => ({ id: t.id, title: t.title, task: t }))
     return <FromYear yearWord={String(year)} seasonWord={periodWord} goals={yearGoals} someday={someday}
       onPick={(g) => runCreate(1, g.title, g.node, `${periodWord}: “${g.title}”`)}
       onBring={({ task }) => {

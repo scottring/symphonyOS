@@ -1,11 +1,12 @@
 // src/components/plan/constellation/horizonPanel.tsx
 //
 // A month or season item opened from its page (paper-style horizons,
-// 2026-11-04): the task panel acts on THIS period only — "Later: {next
-// period}" carries it on, "Let go" ends this period's commitment. It shows and
-// sets no ties (the page no longer draws them) and does not move the item to
-// the level above. Everything else (done, delete, its day, wording) the panel
-// already holds. The two verbs also serve planning's Choose cards (periodMoves).
+// 2026-11-04): "To {next period}" carries it on and "Someday" (not now) ends
+// this period's commitment only; "Let go" (not ever, Scott 2026-11-04) takes
+// it off every list (letGo.ts). It shows and sets no ties (the page no longer
+// draws them) and does not move the item to the level above. Everything else
+// (done, delete, its day, wording) the panel already holds. The same three
+// verbs answer a session's look back (periodMoves).
 //
 // The page is read from the URL the panel opens over — /month, /season or
 // /year, with `horizon` and `start` — so the selection itself carries nothing
@@ -20,6 +21,7 @@ import { committedTo, liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { placementOf } from '@/lib/planning/placement'
+import { letGoUpdates, unletGoUpdates } from '@/lib/planning/letGo'
 
 const ROUTE_LEVEL: Record<string, number> = { '/year': 0, '/season': 1, '/month': 2 }
 const LEVELS: readonly PlanLevel[] = ['year', 'season', 'month']
@@ -57,11 +59,12 @@ function commitmentIsOpen(task: Task, level: 'season' | 'month', bounds: PeriodB
   return commitment === 'legacy' || (!!commitment && commitment.status === 'open')
 }
 
-/** "Later: {next period}" and "Let go" for a month or season item on that
- *  period's list. The task panel and planning's cards offer them, with the
- *  same writes and the same Undo (it puts back the periods the task was on,
- *  planPlacement's stated list). Let go ends THIS period's commitment only;
- *  if it was the item's last open commitment, the item goes to Someday. */
+/** "To {next period}", "Someday" and "Let go" for a month or season item on
+ *  that period's list. The task panel and a session's look back offer them,
+ *  with the same writes and the same Undo. To and Someday act on THIS
+ *  period's commitment only (Someday sends the item to Someday when that was
+ *  its last open commitment); Let go ends every open commitment and marks the
+ *  item let go, and Undo puts back the periods and the place it had. */
 export function periodMoves(
   task: Task, level: 'season' | 'month', bounds: Pick<PeriodBounds, 'start' | 'next' | 'label'>, seasons: Seasons,
   deps: Pick<HorizonPanelDeps, 'updateTask' | 'keepForward' | 'dropCommitment'>, run: Run,
@@ -73,15 +76,20 @@ export function periodMoves(
   const undoToSomeday = async () => (await deps.updateTask(task.id, { ...placementOf(task), commitments: before })) !== false
   return [
     {
-      id: 'horizon-carry', label: `Later: ${nextName}`,
+      id: 'horizon-carry', label: `To ${nextName}`,
       onClick: () => run(`Move “${task.title}” to ${nextName}`, async () => !!await deps.keepForward(task.id, level === 'month' ? { monthStart: bounds.next } : { seasonStart: bounds.next }, bounds.start), { ids: [task.id], undo }),
     },
     {
-      id: 'horizon-remove', label: 'Let go',
-      onClick: () => run(`Let go: “${task.title}”`, async () => {
+      id: 'horizon-someday', label: 'Someday',
+      onClick: () => run(`Someday: “${task.title}”`, async () => {
         if (lastOpen) return (await deps.updateTask(task.id, { bucket: 'someday', scheduledFor: undefined })) !== false
         return deps.dropCommitment(task.id, level, bounds.start)
       }, { ids: [task.id], undo: lastOpen ? undoToSomeday : undo }),
+    },
+    {
+      id: 'horizon-let-go', label: 'Let go',
+      onClick: () => run(`Let go: “${task.title}”`, async () => (await deps.updateTask(task.id, letGoUpdates())) !== false,
+        { ids: [task.id], undo: async () => (await deps.updateTask(task.id, unletGoUpdates(task))) !== false }),
     },
   ]
 }

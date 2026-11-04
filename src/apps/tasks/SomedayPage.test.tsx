@@ -32,6 +32,14 @@ describe('SomedayPage', () => {
     expect(screen.queryByText('Call the plumber')).not.toBeInTheDocument()
   })
 
+  // Let go means not ever (Scott, 2026-11-04): it is kept, but never shown here.
+  it('leaves out what was let go', () => {
+    hook.tasks = [...hook.tasks, createMockTask({ id: 'g1', title: 'Plan winter vacation', bucket: 'someday', context: 'personal', dismissedAt: new Date(2026, 10, 4) })]
+    render(<SomedayPage />)
+    expect(screen.getByText('Learn the cello')).toBeInTheDocument()
+    expect(screen.queryByText('Plan winter vacation')).not.toBeInTheDocument()
+  })
+
   it('pulls a row back onto today through the same verdict handlers as the review', async () => {
     render(<SomedayPage />)
     fireEvent.click(screen.getByRole('button', { name: /^Do today/ }))

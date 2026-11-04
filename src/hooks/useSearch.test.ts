@@ -178,6 +178,24 @@ describe('useSearch', () => {
     })
   })
 
+  // Let go means not ever (Scott, 2026-11-04): off every list, but search
+  // still finds it, and says when it was let go.
+  describe('an item that was let go', () => {
+    it('is found, marked "Let go Nov 4"', async () => {
+      const tasks = [
+        createMockTask({ id: 'g', title: 'Plan winter vacation', bucket: 'someday', dismissedAt: new Date(2026, 10, 4, 9) }),
+        createMockTask({ id: 'p', title: 'Winter vacation paper', category: 'paper', completed: true, dismissedAt: new Date(2026, 10, 4, 9) }),
+      ]
+      const { result } = renderHook(() => useSearch({ tasks, projects: [], contacts: [], routines: [] }))
+      act(() => { result.current.setQuery('winter vacation') })
+      await act(async () => { vi.advanceTimersByTime(200) })
+      const found = Object.fromEntries(result.current.results.tasks.map((t) => [t.id, t.subtitle]))
+      expect(found.g).toBe('Let go Nov 4')
+      // A school paper's "Not ours" is not a let go.
+      expect(found.p).toBeUndefined()
+    })
+  })
+
   describe('match tightness (fuzzy junk regression)', () => {
     const noisyTasks = [
       createMockTask({ id: 't-ped', title: "call the pediatrician about mia's dogworm" }),

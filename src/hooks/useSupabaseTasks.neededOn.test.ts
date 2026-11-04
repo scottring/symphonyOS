@@ -21,3 +21,11 @@ it('hydrates a flexible weekend as a local date without scheduling a day', () =>
   expect(task.weekendStart).toEqual(new Date(2026, 8, 26))
   expect(task.scheduledFor).toBeUndefined()
 })
+
+// Let go ("not ever", 2026-11-04) is kept as dismissed_at: read back so the
+// lists can leave it out and search can say when.
+it('hydrates dismissed_at into a Date, and leaves it undefined when null', () => {
+  expect(dbTaskToTask({ id: 'g', title: 'x', completed: false, dismissed_at: '2026-11-04T14:00:00.000Z' } as never).dismissedAt)
+    .toEqual(new Date('2026-11-04T14:00:00.000Z'))
+  expect(dbTaskToTask({ id: 'g', title: 'x', completed: false, dismissed_at: null } as never).dismissedAt).toBeUndefined()
+})

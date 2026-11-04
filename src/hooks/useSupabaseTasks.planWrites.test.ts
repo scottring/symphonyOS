@@ -5,6 +5,7 @@ import { localYmd } from '@/lib/cadence/config'
 import type { Task } from '@/types/task'
 import { applySession, type SessionWriters } from '@/lib/planning/applySession'
 import { emptyDraft, lookBackRows, summarize, type SessionDraft } from '@/lib/planning/session'
+import { letGoUpdates, unletGoUpdates } from '@/lib/planning/letGo'
 
 // Planning writes must report what actually happened (guided planning, phase 1).
 // The harness is the one in useSupabaseTasks.oneRow.test.ts, grown into a small
@@ -598,6 +599,34 @@ describe('planning writes report real outcomes', () => {
 })
 
 // The session's Done must do everything a tick does (final review I7).
+// Let go means not ever (Scott, 2026-11-04): every open commitment ends, the
+// row goes to Someday with dismissed_at set; Undo brings back all of it.
+describe('Let go, against the real writer', () => {
+  it('an item open on Fall, November and this week: every commitment ends and dismissed_at is set; Undo restores all three', async () => {
+    const fall = new Date(2026, 8, 1), nov = new Date(2026, 10, 1), week = new Date(2026, 10, 1)
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Plan winter vacation', bucket: 'week', week_start: localYmd(week), month_start: localYmd(nov), season_start: localYmd(fall), completed: false }))
+    for (const [level, start] of [['season', fall], ['month', nov], ['week', week]] as const) {
+      db.seed('task_commitments', { id: `c-${level}`, task_id: 't1', level, period_start: localYmd(start), status: 'open', carried_to: null, ended_at: null })
+    }
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const before = result.current.tasks.find((t) => t.id === 't1')!
+    const at = new Date(2026, 10, 4, 9)
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.updateTask('t1', letGoUpdates(at)) })
+    expect(ok).toBe(true)
+    expect(db.rows('task_commitments').filter((c) => c.task_id === 't1').map((c) => c.status)).toEqual(['removed', 'removed', 'removed'])
+    expect(db.rows('tasks').find((r) => r.id === 't1')).toMatchObject({ bucket: 'someday', dismissed_at: at.toISOString() })
+    const local = result.current.tasks.find((t) => t.id === 't1')!
+    expect(local.dismissedAt).toEqual(at)
+    await act(async () => { ok = await result.current.updateTask('t1', unletGoUpdates(before)) })
+    expect(ok).toBe(true)
+    expect(db.rows('task_commitments').filter((c) => c.task_id === 't1').map((c) => c.status)).toEqual(['open', 'open', 'open'])
+    expect(db.rows('tasks').find((r) => r.id === 't1')).toMatchObject({ dismissed_at: null })
+    expect(result.current.tasks.find((t) => t.id === 't1')!.dismissedAt).toBeUndefined()
+  })
+})
+
 describe('completeTask', () => {
   it('completes the task and its open subtasks, clears waiting/discussion, and reports that it wrote', async () => {
     db.seed('tasks', dbTaskRow({ id: 't1', title: 'Errand', bucket: 'month', month_start: '2026-09-01', is_waiting: true, needs_discussion: true }))

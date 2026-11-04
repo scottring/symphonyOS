@@ -167,6 +167,8 @@ export interface DbTask {
    *  database without the column simply returns rows that lack it. */
   supports_goal_task_id?: string | null
   is_fun: boolean | null
+  /** Let go ("not ever"), or a school paper marked "Not ours": kept, never shown. */
+  dismissed_at?: string | null
   sort_order: number | null
   created_at: string
   updated_at: string
@@ -256,6 +258,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     areaId: dbTask.area_id ?? undefined,
     supportsGoalTaskId: dbTask.supports_goal_task_id ?? undefined,
     isFun: dbTask.is_fun ?? undefined,
+    dismissedAt: dbTask.dismissed_at ? new Date(dbTask.dismissed_at) : undefined,
     sortOrder: dbTask.sort_order ?? null,
     captureMeta: dbTask.capture_meta
       ? {
@@ -2046,6 +2049,8 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     if ('areaId' in updates) dbUpdates.area_id = updates.areaId ?? null
     if ('supportsGoalTaskId' in updates) dbUpdates.supports_goal_task_id = updates.supportsGoalTaskId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
+    // Let go (letGo.ts) sets it; its Undo clears it.
+    if ('dismissedAt' in updates) dbUpdates.dismissed_at = updates.dismissedAt?.toISOString() ?? null
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
     if ('weekendStart' in updates) dbUpdates.weekend_start = updates.weekendStart ? localYmd(updates.weekendStart) : null

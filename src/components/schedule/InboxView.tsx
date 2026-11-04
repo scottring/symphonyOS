@@ -1,5 +1,6 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState, useRef, useEffect } from 'react'
+import { isLetGo } from '@/lib/planning/letGo'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { MastheadCard } from '@/components/layout/MastheadCard'
@@ -433,7 +434,8 @@ export function InboxView({
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 
   const inboxTasks = useMemo(
-    () => filteredTasks.filter((t) => !t.completed && t.bucket === 'inbox').sort(sortByCreated),
+    // What was let go ("not ever", letGo.ts) never comes back here.
+    () => filteredTasks.filter((t) => !t.completed && t.bucket === 'inbox' && !isLetGo(t)).sort(sortByCreated),
     [filteredTasks],
   )
   // The inbox is capture-triage ONLY: true captures (bucket 'inbox'), not
@@ -444,7 +446,7 @@ export function InboxView({
   const totalCount = inboxTasks.length
   // Empty because the domain or person filter hides captures — not Inbox zero.
   const hiddenByFilter = totalCount === 0
-    && tasks.some((t) => !t.completed && t.bucket === 'inbox')
+    && tasks.some((t) => !t.completed && t.bucket === 'inbox' && !isLetGo(t))
 
   // ...with ONE exception, added 2026-09-03: work whose date has passed.
   //

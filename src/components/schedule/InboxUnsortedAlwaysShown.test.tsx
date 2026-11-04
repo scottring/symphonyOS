@@ -25,13 +25,13 @@ const unsorted = { ...base, id: 'u', title: 'Plan Yom Kippur reading activity', 
 const personal = { ...base, id: 'p', title: 'Renew gym membership', context: 'personal' } as Task
 const family = { ...base, id: 'f', title: 'Book the sitter', context: 'family' } as Task
 
-function renderInbox() {
+function renderInbox(tasks: Task[] = [unsorted, personal, family]) {
   const actions = {
     onToggleTask: vi.fn(), onUpdateTask: vi.fn(), onPushTask: vi.fn(), onDeleteTask: vi.fn(), familyMembers: [],
   } as unknown as ScheduleActionsValue
   render(
     <ScheduleActionsProvider value={actions}>
-      <InboxView tasks={[unsorted, personal, family]} projects={[]} selectedItemId={null} onSelectItem={vi.fn()} panelOpen={false} onClosePanel={vi.fn()} />
+      <InboxView tasks={tasks} projects={[]} selectedItemId={null} onSelectItem={vi.fn()} panelOpen={false} onClosePanel={vi.fn()} />
     </ScheduleActionsProvider>,
   )
 }
@@ -54,5 +54,12 @@ describe('Inbox always shows Unsorted captures', () => {
     renderInbox()
     expect(screen.getByText('Renew gym membership')).toBeInTheDocument()
     expect(screen.getByText('Plan Yom Kippur reading activity')).toBeInTheDocument()
+  })
+
+  // Let go means not ever (Scott, 2026-11-04): kept, never shown here.
+  it('never lists what was let go', () => {
+    renderInbox([unsorted, { ...base, id: 'g', title: 'Plan winter vacation', context: 'personal', dismissedAt: new Date('2026-11-04T09:00:00') } as Task])
+    expect(screen.getByText('Plan Yom Kippur reading activity')).toBeInTheDocument()
+    expect(screen.queryByText('Plan winter vacation')).not.toBeInTheDocument()
   })
 })
