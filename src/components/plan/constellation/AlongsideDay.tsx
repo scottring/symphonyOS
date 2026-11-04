@@ -58,7 +58,10 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
   const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember } = useFamilyMembers()
   const activity = useCanvasActivity()
   const [pending, setPending] = useState<string | null>(null), [message, setMessage] = useState('')
-  const workspace = useMemo<AlongsideWorkspace | null>(() => weekView ? null : { weekFolded: true }, [weekView])
+  // Where Today draws "Routines {day}" on this sheet (TodayView holds the
+  // day's plan and its writers; fix round 2, 2026-11-04).
+  const [routinesSlot, setRoutinesSlot] = useState<HTMLElement | null>(null)
+  const workspace = useMemo<AlongsideWorkspace | null>(() => weekView ? null : { weekFolded: true, routinesSlot }, [weekView, routinesSlot])
   const lock = useRef(false)
   const wso = readCadenceConfig().weekStartsOn
   const week = weekStartAnchor(date, wso)
@@ -115,7 +118,9 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
               rows={open.map((t) => ({ id: t.id, title: t.title }))} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-              onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />}>
+              onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }}>
+              <div ref={setRoutinesSlot} className="ad-routines" />
+            </AboveSheet>}>
             {day}
           </PaperFold>
         )}

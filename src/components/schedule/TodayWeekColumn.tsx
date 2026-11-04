@@ -38,49 +38,30 @@ export interface TodayNextWeek { weekNo: number; weekStart: Date; entries: DayPl
 /** "Pick three to five for today." — the sheet's foot (spec 2026-11-04). */
 export const TODAY_WEEK_FOOT = 'Pick three to five for today.'
 
-export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek, chooseTask, restoreTask, className, stowed, children }: {
-  plan: DayPlan
-  day: Date
-  weekNo: number
-  weekStart: Date
-  actions: DayPlanPanelActions
-  /** Next week's open list — passed only on the week's last day. */
-  nextWeek?: TodayNextWeek | null
-  /** Choose a task for the day and say whether it saved (planActions'
-   *  chooseTaskDay). Without it, `actions.choose` is used. */
-  chooseTask?: (id: string) => Promise<boolean>
-  /** The task writer, for an exact Undo of a choice. */
-  restoreTask?: (id: string, prev: Partial<Task>) => Promise<unknown> | unknown
-  className?: string
-  /** A session runs on the page: the fold is put away, the day stays mounted. */
-  stowed?: boolean
-  /** The day. */
-  children: ReactNode
-}) {
+/** On the viewed day already: chosen for it, or dated to it. */
+function onViewedDay(e: DayPlanEntry, ymd: string): boolean {
+  const t = e.task
+  if (t?.scheduledFor && localYmd(t.scheduledFor) === ymd) return true
+  return !!(e.planned || e.onToday)
+}
+
+/** The day's routines with no time of their own (the column's "Routines
+ *  today", fix round 1): flexible occurrences, and weekly routines with no
+ *  day. The day's list leaves them off (dayPlan's offMainRoutineItemIds), so
+ *  the week sheet is where they are picked. Chosen or done ones are on the day. */
+function sheetRoutines(plan: DayPlan, day: Date): DayPlanEntry[] {
+  const ymd = localYmd(day)
+  return plan.chooserRoutines.filter((e) => !e.completed && !onViewedDay(e, ymd))
+}
+
+/** Puts a sheet row on the day, as the column's + did, through the canvas
+ *  activity strip with an Undo where the inverse is real. */
+function useToToday(day: Date, actions: DayPlanPanelActions, chooseTask?: (id: string) => Promise<boolean>,
+  restoreTask?: (id: string, prev: Partial<Task>) => Promise<unknown> | unknown) {
   const activity = useCanvasActivity()
   const ymd = localYmd(day)
   const { word: dayWord } = dayWordFor(day)
-
-  // On the viewed day already: chosen for it, or dated to it.
-  const onDay = (e: DayPlanEntry): boolean => {
-    const t = e.task
-    if (t?.scheduledFor && localYmd(t.scheduledFor) === ymd) return true
-    return !!(e.planned || e.onToday)
-  }
-  // The week's open work with no day yet: not done, not on this day, not on
-  // another day of the week.
-  const open = plan.chooserTasks.filter((e) => e.kind === 'task' && !e.completed && !onDay(e) && !alreadyPlaced(e, day))
-  const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
-  // The day's routines with no time of their own (the column's "Routines
-  // today", fix round 1): flexible occurrences, and weekly routines with no
-  // day. The day's list leaves them off (dayPlan's offMainRoutineItemIds), so
-  // this is their place to be picked. Chosen or done ones are on the day.
-  const routines = plan.chooserRoutines.filter((e) => !e.completed && !onDay(e))
-  // Rows are keyed by entry ("task:…", "routine:…"): a routine and a task
-  // never share a row id.
-  const byKey = new Map([...open, ...routines].map((e) => [e.key, e]))
-
-  const toToday = (e: DayPlanEntry) => {
+  const toToday = (e: DayPlanEntry): void => {
     const run = (cmd: () => Promise<boolean | void>, undo?: () => Promise<boolean | void>) =>
       void activity.run(`Plan for ${dayWord}: “${e.title}”`, cmd, { ids: [e.id], undo, retry: () => toToday(e) })
     if (e.kind === 'routine' && e.routine && actions.placeRoutine) {
@@ -104,19 +85,71 @@ export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek,
     // unchoose are each other's inverse.
     return run(async () => actions.choose(e), async () => actions.unchoose(e))
   }
-  // A row drags onto the day (Scott, 2026-10-07): dropped on the day's hours
-  // it gets the time it lands at; dropped on For today it is chosen, no time.
-  const dragRow = (key: string, ev: DragEvent<HTMLLIElement>) => {
-    const e = byKey.get(key)
-    if (e) writePlanDrag(ev.dataTransfer, { kind: e.kind, id: e.id, date: ymd, title: e.title })
+  return toToday
+}
+
+/** A sheet's rows for these entries: + puts one on the day, the title opens
+ *  it, and it drags onto the day (Scott, 2026-10-07: dropped on the day's
+ *  hours it gets the time it lands at; on For today it is chosen, no time).
+ *  Rows are keyed by entry ("task:…", "routine:…"), so a routine and a task
+ *  never share a row id. */
+function sheetRowProps(entries: DayPlanEntry[], day: Date, actions: DayPlanPanelActions, toToday: (e: DayPlanEntry) => void) {
+  const ymd = localYmd(day)
+  const { word: dayWord } = dayWordFor(day)
+  const byKey = new Map(entries.map((e) => [e.key, e]))
+  const with_ = (f: (e: DayPlanEntry) => void) => (key: string) => { const e = byKey.get(key); if (e) f(e) }
+  return {
+    rows: entries.map((e) => ({ id: e.key, title: e.title })),
+    onPick: with_(toToday),
+    pickLabel: (title: string) => `Plan ${title} for ${dayWord}`,
+    onOpen: actions.open ? with_((e) => actions.open?.(e)) : undefined,
+    onDragRow: (key: string, ev: DragEvent<HTMLLIElement>) => {
+      const e = byKey.get(key)
+      if (e) writePlanDrag(ev.dataTransfer, { kind: e.kind, id: e.id, date: ymd, title: e.title })
+    },
   }
-  const pick = (key: string) => { const e = byKey.get(key); if (e) toToday(e) }
-  const openRow = (key: string) => { const e = byKey.get(key); if (e) actions.open?.(e) }
-  const rowProps = {
-    onPick: pick, pickLabel: (title: string) => `Plan ${title} for ${dayWord}`,
-    onOpen: actions.open ? openRow : undefined, onDragRow: dragRow,
-  }
-  const asRows = (es: DayPlanEntry[]) => es.map((e) => ({ id: e.key, title: e.title }))
+}
+
+/** "Routines {day}" on the week sheet: on the plain page under TodayWeekFold,
+ *  and in the connected workspace drawn into AlongsideDay's sheet (TodayView
+ *  holds the day's plan and its writers). Nothing when there are none. */
+export function SheetRoutines({ plan, day, actions }: { plan: DayPlan; day: Date; actions: DayPlanPanelActions }) {
+  const toToday = useToToday(day, actions)
+  const routines = sheetRoutines(plan, day)
+  if (routines.length === 0) return null
+  const { word: dayWord } = dayWordFor(day)
+  return <>
+    <h3 className="above-sheet-sub">Routines {dayWord}</h3>
+    <SheetRows label={`Routines ${dayWord}`} {...sheetRowProps(routines, day, actions, toToday)} />
+  </>
+}
+
+export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek, chooseTask, restoreTask, className, stowed, children }: {
+  plan: DayPlan
+  day: Date
+  weekNo: number
+  weekStart: Date
+  actions: DayPlanPanelActions
+  /** Next week's open list — passed only on the week's last day. */
+  nextWeek?: TodayNextWeek | null
+  /** Choose a task for the day and say whether it saved (planActions'
+   *  chooseTaskDay). Without it, `actions.choose` is used. */
+  chooseTask?: (id: string) => Promise<boolean>
+  /** The task writer, for an exact Undo of a choice. */
+  restoreTask?: (id: string, prev: Partial<Task>) => Promise<unknown> | unknown
+  className?: string
+  /** A session runs on the page: the fold is put away, the day stays mounted. */
+  stowed?: boolean
+  /** The day. */
+  children: ReactNode
+}) {
+  const ymd = localYmd(day)
+  const toToday = useToToday(day, actions, chooseTask, restoreTask)
+  // The week's open work with no day yet: not done, not on this day, not on
+  // another day of the week.
+  const open = plan.chooserTasks.filter((e) => e.kind === 'task' && !e.completed && !onViewedDay(e, ymd) && !alreadyPlaced(e, day))
+  const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
+  const { rows, ...rowProps } = sheetRowProps(open, day, actions, toToday)
 
   const range = formatWeekRangeShort(weekStart)
   const nextById = new Map((nextWeek?.entries ?? []).map((e) => [e.id, e]))
@@ -125,12 +158,9 @@ export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek,
     <PaperFold horizon="day" stowed={stowed} className={['today-fold', className].filter(Boolean).join(' ')} edgeLabel={range} edgeCount={open.length}
       frontLabel={`${range}, to pick from`}
       above={<>
-        <AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`} rows={asRows(open)}
+        <AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`} rows={rows}
           doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps}>
-          {routines.length > 0 && <>
-            <h3 className="above-sheet-sub">Routines {dayWord}</h3>
-            <SheetRows rows={asRows(routines)} label={`Routines ${dayWord}`} {...rowProps} />
-          </>}
+          <SheetRoutines plan={plan} day={day} actions={actions} />
         </AboveSheet>
         {nextWeek && (
           <section className="above-sheet today-fold-next" aria-label={`Week ${nextWeek.weekNo}, starts tomorrow`}>

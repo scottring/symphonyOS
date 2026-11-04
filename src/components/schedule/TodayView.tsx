@@ -11,6 +11,7 @@ import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
  * NOT wired to the route yet — that happens in R4.
  */
 import { useContext, createElement, useMemo, useCallback, useRef, useState, useEffect, useLayoutEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -35,7 +36,7 @@ import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 import { Eye, EyeOff, Printer, GripVertical, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
-import { TodayWeekFold } from './TodayWeekColumn'
+import { TodayWeekFold, SheetRoutines } from './TodayWeekColumn'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 import { TodayComingUp } from './TodayComingUp'
 import { nextWeekEntries } from '@/lib/today/dayPlan'
@@ -1256,7 +1257,14 @@ export function TodayView({
   // In the connected workspace AlongsideDay folds the week around this page.
   // While a session runs the fold is stowed, never unmounted, so the day
   // under it keeps its state.
-  const withWeek = (day: ReactNode) => alongsideWorkspace ? day : (
+  // In the workspace, the day's routines with no time are drawn onto
+  // AlongsideDay's sheet under the week's tasks: this page holds the day's
+  // plan and the writers the + uses.
+  const withWeek = (day: ReactNode) => alongsideWorkspace ? <>
+    {day}
+    {alongsideWorkspace.routinesSlot && !sessionShown && createPortal(
+      <SheetRoutines plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />, alongsideWorkspace.routinesSlot)}
+  </> : (
     <TodayWeekFold stowed={sessionShown} plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
       weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
       nextWeek={nextWeek}
