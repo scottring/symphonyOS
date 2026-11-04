@@ -448,10 +448,12 @@ describe('WeekV2 — the planning summary line', () => {
     expect(document.querySelector('.guide-summary-line')).toBeNull()
   })
 
-  it('is not drawn while the session is open', () => {
+  it('stays in the header while the session is open (the page never changes shape)', () => {
     seed.notes = { guide: { current: 'family', done: [], skipped: [], plannedAt: new Date(2026, 8, 27, 18).toISOString() } }
-    renderAt('/week?plan=1', { deck: makeDeck() })
-    expect(document.querySelector('.guide-summary-line')).toBeNull()
+    renderAt('/week?plan=1', { deck: makeDeck({ onThisWeek: 4, doneThisWeek: 1 }) })
+    expect(screen.getByRole('dialog', { name: 'Planning guide' })).toBeTruthy()
+    expect(document.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun, Sep 27')
+    expect(document.querySelector('.wk-facts')?.textContent).toContain('1 of 4 done')
   })
 
   it('on the desk it sits in the masthead beside the facts', () => {

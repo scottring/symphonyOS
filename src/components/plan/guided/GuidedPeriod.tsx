@@ -27,7 +27,7 @@ import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import { HORIZON_OF, choosingStep, stepsFor } from '@/lib/guide/steps'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
-import { GuideCoach } from '@/components/guide/GuideCoach'
+import { GuideCoach, usePlanSessionLoading } from '@/components/guide/GuideCoach'
 import type { TaskContext } from '@/types/task'
 import '@/components/guide/guide.css'
 
@@ -91,6 +91,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   const CHOOSING = choosingStep(level).id
   const { progress, loading, saveError, next, jump, markPlanned, finish, setThreadId } = useGuidedProgress(level, token)
   useOpenOnStep(level, loading, jump)
+  usePlanSessionLoading(level, loading)
   const { notes, patch } = usePlanningNotes(HORIZON_OF[level], token)
   const [lookDraft, setLookDraft] = useState<ReviewNotes | null>(null)
 

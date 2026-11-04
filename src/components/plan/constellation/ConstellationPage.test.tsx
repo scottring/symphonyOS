@@ -821,12 +821,16 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   expect(summary()).toBe('Planned Sat, Oct 3')
   expect(menu()).toContain('Back to this month')
  })
- it('while reviewing or planning, the header keeps only the title and ⋯',()=>{
-  at(new Date(2026,9,17,12))
-  month('&review=1')
+ it('while planning, the header has no other button or offer, and keeps its fact line and summary line (the page never changes shape)',()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers();plan.saved=null})
+  plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
+  month('&plan=1')
   expect(primaries()).toEqual([])
-  expect(facts()).toBeNull()
   expect(menu().filter(t=>/^(Plan|Review) |guided/.test(t??''))).toEqual([])
+  expect(screen.getByRole('dialog',{name:'Planning guide'})).toBeInTheDocument()
+  expect(facts()).toBe('1 of 2 done')
+  expect(summary()).toBe('Planned Sat, Oct 3')
  })
 })
 

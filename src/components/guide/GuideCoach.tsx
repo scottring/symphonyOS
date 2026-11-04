@@ -34,6 +34,9 @@ import './coach.css'
 
 interface CoachSession {
   level: GuideLevel
+  /** The session's place is still loading (no tooltip yet): the chip waits,
+   *  so a tap cannot drop a `?step=` deep link. */
+  loading?: boolean
   n: number
   m: number
   /** Shows the tooltip again (the chip). */
@@ -50,6 +53,17 @@ function publish(s: CoachSession | null) {
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l) } }
 const snapshot = () => running
 
+/** A session at this level is mounted but its place is still loading: the
+ *  chip shows, disabled, until the tooltip takes over. */
+export function usePlanSessionLoading(level: GuideLevel, loading: boolean) {
+  useEffect(() => {
+    if (!loading) return
+    const s: CoachSession = { level, loading: true, n: 0, m: 0, show: () => {}, stop: () => {} }
+    publish(s)
+    return () => { if (running === s) publish(null) }
+  }, [level, loading])
+}
+
 /** The plan chip in a page header. Before a session: "Plan November", which
  *  starts one. While one runs at this level: "Planning November · 2 of 6"
  *  (shows the tooltip again) and ✕ "Stop planning". */
@@ -61,13 +75,18 @@ export function PlanChip({ level, word, onStart, disabled }: {
   disabled?: boolean
 }) {
   const s = useSyncExternalStore(subscribe, snapshot, snapshot)
-  if (s && s.level === level) {
+  const mine = s && s.level === level ? s : null
+  if (mine?.loading) {
+    return <button type="button" className="plan-chip" disabled aria-busy="true"
+      data-explain="plan-chip" data-explain-label={`Plan ${word}`}>Plan {word}</button>
+  }
+  if (mine) {
     return (
       <span className="plan-chip is-on" data-explain="plan-chip" data-explain-label={`Planning ${word}`}>
-        <button type="button" className="plan-chip-main" onClick={s.show}>
-          <span className="plan-chip-pip" aria-hidden="true" />Planning {word} · {s.n} of {s.m}
+        <button type="button" className="plan-chip-main" onClick={mine.show}>
+          <span className="plan-chip-pip" aria-hidden="true" />Planning {word} · {mine.n} of {mine.m}
         </button>
-        <button type="button" className="plan-chip-stop" aria-label="Stop planning" onClick={s.stop}>✕</button>
+        <button type="button" className="plan-chip-stop" aria-label="Stop planning" onClick={mine.stop}>✕</button>
       </span>
     )
   }
@@ -79,7 +98,6 @@ export function PlanChip({ level, word, onStart, disabled }: {
 
 // ---------- where the tooltip points ----------
 
-const PHONE = '(max-width: 760px)'
 const matches = (q: string): boolean => {
   try { return typeof window.matchMedia === 'function' && window.matchMedia(q).matches } catch { return false }
 }
@@ -106,8 +124,12 @@ function anchorOf(at: string): { at: string; el: HTMLElement | null } {
   if (title) return { at: 'title', el: title }
   return { at: '', el: null }
 }
-const LIT = 'guide-lit'
-const unlight = () => document.querySelectorAll(`.${LIT}`).forEach((n) => n.classList.remove(LIT))
+// The highlight is an attribute, not a class: a re-render of the page
+// rewrites className and would wipe it (coordinator ruling, fix round 1).
+const LIT = 'data-guide-lit'
+const unlight = () => document.querySelectorAll(`[${LIT}]`).forEach((n) => n.removeAttribute(LIT))
+/** The anchor's fold lies stacked (a phone: PaperFold's 'v' mode). */
+const stacked = (el: Element) => (el.closest<HTMLElement>('[data-fold-mode]')?.dataset.foldMode ?? '') === 'v'
 
 /** Places the tooltip beside its anchor (the prototype's placeCoach): a
  *  fold's edge from the side, on a spread; anything else from below, or above
@@ -119,9 +141,9 @@ function placeCoach(coach: HTMLElement | null, at: string) {
   const r = el?.getBoundingClientRect()
   const cw = coach.offsetWidth, ch = coach.offsetHeight
   const W = window.innerWidth, H = window.innerHeight
-  const side = !r || (r.width === 0 && r.height === 0) ? 'none'
-    : !matches(PHONE) && used === 'left' ? 'left'
-      : !matches(PHONE) && used === 'right' ? 'right'
+  const side = !r || !el || (r.width === 0 && r.height === 0) ? 'none'
+    : used === 'left' && !stacked(el) ? 'left'
+      : used === 'right' && !stacked(el) ? 'right'
         : 'top'
   let x: number, y: number, arrow = side
   if (side === 'none' || !r) { x = W - cw - 16; y = 72 }
@@ -138,7 +160,7 @@ function placeCoach(coach: HTMLElement | null, at: string) {
   coach.dataset.at = used
   // The anchor gets a soft highlight (not the folds or the title).
   unlight()
-  if (el && used === at && used !== 'left' && used !== 'right' && used !== 'title') el.classList.add(LIT)
+  if (el && used === at && used !== 'left' && used !== 'right' && used !== 'title') el.setAttribute(LIT, '')
 }
 
 /** Runs `fn` every frame for `ms` (the folds take ~0.6s to settle); returns
@@ -149,6 +171,15 @@ function follow(ms: number, fn: () => void): () => void {
   const tick = () => { fn(); if (performance.now() - t0 < ms) raf = requestAnimationFrame(tick) }
   raf = requestAnimationFrame(tick)
   return () => cancelAnimationFrame(raf)
+}
+
+/** Calls `fn` at most once a frame. */
+function perFrame(fn: () => void): { run: () => void; cancel: () => void } {
+  let raf = 0
+  return {
+    run: () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; fn() }) },
+    cancel: () => { cancelAnimationFrame(raf); raf = 0 },
+  }
 }
 
 const buzz = () => { try { navigator.vibrate?.(6) } catch { /* no haptics */ } }
@@ -218,12 +249,25 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
     window.addEventListener('resize', onResize)
     return () => { window.removeEventListener('scroll', place, { capture: true }); window.removeEventListener('resize', onResize); clearTimeout(rt) }
   }, [at])
+  // While it shows, it follows its anchor as the page moves under it: a line
+  // written above the write line, a list that grows, a section that loads.
+  // The anchor, what holds it, and the page are watched; once a frame.
+  useEffect(() => {
+    const coach = ref.current
+    if (!coach || hidden || typeof ResizeObserver !== 'function') return
+    const frame = perFrame(() => placeCoach(coach, at))
+    const ro = new ResizeObserver(frame.run)
+    const { el } = anchorOf(at)
+    for (const n of new Set([el, el?.parentElement, document.body])) if (n) ro.observe(n)
+    return () => { ro.disconnect(); frame.cancel() }
+  }, [step.id, hidden, shows, at])
   useEffect(() => unlight, [])
 
   // Escape hides it (the session stays).
   useEffect(() => {
     if (hidden) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') hide() }
+    // Something else that took the Escape (a menu, a dialog) keeps it.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) hide() }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [hidden, hide])

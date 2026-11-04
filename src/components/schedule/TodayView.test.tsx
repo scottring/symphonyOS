@@ -912,6 +912,14 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByText(`Planned ${day}`).closest('p')).toHaveTextContent(`Planned ${day} · Yesterday’s review · Energy: medium`)
   })
 
+  it('the line stays under the title while the Day session runs', () => {
+    dayNotes.notes = { guide: { current: 'energy', done: ['look-back'], skipped: [], plannedAt: at(8).toISOString() }, energy: { level: 'medium' } }
+    renderAt(10, { url: '/?plan=1' })
+    expect(screen.getByRole('dialog', { name: 'Planning guide' })).toBeInTheDocument()
+    const day = at(8).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    expect(screen.getByText(`Planned ${day}`).closest('p')).toHaveTextContent(`Planned ${day} · Yesterday’s review · Energy: medium`)
+  })
+
   it('with nothing saved for the day, no line', () => {
     renderAt(10)
     expect(document.querySelector('.guide-summary-line')).toBeNull()

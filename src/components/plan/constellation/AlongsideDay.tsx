@@ -38,9 +38,10 @@ const WEEK_ACTION_MIME = 'application/x-symphony-week-action'
 
 export function AlongsideDay({ children, tasks, date, update, loading, error, weekView = false, onSelect, stepAside = false }: {
   children: ReactNode
-  /** A session runs on the page (Today ?plan=1): the week steps aside and the
-   *  day is a plain page. The shell stays, so the day under it is never
-   *  remounted: a session's way back lives in the day page (walk, 2026-11-01). */
+  /** The old Review today link (?review=1) is on its way to ?plan=1: the
+   *  week steps aside for that moment. A Day session itself keeps the week
+   *  beside the day (planning as tooltips, 2026-11-04). The shell stays, so
+   *  the day under it is never remounted (walk, 2026-11-01). */
   stepAside?: boolean
   tasks: Task[]
   date: Date

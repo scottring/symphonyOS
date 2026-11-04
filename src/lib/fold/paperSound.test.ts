@@ -12,7 +12,6 @@ describe('paperSound', () => {
       paperSound.crinkle(3, 0.08, 0.7)
       paperSound.land()
       paperSound.pencil()
-      paperSound.ribbon()
       paperSound.stamp()
     }).not.toThrow()
   })

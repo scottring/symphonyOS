@@ -12,7 +12,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { dayCount, dayStepTitle } from '@/lib/guide/dayTarget'
 import { stepsFor } from '@/lib/guide/steps'
-import { GuideCoach } from '@/components/guide/GuideCoach'
+import { GuideCoach, usePlanSessionLoading } from '@/components/guide/GuideCoach'
 import { useGuidedDay } from '../useGuidedDay'
 import type { DayPictureItem } from './DayRows'
 import type { DayActions } from '@/lib/planning/dayActions'
@@ -46,6 +46,7 @@ export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, action
   const count = dayItems ? dayCount(dayItems) : null
   const guided = useGuidedDay({ target, isTomorrow, count, actions, onFinish, onClose, onPlanned })
   const { markPlannedOnce } = guided
+  usePlanSessionLoading('day', guided.loading)
   const stepNow = guided.loading ? null : guided.progress.current
   useEffect(() => { if (stepNow) onStep?.(stepNow) }, [stepNow, onStep])
   useEffect(() => listenPlacements?.(() => { void markPlannedOnce() }), [listenPlacements, markPlannedOnce])

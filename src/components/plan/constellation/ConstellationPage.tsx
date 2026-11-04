@@ -201,13 +201,13 @@ function Inner() {
   // The next period's record: "Plan {next}" is offered only while it is unplanned.
   const nextToken = level === 0 ? yearToken(year + 1) : level === 1 ? seasonToken(bounds.next, seasons) : monthToken(bounds.next)
   const nextPlanSession = usePlanningSession(SESSION_HORIZONS[level], nextToken)
-  // The season's notes, for its everyday page (the ideal week). Read only off
-  // a session: while one runs it holds the notes, and leaving it reads them
-  // afresh.
-  const seasonNotes = usePlanningNotes('seasonal', level === 1 && !planning ? sessionToken : '')
-  // The period's own planning notes, off a session (the summary line's
-  // planned day): a running session holds them, and leaving reads them afresh.
-  const periodNotes = usePlanningNotes(SESSION_HORIZONS[level], planning ? '' : sessionToken)
+  // The season's notes, for its everyday page (the ideal week, the energy on
+  // the summary line). The summary line stays through a session (fix round
+  // 1), so these are read then too; a session writes through its own copy,
+  // and marking planned or leaving reads them afresh.
+  const seasonNotes = usePlanningNotes('seasonal', level === 1 ? sessionToken : '')
+  // The period's own planning notes (the summary line's planned day).
+  const periodNotes = usePlanningNotes(SESSION_HORIZONS[level], sessionToken)
   // The year's notes, for its everyday page (the vision and the landscape),
   // read the same way.
   const yearNotes = usePlanningNotes('annual', level === 0 && !planning ? sessionToken : '')
@@ -845,7 +845,9 @@ function Inner() {
   const onPeriod = openNodes.length + doneNodes.length
   const doneWord = level === 0 ? `${onPeriod === 1 ? 'goal' : 'goals'} done` : 'done'
   const countText = `${doneNodes.length} of ${onPeriod} ${doneWord}`
-  const facts = !inFlow && dataReady && !error && !goalsError
+  // The fact line and the summary line stay through a planning session (the
+  // page never changes shape); a review on its way to the session hides them.
+  const facts = !reviewing && dataReady && !error && !goalsError
     ? <p className="wk-facts plan-facts" data-explain="period-facts" data-explain-label={`${periodWord} at a glance`}>
       {level === 1 && <>{periodRange(bounds.start, bounds.end)}{onPeriod > 0 && ' · '}</>}
       {onPeriod > 0 && <>
@@ -858,7 +860,7 @@ function Inner() {
   // "Planned Wed, Nov 4 · Last month’s review", and the season's energy.
   const plannedAt = periodNotes.notes.guide?.plannedAt
     ?? (!planSession.loading && !planSession.error ? planSession.saved?.at.toISOString() : undefined)
-  const summary = !inFlow && dataReady && !error && !goalsError
+  const summary = !reviewing && dataReady && !error && !goalsError
     ? <PeriodSummaryLine level={PERIODS[level]} plannedAt={plannedAt} reviewed={!prevReview.error && !!prevReview.reviewed}
       energy={level === 1 ? seasonNotes.notes.energy : undefined} />
     : null
@@ -1008,8 +1010,9 @@ function Inner() {
       // Planning: this same page, one tooltip per step, each step driving
       // the sheet's folds.
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
-          page={pageBody} bodies={sessionBodies} onFinish={closePeriod} onLeave={() => setMode(null)}
-          onPlanned={() => planSession.reload()} listenPageWrites={listenPageWrites}
+          page={pageBody} bodies={sessionBodies} onFinish={closePeriod}
+          onLeave={() => { setMode(null); periodNotes.reload(); seasonNotes.reload() }}
+          onPlanned={() => { planSession.reload(); periodNotes.reload() }} listenPageWrites={listenPageWrites}
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}
           // Only the areas the space filter shows (a legacy area with no
           // space is Personal): the guide never hears of one out of view.

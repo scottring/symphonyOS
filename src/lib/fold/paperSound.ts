@@ -161,10 +161,6 @@ export const paperSound = {
       }
     })
   },
-  /** The planning ribbon pulled or put back: a low, soft satin slide. */
-  ribbon() {
-    paperSound.swish(0.42, 0.8, 260, 900)
-  },
   /** Done planning: the sheet stamped, a soft thump. */
   stamp() {
     paperSound.land(1.35)

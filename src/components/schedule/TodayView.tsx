@@ -788,7 +788,8 @@ export function TodayView({
   const shownDayBefore = usePeriodReview('daily', dayToken(new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate() - 1)))
   const shownGuide = shownNotes.notes.guide
   const shownSavedAt = typeof shownNotes.notes.savedAt === 'string' ? shownNotes.notes.savedAt : undefined
-  const dayLine = !sessionShown && !shownNotes.error ? (
+  // Kept through the Day session (fix round 1): the page never changes shape.
+  const dayLine = !shownNotes.error ? (
     <PeriodSummaryLine plannedAt={shownGuide?.plannedAt ?? shownSavedAt} energy={shownNotes.notes.energy}
       reviewed={!!shownGuide?.done?.includes('look-back') || !!shownDayBefore.reviewed} level="day" />
   ) : null
@@ -1395,8 +1396,8 @@ export function TodayView({
       )}
       {/* The day, with the week folded beside it (withWeek). The sheet stays
           in view while the day scrolls and scrolls on its own (PaperFold).
-          While the Day session runs, this is its page: the steps rail stands
-          beside it and the fold is put away. */}
+          While the Day session runs this is still the page, as it is every
+          day, with the step's tooltip pointing into it (GuideCoach). */}
       {inDaySession(<div className="px-4 md:px-0">
         {withWeek(<main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths

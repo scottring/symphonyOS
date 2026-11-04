@@ -9,7 +9,7 @@ import { GuidedSessionProvider } from '@/contexts/GuidedSessionContext'
 // pointing at the real thing on the page. No band, no drop card, no bookmark,
 // and the conversation never opens by itself.
 
-const store = vi.hoisted(() => ({ notes: {} as Record<string, unknown> }))
+const store = vi.hoisted(() => ({ notes: {} as Record<string, unknown>, loading: false }))
 vi.mock('@/hooks/usePlanningNotes', async () => {
   const { useState, useCallback } = await import('react')
   return {
@@ -20,7 +20,7 @@ vi.mock('@/hooks/usePlanningNotes', async () => {
         setNotes(store.notes)
         return true
       }, [])
-      return { notes, loading: false, error: null, patch, reload: () => undefined }
+      return { notes, loading: store.loading, error: null, patch, reload: () => undefined }
     },
   }
 })
@@ -30,7 +30,7 @@ vi.mock('@/contexts/AssistantLaunchContext', async (orig) => ({
   useAssistantLauncher: () => launcher,
 }))
 const sound = vi.hoisted(() => ({ crinkle: vi.fn(), stamp: vi.fn() }))
-vi.mock('@/lib/fold/paperSound', () => ({ paperSound: { crinkle: sound.crinkle, stamp: sound.stamp, ribbon: vi.fn() } }))
+vi.mock('@/lib/fold/paperSound', () => ({ paperSound: { crinkle: sound.crinkle, stamp: sound.stamp } }))
 
 import { GuidedPeriod, type SessionFold } from '@/components/plan/guided/GuidedPeriod'
 import { PlanChip, PlannedStamp } from './GuideCoach'
@@ -38,7 +38,7 @@ import { PlanChip, PlannedStamp } from './GuideCoach'
 // November as the page draws it: the header with its title and plan chip,
 // the sheet with the calendar's edge at its right and the write line on a
 // writing step. The fold's drive is written out so a test can read it.
-function MonthPage({ titled = true }: { titled?: boolean }) {
+function MonthPage({ titled = true, stacked = false }: { titled?: boolean; stacked?: boolean }) {
   const [planning, setPlanning] = useState(false)
   const [marked, setMarked] = useState(false)
   const sheet = (fold?: SessionFold) => (
@@ -47,7 +47,7 @@ function MonthPage({ titled = true }: { titled?: boolean }) {
       {marked && !planning && <PlannedStamp at={new Date(2026, 10, 4)} />}
       <ul data-guide-anchor="list"><li>Book the cabin</li></ul>
       {fold?.write && <form data-guide-anchor="write"><input aria-label="Write a November goal" /></form>}
-      <aside data-guide-anchor="right">November calendar</aside>
+      <div data-fold-mode={stacked ? 'v' : 'h'}><aside data-guide-anchor="right">November calendar</aside></div>
     </article>
   )
   return <>
@@ -61,7 +61,7 @@ function MonthPage({ titled = true }: { titled?: boolean }) {
       : sheet()}
   </>
 }
-const show = (titled?: boolean) => render(<MemoryRouter><GuidedSessionProvider><MonthPage titled={titled} /></GuidedSessionProvider></MemoryRouter>)
+const show = (titled?: boolean, stacked?: boolean) => render(<MemoryRouter><GuidedSessionProvider><MonthPage titled={titled} stacked={stacked} /></GuidedSessionProvider></MemoryRouter>)
 const coach = () => screen.getByRole('dialog', { name: 'Planning guide' })
 const tip = () => within(coach())
 const drive = () => JSON.parse(screen.getByTestId('drive').textContent ?? '{}')
@@ -69,10 +69,24 @@ const next = async () => { await act(async () => { fireEvent.click(tip().getByRo
 const start = async () => { await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Plan November' })) }) }
 
 beforeEach(() => {
-  store.notes = {}
+  store.notes = {}; store.loading = false
   launcher.openAssistant.mockClear(); sound.crinkle.mockClear(); sound.stamp.mockClear()
 })
 afterEach(() => { vi.restoreAllMocks() })
+
+// Where each anchor is laid out (happy-dom lays nothing out).
+const rects = { write: { left: 300, top: 400, right: 680, bottom: 430 } }
+function mockRects() {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const at = this.getAttribute('data-guide-anchor')
+    const r = at === 'right' ? { left: 700, top: 100, right: 990, bottom: 700 }
+      : at === 'title' ? { left: 40, top: 20, right: 400, bottom: 60 }
+        : at === 'write' ? rects.write
+          : { left: 0, top: 0, right: 0, bottom: 0 }
+    return { ...r, x: r.left, y: r.top, width: r.right - r.left, height: r.bottom - r.top, toJSON: () => r } as DOMRect
+  })
+}
+const frame = () => act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))) })
 
 describe('GuideCoach — planning is a few tooltips on the everyday page', () => {
   it('the header chip “Plan November” starts a session; the chip counts the steps and the tooltip shows the first', async () => {
@@ -139,14 +153,7 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
 
   it('points at the element marked with the step’s anchor; with none on the page, at the page title', async () => {
     store.notes = { guide: { current: 'next-weeks', done: [], skipped: [] } }
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      const at = this.getAttribute('data-guide-anchor')
-      const r = at === 'right' ? { left: 700, top: 100, right: 990, bottom: 700 }
-        : at === 'title' ? { left: 40, top: 20, right: 400, bottom: 60 }
-          : at === 'write' ? { left: 300, top: 400, right: 680, bottom: 430 }
-            : { left: 0, top: 0, right: 0, bottom: 0 }
-      return { ...r, x: r.left, y: r.top, width: r.right - r.left, height: r.bottom - r.top, toJSON: () => r } as DOMRect
-    })
+    mockRects()
     show()
     await start()
     // Next 4–5 weeks: the calendar's edge, the tooltip at its left.
@@ -157,12 +164,70 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
     await next()
     expect(coach()).toHaveAttribute('data-at', 'write')
     expect(coach().style.transform).toBe('translate(308px, 442px)')
-    expect(document.querySelector('[data-guide-anchor="write"]')).toHaveClass('guide-lit')
+    expect(document.querySelector('[data-guide-anchor="write"]')).toHaveAttribute('data-guide-lit')
     // Maintenance and fun has no write line drawn: still the page, never 0,0.
     await next()
-    expect(document.querySelector('.guide-lit')).toBeNull()
+    expect(document.querySelector('[data-guide-lit]')).toBeNull()
     expect(coach()).toHaveAttribute('data-at', 'title')
     expect(coach().style.transform).toBe('translate(48px, 72px)')
+  })
+
+  it('follows its anchor when the page moves under it after the settle (a ResizeObserver), once a frame', async () => {
+    rects.write = { left: 300, top: 400, right: 680, bottom: 430 }
+    const observers: { cb: ResizeObserverCallback; targets: Element[] }[] = []
+    vi.stubGlobal('ResizeObserver', class {
+      targets: Element[] = []
+      constructor(cb: ResizeObserverCallback) { observers.push({ cb, targets: this.targets }) }
+      observe(el: Element) { this.targets.push(el) }
+      unobserve() {}
+      disconnect() {}
+    })
+    try {
+      store.notes = { guide: { current: 'by-area', done: [], skipped: [] } }
+      mockRects()
+      show()
+      await start()
+      expect(coach().style.transform).toBe('translate(308px, 442px)')
+      const live = observers.at(-1)!
+      expect(live.targets).toContain(document.querySelector('[data-guide-anchor="write"]'))
+      expect(live.targets).toContain(document.body)
+      // The 900ms settle is over: nothing follows by itself any more.
+      vi.spyOn(performance, 'now').mockReturnValue(1e12)
+      await frame(); await frame()
+      // A line written above it: the write line moves down 40px.
+      rects.write = { left: 300, top: 440, right: 680, bottom: 470 }
+      await frame()
+      expect(coach().style.transform).toBe('translate(308px, 442px)')
+      live.cb([], {} as ResizeObserver); live.cb([], {} as ResizeObserver)
+      await frame()
+      expect(coach().style.transform).toBe('translate(308px, 482px)')
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it('on a stacked fold (a phone) it sits under the calendar’s edge, not beside it', async () => {
+    store.notes = { guide: { current: 'next-weeks', done: [], skipped: [] } }
+    mockRects()
+    show(true, true)
+    await start()
+    expect(coach()).toHaveAttribute('data-at', 'right')
+    expect(coach()).toHaveAttribute('data-side', 'top')
+  })
+
+  it('Escape taken by something else (defaultPrevented) leaves it shown', async () => {
+    show()
+    await start()
+    const e = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    e.preventDefault()
+    act(() => { document.dispatchEvent(e) })
+    expect(coach()).toBeInTheDocument()
+  })
+
+  it('while the session’s place loads, the chip waits (disabled) and there is no tooltip yet', async () => {
+    store.loading = true
+    show()
+    await start()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Plan November' })).toBeDisabled()
   })
 
   it('with no anchor and no title on the page it still sits on screen', async () => {

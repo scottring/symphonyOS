@@ -33,7 +33,7 @@ import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
 import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
 import { WeekLookBack } from '@/components/plan/guided/week/WeekLookBack'
 import type { AllDayEvent } from '@/components/plan/guided/week/CalendarCheck'
-import { PlanChip } from '@/components/guide/GuideCoach'
+import { PlanChip, usePlanSessionLoading } from '@/components/guide/GuideCoach'
 import type { SessionFold } from '@/components/plan/guided/GuidedPeriod'
 import type { Routine } from '@/types/actionable'
 import type { ClashEvent } from '@/lib/guide/clashes'
@@ -194,13 +194,15 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
     <span className="wk-facts-count"><b>{doneHere}</b> of {on} done</span>
     <span className="wk-facts-bar" role="img" aria-label={countText}><span style={{ width: `${Math.round(doneHere / on * 1000) / 10}%` }} /></span>
   </> : null
-  const facts = !deckMode && (progress || today) ? (
+  // Kept through a planning session (fix round 1): the week's facts and
+  // its planned line stay in the header; only Give them a day hides them.
+  const facts = deckMode !== 'place' && (progress || today) ? (
     <p className="wk-facts" data-explain="week-facts" data-explain-label="This week’s facts">
       {progress}{progress && today && ' · '}{today && <>Today: {today}</>}
     </p>
   ) : null
   const guide = planNotes.notes.guide
-  const line = !deckMode && !planNotes.error ? (
+  const line = deckMode !== 'place' && !planNotes.error ? (
     <PeriodSummaryLine plannedAt={guide?.plannedAt ?? (!session.loading && !session.error ? session.saved?.at.toISOString() : undefined)} energy={planNotes.notes.energy}
       reviewed={!!guide?.done?.includes('look-back') || !!lastReview.reviewed} level="week" />
   ) : null
@@ -284,6 +286,7 @@ function WeekSession({ weekStart, deck, lastReview, canvas, onFinish, onClose, o
   const { markPlannedOnce } = guided
   const listen = deck.listenCanvasWrites
   useEffect(() => listen?.(() => { void markPlannedOnce() }), [listen, markPlannedOnce])
+  usePlanSessionLoading('week', guided.loading)
   // Where the session is comes first: no flash of step one before a resume.
   if (guided.loading) return null
   const choose = deck.choose
