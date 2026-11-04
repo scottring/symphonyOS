@@ -203,6 +203,28 @@
 - [ ] **Step 4:** Run `npx vitest run src/components/canvas/week src/components/schedule src/components/home/week src/components/plan/v2`, then tsc. Expect PASS.
 - [ ] **Step 5:** Commit: `feat(week): the month folds beside the week; Week and Today show the same week, flat`.
 
+### Task 5b: Today, with the week folded beside it
+
+**Files:**
+- Modify: `src/components/schedule/TodayView.tsx` (the This week column: `TodayWeekColumn` placement), `src/components/schedule/TodayWeekColumn.tsx`. Wrap the day in `PaperFold horizon="day"`; the week sheet is the above content.
+- Modify: `src/components/plan/fold/PaperFold.tsx` and `src/lib/fold/*`: accept `horizon: 'day'` (storage key `symphony-fold:day`).
+- Modify: `src/components/plan/fold/AboveSheet.tsx`: optional `onPick?: (id: string) => void`. When given, each row gets a "+" button named "Plan {title} for today", and rows are draggable onto the day the way the week column's rows are today. With no `onPick`, the sheet stays read-only exactly as now.
+- Test: `src/components/schedule/TodayView.test.tsx`, `TodayWeekColumn.test.tsx`, `src/components/plan/fold/AboveSheet.test.tsx`
+
+**Interfaces:**
+- Consumes: `PaperFold`, `AboveSheet` (Tasks 2 and 3), Task 5's flat week selector.
+
+- [ ] **Step 1: Write failing tests.**
+  - Today shows an edge named "Oct 31 – Nov 6, N open. Unfold to read".
+  - Unfolded, the sheet lists the week's no-day tasks (the same titles the Week page lists).
+  - "+" on a row plans it for today (the same call the old column's + made).
+  - `AboveSheet` without `onPick` renders no buttons.
+  - The foot reads "Pick three to five for today."
+- [ ] **Step 2:** Run the tests and expect FAIL.
+- [ ] **Step 3:** Implement. Keep the old column's other affordances that still apply (open a task, hide the column, the Coming up list) by moving them onto the sheet or the page.
+- [ ] **Step 4:** Run `npx vitest run src/components/schedule src/components/plan/fold`, tsc, and the full suite once. Expect PASS.
+- [ ] **Step 5:** Commit: `feat(today): the week folds beside the day; + plans one for today`.
+
 ### Task 6: Plain words in headers and week labels
 
 **Files:**

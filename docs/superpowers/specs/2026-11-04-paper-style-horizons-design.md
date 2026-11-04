@@ -197,7 +197,15 @@ The prototype is the reference for look, motion and sound. Build what it does:
 - **Web:** Year, Season and Month pages (the sheet above: last year's open
   goals, the year, the season) and the Week page (the month). The fold
   replaces the strip's first tab on those pages. Routines and Week's "No day
-  yet" stay as tabs. Today keeps its This week column (doing, not reading).
+  yet" stay as tabs.
+- **Today (Scott, 2026-11-04: "add today with the + on the week sheet"):** the
+  week folds beside the day like every other horizon, replacing the This week
+  column. The one exception to "no controls on the sheet above": each task on
+  the week sheet keeps its **+** (and drag onto the day), because week and day
+  share items. Giving a week task to today is the daily "pick 3–5", not a
+  copy. Edge label: the week's dates ("Oct 31 – Nov 6"). Foot: "Pick three to
+  five for today."  The iPhone app's Today keeps its existing Duo layout for
+  now.
 - **iPhone app (TestFlight):** the same on the Planner's Month, Season, Year
   and Week (`PeriodPlanView`, `WeekPlanView`), in SwiftUI (rotation3DEffect
   with the same spring and sounds as small bundled sounds or AVAudioEngine
