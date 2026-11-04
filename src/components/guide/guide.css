@@ -257,6 +257,11 @@
 .guide-yl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
 .guide-yl-name { font: 600 10.5px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-600); }
 .guide-yl-crowded { font-size: 11px; font-weight: 600; color: var(--g-accent); }
+/* On the Year page's own section (headless): ruled months, no boxes. */
+.guide-yv.is-headless .guide-yl { margin-top: 4px; row-gap: 0; column-gap: 18px; }
+.guide-yv.is-headless .guide-yl-month { padding: 7px 0 8px; border: 0; border-bottom: 1px solid var(--color-neutral-200); border-radius: 0; min-height: 0; }
+.guide-yv.is-headless .guide-yl-month:not(:has(.guide-yl-lines)) .guide-yl-name { color: var(--color-neutral-400); }
+.guide-yv.is-headless .guide-yv-h:first-child { margin-top: 8px; }
 .guide-yl-lines { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 
 /* The Energy chip in a page header (Today, Season): the prototype's .energy. */

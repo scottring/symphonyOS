@@ -24,8 +24,8 @@ export function EnergyChip({ value, save }: {
     note.set(shown?.words ? { level, words: shown.words } : { level })
   }
   return (
-    <span className="energy-chip-wrap" data-guide-anchor="energy">
-      <button type="button" className="energy-chip" onClick={cycle}
+    <span className="energy-chip-wrap">
+      <button type="button" className="energy-chip" data-guide-anchor="energy" onClick={cycle}
         title={shown ? 'Tap to change' : 'How is your energy? Tap to say'}>
         Energy: <b>{shown?.level ?? '—'}</b>
       </button>
