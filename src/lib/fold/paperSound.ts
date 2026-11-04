@@ -94,7 +94,7 @@ export const paperSound = {
       }
     })
   },
-  swish(dur = 0.32, level = 1) {
+  swish(dur = 0.32, level = 1, lo = 500, hi = 2600) {
     safe(() => {
       const c = ctx!
       const t = c.currentTime + 0.005
@@ -103,8 +103,8 @@ export const paperSound = {
       const bp = c.createBiquadFilter()
       bp.type = 'bandpass'
       bp.Q.value = 0.7
-      bp.frequency.setValueAtTime(500, t)
-      bp.frequency.exponentialRampToValueAtTime(2600, t + dur * 0.7)
+      bp.frequency.setValueAtTime(lo, t)
+      bp.frequency.exponentialRampToValueAtTime(hi, t + dur * 0.7)
       const g = c.createGain()
       g.gain.setValueAtTime(0, t)
       g.gain.linearRampToValueAtTime(0.075 * level, t + dur * 0.35)
@@ -160,5 +160,13 @@ export const paperSound = {
         s.start(tt, Math.random() * 0.8, 0.06)
       }
     })
+  },
+  /** The planning ribbon pulled or put back: a low, soft satin slide. */
+  ribbon() {
+    paperSound.swish(0.42, 0.8, 260, 900)
+  },
+  /** Done planning: the sheet stamped, a soft thump. */
+  stamp() {
+    paperSound.land(1.35)
   },
 }

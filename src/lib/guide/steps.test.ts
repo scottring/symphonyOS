@@ -41,6 +41,25 @@ describe('guide step catalog', () => {
     }
   })
 
+  // The planning ribbon (2026-11-04): each step drives the page's folds.
+  it('says what each step opens on the page', () => {
+    const drives = (level: GuideLevel) => Object.fromEntries(stepsFor(level).map((s) => [s.id, { ...s.drives, ...(s.card ? { card: true } : {}) }]))
+    expect(drives('month')).toEqual({
+      'fresh-start': { card: true }, 'look-back': { above: true, look: true }, 'read-season': { above: true },
+      'next-weeks': { calendar: true }, 'by-area': { above: true, write: true }, 'upkeep-fun': { card: true },
+    })
+    for (const level of ['week', 'month', 'season', 'year'] as const) {
+      expect(stepsFor(level).find((s) => s.id === 'look-back')?.drives).toEqual({ above: true, look: true })
+      expect(choosingStep(level).drives).toEqual({ above: true, write: true })
+    }
+    expect(stepsFor('day').every((s) => s.card && !s.drives)).toBe(true)
+  })
+
+  it('no step asks to carry, table, or send anything back up', () => {
+    const all = JSON.stringify(GUIDE_STEPS)
+    expect(all).not.toMatch(/back to the season|carry it|table it|under its (season|year|month) goal|tied to/i)
+  })
+
   it('maps levels to horizons', () => {
     expect(HORIZON_OF).toEqual({ day: 'daily', week: 'weekly', month: 'monthly', season: 'seasonal', year: 'annual' })
   })

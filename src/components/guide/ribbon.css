@@ -1,0 +1,141 @@
+/* Planning is a ribbon on the same page (Scott, 2026-11-04). The satin
+   bookmark on this period's sheet, the band it lays across the top of the
+   page, the card that drops under the band for a step with its own editor,
+   and the "Planned" stamp. Ported from the approved prototype
+   (docs/superpowers/specs/2026-11-04-paper-fold-prototype.html: .band,
+   .ribbon-tab, .stamp). The band's sheen is one soft highlight with no fine
+   texture behind the text (Scott: the stripes looked pixelated). */
+
+.ribbon-session, .ribbon-tab, .ribbon-stamp {
+  --ribbon: hsl(352 42% 38%);
+  --ribbon-hi: hsl(352 46% 48%);
+  --ribbon-ink: hsl(30 40% 97%);
+  --ribbon-sage: hsl(150 34% 32%);
+  --ribbon-shadow: 215 32% 14%;
+}
+[data-scenery-lighting='nighttime'] :is(.ribbon-session, .ribbon-tab, .ribbon-stamp),
+.dark :is(.ribbon-session, .ribbon-tab, .ribbon-stamp) {
+  --ribbon: hsl(352 38% 44%);
+  --ribbon-hi: hsl(352 44% 54%);
+  --ribbon-sage: hsl(150 30% 62%);
+  --ribbon-shadow: 220 40% 2%;
+}
+
+.ribbon-session { display: grid; gap: 0; min-width: 0; }
+
+/* ---- the band: the session, laid across the top of the page ---- */
+.ribbon-band-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s cubic-bezier(.2,.8,.2,1); }
+.ribbon-band-wrap.is-on { grid-template-rows: 1fr; }
+.ribbon-band-wrap > div { overflow: hidden; min-width: 0; }
+.ribbon-band {
+  position: relative; margin: 0 auto 16px; max-width: 980px;
+  background: linear-gradient(180deg, var(--ribbon-hi), var(--ribbon) 55%);
+  color: var(--ribbon-ink); border-radius: 4px;
+  box-shadow: 0 1px 0 hsl(0 0% 100% / .18) inset, 0 8px 18px -10px hsl(var(--ribbon-shadow) / .5);
+  padding: 10px 16px 12px;
+  font-family: var(--font-family-sans);
+}
+/* satin sheen: one soft highlight across the top, no fine texture behind the text */
+.ribbon-band::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, hsl(0 0% 100% / .14) 0%, hsl(0 0% 100% / .04) 38%, transparent 60%, hsl(0 0% 0% / .06) 100%);
+}
+.ribbon-band > * { position: relative; }
+.ribbon-band-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ribbon-band-title {
+  font: 500 12px/1 var(--font-family-sans); letter-spacing: .16em; text-transform: uppercase;
+  opacity: .85; margin-right: 4px; white-space: nowrap;
+}
+.ribbon-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: 2px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.ribbon-steps > li { flex: none; }
+.ribbon-step {
+  background: none; border: 0; cursor: pointer; color: inherit; opacity: .72;
+  font: 500 12.5px/1 var(--font-family-sans); padding: 7px 9px; border-radius: 999px;
+  display: flex; gap: 6px; align-items: center; white-space: nowrap;
+  transition: opacity .2s, background .2s;
+}
+.ribbon-step-n {
+  width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 10.5px; box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .45);
+}
+li[data-state='done'] .ribbon-step-n { background: hsl(0 0% 100% / .9); color: var(--ribbon); box-shadow: none; }
+li[data-state='skipped'] .ribbon-step-title { font-style: italic; }
+.ribbon-step[aria-current='step'] { opacity: 1; background: hsl(0 0% 100% / .16); }
+.ribbon-step:hover { opacity: 1; }
+.ribbon-band-nav { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.ribbon-band-nav button {
+  background: hsl(0 0% 100% / .14); border: 0; color: inherit; cursor: pointer;
+  font: 500 12.5px/1 var(--font-family-sans); padding: 8px 12px; border-radius: 999px;
+}
+.ribbon-band-nav button:disabled { opacity: .45; cursor: default; }
+.ribbon-band-nav button.is-primary { background: var(--ribbon-ink); color: var(--ribbon); }
+.ribbon-band-note { margin: 8px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 13px; line-height: 1.45; }
+.ribbon-band-note dt { font-weight: 600; opacity: .8; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding-top: 2px; }
+.ribbon-band-note dd { margin: 0; opacity: .96; }
+.ribbon-band-status { margin: 6px 0 0; font-size: 12.5px; opacity: .85; font-variant-numeric: tabular-nums; }
+.ribbon-band-status.is-error { opacity: 1; font-weight: 600; }
+:is(.ribbon-step, .ribbon-band-nav button):focus-visible { outline: 2px solid var(--ribbon-ink); outline-offset: 2px; }
+
+/* ---- the card that drops under the band, for a step with its own editor ---- */
+.ribbon-card {
+  margin: -10px auto 16px; max-width: 940px; width: calc(100% - 24px); box-sizing: border-box;
+  background: var(--color-bg-elevated); color: var(--color-neutral-900);
+  border-radius: 0 0 10px 10px; padding: 16px 20px 18px;
+  box-shadow: 0 1px 1px hsl(var(--ribbon-shadow) / .06), 0 10px 26px -12px hsl(var(--ribbon-shadow) / .3);
+  animation: ribbon-drop .38s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes ribbon-drop { from { opacity: 0; transform: translateY(-10px); } }
+
+.ribbon-page { min-width: 0; }
+
+/* ---- the bookmark: hanging from the top of this period's sheet ---- */
+.ribbon-tab {
+  position: absolute; top: -6px; right: 54px; width: 30px; height: 86px; border: 0; padding: 0; cursor: pointer; z-index: 4;
+  background: linear-gradient(90deg, var(--ribbon) 0%, var(--ribbon-hi) 50%, var(--ribbon) 100%);
+  -webkit-font-smoothing: antialiased;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%);
+  color: var(--ribbon-ink); filter: drop-shadow(0 4px 4px hsl(var(--ribbon-shadow) / .25));
+  transition: height .35s cubic-bezier(.2,1.4,.4,1), transform .2s;
+}
+.ribbon-tab span {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); writing-mode: vertical-rl;
+  font: 600 10px/1 var(--font-family-sans); letter-spacing: .22em; text-transform: uppercase;
+}
+.ribbon-tab:hover { height: 94px; }
+.ribbon-tab[aria-expanded='true'] { height: 26px; }
+.ribbon-tab[aria-expanded='true'] span { opacity: 0; }
+.ribbon-tab:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+
+/* ---- the write line, when a writing step puts the pencil on it ---- */
+.sheet-write.is-glow { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ribbon, hsl(352 42% 38%)) 22%, transparent); border-radius: 4px; transition: box-shadow .6s; }
+
+/* ---- planned stamp ---- */
+.ribbon-stamp {
+  position: absolute; top: 26px; right: 104px; width: 92px; height: 92px; border-radius: 50%;
+  display: grid; place-items: center; align-content: center; text-align: center; z-index: 3;
+  border: 2px solid var(--ribbon-sage); color: var(--ribbon-sage);
+  font: 600 10px/1.25 var(--font-family-sans); letter-spacing: .14em; text-transform: uppercase;
+  transform: rotate(-12deg) scale(1); opacity: .82; pointer-events: none;
+  animation: ribbon-stamp .42s cubic-bezier(.2,1.6,.4,1);
+}
+@keyframes ribbon-stamp { from { transform: rotate(-12deg) scale(1.6); opacity: 0; } }
+
+.ribbon-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---- phones: a sideways-scrolling row of step chips under the header ---- */
+@media (max-width: 760px) {
+  .ribbon-band { margin-bottom: 12px; padding: 10px 12px; }
+  .ribbon-band-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .ribbon-steps { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .ribbon-steps::-webkit-scrollbar { display: none; }
+  .ribbon-band-nav { margin-left: 0; }
+  .ribbon-band-note { grid-template-columns: 1fr; }
+  .ribbon-card { width: 100%; margin-top: -8px; border-radius: 0 0 8px 8px; padding: 14px 14px 16px; }
+  .ribbon-tab { right: 18px; }
+  .ribbon-stamp { right: 56px; top: 18px; width: 76px; height: 76px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ribbon-band-wrap, .ribbon-tab { transition: none; }
+  .ribbon-card, .ribbon-stamp { animation: none; }
+}

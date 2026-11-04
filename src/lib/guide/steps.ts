@@ -17,6 +17,18 @@ export type StepWrite =
   | 'scratchpad'
   | 'none'
 
+/** What a step opens on the page (the planning ribbon, 2026-11-04): the
+ *  sheet above (`above`), this period's calendar (`calendar`), the write line
+ *  focused (`write`), or the sheet above turned to the period before with its
+ *  choices (`look`, which opens the sheet above). Read by PaperFold's `drive`;
+ *  nothing is remembered. */
+export interface StepDrives {
+  above?: boolean
+  calendar?: boolean
+  write?: boolean
+  look?: boolean
+}
+
 export interface GuideStep {
   id: string
   title: string
@@ -27,6 +39,11 @@ export interface GuideStep {
   more: string
   writes: StepWrite[]
   choosing?: true
+  /** The parts of the page this step opens. None: the page as it is. */
+  drives?: StepDrives
+  /** The step has its own editor, shown in the card that drops under the
+   *  ribbon's band for this step only. */
+  card?: true
 }
 
 export const SESSION_LENGTH: Record<GuideLevel, string> = {
@@ -55,6 +72,7 @@ const DAY: readonly GuideStep[] = [
     guide: 'Shows what\'s left and moves it where you say.',
     more: 'An item that slips off the end of a busy day does not announce itself. A quick look puts it in front of you while it still matters. Then it gets a deliberate answer instead of resurfacing days later.',
     writes: ['triage', 'review'],
+    card: true,
   },
   {
     id: 'calendar',
@@ -65,6 +83,7 @@ const DAY: readonly GuideStep[] = [
     guide: 'Shows the day as a timeline.',
     more: 'The gaps between fixed things are the only time you really have. Seeing the day laid out shows how much room there is between commitments. That is easier to judge before anything is placed in it.',
     writes: ['none'],
+    card: true,
   },
   {
     id: 'energy',
@@ -75,6 +94,7 @@ const DAY: readonly GuideStep[] = [
     guide: 'Notes it beside the day. Nothing else changes.',
     more: 'The same task feels different depending on how rested you are. Saying plainly how the day ahead feels lets the choices that follow be honest ones. Nothing is decided by it; it is just a note beside the day.',
     writes: ['note'],
+    card: true,
   },
   {
     id: 'pick',
@@ -85,6 +105,7 @@ const DAY: readonly GuideStep[] = [
     guide: 'Places each where you say and counts toward 5.',
     more: 'A long list leaves you deciding all day what to do next. A few chosen items each have a place, and the rest can wait without nagging. The count is a guide you can see, not a limit that is enforced.',
     writes: ['place'],
+    card: true,
     choosing: true,
   },
   {
@@ -96,6 +117,7 @@ const DAY: readonly GuideStep[] = [
     guide: 'Lists the day\'s routines to tick off as you go.',
     more: 'Small routines rarely feel urgent, so they tend to drop first. A glance at them while the day is still ahead is often enough to keep them from slipping. They are only listed here, never added for you.',
     writes: ['none'],
+    card: true,
   },
 ]
 
@@ -105,10 +127,11 @@ const WEEK: readonly GuideStep[] = [
     title: 'Look back at last week',
     minutes: 15,
     why: 'Close last week before opening this one.',
-    you: 'Wins first. Then each loose end: move it, break it smaller, hand it off, or drop it.',
+    you: 'Wins first. Then each loose end: Done, Next week, Someday (not now) or Let go (not ever).',
     guide: 'Goes through last week\'s open items one at a time and records your call.',
     more: 'Open items from last week tend to ride along unexamined and make the new week feel heavy before it starts. Deciding what happens to each one means it either gets a place or is released. Naming what went well first keeps the look back from feeling like a list of failures.',
     writes: ['review', 'triage'],
+    drives: { above: true, look: true },
   },
   {
     id: 'calendar',
@@ -119,6 +142,7 @@ const WEEK: readonly GuideStep[] = [
     guide: 'Points out overlaps and back-to-back moves. You decide what changes.',
     more: 'A busy week has less room than an empty one, and that should set how much you take on. Clashes and tight changeovers are cheap to fix before the week begins and cost a scramble once the day arrives. You decide what changes; the guide only points out what it sees.',
     writes: ['place'],
+    card: true,
   },
   {
     id: 'read-month',
@@ -126,9 +150,10 @@ const WEEK: readonly GuideStep[] = [
     minutes: 5,
     why: 'The week should move the month forward.',
     you: 'Read the month\'s list and what\'s left on it.',
-    guide: 'Shows the month\'s lines with what\'s already planned under each.',
-    more: 'A month can drift when each week is planned on its own. Seeing which lines have had nothing under them lately shows where the month needs help. It is easy to miss that until the month is nearly gone.',
+    guide: 'Opens the month beside the week, for reading.',
+    more: 'A month can drift when each week is planned on its own. Reading its list before choosing keeps the week pointed the same way. It is easy to forget what the month was for until it is nearly gone.',
     writes: ['none'],
+    drives: { above: true },
   },
   {
     id: 'inbox',
@@ -139,16 +164,18 @@ const WEEK: readonly GuideStep[] = [
     guide: 'Shows each Inbox item and files it where you say.',
     more: 'Captures made in a hurry sit in the Inbox until they matter too late. Giving each one a quick answer keeps the pile from growing into something you avoid. Each is either this week, later, or gone.',
     writes: ['inbox'],
+    card: true,
   },
   {
     id: 'choose',
     title: 'Choose this week\'s tasks',
     minutes: 15,
     why: 'A short list gets done. About 15 is the limit.',
-    you: 'Say what this week needs. Take from the month or add new; the rest stays on the month.',
-    guide: 'Files each under its month line and counts toward 15.',
-    more: 'A week has only so many open hours once everything fixed is counted. A short list that fits is more useful than a long one that mostly rolls into next week. Each task stays tied to the month line it serves.',
+    you: 'Write this week\'s tasks in their own words. The month stays beside you to read.',
+    guide: 'Puts each on this week and counts toward 15.',
+    more: 'A week has only so many open hours once everything fixed is counted. A short list that fits is more useful than a long one that mostly rolls into next week. The month stays as it is; the week is written in its own words.',
     writes: ['commit', 'place'],
+    drives: { above: true, write: true },
     choosing: true,
   },
   {
@@ -160,6 +187,7 @@ const WEEK: readonly GuideStep[] = [
     guide: 'Puts workouts on their days and keeps your weekend note.',
     more: 'The ordinary structure of the week decides how it feels more than any single task. Settling the repeating pieces once saves a lot of small decisions later. The weekend is worth a line of its own so it does not get filled by accident.',
     writes: ['place', 'note'],
+    card: true,
   },
   {
     id: 'family',
@@ -170,6 +198,7 @@ const WEEK: readonly GuideStep[] = [
     guide: 'Posts what you say to mention on the wall for the week.',
     more: 'A plan that only one person has seen tends to surprise everyone else. Putting the week where the household can see it lets others plan around it too. Talking it through together turns it from your plan into the family\'s.',
     writes: ['scratchpad'],
+    card: true,
   },
 ]
 
@@ -183,26 +212,29 @@ const MONTH: readonly GuideStep[] = [
     guide: 'Changes Symphony\'s scenery for you.',
     more: 'A small visible change marks the turn of the month. Opening the app to a different scene tells you that the last month is closed and this one has not been spent yet. It is a gentle signal, nothing more.',
     writes: ['note'],
+    card: true,
   },
   {
     id: 'look-back',
     title: 'Look back at last month',
     minutes: 20,
     why: 'Know what moved before deciding what\'s next.',
-    you: 'Wins first, and how your energy has been. Then what\'s open: carry, back to the season, or drop.',
+    you: 'Wins first, and how your energy has been. Then each open line: Done, To this month, Someday (not now) or Let go (not ever).',
     guide: 'Shows what got done and records your call on each open line.',
-    more: 'It is easy to remember only what did not get done. Naming what was finished first gives a truer picture. Then each open line gets a clear decision: carry it, send it back to the season, or drop it.',
+    more: 'It is easy to remember only what did not get done. Naming what was finished first gives a truer picture. Then each open line gets a clear decision: done, on to this month, Someday, or let go.',
     writes: ['review', 'triage'],
+    drives: { above: true, look: true },
   },
   {
     id: 'read-season',
     title: 'Read the season list',
     minutes: 10,
     why: 'The month should move the season\'s goals forward.',
-    you: 'Read the season\'s goals and how far each has come.',
-    guide: 'Shows each season goal with its steps done so far.',
-    more: 'A season goal only moves if some month takes a piece of it. Seeing how far each one has come makes it plain which are being served and which are being left behind. That helps you judge whether this month is the one to move them.',
+    you: 'Read the season\'s goals beside the month. Nothing moves across.',
+    guide: 'Opens the season beside the month, for reading.',
+    more: 'A season goal only moves if some month does something toward it. Reading the season first makes it plain what this month could be for. That helps you judge whether this month is the one to move each.',
     writes: ['none'],
+    drives: { above: true },
   },
   {
     id: 'next-weeks',
@@ -213,16 +245,18 @@ const MONTH: readonly GuideStep[] = [
     guide: 'Adds what you mention on its date.',
     more: 'Dates that are already fixed shape how much each coming week can hold. This far out the calendar is mostly settled, so it works as a frame for everything else. Anything you remember that is not on it yet is best added now.',
     writes: ['place'],
+    drives: { calendar: true },
   },
   {
     id: 'by-area',
     title: 'The month by area',
     minutes: 30,
     why: 'This is where goals start to look like tasks.',
-    you: 'Say what the month should get done, area by area.',
-    guide: 'Files each under its season goal and area. Asks when it can\'t tell.',
-    more: 'Going area by area keeps one busy part of life from crowding out the others. Each line belongs under the season goal it serves so the month stays connected to the bigger aim. When the guide cannot tell where a line goes, it asks rather than guessing.',
+    you: 'Write the month\'s goals on the sheet, area by area, in their own words.',
+    guide: 'Files each in its area. Asks when it can\'t tell.',
+    more: 'Going area by area keeps one busy part of life from crowding out the others. The season stays open beside you, so the month is written with it in view. When the guide cannot tell which area a line belongs to, it asks rather than guessing.',
     writes: ['commit', 'plan_add', 'area'],
+    drives: { above: true, write: true },
     choosing: true,
   },
   {
@@ -234,6 +268,7 @@ const MONTH: readonly GuideStep[] = [
     guide: 'Shows the monthly routines and adds your fun lines.',
     more: 'Recurring upkeep is easy to forget between cycles, so it helps to see what is due. Fun works the same way in reverse: it rarely happens unless it has a line of its own. The lines are yours; the guide only adds what you name.',
     writes: ['plan_add'],
+    card: true,
   },
 ]
 
@@ -243,20 +278,23 @@ const SEASON: readonly GuideStep[] = [
     title: 'Look back at last season',
     minutes: 30,
     why: 'A season is a fresh start only if the last one is closed out.',
-    you: 'Wins first. Then each open goal: carry it, table it for later, or drop it.',
+    you: 'Wins first. Then each open goal: Done, To this season, Someday (not now) or Let go (not ever).',
     guide: 'Goes through last season\'s open goals one at a time and records your call.',
     more: 'Three months is long enough for goals to change meaning. Closing out each open goal on purpose keeps old intentions from crowding the new season. Naming the wins first makes the review fairer.',
     writes: ['review', 'triage'],
+    drives: { above: true, look: true },
   },
   {
     id: 'from-year',
     title: 'Choose from the year',
     minutes: 20,
-    why: 'Season goals should come from the year list, not from scratch.',
-    you: 'Read the year\'s list and Someday. Pick what fits these three months.',
-    guide: 'Keeps the year list beside you. A goal you pick stays linked to its year goal.',
-    more: 'The year list already holds what you decided mattered. Choosing from it, rather than starting blank, means each season goal still points back to the year it came from. Someday is there for goals that are not ready yet.',
+    why: 'The season is where a year goal gets a three-month shape.',
+    you: 'Read the year beside you. Bring back anything from Someday that fits these months.',
+    guide: 'Keeps the year list beside you, for reading. Nothing moves across.',
+    more: 'The year list already holds what you decided mattered. Reading it first means the season is written with the year in view, in its own words. Someday holds what was set aside until its time came.',
     writes: ['commit'],
+    drives: { above: true },
+    card: true,
   },
   {
     id: 'calendar',
@@ -267,6 +305,7 @@ const SEASON: readonly GuideStep[] = [
     guide: 'Adds the dates and shows which weeks are already full.',
     more: 'Breaks and trips remove whole stretches from a season. Marking them first shows how much time is really open before any goal is given a place. Weeks that are already full are worth knowing about early.',
     writes: ['place'],
+    drives: { calendar: true },
   },
   {
     id: 'energy',
@@ -277,16 +316,18 @@ const SEASON: readonly GuideStep[] = [
     guide: 'Keeps your note at the top of the season.',
     more: 'A season with unusual demands on your health or attention has less room in it than the calendar suggests. Writing that down once lets the later choices respect it. A plan that ignores how tired you are tends to fall apart partway through.',
     writes: ['note'],
+    card: true,
   },
   {
     id: 'by-area',
     title: 'Season goals by area',
     minutes: 30,
     why: 'Turns year goals into something three months can finish.',
-    you: 'Name the goals for this season, area by area.',
-    guide: 'Files each under its year goal and area. Asks when one has no year goal.',
-    more: 'A year goal is often too large to finish, but a part of it can be done in three months. Going area by area makes sure no part of life is skipped by accident. A goal with no year goal behind it gets a question rather than a guess.',
+    you: 'Write the season\'s goals on the sheet, area by area.',
+    guide: 'Files each in its area. Asks when it can\'t tell.',
+    more: 'A year goal is often too large to finish, but something toward it can be done in three months. Going area by area makes sure no part of life is skipped by accident. The year stays open beside you while you write.',
     writes: ['plan_add', 'area'],
+    drives: { above: true, write: true },
     choosing: true,
   },
   {
@@ -298,6 +339,7 @@ const SEASON: readonly GuideStep[] = [
     guide: 'Adds up the hours as you go and shows what\'s left.',
     more: 'After the fixed parts of a week are blocked out, fewer free hours remain than it feels like. Adding up the time each goal needs shows whether it fits beside the rest. If it does not, that is useful to learn now rather than in the middle of the season.',
     writes: ['note'],
+    card: true,
   },
   {
     id: 'wild-cards',
@@ -305,9 +347,10 @@ const SEASON: readonly GuideStep[] = [
     minutes: 20,
     why: 'Seasonal logistics sneak up: money, camps, travel, the house.',
     you: 'Pick the checks that apply this season and say what needs doing.',
-    guide: 'Turns each to-do into a line under the right goal, or the month it\'s due.',
+    guide: 'Turns each to-do into a line on the season, or the month it\'s due.',
     more: 'Some obligations have deadlines that arrive quietly and then become urgent. Going through the usual categories once a season catches them while there is still time. Each one you name becomes a line where it belongs.',
     writes: ['plan_add'],
+    card: true,
   },
 ]
 
@@ -321,6 +364,7 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Shows last year\'s goals with what got done, and records your call on each open one.',
     more: 'A year holds more than memory keeps. Looking at what was actually finished is often kinder than the impression you carried. The goals that stalled show what to do differently next time.',
     writes: ['review', 'triage'],
+    drives: { above: true, look: true },
   },
   {
     id: 'vision',
@@ -331,6 +375,7 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Writes it down in your words. Adds nothing.',
     more: 'Goals chosen without a direction tend to be whatever was loudest. Describing an ordinary day far in the future gives the year something to be measured against. It is written down in your words and nothing is added.',
     writes: ['note'],
+    card: true,
   },
   {
     id: 'landscape',
@@ -341,6 +386,8 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Puts each on a one-page year and points out crowded months.',
     more: 'A year looks open until the fixed dates go on it. Once they are marked, it is clear which months have room for something large and which do not. A crowded month is worth seeing before goals are set.',
     writes: ['note', 'place'],
+    drives: { calendar: true },
+    card: true,
   },
   {
     id: 'areas',
@@ -351,6 +398,7 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Asks which space each area belongs in when it isn\'t obvious.',
     more: 'Areas act as a checklist for the whole of life, so that no part is forgotten. Placing each one inside a space also settles who can see it. The areas are yours to choose; the guide does not propose any.',
     writes: ['area'],
+    card: true,
   },
   {
     id: 'brain-dump',
@@ -361,6 +409,7 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Sorts each goal into its area. Points out an empty area; never fills it.',
     more: 'Judging while listing makes the list shorter and safer than what you actually want. For now every goal can sit side by side, and the sorting comes later. An area left empty is pointed out, but never filled for you.',
     writes: ['plan_add', 'area'],
+    drives: { above: true, write: true },
     choosing: true,
   },
   {
@@ -372,6 +421,7 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Shows goals that overlap or repeat. You decide what happens to them.',
     more: 'A raw list usually has goals that overlap and a few that can wait. Merging the ones that say the same thing and moving others to Someday leaves a list you will want to reread. Each decision stays with you.',
     writes: ['triage'],
+    card: true,
   },
   {
     id: 'share-book',
@@ -382,6 +432,7 @@ const YEAR: readonly GuideStep[] = [
     guide: 'Moves shared goals to Family and puts the season session on the calendar.',
     more: 'A goal that affects others works best when they know about it. Booking the next session while the year is fresh means the plan gets revisited rather than forgotten. You choose what the family sees.',
     writes: ['triage', 'place'],
+    card: true,
   },
 ]
 
