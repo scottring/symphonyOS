@@ -276,6 +276,43 @@ Two different intentions, never the same button:
   Week look back: Done · Next week · Someday · Let go. Month and Season task
   panel: To {next} · Someday · Let go.
 
+### Planning is a ribbon on the same page (Scott, 2026-11-04: "yeah", ribbon over rail)
+
+There is no separate planning layout. The steps rail (`GuideRail`) is
+replaced by a **ribbon**: a satin bookmark hanging from the top of this
+period's sheet ("Plan November"). Pulling it lays a band across the top of
+the page with the session's steps, the current step's Why and You, and Back,
+Next and Leave controls. The last step's Next reads "Done planning November".
+The prototype (`2026-11-04-paper-fold-prototype.html`, the ribbon version) is
+the reference for look, sound (a low satin slide; a stamp on done) and
+behavior.
+
+- **Steps drive the page, not a second screen.** Each step opens the part of
+  the page it uses, through PaperFold's `drive`:
+  - Look back: the left companion shows last period's sheet with its choices.
+  - Read the season, Read the year, Read November: the left companion is open.
+  - The calendar steps (Next 4–5 weeks, Season calendar, Map the 12 months,
+    Calendar check): the right companion is open.
+  - The writing steps (by area, choose this week's tasks, brain dump): the
+    write line is focused, with the level above open to read.
+
+  Leaving or finishing returns both companions to their remembered state.
+- **Steps with their own editors** (energy, ideal week, wild cards, vision,
+  areas, upkeep and fun, refine, share and book, clear the inbox, weekly ops,
+  tell the family) show their existing body in a **card that drops under the
+  band** for that step only.
+- **Look back** is the only time the sheet beside you takes choices: Done ·
+  To {next} · Someday · Let go (Week: Done · Next week · Someday · Let go).
+- **Done planning** folds both companions, stamps the sheet ("Planned" with
+  the date; soft thump), and writes the header line "Planned Wed, Nov 4 · Last
+  month’s review".
+- **Unchanged from the 11-01 spec:** the steps and their order, Why/You/Guide
+  copy, the guide conversation in the docked bar, per-step allowed writes,
+  resume, per-person planned state, and the closing writes (minus the ones
+  this addendum removes).
+- **Phones and the Duo's outside screen:** the band is a sideways-scrolling
+  row of step chips under the header. The drop card sits under it.
+
 ## Settled after the builder check
 
 - **Nothing moves up either.** "Back to <month>" for last week's leftovers,

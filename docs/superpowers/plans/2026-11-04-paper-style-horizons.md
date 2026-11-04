@@ -268,32 +268,48 @@
 - [ ] **Step 4:** Run them plus tsc and expect PASS.
 - [ ] **Step 5:** Commit: `fix(copy): planned lines in plain words; weeks named by their dates`.
 
-### Task 7: Guided sessions write each level in its own words
+### Task 7: Sessions as a ribbon, each level in its own words
 
 **Files:**
-- Modify:
-  - `src/components/plan/guided/season/FromYear.tsx`: year goals read-only. Remove `onPick`; keep the Someday bring (`onBring`).
-  - `ConstellationPage.tsx`: `fromYearBody` 1140-1153; `choose` 896-992 (remove `backToAbove`, `bringHere`, `backUp`, the `sourceId` from `addUnder`, and `onAddStep`); `chooseBody` 1127-1136 (the level above as `AboveSheet` plus the period's add line); `lookBackBody` 1074-1097 (Month: Done / To {next month} / Someday / Let go; Season and Year: the same. To and Someday act on this period only; Let go is "not ever": every open commitment ends, bucket 'someday' and `dismissed_at` set, hidden from Someday, the Inbox and the planning lists, found by search as "Let go {date}", and Undo restores. "Carry" and "Table" are never shown.) Also change the Task 4 panel (`horizonPanel.tsx` / `periodMoves`) to To {next} · Someday · Let go with these meanings, and make the Someday page (`src/apps/tasks/SomedayPage.tsx`), the Inbox and the planning selectors hide `dismissedAt` tasks. Map `dismissed_at` in `useSupabaseTasks` if it isn't already mapped..
-  - `src/components/plan/choose/ChoosePlan.tsx` 186-235: lines from above become read-only.
-  - `src/components/plan/guided/month/PeriodLookBack.tsx` 33-61.
-  - `src/components/plan/guided/week/WeekLookBack.tsx` 28-31 and 118: Done / Next week / Someday / Let go.
-  - `src/lib/planning/useChooseWeek.ts`: remove `LATER` month options (61-66), `thisWeek` on month lines (148), `backUp` (92-99), the `sourceId` from `addUnder` (112-120), and `backTo` (222). Keep `smallerStep` only if it writes a week task with no tie.
-  - `WeekViewV2.tsx` 1090-1102: no closing write back to the month.
-  - `src/lib/guide/steps.ts` 151, 225, 259: step "writes" copy says "writes this {period}'s items in your words".
-- Test: `FromYear.test.tsx` 12; `ChoosePlan.test.tsx` 54, 72; `useChooseWeek.test.ts` 56, 74; `PeriodLookBack.test.tsx` 34; `WeekLookBack.test.tsx` 49, 61, 100; `WeekViewV2.test.tsx` 1053, 1066; `GuidedWeek.test.tsx` 304; `ConstellationPage.test.tsx` 1188-1430
+- Create: `src/components/guide/GuideRibbon.tsx`, `src/components/guide/ribbon.css`, `src/components/guide/GuideRibbon.test.tsx`. Same inputs as `GuideRail` (`level`, `progress`, `titleFor`, `bodies`, `onJump`) plus `onNext`, `onBack`, `onLeave`, `onFinish`, `drives: (stepId) => { above?: boolean; calendar?: boolean; write?: boolean } | undefined`, and `tab: { label: string; onPull: () => void }` (the bookmark).
+- Modify: `src/components/plan/guided/GuidedPeriod.tsx`, `GuidedWeek.tsx`, `day/GuidedDay.tsx`. Replace `GuideRail` with `GuideRibbon`. Each step's `drives` sets PaperFold's `drive` prop (Task 5c). The look-back step puts the look-back body into PaperFold's `above`. Steps with editors render their body in the drop card. Delete `GuideRail.tsx` and its test once nothing imports them.
+- Paper-style session rules (the original Task 7, still required):
+  - `FromYear.tsx`: year goals read-only; keep the Someday bring.
+  - `ConstellationPage.tsx`: `fromYearBody`, `choose` (remove `backToAbove`, `bringHere`, `backUp`, the `sourceId` in `addUnder`, `onAddStep`), `chooseBody`, `lookBackBody`.
+  - `ChoosePlan.tsx`: lines from above read-only.
+  - `PeriodLookBack.tsx`.
+  - `WeekLookBack.tsx`.
+  - `useChooseWeek.ts`: no month destinations; no `backUp`, `backTo` or `sourceId`.
+  - `WeekViewV2.tsx`: no closing write back to the month.
+  - `src/lib/guide/steps.ts`: writes copy.
+- Look-back and panel verbs (rulings 2026-11-04):
+  - Month: Done · To {next month} · Someday · Let go.
+  - Season and Year: the same with their next period.
+  - Week: Done · Next week · Someday · Let go.
+  - To and Someday act on this period only.
+  - Let go is "not ever": every open commitment ends, bucket 'someday' and `dismissed_at` set, hidden from Someday, the Inbox and the planning lists, found by search as "Let go {date}"; Undo restores it.
+  - "Carry" and "Table" are never shown.
+  - Change Task 4's panel (`horizonPanel.tsx` / `periodMoves`) to To {next} · Someday · Let go with these meanings, and make `src/apps/tasks/SomedayPage.tsx`, the Inbox and the planning selectors hide `dismissedAt` tasks. Map `dismissed_at` in `useSupabaseTasks` if it isn't already.
+- Done planning: stamp plus header line (Task 6's `PeriodSummaryLine` wording).
+- Test: `GuideRibbon.test.tsx` plus the session tests named in the original task (FromYear, ChoosePlan, useChooseWeek, PeriodLookBack, WeekLookBack, WeekViewV2, GuidedWeek, GuidedPeriod, and ConstellationPage's session cases)
 
 - [ ] **Step 1: Write failing tests.**
-  - FromYear shows year goals with no button per goal.
-  - Month look back (Oct) offers exactly ['Done', 'To November', 'Someday', 'Let go'], and Season (Summer) offers ['Done', 'To Fall', 'Someday', 'Let go'].
-  - Let go on an item open on Fall, November and this week ends all three commitments, sets dismissedAt, and hides it from the Someday page. Undo restores all three.
-  - Someday on the same item ends only November's. "To December" on a November item opens December's commitment and ends November's only. The task panel's "Later: December" reads "To December".
-  - Week look back has no "Back to November".
-  - Done planning the week leaves leftovers' week commitments in place (no drop).
+  - On Month, the ribbon tab "Plan November" opens a band listing the six Month steps.
+  - Jumping to "Next 4–5 weeks" sets the right companion open, and Leave restores the remembered states.
+  - "Look back at October" shows October's leftovers in the left companion with exactly ['Done', 'To November', 'Someday', 'Let go'].
+  - Let go on an item open on Fall, November and this week ends all three commitments, sets dismissedAt, and hides it from the Someday page; Undo restores all three. Someday on the same item ends only November's.
+  - The Season look back offers ['Done', 'To Fall', 'Someday', 'Let go'].
+  - The "Energy" step shows its editor in the drop card.
+  - "Done planning November" stamps the sheet and the header reads "Planned … · Last month’s review".
+  - FromYear shows year goals with no per-goal button.
+  - The Week look back has no "Back to November".
+  - Done planning the week leaves leftovers' week commitments in place.
   - `useChooseWeek` exposes no month destination.
+  - No `GuideRail` is rendered anywhere.
 - [ ] **Step 2:** Run the listed tests and expect FAIL.
-- [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run `npx vitest run src/components/plan src/lib/planning src/lib/guide src/components/home/week`, then tsc. Expect PASS.
-- [ ] **Step 5:** Commit: `feat(sessions): each level written in its own words; look back acts on this period`.
+- [ ] **Step 3:** Implement. The ribbon's look, sound and motion come from the prototype.
+- [ ] **Step 4:** Run `npx vitest run src/components/guide src/components/plan src/lib/planning src/lib/guide src/components/home/week src/apps/tasks`, tsc, and the full suite once. Expect PASS.
+- [ ] **Step 5:** Commit (more than one commit is fine): `feat(sessions): planning is a ribbon on the page; each level in its own words`.
 
 ### Task 8: The guide places items without ties during a session
 
