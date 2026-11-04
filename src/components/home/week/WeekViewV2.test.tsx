@@ -961,7 +961,8 @@ describe('WeekViewV2 — the deck', () => {
       createMockTask({ id: 'later', title: 'Paint the fence', assignedTo: 'iris', bucket: 'month', updatedAt: recent }),
     ]
     const titles = ['Fix the gate', 'Pot the ferns', 'Call the vet', 'Clean the garage', 'Paint the fence']
-    const drawn = () => titles.filter((t) => screen.queryAllByText(t).length > 0)
+    // The week's rows: not the month's sheet folded beside them (for reading).
+    const drawn = () => titles.filter((t) => screen.queryAllByText(t).some((el) => !el.closest('.paper-fold-flap')))
     const count = () => (deckMock.deck as unknown as { onThisWeek: number }).onThisWeek
 
     it('everyone view: a dated task only Iris carries is on a day, so it counts; her undated one is not shown, so it does not', () => {
@@ -978,6 +979,26 @@ describe('WeekViewV2 — the deck', () => {
       expect(drawn()).toEqual(['Pot the ferns', 'Call the vet'])
       expect(count()).toBe(drawn().length)
     })
+  })
+
+  // Paper-style horizons (spec 2026-11-04): October folds beside the days,
+  // for reading. No month tab, no "→ Week"; a line marked a goal and
+  // committed to this week is on the week's own list like any other (#15).
+  it('folds October beside the days, read-only, and lists a goal-marked week line', () => {
+    const oct = new Date(2026, 9, 1)
+    const onOct = { bucket: 'month' as const, monthStart: oct, commitments: [{ level: 'month' as const, periodStart: oct, status: 'open' as const }], updatedAt: recent }
+    const tasks = [
+      createMockTask({ id: 'o1', title: 'Organize family documents', ...onOct }),
+      createMockTask({ id: 'o2', title: 'Plan winter vacation', isGoal: true, ...onOct,
+        commitments: [...onOct.commitments, { level: 'week', periodStart: sat, status: 'open' }] }),
+      createMockTask({ id: 'o3', title: 'Book the vet', ...onOct, completed: true }),
+    ]
+    open('', tasks)
+    expect(screen.getByRole('button', { name: 'October, 2 open. Unfold to read' })).toBeInTheDocument()
+    expect(screen.queryByText('→ Week')).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'October' })).toBeNull()
+    const noDay = screen.getByRole('list', { name: 'No day yet' })
+    expect(within(noDay).getByText('Plan winter vacation')).toBeInTheDocument()
   })
 
   it('Weekly ops is handed the routines the page shows: the space filter applies', () => {

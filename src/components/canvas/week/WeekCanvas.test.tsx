@@ -18,8 +18,6 @@ const dayOf = (i: number) => new Date(2026, 9, 3 + i)
 const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const task = (x: Partial<Task>) => ({ id: 't', title: 'T', completed: false, createdAt: new Date(2026, 8, 1), ...x }) as Task
 
-const trip = task({ id: 'm1', title: 'Plan the autumn trip', bucket: 'month' })
-const paper = task({ id: 'm2', title: 'Get the paperwork in order', bucket: 'month' })
 const cabin = task({ id: 'a', title: 'Book the cabin', sourceId: 'm1' })
 const car = task({ id: 'b', title: 'Service the car', sourceId: 'm1' })
 const bank = task({ id: 'c', title: 'Call the bank' })
@@ -47,11 +45,7 @@ function days(): CanvasDay[] {
 }
 
 function shelf(): ShelfGroup[] {
-  return buildShelf({
-    weekTasks: [cabin, bank, car, maps, placed], tasks: [trip, paper, cabin, bank, car, maps, placed], weekStart,
-    milestones: [{ id: 'm1', title: trip.title, completed: false, context: 'family' }, { id: 'm2', title: paper.title, completed: false }],
-    now: new Date(2026, 9, 3, 9),
-  })
+  return buildShelf({ weekTasks: [cabin, bank, car, maps, placed], weekStart, now: new Date(2026, 9, 3, 9) })
 }
 
 const show = (w = writers(), extra: Partial<Parameters<typeof WeekCanvas>[0]> = {}) => {
@@ -67,32 +61,7 @@ const dt = () => {
 }
 
 beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 3, 9)) })
-afterEach(() => { vi.useRealTimers(); for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.removeItem(k); for (const k of ['symphony-strip-tab:week', 'symphony-strip-open:week']) localStorage.removeItem(k) })
-
-describe('weekShelf', () => {
-  it('leaves placed work on its day, names the milestone once, offers empty milestones, and puts Unlinked last', () => {
-    const g = shelf()
-    expect(g.map((x) => x.milestone?.id ?? 'unlinked')).toEqual(['m1', 'm2', 'unlinked'])
-    expect(g[0].rows.map((r) => r.task.id)).toEqual(['a', 'b'])
-    expect(g[0].done.map((r) => r.task.id)).toEqual(['d'])
-    expect(g[1].rows).toEqual([])
-    expect(g[2].rows.map((r) => r.task.id)).toEqual(['c'])
-    expect(g.flatMap((x) => x.rows).some((r) => r.task.id === 'p')).toBe(false)
-  })
-
-  it('a milestone put on the week itself stands in its own card, said quietly', () => {
-    const itself = task({ ...trip, bucket: 'week' })
-    const g = buildShelf({ weekTasks: [itself], tasks: [itself], weekStart, milestones: [{ id: 'm1', title: trip.title, completed: false, onWeek: true }], now: new Date(2026, 9, 3, 9) })
-    expect(g[0].milestone?.id).toBe('m1')
-    expect(g[0].rows[0]).toMatchObject({ task: itself, meta: 'the month goal itself' })
-  })
-
-  it('a day that passed undone comes back with a quiet “from Fri”', () => {
-    const missed = task({ id: 'm', title: 'Return books', scheduledFor: new Date(2026, 9, 9), isAllDay: true })
-    const g = buildShelf({ weekTasks: [missed], tasks: [missed], weekStart, milestones: [], now: new Date(2026, 9, 10, 9) })
-    expect(g[0].rows[0].meta).toBe('from Fri')
-  })
-})
+afterEach(() => { vi.useRealTimers(); for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.removeItem(k); for (const k of ['symphony-strip-tab:week', 'symphony-strip-open:week', 'symphony-fold:week']) localStorage.removeItem(k) })
 
 describe('WeekCanvas — drag', () => {
   // Scott 2026-10-19: a timed event drags to another day, keeping its time.
@@ -181,27 +150,42 @@ describe('WeekCanvas — drag', () => {
   })
 })
 
-// Scott, 2026-10-12: the column of October goals repeated the goal cards
-// and, stacked full width, pushed the days off the screen. Each goal is
-// named once, on its card, and a task is filed by dropping it on one.
-describe('WeekCanvas — the strip’s month tab', () => {
-  it('a month line drags onto a day; a month goal never gets a day', async () => {
+// Paper-style horizons (spec 2026-11-04): the month is a read-only sheet
+// folded beside the days, hinged at their left edge. Nothing on it moves onto
+// the week: no "→ Week", no drag onto a day, no month tab in the strip.
+describe('WeekCanvas — the month folds beside the week', () => {
+  const month = { word: 'November', kicker: 'Month · Nov 1 – 30', rows: [{ id: 'ml', title: 'Office clean up' }, { id: 'mg', title: 'Plan winter vacation' }], doneCount: 1 }
+
+  it('shows the month’s edge, "November, 2 open. Unfold to read", and no → Week or month tab', async () => {
     const { MemoryRouter } = await import('react-router-dom')
-    const w = { ...writers(), pullLine: vi.fn() }
-    const line = task({ id: 'ml', title: 'Office clean up', bucket: 'month' })
-    const goal = task({ id: 'mg', title: 'Get the paperwork in order', bucket: 'month', isGoal: true })
-    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={[]} routinesToPlace={[]} isCurrent writers={w}
-      month={{ word: 'October', href: '/month', lines: [{ task: line, meta: null, onWeek: false }, { task: goal, meta: null, onWeek: false }] }} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('tab', { name: 'October' }))
-    expect(screen.getByText('Get the paperwork in order').closest('li')).toHaveAttribute('draggable', 'false')
-    for (const [id, title] of [['ml', 'Office clean up'], ['mg', 'Get the paperwork in order']]) {
-      const d = dt()
-      d.t.setData('application/x-symphony-plan', JSON.stringify({ kind: 'task', id, date: '2026-10-03', title }))
-      d.arm()
-      fireEvent.drop(screen.getByTestId('journal-day-2026-10-06'), { dataTransfer: d.t })
-    }
-    expect(w.pullLine).toHaveBeenCalledTimes(1)
-    expect(w.pullLine).toHaveBeenCalledWith(line, dayOf(3))
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} month={month} /></MemoryRouter>)
+    const edge = screen.getByRole('button', { name: 'November, 2 open. Unfold to read' })
+    expect(edge).toHaveAttribute('aria-expanded', 'false')
+    expect(edge).toHaveAttribute('aria-controls')
+    expect(screen.queryByRole('button', { name: /→ Week/ })).toBeNull()
+    expect(screen.queryByText('→ Week')).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'November' })).toBeNull()
+    expect(screen.getAllByRole('tab').map((t) => t.textContent?.replace(/\d+$/, ''))).toEqual(['Week', 'Routines'])
+    // The days are this sheet; the month's lines are for reading only.
+    const sheet = document.getElementById(screen.getByRole('button', { name: /^November, 2 open/ }).getAttribute('aria-controls')!)!
+    expect(within(sheet).getByText('Office clean up')).toBeInTheDocument()
+    expect(within(sheet).getByText('For reading. Write this week in its own words.')).toBeInTheDocument()
+    expect(within(sheet).queryAllByRole('button', { hidden: true })).toEqual([])
+    expect(edge.closest('.paper-fold')).toContainElement(screen.getByRole('region', { name: 'The days' }))
+  })
+
+  it('nothing on the month’s sheet drags', async () => {
+    const { MemoryRouter } = await import('react-router-dom')
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} month={month} /></MemoryRouter>)
+    const sheet = document.getElementById(screen.getByRole('button', { name: /^November, 2 open/ }).getAttribute('aria-controls')!)!
+    const lines = within(sheet).getAllByRole('listitem', { hidden: true })
+    expect(lines.map((li) => li.textContent)).toEqual(['Office clean up', 'Plan winter vacation'])
+    for (const li of lines) expect(li).not.toHaveAttribute('draggable', 'true')
+  })
+
+  it('no fold while a guided session plans the week (its steps read the month)', () => {
+    show(writers(), { hideStrip: true, month })
+    expect(screen.queryByRole('button', { name: /November, 2 open/ })).toBeNull()
   })
 })
 
@@ -215,6 +199,9 @@ describe('WeekCanvas — deleting from No day yet', () => {
   })
 })
 
+// Scott, 2026-10-12: the column of October goals repeated the goal cards
+// and, stacked full width, pushed the days off the screen. Each goal is
+// named once, on its card, and a task is filed by dropping it on one.
 describe('WeekCanvas — filing a task under a goal', () => {
   it('has no separate column of goals: the strip is the only side panel', () => {
     show()

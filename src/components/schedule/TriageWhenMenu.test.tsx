@@ -4,13 +4,26 @@ import { render } from '@/test/test-utils'
 import { TriageWhenMenu } from './TriageWhenMenu'
 
 describe('TriageWhenMenu', () => {
-  it('renders the four horizon groups + delete', () => {
+  it('renders the horizon groups + delete', () => {
     render(<TriageWhenMenu onPick={vi.fn()} onDelete={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Week' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Month' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Someday' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+
+  // Paper-style horizons (spec 2026-11-04): nothing moves up from the week
+  // to a month. The When menu offers no "This month" or "Next month".
+  it('offers no This month or Next month', async () => {
+    const { user } = render(<TriageWhenMenu onPick={vi.fn()} onDelete={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Month' })).toBeNull()
+    for (const group of ['Today', 'Week']) {
+      await user.click(screen.getByRole('button', { name: group }))
+      expect(screen.queryByRole('menuitem', { name: 'This month' })).toBeNull()
+      expect(screen.queryByRole('menuitem', { name: 'Next month' })).toBeNull()
+    }
+    expect(screen.queryByText('This month')).toBeNull()
+    expect(screen.queryByText('Next month')).toBeNull()
   })
 
   it('Someday applies directly (single option, no fan-out)', async () => {

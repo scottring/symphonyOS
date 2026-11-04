@@ -37,17 +37,18 @@ export function weekListTasks(tasks: readonly Task[], weekStart: Date, meId: str
  * open in Sometime this weekend. The week's count ("N of about 15") is these,
  * so the count covers exactly the rows drawn (spec: same filter for items and
  * counts). A dated task only someone else carries is on its day, so it counts;
- * an undated one the list leaves out is not drawn, so it does not. Goals are
- * not tasks.
+ * an undated one the list leaves out is not drawn, so it does not. A task
+ * marked is_goal is drawn and counted like any other (paper-style horizons,
+ * 2026-11-04).
  */
 export function weekShownTasks({ listed, drawn, weekStart }: { listed: readonly Task[]; drawn: readonly Task[]; weekStart: Date }): Task[] {
   const first = localYmd(weekStart)
   const last = localYmd(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6))
   const inWeek = (d: Date | undefined) => !!d && localYmd(d) >= first && localYmd(d) <= last
   const out = new Map<string, Task>()
-  for (const t of listed) if (!t.isGoal) out.set(t.id, t)
+  for (const t of listed) out.set(t.id, t)
   for (const t of drawn) {
-    if (t.isGoal || out.has(t.id)) continue
+    if (out.has(t.id)) continue
     if (t.scheduledFor ? inWeek(t.scheduledFor) : (!t.completed && inWeek(t.weekendStart))) out.set(t.id, t)
   }
   return [...out.values()]

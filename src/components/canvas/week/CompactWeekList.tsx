@@ -5,10 +5,9 @@
 // classic TodayWeekColumn and the connected workspace's AlongsideDay — each
 // keeping its own data and writers; this draws the rows.
 //
-//  - Rows sit under the line they serve (the month milestone), the parent
-//    written once as a group header. A parent with one row here is a muted
-//    suffix on that row instead. Rows that serve nothing are the last group,
-//    "Unlinked" — first-class, not a warning.
+//  - The rows are flat, in the week's own order (paper-style horizons,
+//    2026-11-04): no heading for a month line, no "Unlinked", and nothing
+//    on a row says what it serves. Week and Today show the same week.
 //  - Titles wrap; nothing is cut to one line.
 //  - "Add to today" is a small, always-visible icon button, not a pill of
 //    words repeated down the column.
@@ -24,7 +23,6 @@
 import { useState, type ComponentPropsWithRef, type DragEvent, type ReactNode } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { useArrived } from '@/contexts/CanvasActivityContext'
-import { groupByParent, type ParentGroup, type RowParent } from './compactWeek'
 
 export interface CompactRow<T> {
   key: string
@@ -33,7 +31,6 @@ export interface CompactRow<T> {
   title: string
   item: T
   completed?: boolean
-  parent?: RowParent | null
   /** One small line under the title ("Kept from last week", "Currently Oct 9"). */
   context?: string | null
   /** Already on the viewed day: the tag's words ("Today", "Today 2p"). */
@@ -50,12 +47,9 @@ export interface CompactWeekListProps<T> {
   label: string
   /** "Add Call the bank to today". */
   addLabel?: (title: string) => string
-  /** Group rows under their parents (default). Off: one plain list. */
-  grouped?: boolean
   onAdd?: (item: T, button: HTMLButtonElement) => void
   onComplete?: (item: T) => void
   onOpen?: (item: T) => void
-  onOpenParent?: (parentId: string) => void
   /** Writes the caller's own drag payload. Absent: rows don't drag. */
   onDragStart?: (item: T, ev: DragEvent<HTMLLIElement>) => void
   /** The row whose add is saving. */
@@ -67,49 +61,15 @@ export interface CompactWeekListProps<T> {
 }
 
 export function CompactWeekList<T>(props: CompactWeekListProps<T>) {
-  const { rows, label, grouped = true, empty } = props
+  const { rows, label, empty } = props
   const [showDone, setShowDone] = useState(false)
   const doneCount = rows.filter((r) => r.completed).length
   const visible = showDone ? rows : rows.filter((r) => !r.completed)
-  const groups = grouped ? groupByParent(visible) : [{ key: 'all', parent: null, rows: visible } as ParentGroup<CompactRow<T>>]
-  // One group of nothing-in-particular has no header worth reading.
-  const onlyUnlinked = groups.length === 1 && !groups[0].parent
-
-  const blocks: ReactNode[] = []
-  let loose: ReactNode[] = []
-  const flush = () => {
-    if (!loose.length) return
-    blocks.push(<ul key={`loose-${blocks.length}`} className="cw-rows">{loose}</ul>)
-    loose = []
-  }
-  for (const g of groups) {
-    if (g.parent && g.rows.length === 1) {
-      loose.push(<CompactWeekRow key={g.rows[0].key} row={g.rows[0]} suffix={g.parent.title} {...props} />)
-      continue
-    }
-    if (!g.parent && onlyUnlinked) {
-      loose.push(...g.rows.map((r) => <CompactWeekRow key={r.key} row={r} {...props} />))
-      continue
-    }
-    flush()
-    const title = g.parent?.title ?? 'Unlinked'
-    blocks.push(
-      <section key={g.key} className={`canvas-group cw-group${g.parent ? '' : ' is-unlinked'}`} aria-label={title}>
-        <div className="canvas-group-head">
-          {g.parent && props.onOpenParent
-            ? <button type="button" className="canvas-group-title cw-group-title" onClick={() => props.onOpenParent?.(g.parent!.id)}>{title}</button>
-            : <span className="canvas-group-title">{title}</span>}
-        </div>
-        <ul className="cw-rows">{g.rows.map((r) => <CompactWeekRow key={r.key} row={r} {...props} />)}</ul>
-      </section>,
-    )
-  }
-  flush()
 
   return (
     <div className="cw-list" role="group" aria-label={label}>
       {visible.length === 0 && empty}
-      {blocks}
+      {visible.length > 0 && <ul className="cw-rows">{visible.map((r) => <CompactWeekRow key={r.key} row={r} {...props} />)}</ul>}
       {doneCount > 0 && (
         <button type="button" className="canvas-link cw-done-toggle" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>
           {showDone ? 'Hide done' : 'Show done'}
@@ -121,8 +81,6 @@ export function CompactWeekList<T>(props: CompactWeekListProps<T>) {
 
 export interface CompactWeekRowProps<T> {
   row: CompactRow<T>
-  /** A lone row's parent, written after its title. */
-  suffix?: string
   addLabel?: (title: string) => string
   /** The + button; it is handed the button so a caller can anchor a picker. */
   onAdd?: (item: T, button: HTMLButtonElement) => void
@@ -149,7 +107,7 @@ export interface CompactWeekRowProps<T> {
 }
 
 /** One compact row: check, wrapping title, small meta, and + (or a menu). */
-export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, extra, under, children, className, liProps }: CompactWeekRowProps<T>) {
+export function CompactWeekRow<T>({ row, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, extra, under, children, className, liProps }: CompactWeekRowProps<T>) {
   const arrived = useArrived(row.id)
   const done = !!row.completed
   const movable = !!onDragStart && !row.readOnly && !row.onDay && !done && !disabled
@@ -170,11 +128,10 @@ export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete,
         {onOpen
           ? <button type="button" className="cw-title" onClick={() => onOpen(row.item)}>{row.title}</button>
           : <span className="cw-title">{row.title}</span>}
-        {/* One muted line under the title: what it serves, then its notes.
-            The title gets the row's width; this line never wraps. */}
-        {(suffix || row.meta || row.context) && (
-          <span className="cw-sub" title={[suffix, row.meta, row.context].filter(Boolean).join(" · ")}>
-            {suffix && <span className="cw-parent"><span className="sr-only">For </span>{suffix}</span>}
+        {/* One muted line under the title: its notes. The title gets the
+            row's width; this line never wraps. */}
+        {(row.meta || row.context) && (
+          <span className="cw-sub" title={[row.meta, row.context].filter(Boolean).join(" · ")}>
             {row.meta && <span className="cw-meta">{row.meta}</span>}
             {row.context && <span className="cw-context">{row.context}</span>}
           </span>

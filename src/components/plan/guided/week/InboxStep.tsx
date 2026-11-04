@@ -1,8 +1,9 @@
 // Planning the week, step 4 (spec 2026-11-01): clear the inbox. Each capture
-// gets one of three answers: This week, Later (next week, this month, next
-// month) or Let go (out of the way, in Someday: nothing here deletes). The
-// captures are the page's own (its space filter and people lens), and every
-// answer saves through the deck's writers, with a receipt and Undo.
+// gets one of three answers: This week, Later (next week; paper-style
+// horizons, 2026-11-04: nothing goes up to a month from here) or Let go (out
+// of the way, in Someday: nothing here deletes). The captures are the page's
+// own (its space filter and people lens), and every answer saves through the
+// deck's writers, with a receipt and Undo.
 
 import { useState } from 'react'
 import type { DeckCard } from '@/lib/planning/deck'
@@ -10,8 +11,6 @@ import type { DeckActions, LaterWhen } from '@/components/home/week/useDeckActio
 
 const LATER: { label: string; when: LaterWhen }[] = [
   { label: 'Next week', when: 'next-week' },
-  { label: 'This month', when: 'this-month' },
-  { label: 'Next month', when: 'next-month' },
 ]
 
 export function InboxStep({ cards, actions }: {

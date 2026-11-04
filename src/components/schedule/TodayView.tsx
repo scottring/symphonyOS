@@ -39,8 +39,6 @@ import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { TodayWeekColumn } from './TodayWeekColumn'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 import { TodayComingUp } from './TodayComingUp'
-import { ServesLine } from './ServesLine'
-import { parentLinkOf } from '@/lib/planning/parentLink'
 import { nextWeekEntries } from '@/lib/today/dayPlan'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
@@ -1205,15 +1203,6 @@ export function TodayView({
       Add task
     </button>
   ) : undefined
-  // What each row serves, at rest — the Week list's "↳ Step toward …" /
-  // "↳ From …" line (walkthrough 2026-10-02, #24). Read from this page's own
-  // filtered tasks, so a parent outside the reader's view is never named.
-  const servesFor = useCallback((task: Task) => {
-    if (task.completed) return undefined
-    const parent = parentLinkOf(task, (id) => tasksMap.get(id))
-    return parent ? <ServesLine parent={parent} onOpen={(id) => handleSelectItem(`task-${id}`)} /> : undefined
-  }, [tasksMap, handleSelectItem])
-
   // A pending change card's marks on the rows (todayPreview.ts). A row the
   // card draws again elsewhere on the day is left out where it is now.
   const previewOf = useCallback((item: TimelineItem) => {
@@ -1234,7 +1223,6 @@ export function TodayView({
   // the one flat list had, handed to three renders of it. Rows: tick, drag,
   // tap to open; the item panel holds every other job (spec 2026-10-14).
   const listProps = {
-    servesFor,
     isReadOnlyEvent,
     viewedDate,
     isMobile,
@@ -1720,7 +1708,6 @@ export function TodayView({
             <TodayWeekColumn plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
               weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
               nextWeek={nextWeek} onHide={() => setTodayView('list')}
-              findTask={(id) => tasksMap.get(id)} openTask={(id) => handleSelectItem(`task-${id}`)}
               chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
               restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)} />
           )}

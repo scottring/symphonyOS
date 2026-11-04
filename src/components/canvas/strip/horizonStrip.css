@@ -79,6 +79,19 @@
 /* Doubled class: the app loads canvas-today.css (.wc, a column) after this
    file, and a column here squeezed the days to a sliver. */
 .wc.wc-with-strip > .hs-main { display: flex; flex-direction: column; gap: 16px; flex: 999 1 560px; min-width: 0; width: auto; container-type: inline-size; }
+/* The month folded beside the days (paper-style horizons, 2026-11-04). The
+   days are this sheet, at the width the page gives them: opening the fold
+   takes its room from the days rather than capping them at a reading column,
+   and the days stack (the container query below) when that leaves too little.
+   `article` lifts these over PaperFold's own sizes in every fold mode. */
+.paper-fold.wc-fold { width: 100%; margin-inline: 0; }
+.paper-fold.wc-fold > article.paper-fold-current {
+  /* tall enough for the edge's name and the month's lines on a quiet week */
+  width: auto; flex: 1 1 0; min-width: 0; min-height: 320px;
+  padding: 0; background: none; box-shadow: none; border-radius: 0;
+  container-type: inline-size;
+}
+.paper-fold.wc-fold[data-fold-mode='v'] > article.paper-fold-current { width: 100%; flex: none; min-height: 0; padding-top: 10px; }
 .hs .wc-noday-chips.hs-noday { grid-template-columns: 1fr; column-gap: 0; margin-top: 6px; }
 .hs .wc-noday-chip { min-height: 32px; padding: 0 4px; }
 .hs .wc-noday-open { font-size: 14px; }

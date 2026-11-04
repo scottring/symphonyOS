@@ -14,7 +14,7 @@ describe('TaskFateMenu', () => {
     render(<TaskFateMenu onPickWhen={vi.fn()} onComplete={vi.fn()} onDelete={vi.fn()} />)
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     open()
-    for (const label of ['Today', 'Week', 'Month', 'Someday']) {
+    for (const label of ['Today', 'Week', 'Season', 'Someday']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
     expect(screen.getByLabelText('Mark done')).toBeInTheDocument()
@@ -30,13 +30,14 @@ describe('TaskFateMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  it('routes a fanned-out when (Month → This month)', () => {
+  // Paper-style horizons (2026-11-04): the When menu has no Month group.
+  it('routes a fanned-out when (Week → Next week)', () => {
     const onPickWhen = vi.fn()
     render(<TaskFateMenu onPickWhen={onPickWhen} />)
     open()
-    fireEvent.click(screen.getByRole('button', { name: 'Month' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'This month' }))
-    expect(onPickWhen).toHaveBeenCalledWith('this-month')
+    fireEvent.click(screen.getByRole('button', { name: 'Week' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Next week' }))
+    expect(onPickWhen).toHaveBeenCalledWith('next-week')
   })
 
   it('Done and Delete fire their handlers', () => {

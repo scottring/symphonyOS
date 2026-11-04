@@ -22,7 +22,6 @@ import { WeekRow } from './WeekRow'
 import { MonthLink } from './MonthLink'
 import { useSafeAdd } from './useSafeAdd'
 import { anOrA } from '@/lib/week/monthLinks'
-import { groupByParent } from '@/components/canvas/week/compactWeek'
 
 export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint, forLine, forOptions, onForLine, forId: forIdProp, onForId, inputRef, footer }: {
   title: string
@@ -90,15 +89,9 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   const allPlaced = open.length > 0 && open.every((l) => inWeek(l.task)) && !missed.length
   const missedIds = new Set(missed.map((l) => l.task.id))
   // What still waits for a day — passed, undated, or dated outside this week —
-  // in the person's own order, under the month line each serves (the line
-  // written ONCE as a header; one row alone carries it as its own note).
-  // Rows that serve no line come last, together (canvas design 2026-10-10).
+  // flat, in the person's own order (paper-style horizons, 2026-11-04: no
+  // grouping by the month line a row was written for).
   const waiting = open.filter((l) => missedIds.has(l.task.id) || !l.task.scheduledFor || !inWeek(l.task))
-  const parentGroups = groupByParent(waiting.map((l) => {
-    const f = forLine?.(l.task) ?? null
-    return { vm: l, line: f, parent: f ? { id: f.id, title: f.title } : null }
-  }))
-  const onlyUnlinked = parentGroups.length === 1 && !parentGroups[0].parent
   // The list takes things back: a day's task dropped here loses its day and
   // stays this week (useWeekDragDrop, kind 'weekList').
   const { setNodeRef: dropRef, isOver } = useDroppable({ id: 'week-list', data: { kind: 'weekList' }, disabled: !dragEnabled })
@@ -108,29 +101,13 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
     onContext={onContext} dragEnabled={dragEnabled} forLine={forLineOf} forPlacement={forPlacement} note={outside(vm.task)}
     forControl={onForLine && forOptions ? (cur) => <MonthLink title={vm.task.title} current={cur} options={forOptions} onChange={(id) => onForLine(vm.task, id)} /> : undefined}
     passed={missedIds.has(vm.task.id) ? vm.task.scheduledFor!.toLocaleDateString('en-US', { weekday: 'long' }) : null} />
-  const blocks: ReactNode[] = []
-  let loose: ReactNode[] = []
-  const flush = () => { if (loose.length) { blocks.push(<ul key={`loose-${blocks.length}`} className="pv2-list">{loose}</ul>); loose = [] } }
-  for (const g of parentGroups) {
-    if (onlyUnlinked || (g.parent && g.rows.length === 1)) { loose.push(...g.rows.map((r) => row(r.vm, r.line))); continue }
-    flush()
-    const month = g.rows[0].line?.month
-    const label = g.parent ? `for ${month}: ${g.parent.title}` : 'Unlinked'
-    blocks.push(
-      <section key={g.key} aria-label={label} className={`canvas-group cw-wl-group${g.parent ? '' : ' is-unlinked'}`}>
-        <div className="canvas-group-head"><span className="canvas-group-title">{g.parent ? g.parent.title : 'Unlinked'}</span>{g.parent && month && <small>{month}</small>}</div>
-        <ul className="pv2-list">{g.rows.map((r) => row(r.vm, r.line, 'tools'))}</ul>
-      </section>,
-    )
-  }
-  flush()
   return (
     <section ref={dropRef} aria-label="This week's list" className={`pv2-wl${isOver ? ' is-over' : ''}`}>
       <div className="pv2-colh">{title}{headerAction}</div>
       {hint && <p className="wk-listhint">{hint}</p>}
       {!open.length && !done.length && <p className="pv2-hint ds-empty-body">{emptyHint ?? 'Nothing on this week’s list yet. Add below.'}</p>}
       {allPlaced && <p className="pv2-hint">Everything on this week’s list has a day.</p>}
-      {blocks}
+      {waiting.length > 0 && <ul className="pv2-list">{waiting.map((l) => row(l, forLine?.(l.task) ?? null))}</ul>}
       {showDone && done.length > 0 && (
         <section aria-label="Completed">
           <div className="pv2-wl-h">Completed</div>

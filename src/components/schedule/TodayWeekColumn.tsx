@@ -11,6 +11,10 @@
 // each manual command reporting through the canvas activity strip with an
 // Undo where the inverse is real.
 //
+// The rows are flat and say nothing about what they serve (paper-style
+// horizons, 2026-11-04): the same week, in the same order, as the Week page's
+// own list, since both read weekListTasks.
+//
 // On the week's last day the week still ahead is here too (walkthrough
 // 2026-10-02, #24/#18: a plan made for next week was nowhere on Today). Its
 // rows are for reading — a details click, never "add to today".
@@ -23,7 +27,6 @@ import { alreadyPlaced } from '@/lib/today/dayPlan'
 import type { DayPlanPanelActions } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
 import { writePlanDrag } from '@/lib/planning/planDrag'
-import { parentLinkOf } from '@/lib/planning/parentLink'
 import { focusSnapshot } from '@/lib/placement/model'
 import { formatTimeCompact } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
@@ -32,7 +35,7 @@ import { dayWordFor } from '@/components/canvas/week/compactWeek'
 
 export interface TodayNextWeek { weekNo: number; weekStart: Date; entries: DayPlanEntry[] }
 
-export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWeek, onHide, findTask, openTask, chooseTask, restoreTask }: {
+export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWeek, onHide, chooseTask, restoreTask }: {
   plan: DayPlan
   day: Date
   weekNo: number
@@ -43,11 +46,6 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
   /** Folds the column away once the day is chosen (the header's view icons
    *  bring it back). */
   onHide?: () => void
-  /** The page's own (filtered) task lookup: a row's parent is named only
-   *  when the reader can see it. */
-  findTask?: (id: string) => Task | undefined
-  /** Opens a parent line's details (the group header is its door). */
-  openTask?: (id: string) => void
   /** Choose a task for the day and say whether it saved (planActions'
    *  chooseTaskDay). Without it, `actions.choose` is used. */
   chooseTask?: (id: string) => Promise<boolean>
@@ -67,14 +65,9 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
     if (t?.scheduledFor && localYmd(t.scheduledFor) === ymd) return t.isAllDay === false ? `${dayTag} ${formatTimeCompact(t.scheduledFor)}` : dayTag
     return e.planned || e.onToday ? dayTag : null
   }
-  const parentOf = (e: DayPlanEntry) => {
-    if (!e.task || !findTask) return null
-    const p = parentLinkOf(e.task, findTask)
-    return p ? { id: p.id, title: p.title } : null
-  }
   const toRow = (e: DayPlanEntry, readOnly = false): CompactRow<DayPlanEntry> => ({
     key: e.key, id: e.id, title: e.title, item: e, completed: e.completed,
-    parent: parentOf(e), context: e.context, onDay: readOnly ? null : onDayTag(e), readOnly,
+    context: e.context, onDay: readOnly ? null : onDayTag(e), readOnly,
   })
 
   // The week's rows: still to place, or already on this day (marked, not
@@ -125,7 +118,6 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
     onAdd: toToday,
     onComplete: complete,
     onOpen: actions.open,
-    onOpenParent: openTask,
     onDragStart: (e: DayPlanEntry, ev: DragEvent<HTMLLIElement>) =>
       writePlanDrag(ev.dataTransfer, { kind: e.kind, id: e.id, date: ymd, title: e.title }),
   }
@@ -149,7 +141,7 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
           <button type="button" className="cw-fold" aria-expanded={routinesOpen} onClick={() => setRoutinesOpen((o) => !o)}>
             Routines {dayWord} <ChevronRight size={14} aria-hidden="true" className="cw-fold-icon" />
           </button>
-          {routinesOpen && <CompactWeekList rows={routineRows} grouped={false} label={`Routines ${dayWord}`} {...listProps} />}
+          {routinesOpen && <CompactWeekList rows={routineRows} label={`Routines ${dayWord}`} {...listProps} />}
         </div>
       )}
       <button type="button" className="canvas-link cw-open" onClick={() => navigate(`/week?start=${localYmd(weekStart)}`)}>Open week {weekNo} →</button>

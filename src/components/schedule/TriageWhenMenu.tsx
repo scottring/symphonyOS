@@ -35,10 +35,11 @@ const GROUPS: WhenGroup[] = [
       { when: 'next-weekend', label: 'Next weekend' },
     ],
   },
+  // Paper-style horizons (spec 2026-11-04): nothing moves up from the week to
+  // a month, so "This month" and "Next month" are gone. This season stays,
+  // on its own.
   {
-    label: 'Month', primary: 'this-month', options: [
-      { when: 'this-month', label: 'This month' },
-      { when: 'next-month', label: 'Next month' },
+    label: 'Season', primary: 'this-season', options: [
       { when: 'this-season', label: 'This season' },
     ],
   },

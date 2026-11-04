@@ -23,15 +23,17 @@ describe('InboxStep — step 4, clear the inbox', () => {
     expect(a.letGo).toHaveBeenCalledWith(cards[1])
   })
 
-  it('Later opens when: next week, this month, next month', async () => {
+  // Paper-style horizons (spec 2026-11-04): nothing goes up to a month from
+  // the week's planning; Later is next week.
+  it('Later opens when: next week only, no This month or Next month', async () => {
     const a = actions()
     const cards = [card('Book the vet')]
     render(<InboxStep cards={cards} actions={a} />)
     fireEvent.click(screen.getByRole('button', { name: 'Later: Book the vet' }))
     const when = within(screen.getByRole('group', { name: 'Later: Book the vet' }))
-    expect(when.getAllByRole('button').map((b) => b.textContent)).toEqual(['Next week', 'This month', 'Next month'])
-    await act(async () => { fireEvent.click(when.getByRole('button', { name: 'Next month' })) })
-    expect(a.later).toHaveBeenCalledWith(cards[0], 'next-month')
+    expect(when.getAllByRole('button').map((b) => b.textContent)).toEqual(['Next week'])
+    await act(async () => { fireEvent.click(when.getByRole('button', { name: 'Next week' })) })
+    expect(a.later).toHaveBeenCalledWith(cards[0], 'next-week')
   })
 
   it('a write that did not save says so on its row', async () => {

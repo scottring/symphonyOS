@@ -19,6 +19,10 @@
 //                    days: a few as draggable rows, more folded to one line
 //                    (2026-10-14). Inbox, last week and the month's goals
 //                    are the planning session's.
+//   The month        folded beside the days (paper-style horizons, Scott
+//                    2026-11-04): a read-only sheet hinged at the days' left
+//                    edge (PaperFold + AboveSheet). Nothing on it moves onto
+//                    the week: no "→ Week", no drag onto a day.
 //
 // Drag a row onto a day to place it, a day's row onto another day to move
 // it, back onto the No day yet line to take its day away. While dragging, the
@@ -68,6 +72,8 @@ import { dragPointerY } from '@/lib/today/dragPointer'
 import { gapAt, gapToListIndex } from '@/lib/week/dayReorder'
 import { HorizonStrip } from '@/components/canvas/strip/HorizonStrip'
 import { TypedAdd } from '@/components/canvas/strip/TypedAdd'
+import { PaperFold } from '@/components/plan/fold/PaperFold'
+import { AboveSheet } from '@/components/plan/fold/AboveSheet'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 
 export interface CanvasDayItem {
@@ -145,17 +151,22 @@ export interface WeekCanvasWriters {
   /** Move a timed calendar event to another day at the same time. Absent:
    *  events do not drag. */
   moveEvent?: (event: CanvasDayItem, day: Date) => void
-  /** The strip's month tab: bring a month line onto this week, on a day or
-   *  (null) with no day. Absent: the month tab is not drawn. */
-  pullLine?: (task: Task, day: Date | null) => void
   /** No day yet: delete a task (the caller offers Undo). Absent: no Delete. */
   deleteTask?: (task: Task) => void
   /** "+ Add to week" / "+ Add to day": a typed sentence, landed by its date. */
   addTyped?: (parse: HorizonParse, landing: HorizonLanding) => Promise<boolean>
 }
 
-/** A month line in the strip's month tab. */
-export interface StripLine { task: Task; meta: string | null; onWeek: boolean }
+/** The month above this week, for reading beside the days: its open lines,
+ *  titles only, and how many are done. */
+export interface WeekMonthSheet {
+  /** "November": the edge's name and the sheet's title. */
+  word: string
+  /** "Month · Nov 1 – 30". */
+  kicker: string
+  rows: { id: string; title: string }[]
+  doneCount: number
+}
 
 export interface WeekCanvasProps {
   weekStart: Date
@@ -182,8 +193,9 @@ export interface WeekCanvasProps {
   unplacedCount?: number
   /** Who is looking: a row only they carry shows no face. */
   viewerId?: string
-  /** The month above this week, for the strip's month tab. */
-  month?: { word: string; href: string; lines: StripLine[] }
+  /** The month above this week, folded beside the days for reading. Absent
+   *  (a week looked back on): no fold. */
+  month?: WeekMonthSheet
   /** A guided session's steps stand where the strip does (spec 2026-11-01:
    *  the strip's lists appear inside the steps that use them). Planning,
    *  every day shows its whole slate, nothing behind "+N more" (Scott,
@@ -255,8 +267,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const prefs = useWeekViewPrefs()
   const showDone = prefs.done
   // The desk and tablet draw the strip on the left (Scott's wireframe,
-  // 2026-10-25): the week's own list, its routines and the month above. The
-  // days hold what happens on each day, routines included.
+  // 2026-10-25): the week's own list and its routines. The days hold what
+  // happens on each day, routines included; the month folds beside them.
   const stripMode = !phone
   const [drag, setDrag] = useState<Drag | null>(null)
   const [overDay, setOverDay] = useState<string | null>(null)
@@ -313,13 +325,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     writePlanDrag(ev.dataTransfer, payload)
     setDrag(d); setPicker(null)
   }
-  const monthLine = (id: string) => month?.lines.find((l) => l.task.id === id) ?? null
   const dropOnDay = (day: CanvasDay, p: PlanDragPayload) => {
     endDrag()
     if (p.kind === 'task') {
-      const line = monthLine(p.id)
-      // A goal is never given a day (nested horizons): only its next actions are.
-      if (line && writers.pullLine && !shelfTasks.has(p.id) && !dayTask(p.id)) { if (!line.task.isGoal) writers.pullLine(line.task, day.date); return }
       const fromShelf = shelfTasks.get(p.id)
       if (fromShelf) { writers.placeTask(fromShelf, day.date); return }
       const placed = dayTask(p.id)
@@ -737,6 +745,18 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     ? pastNote && createPortal(pastNote, slots.subline)
     : pastNote && <p className="wc-subtitle is-inline">{pastNote}</p>
 
+  // The month above, folded beside the days for reading (paper-style
+  // horizons, 2026-11-04), hinged at their left edge (the top edge on a
+  // phone). Not while a guided session plans the week: its steps read the
+  // month.
+  const withMonth = (node: ReactNode) => month && !hideStrip ? (
+    <PaperFold horizon="week" className="wc-fold" edgeLabel={month.word} edgeCount={month.rows.length}
+      above={<AboveSheet kicker={month.kicker} title={month.word} rows={month.rows} doneCount={month.doneCount}
+        foot="For reading. Write this week in its own words." empty={`No ${month.word} goals yet.`} />}>
+      {node}
+    </PaperFold>
+  ) : node
+
   if (phone) {
     const sel = days.find((d) => d.key === selectedKey)
     return withTouch(
@@ -751,9 +771,11 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             </button>
           ))}
         </div>
-        {sel && dayColumn(sel)}
-        {nodayTray}
-        {rhythmNode}
+        {withMonth(<>
+          {sel && dayColumn(sel)}
+          {nodayTray}
+          {rhythmNode}
+        </>)}
       </div>,
     )
   }
@@ -830,27 +852,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       {everyDay.length > 0 && <p className="hs-note">Every-day routines are on <Link to="/today">Today</Link>: {everyDay.slice(0, 3).join(', ')}{everyDay.length > 3 ? ` and ${everyDay.length - 3} more` : ''}.</p>}
     </>
   )
-  // The month above: its open lines, brought onto this week by drag or "→ Week".
-  const monthTab = month && writers.pullLine && (
-    <>
-      <p className="hs-eyebrow">{month.word} · still open</p>
-      {month.lines.length === 0 && <p className="hs-empty">Nothing open on {month.word}.</p>}
-      <ul className="hs-list">
-        {month.lines.map((l) => (
-          <li key={l.task.id} className="hs-row" draggable={!coarse && !l.onWeek && !l.task.isGoal}
-            onDragStart={(ev) => startDrag(ev, { kind: 'task', id: l.task.id, date: localYmd(weekStart), title: l.task.title }, { kind: 'task', id: l.task.id })}
-            onDragEnd={endDrag}>
-            <span className="hs-row-body">
-              <button type="button" className="hs-row-title" onClick={() => writers.open(`task-${l.task.id}`)}>{l.task.title}</button>
-              {(l.onWeek || l.meta) && <span className={`hs-row-meta${l.onWeek ? ' is-here' : ''}`}>{l.onWeek ? 'On this week' : l.meta}</span>}
-            </span>
-            {!l.onWeek && <button type="button" className="hs-row-go" aria-label={`Bring ${l.task.title} onto this week`} onClick={() => writers.pullLine!(l.task, null)}>→ Week</button>}
-          </li>
-        ))}
-      </ul>
-      <Link to={month.href} className="canvas-link hs-add">Open {month.word} →</Link>
-    </>
-  )
   const composerDay = composer?.key ? days.find((d) => d.key === composer.key) : undefined
   const composerNode = composer && writers.addTyped && (
     <TypedAdd key={composer.key ?? 'week'} label={composerDay ? `Add to ${dayShort(composerDay.date)}` : 'Add to this week'}
@@ -878,37 +879,38 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         tabs={[
           { id: 'week', label: 'Week', count: nodayN || undefined, content: weekTab },
           { id: 'routines', label: 'Routines', count: routineCount || undefined, content: routinesTab },
-          ...(monthTab ? [{ id: 'month', label: month!.word, content: monthTab }] : []),
         ]} />}
       <div className="hs-main">
       {subtitleNode}
       {composerNode}
-      <section className="wc-days" aria-label="The days">
-        <h2 className="wc-label sr-only">The days</h2>
-        {spans.length > 0 && (
-          <ul className="wc-spans" aria-label="Across these days">
-            {spans.map((sp) => (
-              <li key={sp.id} className={bars.some((b) => b.sp === sp) ? 'has-bar' : undefined}><button type="button" className="wc-span" onClick={() => writers.open(sp.id)}>
-                <span className="wc-span-when">{sp.when}</span> {sp.title}{sp.tail && <span className="wc-span-when">{sp.tail}</span>}
-              </button></li>
-            ))}
-          </ul>
-        )}
-        {weekendFold}
-        <div className={`wc-strip${bars.length ? ' has-bars' : ''}`} style={{ ['--wc-days' as string]: stripDays.length, gridTemplateColumns: stripCols }}>
-          {stripDays.map((d, i) => dayColumn(d, i + 1))}
-          {bars.length > 0 && (
-            <div className="wc-bars" aria-hidden="true" style={{ gridTemplateColumns: stripCols }}>
-              {bars.map(({ sp, start, end }) => (
-                <button key={sp.id} type="button" tabIndex={-1} className="wc-bar" style={{ gridColumn: `${start} / ${end + 1}` }} onClick={() => writers.open(sp.id)}>
-                  <span className="wc-bar-title">{sp.title}</span>{barTail(sp) && <span className="wc-bar-tail">{barTail(sp)}</span>}
-                </button>
+      {withMonth(
+        <section className="wc-days" aria-label="The days">
+          <h2 className="wc-label sr-only">The days</h2>
+          {spans.length > 0 && (
+            <ul className="wc-spans" aria-label="Across these days">
+              {spans.map((sp) => (
+                <li key={sp.id} className={bars.some((b) => b.sp === sp) ? 'has-bar' : undefined}><button type="button" className="wc-span" onClick={() => writers.open(sp.id)}>
+                  <span className="wc-span-when">{sp.when}</span> {sp.title}{sp.tail && <span className="wc-span-when">{sp.tail}</span>}
+                </button></li>
               ))}
-            </div>
+            </ul>
           )}
-        </div>
-        {dinnerRow}
-      </section>
+          {weekendFold}
+          <div className={`wc-strip${bars.length ? ' has-bars' : ''}`} style={{ ['--wc-days' as string]: stripDays.length, gridTemplateColumns: stripCols }}>
+            {stripDays.map((d, i) => dayColumn(d, i + 1))}
+            {bars.length > 0 && (
+              <div className="wc-bars" aria-hidden="true" style={{ gridTemplateColumns: stripCols }}>
+                {bars.map(({ sp, start, end }) => (
+                  <button key={sp.id} type="button" tabIndex={-1} className="wc-bar" style={{ gridColumn: `${start} / ${end + 1}` }} onClick={() => writers.open(sp.id)}>
+                    <span className="wc-bar-title">{sp.title}</span>{barTail(sp) && <span className="wc-bar-tail">{barTail(sp)}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {dinnerRow}
+        </section>
+      )}
       </div>
     </div>,
   )

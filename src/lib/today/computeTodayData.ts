@@ -5,7 +5,6 @@ import { selectCarriedOver, selectSlipped, selectCompletedInbox, selectTimed } f
 import { selectNeedsAttention } from './attention'
 import { buildRoutineStatusMap, buildEventStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildGroupedSections } from './grouping'
-import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { countRoutineUnits } from './routineCollections'
 import { selectDayPlan, routineResolveCtx, routinesForMain } from './dayPlan'
 import { localYmd } from '@/lib/cadence/config'
@@ -119,10 +118,8 @@ export function computeTodayData(given: TodayDataInput): TodayData {
     eventNotesMap: input.eventNotesMap,
     eventContextOverrides: input.eventContextOverrides,
     getDomainForCalendar: input.getDomainForCalendar,
-    // Built from the reader's OWN task list, which RLS has already filtered:
-    // a goal they cannot see contributes no title, so a shared step can never
-    // leak a private goal's name onto Today.
-    goalTitles: goalTitleMap(input.tasks),
+    // No goalTitles: Today's rows say nothing about what they serve
+    // (paper-style horizons, 2026-11-04).
   })
   // Focus orders and highlights a row; it never decides whether the row is on
   // the page (Scott, 2026-09-21). Marked here, on the items themselves, so the

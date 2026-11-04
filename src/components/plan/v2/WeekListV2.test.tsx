@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { WeekListV2 } from './WeekListV2'
 import type { Task } from '@/types/task'
 import type { LineActions } from './PlanLine'
@@ -61,17 +61,16 @@ describe('WeekListV2 — the week’s own list', () => {
     expect(screen.getByText('Monday passed — give it another day?')).toBeInTheDocument()
   })
 
-  // Canvas design, 2026-10-10: the week's list grouped by month goal.
-  it('groups waiting rows under their month goal, one row carrying it as its own note, Unlinked last', () => {
+  // Paper-style horizons (2026-11-04): the week's list is flat, in its own
+  // order, with no heading for a month goal and no "Unlinked".
+  it('lists waiting rows flat, in order, with no group headings', () => {
     const lines = ['a', 'b', 'c', 'd'].map((id) => ({ task: task({ id, title: `Row ${id}` }), fate: 'open' as const, partOf: null, where: null }))
     const forLine = (t: Task) => t.id === 'a' || t.id === 'c' ? { id: 'm1', title: 'Plan the trip', month: 'October' }
       : t.id === 'b' ? { id: 'm2', title: 'Sort the paperwork', month: 'October' } : null
     render(<WeekListV2 {...base} lines={lines} forLine={forLine} />)
-    const group = screen.getByRole('region', { name: 'for October: Plan the trip' })
-    expect(within(group).getByText('Row a')).toBeInTheDocument()
-    expect(within(group).getByText('Row c')).toBeInTheDocument()
-    expect(within(group).queryByText(/for October: Plan the trip/)).toBeNull()
-    expect(screen.getByText('for October: Sort the paperwork')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Unlinked' })).getByText('Row d')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /for October/ })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Unlinked' })).toBeNull()
+    const titles = screen.getAllByText(/^Row [a-d]$/).map((el) => el.textContent)
+    expect(titles).toEqual(['Row a', 'Row b', 'Row c', 'Row d'])
   })
 })

@@ -5,7 +5,8 @@
 // draws too; this file keeps its own data (the week's actions through the
 // page's layer and people filters) and its own writer (lineDropUpdates
 // through `update`), reporting each placement through the canvas activity
-// strip with an Undo that puts the fields back.
+// strip with an Undo that puts the fields back. The rows are flat, with no
+// parent (paper-style horizons, 2026-11-04), as on Week and Today.
 import { useRef, useState, useMemo, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
@@ -18,7 +19,6 @@ import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { lineDropUpdates } from '@/lib/planning/v2/planV2'
-import { parentOf, WEEK_TO_MONTH } from '@/lib/planning/journalGroups'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { formatTimeCompact } from '@/lib/dateHelpers'
 import { useSideColumnSlot } from '@/shell/SideColumn'
@@ -61,7 +61,6 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
   const week = weekStartAnchor(date, wso)
   const lens = planPeopleLens(people, getCurrentUserMember()?.id ?? null)
   const visible = filterTasksForLayers(tasks, layers).filter(lens.keep)
-  const ids = new Set(visible.map((t) => t.id))
   const weekTasks = weekListTasks(visible, week, lens.scopeId, { isCurrent: localYmd(week) === localYmd(weekStartAnchor(new Date(), wso)) })
   const ymd = localYmd(date)
   const dayLabel = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
@@ -69,11 +68,8 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
 
   const rows: CompactRow<Task>[] = weekTasks.map((t) => {
     const onDay = !t.completed && !!t.scheduledFor && localYmd(t.scheduledFor) === ymd
-    const p = parentOf(t, WEEK_TO_MONTH, ids)
-    const parentTitle = p ? visible.find((x) => x.id === p.id)?.title : undefined
     return {
       key: t.id, id: t.id, title: t.title, item: t, completed: t.completed,
-      parent: p && parentTitle ? { id: p.id, title: parentTitle } : null,
       onDay: onDay ? (t.isAllDay === false ? `${dayTag} ${formatTimeCompact(t.scheduledFor!)}` : dayTag) : null,
       context: !onDay && !t.completed && t.scheduledFor
         ? `Currently ${t.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${t.isAllDay === false ? ` at ${t.scheduledFor.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : ''}`
@@ -139,7 +135,6 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
                     onAdd={(t) => { void place(t.id) }}
                     onComplete={complete ? toggle : undefined}
                     onOpen={onSelect ? (t) => onSelect(t.id) : undefined}
-                    onOpenParent={onSelect}
                     onDragStart={(t, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, t.id); ev.dataTransfer.effectAllowed = 'move' }}
                     busyKey={pending} disabled={!!pending} />
                   <button type="button" className="canvas-link cw-open" onClick={() => navigate(`/week?view=alongside&start=${localYmd(week)}`)}>Open week {weekNo} →</button>

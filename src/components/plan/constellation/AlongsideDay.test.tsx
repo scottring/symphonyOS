@@ -71,9 +71,10 @@ it('draws the shared compact list: on-day rows marked, done rows behind a reveal
  render(<MemoryRouter><AlongsideDay tasks={[month,task,second,placed,done]} date={date} update={vi.fn()} complete={complete} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
  const list=screen.getByRole('group',{name:'This week’s tasks'})
  expect(list).toHaveClass('cw-list')
- const group=screen.getByRole('region',{name:'Plan the autumn picnic'})
- expect(group).toHaveTextContent('Choose picnic spot')
- expect(group).toHaveTextContent('Buy a blanket')
+ // Paper-style horizons (2026-11-04): flat, no heading for the month line.
+ expect(screen.queryByRole('region',{name:'Plan the autumn picnic'})).toBeNull()
+ expect(list).toHaveTextContent('Choose picnic spot')
+ expect(list).toHaveTextContent('Buy a blanket')
  const onDay=screen.getByText('Pack the basket').closest('li')!
  expect(onDay).toHaveClass('is-on-today')
  expect(screen.queryByRole('button',{name:/^Add Pack the basket/})).toBeNull()

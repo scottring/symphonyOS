@@ -1,19 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { CompactWeekList, type CompactRow } from './CompactWeekList'
-import { groupByParent, dayWordFor } from './compactWeek'
+import { dayWordFor } from './compactWeek'
 
-const trip = { id: 'm1', title: 'Plan the autumn trip' }
-const paper = { id: 'm2', title: 'Get the paperwork in order' }
 const row = (key: string, x: Partial<CompactRow<string>> = {}): CompactRow<string> => ({ key, id: key, title: `Row ${key}`, item: key, ...x })
-
-describe('groupByParent', () => {
-  it('orders groups by first appearance, keeps row order, and puts Unlinked last', () => {
-    const g = groupByParent([row('a'), row('b', { parent: trip }), row('c', { parent: paper }), row('d', { parent: trip })])
-    expect(g.map((x) => x.parent?.id ?? 'unlinked')).toEqual(['m1', 'm2', 'unlinked'])
-    expect(g[0].rows.map((r) => r.key)).toEqual(['b', 'd'])
-  })
-})
 
 describe('dayWordFor', () => {
   it('says today for today, the weekday otherwise', () => {
@@ -24,31 +14,22 @@ describe('dayWordFor', () => {
 })
 
 describe('CompactWeekList', () => {
-  const rows = [
-    row('a', { parent: trip }), row('b', { parent: paper }), row('c', { parent: trip }), row('d'),
-  ]
-
-  it('writes a parent with two or more rows once as a header; a lone row carries it as a suffix; the rest are Unlinked', () => {
-    render(<CompactWeekList rows={rows} label="Week" />)
-    const group = screen.getByRole('region', { name: 'Plan the autumn trip' })
-    expect(within(group).getByText('Row a')).toBeInTheDocument()
-    expect(within(group).getByText('Row c')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Get the paperwork in order' })).toBeNull()
-    expect(screen.getByText('Row b').closest('li')).toHaveTextContent('Get the paperwork in order')
-    const unlinked = screen.getByRole('region', { name: 'Unlinked' })
-    expect(unlinked).toHaveClass('is-unlinked')
-    expect(within(unlinked).getByText('Row d')).toBeInTheDocument()
+  // Paper-style horizons (spec 2026-11-04): Week and Today show the week
+  // flat, in its own order: no group headings, no parent, no serves line.
+  it('draws the rows flat, in order, with no group heading or parent', () => {
+    // Rows that once carried a parent (a month line) draw flat all the same.
+    const trip = { parent: { id: 'm1', title: 'Plan the autumn trip' } } as never
+    render(<CompactWeekList rows={[row('a', trip), row('b'), row('c', trip), row('d')]} label="Week" />)
+    const list = screen.getByRole('group', { name: 'Week' })
+    expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Row a', 'Row b', 'Row c', 'Row d'])
+    expect(within(list).queryAllByRole('region')).toEqual([])
+    expect(screen.queryByText('Plan the autumn trip')).toBeNull()
+    expect(list.querySelector('.canvas-group, .cw-parent, .serves-line, .today-serves')).toBeNull()
   })
 
-  it('draws no Unlinked header when nothing is linked', () => {
-    render(<CompactWeekList rows={[row('a'), row('b')]} label="Week" />)
-    expect(screen.queryByRole('region', { name: 'Unlinked' })).toBeNull()
-    expect(screen.getByText('Row a')).toBeInTheDocument()
-  })
-
-  it('keeps a row already on the day in its group, tagged, without an add button', () => {
+  it('keeps a row already on the day in its place, tagged, without an add button', () => {
     const onAdd = vi.fn()
-    render(<CompactWeekList rows={[row('a', { parent: trip, onDay: 'Today 2p' }), row('c', { parent: trip })]} label="Week" onAdd={onAdd} />)
+    render(<CompactWeekList rows={[row('a', { onDay: 'Today 2p' }), row('c')]} label="Week" onAdd={onAdd} />)
     const li = screen.getByText('Row a').closest('li')!
     expect(li).toHaveClass('is-on-today')
     expect(within(li).getByText('Today 2p')).toBeInTheDocument()

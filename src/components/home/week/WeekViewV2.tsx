@@ -65,17 +65,16 @@ import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { weekListTasks, weekShownTasks } from '@/lib/planning/weekList'
 import { selectPeriodTasks } from '@/lib/planning/periodPage'
-import { monthsOfWeek } from '@/lib/planning/periodPlacement'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { weekRhythm, rhythmLines } from '@/lib/week/weekRhythm'
 import { densityDescription } from '@/lib/planning/dayDensity'
 import { dayFreeWindows, formatFree } from '@/lib/week/dayShape'
 import { parseSpecials } from '@/lib/today/specials'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
-import { buildShelf, type ShelfGroup, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
-import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
+import { buildShelf, type ShelfGroup } from '@/components/canvas/week/weekShelf'
+import { periodRange } from '@/components/canvas/plan/planGroups'
+import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters, type WeekMonthSheet } from '@/components/canvas/week/WeekCanvas'
 import { DayWeather } from './WeekJournal'
-import { committedTo } from '@/lib/placement/model'
 import { alsoDoneIn, weekReviewState } from '@/lib/planning/periodReview'
 import type { WeekDeck } from '@/components/plan/v2/WeekV2'
 import { buildDeck, deckModeOf, deckWeekAllowed } from '@/lib/planning/deck'
@@ -83,7 +82,7 @@ import { staleForDrain } from '@/lib/planning/drain'
 import { withPlacedSubtasks } from '@/lib/planning/plannedSubtasks'
 import { useChooseWeek } from './useChooseWeek'
 import { restoreDeleted } from '@/lib/planning/restoreDeleted'
-import { openCommitment, liveCommitments } from '@/lib/placement/model'
+import { openCommitment } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { doableBy } from '@/lib/planning/poolViews'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
@@ -713,8 +712,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // ── The week canvas (Days; approved composition 2026-10-10) ───────────
   // The same data the journal and the week's list read: the week's list
-  // through the top bar's people lens, the month(s)' milestones in the
-  // reader's scope, the days as buildJournalDays assembles them, and the
+  // through the top bar's people lens, flat; the days as buildJournalDays
+  // assembles them; the month folded beside them, for reading; and the
   // weekly routines that still need a day (unhomedRoutines). Every write goes
   // through the canvas activity strip with an Undo that restores what it
   // changed.
@@ -726,7 +725,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // the page draws for this week (its list and its days), through exactly
   // their filters.
   const weekShown = useMemo(() => weekShownTasks({ listed: weekListed, drawn: drawnTasks, weekStart: weekAnchor }), [weekListed, drawnTasks, weekAnchor])
-  const shelf = useMemo(() => weekShelf(tasks, weekAnchor, weekListed, meId), [tasks, weekAnchor, weekListed, meId])
+  const shelf = useMemo(() => weekShelf(weekAnchor, weekListed), [weekAnchor, weekListed])
   const routinesToPlace = useMemo(() => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }, { weekStart: weekAnchor, instances: weekInstances })
     .map((r) => ({ id: r.id, title: r.name })), [routines, selectedAssignees, layers, weekAnchor, weekInstances])
   // Every-day routines: written once above the days (default), or in each
@@ -749,18 +748,17 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const planMonth = useMemo(() => monthStartOf(new Date(weekAnchor.getTime() + 3 * 86_400_000)), [weekAnchor])
   const planLines = useMemo(() => selectPeriodTasks(layerTasks.filter(lens.keep), 'month', planMonth,
     planMonth.getTime() === monthStartOf(new Date()).getTime(), lens.scopeId, readSeasons()), [layerTasks, lens, planMonth])
-  // The strip's month tab: the month's open lines, through the same filters.
-  const stripMonth = useMemo(() => {
-    const byId = new Map(tasks.map((t) => [t.id, t]))
+  // The month, folded beside the days for reading (paper-style horizons,
+  // 2026-11-04): its open lines, titles only, through the same filters.
+  const monthSheet = useMemo<WeekMonthSheet>(() => {
+    const monthEnd = new Date(planMonth.getFullYear(), planMonth.getMonth() + 1, 1)
     return {
       word: planMonth.toLocaleDateString('en-US', { month: 'long' }),
-      href: `/month?view=constellation&horizon=2&start=${localYmd(planMonth)}`,
-      lines: planLines.filter((t) => !t.completed).map((t) => {
-        const above = t.sourceId ? byId.get(t.sourceId) : undefined
-        return { task: t, onWeek: !!committedTo(t, 'week', weekAnchor, { isCurrent: weekIsCurrent }), meta: above ? `Under ${above.title}` : null }
-      }),
+      kicker: `Month · ${periodRange(planMonth, monthEnd)}`,
+      rows: planLines.filter((t) => !t.completed).map((t) => ({ id: t.id, title: t.title })),
+      doneCount: planLines.filter((t) => t.completed).length,
     }
-  }, [planLines, planMonth, tasks, weekAnchor, weekIsCurrent])
+  }, [planLines, planMonth])
   // A guided session listening for the canvas's saved writes (WeekV2's
   // session marks the week planned when one lands on its choosing step).
   const canvasWriteListener = useRef<(() => void) | null>(null)
@@ -827,15 +825,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
         }, opts)
       },
       open: (id) => handleSelectBlock(id),
-      // A month line onto this week (the choose flow's "This week": nothing is
-      // copied, the same row keeps its month), and onto a day when dropped on one.
-      pullLine: (t, day) => {
-        const was = { ...timingRemoval(t, 'day').previous, commitments: liveCommitments({ commitments: bootstrapCommitments(t) }) }
-        void run(day ? `Give “${t.title}” ${short(day)}` : `Bring “${t.title}” onto this week`, async () => {
-          if (!(await keepForward(t.id, { weekStart: weekAnchor }))) return false
-          return day ? (await onUpdateTask(t.id, lineDropUpdates(t, { kind: 'day', at: atMidnight(day) }))) !== false : true
-        }, { ids: [t.id], undo: async () => { await onUpdateTask(t.id, was) } })
-      },
       // Delete from No day yet, with Undo: the same row back (restoreDeleted).
       deleteTask: (t) => {
         void activity.run(`Delete “${t.title}”`, async () => { await deleteTask(t.id); return true }, {
@@ -904,7 +893,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, keepForward, addTask, deleteTask, meId, layers])
+  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, addTask, deleteTask, meId, layers])
   const canvasSpans = useMemo(() => toCanvasSpans(journalSpans, journalDays), [journalSpans, journalDays])
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
@@ -912,9 +901,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // A guided session's look back asks for the week it looks back on (walk
   // 2026-11-01: "Look back at last week" stood beside the week being
   // planned): the week before this one, drawn the same way (PastWeekCanvas).
-  // Nothing is added from there: a typed add or a month line lands on this
-  // week, so neither is offered on it.
-  const lookBackWriters = useMemo<WeekCanvasWriters>(() => ({ ...canvasWriters, addTyped: undefined, pullLine: undefined }), [canvasWriters])
+  // Nothing is added from there: a typed add lands on this week, so it is
+  // not offered on it.
+  const lookBackWriters = useMemo<WeekCanvasWriters>(() => ({ ...canvasWriters, addTyped: undefined }), [canvasWriters])
   const weekCanvas = (opts?: { hideStrip?: boolean; period?: 'previous' }) => opts?.period === 'previous' ? (
     <PastWeekCanvas anchor={lastWeekStart} hideStrip={opts.hideStrip} tasks={tasks} drawnTasks={drawnTasks} weekendTasks={weekendTasks}
       events={events} routines={routines} selectedAssignees={selectedAssignees} layers={layers} userId={userId} labelFor={labelFor}
@@ -925,7 +914,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers} viewerId={meId ?? undefined}
       pointing={activity.pointing}
-      onPlaceUnplaced={deckAvailable ? openPlace : undefined} unplacedCount={placeCount} month={stripMonth} />
+      onPlaceUnplaced={deckAvailable ? openPlace : undefined} unplacedCount={placeCount} month={monthSheet} />
   )
   const todayLine = null
 
@@ -1243,20 +1232,11 @@ function weekEventItems(extras: ReturnType<typeof partitionWeekExtras>) {
 }
 
 /** The week's own list on the canvas: what is chosen for the week (`listed`,
- *  through the people lens) less what waits for its weekend, under the
- *  month(s)' milestones in the reader's scope. */
-function weekShelf(tasks: Task[], anchor: Date, listed: Task[], meId: string | null) {
+ *  through the people lens) less what waits for its weekend, flat. */
+function weekShelf(anchor: Date, listed: Task[]) {
   const end = anchor.getTime() + 7 * 86_400_000
   const inWeekend = (t: Task) => !!t.weekendStart && !t.scheduledFor && t.weekendStart.getTime() >= anchor.getTime() && t.weekendStart.getTime() < end
-  const isCurrent = weekIsCurrentFor(anchor)
-  const months = monthsOfWeek(anchor).map((start) => ({
-    name: start.toLocaleDateString('en-US', { month: 'long' }),
-    rows: selectPeriodTasks(tasks, 'month', start, isCurrent && start.getTime() === monthStartOf(new Date(anchor.getTime() + 3 * 86_400_000)).getTime(), meId, readSeasons()),
-  }))
-  return buildShelf({
-    weekTasks: listed.filter((t) => !inWeekend(t)), tasks, weekStart: anchor,
-    milestones: months.flatMap((m) => m.rows.map((t): ShelfMilestone => ({ id: t.id, title: t.title, completed: !!t.completed, month: m.name, context: t.context ?? null, onWeek: !!committedTo(t, 'week', anchor, { isCurrent }) }))),
-  })
+  return buildShelf({ weekTasks: listed.filter((t) => !inWeekend(t)), weekStart: anchor })
 }
 
 /** The days as the canvas draws them, from the days buildJournalDays assembles. */
@@ -1379,8 +1359,8 @@ function PastWeekCanvas({ anchor, tasks, drawnTasks, weekendTasks, events, routi
       dinnersByDay: extras.dinnersByDay, routineItems, instances, labelFor,
     })
   }, [start, events, routines, instances, selectedAssignees, layers, drawnTasks, weekendTasks, userId, labelFor])
-  const shelf = useMemo(() => weekShelf(tasks, start, weekListTasks(tasks, start, lens.scopeId, { isCurrent }).filter(lens.keep), meId),
-    [tasks, start, lens, isCurrent, meId])
+  const shelf = useMemo(() => weekShelf(start, weekListTasks(tasks, start, lens.scopeId, { isCurrent }).filter(lens.keep)),
+    [tasks, start, lens, isCurrent])
   const routinesToPlace = useMemo(() => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }, { weekStart: start, instances })
     .map((r) => ({ id: r.id, title: r.name })), [routines, selectedAssignees, layers, start, instances])
   const canvasDays = useMemo(() => toCanvasDays({ days: journal.days, weekend: journal.weekend, shelf, dailyShown, forecast, plannedDinners, eventsReady, canMoveEvent }),

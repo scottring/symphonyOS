@@ -81,25 +81,18 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers() })
 
-describe('#24 Today rows show what they serve', () => {
-  it('a step of a goal reads "Step toward"; a copied-down line reads "From" — at rest', () => {
+// Paper-style horizons (spec 2026-11-04): Today's rows are the work itself,
+// flat. A row no longer says what it serves ("Step toward …", "From …").
+describe('Today rows carry no serves line', () => {
+  it('a step of a goal and a copied-down line are plain rows', () => {
     renderView()
     const focus = screen.getByRole('region', { name: 'For today' })
-    expect(within(focus).getByText('Step toward “Run a 10K”')).toBeInTheDocument()
-    expect(within(focus).getByText('From “Plan the garden”')).toBeInTheDocument()
-  })
-
-  it('pressing the line opens the parent’s details, not the row', () => {
-    const { onSelectItem } = renderView()
-    fireEvent.click(screen.getByRole('button', { name: /Step toward Run a 10K — open its details/ }))
-    expect(onSelectItem).toHaveBeenCalledWith('task-goal-10k')
-    expect(onSelectItem).not.toHaveBeenCalledWith('task-step')
-  })
-
-  it('names no parent the reader cannot see (it is not in the filtered list)', () => {
-    renderView({ tasks: [line, step, copied] })
+    expect(within(focus).getByText('Buy running shoes')).toBeInTheDocument()
+    expect(within(focus).getByText('Order seeds')).toBeInTheDocument()
     expect(screen.queryByText(/Step toward/)).toBeNull()
-    expect(screen.getByText('From “Plan the garden”')).toBeInTheDocument()
+    expect(screen.queryByText(/From “Plan the garden”/)).toBeNull()
+    expect(within(focus).queryByText('Run a 10K')).toBeNull()
+    expect(document.querySelector('.today-serves, .serves-line')).toBeNull()
   })
 })
 

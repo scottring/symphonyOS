@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createMockTask } from '@/test/mocks/factories'
-import { weekListTasks, weekRowNote, weekRowNoteText } from './weekList'
+import { weekListTasks, weekRowNote, weekRowNoteText, weekShownTasks } from './weekList'
 
 const WEEK = new Date(2026, 9, 4)   // Sunday Oct 4, 2026
 const LAST = new Date(2026, 8, 27)  // Sunday Sep 27
@@ -62,5 +62,15 @@ describe('weekRowNote', () => {
     expect(weekRowNoteText(weekRowNote(m, WEEK, 'me', '2026-10-06'))).toBe('from October')
     const p = createMockTask({ id: 'p', bucket: 'week', weekStart: WEEK, commitments: [c('week', WEEK)] })
     expect(weekRowNoteText(weekRowNote(p, WEEK, 'me', '2026-10-06'))).toBeUndefined()
+  })
+})
+
+describe('weekShownTasks', () => {
+  // Paper-style horizons (2026-11-04): the week's count covers the rows the
+  // page draws, and the page draws a task marked is_goal like any other.
+  it('counts a task marked a goal, on the list or on a day', () => {
+    const listed = createMockTask({ id: 'g', isGoal: true, bucket: 'week', weekStart: WEEK, commitments: [c('week', WEEK)] })
+    const dated = createMockTask({ id: 'h', isGoal: true, scheduledFor: new Date(2026, 9, 6) })
+    expect(weekShownTasks({ listed: [listed], drawn: [listed, dated], weekStart: WEEK }).map((t) => t.id)).toEqual(['g', 'h'])
   })
 })
