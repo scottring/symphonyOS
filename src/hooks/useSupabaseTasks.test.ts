@@ -1613,6 +1613,16 @@ describe('useSupabaseTasks', () => {
       expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ completed: true }))
     })
 
+    it('stamps completedAt at once on ticking, and clears it on reopening (no wait for the database echo)', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', completed: false, completed_at: null } as never))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => { expect(result.current.tasks).toHaveLength(1) })
+      await act(async () => { await result.current.toggleTask('task-1') })
+      expect(result.current.tasks[0].completedAt).toBeInstanceOf(Date)
+      await act(async () => { await result.current.toggleTask('task-1') })
+      expect(result.current.tasks[0].completedAt).toBeNull()
+    })
+
     it('marks complete task as incomplete', async () => {
       mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', completed: true }))
 

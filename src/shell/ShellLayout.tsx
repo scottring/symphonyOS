@@ -208,7 +208,7 @@ function ShellLayoutInner({ children }: Props) {
   // save receipt journals them and its Undo reverses them.
   const userId = user?.id;
   const choiceWriters = useMemo(() => (userId ? makeChoiceWriters(reviewedWriter.client, userId) : undefined), [reviewedWriter, userId]);
-  const { tasks, refetch, deleteTask, updateTask, addTask, completeTask, toggleTask, keepForward, dropCommitment } = useSupabaseTasks(reviewedWriter.client);
+  const { tasks, letGoTasks, refetch, deleteTask, updateTask, addTask, completeTask, toggleTask, keepForward, dropCommitment } = useSupabaseTasks(reviewedWriter.client);
   const { goals, deleteGoal, updateGoal, addGoal } = useGoals(reviewedWriter.client);
   // Held so routine writes from a conversation are seen (and undoable) too.
   const { routines: canvasRoutines, deleteRoutine, updateRoutine, addRoutine, refetch: refetchRoutines } = useRoutines(reviewedWriter.client);
@@ -470,7 +470,8 @@ function ShellLayoutInner({ children }: Props) {
   const sessionLevel = guided?.level;
   const applyChanges = useCallback(async (set: ChangeSet) => {
     const result = await applyReviewedChange(set, {
-      tasks, updateTask, deleteTask,
+      // A let-go item is still a row a card can place and bring back.
+      tasks: [...tasks, ...(letGoTasks ?? [])], updateTask, deleteTask,
       addTask: (title, when, options) => addTask(title, undefined, undefined, when, options),
       weekStart: plannedWeekStart(set, new Date(), readCadenceConfig().weekStartsOn),
       completeTask,
@@ -503,7 +504,7 @@ function ShellLayoutInner({ children }: Props) {
     // something is applied at its choosing step).
     if (result.ok) guidedLatest.current?.onApplied?.();
     return result;
-  }, [reviewedWriter, tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment, choiceWriters, sessionLevel]);
+  }, [reviewedWriter, tasks, letGoTasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment, choiceWriters, sessionLevel]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   // School review saves happen in Settings. Refresh the mounted planning
   // data immediately, including when the realtime socket has gone to sleep.

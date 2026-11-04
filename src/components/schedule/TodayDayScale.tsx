@@ -345,10 +345,13 @@ export function TodayDayScale({
       const payload = readPlanDrag(e.dataTransfer)
       setLanding(null)
       if (!payload) return
+      // Outside the hour range there is no time: let the drop bubble so the
+      // day's untimed placement still happens.
+      const when = timeAt(e.clientY)
+      if (!when) return
       e.preventDefault()
       e.stopPropagation()
-      const when = timeAt(e.clientY)
-      if (when) onPlanDrop(payload, when)
+      onPlanDrop(payload, when)
     },
   } : {}
 

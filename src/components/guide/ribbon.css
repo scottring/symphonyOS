@@ -162,7 +162,10 @@ li[data-state='skipped'] .ribbon-step-title { font-style: italic; }
    at the left, the primary and ⋯ at the right), so the bookmark hangs in the
    page's right margin, beside the day's top edge. */
 .today-ribbon-host > .ribbon-tab { left: auto; right: -38px; }
-@media (max-width: 767px) { .today-ribbon-host > .ribbon-tab { right: 0; } }
+/* iPad portrait and small laptops (768-1100px): the page's right margin is
+   narrower than the 38px the bookmark hangs into, and the shell scroller clips
+   sideways overflow, so it stands at the column's own edge instead. */
+@media (max-width: 1100px) { .today-ribbon-host > .ribbon-tab { right: 0; } }
 /* On a phone nothing above a period's sheet or the week's days is free (the
    level above stacks over the sheet; the week's header has its words at the
    left and ⋯ at the right), so the bookmark is only its 18px foot, inside

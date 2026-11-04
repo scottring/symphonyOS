@@ -91,6 +91,23 @@ describe('TodayDayScale', () => {
     expect([when.getHours(), when.getMinutes()]).toEqual([14, 0])
   })
 
+  it('lets a row dropped where no time can be read bubble, so the day still takes it untimed', () => {
+    const onPlanDrop = vi.fn()
+    const onOuter = vi.fn()
+    render(<DndContext><div onDrop={onOuter}><TodayDayScale {...{ items: [], viewedDate: at(0), now: null, isMobile: false, selectedItemId: null, peopleOf: () => [], isReadOnlyEvent: () => false, onSelect: vi.fn(), onPlanDrop }} /></div></DndContext>)
+    const track = screen.getByTestId('today-day-scale')
+    // No readable column geometry: no time is found, whatever the pointer.
+    track.getBoundingClientRect = (() => undefined) as unknown as typeof track.getBoundingClientRect
+    const payload = { kind: 'task', id: 't1', date: '2026-10-06', title: 'Call the bank' }
+    const dataTransfer = { types: [PLAN_MIME], getData: (k: string) => (k === PLAN_MIME ? JSON.stringify(payload) : ''), dropEffect: 'none' }
+    const drop = createEvent.drop(track, { dataTransfer })
+    Object.defineProperty(drop, 'clientY', { value: 5 })
+    fireEvent(track, drop)
+    expect(onPlanDrop).not.toHaveBeenCalled()
+    expect(drop.defaultPrevented).toBe(false)
+    expect(onOuter).toHaveBeenCalledOnce()
+  })
+
   // Scott, 2026-10-30: "why can't I drag to resize in The Day grid?"
   it('drags a task’s bottom edge to a new end, in quarter hours', () => {
     const onResize = vi.fn()

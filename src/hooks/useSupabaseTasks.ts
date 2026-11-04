@@ -1255,6 +1255,9 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
             return {
               ...t,
               completed: newCompleted,
+              // An undated legacy row is hidden by its tick until completed_at
+              // is known; the database echoes it back later.
+              completedAt: newCompleted ? new Date() : null,
               // The records move with the tick, as the trigger moves them.
               commitments: commitmentsAfterCompletion(t.commitments, newCompleted),
               // Clear waiting state when completing
@@ -1319,6 +1322,7 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
         task: {
           ...task,
           completed: newCompleted,
+          completedAt: newCompleted ? new Date() : null,
           // The records too: other instances (the plan page has several)
           // otherwise keep the pre-tick statuses, and a later move reads
           // them — a reopened action then stayed open on its old week.

@@ -39,7 +39,7 @@ interface Props {
 }
 
 export function TaskViewContainer({ taskId, onBack }: Props) {
-  const { tasks, loading, addTask, addSubtask, deleteTask, toggleTask, updateTask, setGoalLink, pushTask } = useSupabaseTasks();
+  const { tasks, letGoTasks, loading, addTask, addSubtask, deleteTask, toggleTask, updateTask, setGoalLink, pushTask } = useSupabaseTasks();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, searchProjects } = useProjects();
   const { addNote, addEntityLink, getNotesForEntity } = useNotesContext();
@@ -48,7 +48,10 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
   const { createVaultNote } = useVaultWrite();
   const navigate = useNavigate();
 
-  const task = useMemo(() => tasks.find(t => t.id === taskId) ?? null, [tasks, taskId]);
+  const task = useMemo(
+    () => tasks.find(t => t.id === taskId) ?? (letGoTasks ?? []).find(t => t.id === taskId) ?? null,
+    [tasks, letGoTasks, taskId],
+  );
   const { activeRoutines } = useRoutines();
   const { members: familyMembers } = useFamilyMembers();
   const [addingExisting, setAddingExisting] = useState(false);

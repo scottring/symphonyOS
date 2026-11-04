@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-const state = { loading: true }
+const state = { loading: true, letGo: [] as { id: string; title: string }[] }
 // Stable values: a mock that returns a fresh array each render feeds the
 // container's effects a new dependency every time and never settles.
 const m = vi.hoisted(() => {
@@ -19,7 +19,7 @@ const m = vi.hoisted(() => {
     routines: { activeRoutines: [] }, auth: { user: { id: 'u1' } }, choices: { forWeek: () => undefined },
   }
 })
-vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ ...m.tasks, tasks: m.none, loading: state.loading }) }))
+vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ ...m.tasks, tasks: m.none, letGoTasks: state.letGo, loading: state.loading }) }))
 vi.mock('@/hooks/useContacts', () => ({ useContacts: () => m.contacts }))
 vi.mock('@/hooks/useProjects', () => ({ useProjects: () => m.projects }))
 vi.mock('@/contexts/NotesContext', () => ({ useNotesContext: () => m.notes }))
@@ -29,7 +29,7 @@ vi.mock('@/hooks/useVaultWrite', () => ({ useVaultWrite: () => m.vault }))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => m.routines }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => m.auth }))
 vi.mock('@/hooks/useDayChoices', () => ({ useDayChoices: () => m.choices }))
-vi.mock('@/components/lazy', () => ({ TaskView: () => null }))
+vi.mock('@/components/lazy', () => ({ TaskView: ({ task }: { task: { title: string } }) => <p>Open: {task.title}</p> }))
 vi.mock('@/components/plan/GoalPeriodShelves', () => ({ GoalPeriodShelves: () => null }))
 
 import { TaskViewContainer } from './TaskViewContainer'
@@ -48,5 +48,13 @@ describe('TaskViewContainer before the tasks arrive', () => {
     state.loading = false
     show()
     expect(screen.getByText(/Task not found/)).toBeInTheDocument()
+  })
+
+  it('opens a let-go item (it is in letGoTasks, not tasks)', () => {
+    state.loading = false
+    state.letGo = [{ id: 't1', title: 'Let go idea' }]
+    show()
+    expect(screen.getByText('Open: Let go idea')).toBeInTheDocument()
+    state.letGo = []
   })
 })

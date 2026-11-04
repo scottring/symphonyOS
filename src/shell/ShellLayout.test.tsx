@@ -9,6 +9,7 @@ import { deriveActiveView, pageOwnsFilterChrome, ShellLayout } from './ShellLayo
 import { useMemo } from 'react'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
+import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { AssistantLaunchProvider, useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 
 vi.mock('@/lib/canvas/reviewedChange', async () => {
@@ -64,9 +65,9 @@ describe('deriveActiveView', () => {
 const mobileState = vi.hoisted(() => ({ isMobile: false }))
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mobileState.isMobile }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: null, signOut: vi.fn() }) }))
-const tasksState = vi.hoisted(() => ({ addTask: vi.fn(async () => 'new1') }))
+const tasksState = vi.hoisted(() => ({ addTask: vi.fn(async () => 'new1'), updateTask: vi.fn(async () => true), letGoTasks: [] as unknown[] }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
-  tasks: [], loading: false, updateTask: vi.fn(), updateTasksBulk: vi.fn(), pushTask: vi.fn(), toggleTask: vi.fn(),
+  tasks: [], letGoTasks: tasksState.letGoTasks, loading: false, updateTask: tasksState.updateTask, updateTasksBulk: vi.fn(), pushTask: vi.fn(), toggleTask: vi.fn(),
   addTask: tasksState.addTask, deleteTask: vi.fn(), refetch: vi.fn(),
 }) }))
 const aiState = vi.hoisted(() => ({ hidden: true }))
@@ -715,5 +716,22 @@ describe('A guided planning session in the shell', () => {
     view.rerender(atPhone(<GuidedPage stepId="inbox" on={false} />))
     expect(overlay().style.display).toBe('none')
     expect(assistantState.resetSession).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('change cards on a let-go item', () => {
+  it('a card placing a let-go task applies (the lookup includes let-go rows) and writes the placement', async () => {
+    const seen = '2026-10-14T07:00:00.123456+00:00'
+    tasksState.letGoTasks = [{ id: 'lg1', title: 'Old idea', completed: false, createdAt: new Date(2026, 8, 1), updatedAt: new Date(Date.parse(seen)), bucket: 'someday', dismissedAt: new Date(2026, 9, 1) }]
+    tasksState.updateTask.mockClear()
+    let activity: ReturnType<typeof useCanvasActivity> | null = null
+    function P() { activity = useCanvasActivity(); return null }
+    render(<MemoryRouter initialEntries={['/week']}><DomainProvider><DomainGateProvider><ShellLayout><P /></ShellLayout></DomainGateProvider></DomainProvider></MemoryRouter>)
+    act(() => activity!.setChangeSet({ key: 'lg', title: '1 change', ops: [{ key: 'lg:0', op: 'place', taskId: 'lg1', title: 'Old idea', date: '2026-11-06', seen }] }))
+    let ok = false
+    await act(async () => { ok = await activity!.approveChangeSet() })
+    expect(ok).toBe(true)
+    expect(tasksState.updateTask).toHaveBeenCalledWith('lg1', expect.anything())
+    tasksState.letGoTasks = []
   })
 })
