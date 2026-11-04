@@ -242,7 +242,8 @@
    Medium · High · Clear, a small paper popover under it. */
 .energy-menu-wrap { position: relative; display: inline-block; }
 .energy-menu {
-  position: absolute; z-index: 40; top: calc(100% + 6px); left: -8px; min-width: 128px;
+  /* Above the planning tooltip (z 60), which may sit under the line. */
+  position: absolute; z-index: 70; top: calc(100% + 6px); left: -8px; min-width: 128px;
   display: grid; padding: 4px; border-radius: 10px;
   background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
   box-shadow: 0 10px 24px -12px hsl(215 32% 14% / .3), 0 1px 3px hsl(215 32% 14% / .08);
