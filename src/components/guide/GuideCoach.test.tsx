@@ -1,0 +1,196 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, act, within } from '@testing-library/react'
+import { useState } from 'react'
+import { MemoryRouter } from 'react-router-dom'
+import { GuidedSessionProvider } from '@/contexts/GuidedSessionContext'
+
+// Planning is a few tooltips on the everyday page (Scott, 2026-11-04): a plan
+// chip in the header starts the session, and each step is one paper tooltip
+// pointing at the real thing on the page. No band, no drop card, no bookmark,
+// and the conversation never opens by itself.
+
+const store = vi.hoisted(() => ({ notes: {} as Record<string, unknown> }))
+vi.mock('@/hooks/usePlanningNotes', async () => {
+  const { useState, useCallback } = await import('react')
+  return {
+    usePlanningNotes: () => {
+      const [notes, setNotes] = useState(store.notes)
+      const patch = useCallback(async (p: Record<string, unknown>, defaults?: Record<string, unknown>) => {
+        store.notes = { ...defaults, ...store.notes, ...p }
+        setNotes(store.notes)
+        return true
+      }, [])
+      return { notes, loading: false, error: null, patch, reload: () => undefined }
+    },
+  }
+})
+const launcher = vi.hoisted(() => ({ openAssistant: vi.fn() }))
+vi.mock('@/contexts/AssistantLaunchContext', async (orig) => ({
+  ...(await orig<object>()),
+  useAssistantLauncher: () => launcher,
+}))
+const sound = vi.hoisted(() => ({ crinkle: vi.fn(), stamp: vi.fn() }))
+vi.mock('@/lib/fold/paperSound', () => ({ paperSound: { crinkle: sound.crinkle, stamp: sound.stamp, ribbon: vi.fn() } }))
+
+import { GuidedPeriod, type SessionFold } from '@/components/plan/guided/GuidedPeriod'
+import { PlanChip, PlannedStamp } from './GuideCoach'
+
+// November as the page draws it: the header with its title and plan chip,
+// the sheet with the calendar's edge at its right and the write line on a
+// writing step. The fold's drive is written out so a test can read it.
+function MonthPage({ titled = true }: { titled?: boolean }) {
+  const [planning, setPlanning] = useState(false)
+  const [marked, setMarked] = useState(false)
+  const sheet = (fold?: SessionFold) => (
+    <article>
+      <output data-testid="drive">{JSON.stringify(fold?.drive ?? {})}</output>
+      {marked && !planning && <PlannedStamp at={new Date(2026, 10, 4)} />}
+      <ul data-guide-anchor="list"><li>Book the cabin</li></ul>
+      {fold?.write && <form data-guide-anchor="write"><input aria-label="Write a November goal" /></form>}
+      <aside data-guide-anchor="right">November calendar</aside>
+    </article>
+  )
+  return <>
+    <header>
+      {titled && <h1 data-guide-anchor="title">November 2026</h1>}
+      <PlanChip level="month" word="November" onStart={() => setPlanning(true)} />
+    </header>
+    {planning
+      ? <GuidedPeriod level="month" token="2026-11" periodLabel="November" page={sheet} bodies={() => ({ 'fresh-start': <p>Pick a scenery</p> })}
+          onFinish={async () => { setMarked(true); return true }} onLeave={() => setPlanning(false)} />
+      : sheet()}
+  </>
+}
+const show = (titled?: boolean) => render(<MemoryRouter><GuidedSessionProvider><MonthPage titled={titled} /></GuidedSessionProvider></MemoryRouter>)
+const coach = () => screen.getByRole('dialog', { name: 'Planning guide' })
+const tip = () => within(coach())
+const drive = () => JSON.parse(screen.getByTestId('drive').textContent ?? '{}')
+const next = async () => { await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Next' })) }) }
+const start = async () => { await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Plan November' })) }) }
+
+beforeEach(() => {
+  store.notes = {}
+  launcher.openAssistant.mockClear(); sound.crinkle.mockClear(); sound.stamp.mockClear()
+})
+afterEach(() => { vi.restoreAllMocks() })
+
+describe('GuideCoach — planning is a few tooltips on the everyday page', () => {
+  it('the header chip “Plan November” starts a session; the chip counts the steps and the tooltip shows the first', async () => {
+    show()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await start()
+    expect(screen.getByRole('button', { name: 'Planning November · 1 of 6' })).toBeInTheDocument()
+    expect(tip().getByText('Step 1 of 6')).toBeInTheDocument()
+    expect(tip().getByText('Fresh start')).toBeInTheDocument()
+    expect(tip().getByText('A visible reset makes a new month feel like a new start.')).toBeInTheDocument()
+    expect(tip().getByText("Pick this month's scenery.")).toBeInTheDocument()
+    expect(tip().getByRole('button', { name: 'Back' })).toBeDisabled()
+  })
+
+  it('Next moves on, the chip follows, and “Next 4–5 weeks” drives the calendar open', async () => {
+    show()
+    await start()
+    await next()
+    expect(tip().getByText('Step 2 of 6')).toBeInTheDocument()
+    expect(tip().getByText('Look back at last month')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Planning November · 2 of 6' })).toBeInTheDocument()
+    expect(sound.crinkle).toHaveBeenCalled()
+    await next(); await next()
+    expect(tip().getByText('Next 4–5 weeks')).toBeInTheDocument()
+    expect(drive()).toEqual({ calendar: true })
+    await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Back' })) })
+    expect(tip().getByText('Read the season list')).toBeInTheDocument()
+  })
+
+  it('the tooltip’s ✕ hides it and the chip stays; the chip shows it again; Escape hides it too', async () => {
+    show()
+    await start()
+    fireEvent.click(tip().getByRole('button', { name: 'Hide the guide' }))
+    expect(screen.queryByRole('dialog', { name: 'Planning guide' })).toBeNull()
+    const chip = screen.getByRole('button', { name: 'Planning November · 1 of 6' })
+    fireEvent.click(chip)
+    expect(tip().getByText('Step 1 of 6')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Planning guide' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Stop planning' })).toBeInTheDocument()
+  })
+
+  it('the chip’s ✕ ends the session: no tooltip, and the folds are the reader’s again', async () => {
+    store.notes = { guide: { current: 'next-weeks', done: [], skipped: [] } }
+    show()
+    await start()
+    expect(drive()).toEqual({ calendar: true })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Stop planning' })) })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(drive()).toEqual({})
+    expect(screen.getByRole('button', { name: 'Plan November' })).toBeInTheDocument()
+  })
+
+  it('“Done planning November” on the last step stamps the sheet', async () => {
+    store.notes = { guide: { current: 'upkeep-fun', done: [], skipped: [] } }
+    show()
+    await start()
+    expect(tip().getByText('Step 6 of 6')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Done planning November' })) })
+    expect(screen.getByRole('img', { name: 'Planned Nov 4' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Plan November' })).toBeInTheDocument()
+  })
+
+  it('points at the element marked with the step’s anchor; with none on the page, at the page title', async () => {
+    store.notes = { guide: { current: 'next-weeks', done: [], skipped: [] } }
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const at = this.getAttribute('data-guide-anchor')
+      const r = at === 'right' ? { left: 700, top: 100, right: 990, bottom: 700 }
+        : at === 'title' ? { left: 40, top: 20, right: 400, bottom: 60 }
+          : at === 'write' ? { left: 300, top: 400, right: 680, bottom: 430 }
+            : { left: 0, top: 0, right: 0, bottom: 0 }
+      return { ...r, x: r.left, y: r.top, width: r.right - r.left, height: r.bottom - r.top, toJSON: () => r } as DOMRect
+    })
+    show()
+    await start()
+    // Next 4–5 weeks: the calendar's edge, the tooltip at its left.
+    expect(coach()).toHaveAttribute('data-at', 'right')
+    expect(coach()).toHaveAttribute('data-side', 'right')
+    expect(coach().style.transform).toBe('translate(686px, 196px)')
+    // The month by area: the write line, the tooltip under it, and lit.
+    await next()
+    expect(coach()).toHaveAttribute('data-at', 'write')
+    expect(coach().style.transform).toBe('translate(308px, 442px)')
+    expect(document.querySelector('[data-guide-anchor="write"]')).toHaveClass('guide-lit')
+    // Maintenance and fun has no write line drawn: still the page, never 0,0.
+    await next()
+    expect(document.querySelector('.guide-lit')).toBeNull()
+    expect(coach()).toHaveAttribute('data-at', 'title')
+    expect(coach().style.transform).toBe('translate(48px, 72px)')
+  })
+
+  it('with no anchor and no title on the page it still sits on screen', async () => {
+    show(false)
+    await start()
+    expect(coach()).toHaveAttribute('data-at', '')
+    const [, x, y] = /translate\((-?\d+)px, (-?\d+)px\)/.exec(coach().style.transform) ?? []
+    expect(Number(x)).toBeGreaterThanOrEqual(12)
+    expect(Number(y)).toBeGreaterThanOrEqual(12)
+  })
+
+  it('no band, no ribbon tab, no drop card, and the conversation is not opened', async () => {
+    show()
+    await start()
+    await next()
+    expect(document.querySelector('.guide-band, .ribbon-band, .ribbon-tab, .ribbon-card, .ribbon-session')).toBeNull()
+    // Fresh start had a card: it draws nothing now (its place is the page's ⋯).
+    expect(screen.queryByText('Pick a scenery')).toBeNull()
+    expect(launcher.openAssistant).not.toHaveBeenCalled()
+  })
+
+  it('reduced motion: the tooltip comes in without its entrance', async () => {
+    const mm = window.matchMedia
+    window.matchMedia = ((q: string) => ({ ...mm(q), matches: q.includes('reduce') })) as typeof window.matchMedia
+    try {
+      show()
+      await start()
+      expect(coach()).not.toHaveClass('is-in')
+    } finally { window.matchMedia = mm }
+  })
+})

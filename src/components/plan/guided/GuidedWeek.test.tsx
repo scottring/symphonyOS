@@ -3,8 +3,7 @@ import { render, screen, fireEvent, within, act, renderHook, waitFor } from '@te
 import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom'
 import { useEffect, type ReactNode } from 'react'
 import { deckModeOf } from '@/lib/planning/deck'
-import { createMockTask, createMockRoutine } from '@/test/mocks/factories'
-import type { RecurrencePattern } from '@/types/actionable'
+import { createMockTask } from '@/test/mocks/factories'
 import { GuidedSessionProvider, useGuidedSession, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 
 // The person's notes row for the week, in memory: what usePlanningNotes reads
@@ -39,9 +38,6 @@ vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members:
 vi.mock('@/contexts/CanvasActivityContext', () => ({ useCanvasActivity: () => ({ changeSet: null, receipt: null }) }))
 const phone = vi.hoisted(() => ({ on: false }))
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => phone.on }))
-vi.mock('@/hooks/usePlannedDinners', () => ({ usePlannedDinners: () => new Map([['2026-09-28', { dateKey: '2026-09-28', title: 'Tacos' }]]) }))
-const wall = vi.hoisted(() => ({ add: vi.fn(async (..._a: unknown[]) => true) }))
-vi.mock('@/lib/wall/addScratchpadNote', () => ({ addScratchpadNote: wall.add, ownMemberId: async () => 'member-me' }))
 
 import { WeekV2, type WeekDeck } from '@/components/plan/v2/WeekV2'
 import { useGuidedWeek } from './useGuidedWeek'
@@ -87,9 +83,11 @@ const canvas = vi.fn((o?: CanvasOpts) => <section aria-label="The days" data-dri
 </section>)
 const drive = () => JSON.parse(screen.getByRole('region', { name: 'The days' }).getAttribute('data-drive') ?? 'null')
 const lookSheet = () => within(screen.getByRole('complementary', { name: 'Last week, looking back' }))
-const band = () => within(screen.getByRole('region', { name: 'Plan the week' }))
-const card = (name: string) => within(screen.getByRole('region', { name }))
-const stepNow = () => band().getAllByRole('button').find((b) => b.getAttribute('aria-current') === 'step')?.querySelector('.ribbon-step-title')?.textContent
+// The session's one tooltip (GuideCoach) and the step it shows.
+const coach = () => within(screen.getByRole('dialog', { name: 'Planning guide' }))
+const stepNow = () => document.querySelector('.coach-t')?.textContent
+const next = async (n = 1) => { for (let i = 0; i < n; i++) await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Next' })) }) }
+const back = async () => { await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Back' })) }) }
 const open = (url: string, deck = makeDeck()) => render(
   <MemoryRouter initialEntries={[url]}>
     <GuidedSessionProvider>
@@ -105,7 +103,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 29, 12)) // Tuesday
   store.notes = {}; store.patches = []; store.order = []; store.fail = false
   shell.reg = null
-  wall.add.mockClear(); session.reload.mockClear()
+  session.reload.mockClear()
   canvas.mockClear()
   session.save.mockReset(); session.save.mockImplementation(async () => { store.order.push('planned'); return true })
   review.finish.mockReset(); review.finish.mockImplementation(async () => { store.order.push('review'); return true })
@@ -113,14 +111,13 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); phone.on = false })
 
 describe('GuidedWeek — the Week page while planning', () => {
-  it('?plan=1 lays the ribbon over the week: its seven steps, the count, and the week without its strip; the look back on the sheet beside it', () => {
+  it('?plan=1 shows the first step’s tooltip over the week without its strip; the look back on the sheet beside it; the chip counts the steps', () => {
     open('/week?plan=1')
     const session = screen.getByRole('region', { name: 'Planning the week' })
-    expect(band().getAllByRole('listitem')).toHaveLength(7)
+    expect(coach().getByText('Step 1 of 7')).toBeInTheDocument()
     expect(stepNow()).toBe('Look back at last week')
-    expect(band().getByRole('button', { name: /Read October/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Planning the week · 1 of 7' })).toBeInTheDocument()
     expect(within(session).getByText('days without the strip')).toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'Steps in this session' })).toBeNull()
     // Step 1 looks back: the month's sheet beside the week turns to last week.
     expect(drive()).toEqual({ above: true })
     expect(lookSheet().getByLabelText('What went well')).toBeInTheDocument()
@@ -128,16 +125,17 @@ describe('GuidedWeek — the Week page while planning', () => {
     expect(within(session).queryByRole('button', { name: 'Next step' })).toBeNull()
     expect(panel().getByText('Look back at last week')).toBeInTheDocument()
     expect(shell.reg).toMatchObject({ level: 'week', token: '2026-9-27', threadKey: 'weekly:2026-9-27', stepId: 'look-back' })
+    // No band, no bookmark, no drop card.
+    expect(document.querySelector('.ribbon-band, .ribbon-tab, .ribbon-card')).toBeNull()
   })
-  // Phone ruling (final review 2026-11-01): the conversation does not cover
-  // the page; the step's controls stand in the session area above the rail.
-  it('phone: the band is a row of step chips with Next and Talk to the guide', async () => {
+  it('phone: the same tooltip and chip; no Talk to the guide button', async () => {
     phone.on = true
     open('/week?plan=1')
-    expect(band().getByRole('button', { name: 'Talk to the guide' })).toBeInTheDocument()
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
+    expect(screen.queryByRole('button', { name: 'Talk to the guide' })).toBeNull()
+    await next()
     expect(shell.reg?.stepId).toBe('calendar')
     expect(stepNow()).toBe('Calendar check')
+    expect(screen.getByRole('button', { name: 'Planning the week · 2 of 7' })).toBeInTheDocument()
   })
   it('desktop: no header on the page and no Talk button', () => {
     open('/week?plan=1')
@@ -162,31 +160,31 @@ describe('GuidedWeek — the Week page while planning', () => {
   it('the look back turns the month’s sheet to last week; the next step gives it back; the count is this week’s throughout', async () => {
     open('/week?plan=1', makeDeck({ onThisWeek: 3 }))
     expect(lookSheet().getByText('Not done last week')).toBeInTheDocument()
-    expect(band().getByText('3 of about 15 on this week')).toBeInTheDocument()
     expect(shell.reg).toMatchObject({ token: '2026-9-27', stepId: 'look-back' })
     expect(shell.reg?.sessionContext.guide?.counts).toEqual({ label: 'tasks on this week', n: 3, of: 'about 15' })
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
+    await next()
     expect(screen.queryByRole('complementary', { name: 'Last week, looking back' })).toBeNull()
     expect(drive()).toEqual({})
-    expect(band().getByText('3 of about 15 on this week')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Read October/ })) })
+    expect(shell.reg?.sessionContext.guide?.counts).toEqual({ label: 'tasks on this week', n: 3, of: 'about 15' })
+    await next()
+    expect(stepNow()).toBe('Read October')
     expect(drive()).toEqual({ above: true })
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Look back at last week/ })) })
+    await back(); await back()
     expect(shell.reg?.stepId).toBe('look-back')
     expect(lookSheet().getByText('Not done last week')).toBeInTheDocument()
     expect(shell.reg).toMatchObject({ token: '2026-9-27', threadKey: 'weekly:2026-9-27' })
   })
-  it('Next step moves the registration on; tapping a step jumps there; Back goes back', async () => {
+  it('Next moves the registration on; Back goes back', async () => {
     open('/week?plan=1')
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
+    await next()
     expect(shell.reg?.stepId).toBe('calendar')
     expect(panel().getByText('Calendar check')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Choose this week/ })) })
+    await next(3)
     expect(shell.reg?.stepId).toBe('choose')
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Back' })) })
+    await back()
     expect(shell.reg?.stepId).toBe('inbox')
   })
-  it('the look back on the sheet beside the week; the calendar check and the inbox in the card under the band; Read October is the month itself', async () => {
+  it('the look back on the sheet beside the week; the calendar check and the inbox are the week itself; Read October is the month', async () => {
     const gate = { key: 'gate', title: 'Fix the gate', done: vi.fn(async () => true), nextWeek: vi.fn(async () => true), someday: vi.fn(async () => true), letGo: vi.fn(async () => true) }
     const vet = createMockTask({ id: 'vet', title: 'Book the vet', bucket: 'inbox' })
     const deck = makeDeck({
@@ -205,51 +203,30 @@ describe('GuidedWeek — the Week page while planning', () => {
     await act(async () => { fireEvent.click(lookSheet().getByRole('button', { name: 'Let go: Fix the gate' })) })
     expect(gate.letGo).toHaveBeenCalled()
     expect(lookSheet().getByText(/Moved 2 untouched things to Later/)).toBeInTheDocument()
-    // 2 · Calendar check, before the month (Scott, 2026-11-02): the clash, flagged on its day.
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
-    expect(card('Calendar check').getByText('Overlap: Dentist and Team call')).toBeInTheDocument()
-    // 3 · Read October: the month's own sheet, opened beside the week; no card.
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
+    // 2 · Calendar check, before the month: the week itself, no card.
+    await next()
+    expect(stepNow()).toBe('Calendar check')
+    expect(screen.queryByText('Overlap: Dentist and Team call')).toBeNull()
+    // 3 · Read October: the month's own sheet, opened beside the week.
+    await next()
     expect(drive()).toEqual({ above: true })
-    expect(document.querySelector('.ribbon-card')).toBeNull()
-    // 4 · Clear the inbox: filed through the deck's writers.
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
-    await act(async () => { fireEvent.click(card('Clear the inbox').getByRole('button', { name: 'This week: Book the vet' })) })
-    expect(deck.actions.keepThisWeek).toHaveBeenCalledWith(deck.cards[0])
+    // 4 · Clear the inbox: the tooltip only (its place is the top bar's Inbox).
+    await next()
+    expect(stepNow()).toBe('Clear the inbox')
+    expect(screen.queryByRole('button', { name: 'This week: Book the vet' })).toBeNull()
   })
-  it('Choose this week’s tasks is the week itself with the month open beside it; weekly ops and tell the family drop their cards', async () => {
+  it('Choose this week’s tasks is the week itself with the month open beside it; weekly ops and tell the family draw no card', async () => {
     store.notes = { guide: { current: 'choose', done: [], skipped: [] } }
-    const dog = createMockRoutine({ id: 'dog', name: 'Walk the dog', time_of_day: '07:00:00', recurrence_pattern: { type: 'daily' } as RecurrencePattern })
-    const deck = makeDeck({
-      tasks: [onWeek('a'), onWeek('gate', { title: 'Fix the gate', context: 'family' }), onWeek('board', { title: 'Board deck', context: 'work' })],
-      onThisWeek: 3,
-      routines: [dog],
-    })
-    open('/week?plan=1', deck)
-    // 5 · Choose: the month beside the week, no card; the count on the band.
+    open('/week?plan=1', makeDeck({ onThisWeek: 3 }))
     expect(drive()).toEqual({ above: true })
-    expect(document.querySelector('.ribbon-card')).toBeNull()
-    expect(band().getByText('3 of about 15 on this week')).toBeInTheDocument()
-    // 6 · Weekly ops: dinners, routines, the weekend note on the same row.
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
-    const ops = () => card('Weekly ops')
-    expect(ops().getByText('Tacos')).toBeInTheDocument()
-    expect(ops().getByRole('link', { name: 'Open the meal plan' })).toHaveAttribute('href', '/meals/plan?week=2026-09-27')
-    expect(ops().getByText('7a Walk the dog')).toBeInTheDocument()
-    fireEvent.change(ops().getByLabelText('What the weekend is for'), { target: { value: 'The lake' } })
-    await act(async () => { fireEvent.click(ops().getByRole('button', { name: 'Save weekend note' })) })
-    expect(store.patches.at(-1)?.p).toEqual({ weekend: 'The lake' })
-    expect(store.notes.weekend).toBe('The lake')
-    // 7 · Tell the family: the week's Family items for reference; only what
-    // is typed is posted, kept until the week is over.
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
-    const family = () => card('Tell the family')
-    expect(family().getByRole('list', { name: 'This week’s Family items' })).toHaveTextContent('Fix the gate')
-    expect(family().queryByText('Board deck')).toBeNull()
-    fireEvent.change(family().getByLabelText('What should the family know?'), { target: { value: 'Grandma Thursday' } })
-    await act(async () => { fireEvent.click(family().getByRole('button', { name: 'Post to the wall' })) })
-    expect(wall.add).toHaveBeenCalledWith('me', 'Grandma Thursday', 'note', 'member-me', new Date(2026, 9, 4))
-    expect(family().getByRole('status')).toHaveTextContent('Posted 1 note')
+    await next()
+    expect(stepNow()).toBe('Weekly ops')
+    expect(drive()).toEqual({})
+    expect(screen.queryByLabelText('What the weekend is for')).toBeNull()
+    await next()
+    expect(stepNow()).toBe('Tell the family')
+    expect(screen.queryByLabelText('What should the family know?')).toBeNull()
+    expect(coach().getByRole('button', { name: 'Done planning the week' })).toBeInTheDocument()
   })
   it('a write saved on the page itself marks the week planned on the choosing step, and only there', async () => {
     store.notes = { guide: { current: 'inbox', done: [], skipped: [] } }
@@ -261,7 +238,8 @@ describe('GuidedWeek — the Week page while planning', () => {
     // Dragged onto a day while clearing the inbox: not planned.
     await act(async () => { listening.fn?.() })
     expect(plannedPatches()).toHaveLength(0)
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Choose this week/ })) })
+    await next()
+    expect(shell.reg?.stepId).toBe('choose')
     await act(async () => { listening.fn?.() })
     await waitFor(() => expect(plannedPatches()).toHaveLength(1))
     expect(session.reload).toHaveBeenCalled()
@@ -277,19 +255,18 @@ describe('GuidedWeek — the Week page while planning', () => {
     open('/week?plan=1')
     fireEvent.change(lookSheet().getByLabelText('What went well'), { target: { value: 'Rested' } })
     expect(lookSheet().getByText('Not saved yet')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
+    await next()
     expect(screen.queryByLabelText('What went well')).toBeNull()
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Look back at last week/ })) })
+    await back()
     expect(lookSheet().getByLabelText('What went well')).toHaveValue('Rested')
     expect(lookSheet().getByText('Not saved yet')).toBeInTheDocument()
     expect(review.finish).not.toHaveBeenCalled()
   })
   // The count is the page's own (WeekViewV2 counts the rows it draws), never
   // worked out again here from a different list.
-  it('the count reads "{n} of about 15": the page’s own count of what it draws on this week', () => {
+  it('the guide hears the count "{n} of about 15": the page’s own count of what it draws on this week', () => {
     const tasks = [onWeek('a'), onWeek('b', { completed: true }), onWeek('c'), onWeek('d'), createMockTask({ id: 'inbox', bucket: 'inbox' })]
     open('/week?plan=1', makeDeck({ tasks, onThisWeek: 3 }))
-    expect(screen.getByText('3 of about 15 on this week')).toBeInTheDocument()
     expect(shell.reg?.sessionContext.guide.counts).toEqual({ label: 'tasks on this week', n: 3, of: 'about 15' })
   })
 
@@ -298,7 +275,7 @@ describe('GuidedWeek — the Week page while planning', () => {
     const deck = makeDeck()
     open('/week?plan=1', deck)
     expect(panel().queryByRole('button', { name: 'Next step' })).toBeNull()
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Done planning the week' })) })
+    await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Done planning the week' })) })
     await waitFor(() => expect(where().get('plan')).toBeNull())
     expect(store.order).toEqual(['review', 'planned', 'finished'])
     expect((store.notes.guide as { finishedAt?: string }).finishedAt).toEqual(expect.any(String))
@@ -313,17 +290,18 @@ describe('GuidedWeek — the Week page while planning', () => {
     localStorage.setItem('symphony-fold:week', 'open')
     store.notes = { guide: { current: 'family', done: [], skipped: [] } }
     open('/week?plan=1')
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Done planning the week' })) })
+    await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Done planning the week' })) })
     await waitFor(() => expect(where().get('plan')).toBeNull())
     expect(localStorage.getItem('symphony-fold:week')).toBe('folded')
     localStorage.removeItem('symphony-fold:week')
   })
 
-  it('Leave closes without finishing and keeps where the session is', async () => {
+  it('Stop planning closes without finishing and keeps where the session is', async () => {
     store.notes = { guide: { current: 'calendar', done: ['look-back'], skipped: ['read-month'] } }
     const deck = makeDeck()
     open('/week?plan=1', deck)
-    fireEvent.click(band().getByRole('button', { name: 'Leave' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop planning' }))
+    expect(screen.queryByRole('dialog', { name: 'Planning guide' })).toBeNull()
     expect(where().get('plan')).toBeNull()
     expect(screen.getByText('days with the strip')).toBeInTheDocument()
     expect(review.finish).not.toHaveBeenCalled()

@@ -17,7 +17,7 @@ export type StepWrite =
   | 'scratchpad'
   | 'none'
 
-/** What a step opens on the page (the planning ribbon, 2026-11-04): the
+/** What a step opens on the page (planning on the page, 2026-11-04): the
  *  sheet above (`above`), this period's calendar (`calendar`), the write line
  *  focused (`write`), or the sheet above turned to the period before with its
  *  choices (`look`, which opens the sheet above). Read by PaperFold's `drive`;
@@ -41,10 +41,21 @@ export interface GuideStep {
   choosing?: true
   /** The parts of the page this step opens. None: the page as it is. */
   drives?: StepDrives
-  /** The step has its own editor, shown in the card that drops under the
-   *  ribbon's band for this step only. */
+  /** The step has its own editor. It used to drop in a card under the
+   *  ribbon; the tooltips (2026-11-04) draw no card, and each editor gets a
+   *  permanent place on its page (anchored by `at`). */
   card?: true
+  /** Where the step's tooltip points: the element on the page marked
+   *  `data-guide-anchor="<at>"`. Missing on the page, the tooltip points at
+   *  the page title (`title`). */
+  at: GuideAnchor
 }
+
+/** The places on the everyday pages a step's tooltip can point at. */
+export type GuideAnchor =
+  | 'left' | 'right' | 'write' | 'list' | 'title' | 'leftovers' | 'day' | 'energy'
+  | 'routines' | 'inbox' | 'dinner' | 'family' | 'menu' | 'ideal-week' | 'vision'
+  | 'landscape' | 'areas'
 
 export const SESSION_LENGTH: Record<GuideLevel, string> = {
   day: '10 to 15 minutes',
@@ -65,6 +76,7 @@ export const HORIZON_OF: Record<GuideLevel, SessionHorizon> = {
 const DAY: readonly GuideStep[] = [
   {
     id: 'look-back',
+    at: 'leftovers',
     title: 'Look back at yesterday',
     minutes: 2,
     why: 'Nothing left from yesterday should quietly vanish.',
@@ -76,6 +88,7 @@ const DAY: readonly GuideStep[] = [
   },
   {
     id: 'calendar',
+    at: 'day',
     title: 'Today\'s calendar',
     minutes: 2,
     why: 'Fixed times decide where the free space is.',
@@ -87,6 +100,7 @@ const DAY: readonly GuideStep[] = [
   },
   {
     id: 'energy',
+    at: 'energy',
     title: 'Energy',
     minutes: 1,
     why: 'Pick work that fits how you\'ll actually feel.',
@@ -98,6 +112,7 @@ const DAY: readonly GuideStep[] = [
   },
   {
     id: 'pick',
+    at: 'left',
     title: 'Pick 3 to 5',
     minutes: 5,
     why: 'A few real priorities beat a long hopeful list.',
@@ -105,11 +120,14 @@ const DAY: readonly GuideStep[] = [
     guide: 'Places each where you say and counts toward 5.',
     more: 'A long list leaves you deciding all day what to do next. A few chosen items each have a place, and the rest can wait without nagging. The count is a guide you can see, not a limit that is enforced.',
     writes: ['place'],
+    // The week opens beside the day: + on three to five (the prototype's Pick).
+    drives: { above: true },
     card: true,
     choosing: true,
   },
   {
     id: 'habits',
+    at: 'routines',
     title: 'Habits',
     minutes: 1,
     why: 'Small daily routines are easy to skip without a check.',
@@ -117,6 +135,7 @@ const DAY: readonly GuideStep[] = [
     guide: 'Lists the day\'s routines to tick off as you go.',
     more: 'Small routines rarely feel urgent, so they tend to drop first. A glance at them while the day is still ahead is often enough to keep them from slipping. They are only listed here, never added for you.',
     writes: ['none'],
+    drives: { above: true },
     card: true,
   },
 ]
@@ -124,6 +143,7 @@ const DAY: readonly GuideStep[] = [
 const WEEK: readonly GuideStep[] = [
   {
     id: 'look-back',
+    at: 'left',
     title: 'Look back at last week',
     minutes: 15,
     why: 'Close last week before opening this one.',
@@ -135,6 +155,7 @@ const WEEK: readonly GuideStep[] = [
   },
   {
     id: 'calendar',
+    at: 'day',
     title: 'Calendar check',
     minutes: 10,
     why: 'See how full the week already is before choosing what goes in it.',
@@ -146,6 +167,7 @@ const WEEK: readonly GuideStep[] = [
   },
   {
     id: 'read-month',
+    at: 'left',
     title: 'Read the month',
     minutes: 5,
     why: 'The week should move the month forward.',
@@ -157,6 +179,7 @@ const WEEK: readonly GuideStep[] = [
   },
   {
     id: 'inbox',
+    at: 'inbox',
     title: 'Clear the inbox',
     minutes: 10,
     why: 'Nothing hidden should surprise you mid-week.',
@@ -168,6 +191,7 @@ const WEEK: readonly GuideStep[] = [
   },
   {
     id: 'choose',
+    at: 'write',
     title: 'Choose this week\'s tasks',
     minutes: 15,
     why: 'A short list gets done. About 15 is the limit.',
@@ -180,6 +204,7 @@ const WEEK: readonly GuideStep[] = [
   },
   {
     id: 'ops',
+    at: 'dinner',
     title: 'Weekly ops',
     minutes: 10,
     why: 'Meals, workouts, sleep and the weekend run the week.',
@@ -191,6 +216,7 @@ const WEEK: readonly GuideStep[] = [
   },
   {
     id: 'family',
+    at: 'family',
     title: 'Tell the family',
     minutes: 5,
     why: 'Everyone should know the week before it starts.',
@@ -205,6 +231,7 @@ const WEEK: readonly GuideStep[] = [
 const MONTH: readonly GuideStep[] = [
   {
     id: 'fresh-start',
+    at: 'menu',
     title: 'Fresh start',
     minutes: 5,
     why: 'A visible reset makes a new month feel like a new start.',
@@ -216,6 +243,7 @@ const MONTH: readonly GuideStep[] = [
   },
   {
     id: 'look-back',
+    at: 'left',
     title: 'Look back at last month',
     minutes: 20,
     why: 'Know what moved before deciding what\'s next.',
@@ -227,6 +255,7 @@ const MONTH: readonly GuideStep[] = [
   },
   {
     id: 'read-season',
+    at: 'left',
     title: 'Read the season list',
     minutes: 10,
     why: 'The month should move the season\'s goals forward.',
@@ -238,6 +267,7 @@ const MONTH: readonly GuideStep[] = [
   },
   {
     id: 'next-weeks',
+    at: 'right',
     title: 'Next 4–5 weeks',
     minutes: 15,
     why: 'This far out the calendar is mostly settled. Plan around it.',
@@ -249,6 +279,7 @@ const MONTH: readonly GuideStep[] = [
   },
   {
     id: 'by-area',
+    at: 'write',
     title: 'The month by area',
     minutes: 30,
     why: 'This is where goals start to look like tasks.',
@@ -261,6 +292,7 @@ const MONTH: readonly GuideStep[] = [
   },
   {
     id: 'upkeep-fun',
+    at: 'write',
     title: 'Maintenance and fun',
     minutes: 15,
     why: 'Bills, decluttering and supply orders come round again. Fun gets lost unless it\'s planned.',
@@ -275,6 +307,7 @@ const MONTH: readonly GuideStep[] = [
 const SEASON: readonly GuideStep[] = [
   {
     id: 'look-back',
+    at: 'left',
     title: 'Look back at last season',
     minutes: 30,
     why: 'A season is a fresh start only if the last one is closed out.',
@@ -286,6 +319,7 @@ const SEASON: readonly GuideStep[] = [
   },
   {
     id: 'from-year',
+    at: 'left',
     title: 'Choose from the year',
     minutes: 20,
     why: 'The season is where a year goal gets a three-month shape.',
@@ -298,6 +332,7 @@ const SEASON: readonly GuideStep[] = [
   },
   {
     id: 'calendar',
+    at: 'right',
     title: 'Season calendar',
     minutes: 20,
     why: 'Holidays and school breaks eat time you might be counting on.',
@@ -309,6 +344,7 @@ const SEASON: readonly GuideStep[] = [
   },
   {
     id: 'energy',
+    at: 'energy',
     title: 'Energy check',
     minutes: 10,
     why: 'A plan that ignores how tired you are falls apart by week three.',
@@ -320,6 +356,7 @@ const SEASON: readonly GuideStep[] = [
   },
   {
     id: 'by-area',
+    at: 'write',
     title: 'Season goals by area',
     minutes: 30,
     why: 'Turns year goals into something three months can finish.',
@@ -332,6 +369,7 @@ const SEASON: readonly GuideStep[] = [
   },
   {
     id: 'ideal-week',
+    at: 'ideal-week',
     title: 'Ideal week',
     minutes: 30,
     why: 'Tests whether these goals physically fit into 168 hours.',
@@ -343,6 +381,7 @@ const SEASON: readonly GuideStep[] = [
   },
   {
     id: 'wild-cards',
+    at: 'write',
     title: 'Wild cards',
     minutes: 20,
     why: 'Seasonal logistics sneak up: money, camps, travel, the house.',
@@ -357,6 +396,7 @@ const SEASON: readonly GuideStep[] = [
 const YEAR: readonly GuideStep[] = [
   {
     id: 'look-back',
+    at: 'left',
     title: 'Look back at last year',
     minutes: 45,
     why: 'You can\'t set next year well without knowing what this one taught you.',
@@ -368,6 +408,7 @@ const YEAR: readonly GuideStep[] = [
   },
   {
     id: 'vision',
+    at: 'vision',
     title: 'Picture 5–10 years out',
     minutes: 30,
     why: 'The long view keeps the year\'s goals pointing somewhere.',
@@ -379,6 +420,7 @@ const YEAR: readonly GuideStep[] = [
   },
   {
     id: 'landscape',
+    at: 'landscape',
     title: 'Map the 12 months',
     minutes: 45,
     why: 'Fixed dates decide how much room each month really has.',
@@ -391,6 +433,7 @@ const YEAR: readonly GuideStep[] = [
   },
   {
     id: 'areas',
+    at: 'areas',
     title: 'Choose life areas',
     minutes: 15,
     why: 'Areas make sure no part of life is forgotten.',
@@ -402,6 +445,7 @@ const YEAR: readonly GuideStep[] = [
   },
   {
     id: 'brain-dump',
+    at: 'write',
     title: 'Brain dump goals',
     minutes: 45,
     why: 'Get everything out before judging any of it.',
@@ -414,6 +458,7 @@ const YEAR: readonly GuideStep[] = [
   },
   {
     id: 'refine',
+    at: 'list',
     title: 'Refine the list',
     minutes: 30,
     why: 'A list you can actually carry for twelve months.',
@@ -425,6 +470,7 @@ const YEAR: readonly GuideStep[] = [
   },
   {
     id: 'share-book',
+    at: 'list',
     title: 'Share and book the next session',
     minutes: 10,
     why: 'Plans stick when the people affected know them and the next check-in is booked.',

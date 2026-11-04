@@ -49,7 +49,7 @@ export const PAGE_TOURS: Record<string, TourPart[]> = {
     { target: 'region:The days', title: 'The days', text: 'The picture of the week. Each day shows its events, the kids’ specials, tasks (circles) and routines (rounded squares), and who carries each; the hours with nothing scheduled show once turned on under ⋯. Tick a task to finish it, drag it to move it, tap it to open it. Days gone by are dimmed.' },
     { target: 'week-facts', title: 'This week’s facts', text: 'How many things were done last week, whether last week was reviewed (Review opens the review), and today’s first event.' },
     { target: 'still-to-place', title: 'No day yet', text: 'What is chosen for this week but has no day. Drag one onto a day, or on a phone press + to pick its day.' },
-    { target: 'plan-deck', title: 'Plan this week', text: 'Opens the deck: everything without a home this week, one card at a time. Finishing it marks the week planned.' },
+    { target: 'plan-chip', title: 'Plan the week', text: 'Starts planning the week, right on this page: a small note for each step points at the part of the week it is about. Done planning marks the week planned.' },
     { target: 'week-options', title: 'Week options', text: 'Show free time, weather, done work and the daily routines in each day, all off until turned on; How this page works; Watch the guide.' },
   ],
   today: [

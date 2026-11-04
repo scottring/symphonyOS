@@ -14,7 +14,7 @@
 //
 // The motion of each companion (spring, drag, keys, sounds) is useFoldMotion;
 // this file lays them out. The page can also drive a companion open or folded
-// for a while (`drive`: the planning ribbon's steps, the guide's Today step)
+// for a while (`drive`: a planning session's steps, the guide's Today step)
 // without touching what the reader left; letting go returns it there.
 
 import {
@@ -523,7 +523,8 @@ function PaperFoldSheet({
       data-calendar-open={hasCal ? (calOpen ? 'true' : 'false') : undefined}
       data-stowed={stowed ? 'true' : undefined}
     >
-      <div ref={slotRef} className="paper-fold-slot" data-open={open ? 'true' : 'false'} hidden={stowed}>
+      {/* A planning step's tooltip points at a fold by its edge (GuideCoach). */}
+      <div ref={slotRef} className="paper-fold-slot" data-open={open ? 'true' : 'false'} hidden={stowed} data-guide-anchor="left">
         <div ref={pinRef} className="paper-fold-pin">
           <button
             type="button"
@@ -574,6 +575,7 @@ function PaperFoldSheet({
           className="paper-fold-slot paper-fold-slot--calendar"
           data-open={calOpen ? 'true' : 'false'}
           hidden={stowed}
+          data-guide-anchor="right"
         >
           <div ref={calPinRef} className="paper-fold-pin">
             <button

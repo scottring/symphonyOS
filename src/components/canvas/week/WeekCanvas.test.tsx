@@ -242,12 +242,11 @@ describe('WeekCanvas — filing a task under a goal', () => {
 
   // Fix round 1 ruling: the week carries the bookmark on the top edge of its
   // days, as Month's sheet does.
-  it('the bookmark hangs from the days; pulling it starts planning the week', () => {
-    const onPull = vi.fn()
-    show(writers(), { ribbon: { label: 'Plan this week', onPull } })
-    const tab = within(screen.getByRole('region', { name: 'The days' })).getByRole('button', { name: 'Plan this week', expanded: false })
-    fireEvent.click(tab)
-    expect(onPull).toHaveBeenCalled()
+  it('the days are where a planning step’s tooltip points (no bookmark on them)', () => {
+    show(writers())
+    const days = screen.getByRole('region', { name: 'The days' })
+    expect(days).toHaveAttribute('data-guide-anchor', 'day')
+    expect(within(days).queryByRole('button', { name: /^Plan / })).toBeNull()
   })
 
   it('hideStrip leaves the strip out and keeps the days', () => {

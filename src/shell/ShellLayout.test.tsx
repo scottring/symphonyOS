@@ -599,8 +599,8 @@ describe('typing while voice is on (2026-10-14, Wednesday Wheelie\'s)', () => {
 })
 
 // Guided planning (spec 2026-11-01): a page registers its session; the shell
-// opens the conversation beside it with the step's header on top, reopens the
-// session's own thread, and sends the step with every turn.
+// reopens the session's own thread and sends the step with every turn. It
+// never opens the conversation by itself (planning as tooltips, 2026-11-04).
 describe('A guided planning session in the shell', () => {
   const onThread = vi.fn()
   function GuidedPage({ stepId, on = true, onApplied }: { stepId: string; on?: boolean; onApplied?: () => void }) {
@@ -641,19 +641,21 @@ describe('A guided planning session in the shell', () => {
     expect(screen.getByRole('button', { name: 'Chat history' })).toBeInTheDocument()
   })
 
-  it('desktop: opens the panel once with the step header, reopens the session thread, and restores on leaving', () => {
+  it('desktop: the panel never opens by itself; opened by hand it has the step header and the session thread', () => {
     const view = render(at(<GuidedPage stepId="look-back" on={false} />))
     expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
     expect(assistantState.options?.sessionContext).toBeUndefined()
 
     view.rerender(at(<GuidedPage stepId="inbox" />))
-    const panel = screen.getByRole('region', { name: 'Chat with Symphony' })
-    expect(within(panel).getByText('Step header: inbox')).toBeInTheDocument()
-    // The page's suggested talk gives way to the session.
-    expect(within(panel).queryByText(/Suggested:/)).not.toBeInTheDocument()
+    // The session starts: the page stays as it is, the conversation closed.
+    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
     expect(assistantState.openThread).toHaveBeenCalledTimes(1)
     expect(assistantState.openThread.mock.calls[0].slice(0, 2)).toEqual(['planning_session', 'weekly:2026-11-1'])
     expect(assistantState.options?.sessionContext).toMatchObject({ stepId: 'inbox', guide: { stepId: 'inbox' } })
+    // A step change does not open it either.
+    view.rerender(at(<GuidedPage stepId="calendar" />))
+    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
+    expect(assistantState.options?.sessionContext).toMatchObject({ guide: { stepId: 'calendar' } })
 
     // The thread link reaches the page only when it is a different row.
     const reportThread = assistantState.openThread.mock.calls[0][2] as (id: string) => void
@@ -662,34 +664,29 @@ describe('A guided planning session in the shell', () => {
     reportThread('new-thread')
     expect(onThread).toHaveBeenCalledWith('new-thread')
 
-    // Closed by hand mid-session, a step change does not force it back open.
-    fireEvent.click(screen.getByRole('button', { name: 'Close Chat' }))
-    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
-    view.rerender(at(<GuidedPage stepId="calendar" />))
-    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
-    expect(assistantState.openThread).toHaveBeenCalledTimes(1)
-    expect(assistantState.options?.sessionContext).toMatchObject({ guide: { stepId: 'calendar' } })
-
+    // Leaving returns to the everyday thread.
     view.rerender(at(<GuidedPage stepId="calendar" on={false} />))
     expect(assistantState.resetSession).toHaveBeenCalledTimes(1)
     expect(assistantState.options?.sessionContext).toBeUndefined()
-    // Hidden before the session, hidden after it.
-    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
   })
 
-  it('desktop: leaving restores the pane as it was, and the walk returns', () => {
-    const view = render(at(<GuidedPage stepId="inbox" on={false} />))
-    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
-    view.rerender(at(<GuidedPage stepId="inbox" />))
+  it('desktop: open by hand, the conversation has the step’s header; leaving leaves the pane as it is', () => {
+    aiState.hidden = false
+    const view = render(at(<GuidedPage stepId="calendar" />))
+    const panel = screen.getByRole('region', { name: 'Chat with Symphony' })
+    expect(within(panel).getByText('Step header: calendar')).toBeInTheDocument()
+    // The page's suggested talk gives way to the session.
+    expect(within(panel).queryByText(/Suggested:/)).not.toBeInTheDocument()
+    view.rerender(at(<GuidedPage stepId="calendar" on={false} />))
     expect(screen.getByRole('region', { name: 'Chat with Symphony' })).toBeInTheDocument()
-    view.rerender(at(<GuidedPage stepId="inbox" on={false} />))
-    expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Step header: inbox')).not.toBeInTheDocument()
+    expect(screen.queryByText('Step header: calendar')).not.toBeInTheDocument()
+    expect(assistantState.resetSession).toHaveBeenCalledTimes(1)
   })
 
   // The Week marks itself planned once a card is applied at its choosing step.
   it('a change card applied while the session runs is told to the page', async () => {
     const onApplied = vi.fn()
+    aiState.hidden = false
     render(at(<GuidedPage stepId="choose" onApplied={onApplied} />))
     act(() => assistantState.observer!.changeSet?.({ key: 'g1', title: '1 change', ops: [{ key: 'g1:0', op: 'add', title: 'Book the vet' }] }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save 1 change' })) })
@@ -697,11 +694,10 @@ describe('A guided planning session in the shell', () => {
     expect(onApplied).toHaveBeenCalledTimes(1)
   })
 
-  // Phone ruling (final review 2026-11-01): the session stays on the page,
-  // its controls there; the conversation opens only when asked.
-  it('phone: the overlay does not open on its own; Talk to the guide opens it with the header; leaving closes it', () => {
+  // Phone: the session stays on the page; the conversation opens only when asked.
+  it('phone: the overlay does not open on its own; opened by hand it has the header', () => {
     mobileState.isMobile = true
-    function Talk() { const { openAssistant } = useAssistantLauncher(); return <button type="button" onClick={() => openAssistant()}>Talk to the guide</button> }
+    function Talk() { const { openAssistant } = useAssistantLauncher(); return <button type="button" onClick={() => openAssistant()}>Talk</button> }
     const atPhone = (node: ReactNode) => <AssistantLaunchProvider>{at(<>{node}<Talk /></>)}</AssistantLaunchProvider>
     const view = render(atPhone(<GuidedPage stepId="inbox" on={false} />))
     const overlay = () => document.querySelector<HTMLElement>('[aria-label="Symphony conversation"]')!
@@ -710,11 +706,10 @@ describe('A guided planning session in the shell', () => {
     expect(overlay().style.display).toBe('none')
     // The session's own thread still opens, ready for when they talk.
     expect(assistantState.openThread.mock.calls[0].slice(0, 2)).toEqual(['planning_session', 'weekly:2026-11-1'])
-    fireEvent.click(screen.getByRole('button', { name: 'Talk to the guide' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Talk' }))
     expect(overlay().style.display).not.toBe('none')
     expect(within(overlay()).getByText('Step header: inbox')).toBeInTheDocument()
     view.rerender(atPhone(<GuidedPage stepId="inbox" on={false} />))
-    expect(overlay().style.display).toBe('none')
     expect(assistantState.resetSession).toHaveBeenCalledTimes(1)
   })
 })

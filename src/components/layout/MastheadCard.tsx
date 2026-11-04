@@ -58,7 +58,9 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
 }) {
   const open = variant !== 'card'
   const heading = (
-    <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'}>
+    // The page title: where a planning step's tooltip points when its own
+    // anchor is not on the page (GuideCoach).
+    <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'} data-guide-anchor="title">
       {title}
       {/* "What is this page?", where the page has a guide, and its
           short video beside it until watched (learnVideos.ts). */}

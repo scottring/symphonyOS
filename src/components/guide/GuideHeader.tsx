@@ -1,8 +1,9 @@
 // What the current step is for, in three plain lines: Why, You, Guide. "Explain
 // more" opens the longer note inline. Step copy is fixed text, never model output.
-// It tops the session's conversation. The planning ribbon's band owns the
-// session's navigation (Back, Next, Done planning, Leave): one Next, on the
-// page, never a second one here (fix round 1, 2026-11-04).
+// It tops the session's conversation, when Scott opens it. The step's tooltip
+// on the page (GuideCoach) owns the session's navigation (Back, Next, Done
+// planning) and the header chip stops it: one Next, on the page, never a
+// second one here (2026-11-04).
 
 import { useState } from 'react'
 import type { GuideLevel, GuideStep } from '@/lib/guide/steps'

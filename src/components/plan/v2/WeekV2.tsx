@@ -15,12 +15,11 @@
 //
 // It is chrome AROUND the existing week: the canvas, drag and drop and
 // add-to-day are WeekViewV2's, unchanged. Review (?review=1) and Plan
-// (?plan=1) open the guided session on this same page: the planning ribbon
-// across the top of the week (2026-11-04), each step driving the month's fold
-// beside it, the step's header in the conversation. "Place them" (?place=1)
-// opens Give them a day.
+// (?plan=1) open the guided session on this same page: the plan chip in the
+// header and one tooltip per step (2026-11-04), each step driving the month's
+// fold beside the week. "Place them" (?place=1) opens Give them a day.
 
-import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
@@ -33,17 +32,15 @@ import { GiveThemADay } from '@/components/plan/choose/GiveThemADay'
 import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
 import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
 import { WeekLookBack } from '@/components/plan/guided/week/WeekLookBack'
-import { CalendarCheck, type AllDayEvent } from '@/components/plan/guided/week/CalendarCheck'
-import { InboxStep } from '@/components/plan/guided/week/InboxStep'
-import { WeeklyOps } from '@/components/plan/guided/week/WeeklyOps'
-import { TellFamily } from '@/components/plan/guided/week/TellFamily'
+import type { AllDayEvent } from '@/components/plan/guided/week/CalendarCheck'
+import { PlanChip } from '@/components/guide/GuideCoach'
 import type { SessionFold } from '@/components/plan/guided/GuidedPeriod'
 import type { Routine } from '@/types/actionable'
 import type { ClashEvent } from '@/lib/guide/clashes'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import type { DeckCard, DeckMode } from '@/lib/planning/deck'
 import type { DeckActions } from '@/components/home/week/useDeckActions'
-import { REVIEW_WINDOW_DAYS, reviewTarget, weekPhrase, weekReviewState } from '@/lib/planning/periodReview'
+import { REVIEW_WINDOW_DAYS, reviewTarget, weekPhrase } from '@/lib/planning/periodReview'
 import { showToast } from '@/hooks/useToast'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
 import { WeekMenu } from './WeekMenu'
@@ -101,9 +98,9 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   weekStart: Date
   isCurrent: boolean
   /** The week at rest: WeekViewV2's canvas. A guided session asks for it
-   *  without its strip, with the month's fold driven by the ribbon's step
+   *  without its strip, with the month's fold driven by the session's step
    *  (`fold`: on the look back, last week with its choices). */
-  canvas?: ReactNode | ((opts?: { hideStrip?: boolean; fold?: SessionFold; ribbon?: { label: string; onPull: () => void } }) => ReactNode)
+  canvas?: ReactNode | ((opts?: { hideStrip?: boolean; fold?: SessionFold }) => ReactNode)
   /** Today's first item, for the fact line ("Today: …"); null when there is
    *  none, the week is not this one, or it has not loaded. */
   today?: string | null
@@ -172,28 +169,23 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   }
 
   // ── The header ─────────────────────────────────────────────────────────
-  // One button at most, and only the one that's due — the rule every horizon
-  // follows (reviewed design, 2026-10-20). Not planned yet: "Plan this week",
-  // which opens on Looking back at last week. Planned: no button. Its last
-  // day, until reviewed: "Review this week" — the deck on next week, which
-  // looks back at this one and records its review. Reviewed: no button. The
-  // rest waits in ⋯ ("Plan this week again"); nothing while the deck is open.
+  // Planning is the plan chip ("Plan the week"; while a session runs,
+  // "Planning the week · 2 of 7" with ✕), always there on a week that can be
+  // planned (planning as tooltips, 2026-11-04). Besides it, one button at
+  // most, only when due: on the week's last day, until reviewed, "Review this
+  // week" — the deck on next week, which looks back at this one and records
+  // its review. Nothing more while the deck is open.
   // ⋯ once also offered "Review last week" and "Plan next week early"
   // (removed 2026-10-31): the first opened the same deck as Plan this week,
   // and the second could never open (deckWeekAllowed lets next week's deck
   // open only on this week's last day, when "Review this week" is it).
   type Offer = { id: string; label: string; due: boolean; run: () => void }
   const settled = !session.loading && !thisReview.loading && !lastReview.loading
-  const planned = !session.error && !!session.saved
   const offers: Offer[] = deckMode || !deck || !settled ? [] : [
     ...(target === 'this' && isCurrent && !thisReview.error && !thisReview.reviewed
       ? [{ id: 'review', label: `Review ${reviewWord}`, due: true, run: () => setMode('plan', nextWeek, 'look-back') }] : []),
-    ...(plannable ? [{ id: 'plan', label: planned ? `Plan ${reviewWord} again` : `Plan ${reviewWord}`, due: !planned, run: () => setMode('plan') }] : []),
   ]
   const primary = offers.find((o) => o.due) ?? null
-  // The planning ribbon's bookmark on the days (fix round 1): the same session
-  // the Plan button starts. In a session it is the pulled ribbon (Leave).
-  const ribbon = { label: `Plan ${reviewWord}`, onPull: () => setMode('plan') }
   // The fact line: this week's count and bar, and today's first item.
   const on = deck?.onThisWeek ?? 0, doneHere = deck?.doneThisWeek ?? 0
   const countText = `${doneHere} of ${on} done`
@@ -214,6 +206,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   ) : null
   const controls = (
     <>
+      {(plannable || deckMode === 'full') && <PlanChip level="week" word="the week" onStart={() => setMode('plan')} />}
       {primary && <button type="button" className="pv2-btn wk-plan" onClick={primary.run} data-explain="plan-deck" data-explain-label={primary.label}>{primary.label}</button>}
       <WeekMenu offers={offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run }))} />
     </>
@@ -255,27 +248,23 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
       {deckMode && deck
         // Drawn only once the tasks are in: no flash of an empty October.
         ? (deck.loading ? null : deckMode === 'full'
-          ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} isCurrent={isCurrent} deck={deck} lastReview={lastReview}
-              canvas={(fold) => typeof canvas === 'function' ? canvas({ hideStrip: true, fold, ribbon }) : canvas}
+          ? <WeekSession key={localYmd(weekStart)} weekStart={weekStart} deck={deck} lastReview={lastReview}
+              canvas={(fold) => typeof canvas === 'function' ? canvas({ hideStrip: true, fold }) : canvas}
               onFinish={closeWeek} onClose={() => { setMode(null); planNotes.reload() }}
               onPlanned={() => { session.reload(); planNotes.reload() }} />
           : <section className="deck choose-flow" aria-label="Plan this week">
               <GiveThemADay days={deck.stripDays} items={deck.choose.placeItems} placedCount={deck.choose.placedCount}
                 onLeave={() => setMode(null)} primary={{ label: 'Done', run: () => setMode(null) }} />
             </section>)
-        : <div className="wk-canvas">{typeof canvas === 'function' ? canvas(plannable ? { ribbon } : undefined) : canvas}</div>}
+        : <div className="wk-canvas">{typeof canvas === 'function' ? canvas() : canvas}</div>}
     </div>
   )
 }
 
-const NO_TASKS: readonly Task[] = []
-const NO_ROUTINES: readonly Routine[] = []
-
 /** Planning the week (spec 2026-11-01): the guided session on this page.
  *  Mounted only while it runs, so its notes are read only then. */
-function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish, onClose, onPlanned }: {
+function WeekSession({ weekStart, deck, lastReview, canvas, onFinish, onClose, onPlanned }: {
   weekStart: Date
-  isCurrent: boolean
   deck: WeekDeck
   /** Last week's review: Look back's notes save through it. */
   lastReview: ReturnType<typeof usePeriodReview>
@@ -290,34 +279,24 @@ function WeekSession({ weekStart, isCurrent, deck, lastReview, canvas, onFinish,
   // planning the week saves what is still unsaved.
   const [lookDraft, setLookDraft] = useState<ReviewNotes | null>(null)
   const guided = useGuidedWeek({ weekStart, count: deck.onThisWeek ?? 0, choose: deck.choose, onFinish: () => onFinish(lookDraft), onClose, onPlanned })
-  const [weekendDraft, setWeekendDraft] = useState<string | null>(null)
-  const [familyDraft, setFamilyDraft] = useState<string | null>(null)
   // A write saved on the page itself (a task dragged onto a day) counts as
   // applied too: on the choosing step it marks the week planned, once.
   const { markPlannedOnce } = guided
   const listen = deck.listenCanvasWrites
   useEffect(() => listen?.(() => { void markPlannedOnce() }), [listen, markPlannedOnce])
-  // Tell the family's reference list: the week's open Family items, from the
-  // page's own scoped list.
-  const tasks = deck.tasks ?? NO_TASKS
-  const familyItems = useMemo(() => tasks.filter((t) => t.context === 'family' && !t.completed
-    && weekReviewState(t, weekStart, { isCurrent }) !== undefined), [tasks, weekStart, isCurrent])
   // Where the session is comes first: no flash of step one before a resume.
   if (guided.loading) return null
   const choose = deck.choose
-  // What each step shows: the look back on the sheet beside the week (last
-  // week, with its choices), a step with its own editor in the card under
-  // the band. Read November and Choose this week's tasks are the week's own
-  // page with the month open beside it.
+  // The look back is on the sheet beside the week (last week, with its
+  // choices). Every other step is the week's own page, pointed at by its
+  // tooltip; the steps' old editors (calendar check, inbox, weekly ops, tell
+  // the family) are not drawn in a session (2026-11-04: their place is the
+  // week itself).
   const bodies = {
     'look-back': <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
       notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} aged={deck.aged} onSeeAged={deck.onSeeAged} />,
-    calendar: <CalendarCheck weekStart={weekStart} events={deck.events ?? []} allDay={deck.allDayEvents} />,
-    inbox: <InboxStep cards={deck.cards.filter((c) => c.source === 'inbox')} actions={deck.actions} />,
-    ops: <WeeklyOps weekStart={weekStart} routines={deck.routines ?? NO_ROUTINES} draft={weekendDraft} onDraft={setWeekendDraft} />,
-    family: <TellFamily weekStart={weekStart} familyItems={familyItems} draft={familyDraft} onDraft={setFamilyDraft} />,
   }
-  return <GuidedWeek canvas={canvas} bodies={bodies} count={guided.count} monthWord={guided.monthWord}
+  return <GuidedWeek canvas={canvas} bodies={bodies} monthWord={guided.monthWord}
     progress={guided.progress} saveError={guided.saveError} onJump={(id) => { void guided.jump(id) }}
     onNext={() => { void guided.next() }} onFinish={() => { void guided.done() }} onLeave={onClose} />
 }

@@ -39,12 +39,12 @@ describe('page-written tours', () => {
       <div data-explain="page-title">Oct 10 – 16</div>
       <p data-explain="week-facts">3 done last week · Review</p>
       <span data-explain="still-to-place">No day yet</span>
-      <button data-explain="plan-deck">Plan this week</button>
+      <button data-explain="plan-chip">Plan the week</button>
       <button data-explain="week-options">⋯</button>
       <section aria-label="The days">days</section>
     </div>`
     const steps = tourFor('week')
-    expect(steps.map((s) => s.targets[0])).toEqual(['page-title', 'region:The days', 'week-facts', 'still-to-place', 'plan-deck', 'week-options'])
+    expect(steps.map((s) => s.targets[0])).toEqual(['page-title', 'region:The days', 'week-facts', 'still-to-place', 'plan-chip', 'week-options'])
     const words = [PAGE_GUIDES.week, ...(PAGE_TOURS.week ?? []).map((p) => p.text)].join(' ')
     for (const gone of [/eight steps/i, /Show opens/, /Days and Hours/, /Still to place/, /planning session/i, /Help me plan/, /happy with this week/, /sentence/i]) expect(words).not.toMatch(gone)
     expect(PAGE_GUIDES.week).toMatch(/"Calendar clear"[^.]*off until/)

@@ -52,14 +52,14 @@ import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { rememberFolded } from '@/components/plan/fold/PaperFold'
-import { RibbonTab } from '@/components/guide/GuideRibbon'
+import { PlanChip } from '@/components/guide/GuideCoach'
+import { stepsFor } from '@/lib/guide/steps'
 import { GuidedDay } from '@/components/plan/guided/day/GuidedDay'
 import type { DayPictureItem } from '@/components/plan/guided/day/DayRows'
 import { makeDayActions } from '@/lib/planning/dayActions'
 import { dayTarget } from '@/lib/guide/dayTarget'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
-import { buildTodayChoice, buildTodayReview, goalOf } from '@/lib/planning/chooseToday'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { dayToken, usePlanningSession } from '@/hooks/usePlanningSession'
 import { SECTIONS_ORDER } from '@/lib/today/types'
@@ -381,11 +381,6 @@ export function TodayView({
   // `drive` opens it without remembering it, and hands it back after.
   const { state: guide } = useGuidedPlan()
   const guideOnToday = guide?.status === 'active' && currentStep(guide) === 'today'
-  useEffect(() => {
-    if (!guideOnToday || !alongsideWorkspace) return
-    alongsideWorkspace.driveWeek(true)
-    return () => alongsideWorkspace.driveWeek(undefined)
-  }, [guideOnToday, alongsideWorkspace])
   // ── The Day session (spec 2026-11-01): ?plan=1 runs it on this page,
   // replacing Plan today / Review today. It plans today until 4 pm and
   // tomorrow from 4 pm (dayTarget); which day is fixed when it opens, so 4 pm
@@ -414,9 +409,16 @@ export function TodayView({
   const onSessionDay = (key: string) => key === targetKey || key === lookBackKey
   const sessionShown = planOpen && onSessionDay(localYmd(viewedDate))
   // The week lies folded beside the day — here, or in the connected
-  // workspace around it — except while the Day session runs: its steps rail
-  // stands beside the day instead.
-  const showWeek = !sessionShown
+  // workspace around it — while the Day session runs too (planning as
+  // tooltips, 2026-11-04: the page never changes shape). The session's Pick
+  // and Habits steps open it (steps.ts `drives`); the guide's Today step too.
+  const stepOpensWeek = sessionShown && !!sessionStep && !!stepsFor('day').find((s) => s.id === sessionStep)?.drives?.above
+  const driveWeek = guideOnToday || stepOpensWeek ? true : undefined
+  useEffect(() => {
+    if (!driveWeek || !alongsideWorkspace) return
+    alongsideWorkspace.driveWeek(true)
+    return () => alongsideWorkspace.driveWeek(undefined)
+  }, [driveWeek, alongsideWorkspace])
   const weekRange = formatWeekRangeShort(weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn))
   // The dock's Today pin showed this same list beside the page; the week's
   // fold holds it now, so the page never shows it twice.
@@ -750,22 +752,6 @@ export function TodayView({
   // is, so its button can step aside (reviewed design, 2026-10-20).
   const dayPlan = usePlanningSession('daily', dayToken(day.target))
   const dayWord = day.isTomorrow ? 'tomorrow' : 'today'
-  const monthWordToday = viewedDate.toLocaleDateString('en-US', { month: 'long' })
-  const tasksById = useMemo(() => {
-    const m = new Map<string, Task>()
-    for (const t of tasks) { m.set(t.id, t); for (const st of t.subtasks ?? []) if (!m.has(st.id)) m.set(st.id, st) }
-    return m
-  }, [tasks])
-  // This week → the day on the page (the day being planned, while it runs).
-  const todayChoice = useMemo(() => buildTodayChoice({
-    week: data.dayPlan.chooserTasks.flatMap((e) => (e.kind === 'task' && e.task ? [e.task] : [])),
-    carried: data.dayPlan.carried.flatMap((e) => (e.kind === 'task' && e.task ? [e.task] : [])),
-    allTasks: tasks, today: viewedDate, userId, monthWord: monthWordToday,
-  }), [data.dayPlan, tasks, viewedDate, userId, monthWordToday])
-  // The day before, through the page's filters: `tasks` arrives filtered to
-  // the reader's spaces; the people filter is applied as the chooser's is.
-  const lookBack = useMemo(() => buildTodayReview({ allTasks: tasks, today: day.lookBackOn, userId, match: makeAssigneeFilter(selectedAssignees ?? []) }),
-    [tasks, day.lookBackOn, userId, selectedAssignees])
   // The day as this page shows it, under its filters: the session's count
   // and pictures read exactly what is drawn.
   const dayPicture = useMemo<DayPictureItem[]>(() => SECTIONS_ORDER.flatMap((sec) => data.grouped[sec] ?? [])
@@ -788,15 +774,12 @@ export function TodayView({
     rememberFolded('day')
     return true
   }
-  // One button at most: "Plan today" (until 4 pm) or "Plan tomorrow" (from
-  // 4 pm) until that day is planned, then a quiet "… again". On today's page,
-  // and on the day being planned.
-  const dayFlowOffer = !sessionShown && !dayPlan.loading && (data.isToday || localYmd(viewedDate) === targetKey)
-    ? { label: `Plan ${dayWord}`, due: !dayPlan.saved } : null
+  // The plan chip: "Plan today" (until 4 pm) or "Plan tomorrow" (from 4 pm),
+  // on today's page and on the day being planned; while the session runs,
+  // "Planning today · 2 of 5" with ✕ (planning as tooltips, 2026-11-04).
+  const dayFlowOffer = sessionShown || (!dayPlan.loading && (data.isToday || localYmd(viewedDate) === targetKey))
   const dayFlowButton = dayFlowOffer
-    ? dayFlowOffer.due
-      ? <button type="button" className="pv2-btn today-flow-btn" data-explain="day-flow" data-explain-label={dayFlowOffer.label} onClick={openDaySession}>{dayFlowOffer.label}</button>
-      : <button type="button" className="canvas-link wc-quiet-link today-flow-again" onClick={openDaySession}>{dayFlowOffer.label} again</button>
+    ? <PlanChip level="day" word={dayWord} onStart={openDaySession} />
     : null
   // The shown day's line under the title: "Planned Sun · energy: medium ·
   // looked back". Looked back: its session did its Look back step, or the
@@ -1269,34 +1252,29 @@ export function TodayView({
     currentMemberId: meId,
   }
 
-  // The Day session wraps the page it runs on: the session bar, the steps
-  // rail, and this same page beside them.
+  // The Day session wraps the page it runs on: the page itself, unchanged,
+  // and the step's tooltip pointing into it.
   const inDaySession = (page: ReactNode) => !sessionShown ? page : (
-    <div className="px-4 md:px-0">
-      <GuidedDay key={targetKey} target={day.target} lookBackOn={day.lookBackOn} isTomorrow={day.isTomorrow}
-        canvas={page} dayItems={localYmd(viewedDate) === targetKey ? dayPicture : null} onStep={setSessionStep} routinesHidden={hideRoutines} lookBack={lookBack} choice={todayChoice} actions={dayActions}
-        listenPlacements={listenPlacements}
-        goalLabel={(t) => (goalOf(t, tasksById) ? `${monthWordToday} goal` : undefined)}
-        onFinish={finishDay}
-        onClose={() => { closeDaySession(); reloadShownNotes() }}
-        onPlanned={() => { dayPlan.reload(); reloadShownNotes() }} />
-    </div>
+    <GuidedDay key={targetKey} target={day.target} isTomorrow={day.isTomorrow}
+      canvas={page} dayItems={localYmd(viewedDate) === targetKey ? dayPicture : null} onStep={setSessionStep} actions={dayActions}
+      listenPlacements={listenPlacements}
+      onFinish={finishDay}
+      onClose={() => { closeDaySession(); reloadShownNotes() }}
+      onPlanned={() => { dayPlan.reload(); reloadShownNotes() }} />
   )
 
   // The day, with its week folded beside it (paper-style horizons, Scott
   // 2026-11-04). Each week row keeps its + and its drag onto the day.
   // In the connected workspace AlongsideDay folds the week around this page.
-  // While a session runs the fold is stowed, never unmounted, so the day
-  // under it keeps its state.
   // In the workspace, the day's routines with no time are drawn onto
   // AlongsideDay's sheet under the week's tasks: this page holds the day's
   // plan and the writers the + uses.
   const withWeek = (day: ReactNode) => alongsideWorkspace ? <>
     {day}
-    {alongsideWorkspace.routinesSlot && !sessionShown && createPortal(
+    {alongsideWorkspace.routinesSlot && createPortal(
       <SheetRoutines plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />, alongsideWorkspace.routinesSlot)}
   </> : (
-    <TodayWeekFold stowed={sessionShown} drive={guideOnToday ? true : undefined} plan={data.dayPlan} day={viewedDate}
+    <TodayWeekFold drive={driveWeek} plan={data.dayPlan} day={viewedDate}
       weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
       nextWeek={nextWeek}
       chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
@@ -1312,7 +1290,7 @@ export function TodayView({
     // beside the day, a planning page that fills the screen.
     // In the connected workspace Today always shares the planning frame, so
     // Today, Week, Plan and Routines have one shape (Scott, 2026-10-10).
-    <div className={`today-page @container w-full ${alongsideWorkspace || sessionShown ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
+    <div className={`today-page @container w-full ${alongsideWorkspace ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}
@@ -1419,11 +1397,8 @@ export function TodayView({
           in view while the day scrolls and scrolls on its own (PaperFold).
           While the Day session runs, this is its page: the steps rail stands
           beside it and the fold is put away. */}
-      {inDaySession(<div className={sessionShown ? '' : 'px-4 md:px-0'}>
-        {withWeek(<main className="min-w-0 ribbon-host today-ribbon-host">
-          {/* The planning ribbon's bookmark on the day (fix round 1): the same
-              session Plan today starts; in a session, the pulled ribbon. */}
-          {(dayFlowOffer || sessionShown) && <RibbonTab label={`Plan ${dayWord}`} onPull={openDaySession} />}
+      {inDaySession(<div className="px-4 md:px-0">
+        {withWeek(<main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,
               and it sent you to the Inbox. Unfinished work now has one quiet
@@ -1541,9 +1516,7 @@ export function TodayView({
               <div className="py-4">
                 <p className="font-display text-lg text-neutral-600">{focusWork.completedCount ? 'Everything on your list is done.' : 'Nothing chosen yet.'}</p>
                 <p className="mt-1 text-[14px] text-neutral-500">
-                  {showWeek
-                    ? <>Choose from {weekRange} {isMobile ? 'above' : 'beside this list'}, or add something for {data.isToday ? 'today' : 'this day'}.</>
-                    : <>Add something for {data.isToday ? 'today' : 'this day'}.</>}
+                  Choose from {weekRange} {isMobile ? 'above' : 'beside this list'}, or add something for {data.isToday ? 'today' : 'this day'}.
                 </p>
                 {/* Say when the view is narrowed, so an empty filtered list
                     isn't read as an empty day. No hidden counts. */}
@@ -1607,7 +1580,7 @@ export function TodayView({
           </ForTodayDropZone>
           </section>
 
-          <section aria-labelledby="today-day-heading" className="daybook-journal-section today-day-section">
+          <section aria-labelledby="today-day-heading" className="daybook-journal-section today-day-section" data-guide-anchor="day">
             <div className="daybook-journal-heading">
               <h2 id="today-day-heading">The day</h2>
               {/* Late in the day the spent morning took most of the column

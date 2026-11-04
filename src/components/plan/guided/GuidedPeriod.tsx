@@ -1,18 +1,19 @@
-// Month, Season or Year while a guided session runs: planning is a ribbon on
-// the same page (Scott, 2026-11-04). The band lies across the top of the
-// period's own page (GuideRibbon); each step drives the page's folds (the
+// Month, Season or Year while a guided session runs: planning is a few
+// tooltips on the period's own page (Scott, 2026-11-04). The plan chip in
+// the header shows where the session is; each step is one tooltip (GuideCoach)
+// pointing at the real thing on the page, and drives the page's folds (the
 // level above, this period's calendar, the write line) instead of showing a
 // second layout. The look back turns the sheet above to the period before,
-// with its choices; a step with its own editor shows it in the card under the
-// band. The step's header and the conversation are the shell's: this
-// registers them, as the Week (useGuidedWeek) and the Day (useGuidedDay) do.
+// with its choices. The step's header and the conversation are the shell's
+// (it never opens by itself): this registers them, as the Week
+// (useGuidedWeek) and the Day (useGuidedDay) do.
 //
 // Planned (per person) once anything is applied at the level's choosing step
 // (Month and Season: by area; Year: the brain dump), the steps that write on
 // the sheet itself: a write saved on the page (`listenPageWrites`) or a change
 // card's Apply, whichever comes first. Done planning runs the page's
-// closing writes, then the session's own finish, then leaves. Leave writes
-// nothing and keeps where the session is.
+// closing writes, then the session's own finish, then leaves. Stopping (the
+// chip's ✕) writes nothing and keeps where the session is.
 //
 // The look back's notes as typed are held here, so they outlive their step's
 // body (only the current step's body is drawn); Done hands them to the
@@ -26,7 +27,7 @@ import type { ReviewNotes } from '@/hooks/usePeriodReview'
 import { HORIZON_OF, choosingStep, stepsFor } from '@/lib/guide/steps'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
-import { GuideRibbon } from '@/components/guide/GuideRibbon'
+import { GuideCoach } from '@/components/guide/GuideCoach'
 import type { TaskContext } from '@/types/task'
 import '@/components/guide/guide.css'
 
@@ -58,7 +59,7 @@ type Line = { id: string; title: string }
 type Area = { id: string; name: string; context: TaskContext | null }
 const NONE: readonly never[] = []
 
-export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites, plannedAt }: {
+export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites }: {
   level: PeriodLevel
   /** The period's planning token (monthToken, seasonToken, yearToken). */
   token: string
@@ -67,13 +68,14 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   /** The period's page itself, without its strip, drawn with the folds the
    *  current step asks for. */
   page: ReactNode | ((fold: SessionFold) => ReactNode)
-  /** What each step shows, by step id: the look back's in the sheet above,
-   *  a step with its own editor's in the card under the band. */
+  /** What each step shows, by step id: the look back's in the sheet above.
+   *  The other steps' editors are not drawn in a session (their place is the
+   *  page itself; 2026-11-04 tooltips). */
   bodies: (tools: PeriodSessionTools) => Partial<Record<string, ReactNode>>
   /** The period's closing writes, with the look back's unsaved notes; false
    *  keeps the session open. */
   onFinish: (lookDraft: ReviewNotes | null) => Promise<boolean>
-  /** Back to the page as it is every day (Leave, and after Done). */
+  /** Back to the page as it is every day (Stop planning, and after Done). */
   onLeave: () => void
   /** The period was just marked planned (the page re-reads its planned mark). */
   onPlanned?: () => void
@@ -84,11 +86,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
   /** Hear of each placement-type write saved on the page itself; returns the
    *  way to stop listening. */
   listenPageWrites?: (listener: () => void) => () => void
-  /** When the period was last marked planned. Planned before this session
-   *  opened, the session line says so quietly: it is being planned again. */
-  plannedAt?: Date
 }) {
-  const [openedAt] = useState(() => Date.now())
   const steps = stepsFor(level)
   const CHOOSING = choosingStep(level).id
   const { progress, loading, saveError, next, jump, markPlanned, finish, setThreadId } = useGuidedProgress(level, token)
@@ -134,7 +132,6 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
     return { id, name, context: (context || null) as TaskContext | null }
   }) : [], [areasKey])
 
-  const finishLabel = `Done planning ${periodLabel}`
   const registration = useMemo<GuidedSessionRegistration | null>(() => {
     if (loading) return null
     const index = Math.max(0, steps.findIndex((s) => s.id === progress.current))
@@ -167,23 +164,16 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
     look: drives?.look ? drawn[step!.id] ?? null : null,
     write: !!drives?.write,
   }
-  const word = periodLabel[0].toUpperCase() + periodLabel.slice(1)
-  const status = plannedAt && plannedAt.getTime() < openedAt
-    ? `${word} was planned ${plannedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. You can still change it.`
-    : null
   const pageNode = typeof page === 'function' ? page(fold) : page
   // Where the session is comes first: no flash of step one before a resume.
   // The page stays put while it loads.
   if (loading) return <section className="guide-session" aria-label={`Planning ${periodLabel}`} aria-busy="true">{pageNode}</section>
   return (
     <section className="guide-session" aria-label={`Planning ${periodLabel}`}>
-      <GuideRibbon level={level} progress={progress} bodies={drawn}
-        onJump={(id) => { void jump(id) }} onNext={() => { void next() }}
-        onBack={() => { if (index > 0) void jump(steps[index - 1].id) }}
-        onLeave={onLeave} onFinish={() => { void done() }} finishLabel={finishLabel}
-        tab={{ label: `Plan ${periodLabel}`, onPull: onLeave }} status={status} error={saveError}>
-        {pageNode}
-      </GuideRibbon>
+      {pageNode}
+      <GuideCoach level={level} current={progress.current} word={periodLabel}
+        onNext={() => { void next() }} onBack={() => { if (index > 0) void jump(steps[index - 1].id) }}
+        onStop={onLeave} onFinish={() => { void done() }} error={saveError} />
     </section>
   )
 }

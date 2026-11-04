@@ -1,5 +1,5 @@
 // Planning the week, step 1 (spec 2026-11-01): look back at last week, on the
-// sheet beside the week (the planning ribbon, 2026-11-04). Its count and the
+// sheet beside the week (planning on the page, 2026-11-04). Its count and the
 // two notes (Looking back, compact), what the opening sweep moved to Later,
 // then each loose end from last week with four plain calls (Scott,
 // 2026-11-04): Done · Next week · Someday (not now) · Let go (not ever).

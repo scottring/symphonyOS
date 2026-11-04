@@ -907,12 +907,13 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         </div>
       )}
 
-      {/* Planning or reviewing the day (Today ?plan=1 / ?review=1) is its own
-          screen: the week column beside it would list the same things twice,
-          so it steps aside. The workspace shell stays: swapping it for a bare
-          fragment remounted the day page, which lost its way back on Leave
-          (walk, 2026-11-01). */}
-      <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside'} stepAside={fixedView !== 'week' && (searchParams.get('plan') === '1' || searchParams.get('review') === '1')} tasks={tasks} date={viewedDate} update={gated.updateTask} complete={toggleTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
+      {/* Planning the day (Today ?plan=1) is the same page with its week
+          folded beside it (planning as tooltips, 2026-11-04): the session's
+          Pick step opens it. Only the old ?review=1 link, on its way to
+          ?plan=1, steps the week aside. The workspace shell stays: swapping
+          it for a bare fragment remounted the day page, which lost its way
+          back (walk, 2026-11-01). */}
+      <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside'} stepAside={fixedView !== 'week' && searchParams.get('review') === '1'} tasks={tasks} date={viewedDate} update={gated.updateTask} complete={toggleTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
       <HomeView
         registerUndo={undo.pushAction}
         // The week reminder is Today's, below its schedule (2026-09-22): a

@@ -1,5 +1,5 @@
 // Planning a month, season or year, step 1 or 2 (spec 2026-11-01): look back
-// at the period before, on the sheet beside this one (the planning ribbon,
+// at the period before, on the sheet beside this one (planning on the page,
 // 2026-11-04). Its count and the two notes (Looking back, compact; a month's
 // energy goes in these notes), then each line it left open with the same four
 // calls on every level (Scott, 2026-11-04): Done · To {next} · Someday (not

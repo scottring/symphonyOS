@@ -36,14 +36,14 @@
 // Every manual write goes through the canvas activity, so it reports saving /
 // saved / didn't save, with Undo when the previous fields can be restored.
 //
-// Planning (?plan=1) is a ribbon on this same page (Scott, 2026-11-04): the
-// satin bookmark on the sheet ("Plan November") lays the session's band
-// across the top (GuidedPeriod), and each step drives this sheet's folds
-// through PaperFold's `drive`: the look back turns the sheet above to the
-// period before with its choices, the reading steps open the level above,
-// the calendar steps this period's calendar, the writing steps the write
-// line. A step with its own editor shows it in a card under the band. Done
-// planning stamps the sheet and the header line says when.
+// Planning (?plan=1) is a few tooltips on this same page (Scott, 2026-11-04):
+// the plan chip in the header ("Plan November") starts the session
+// (GuidedPeriod), each step is one tooltip pointing at the real thing on the
+// page (GuideCoach), and each step drives this sheet's folds through
+// PaperFold's `drive`: the look back turns the sheet above to the period
+// before with its choices, the reading steps open the level above, the
+// calendar steps this period's calendar, the writing steps the write line.
+// Done planning stamps the sheet and the header line says when.
 
 import { PageHelpContext, usePageHelp } from '@/components/explain/PageHelp'
 import { PageMenu, type PageMenuChoice } from '@/components/plan/PageMenu'
@@ -102,7 +102,7 @@ import { CalendarSheet, MonthGrid } from '@/components/plan/fold/CalendarSheet'
 import { WriteLine } from '@/components/plan/fold/WriteLine'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 import { GuidedPeriod, type PeriodSessionTools, type SessionFold } from '@/components/plan/guided/GuidedPeriod'
-import { PlannedStamp, RibbonTab } from '@/components/guide/GuideRibbon'
+import { PlanChip, PlannedStamp } from '@/components/guide/GuideCoach'
 import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
 import { FreshStart } from '@/components/plan/guided/month/FreshStart'
 import { PeriodLookBack } from '@/components/plan/guided/month/PeriodLookBack'
@@ -776,10 +776,11 @@ function Inner() {
   const openSeasonGoals = level === 1 ? openNodes.map((n) => ({ id: n.id, title: n.title })) : []
   // The year's open goals, for the refine and share steps.
   const yearOpen = level === 0 ? openNodes.filter((n) => n.goal) : []
-  // What each step shows (the planning ribbon, 2026-11-04): the look back on
-  // the sheet above, a step with its own editor in the card under the band.
-  // The reading, calendar and writing steps are this page itself, its folds
-  // opened by the step (steps.ts `drives`).
+  // What each step shows: the look back on the sheet above. The reading,
+  // calendar and writing steps are this page itself, its folds opened by the
+  // step (steps.ts `drives`). The other editors here are no longer drawn in a
+  // session (planning as tooltips, 2026-11-04: no drop card); each gets a
+  // permanent place on the page, where its step's tooltip points.
   const sessionBodies = (t: PeriodSessionTools) => level === 2 ? {
     'fresh-start': <FreshStart monthWord={periodWord} value={t.notes.scenery} patch={t.patch} />,
     'look-back': lookBackBody(t),
@@ -811,34 +812,26 @@ function Inner() {
   }
 
   // ---- The header (calm pass, 2026-10-18) ------------------------------------
-  // One button at most, and only the one that's due (reviewed design,
-  // 2026-10-20), the same rule on every horizon. Not planned yet: "Plan
-  // October", which opens on Looking back at September — so a review missed
-  // in September's last days is never lost. Planned, under way: no button.
-  // The last days (REVIEW_WINDOW_DAYS: a month's last 3, a season's or year's
-  // last 7) and after, until reviewed: "Review October", the same walk —
-  // Looking back at October, then plan November. Reviewed: no button. Year is
-  // reference: "Plan 2027" is due only in its planning window (talkFor, Jan
-  // 1–14). Everything not due waits in ⋯ — planning again, planning the next
-  // period early, a review never done; nothing while a flow is open.
+  // Planning this period is the plan chip ("Plan October"; while a session
+  // runs, "Planning October · 2 of 6" with ✕), on every period that can still
+  // be planned (planning as tooltips, 2026-11-04). Besides it, one button at
+  // most, only when due (reviewed design, 2026-10-20): the last days
+  // (REVIEW_WINDOW_DAYS: a month's last 3, a season's or year's last 7) and
+  // after, until reviewed, "Review October" — Looking back at October, then
+  // plan November. Everything else waits in ⋯ — planning the next period
+  // early, a review never done; nothing while a flow is open.
   type Offer = { id: string; label: string; due: boolean; run: () => void }
   const inFlow = reviewing || planning
   // Held until the reviews and the plan records have loaded, so the button
   // doesn't flicker from one offer to another.
   const settled = !review.loading && !prevReview.loading && !planSession.loading && !nextPlanSession.loading
   // A record that failed to load reads as unplanned, so planning stays offered.
-  const thisPlanned = !planSession.error && !!planSession.saved
   const nextPlanned = !nextPlanSession.error && !!nextPlanSession.saved
-  const yearWindow = level === 0 && !!talk && localYmd(talk.start) === localYmd(bounds.start)
   const offers: Offer[] = inFlow || !settled ? [] : [
     ...(target === 'this' && !review.error && !review.reviewed
       ? [{ id: 'review', label: `Review ${periodWord}`, due: true, run: () => setReviewing(true) }] : []),
     ...(target === 'previous' && !prevReview.error && !prevReview.reviewed
       ? [{ id: 'review', label: `Review ${prevWord}`, due: false, run: () => setReviewing(true, bounds.prev) }] : []),
-    ...(plannable ? [{
-      id: 'plan', label: thisPlanned ? `Plan ${periodWord} again` : `Plan ${periodWord}`,
-      due: !thisPlanned && target !== 'this' && (level !== 0 || yearWindow), run: () => setMode('plan'),
-    }] : []),
     ...(!nextPlanned ? [{ id: 'plan-next', label: target === 'this' ? `Plan ${nextWord}` : `Plan ${nextWord} early`, due: false, run: () => setMode('plan', bounds.next) }] : []),
   ]
   const primary = offers.find((o) => o.due) ?? null
@@ -882,9 +875,8 @@ function Inner() {
 
   // The period's sheet: its list, then the next ruled line to write on. It
   // lies beside the level above, folded at its left edge, and its calendar,
-  // folded at its right (PaperFold). The ribbon hangs from its top: pulled,
-  // the session's band lies across the page and each step drives the folds;
-  // Done planning stamps it.
+  // folded at its right (PaperFold). In a session each step drives the
+  // folds; Done planning stamps it.
   const footer = proposals.length > 0 || openNodes.length > 0
   // This period's calendar, folded at the sheet's right edge, for reading
   // (Task 5c). It reuses the sessions' read-only steps: Month the month at a
@@ -919,8 +911,7 @@ function Inner() {
         className={`sheet-area${picked?.id === a.id ? ' is-on' : ''}`} onClick={() => setWriteAreaId(picked?.id === a.id ? null : a.id)}>{a.name}</button>)}
     </div>
     return (
-    <section className="plan-list plan-sheet ribbon-host" data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
-      {plannable && <RibbonTab label={`Plan ${periodWord}`} onPull={() => setMode('plan')} />}
+    <section className="plan-list plan-sheet" data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
       {justMarked && !planning && <PlannedStamp at={justMarkedAt} />}
       <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items} headingOf={headingOf} groupOf={groupOf}
         keyOf={(n) => n.key} titleOf={(n) => n.title}
@@ -987,7 +978,7 @@ function Inner() {
       <div className="plan-head-main">
         <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
           <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
-          <h1>{periodTitle}</h1>
+          <h1 data-guide-anchor="title">{periodTitle}</h1>
           <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
         </div>
         {/* The review and the plan say where the period stands in their own
@@ -996,6 +987,7 @@ function Inner() {
         {summary}
       </div>
       <div className="plan-head-tools">
+        {plannable && !reviewing && <PlanChip level={PERIODS[level]} word={periodWord} onStart={() => setMode('plan')} disabled={!dataReady} />}
         {primary && <button type="button" className="pv2-btn wk-plan plan-primary" disabled={!dataReady} onClick={primary.run}
           data-explain="plan-primary" data-explain-label={primary.label}>{primary.label}</button>}
         {/* Without the docked bar (phones), ⋯ offers the talk that is due. */}
@@ -1013,12 +1005,11 @@ function Inner() {
       // Reviewing a period is the first card of planning the one after it
       // (spec 2026-10-19): Review October opens Plan November on Looking back.
       : reviewing ? <Navigate replace to={`${pathname}?${(() => { const q = new URLSearchParams(params); q.delete('review'); q.delete('focus'); q.set('plan', '1'); q.set('step', 'look-back'); q.set('start', localYmd(bounds.next)); return q.toString() })()}`} />
-      // Planning: the ribbon on this page, its band across the top and each
-      // step driving the sheet's folds.
+      // Planning: this same page, one tooltip per step, each step driving
+      // the sheet's folds.
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
           page={pageBody} bodies={sessionBodies} onFinish={closePeriod} onLeave={() => setMode(null)}
           onPlanned={() => planSession.reload()} listenPageWrites={listenPageWrites}
-          plannedAt={!planSession.error ? planSession.saved?.at : undefined}
           aboveLines={above.map((n) => ({ id: n.id, title: n.title }))}
           // Only the areas the space filter shows (a legacy area with no
           // space is Personal): the guide never hears of one out of view.

@@ -52,7 +52,29 @@ describe('guide step catalog', () => {
       expect(stepsFor(level).find((s) => s.id === 'look-back')?.drives).toEqual({ above: true, look: true })
       expect(choosingStep(level).drives).toEqual({ above: true, write: true })
     }
-    expect(stepsFor('day').every((s) => s.card && !s.drives)).toBe(true)
+    // Today: the week opens beside the day to pick from, and for its routines.
+    expect(drives('day')).toEqual({
+      'look-back': { card: true }, calendar: { card: true }, energy: { card: true },
+      pick: { above: true, card: true }, habits: { above: true, card: true },
+    })
+  })
+
+  // Planning as tooltips (2026-11-04): each step points at its place on the page.
+  it('says where each step’s tooltip points', () => {
+    const at = (level: GuideLevel) => Object.fromEntries(stepsFor(level).map((s) => [s.id, s.at]))
+    expect(at('day')).toEqual({ 'look-back': 'leftovers', calendar: 'day', energy: 'energy', pick: 'left', habits: 'routines' })
+    expect(at('week')).toEqual({ 'look-back': 'left', calendar: 'day', 'read-month': 'left', inbox: 'inbox', choose: 'write', ops: 'dinner', family: 'family' })
+    expect(at('month')).toEqual({ 'fresh-start': 'menu', 'look-back': 'left', 'read-season': 'left', 'next-weeks': 'right', 'by-area': 'write', 'upkeep-fun': 'write' })
+    expect(at('season')).toEqual({ 'look-back': 'left', 'from-year': 'left', calendar: 'right', energy: 'energy', 'by-area': 'write', 'ideal-week': 'ideal-week', 'wild-cards': 'write' })
+    expect(at('year')).toEqual({ 'look-back': 'left', vision: 'vision', landscape: 'landscape', areas: 'areas', 'brain-dump': 'write', refine: 'list', 'share-book': 'list' })
+    // A step that opens the calendar points at it (Year's landscape at its
+    // own section); a writing step at the write line.
+    for (const level of ['day', 'week', 'month', 'season', 'year'] as const) {
+      for (const s of stepsFor(level)) {
+        if (s.drives?.calendar && s.id !== 'landscape') expect(s.at).toBe('right')
+        if (s.drives?.write) expect(s.at).toBe('write')
+      }
+    }
   })
 
   it('no step asks to carry, table, or send anything back up', () => {

@@ -746,8 +746,10 @@ describe('TodayView — the Day session', () => {
     )
     return { ...view, onDateChange }
   }
-  // The header's Plan button (the ribbon on the day carries the same name).
-  const flowButton = (name: string) => screen.getAllByRole('button', { name }).find((b) => b.classList.contains('today-flow-btn'))!
+  // The header's plan chip, and the session's one tooltip (GuideCoach).
+  const flowButton = (name: string) => screen.getAllByRole('button', { name }).find((b) => b.classList.contains('plan-chip'))!
+  const coach = () => within(screen.getByRole('dialog', { name: 'Planning guide' }))
+  const stepNow = () => document.querySelector('.coach-t')?.textContent
   const search = () => new URLSearchParams(window.location.search)
 
   it('in the morning the page offers Plan today, which opens the session on the page itself', async () => {
@@ -757,15 +759,16 @@ describe('TodayView — the Day session', () => {
     await user.click(flowButton('Plan today'))
     const session = screen.getByRole('region', { name: 'Planning today' })
     expect(search().get('plan')).toBe('1')
-    // The planning ribbon (2026-11-04): the band across the top of the day.
-    expect(within(session).getByRole('region', { name: 'Plan today' })).toBeInTheDocument()
+    // Planning as tooltips (2026-11-04): one tooltip, no band, no card.
+    expect(coach().getByText('Step 1 of 5')).toBeInTheDocument()
+    expect(document.querySelector('.ribbon-band, .ribbon-tab, .ribbon-card')).toBeNull()
     expect(within(screen.getByTestId('guide-panel')).getByText('Look back at yesterday')).toBeInTheDocument()
-    // One page: the day is still there beside the steps.
+    // One page: the day is still there, as every day.
     expect(within(session).getByRole('heading', { name: 'For today' })).toBeInTheDocument()
     expect(within(session).getByRole('heading', { name: 'The day' })).toBeInTheDocument()
-    // The header's button steps aside; the ribbon on the day is the session's, pulled.
-    expect(document.querySelector('.today-flow-btn')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Plan today', expanded: true })).toBeInTheDocument()
+    // The chip says where the session is.
+    expect(screen.getByRole('button', { name: 'Planning today · 1 of 5' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Plan today' })).toBeNull()
   })
 
   it('from 4 pm it offers Plan tomorrow, which opens on today for the look back; there is no Review today', async () => {
@@ -785,7 +788,7 @@ describe('TodayView — the Day session', () => {
     expect(within(session).queryByText(/on tomorrow$/)).toBeNull()
   })
 
-  it('with the real date-writing parent, the page shows the day each step is about; Leave goes back to today', async () => {
+  it('with the real date-writing parent, the page shows the day each step is about; Stop planning goes back to today', async () => {
     const { user } = renderAt(17, { dated: true })
     const heading = (d: Date) => ({ level: 1, name: d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) })
     await user.click(flowButton('Plan tomorrow'))
@@ -794,16 +797,16 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument()
     expect(search().get('date')).toBeNull()
     // Tomorrow's calendar: the page goes to tomorrow, the session with it.
-    await user.click(within(document.querySelector<HTMLElement>('.ribbon-band')!).getByRole('button', { name: 'Next' }))
+    await user.click(coach().getByRole('button', { name: 'Next' }))
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0, 1)))).toBeInTheDocument())
     expect(search().get('date')).toBe(localYmd(at(0, 1)))
     expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
-    expect(screen.getByText('0 of 3–5 on tomorrow')).toBeInTheDocument()
-    // Back to the look back from the rail: today again.
-    await user.click(within(screen.getByRole('region', { name: 'Plan tomorrow' })).getByRole('button', { name: /Look back at today/ }))
+    expect(stepNow()).toBe('Tomorrow\'s calendar')
+    // Back to the look back: today again.
+    await user.click(coach().getByRole('button', { name: 'Back' }))
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
     expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Leave' }))
+    await user.click(screen.getByRole('button', { name: 'Stop planning' }))
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
     // Today keeps its clean URL: no ?date= naming it.
     await vi.waitFor(() => expect(search().get('date')).toBeNull())
@@ -816,9 +819,9 @@ describe('TodayView — the Day session', () => {
     await user.click(flowButton('Plan today'))
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0, -1)))).toBeInTheDocument())
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
-    await user.click(within(document.querySelector<HTMLElement>('.ribbon-band')!).getByRole('button', { name: 'Next' }))
+    await user.click(coach().getByRole('button', { name: 'Next' }))
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
-    await user.click(screen.getByRole('button', { name: 'Leave' }))
+    await user.click(screen.getByRole('button', { name: 'Stop planning' }))
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
     await vi.waitFor(() => expect(search().get('date')).toBeNull())
     await vi.waitFor(() => expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument())
@@ -834,23 +837,11 @@ describe('TodayView — the Day session', () => {
     await vi.waitFor(() => expect(dayNotes.patches.some((p) => (p.guide as { plannedAt?: string } | undefined)?.plannedAt)).toBe(true))
   })
 
-  it('the look back follows the page’s people filter', () => {
-    const y = at(0, -1)
-    const mine = createMockTask({ id: 'm', title: 'Email Dana', bucket: 'timed', scheduledFor: y, isAllDay: true, assignedTo: 'me' })
-    const hers = createMockTask({ id: 'h', title: 'Call the school', bucket: 'timed', scheduledFor: y, isAllDay: true, assignedTo: 'iris' })
-    renderAt(10, { url: '/?plan=1', tasks: [mine, hers], selectedAssignees: ['me'] })
-    const rail = within(screen.getByRole('region', { name: 'Look back at yesterday' }))
-    expect(rail.getByText('Email Dana')).toBeInTheDocument()
-    expect(rail.queryByText('Call the school')).toBeNull()
-    expect(rail.getByText('Yesterday · 0 of 1 done')).toBeInTheDocument()
-  })
-
   it('on tomorrow’s page in the evening the session plans tomorrow and looks back at today', () => {
     renderAt(17, { url: '/?plan=1', viewed: at(0, 1) })
-    const session = screen.getByRole('region', { name: 'Planning tomorrow' })
-    expect(within(session).getByRole('button', { name: /Look back at today/ })).toBeInTheDocument()
-    expect(within(session).getByRole('button', { name: /Tomorrow's calendar/ })).toBeInTheDocument()
-    expect(within(session).getByText('0 of 3–5 on tomorrow')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
+    expect(stepNow()).toBe('Look back at today')
+    expect(screen.getByRole('button', { name: 'Planning tomorrow · 1 of 5' })).toBeInTheDocument()
   })
 
   it('?review=1 opens the session (the old Review today link)', async () => {
@@ -863,17 +854,17 @@ describe('TodayView — the Day session', () => {
   it('?review=1 opens on the look back even when the session was left further on', async () => {
     dayNotes.notes = { guide: { current: 'energy', done: [], skipped: [] } }
     renderAt(10, { url: '/?review=1' })
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: /Look back at yesterday/ })).toHaveAttribute('aria-current', 'step'))
+    await vi.waitFor(() => expect(stepNow()).toBe('Look back at yesterday'))
     expect(search().get('step')).toBeNull()
   })
 
   it('?step= beside ?date= (opened on another day): the step is used and dropped, plan and the session\'s date survive', async () => {
     renderAt(10, { url: `/?plan=1&step=energy&date=${localYmd(at(0, 3))}`, dated: true })
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Energy' })).toHaveAttribute('aria-current', 'step'))
+    await vi.waitFor(() => expect(stepNow()).toBe('Energy'))
     await vi.waitFor(() => expect(search().get('step')).toBeNull())
     expect(search().get('plan')).toBe('1')
     expect(search().get('date')).toBe(localYmd(at(0, 0)))
-    expect(screen.getByRole('button', { name: 'Energy' })).toHaveAttribute('aria-current', 'step')
+    expect(stepNow()).toBe('Energy')
   })
 
   it('a bare ?plan=1 in the evening plans tomorrow, its look back on today’s page', async () => {
@@ -889,24 +880,28 @@ describe('TodayView — the Day session', () => {
     await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument())
   })
 
-  // One button at most, only the one that's due (reviewed design, 2026-10-20).
-  // Fix round 1 ruling: the day carries the planning ribbon's bookmark, which
-  // starts the same session as Plan today.
-  it('the bookmark on the day starts planning it; in the session it is the ribbon pulled', async () => {
+  // Planning as tooltips (2026-11-04): the plan chip in the header starts the
+  // session; in it, the chip says where the session is and its ✕ stops it.
+  it('the plan chip starts planning the day; in the session it counts the steps; its ✕ stops', async () => {
     const { user } = renderAt(10)
-    const tab = screen.getByRole('button', { name: 'Plan today', expanded: false })
-    expect(tab).toHaveClass('ribbon-tab')
-    await user.click(tab)
+    expect(document.querySelectorAll('.ribbon-tab, .today-flow-btn')).toHaveLength(0)
+    await user.click(flowButton('Plan today'))
     expect(search().get('plan')).toBe('1')
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Plan today', expanded: true })).toHaveClass('ribbon-tab')
+    await user.click(coach().getByRole('button', { name: 'Hide the guide' }))
+    expect(screen.queryByRole('dialog', { name: 'Planning guide' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Planning today · 1 of 5' }))
+    expect(stepNow()).toBe('Look back at yesterday')
+    await user.click(screen.getByRole('button', { name: 'Stop planning' }))
+    await vi.waitFor(() => expect(search().get('plan')).toBeNull())
+    expect(screen.queryByRole('dialog', { name: 'Planning guide' })).toBeNull()
+    expect(flowButton('Plan today')).toBeInTheDocument()
   })
 
-  it('once the day is planned, Plan today steps aside for a quiet "Plan today again"', async () => {
+  it('once the day is planned, the chip still offers Plan today', async () => {
     daySession.saved = { at: at(8), authorId: 'me', notes: {} }
     const { user } = renderAt(10)
-    expect(document.querySelectorAll('.today-flow-btn')).toHaveLength(0)
-    await user.click(screen.getByRole('button', { name: 'Plan today again' }))
+    await user.click(flowButton('Plan today'))
     expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
   })
 
@@ -926,7 +921,7 @@ describe('TodayView — the Day session', () => {
     dayNotes.notes = { guide: { current: 'habits', done: [], skipped: [] } }
     localStorage.setItem('symphony-fold:day', 'open')
     renderAt(10, { url: '/?plan=1' })
-    await act(async () => { fireEvent.click(within(document.querySelector<HTMLElement>('.ribbon-band')!).getByRole('button', { name: 'Done planning today' })) })
+    await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Done planning today' })) })
     await vi.waitFor(() => expect(search().get('plan')).toBeNull())
     // Done planning folds the week beside the day, and it stays folded.
     expect(localStorage.getItem('symphony-fold:day')).toBe('folded')

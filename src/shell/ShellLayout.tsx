@@ -384,32 +384,20 @@ function ShellLayoutInner({ children }: Props) {
     setPane(next);
   }, [setAiHidden]);
 
-  // A guided session opens the conversation beside the page once, as it
-  // starts (closing it mid-session sticks), and leaving puts the pane back
-  // as it was and returns to the everyday thread. On a phone it does not
-  // open over the page: the step's controls are on the page and "Talk to the
-  // guide" (the planning ribbon's band) opens it (phone ruling, final review
-  // 2026-11-01).
+  // A guided session never opens the conversation by itself (planning as
+  // tooltips, Scott 2026-11-04: the band, the card and the guide panel all
+  // repeated the same guidance). The docked conversation stays as it is every
+  // day; opened by hand during a session it shows the step's header and the
+  // session's own thread. Leaving the session returns to the everyday thread.
   const guidedActive = !!guided;
-  const paneBefore = useRef<{ aiHidden: boolean; pane: SidePane; phoneChatOpen: boolean } | null>(null);
-  const paneNow = useRef({ aiHidden, pane, phoneChatOpen, isMobile });
-  useEffect(() => { paneNow.current = { aiHidden, pane, phoneChatOpen, isMobile }; });
+  const wasGuided = useRef(false);
   const { openThread, resetSession } = assistant;
   useEffect(() => {
-    if (guidedActive) {
-      if (paneBefore.current) return;
-      const now = paneNow.current;
-      paneBefore.current = { aiHidden: now.aiHidden, pane: now.pane, phoneChatOpen: now.phoneChatOpen };
-      if (!now.isMobile) showPane('ai');
-    } else if (paneBefore.current) {
-      const before = paneBefore.current;
-      paneBefore.current = null;
-      setAiHidden(before.aiHidden);
-      setPane(before.pane);
-      setPhoneChatOpen(before.phoneChatOpen);
-      resetSession();
-    }
-  }, [guidedActive, showPane, setAiHidden, resetSession]);
+    if (guidedActive) { wasGuided.current = true; return; }
+    if (!wasGuided.current) return;
+    wasGuided.current = false;
+    resetSession();
+  }, [guidedActive, resetSession]);
   // Each session has its own saved thread; reopening the session reopens it.
   const guidedLatest = useRef(guided);
   useEffect(() => { guidedLatest.current = guided; });

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, act, waitFor } from '@testing-library/react'
 import { useEffect } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
-import { createMockTask } from '@/test/mocks/factories'
 import { GuidedSessionProvider, useGuidedSession, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import type { DayPictureItem } from './DayRows'
 import type { DayActions } from '@/lib/planning/dayActions'
@@ -27,15 +26,9 @@ vi.mock('@/hooks/usePlanningNotes', async () => {
     },
   }
 })
-const review = vi.hoisted(() => ({ reviewed: null, mine: null as null | { wentWell: string; didnt: string }, loading: false, error: null, reload: vi.fn(), finish: vi.fn(async (_n: unknown) => true) }))
-const reviewTokens = vi.hoisted(() => [] as string[])
-vi.mock('@/hooks/usePeriodReview', () => ({ usePeriodReview: (_h: string, token: string) => { reviewTokens.push(token); return review } }))
-
 import { GuidedDay } from './GuidedDay'
 
-const SUN = new Date(2026, 10, 1), MON = new Date(2026, 10, 2), TUE = new Date(2026, 10, 3)
-const inv = createMockTask({ id: 'i', title: 'Inventory all documents' })
-const left = createMockTask({ id: 'l', title: 'Sign kids up for Coppermine' })
+const MON = new Date(2026, 10, 2), TUE = new Date(2026, 10, 3)
 const dayItems: DayPictureItem[] = [
   { key: 'event-1', time: '9am', title: 'UPM kick-off', kind: 'event' },
   { key: 'routine-r', time: '7am', title: 'Walk the dog', kind: 'routine' },
@@ -54,17 +47,17 @@ function Shell() {
   return reg ? <div data-testid="guide-panel">{reg.header}</div> : null
 }
 const panel = () => within(screen.getByTestId('guide-panel'))
-// The planning ribbon (2026-11-04): its band, and the card each step drops under it.
-const rail = () => within(document.querySelector<HTMLElement>('.ribbon-session')!)
-const stepNow = () => [...document.querySelectorAll('.ribbon-step')].find((b) => b.getAttribute('aria-current') === 'step')?.querySelector('.ribbon-step-title')?.textContent
+// The session's one tooltip (GuideCoach) and the step it shows.
+const coach = () => within(screen.getByRole('dialog', { name: 'Planning guide' }))
+const stepNow = () => document.querySelector('.coach-t')?.textContent
+const next = async (n = 1) => { for (let i = 0; i < n; i++) await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Next' })) }) }
 
 function Where() { return <output data-testid="where">{useLocation().search}</output> }
 function open(over: Partial<Parameters<typeof GuidedDay>[0]> = {}, url = '/today?plan=1') {
   const props = {
-    target: MON, lookBackOn: SUN, isTomorrow: false,
+    target: MON, isTomorrow: false,
     canvas: <section aria-label="The day itself">the page</section>,
-    dayItems, lookBack: { open: [left], done: [] }, choice: { missed: [], groups: [{ title: 'Also this week', tasks: [inv] }], otherDays: [] },
-    actions: actions(), goalLabel: () => undefined,
+    dayItems, actions: actions(),
     onFinish: vi.fn(async () => { store.order.push('planned'); return true }), onClose: vi.fn(), onPlanned: vi.fn(),
     ...over,
   }
@@ -75,105 +68,61 @@ const plannedPatches = () => store.patches.filter((x) => (x.p.guide as { planned
 
 beforeEach(() => {
   store.notes = {}; store.patches = []; store.order = []; store.fail = false
-  shell.reg = null; reviewTokens.length = 0
-  review.mine = null
-  review.finish.mockReset(); review.finish.mockImplementation(async () => { store.order.push('review'); return true })
+  shell.reg = null
 })
 
 describe('GuidedDay — Today while planning the day', () => {
-  it('opens on the page: the ribbon’s band with the day’s count and five steps, the step’s card, and the day itself', () => {
+  it('opens on the page: the day itself, unchanged, and the first step’s tooltip; no band, no card', () => {
     open()
     const session = screen.getByRole('region', { name: 'Planning today' })
     expect(stepNow()).toBe('Look back at yesterday')
-    expect(within(session).getByText('2 of 3–5 on today')).toBeInTheDocument()
-    expect(within(session).getByRole('region', { name: 'Look back at yesterday' })).toBeInTheDocument()
-    expect([...document.querySelectorAll('.ribbon-step-title')].map((el) => el.textContent))
-      .toEqual(['Look back at yesterday', 'Today\'s calendar', 'Energy', 'Pick 3 to 5', 'Habits'])
+    expect(coach().getByText('Step 1 of 5')).toBeInTheDocument()
     expect(within(session).getByRole('region', { name: 'The day itself' })).toBeInTheDocument()
+    expect(document.querySelector('.ribbon-band, .ribbon-card, .ribbon-session')).toBeNull()
     expect(panel().getByText('Look back at yesterday')).toBeInTheDocument()
     expect(shell.reg).toMatchObject({ level: 'day', token: '2026-11-2', threadKey: 'daily:2026-11-2', stepId: 'look-back' })
     expect(shell.reg?.sessionContext.guide).toMatchObject({ level: 'day', stepId: 'look-back', counts: { label: 'tasks on today', n: 2, of: '3–5' } })
-    // The look back's win is yesterday's review.
-    expect(reviewTokens).toContain('2026-11-1')
   })
 
-  it('in the evening it plans tomorrow: titles say today and tomorrow', () => {
-    open({ target: TUE, lookBackOn: MON, isTomorrow: true })
+  it('in the evening it plans tomorrow: titles say today and tomorrow', async () => {
+    open({ target: TUE, isTomorrow: true })
     expect(screen.getByRole('region', { name: 'Planning tomorrow' })).toBeInTheDocument()
-    expect(rail().getByRole('button', { name: /Look back at today/ })).toBeInTheDocument()
-    expect(rail().getByRole('button', { name: /Tomorrow's calendar/ })).toBeInTheDocument()
+    expect(stepNow()).toBe('Look back at today')
     expect(panel().getByText('Look back at today')).toBeInTheDocument()
-    expect(screen.getByText('2 of 3–5 on tomorrow')).toBeInTheDocument()
+    await next()
+    expect(stepNow()).toBe('Tomorrow\'s calendar')
     expect(shell.reg).toMatchObject({ token: '2026-11-3' })
-    expect(reviewTokens).toContain('2026-11-2')
+    expect(shell.reg?.sessionContext.guide).toMatchObject({ counts: { label: 'tasks on tomorrow', n: 2 } })
   })
 
-  it('resumes on the saved step; the calendar step shows the day, habits its routines', async () => {
+  it('resumes on the saved step and tells the page which step it is on', async () => {
     store.notes = { guide: { current: 'calendar', done: ['look-back'], skipped: [] } }
-    open()
+    const onStep = vi.fn()
+    open({ onStep })
     expect(stepNow()).toBe('Today\'s calendar')
-    const day = within(rail().getByRole('group', { name: 'Monday, as it stands' }))
-    expect(day.getByText('UPM kick-off')).toBeInTheDocument()
-    expect(day.getByText('Fix the gate')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: /Habits/ })) })
-    expect(rail().getByText('Walk the dog')).toBeInTheDocument()
-    expect(rail().queryByText('UPM kick-off')).toBeNull()
+    expect(onStep).toHaveBeenLastCalledWith('calendar')
+    await next(3)
+    expect(stepNow()).toBe('Habits')
+    expect(onStep).toHaveBeenLastCalledWith('habits')
+    expect(coach().getByRole('button', { name: 'Done planning today' })).toBeInTheDocument()
   })
 
-  it('Energy saves the note beside the day', async () => {
-    store.notes = { guide: { current: 'energy', done: [], skipped: [] } }
-    open()
-    await act(async () => { fireEvent.click(rail().getByLabelText('Medium')) })
-    expect(store.patches.at(-1)?.p).toEqual({ energy: { level: 'medium' } })
-  })
-
-  it('the first pick on the pick step marks the day planned, once', async () => {
-    store.notes = { guide: { current: 'pick', done: [], skipped: [] } }
-    const { props } = open()
-    expect(rail().getByText('That’s 2 of 3–5.')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Today: Inventory all documents' })) })
-    expect(props.actions.place).toHaveBeenCalledWith(inv, MON)
-    await waitFor(() => expect(plannedPatches()).toHaveLength(1))
-    expect(plannedPatches()[0].defaults).toEqual({ savedAt: expect.any(String) })
-    expect(props.onPlanned).toHaveBeenCalledTimes(1)
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Undo: Inventory all documents' })) })
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Today: Inventory all documents' })) })
-    expect(plannedPatches()).toHaveLength(1)
-  })
-
-  it('Done on a row in Pick counts as applied too (one rule with the Week)', async () => {
-    store.notes = { guide: { current: 'pick', done: [], skipped: [] } }
-    const { props } = open()
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Done: Inventory all documents' })) })
-    expect(props.actions.done).toHaveBeenCalledWith(inv)
-    await waitFor(() => expect(plannedPatches()).toHaveLength(1))
-  })
-
-  it('a placement saved on the page itself (a drag onto the day) marks it on the pick step only', async () => {
+  it('a placement saved on the page itself (a drag onto the day, + on the week) marks it on the pick step only', async () => {
     store.notes = { guide: { current: 'energy', done: [], skipped: [] } }
     const listening = { fn: null as null | (() => void) }
     const stop = vi.fn()
     const view = open({ listenPlacements: (fn) => { listening.fn = fn; return stop } })
     await act(async () => { listening.fn?.() })
     expect(plannedPatches()).toHaveLength(0)
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: /Pick 3 to 5/ })) })
+    await next()
+    expect(stepNow()).toBe('Pick 3 to 5')
     await act(async () => { listening.fn?.() })
     await waitFor(() => expect(plannedPatches()).toHaveLength(1))
+    expect(plannedPatches()[0].defaults).toEqual({ savedAt: expect.any(String) })
+    await act(async () => { listening.fn?.() })
+    expect(plannedPatches()).toHaveLength(1)
     view.unmount()
     expect(stop).toHaveBeenCalled()
-  })
-
-  it('Habits says so when the page hides routines', () => {
-    store.notes = { guide: { current: 'habits', done: [], skipped: [] } }
-    open({ routinesHidden: true, dayItems: dayItems.filter((i) => i.kind !== 'routine') })
-    expect(rail().getByText('Routines are hidden on this page.')).toBeInTheDocument()
-  })
-
-  it('a pick on another step, or one that did not save, marks nothing', async () => {
-    store.notes = { guide: { current: 'look-back', done: [], skipped: [] } }
-    open()
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Today: Sign kids up for Coppermine' })) })
-    expect(plannedPatches()).toHaveLength(0)
   })
 
   it('a change card applied on the pick step marks it too', async () => {
@@ -183,33 +132,31 @@ describe('GuidedDay — Today while planning the day', () => {
     await waitFor(() => expect(plannedPatches()).toHaveLength(1))
   })
 
-  it('"Done planning today" saves an unsaved win, runs the closing write, finishes and closes', async () => {
+  it('"Done planning today" runs the closing write, finishes and closes', async () => {
+    store.notes = { guide: { current: 'habits', done: [], skipped: [] } }
     const { props } = open()
-    fireEvent.change(rail().getByLabelText('A win yesterday'), { target: { value: 'Shipped it' } })
-    // On to Habits, past the steps between: the win's draft is the session's.
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: /Habits/ })) })
     expect(panel().queryByRole('button', { name: 'Next step' })).toBeNull()
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Done planning today' })) })
+    await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Done planning today' })) })
     await waitFor(() => expect(props.onClose).toHaveBeenCalled())
-    expect(review.finish).toHaveBeenCalledWith({ wentWell: 'Shipped it', didnt: '' })
-    expect(store.order).toEqual(['review', 'planned', 'finished'])
+    expect(store.order).toEqual(['planned', 'finished'])
   })
 
   it('a closing write that fails keeps the session open', async () => {
     store.notes = { guide: { current: 'habits', done: [], skipped: [] } }
-    const { props } = open({ isTomorrow: true, target: TUE, lookBackOn: MON, onFinish: vi.fn(async () => false) })
-    await act(async () => { fireEvent.click(rail().getByRole('button', { name: 'Done planning tomorrow' })) })
+    const { props } = open({ isTomorrow: true, target: TUE, onFinish: vi.fn(async () => false) })
+    await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Done planning tomorrow' })) })
     expect(props.onClose).not.toHaveBeenCalled()
     expect(store.order).not.toContain('finished')
   })
 
-  it('Leave closes and keeps everything as it is', () => {
+  it('the tooltip’s ✕ hides it and the session stays', () => {
     store.notes = { guide: { current: 'energy', done: ['look-back'], skipped: ['calendar'] } }
     const { props } = open()
-    fireEvent.click(rail().getByRole('button', { name: 'Leave' }))
-    expect(props.onClose).toHaveBeenCalled()
+    fireEvent.click(coach().getByRole('button', { name: 'Hide the guide' }))
+    expect(screen.queryByRole('dialog', { name: 'Planning guide' })).toBeNull()
+    expect(props.onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('region', { name: 'Planning today' })).toBeInTheDocument()
     expect(store.patches).toEqual([])
-    expect(review.finish).not.toHaveBeenCalled()
   })
 })
 

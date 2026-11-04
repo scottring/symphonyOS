@@ -25,7 +25,7 @@ vi.mock('@/hooks/usePlanningNotes', async () => {
 })
 
 import { GuidedPeriod, type PeriodSessionTools, type SessionFold } from './GuidedPeriod'
-import { RibbonTab } from '@/components/guide/GuideRibbon'
+import { PlanChip } from '@/components/guide/GuideCoach'
 import { stepsFor } from '@/lib/guide/steps'
 
 const shell = { reg: null as GuidedSessionRegistration | null }
@@ -42,14 +42,17 @@ function Where() { return <output data-testid="where">{useLocation().search}</ou
 // sheet above's look back when there is one.
 function Page({ fold }: { fold: SessionFold }) {
   return <section aria-label="The month">
+    <PlanChip level="month" word="November" onStart={vi.fn()} />
     November goals
     <output data-testid="drive">{JSON.stringify(fold.drive)}</output>
     {fold.look && <aside aria-label="Sheet above">{fold.look}</aside>}
   </section>
 }
 const drive = () => JSON.parse(screen.getByTestId('drive').textContent ?? '{}')
-const band = () => within(screen.getByRole('region', { name: 'Plan November' }))
-const stepNow = () => band().getAllByRole('button').find((b) => b.getAttribute('aria-current') === 'step')?.querySelector('.ribbon-step-title')?.textContent
+// The session's one tooltip (GuideCoach) and the step it shows.
+const coach = () => within(screen.getByRole('dialog', { name: 'Planning guide' }))
+const stepNow = () => document.querySelector('.coach-t')?.textContent
+const next = async (n = 1) => { for (let i = 0; i < n; i++) await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Next' })) }) }
 const setup = (over: Partial<Parameters<typeof GuidedPeriod>[0]> = {}, url = '/plan?plan=1') => {
   const props = {
     level: 'month' as const, token: '2026-11', periodLabel: 'November',
@@ -77,16 +80,16 @@ beforeEach(() => {
   shell.reg = null
 })
 
-describe('GuidedPeriod — Month, Season and Year while planning: a ribbon on the same page', () => {
-  it('Month: the ribbon’s band lists the six steps over the period’s own page; the header is in the conversation', () => {
+describe('GuidedPeriod — Month, Season and Year while planning: a few tooltips on the same page', () => {
+  it('Month: one tooltip, step 1 of 6, over the period’s own page; the header is in the conversation', () => {
     setup()
     const session = screen.getByRole('region', { name: 'Planning November' })
-    expect(band().getAllByRole('listitem').map((li) => li.querySelector('.ribbon-step-title')?.textContent))
-      .toEqual(stepsFor('month').map((s) => s.title))
+    expect(coach().getByText(`Step 1 of ${stepsFor('month').length}`)).toBeInTheDocument()
     expect(stepNow()).toBe('Fresh start')
-    // Fresh start has its own editor: in the card under the band.
-    expect(within(screen.getByRole('region', { name: 'Fresh start' })).getByText('Pick a scenery')).toBeInTheDocument()
+    // No drop card: Fresh start's editor is not drawn in the session.
+    expect(screen.queryByText('Pick a scenery')).toBeNull()
     expect(within(session).getByRole('region', { name: 'The month' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Planning November · 1 of 6' })).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Steps in this session' })).toBeNull()
     expect(panel().getByText('Fresh start')).toBeInTheDocument()
     expect(shell.reg).toMatchObject({ level: 'month', token: '2026-11', threadKey: 'monthly:2026-11', stepId: 'fresh-start', periodLabel: 'November' })
@@ -100,23 +103,21 @@ describe('GuidedPeriod — Month, Season and Year while planning: a ribbon on th
   it('each step drives the page’s folds: the look back turns the sheet above to last month, Read the season opens it, the next weeks open the calendar', async () => {
     setup()
     expect(drive()).toEqual({})
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
+    await next()
     expect(shell.reg?.stepId).toBe('look-back')
     expect(drive()).toEqual({ above: true })
     expect(within(screen.getByRole('complementary', { name: 'Sheet above' })).getByLabelText('Went well')).toBeInTheDocument()
-    // The look back is on the sheet above, never in the card.
-    expect(document.querySelector('.ribbon-card')).toBeNull()
     expect(shell.reg).toMatchObject({ token: '2026-11', threadKey: 'monthly:2026-11' })
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
+    await next()
     expect(drive()).toEqual({ above: true })
     expect(screen.queryByRole('complementary', { name: 'Sheet above' })).toBeNull()
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Next 4–5 weeks/ })) })
+    await next()
+    expect(stepNow()).toBe('Next 4–5 weeks')
     expect(drive()).toEqual({ calendar: true })
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
-    // The month by area writes on the sheet, Fall open beside it: no card.
+    await next()
+    // The month by area writes on the sheet, Fall open beside it.
     expect(drive()).toEqual({ above: true })
     expect(screen.queryByText(/Never drawn/)).toBeNull()
-    // Leave hands the folds back: the page is no longer driven.
   })
 
   it('resuming opens the saved step', () => {
@@ -126,30 +127,34 @@ describe('GuidedPeriod — Month, Season and Year while planning: a ribbon on th
     expect(panel().getByText('The month by area')).toBeInTheDocument()
   })
 
-  it('Next, a step and Back move and are saved; Leave writes nothing more', async () => {
+  it('Next and Back move and are saved; Stop planning writes nothing more', async () => {
     const p = setup()
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Read the season list/ })) })
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Back' })) })
+    await next(2)
+    await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Back' })) })
     expect(guideSteps()).toEqual(['look-back', 'read-season', 'look-back'])
     const before = store.patches.length
-    fireEvent.click(band().getByRole('button', { name: 'Leave' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop planning' }))
     expect(p.onLeave).toHaveBeenCalled()
     expect(store.patches).toHaveLength(before)
   })
 
-  // Fix round 1 ruling: the band owns navigation. One Next on the page; the
-  // conversation's header explains the step and moves nothing.
-  it('there is one Next, the band’s; the conversation’s header has no Next, Skip or Done', () => {
+  // The tooltip owns navigation. One Next on the page; the conversation's
+  // header explains the step and moves nothing.
+  it('there is one Next, the tooltip’s; the conversation’s header has no Next, Skip or Done', () => {
     setup()
     expect(screen.getAllByRole('button', { name: 'Next' })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: /^(Next step|Skip this step)$/ })).toBeNull()
     expect(panel().getByRole('button', { name: 'Explain more' })).toBeInTheDocument()
   })
 
-  it('pulling the bookmark again is Leave', () => {
-    const p = setup({ page: () => <article><RibbonTab label="Plan November" onPull={vi.fn()} /></article> })
-    fireEvent.click(screen.getByRole('button', { name: 'Plan November', expanded: true }))
+  it('the chip shows the hidden tooltip again; its ✕ stops planning', () => {
+    const p = setup()
+    fireEvent.click(coach().getByRole('button', { name: 'Hide the guide' }))
+    expect(screen.queryByRole('dialog', { name: 'Planning guide' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Planning November · 1 of 6' }))
+    expect(stepNow()).toBe('Fresh start')
+    expect(p.onLeave).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop planning' }))
     expect(p.onLeave).toHaveBeenCalled()
   })
 
@@ -186,13 +191,14 @@ describe('GuidedPeriod — Month, Season and Year while planning: a ribbon on th
     store.notes = { guide: { current: 'look-back', done: ['fresh-start'], skipped: [] } }
     const p = setup()
     fireEvent.change(screen.getByLabelText('Went well'), { target: { value: 'Cabin booked' } })
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Next' })) })
+    await next()
     expect(screen.queryByLabelText('Went well')).toBeNull()
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Look back at last month/ })) })
+    await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Back' })) })
     expect(screen.getByLabelText('Went well')).toHaveValue('Cabin booked')
-    // To the last step, then Done planning November on the band.
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: /Maintenance and fun/ })) })
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Done planning November' })) })
+    // To the last step, then Done planning November on the tooltip.
+    await next(4)
+    expect(stepNow()).toBe('Maintenance and fun')
+    await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Done planning November' })) })
     expect(p.onFinish).toHaveBeenCalledWith({ wentWell: 'Cabin booked', didnt: '' })
     await waitFor(() => expect(p.onLeave).toHaveBeenCalled())
     expect((store.notes.guide as { finishedAt?: string }).finishedAt).toEqual(expect.any(String))
@@ -201,29 +207,18 @@ describe('GuidedPeriod — Month, Season and Year while planning: a ribbon on th
   it('a closing write that failed keeps the session open', async () => {
     store.notes = { guide: { current: 'upkeep-fun', done: [], skipped: [] } }
     const p = setup({ onFinish: vi.fn(async () => false) })
-    await act(async () => { fireEvent.click(band().getByRole('button', { name: 'Done planning November' })) })
+    await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Done planning November' })) })
     expect(p.onFinish).toHaveBeenCalledWith(null)
     expect(p.onLeave).not.toHaveBeenCalled()
     expect((store.notes.guide as { finishedAt?: string }).finishedAt).toBeUndefined()
   })
 
-  it('planned before the session opened, the band says so quietly; planned during it, it does not', () => {
-    const { unmount } = render(<MemoryRouter><GuidedSessionProvider><GuidedPeriod level="month" token="2026-11" periodLabel="November" page={null} bodies={() => ({})}
-      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} plannedAt={new Date(2026, 9, 3)} /></GuidedSessionProvider></MemoryRouter>)
-    expect(band().getByText('November was planned Oct 3. You can still change it.')).toBeInTheDocument()
-    unmount()
-    render(<MemoryRouter><GuidedSessionProvider><GuidedPeriod level="month" token="2026-11" periodLabel="November" page={null} bodies={() => ({})}
-      onFinish={vi.fn(async () => true)} onLeave={vi.fn()} plannedAt={new Date(Date.now() + 1000)} /></GuidedSessionProvider></MemoryRouter>)
-    expect(screen.queryByText(/was planned/)).toBeNull()
-  })
-
   it('Season and Year use their own steps and finish label', async () => {
     store.notes = { guide: { current: 'wild-cards', done: [], skipped: [] } }
     setup({ level: 'season', token: '2026-fall', periodLabel: 'Fall' })
-    const fall = within(screen.getByRole('region', { name: 'Plan Fall' }))
-    expect(fall.getAllByRole('listitem')).toHaveLength(7)
-    expect(fall.getByRole('button', { name: 'Done planning Fall' })).toBeInTheDocument()
-    // The band owns navigation: the conversation's header has none.
+    expect(coach().getByText('Step 7 of 7')).toBeInTheDocument()
+    expect(coach().getByRole('button', { name: 'Done planning Fall' })).toBeInTheDocument()
+    // The tooltip owns navigation: the conversation's header has none.
     expect(panel().queryByRole('button', { name: /Done planning|Next|Skip/ })).toBeNull()
     expect(shell.reg).toMatchObject({ level: 'season', threadKey: 'seasonal:2026-fall' })
   })
@@ -247,6 +242,6 @@ describe('GuidedPeriod — ?step= opens the session on a step', () => {
 
   it('Year: step=landscape opens the landscape step', async () => {
     setup({ level: 'year', token: '2027', periodLabel: '2027' }, '/plan?plan=1&step=landscape')
-    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Plan 2027' })).getByRole('button', { name: /Map the 12 months/ })).toHaveAttribute('aria-current', 'step'))
+    await waitFor(() => expect(stepNow()).toBe('Map the 12 months'))
   })
 })

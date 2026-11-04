@@ -1098,8 +1098,10 @@ describe('WeekViewV2 — the deck', () => {
       createMockTask({ id: 'garage', title: 'Clean the garage', scheduledFor: new Date(2026, 9, 19), isAllDay: true, updatedAt: recent }),
     ]
     open('?plan=1', tasks)
-    const guided = () => deckMock.guided as unknown as { canvas: (fold: unknown) => React.ReactNode; count: number }
-    expect(guided().count).toBe(1)
+    const guided = () => deckMock.guided as unknown as { canvas: (fold: unknown) => React.ReactNode }
+    // The week's count, as the session (and the guide) hear it.
+    const count = () => (deckMock.deck as { onThisWeek?: number }).onThisWeek
+    expect(count()).toBe(1)
     const lookBack = render(<>{guided().canvas({ stepId: 'look-back', drive: { above: true }, look: <p>Last week’s leftovers</p> })}</>)
     const shown = within(lookBack.container)
     // This week stays on the page.
@@ -1113,7 +1115,7 @@ describe('WeekViewV2 — the deck', () => {
     const now = within(planned.container)
     expect(now.queryByText('Last week’s leftovers')).toBeNull()
     expect(planned.container.querySelector('section[aria-label$=", for reading"]')).not.toBeNull()
-    expect(guided().count).toBe(1)
+    expect(count()).toBe(1)
   })
   // Controller ruling: the deck reviews the week that is ending, opened from the
   // week after it — so only this week, and next week on this week's last day.
@@ -1232,9 +1234,8 @@ describe('WeekViewV2 — the deck', () => {
     const next = new Date(2026, 9, 24)
     const tasks = [createMockTask({ id: 'd', title: 'Paint the shed', scheduledFor: new Date(2026, 9, 20), isAllDay: true, completed: true, updatedAt: recent })]
     open('', tasks, { weekStart: next })
-    // The header's Plan button (the bookmark on the days starts the same session).
-    expect(screen.getAllByRole('button', { name: 'Plan the week of Oct 24' })).toHaveLength(2)
-    fireEvent.click(document.querySelector<HTMLElement>('.wk-plan')!)
+    // The header's plan chip.
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
     const q = new URLSearchParams(window.location.search)
     expect(q.get('plan')).toBe('1')
     expect(q.get('date')).toBeNull()

@@ -1,57 +1,41 @@
-// Today while a Day session runs: planning is a ribbon on the same page
-// (Scott, 2026-11-04). The band lies across the top of the day with the day's
-// count, each step's editor drops under it as a card, and the day itself, the
-// real page, stays below, unchanged. The step's header and the conversation
-// are the shell's (useGuidedDay registers them).
+// Today while a Day session runs: planning is a few tooltips on the same page
+// (Scott, 2026-11-04). The plan chip in the header shows where the session
+// is; each step is one tooltip (GuideCoach) pointing at the real thing on the
+// day, which stays exactly as it is every day. Pick and Habits open the week
+// beside the day (steps.ts `drives`; TodayView drives the fold). The step's
+// header and the conversation are the shell's (useGuidedDay registers them;
+// it never opens by itself).
 //
 // Morning: plans today and looks back on yesterday. From 4 pm: plans tomorrow
-// and looks back on today (dayTarget). Mounted only while it runs, so its
-// notes are read only then.
+// and looks back on today (dayTarget). Mounted only while it runs.
 
-import { useEffect, useState, type ReactNode } from 'react'
-import type { Task } from '@/types/task'
-import type { TodayChoice, TodayReview } from '@/lib/planning/chooseToday'
-import { DAY_COUNT_OF, dayCount, dayStepTitle } from '@/lib/guide/dayTarget'
+import { useEffect, type ReactNode } from 'react'
+import { dayCount, dayStepTitle } from '@/lib/guide/dayTarget'
 import { stepsFor } from '@/lib/guide/steps'
-import { dayToken } from '@/hooks/usePlanningSession'
-import { usePlanningNotes, type GuideNotes } from '@/hooks/usePlanningNotes'
-import { usePeriodReview } from '@/hooks/usePeriodReview'
-import { showToast } from '@/hooks/useToast'
-import { GuideRibbon } from '@/components/guide/GuideRibbon'
-import { EnergyNote } from '@/components/guide/EnergyNote'
+import { GuideCoach } from '@/components/guide/GuideCoach'
 import { useGuidedDay } from '../useGuidedDay'
-import { DayLookBack } from './DayLookBack'
-import { DayPick } from './DayPick'
-import { DayPicture, type DayPictureItem } from './DayRows'
+import type { DayPictureItem } from './DayRows'
 import type { DayActions } from '@/lib/planning/dayActions'
 import '@/components/guide/guide.css'
 
-export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, onStep, routinesHidden, lookBack, choice, actions, goalLabel, listenPlacements, onFinish, onClose, onPlanned }: {
+export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, actions, listenPlacements, onFinish, onClose, onPlanned }: {
   /** The day being planned (dayTarget). */
   target: Date
-  lookBackOn: Date
   isTomorrow: boolean
   /** The day itself: the page as it is every day. */
   canvas: ReactNode
   /** The day being planned as the page shows it, under its filters: the
-   *  calendar step's picture, Habits' routines and the count. Null while the
-   *  page shows the day looked back on (the look back step): no count then. */
+   *  count the guide is told. Null while the page shows the day looked back
+   *  on (the look back step): no count then. */
   dayItems: readonly DayPictureItem[] | null
   /** The current step, once the session's place has loaded: the page shows
-   *  the day that step is about. */
+   *  the day that step is about, and opens what it asks for. */
   onStep?: (stepId: string) => void
-  /** The page's "hide routines" is on: Habits says so rather than "none". */
-  routinesHidden?: boolean
-  /** What the day looked back on held (buildTodayReview). */
-  lookBack: TodayReview
-  /** This week → the day being planned (buildTodayChoice). */
-  choice: TodayChoice
   /** The page's writers, each taking the day it acts on. */
   actions: DayActions
-  goalLabel: (t: Task) => string | undefined
-  /** Placements saved on the page itself (a task dragged onto the day):
-   *  on the pick step they mark the day planned, as a pick does. Returns the
-   *  unsubscribe. */
+  /** Placements saved on the page itself (a task dragged onto the day, + on
+   *  the week beside it): on the pick step they mark the day planned. Returns
+   *  the unsubscribe. */
   listenPlacements?: (listener: () => void) => () => void
   /** The page's closing write (the day stamped planned); false keeps the
    *  session open. */
@@ -59,71 +43,26 @@ export function GuidedDay({ target, lookBackOn, isTomorrow, canvas, dayItems, on
   onClose: () => void
   onPlanned?: () => void
 }) {
-  // The look back's win as typed, kept here so it outlives its step's body
-  // (only the current step's body is drawn). Done planning saves it.
-  const [winDraft, setWinDraft] = useState<string | null>(null)
-  const review = usePeriodReview('daily', dayToken(lookBackOn))
-  const notes = usePlanningNotes('daily', dayToken(target))
-  const items = dayItems ?? []
   const count = dayItems ? dayCount(dayItems) : null
-  const closeDay = async () => {
-    const win = winDraft?.trim()
-    if (winDraft !== null && win !== (review.mine?.wentWell ?? '')
-      && !(await review.finish({ wentWell: win ?? '', didnt: review.mine?.didnt ?? '' }).catch(() => false))) {
-      showToast(`Couldn’t save the win for ${isTomorrow ? 'today' : 'yesterday'} — try again.`, 'error', 5000)
-    }
-    return onFinish()
-  }
-  const guided = useGuidedDay({ target, isTomorrow, count, actions, onFinish: closeDay, onClose, onPlanned })
+  const guided = useGuidedDay({ target, isTomorrow, count, actions, onFinish, onClose, onPlanned })
   const { markPlannedOnce } = guided
   const stepNow = guided.loading ? null : guided.progress.current
   useEffect(() => { if (stepNow) onStep?.(stepNow) }, [stepNow, onStep])
   useEffect(() => listenPlacements?.(() => { void markPlannedOnce() }), [listenPlacements, markPlannedOnce])
 
   const dayWord = isTomorrow ? 'tomorrow' : 'today'
-  const dayLabel = target.toLocaleDateString('en-US', { weekday: 'long' })
   const steps = stepsFor('day')
   const index = Math.max(0, steps.findIndex((s) => s.id === guided.progress.current))
-  const routines = items.filter((i) => i.kind === 'routine')
-  const bodies = {
-    'look-back': <DayLookBack isTomorrow={isTomorrow} target={target} lookBackOn={lookBackOn} lookBack={lookBack}
-      actions={guided.actions} goalLabel={goalLabel} review={review} draft={winDraft} onDraft={setWinDraft} />,
-    calendar: <div className="gw-body"><DayPicture dayLabel={dayLabel} items={items} /></div>,
-    energy: <DayEnergy value={notes.notes.energy} save={(energy) => notes.patch({ energy })} />,
-    pick: <DayPick count={count ?? 0} isTomorrow={isTomorrow} target={target} choice={choice}
-      skip={new Set(lookBack.open.map((t) => t.id))} actions={guided.actions} />,
-    habits: <div className="gw-body">
-      {routinesHidden ? <p className="choose-empty">Routines are hidden on this page.</p>
-        : routines.length === 0 ? <p className="choose-empty">No routines on {dayWord}.</p>
-        : <ul className="gw-days" aria-label={`Routines ${dayWord}`}>
-          {routines.map((r) => <li key={r.key}><b>{r.time ?? ''}</b><span>{r.title}</span></li>)}
-        </ul>}
-      <p className="gw-row-note">Tick them off on the day as you go.</p>
-    </div>,
-  }
 
   // Where the session is comes first: no flash of step one before a resume.
   // The day stays put while it loads.
   if (guided.loading) return <section className="guide-session" aria-label={`Planning ${dayWord}`} aria-busy="true">{canvas}</section>
   return (
     <section className="guide-session" aria-label={`Planning ${dayWord}`}>
-      <GuideRibbon level="day" progress={guided.progress} titleFor={(s) => dayStepTitle(s, isTomorrow)} bodies={bodies}
-        onJump={(id) => { void guided.jump(id) }} onNext={() => { void guided.next() }}
-        onBack={() => { if (index > 0) void guided.jump(steps[index - 1].id) }}
-        onLeave={onClose} onFinish={() => { void guided.done() }} finishLabel={`Done planning ${dayWord}`}
-        tab={{ label: `Plan ${dayWord}`, onPull: onClose }} error={guided.saveError}
-        status={count !== null ? `${count} of ${DAY_COUNT_OF} on ${dayWord}` : null}>
-        <div className="gd-page">{canvas}</div>
-      </GuideRibbon>
+      {canvas}
+      <GuideCoach level="day" current={guided.progress.current} word={dayWord} titleFor={(s) => dayStepTitle(s, isTomorrow)}
+        onNext={() => { void guided.next() }} onBack={() => { if (index > 0) void guided.jump(steps[index - 1].id) }}
+        onStop={onClose} onFinish={() => { void guided.done() }} error={guided.saveError} />
     </section>
   )
-}
-
-/** Energy: high, medium or low, with a word or two, beside the day. */
-function DayEnergy({ value, save }: { value?: GuideNotes['energy']; save: (v: NonNullable<GuideNotes['energy']>) => Promise<boolean> }) {
-  const [failed, setFailed] = useState(false)
-  return <div className="gw-body">
-    <EnergyNote value={value} onChange={(v) => { setFailed(false); void save(v).catch(() => false).then((ok) => { if (!ok) setFailed(true) }) }} />
-    {failed && <p className="choose-status is-failed" role="alert">Didn’t save. Try again.</p>}
-  </div>
 }

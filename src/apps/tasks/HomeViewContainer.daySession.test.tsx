@@ -123,13 +123,13 @@ describe('HomeViewContainer — leaving the Day session', () => {
     const { user } = render(<HomeViewContainer />)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(today())
 
-    // The header's Plan button (the ribbon on the day carries the same name).
-    await user.click(screen.getAllByRole('button', { name: 'Plan tomorrow' }).find((b) => !b.classList.contains('ribbon-tab'))!)
+    // The header's plan chip (a probe here).
+    await user.click(screen.getByRole('button', { name: 'Plan tomorrow' }))
     expect(search().get('plan')).toBe('1')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(tomorrow())
-    // The session is its own screen: the week folded beside the day is put
-    // away (paper-style horizons, 2026-11-04: the fold replaced the column).
-    expect(screen.queryByRole('button', { name: /Unfold to read$/ })).toBeNull()
+    // The session is the same page: the week stays folded beside the day
+    // (planning as tooltips, 2026-11-04; its Pick step opens it).
+    if (url.includes('alongside')) expect(screen.getByRole('button', { name: /Unfold to read$/ })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Leave' }))
     await act(async () => {})

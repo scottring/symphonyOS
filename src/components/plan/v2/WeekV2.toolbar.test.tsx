@@ -55,10 +55,10 @@ const slotsFor = () => {
   return { subline, controls, done: () => { subline.remove(); controls.remove() } }
 }
 
-describe('WeekV2 header — one primary button and the ⋯ menu', () => {
+describe('WeekV2 header — the plan chip, at most one button, and the ⋯ menu', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null; session.save.mockReset(); review.reviewed = null })
 
-  it('on the desk, the masthead holds exactly one primary button and the ⋯ menu', () => {
+  it('on the desk, the masthead holds the plan chip and the ⋯ menu', () => {
     const slots = slotsFor()
     const { container } = render(
       <MemoryRouter>
@@ -69,8 +69,8 @@ describe('WeekV2 header — one primary button and the ⋯ menu', () => {
     )
     expect(container.querySelector('.pv2-toolbar')).toBeNull()
     const controls = within(slots.controls)
-    expect(slots.controls.querySelectorAll('.pv2-btn')).toHaveLength(1)
-    expect(controls.getByRole('button', { name: 'Plan this week' })).toHaveClass('pv2-btn')
+    expect(slots.controls.querySelectorAll('.pv2-btn')).toHaveLength(0)
+    expect(controls.getByRole('button', { name: 'Plan the week' })).toHaveClass('plan-chip')
     expect(controls.getByRole('button', { name: 'Week options' })).toHaveAttribute('aria-haspopup', 'menu')
     expect(controls.getAllByRole('button')).toHaveLength(2)
     slots.done()
@@ -80,8 +80,8 @@ describe('WeekV2 header — one primary button and the ⋯ menu', () => {
     const { container } = renderWeek({ deck: makeDeck() })
     const head = container.querySelector('.wk-head') as HTMLElement
     expect(head).toBeTruthy()
-    expect(head.querySelectorAll('.pv2-btn')).toHaveLength(1)
-    expect(within(head).getByRole('button', { name: 'Plan this week' })).toBeTruthy()
+    expect(head.querySelectorAll('.pv2-btn')).toHaveLength(0)
+    expect(within(head).getByRole('button', { name: 'Plan the week' })).toHaveClass('plan-chip')
     expect(within(head).getByRole('button', { name: 'Week options' })).toBeTruthy()
   })
 
@@ -195,13 +195,14 @@ describe('WeekV2 header — the fact line', () => {
     expect(screen.queryByRole('menuitem', { name: /^Plan next week/ })).toBeNull()
   })
 
-  it('planned, mid-week: no button; planning again waits in ⋯', () => {
+  it('planned, mid-week: no button; planning again is the same chip, and ⋯ offers no Plan or Review', () => {
     session.saved = { authorId: 'me', at: new Date(2026, 8, 27, 18) }
     renderAt('/week', { deck: makeDeck() })
     expect(document.querySelectorAll('.pv2-btn')).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Plan the week' })).toHaveClass('plan-chip')
     fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
-    const items = within(screen.getByRole('menu', { name: 'Week options' })).getAllByRole('menuitem').map((i) => i.textContent)
-    expect(items.filter((t) => /^(Plan|Review) /.test(t ?? ''))).toEqual(['Plan this week again'])
+    const items = within(screen.getByRole('menu', { name: 'Week options' })).queryAllByRole('menuitem').map((i) => i.textContent)
+    expect(items.filter((t) => /^(Plan|Review) /.test(t ?? ''))).toEqual([])
   })
 
   it('on the desk it is the masthead’s subline', () => {
@@ -253,7 +254,11 @@ const makeDeck = (over: Partial<WeekDeck> = {}): WeekDeck => ({
 // the conversation; Shell stands in for it).
 const finishPlanning = async () => {
   await screen.findByTestId('guide-panel')
-  // The band owns navigation (fix round 1): Done planning is on the ribbon.
+  // The tooltip owns navigation: walk on to the last step, then Done planning.
+  for (let i = 0; i < 8 && !screen.queryByRole('button', { name: 'Done planning the week' }); i++) {
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByTestId('guide-panel')
+  }
   fireEvent.click(await screen.findByRole('button', { name: 'Done planning the week' }))
 }
 function Shell() {
@@ -266,7 +271,7 @@ function WithDeck({ deck, ...props }: Partial<React.ComponentProps<typeof WeekV2
   const [params] = useSearchParams()
   const withMode = deck && { ...deck, mode: deck.available ? deckModeOf(params) : null }
   // The week as WeekViewV2 draws it: in a session, the look back on the sheet beside it.
-  return <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent canvas={(o) => <><p>The days</p>{o?.ribbon && <button type="button" data-testid="ribbon-tab" onClick={o.ribbon.onPull}>{o.ribbon.label}</button>}{o?.fold?.look}</>} {...props} deck={withMode} />
+  return <WeekV2 weekStart={new Date(2026, 8, 27)} isCurrent canvas={(o) => <><p>The days</p>{o?.fold?.look}</>} {...props} deck={withMode} />
 }
 const renderAt = (url: string, props: Partial<React.ComponentProps<typeof WeekV2>> = {}) => render(
   <MemoryRouter initialEntries={[url]}>
@@ -284,7 +289,7 @@ describe('WeekV2 — Review opens the deck', () => {
   // Reviewed design (2026-10-20): on the week's last day, until it is
   // reviewed, the one button is "Review this week" — the deck on the week
   // after, which looks back at this one. Reviewed, no button.
-  it('on the week’s last day, "Review this week" opens the deck on the week after; Leave closes it', () => {
+  it('on the week’s last day, "Review this week" opens the deck on the week after; Stop planning closes it', () => {
     vi.setSystemTime(new Date(2026, 9, 3, 9))
     const deck = makeDeck()
     renderAt('/week', { deck })
@@ -293,11 +298,12 @@ describe('WeekV2 — Review opens the deck', () => {
     expect(screen.getByRole('region', { name: 'Planning the week' })).toBeTruthy()
     expect(where().get('plan')).toBe('1')
     expect(where().get('date')).toBe('2026-10-04')
-    // No Review or Plan button in the header while the session runs (the
-    // ribbon on the days is the session's own, pulled).
+    // No Review button in the header while the session runs; the chip says
+    // where the session is.
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     expect(document.querySelector('.wk-plan')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Leave' }))
+    expect(screen.getByRole('button', { name: 'Planning the week · 1 of 7' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop planning' }))
     expect(screen.getByText('The days')).toBeTruthy()
     expect(where().get('plan')).toBeNull()
     expect(review.finish).not.toHaveBeenCalled()
@@ -339,8 +345,7 @@ describe('WeekV2 — Review opens the deck', () => {
     const deck = makeDeck()
     renderAt('/week', { deck })
     expect(screen.queryByRole('button', { name: 'Review this week' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Week options' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Plan this week again' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
     expect(where().get('plan')).toBe('1')
     expect(where().get('date')).toBeNull()
     await finishPlanning()
@@ -467,32 +472,25 @@ describe('WeekV2 — the planning summary line', () => {
 describe('WeekV2 — Plan and Place them open the deck', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null; review.finish.mockClear() })
 
-  it('Plan this week opens the session on the page, beside the same week, with no mark in the bar', () => {
+  it('the chip “Plan the week” opens the session on the page, beside the same week, with one tooltip', () => {
     renderAt('/week', { deck: makeDeck() })
-    fireEvent.click(document.querySelector<HTMLElement>('.wk-plan')!)
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
     const planning = screen.getByRole('region', { name: 'Planning the week' })
-    expect(within(planning).getByRole('region', { name: 'Plan the week' })).toBeTruthy()
-    expect(screen.queryByRole('group', { name: 'Steps in this session' })).toBeNull()
+    expect(within(screen.getByRole('dialog', { name: 'Planning guide' })).getByText(/^Step \d of 7$/)).toBeTruthy()
+    expect(document.querySelector('.ribbon-band, .ribbon-tab, .ribbon-card')).toBeNull()
     // The page never disappears behind a session screen.
     expect(within(planning).getByText('The days')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Review / })).toBeNull()
     expect(screen.queryByRole('button', { name: 'I’m happy with this week' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Leave' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop planning' }))
     expect(screen.queryByRole('region', { name: 'Planning the week' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Planning guide' })).toBeNull()
     expect(screen.getByText('The days')).toBeTruthy()
   })
 
-  // Fix round 1 ruling: the week's bookmark starts the same session the Plan
-  // button starts.
-  it('the bookmark on the days starts planning the week; a week that can’t be planned has none', () => {
-    renderAt('/week', { deck: makeDeck() })
-    expect(screen.getByTestId('ribbon-tab')).toHaveTextContent('Plan this week')
-    fireEvent.click(screen.getByTestId('ribbon-tab'))
-    expect(where().get('plan')).toBe('1')
-    expect(screen.getByRole('region', { name: 'Planning the week' })).toBeTruthy()
-    cleanup()
+  it('a week that can’t be planned has no plan chip', () => {
     renderAt('/week', { deck: makeDeck({ available: false }) })
-    expect(screen.queryByTestId('ribbon-tab')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Plan the week' })).toBeNull()
   })
 
   it('a week the deck may not open on offers neither Review nor Plan, and ignores the URL', () => {

@@ -178,7 +178,8 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, rend
   }
 
   return <DndContext sensors={sensors} onDragStart={onTouchStart} onDragMove={onTouchMove} onDragEnd={onTouchEnd} onDragCancel={endDrag}>
-    <ul ref={listRef} className={`plan-items plan-goal-list${dragId ? ' is-ordering' : ''}`} aria-label={label} {...listDrop}>
+    {/* The period's list: a planning step's tooltip can point here (GuideCoach). */}
+    <ul ref={listRef} className={`plan-items plan-goal-list${dragId ? ' is-ordering' : ''}`} aria-label={label} data-guide-anchor="list" {...listDrop}>
       {headingOf && groupOf
         ? items.map((t, i) => {
           const h = headingOf(t)

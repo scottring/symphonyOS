@@ -25,9 +25,9 @@ describe('GuideHeader', () => {
     expect(screen.queryByText(step.more)).toBeNull()
   })
 
-  // Fix round 1 ruling: the planning ribbon's band owns the session's
+  // The step's tooltip on the page owns the session's
   // navigation; the conversation's header only explains the step.
-  it('has no Next, Skip or Done: the band on the page holds them', () => {
+  it('has no Next, Skip or Done: the tooltip on the page holds them', () => {
     render(<GuideHeader {...base} />)
     expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Explain more'])
   })

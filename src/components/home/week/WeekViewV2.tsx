@@ -895,13 +895,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
   ])), [dayChoices])
-  // A guided session's ribbon (2026-11-04) drives the month's fold beside
+  // A guided session's step (2026-11-04) drives the month's fold beside
   // the week: its look back turns that sheet to last week, with its choices.
-  const weekCanvas = (opts?: { hideStrip?: boolean; fold?: SessionFold; ribbon?: { label: string; onPull: () => void } }) => (
+  const weekCanvas = (opts?: { hideStrip?: boolean; fold?: SessionFold }) => (
     <WeekCanvas weekStart={weekAnchor} hideStrip={opts?.hideStrip} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers} viewerId={meId ?? undefined}
-      pointing={activity.pointing} fold={opts?.fold} ribbon={opts?.ribbon}
+      pointing={activity.pointing} fold={opts?.fold}
       onPlaceUnplaced={deckAvailable ? openPlace : undefined} unplacedCount={placeCount} month={monthSheet} />
   )
   const todayLine = null

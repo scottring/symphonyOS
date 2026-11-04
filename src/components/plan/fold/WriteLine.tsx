@@ -44,7 +44,7 @@ export function WriteLine({ placeholder, period, periodWord, onWrite, extra }: {
   }
 
   return (
-    <form className={`sheet-write${failed ? ' is-failed' : ''}`} onSubmit={submit} autoComplete="off">
+    <form className={`sheet-write${failed ? ' is-failed' : ''}`} onSubmit={submit} autoComplete="off" data-guide-anchor="write">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" />
         <path d="m14.5 5.5 3 3" />
