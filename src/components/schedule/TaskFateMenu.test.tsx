@@ -14,7 +14,7 @@ describe('TaskFateMenu', () => {
     render(<TaskFateMenu onPickWhen={vi.fn()} onComplete={vi.fn()} onDelete={vi.fn()} />)
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     open()
-    for (const label of ['Today', 'Week', 'Season', 'Someday']) {
+    for (const label of ['Today', 'Week', 'Month', 'Someday']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
     expect(screen.getByLabelText('Mark done')).toBeInTheDocument()
@@ -30,7 +30,7 @@ describe('TaskFateMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  // Paper-style horizons (2026-11-04): the When menu has no Month group.
+  // The When menu's Month group is gated per caller (TriageWhenMenu `months`).
   it('routes a fanned-out when (Week → Next week)', () => {
     const onPickWhen = vi.fn()
     render(<TaskFateMenu onPickWhen={onPickWhen} />)
