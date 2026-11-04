@@ -77,6 +77,7 @@ import { useCanvasActivity } from '@/contexts/CanvasActivityContext';
 import { waitingUpdates, CLEAR_WAITING, checkBackLabel } from '@/lib/today/waiting';
 import { viewedDayFromParam, isNeededOn, neededTodayToggle, isOnDay, dayRemovalWithUndo } from '@/lib/today/itemPanelDay';
 import { isSameDay } from '@/lib/dateUtils';
+import { bringBack } from '@/lib/planning/letGo';
 
 /** Find a task by id, searching one level of nested subtasks (group children). */
 function findTask(tasks: Task[], id: string): Task | null {
@@ -214,7 +215,9 @@ function TaskPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
 
-  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, setGoal, setGoalLink, refetch, keepForward, dropCommitment } = useSupabaseTasks();
+  const { tasks, letGoTasks, addTask, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, setGoal, setGoalLink, refetch, keepForward, dropCommitment } = useSupabaseTasks();
+  // Lists get live tasks only; a let-go item opened from search is found here.
+  const findAny = useCallback((tid: string) => findTask(tasks, tid) ?? findTask(letGoTasks ?? [], tid), [tasks, letGoTasks]);
   // "Part of…" offers the goals in the life areas in view — the same lens
   // every list applies (useDomain layers).
   const { layers } = useDomain();
@@ -242,7 +245,7 @@ function TaskPanelBody({ id }: { id: string }) {
   // (useCallback-wrapped) members for referential stability. `updateTask` is
   // shadowed to the gated version so every existing call site below — not
   // just the four the gate was written for — goes through it uniformly.
-  const findTaskById = useCallback((tid: string) => findTask(tasks, tid) ?? undefined, [tasks]);
+  const findTaskById = useCallback((tid: string) => findAny(tid) ?? undefined, [findAny]);
   const gatedRaw = useMemo(
     () => ({ updateTask: rawUpdateTask, pushTask, updateTasksBulk, setBucket }),
     [rawUpdateTask, pushTask, updateTasksBulk, setBucket],
@@ -256,7 +259,7 @@ function TaskPanelBody({ id }: { id: string }) {
   const mealEvents = useMealEventsForDate(today);
   const eventsWithMeals = useMemo(() => [...events, ...mealEvents], [events, mealEvents]);
 
-  const task = useMemo(() => findTask(tasks, id), [tasks, id]);
+  const task = useMemo(() => findAny(id), [findAny, id]);
 
   const handleClose = useCallback(() => clearSelection(), [clearSelection]);
 
@@ -457,6 +460,9 @@ function TaskPanelBody({ id }: { id: string }) {
       onToggleNeededToday={() => updateTask(task.id, neededTodayToggle(task, viewedDay))}
       removeFromDayLabel={`Remove from ${dayName}`}
       periodActions={horizon.actions}
+      // Let go is kept, never shown; opened from search it can come back —
+      // to the periods and place it had, with Undo.
+      onBringBack={task.dismissedAt && task.category !== 'paper' ? () => bringBack(task, updateTask, run) : undefined}
       onRemoveFromDay={isOnDay(task, viewedDay) ? () => {
         const { updates, previous } = dayRemovalWithUndo(task, viewedDay);
         return run(`Remove “${task.title}” from ${dayName}`, async () => (await updateTask(task.id, updates)) !== false, {

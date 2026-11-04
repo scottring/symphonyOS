@@ -1,4 +1,5 @@
 import { weekendLabel } from '@/lib/planning/weekend'
+import { letGoNote } from '@/lib/planning/letGo'
 import { useCallback, useRef, useState, type ReactNode, useEffect } from 'react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -156,6 +157,9 @@ interface TapContextPanelProps {
   /** Opened from a Month or Season page: "Move to November", "Remove from
    *  October" (horizonPanel.tsx). Listed in the ⋯ with removing the day. */
   periodActions?: { id: string; label: string; onClick: () => void }[]
+  /** A let-go item (found through search): "Let go Nov 4 · Bring back"
+   *  puts back what it had and clears the mark (unletGoUpdates). */
+  onBringBack?: () => unknown
 }
 
 export function TapContextPanel(props: TapContextPanelProps) {
@@ -390,6 +394,19 @@ export function TapContextPanel(props: TapContextPanelProps) {
               },
             ]}
           />
+          {props.onBringBack && letGoNote(task) && (
+            <p className="mt-2 text-sm text-neutral-500" data-testid="let-go-line">
+              {letGoNote(task)}
+              {' · '}
+              <button
+                type="button"
+                className="text-neutral-700 underline underline-offset-2 hover:text-neutral-900"
+                onClick={() => { void props.onBringBack?.() }}
+              >
+                Bring back
+              </button>
+            </p>
+          )}
           {props.whyChain}
         </>
       }

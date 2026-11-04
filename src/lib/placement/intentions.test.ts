@@ -230,6 +230,37 @@ describe('let go and complete', () => {
   })
 })
 
+describe('a let-go item placed again comes back (final review)', () => {
+  const GONE = new Date(2026, 10, 4)
+  const letGo = (extra: Partial<Task> = {}) => task({ bucket: 'someday', dismissedAt: GONE, ...extra })
+  const back = (updates: Partial<Task>, t = letGo()) => {
+    const p = planPlacement(t, updates, ctx)
+    return 'dismissedAt' in p.row && p.row.dismissedAt === undefined && p.local.dismissedAt === undefined
+  }
+  it('a day, a pick, a period stamp, a level or an open commitment clears dismissedAt', () => {
+    expect(back({ bucket: 'timed', scheduledFor: new Date(2026, 10, 4) })).toBe(true)
+    expect(back({ plannedOn: new Date(2026, 10, 4) })).toBe(true)
+    expect(back({ weekStart: WK20 })).toBe(true)
+    expect(back({ monthStart: OCT })).toBe(true)
+    expect(back({ bucket: 'month' })).toBe(true)
+    expect(back({ commitments: [c('season', FALL)] })).toBe(true)
+    expect(back({ focus: [{ userId: 'scott', date: new Date(2026, 10, 4) }] })).toBe(true)
+  })
+  it('Someday, the Inbox, a title or an unschedule do not', () => {
+    for (const u of [{ bucket: 'someday' as const }, { bucket: 'inbox' as const }, { title: 'x' }, { scheduledFor: undefined }, { commitments: [] }]) {
+      const p = planPlacement(letGo(), u, ctx)
+      expect('dismissedAt' in p.row).toBe(false)
+      expect(p.local.dismissedAt).toEqual(GONE)
+    }
+  })
+  it('a write that states dismissedAt keeps it; a school paper stays "Not ours"', () => {
+    const p = planPlacement(letGo(), { scheduledFor: new Date(2026, 10, 4), dismissedAt: GONE }, ctx)
+    expect(p.row.dismissedAt).toEqual(GONE)
+    const paper = planPlacement(letGo({ category: 'paper' }), { scheduledFor: new Date(2026, 10, 4) }, ctx)
+    expect('dismissedAt' in paper.row).toBe(false)
+  })
+})
+
 describe('keep — same task, next period', () => {
   it('carries September and opens October on the SAME row', () => {
     const t = task({ bucket: 'month', commitments: [c('season', FALL), c('month', SEP)] })

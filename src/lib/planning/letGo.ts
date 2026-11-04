@@ -40,3 +40,33 @@ export function letGoNote(t: Pick<Task, 'dismissedAt' | 'category'>): string | n
   if (!t.dismissedAt || t.category === 'paper') return null
   return `Let go ${t.dismissedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
 }
+
+/** What every list is given (useSupabaseTasks' `tasks`): let-go items left
+ *  out, and let-go steps taken off a live parent. Unchanged input comes back
+ *  as the same array. */
+export function withoutLetGo(tasks: Task[]): Task[] {
+  if (!tasks.some((t) => isLetGo(t) || t.subtasks?.some(isLetGo))) return tasks
+  return tasks
+    .filter((t) => !isLetGo(t))
+    .map((t) => (t.subtasks?.some(isLetGo) ? { ...t, subtasks: t.subtasks.filter((s) => !isLetGo(s)) } : t))
+}
+
+/** Search's own selector: the let-go items (with their steps), and let-go
+ *  steps of live parents — what `withoutLetGo` leaves out. */
+export function selectLetGoTasks(tasks: Task[]): Task[] {
+  return [
+    ...tasks.filter(isLetGo),
+    ...tasks.filter((t) => !isLetGo(t)).flatMap((t) => (t.subtasks ?? []).filter(isLetGo)),
+  ]
+}
+
+type Run = (label: string, command: () => Promise<boolean>, options?: { ids?: string[]; undo?: () => Promise<boolean> }) => Promise<boolean>
+
+/** The task panel's "Let go Nov 4 · Bring back": what it had comes back
+ *  (unletGoUpdates — for an item let go earlier that is Someday), with Undo
+ *  letting it go again on the same date. */
+export function bringBack(task: Task, updateTask: (id: string, u: Partial<Task>) => Promise<unknown>, run: Run): Promise<boolean> {
+  return run(`Bring back “${task.title}”`,
+    async () => (await updateTask(task.id, unletGoUpdates(task))) !== false,
+    { ids: [task.id], undo: async () => (await updateTask(task.id, letGoUpdates(task.dismissedAt))) !== false })
+}

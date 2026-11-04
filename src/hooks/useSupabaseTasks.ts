@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase as defaultSupabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
@@ -20,6 +20,7 @@ import type { TaskCommitment, TaskFocusEntry, PlacementLevel } from '@/types/tas
 import { committedTo, deriveCache, focusSnapshot } from '@/lib/placement/model'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
+import { withoutLetGo, selectLetGoTasks, isLetGo } from '@/lib/planning/letGo'
 // `import type` on purpose: erased at compile time, so it does NOT drag
 // taskOrdering's @dnd-kit/sortable dependency into this hook's runtime bundle.
 import type { OrderWrite } from '@/lib/today/taskOrdering'
@@ -2685,7 +2686,7 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
 
   // Get prep tasks for a specific event (legacy - use getLinkedTasks for new code)
   const getPrepTasks = useCallback((eventId: string): Task[] => {
-    return tasks.filter((t) => t.linkedEventId === eventId)
+    return tasks.filter((t) => t.linkedEventId === eventId && !isLetGo(t))
   }, [tasks])
 
   // Get all linked tasks (prep and followup) for any activity type
@@ -2694,6 +2695,7 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     activityId: string
   ): { prep: Task[], followup: Task[] } => {
     const linked = tasks.filter(t =>
+      !isLetGo(t) &&
       t.linkedTo?.type === activityType &&
       t.linkedTo?.id === activityId
     )
@@ -2703,6 +2705,14 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     }
   }, [tasks])
 
+  // Let go ("not ever") is off every list, so the hook hands out live tasks
+  // only — one boundary instead of a filter in each view (final review,
+  // 2026-11-04). Search, and the panel it opens, read `letGoTasks`; the
+  // writers above still find every row (tasksRef), so placing a let-go item
+  // again brings it back.
+  const liveTasks = useMemo(() => withoutLetGo(tasks), [tasks])
+  const letGoTasks = useMemo(() => selectLetGoTasks(tasks), [tasks])
+
   // `userId`: whose focus rows count on a day (task_focus is per person).
-  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, setGoalLink, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, dropCommitment, completeTask, userId: user?.id ?? null }
+  return { tasks: liveTasks, letGoTasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, setGoalLink, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, dropCommitment, completeTask, userId: user?.id ?? null }
 }

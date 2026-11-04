@@ -264,7 +264,9 @@ export function useWallData(): UseWallDataReturn {
           .eq('context', 'family')
           // School papers live on their own (query 17): read-only chips and
           // the kid's page, never a tickable row in the day's lists.
-          .or('category.is.null,category.neq.paper'),
+          .or('category.is.null,category.neq.paper')
+          // Let go ("not ever") is off every list, the wall's included.
+          .is('dismissed_at', null),
 
         // 3. Routines. Deliberately NOT filtered to visibility 'active' in
         // SQL: a routine collection is 'reference' (it never renders itself)
@@ -317,7 +319,9 @@ export function useWallData(): UseWallDataReturn {
           .gte('scheduled_for', overdueFloor.toISOString())
           .eq('completed', false)
           .eq('context', 'family')
-          .or('category.is.null,category.neq.paper'),
+          .or('category.is.null,category.neq.paper')
+          // Let go ("not ever") is off every list, the wall's included.
+          .is('dismissed_at', null),
 
         // (An inbox-count query used to sit here. It filtered on `is_someday`,
         //  a column that no longer exists — someday is `bucket = 'someday'`
@@ -348,7 +352,9 @@ export function useWallData(): UseWallDataReturn {
           .eq('completed', false)
           .eq('context', 'family')
           .in('needed_on', [todayStr, localYmd(addDays(new Date(), 1))])
-          .or('category.is.null,category.neq.paper'),
+          .or('category.is.null,category.neq.paper')
+          // Let go ("not ever") is off every list, the wall's included.
+          .is('dismissed_at', null),
 
         // 14. "Free" events (informational-only — no prep/handoff). event_notes
         // is shared within the household, so this reads every member's flags,
@@ -370,7 +376,8 @@ export function useWallData(): UseWallDataReturn {
           .select(TASK_COLUMNS)
           .eq('completed', false)
           .eq('context', 'family')
-          .eq('category', 'homework'),
+          .eq('category', 'homework')
+          .is('dismissed_at', null),
 
         // 16. Standing info from school, last 14 days. Aged by query, never
         // deleted — the rows are the record.
@@ -401,7 +408,9 @@ export function useWallData(): UseWallDataReturn {
           .is('scheduled_for', null)
           .gte('weekend_start', localYmd(addDays(startDate, -1)))
           .lte('weekend_start', endStr)
-          .or('category.is.null,category.neq.paper'),
+          .or('category.is.null,category.neq.paper')
+          // Let go ("not ever") is off every list, the wall's included.
+          .is('dismissed_at', null),
       ])
 
       if (!mountedRef.current) return

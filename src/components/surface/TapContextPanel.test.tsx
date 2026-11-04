@@ -57,6 +57,26 @@ describe('TapContextPanel', () => {
     expect(screen.queryByRole('button', { name: '+ Log' })).toBeNull()
   })
 
+  // Final review (2026-11-04): a let-go item opened from search can come back.
+  it('a let-go item shows "Let go Nov 4 · Bring back", and Bring back calls the host', () => {
+    const onBringBack = vi.fn()
+    const gone = createMockTask({ title: 'Plan winter vacation', bucket: 'someday', dismissedAt: new Date(2026, 10, 4, 9) })
+    const { unmount } = render(<TapContextPanel
+      task={gone} contacts={[]} projects={[]} events={[]} familyMembers={[]}
+      siblingTaskCandidates={[]} allTasks={[gone]} {...baseHandlers} onBringBack={onBringBack}
+    />)
+    expect(screen.getByTestId('let-go-line')).toHaveTextContent('Let go Nov 4 · Bring back')
+    fireEvent.click(screen.getByRole('button', { name: 'Bring back' }))
+    expect(onBringBack).toHaveBeenCalledTimes(1)
+    unmount()
+    const live = createMockTask({ title: 'Call' })
+    render(<TapContextPanel
+      task={live} contacts={[]} projects={[]} events={[]} familyMembers={[]}
+      siblingTaskCandidates={[]} allTasks={[live]} {...baseHandlers} onBringBack={onBringBack}
+    />)
+    expect(screen.queryByTestId('let-go-line')).toBeNull()
+  })
+
   it('renders task title in the header', () => {
     const task = createMockTask({ title: 'Call Dr. Smith' })
     render(<TapContextPanel

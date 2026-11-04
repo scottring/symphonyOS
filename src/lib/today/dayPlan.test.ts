@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { alreadyPlaced, selectDayPlan, type DayPlanEntry, type DayPlanInput } from './dayPlan'
 import { computeTodayData } from './computeTodayData'
+import { planPlacement } from '@/lib/placement/intentions'
+import { letGoUpdates } from '@/lib/planning/letGo'
+import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
 import { ALL_LAYERS } from '@/lib/domains'
 import type { ActionableInstance, Routine } from '@/types/actionable'
@@ -82,6 +85,17 @@ describe('selectDayPlan — dated vs chosen tasks', () => {
     const plan = selectDayPlan(input({ tasks: [picked, dated({ id: 'd2', dismissedAt: new Date(2026, 8, 19, 9) })] }))
     expect(plan.plannedExtraTasks).toEqual([])
     expect(plan.scheduled).toEqual([])
+  })
+
+  // Final review (2026-11-04): a let-go item scheduled again comes back.
+  it('let go, then scheduled for today: it is on Today again', () => {
+    const ctx = { now: SAT, userId: 'u', seasons: DEFAULT_SEASONS }
+    const t = createMockTask({ id: 'w1', title: 'Book the plumber', bucket: 'week', weekStart: WEEK, commitments: [{ level: 'week', periodStart: WEEK, status: 'open' }] })
+    const gone = planPlacement(t, letGoUpdates(SAT), ctx).local
+    expect(selectDayPlan(input({ tasks: [gone] })).week).toEqual([])
+    const again = planPlacement(gone, { bucket: 'timed', scheduledFor: new Date(2026, 8, 19), isAllDay: true }, ctx).local
+    expect(again.dismissedAt).toBeUndefined()
+    expect(selectDayPlan(input({ tasks: [again] })).scheduled.map((e) => e.id)).toEqual(['w1'])
   })
 
   it('each entry appears once, in its most specific group', () => {

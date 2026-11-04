@@ -30,7 +30,10 @@ interface OmniboxResultsProps {
 }
 
 export function OmniboxResults({ query, onNavigate }: OmniboxResultsProps) {
-  const { tasks } = useSupabaseTasks()
+  const { tasks: liveTasks, letGoTasks } = useSupabaseTasks()
+  // Search is where a let-go item is found ("Let go Nov 4"); every list is
+  // given live tasks only (useSupabaseTasks).
+  const tasks = useMemo(() => [...liveTasks, ...(letGoTasks ?? [])], [liveTasks, letGoTasks])
   const { contacts } = useContacts()
   const { routines } = useRoutines()
   const { lists } = useListsContext()

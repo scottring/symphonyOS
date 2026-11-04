@@ -20,7 +20,11 @@ const task = (over: Partial<Task>): Task => ({
 })
 
 vi.mock('@/hooks/useSupabaseTasks', () => ({
-  useSupabaseTasks: () => ({ tasks: [task({ id: 't1', title: 'Replace kitchen light bulbs' })] }),
+  useSupabaseTasks: () => ({
+    tasks: [task({ id: 't1', title: 'Replace kitchen light bulbs' })],
+    // The hook hands lists live tasks only; search reads the let-go ones here.
+    letGoTasks: [task({ id: 'g1', title: 'Plan winter vacation', bucket: 'someday', dismissedAt: new Date(2026, 10, 4, 9) })],
+  }),
 }))
 vi.mock('@/hooks/useProjects', () => ({ useProjects: () => ({ projects: [{ id: 'p1', name: 'Light fixtures project' }] }) }))
 vi.mock('@/hooks/useContacts', () => ({ useContacts: () => ({ contacts: [] }) }))
@@ -50,6 +54,13 @@ describe('OmniboxResults', () => {
     render(<OmniboxResults query="light" onNavigate={onNavigate} />)
     fireEvent.click(await screen.findByText('Replace kitchen light bulbs'))
     expect(onNavigate).toHaveBeenCalled()
+  })
+
+  it('finds a let-go item, marked "Let go Nov 4", and opens it', async () => {
+    render(<OmniboxResults query="winter vacation" onNavigate={vi.fn()} />)
+    fireEvent.click(await screen.findByText('Plan winter vacation'))
+    expect(screen.getByText('Let go Nov 4')).toBeInTheDocument()
+    expect(navigateSpy).toHaveBeenCalledWith(expect.stringContaining('detail=task:g1'))
   })
 
   it('renders nothing when there are no matches', async () => {

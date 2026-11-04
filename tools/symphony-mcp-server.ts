@@ -18,6 +18,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { normalizeScheduledFor } from '../src/lib/scheduledFor'
+import { placesRow, reviveIfPlaced } from '../supabase/functions/_shared/letGoRow'
 
 // --- Config ---
 
@@ -196,6 +197,8 @@ Common queries:
     if (params.is_waiting !== undefined) query = query.eq('is_waiting', params.is_waiting)
     if (params.project_id) query = query.eq('project_id', params.project_id)
     if (params.search) query = query.ilike('title', `%${params.search}%`)
+    // Let go is off every list; a title search still finds it.
+    else query = query.is('dismissed_at', null)
     if (params.scheduled_for) {
       const start = `${params.scheduled_for}T00:00:00`
       const end = `${params.scheduled_for}T23:59:59`
@@ -242,6 +245,11 @@ To mark waiting: set is_waiting=true.`,
     const { id, ...updates } = params
     const dbUpdates = toDbTask(updates as Record<string, unknown>)
     dbUpdates.updated_at = new Date().toISOString()
+    // A let-go item placed again comes back (letGoRow.ts).
+    if (placesRow(dbUpdates)) {
+      const { data: was } = await supabase.from('tasks').select('dismissed_at, category').eq('id', id).single()
+      Object.assign(dbUpdates, reviveIfPlaced(dbUpdates, was ?? null))
+    }
 
     const { data, error } = await supabase
       .from('tasks')

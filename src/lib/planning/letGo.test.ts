@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { Task } from '@/types/task'
-import { isLetGo, letGoNote, letGoUpdates, unletGoUpdates } from './letGo'
+import { isLetGo, letGoNote, letGoUpdates, unletGoUpdates, bringBack, withoutLetGo, selectLetGoTasks } from './letGo'
 
 // Let go means not ever (Scott, 2026-11-04).
 const FALL = new Date(2026, 8, 1), NOV = new Date(2026, 10, 1)
@@ -31,5 +31,37 @@ describe('letGo', () => {
     expect(letGoNote(task({ dismissedAt: new Date(2026, 10, 4, 9) }))).toBe('Let go Nov 4')
     expect(letGoNote(task({ dismissedAt: new Date(2026, 10, 4, 9), category: 'paper' }))).toBeNull()
     expect(letGoNote(task())).toBeNull()
+  })
+})
+
+describe('bringBack (the task panel’s "Let go Nov 4 · Bring back")', () => {
+  it('writes unletGoUpdates, and Undo lets it go again on the same date', async () => {
+    const at = new Date(2026, 10, 4, 9)
+    const t = task({ bucket: 'someday', dismissedAt: at })
+    const updateTask = vi.fn(async () => true)
+    let undo: (() => Promise<boolean>) | undefined
+    const run = vi.fn(async (_l: string, cmd: () => Promise<boolean>, o?: { undo?: () => Promise<boolean> }) => { undo = o?.undo; return cmd() })
+    expect(await bringBack(t, updateTask, run)).toBe(true)
+    expect(run.mock.calls[0][0]).toBe('Bring back “Plan winter vacation”')
+    expect(updateTask).toHaveBeenLastCalledWith('t', unletGoUpdates(t))
+    expect(updateTask.mock.calls[0][1]).toMatchObject({ dismissedAt: undefined, bucket: 'someday' })
+    await undo!()
+    expect(updateTask).toHaveBeenLastCalledWith('t', letGoUpdates(at))
+  })
+})
+
+describe('the hook boundary’s selectors', () => {
+  const gone = new Date(2026, 10, 4)
+  const live = task({ id: 'live', subtasks: [task({ id: 's1' }), task({ id: 's2', dismissedAt: gone })] })
+  const letGone = task({ id: 'g', dismissedAt: gone })
+  it('withoutLetGo leaves out let-go items and let-go steps', () => {
+    const out = withoutLetGo([live, letGone])
+    expect(out.map((t) => t.id)).toEqual(['live'])
+    expect(out[0].subtasks!.map((s) => s.id)).toEqual(['s1'])
+    const plain = [task({ id: 'a' })]
+    expect(withoutLetGo(plain)).toBe(plain)
+  })
+  it('selectLetGoTasks is what withoutLetGo leaves out', () => {
+    expect(selectLetGoTasks([live, letGone]).map((t) => t.id)).toEqual(['g', 's2'])
   })
 })

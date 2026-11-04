@@ -73,6 +73,16 @@ function sourceCommitment(list: readonly TaskCommitment[], level: PlacementLevel
   return inPeriod.find((c) => c.status === 'open') ?? inPeriod[0]
 }
 
+/** Does this write put the task somewhere — a day, a pick for a day, a
+ *  period list, or an open commitment? (Not Someday or the Inbox.) */
+function placesItem(updates: Partial<Task>, toLevel: boolean): boolean {
+  return toLevel
+    || !!updates.scheduledFor || !!updates.plannedOn
+    || !!updates.weekStart || !!updates.monthStart || !!updates.seasonStart || !!updates.weekendStart
+    || ('commitments' in updates && (updates.commitments ?? []).some((c) => c.status === 'open'))
+    || ('focus' in updates && (updates.focus ?? []).length > 0)
+}
+
 function stampFor(level: PlacementLevel, updates: Partial<Task>): Date | undefined {
   return level === 'week' ? updates.weekStart : level === 'month' ? updates.monthStart : updates.seasonStart
 }
@@ -343,6 +353,15 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
       if (updates.completed && c.status === 'open') commitmentOps.push({ op: 'done', level: c.level, periodStart: c.periodStart })
       if (!updates.completed && c.status === 'done') commitmentOps.push({ op: 'reopen', level: c.level, periodStart: c.periodStart })
     }
+  }
+
+  // ── A let-go item placed again comes back (final review, 2026-11-04) ────
+  // Let go hides an item from every list (letGo.ts). Giving it a day, a
+  // pick, a period or an open commitment is asking for it back, so the mark
+  // clears. A write that states `dismissedAt` itself (Let go, its Undo) says
+  // what it means; a school paper's "Not ours" is not a let go.
+  if (task.dismissedAt && !('dismissedAt' in updates) && task.category !== 'paper' && placesItem(updates, !!targetLevel)) {
+    row.dismissedAt = undefined
   }
 
   // ── The optimistic row: records after the ops, cache derived from them ──

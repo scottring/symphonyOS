@@ -4,6 +4,8 @@ import { planSaved } from './planSaved.ts'
 import { onboardingCardAllowed } from './onboardingMode.ts'
 import { activitySetFromInput } from './onboardingActivities.ts'
 import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
+import { placesRow, reviveIfPlaced } from '../_shared/letGoRow.ts'
+import { listTasksQuery } from './listTasks.ts'
 import { ACCOUNT_GROUNDING_RULES, ASSISTANT_PERSONALITY, RESULT_LANGUAGE_RULES } from '../_shared/assistantExperience.ts'
 import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
@@ -217,7 +219,7 @@ const TOOLS = [
   { name: 'symphony_update_intention', description: 'Edit the wording or completion state of an existing year goal. Does not change its year, sharing or links.', input_schema:{type:'object',properties:{id:{type:'string'},name:{type:'string'},status:{type:'string',enum:['active','completed']}},required:['id']}},
   {
     name: 'symphony_list_tasks',
-    description: 'List tasks (max 50). Filter by bucket, context, completed, is_waiting, scheduled_for (YYYY-MM-DD), or search (title substring).',
+    description: 'List tasks (max 50). Filter by bucket, context, completed, is_waiting, scheduled_for (YYYY-MM-DD), or search (title substring). Items the user let go are left out unless you search.',
     input_schema: {
       type: 'object',
       properties: {
@@ -774,17 +776,8 @@ async function runTool(
         return await readChoices(db, input, today)
       }
       case 'symphony_list_tasks': {
-        let q = db.from('tasks').select('*').order('scheduled_for', { ascending: true, nullsFirst: false })
-        if (input.bucket) q = q.eq('bucket', input.bucket)
-        if (input.context) q = q.eq('context', input.context)
-        if (input.completed !== undefined) q = q.eq('completed', input.completed)
-        if (input.is_waiting !== undefined) q = q.eq('is_waiting', input.is_waiting)
-        if (input.search) q = q.ilike('title', `%${input.search}%`)
-        if (input.scheduled_for) {
-          q = q.gte('scheduled_for', `${input.scheduled_for}T00:00:00`).lte('scheduled_for', `${input.scheduled_for}T23:59:59`)
-        }
-        q = q.limit(typeof input.limit === 'number' ? input.limit : 50)
-        const { data, error } = await q
+        // Let-go rows are left out unless searching (listTasks.ts).
+        const { data, error } = await listTasksQuery(db, input)
         if (error) throw error
         return `${(data || []).length} tasks:\n${JSON.stringify(data, null, 2)}`
       }
@@ -868,6 +861,12 @@ async function runTool(
           } else {
             updates.bucket = (updates.bucket as string) ?? 'inbox'
           }
+        }
+        // A let-go item placed again comes back (letGoRow.ts; the app's
+        // planPlacement does the same).
+        if (placesRow(updates) && !('dismissed_at' in updates)) {
+          const { data: was } = await db.from('tasks').select('dismissed_at, category').eq('id', id).single()
+          Object.assign(updates, reviveIfPlaced(updates, was ?? null))
         }
         const fieldError = contactFieldError(updates)
         if (fieldError) return `Error: ${fieldError}`
