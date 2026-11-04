@@ -199,7 +199,7 @@ export interface WeekCanvasProps {
   /** A guided session's step (2026-11-04) drives the month's fold: the
    *  step opens it (`drive`), and the look back turns it to last week with
    *  its choices (`look`). Nothing is remembered. */
-  fold?: { drive?: { above?: boolean }; look?: ReactNode | null; write?: boolean }
+  fold?: { stepId?: string | null; drive?: { above?: boolean }; look?: ReactNode | null; write?: boolean }
 }
 
 type Drag = { kind: 'task' | 'routine' | 'occ' | 'event'; id: string; groupKey?: string; fromKey?: string }
@@ -760,7 +760,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const look = session?.look ?? null
   const withMonth = (node: ReactNode) => month ? (
     <PaperFold horizon="week" className="wc-fold" edgeLabel={look ? 'Last week' : month.word} edgeCount={look ? undefined : month.rows.length}
-      drive={session?.drive}
+      drive={session?.drive} driveKey={session?.stepId}
       frontLabel={look ? 'Last week, looking back' : undefined}
       above={look ? <LookSheet title="last week">{look}</LookSheet>
         : <AboveSheet kicker={month.kicker} title={month.word} rows={month.rows} doneCount={month.doneCount}

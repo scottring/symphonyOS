@@ -729,3 +729,108 @@ describe('PaperFold: drive at 820px, one companion at a time', () => {
     expect(paperSound.swish).toHaveBeenCalledTimes(1)
   })
 })
+
+// Scott, 2026-11-04: "it seems impossible to dismiss the november month column
+// from the week view, or rather to fold it". The open sheet carries a quiet
+// fold tab at its hinge, always visible, mirrored for the calendar.
+describe('PaperFold: the fold tab on the open sheet', () => {
+  const view = (drive?: { above?: boolean; calendar?: boolean }, driveKey?: string) => (
+    <PaperFold horizon="month" edgeLabel="Fall 2026" above={<p>above</p>} drive={drive} driveKey={driveKey}
+      calendar={<p>Thanksgiving</p>} calendarLabel="November calendar">
+      <h1>November</h1>
+    </PaperFold>
+  )
+  const tab = (name: string) => screen.getByRole('button', { name })
+  const tabEl = (c: HTMLElement, cal = false) =>
+    c.querySelector(`.paper-fold-slot${cal ? '--calendar' : ':not(.paper-fold-slot--calendar)'} .paper-fold-tab`) as HTMLElement
+
+  it('folded, the tab is out of reach; open, "Fold Fall 2026 away" is the tab, and a click folds it with the sound', () => {
+    const { container } = render(view())
+    expect(tabEl(container)).toHaveAttribute('aria-hidden', 'true')
+    expect(tabEl(container)).toHaveAttribute('tabindex', '-1')
+    fireEvent.keyDown(edge(), { key: 'Enter' })
+    const t = tab('Fold Fall 2026 away')
+    expect(t).toBe(tabEl(container))
+    expect(t).toHaveAttribute('aria-expanded', 'true')
+    expect(t).toHaveTextContent('‹')
+    fireEvent.click(t)
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(paperSound.land).toHaveBeenCalled()
+    expect(localStorage.getItem('symphony-fold:month')).toBe('folded')
+  })
+
+  it('the calendar has its mirror, "›"', () => {
+    const { container } = render(view())
+    fireEvent.keyDown(screen.getByRole('button', { name: /November calendar/ }), { key: 'Enter' })
+    const t = tab('Fold November calendar away')
+    expect(t).toBe(tabEl(container, true))
+    expect(t).toHaveTextContent('›')
+    fireEvent.click(t)
+    expect(root(container)).toHaveAttribute('data-calendar-open', 'false')
+  })
+
+  it('the open edge leaves the tab order, so the tab is the one "Fold … away"', () => {
+    const { container } = render(view())
+    fireEvent.keyDown(edge(), { key: 'Enter' })
+    const theEdge = container.querySelector('.paper-fold-edge') as HTMLElement
+    expect(theEdge).toHaveAttribute('aria-hidden', 'true')
+    expect(theEdge).toHaveAttribute('tabindex', '-1')
+    expect(screen.getAllByRole('button', { name: /Fold Fall 2026 away/ })).toHaveLength(1)
+  })
+
+  // The reader beats the drive for the current step.
+  it('during a drive, the tab folds it and it stays folded through re-renders; nothing is written', () => {
+    const { container, rerender } = render(view({ above: true }, 'read'))
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    fireEvent.click(tab('Fold Fall 2026 away'))
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    rerender(view({ above: true }, 'read'))
+    rerender(view({ above: true }, 'read'))
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(localStorage.getItem('symphony-fold:month')).toBeNull()
+  })
+
+  it('a later step that drives it opens it again', () => {
+    const { container, rerender } = render(view({ above: true }, 'read'))
+    fireEvent.click(tab('Fold Fall 2026 away'))
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    rerender(view({ above: true }, 'brain-dump'))
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    expect(localStorage.getItem('symphony-fold:month')).toBeNull()
+  })
+
+  it('without a step key, a change in the drive opens it again', () => {
+    const { container, rerender } = render(view({ above: true }))
+    fireEvent.click(tab('Fold Fall 2026 away'))
+    rerender(view({ above: true, calendar: false }))
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    rerender(view({}))
+    rerender(view({ above: true }))
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+  })
+
+  it('F and a drag beat the drive too, unremembered; letting go returns to what the reader left before', () => {
+    localStorage.setItem('symphony-fold:month', 'open')
+    const { container, rerender } = render(view({ above: false }, 'look'))
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    fireEvent.keyDown(document.body, { key: 'f' })
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    rerender(view({ above: false }, 'look'))
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    const t = tab('Fold Fall 2026 away')
+    fireEvent.pointerDown(t, { clientX: 300, clientY: 300, button: 0, pointerId: 1 })
+    fireEvent.pointerMove(t, { clientX: 520, clientY: 300, pointerId: 1 })
+    fireEvent.pointerUp(t, { clientX: 520, clientY: 300, pointerId: 1 })
+    expect(root(container)).toHaveAttribute('data-open', 'false')
+    expect(localStorage.getItem('symphony-fold:month')).toBe('open')
+    rerender(view(undefined))
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+  })
+
+  it('a step that drives nothing is still a session: the reader’s move is not written', () => {
+    const { container } = render(view({}, 'energy'))
+    fireEvent.keyDown(edge(), { key: 'Enter' })
+    expect(root(container)).toHaveAttribute('data-open', 'true')
+    expect(localStorage.getItem('symphony-fold:month')).toBeNull()
+  })
+})

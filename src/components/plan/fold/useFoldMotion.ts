@@ -153,6 +153,8 @@ export function useFoldMotion({
   keyName,
   keyEnabled,
   onOpen,
+  remembers,
+  onReader,
 }: {
   side: FoldSide
   /** localStorage key for the remembered state. */
@@ -169,6 +171,13 @@ export function useFoldMotion({
   keyEnabled: () => boolean
   /** It is about to open: the other companion folds when the spread has no room for both. */
   onOpen?: (o: { remember: boolean }) => void
+  /** Whether the reader's own fold or unfold is remembered now. False while
+   *  the page drives the folds (a planning session): the reader's move holds
+   *  for now and is not written. Default: always. */
+  remembers?: () => boolean
+  /** The reader folded or unfolded it (a tap, a key, a drag, the fold tab),
+   *  not the page or the layout. */
+  onReader?: () => void
 }): FoldMotion {
   const [open, setOpen] = useState(initialOpen)
   const initial = initialOpen ? 1 : 0
@@ -189,10 +198,14 @@ export function useFoldMotion({
   const keyRef = useRef(storageKey)
   const enabledRef = useRef(keyEnabled)
   const onOpenRef = useRef(onOpen)
+  const remembersRef = useRef(remembers)
+  const onReaderRef = useRef(onReader)
   useLayoutEffect(() => {
     keyRef.current = storageKey
     enabledRef.current = keyEnabled
     onOpenRef.current = onOpen
+    remembersRef.current = remembers
+    onReaderRef.current = onReader
   })
 
   const apply = useCallback(
@@ -300,7 +313,17 @@ export function useFoldMotion({
     [apply, step, stop],
   )
 
-  const toggle = useCallback(() => go(m.current.target > 0.5 ? 0 : 1), [go])
+  /** The reader's own move (not the page's, not the layout's): it beats a
+   *  drive for now, and is remembered only when nothing drives the folds. */
+  const readerGo = useCallback(
+    (to: 0 | 1, opts: GoOptions = {}) => {
+      onReaderRef.current?.()
+      go(to, { ...opts, remember: opts.remember ?? (remembersRef.current?.() ?? true) })
+    },
+    [go],
+  )
+
+  const toggle = useCallback(() => readerGo(m.current.target > 0.5 ? 0 : 1), [readerGo])
 
   const patch = useCallback<FoldMotion['patch']>((p) => {
     Object.assign(m.current, p)
@@ -363,7 +386,7 @@ export function useFoldMotion({
       // Pulled open past a sliver: the other companion makes room now.
       if (np > 0.05 && s.target === 0 && !drag.cleared) {
         drag.cleared = true
-        onOpenRef.current?.({ remember: true })
+        onOpenRef.current?.({ remember: remembersRef.current?.() ?? true })
       }
       const now = performance.now()
       const dt = Math.max(1, now - drag.lastT)
@@ -390,7 +413,7 @@ export function useFoldMotion({
         return
       }
       s.v = drag.vel
-      go(releaseTarget(s.p, s.v), { fromDrag: true })
+      readerGo(releaseTarget(s.p, s.v), { fromDrag: true })
     }
 
     const onPointerCancel = () => {
@@ -404,7 +427,7 @@ export function useFoldMotion({
         return
       }
       s.v = drag.vel
-      go(releaseTarget(s.p, s.v), { fromDrag: true })
+      readerGo(releaseTarget(s.p, s.v), { fromDrag: true })
     }
 
     // A click that follows a handled pointer gesture is ignored; a click with
@@ -422,7 +445,7 @@ export function useFoldMotion({
     }
 
     return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onClick, onKeyDown }
-  }, [side, mode, apply, go, stop, toggle])
+  }, [side, mode, apply, go, readerGo, stop, toggle])
 
   return { open, m, apply, go, toggle, stop, patch, handlers }
 }

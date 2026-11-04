@@ -163,6 +163,29 @@
 .paper-fold-grip:hover::before,
 .paper-fold-grip:focus-visible::before { opacity: .35; }
 
+/* The fold tab (Scott, 2026-11-04: the open November "seems impossible to
+   ... fold"): a quiet paper tab on the open sheet at its hinge, vertically
+   centred, always visible, pointing the way the sheet goes. Tap it, press it
+   or drag it; it folds with the usual motion and sound. It turns with the
+   sheet, so it is gone once the sheet is folded behind its edge. */
+.paper-fold-tab {
+  position: absolute; z-index: 4; top: 50%; right: 0;
+  width: 20px; height: 52px; margin-top: -26px; padding: 0 0 2px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 8px 0 0 8px; cursor: pointer;
+  background-color: color-mix(in srgb, var(--paper-fold-paper-above) 82%, var(--color-neutral-300));
+  background-image: var(--paper-fold-grain, none);
+  box-shadow: inset 1px 0 0 var(--paper-fold-rule-above), -1px 1px 4px -2px hsl(var(--paper-fold-shadow) / .25);
+  color: var(--paper-fold-ink-soft);
+  font: 500 18px/1 var(--font-family-display);
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  transform: translateZ(1px);
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  transition: background-color .2s, color .2s;
+}
+.paper-fold-tab:hover { color: var(--paper-fold-ink); background-color: color-mix(in srgb, var(--paper-fold-paper-above) 70%, var(--color-neutral-300)); }
+.paper-fold-tab:focus-visible { outline: 2px solid var(--paper-fold-accent); outline-offset: 2px; }
+
 /* ---- the calendar, hinged to the right edge: the mirror of the above ---- */
 .paper-fold-slot--calendar { --p: 0; }
 .paper-fold-slot--calendar .paper-fold-pin { perspective-origin: 0% 40%; }
@@ -186,6 +209,12 @@
 }
 .paper-fold-slot--calendar .paper-fold-scroll { scrollbar-color: var(--paper-fold-rule) transparent; }
 .paper-fold-slot--calendar .paper-fold-grip { right: auto; left: -6px; }
+.paper-fold-slot--calendar .paper-fold-tab {
+  right: auto; left: 0; border-radius: 0 8px 8px 0;
+  background-color: color-mix(in srgb, var(--paper-fold-paper-cal) 82%, var(--color-neutral-300));
+  box-shadow: inset -1px 0 0 var(--paper-fold-rule), 1px 1px 4px -2px hsl(var(--paper-fold-shadow) / .25);
+}
+.paper-fold-slot--calendar .paper-fold-tab:hover { background-color: color-mix(in srgb, var(--paper-fold-paper-cal) 70%, var(--color-neutral-300)); }
 
 /* ---- phones: the sheet above folds down from the top edge ---- */
 .paper-fold[data-fold-mode='v'] { flex-direction: column; align-items: stretch; width: 100%; }
@@ -220,6 +249,14 @@
 .paper-fold[data-fold-mode='v'] .paper-fold-scroll { padding: 22px 20px 18px; }
 .paper-fold[data-fold-mode='v'] .paper-fold-grip { top: auto; left: 0; right: 0; bottom: -6px; width: auto; height: 16px; }
 .paper-fold[data-fold-mode='v'] .paper-fold-grip::before { top: 6px; left: 50%; height: 4px; width: 44px; margin-top: 0; margin-left: -22px; }
+/* the tab sits on the hanging sheet's bottom edge, its hinge, pointing up */
+.paper-fold[data-fold-mode='v'] .paper-fold-tab {
+  top: auto; bottom: 0; right: auto; left: 50%; width: 52px; height: 20px; margin: 0 0 0 -26px; padding: 0 2px 0 0;
+  border-radius: 8px 8px 0 0;
+  box-shadow: inset 0 1px 0 var(--paper-fold-rule-above), 0 -1px 4px -2px hsl(var(--paper-fold-shadow) / .25);
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-tab > span { transform: rotate(90deg); }
+.paper-fold[data-fold-mode='v'] .paper-fold-scroll { padding-bottom: 28px; }
 /* the calendar folds up from the bottom edge */
 .paper-fold[data-fold-mode='v']:has(> .paper-fold-slot--calendar) .paper-fold-current { border-radius: 3px; }
 .paper-fold[data-fold-mode='v'] .paper-fold-current::after {
@@ -243,6 +280,11 @@
   background: linear-gradient(to bottom, hsl(var(--paper-fold-shadow) / .55), hsl(var(--paper-fold-shadow) / .12) 45%, hsl(var(--paper-fold-shadow) / 0));
 }
 .paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-grip { top: -6px; bottom: auto; }
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-tab {
+  top: 0; bottom: auto; border-radius: 0 0 8px 8px;
+  box-shadow: inset 0 -1px 0 var(--paper-fold-rule), 0 1px 4px -2px hsl(var(--paper-fold-shadow) / .25);
+}
+.paper-fold[data-fold-mode='v'] .paper-fold-slot--calendar .paper-fold-scroll { padding-top: 28px; padding-bottom: 18px; }
 
 /* ---- iPhone Duo, open: the phone's hinge is the page's crease. Left: the
    sheet above. Right: this period. ---- */

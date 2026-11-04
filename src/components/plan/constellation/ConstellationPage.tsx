@@ -977,7 +977,7 @@ function Inner() {
           : <AboveSheet {...aboveSheet} foot={`For reading. Write ${periodWord} in its own words.`}>
             {level === 1 && fold?.stepId === 'from-year' && somedayRows()}
           </AboveSheet>}
-        calendar={calendarSheet} calendarLabel={`${periodWord} calendar`} drive={fold?.drive}>
+        calendar={calendarSheet} calendarLabel={`${periodWord} calendar`} drive={fold?.drive} driveKey={fold?.stepId}>
         {sheetFor(fold)}
       </PaperFold>
     </div>

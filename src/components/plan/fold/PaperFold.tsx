@@ -58,8 +58,14 @@ export interface PaperFoldProps {
   calendarLabel?: string
   /** The page drives a companion for now: true opens it, false folds it,
    *  with the sound, and nothing is remembered. A key left undefined (or no
-   *  `drive`) is the reader's: it returns to what they left. */
+   *  `drive`) is the reader's: it returns to what they left. While a drive is
+   *  given (even `{}`), the reader's own fold or unfold beats it for now and
+   *  is not remembered (Scott, 2026-11-04: the open November could not be
+   *  folded from the Week). */
   drive?: { above?: boolean; calendar?: boolean }
+  /** Which step drives (a planning session's step id). A new key is a new
+   *  ask: it drives the folds again over what the reader did on the last. */
+  driveKey?: string | null
 }
 
 const storageKey = (h: FoldHorizon) => `symphony-fold:${h}`
@@ -143,6 +149,9 @@ function keepsOpen(drive: Drive): FoldSide {
   return drive.calendar === true ? 'calendar' : 'above'
 }
 
+/** Which way the tab points to fold its sheet away: toward the hinge. */
+const TAB_GLYPH: Record<FoldSide, string> = { above: '‹', calendar: '›' }
+
 function Chevron({ d }: { d: string }) {
   return (
     <svg
@@ -171,6 +180,7 @@ function PaperFoldSheet({
   calendar,
   calendarLabel = 'Calendar',
   drive,
+  driveKey,
 }: PaperFoldProps) {
   const hasCal = calendar !== undefined && calendar !== null && calendar !== false
   const aboveKey = storageKey(horizon)
@@ -199,10 +209,19 @@ function PaperFoldSheet({
   const stowedRef = useRef(stowed)
   const hasCalRef = useRef(hasCal)
   const driveRef = useRef<Drive>({ above: drive?.above, calendar: drive?.calendar })
+  // A drive is given (a planning session is on the page): the reader's moves
+  // hold for now and are not remembered.
+  const drivenRef = useRef(drive !== undefined)
+  // The reader folded or unfolded a companion under the current drive: it
+  // stays as they left it until that companion's drive changes (a new value,
+  // a new step) or the drive clears.
+  const overridden = useRef<Record<FoldSide, boolean>>({ above: false, calendar: false })
   useLayoutEffect(() => {
     stowedRef.current = stowed
     hasCalRef.current = hasCal
-  }, [stowed, hasCal])
+    drivenRef.current = drive !== undefined
+  }, [stowed, hasCal, drive])
+  const remembers = useCallback(() => !drivenRef.current, [])
 
   // The calendar's contents mount on its first opening (a tap, C, a drag
   // past a sliver, a remembered open state or the page's drive) and then stay
@@ -229,6 +248,8 @@ function PaperFoldSheet({
     keyName: 'f',
     keyEnabled: () => !stowedRef.current,
     onOpen: (o) => foldOther('calendar', o),
+    remembers,
+    onReader: () => { if (drivenRef.current) overridden.current.above = true },
   })
   const C = useFoldMotion({
     side: 'calendar',
@@ -241,6 +262,8 @@ function PaperFoldSheet({
     keyName: 'c',
     keyEnabled: () => hasCalRef.current && !stowedRef.current,
     onOpen: (o) => { setCalMounted(true); foldOther('above', o) },
+    remembers,
+    onReader: () => { if (drivenRef.current) overridden.current.calendar = true },
   })
   useLayoutEffect(() => {
     motions.current = { above: A, calendar: C }
@@ -482,19 +505,30 @@ function PaperFoldSheet({
   // key beats a remembered one, and with both driven the calendar wins. The
   // other folds quietly first, so the only sound is the one that opens. Nothing
   // is remembered on the way; `go` does nothing for a companion already there.
+  // The reader beats the drive (Scott, 2026-11-04): a companion they folded or
+  // unfolded under this drive stays put until its drive changes (a new value
+  // or a new step key) or the drive clears.
   const driveAbove = drive?.above
   const driveCal = drive?.calendar
-  const prevDrive = useRef<Drive>({})
+  const stepKey = driveKey ?? null
+  const prevDrive = useRef<Drive & { key: string | null }>({ key: null })
   useEffect(() => {
     const prev = prevDrive.current
     driveRef.current = { above: driveAbove, calendar: driveCal }
-    prevDrive.current = { above: driveAbove, calendar: driveCal }
+    prevDrive.current = { above: driveAbove, calendar: driveCal, key: stepKey }
+    const newStep = prev.key !== stepKey
+    if (newStep || prev.above !== driveAbove) overridden.current.above = false
+    if (newStep || prev.calendar !== driveCal) overridden.current.calendar = false
     // The reader's own fold: never driven, nothing to hand back.
     if (driveAbove === undefined && driveCal === undefined && prev.above === undefined && prev.calendar === undefined) return
-    let wantA = driveAbove ?? readStored(aboveKey)
-    let wantC = hasCal && (driveCal ?? readStored(calKey))
+    const keepA = overridden.current.above
+    const keepC = overridden.current.calendar
+    let wantA = keepA ? mA.current.target === 1 : (driveAbove ?? readStored(aboveKey))
+    let wantC = hasCal && (keepC ? mC.current.target === 1 : (driveCal ?? readStored(calKey)))
     if (!bothRef.current && wantA && wantC) {
-      if (keepsOpen(driveRef.current) === 'calendar') wantA = false
+      if (keepA && !keepC) wantC = false
+      else if (keepC && !keepA) wantA = false
+      else if (keepsOpen(driveRef.current) === 'calendar') wantA = false
       else wantC = false
     }
     const fold: GoOptions = { remember: false, quiet: true }
@@ -503,13 +537,29 @@ function PaperFoldSheet({
     if (!wantC) goC(0, fold)
     if (wantA) goA(1, unfold)
     if (wantC) goC(1, unfold)
-  }, [driveAbove, driveCal, hasCal, aboveKey, calKey, goA, goC])
+  }, [driveAbove, driveCal, stepKey, hasCal, aboveKey, calKey, goA, goC, mA, mC])
 
   const open = A.open
   const calOpen = hasCal && C.open
   // Opened before this render could see onOpen (remembered, driven): mount now.
   if (hasCal && !calMounted && (calOpen || drive?.calendar === true)) setCalMounted(true)
   useLayoutEffect(markDuoPage, [markDuoPage, calOpen])
+  // Opened from its edge by the keyboard, focus moves to the fold tab (the edge
+  // leaves the tab order while open), and back to the edge when it folds.
+  const edgeRef = useRef<HTMLButtonElement>(null)
+  const tabRef = useRef<HTMLButtonElement>(null)
+  const calEdgeRef = useRef<HTMLButtonElement>(null)
+  const calTabRef = useRef<HTMLButtonElement>(null)
+  useLayoutEffect(() => {
+    const active = document.activeElement
+    if (open && active === edgeRef.current) tabRef.current?.focus()
+    else if (!open && active === tabRef.current) edgeRef.current?.focus()
+  }, [open])
+  useLayoutEffect(() => {
+    const active = document.activeElement
+    if (calOpen && active === calEdgeRef.current) calTabRef.current?.focus()
+    else if (!calOpen && active === calTabRef.current) calEdgeRef.current?.focus()
+  }, [calOpen])
   const countPart = edgeCount === undefined ? '' : `, ${edgeCount} open`
   const edgeName = open ? `Fold ${edgeLabel} away` : `${edgeLabel}${countPart}. Unfold to read`
   const calName = calOpen ? `Fold ${calendarLabel} away` : `${calendarLabel}. Unfold to read`
@@ -527,11 +577,15 @@ function PaperFoldSheet({
       <div ref={slotRef} className="paper-fold-slot" data-open={open ? 'true' : 'false'} hidden={stowed} data-guide-anchor="left">
         <div ref={pinRef} className="paper-fold-pin">
           <button
+            ref={edgeRef}
             type="button"
             className="paper-fold-edge"
             aria-expanded={open}
             aria-controls={frontId}
             aria-label={edgeName}
+            // Open, the fold tab is the control; the edge is behind the sheet.
+            aria-hidden={open || undefined}
+            tabIndex={open ? -1 : undefined}
             // The page tours' "above" step points here (pageTours.ts).
             data-explain="above"
             {...A.handlers}
@@ -555,14 +609,22 @@ function PaperFoldSheet({
               </div>
             </section>
             <div className="paper-fold-face paper-fold-back" aria-hidden="true" />
+            {/* The hinge drags; the tab is what the eye and the keyboard find. */}
+            <button type="button" className="paper-fold-grip" aria-hidden="true" tabIndex={-1} {...A.handlers} />
             <button
+              ref={tabRef}
               type="button"
-              className="paper-fold-grip"
-              aria-label="Fold the sheet away"
-              aria-hidden={!open}
+              className="paper-fold-tab"
+              aria-label={`Fold ${edgeLabel} away`}
+              aria-expanded={open}
+              aria-controls={frontId}
+              aria-hidden={!open || undefined}
               tabIndex={open ? 0 : -1}
+              title={`Fold ${edgeLabel} away (F)`}
               {...A.handlers}
-            />
+            >
+              <span aria-hidden="true">{TAB_GLYPH.above}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -579,11 +641,14 @@ function PaperFoldSheet({
         >
           <div ref={calPinRef} className="paper-fold-pin">
             <button
+              ref={calEdgeRef}
               type="button"
               className="paper-fold-edge"
               aria-expanded={calOpen}
               aria-controls={calId}
               aria-label={calName}
+              aria-hidden={calOpen || undefined}
+              tabIndex={calOpen ? -1 : undefined}
               // The page tours' "calendar" step points here (pageTours.ts).
               data-explain="calendar"
               {...C.handlers}
@@ -606,14 +671,21 @@ function PaperFoldSheet({
                 </div>
               </section>
               <div className="paper-fold-face paper-fold-back" aria-hidden="true" />
+              <button type="button" className="paper-fold-grip" aria-hidden="true" tabIndex={-1} {...C.handlers} />
               <button
+                ref={calTabRef}
                 type="button"
-                className="paper-fold-grip"
-                aria-label="Fold the calendar away"
-                aria-hidden={!calOpen}
+                className="paper-fold-tab"
+                aria-label={`Fold ${calendarLabel} away`}
+                aria-expanded={calOpen}
+                aria-controls={calId}
+                aria-hidden={!calOpen || undefined}
                 tabIndex={calOpen ? 0 : -1}
+                title={`Fold ${calendarLabel} away (C)`}
                 {...C.handlers}
-              />
+              >
+                <span aria-hidden="true">{TAB_GLYPH.calendar}</span>
+              </button>
             </div>
           </div>
         </div>
