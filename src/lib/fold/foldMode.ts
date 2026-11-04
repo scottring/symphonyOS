@@ -11,7 +11,10 @@ export function detectFoldMode(i: {
 }): FoldMode {
   const ratio = i.height / i.width
   if (i.segments) return 'duo'
-  if (i.coarse && i.width >= 560 && i.width <= 900 && ratio >= 1.2 && ratio <= 1.65) return 'duo'
+  // The Duo's inside screens, open as a book. An iPad in portrait (744–834
+  // wide) is not a Duo: it folds like a desk page ('h'), or below 760 like a
+  // phone ('v').
+  if (i.coarse && i.width >= 560 && i.width <= 720 && ratio >= 1.2 && ratio <= 1.65) return 'duo'
   return i.width < 760 ? 'v' : 'h'
 }
 

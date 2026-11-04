@@ -1287,6 +1287,21 @@ describe('WeekViewV2 — the deck', () => {
     expect(new URLSearchParams(window.location.search).get('place')).toBeNull()
   })
 
+  // Paper-style horizons (2026-11-04): one rule for the week's own list, the
+  // deck and last week's counts. A task marked is_goal is not left out.
+  it('a goal-marked week task is dealt by "place them one at a time", as the No day yet list shows it', () => {
+    const goal = createMockTask({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'week', weekStart: sat, commitments: [{ level: 'week', periodStart: sat, status: 'open' }], updatedAt: recent })
+    open('?place=1', [goal])
+    expect(props().choose.placeItems.map((c) => c.key)).toEqual(['g'])
+  })
+
+  it('a goal-marked task done last week counts as done last week', () => {
+    const lastSat = new Date(2026, 9, 10)
+    const done = createMockTask({ id: 'gd', title: 'Book the cabin', isGoal: true, bucket: 'week', weekStart: lastSat, completed: true, completedAt: new Date(2026, 9, 12), commitments: [{ level: 'week', periodStart: lastSat, status: 'done' }], updatedAt: recent })
+    open('?review=1', [done])
+    expect((deckMock.deck as unknown as { doneLastWeek: number }).doneLastWeek).toBe(1)
+  })
+
   it('Leave returns to the week without draining or recording; See them opens Someday', async () => {
     open('?review=1', [createMockTask({ id: 'a', title: 'Fix the gate', scheduledFor: new Date(2026, 9, 12), isAllDay: true, updatedAt: recent })])
     act(() => { props().onLeave() })

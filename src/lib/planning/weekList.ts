@@ -9,7 +9,7 @@
 
 import { weekendLabel } from './weekend'
 import type { Task } from '@/types/task'
-import { committedTo, isFocused, openCommitment, sameDay } from '@/lib/placement/model'
+import { committedTo, isFocused, sameDay } from '@/lib/placement/model'
 import { doableBy } from './poolViews'
 import { localYmd } from '@/lib/cadence/config'
 
@@ -56,26 +56,25 @@ export function weekShownTasks({ listed, drawn, weekStart }: { listed: readonly 
 
 /** `dayLabel` is a real date ("Sat, Oct 3"), never a bare weekday: "kept from
  *  last week · Sat" read as either Saturday (Scott, 2026-09-28). `dayPassed`:
- *  the day came and went with the row still open. */
-export interface WeekRowNote { origin?: 'month' | 'kept'; monthLabel?: string; dayLabel?: string; dayPassed?: boolean; pickedToday: boolean; weekend?: string }
+ *  the day came and went with the row still open. A row no longer says which
+ *  month it came from ("from November"): that is a tie line, and the week is
+ *  written in its own words (paper-style horizons, 2026-11-04). */
+export interface WeekRowNote { origin?: 'kept'; dayLabel?: string; dayPassed?: boolean; pickedToday: boolean; weekend?: string }
 
 export function weekRowNote(t: Task, weekStart: Date, userId: string | null | undefined, todayYmd: string): WeekRowNote {
   const prev = new Date(weekStart); prev.setDate(prev.getDate() - 7)
   const keptFromLast = (t.commitments ?? []).some((c) => c.level === 'week' && c.status === 'carried' && sameDay(c.periodStart, prev) && !!c.carriedTo && sameDay(c.carriedTo, weekStart))
-  const month = openCommitment(t, 'month')?.periodStart ?? (t.bucket === 'month' ? t.monthStart : undefined)
-  const monthLabel = month ? month.toLocaleDateString('en-US', { month: 'long' }) : undefined
   const end = new Date(weekStart); end.setDate(end.getDate() + 7)
   const inWeek = !!t.scheduledFor && t.scheduledFor >= weekStart && t.scheduledFor < end
   const dayLabel = inWeek ? t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : undefined
   const dayPassed = inWeek && !t.completed && localYmd(t.scheduledFor!) < todayYmd
-  return { weekend: t.weekendStart ? weekendLabel(t.weekendStart) : undefined, origin: keptFromLast ? 'kept' : monthLabel ? 'month' : undefined, monthLabel, dayLabel, ...(dayPassed ? { dayPassed } : {}), pickedToday: isFocused(t, userId, todayYmd) }
+  return { weekend: t.weekendStart ? weekendLabel(t.weekendStart) : undefined, origin: keptFromLast ? 'kept' : undefined, dayLabel, ...(dayPassed ? { dayPassed } : {}), pickedToday: isFocused(t, userId, todayYmd) }
 }
 
 export function weekRowNoteText(n: WeekRowNote): string | undefined {
   const parts: string[] = []
   if (n.weekend) parts.push(n.weekend)
   if (n.origin === 'kept') parts.push('kept from last week')
-  else if (n.origin === 'month' && n.monthLabel) parts.push(`from ${n.monthLabel}`)
   if (n.dayLabel) parts.push(n.dayPassed ? `missed ${n.dayLabel}` : n.dayLabel)
   if (n.pickedToday) parts.push('picked for today')
   return parts.length ? parts.join(' · ') : undefined

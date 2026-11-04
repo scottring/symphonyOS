@@ -937,7 +937,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const tasksLoaded = (sources?.tasks ?? 'ready') === 'ready'
   const lastWeekStart = useMemo(() => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() - 7), [weekAnchor])
   const nextWeekStart = useMemo(() => new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7), [weekAnchor])
-  const scopedTasks = useMemo(() => layerTasks.filter((t) => !t.isGoal).filter(lens.keep), [layerTasks, lens])
+  // Nothing is left out for being marked a goal (paper-style horizons,
+  // 2026-11-04): the deck, last week's counts and No day yet read one rule.
+  const scopedTasks = useMemo(() => layerTasks.filter(lens.keep), [layerTasks, lens])
   const deckTasks = useMemo(() => scopedTasks.filter((t) => lens.on || !meId || doableBy(t, meId)), [scopedTasks, lens, meId])
   // The drains never move a task assigned only to someone else, even where
   // the lens shows it (Stage 2's household session decides those together).

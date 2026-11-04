@@ -80,7 +80,9 @@ export function buildDeck(input: {
     || (t.scheduledFor >= weekStart && t.scheduledFor < weekEnd && isMissedPlacement(t.scheduledFor, t.completed, now))
   const groups: Record<DeckSource, Task[]> = { 'this-week': [], 'last-week': [], inbox: [] }
   for (const t of tasks) {
-    if (t.completed || t.isGoal) continue
+    // A task marked is_goal is dealt like any other (paper-style horizons,
+    // 2026-11-04): the No day yet list shows it.
+    if (t.completed) continue
     if (noDay(t) && weekReviewState(t, weekStart, { isCurrent }) === 'open') groups['this-week'].push(t)
     else if (weekReviewState(t, lastWeekStart, { isCurrent: false }) === 'open') groups['last-week'].push(t)
     else if (t.bucket === 'inbox') groups.inbox.push(t)

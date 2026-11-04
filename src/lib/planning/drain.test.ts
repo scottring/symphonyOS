@@ -23,7 +23,6 @@ describe('staleForDrain', () => {
     const old = { updatedAt: daysAgo(22) }
     const tasks = [
       createMockTask({ id: 'done', bucket: 'inbox', completed: true, ...old }),
-      createMockTask({ id: 'goal', bucket: 'inbox', isGoal: true, ...old }),
       createMockTask({ id: 'recent', bucket: 'inbox', updatedAt: daysAgo(20) }),
       createMockTask({ id: 'future', bucket: 'week', scheduledFor: new Date(2026, 9, 20), ...old }),
       createMockTask({ id: 'open', bucket: 'week', ...old, commitments: [{ level: 'week', periodStart: WEEK, status: 'open' }] }),
@@ -32,6 +31,12 @@ describe('staleForDrain', () => {
       createMockTask({ id: 'someday', bucket: 'someday', ...old }),
     ]
     expect(staleForDrain(tasks, NOW)).toEqual([])
+  })
+
+  // Paper-style horizons (2026-11-04): is_goal is not a reason to keep it.
+  it('drains a stale task marked is_goal like any other', () => {
+    const goal = createMockTask({ id: 'goal', bucket: 'inbox', isGoal: true, updatedAt: daysAgo(22) })
+    expect(staleForDrain([goal], NOW).map((t) => t.id)).toEqual(['goal'])
   })
 
   // Every placement reader goes through the cached stamps when the records

@@ -26,6 +26,12 @@ describe('TriageWhenMenu', () => {
     expect(screen.queryByText('Next month')).toBeNull()
   })
 
+  it('season={false} (a planning page) leaves This season out', () => {
+    render(<TriageWhenMenu onPick={vi.fn()} season={false} />)
+    expect(screen.queryByRole('button', { name: 'Season' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Someday' })).toBeInTheDocument()
+  })
+
   it('Someday applies directly (single option, no fan-out)', async () => {
     const onPick = vi.fn()
     const { user } = render(<TriageWhenMenu onPick={onPick} onDelete={vi.fn()} />)

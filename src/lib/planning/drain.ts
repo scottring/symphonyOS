@@ -28,7 +28,8 @@ export function staleForDrain(tasks: Task[], now: Date, afterDays = DRAIN_AFTER_
   const cutoff = now.getTime() - afterDays * DAY_MS
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   return tasks.filter((t) => {
-    if (t.completed || t.isGoal) return false
+    // is_goal is not a reason to keep it (paper-style horizons, 2026-11-04).
+    if (t.completed) return false
     // A day today or later is a home.
     if (t.scheduledFor && t.scheduledFor.getTime() >= today) return false
     if (t.updatedAt.getTime() >= cutoff) return false

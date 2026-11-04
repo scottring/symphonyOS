@@ -52,6 +52,16 @@ function readStored(h: FoldHorizon): boolean {
   }
 }
 
+/** Has the reader ever opened or folded this horizon here? */
+function hasStored(h: FoldHorizon): boolean {
+  try {
+    const v = localStorage.getItem(storageKey(h))
+    return v === 'open' || v === 'folded'
+  } catch {
+    return false
+  }
+}
+
 function writeStored(h: FoldHorizon, open: boolean) {
   try {
     localStorage.setItem(storageKey(h), open ? 'open' : 'folded')
@@ -301,7 +311,9 @@ function PaperFoldSheet({
         go(1, { remember: false })
         return
       }
-      if (!was) {
+      // Mounting in Duo keeps what the reader left; with nothing remembered,
+      // the book opens.
+      if (!was && !hasStored(horizonRef.current)) {
         s.p = 1
         s.target = 1
       }

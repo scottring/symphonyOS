@@ -126,7 +126,7 @@ describe('Today and Week agree on the week', () => {
   const wk = (title: string, x: Partial<Task> = {}) => createMockTask({ id: `w${++n}`, title, bucket: 'week', weekStart, commitments: onWeek, createdAt: new Date(2026, 9, n), ...x })
   // No weekend-only and no scope-filtered tasks: both pages show them all.
   const tasks = [
-    wk('Book the cabin', { sourceId: 'm1' }),
+    wk('Book the cabin', { sourceId: 'm1', commitments: [...onWeek!, { level: 'month', periodStart: new Date(2026, 10, 1), status: 'open' }] as Task['commitments'] }),
     wk('Plan winter vacation', { isGoal: true, bucket: 'month', monthStart: new Date(2026, 10, 1), commitments: [...onWeek!, { level: 'month', periodStart: new Date(2026, 10, 1), status: 'open' }] as Task['commitments'] }),
     wk('Call the bank'),
     wk('Service the car', { goalTaskId: 'm1' }),
@@ -135,15 +135,21 @@ describe('Today and Week agree on the week', () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now) })
   afterEach(() => { vi.useRealTimers() })
 
-  it('Today’s week column titles equal the Week page’s No day yet titles', () => {
+  it('Today’s week column titles and notes equal the Week page’s No day yet titles and notes', () => {
     const plan = selectDayPlan({
       tasks, routines: [], dateInstances: [], viewedDate: now, selectedAssignee: null, hideRoutines: false,
       layers: new Set(ALL_LAYERS), weekStart, userId: 'u1', now,
     })
     render(<MemoryRouter><TodayWeekColumn plan={plan} day={now} weekNo={45} weekStart={weekStart} actions={{ choose: vi.fn() } as never} /></MemoryRouter>)
-    const today = within(screen.getByRole('group', { name: 'Week 45’s list' })).getAllByRole('listitem').map((li) => li.querySelector('.cw-title')?.textContent)
-    const week = buildShelf({ weekTasks: weekListTasks(tasks, weekStart, null, { isCurrent: true }), weekStart, now }).flatMap((g) => g.rows.map((r) => r.task.title))
+    const items = within(screen.getByRole('group', { name: 'Week 45’s list' })).getAllByRole('listitem')
+    const today = items.map((li) => li.querySelector('.cw-title')?.textContent)
+    const rows = buildShelf({ weekTasks: weekListTasks(tasks, weekStart, null, { isCurrent: true }), weekStart, now }).flatMap((g) => g.rows)
+    const week = rows.map((r) => r.task.title)
     expect(week).toEqual(['Book the cabin', 'Plan winter vacation', 'Call the bank', 'Service the car'])
     expect(today).toEqual(week)
+    // The notes agree too: no "from November" on Today for a row that is
+    // also on the month (a tie line, ruled out 2026-11-04).
+    expect(items.map((li) => li.querySelector('.cw-sub')?.textContent ?? null)).toEqual(rows.map((r) => r.meta))
+    expect(screen.queryByText(/from November/)).toBeNull()
   })
 })

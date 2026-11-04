@@ -36,8 +36,9 @@ const GROUPS: WhenGroup[] = [
     ],
   },
   // Paper-style horizons (spec 2026-11-04): nothing moves up from the week to
-  // a month, so "This month" and "Next month" are gone. This season stays,
-  // on its own.
+  // a month, so "This month" and "Next month" are gone. This season stays
+  // for lists outside the planning pages (a family member's list); a
+  // planning page leaves it out (`season={false}`).
   {
     label: 'Season', primary: 'this-season', options: [
       { when: 'this-season', label: 'This season' },
@@ -52,6 +53,9 @@ const GROUPS: WhenGroup[] = [
 
 interface TriageWhenMenuProps {
   contained?: boolean
+  /** Offer "This season". Off on the planning pages (the Week's own list):
+   *  nothing moves up from the week. Default on. */
+  season?: boolean
   onPick: (when: TriageWhen) => void
   /** When provided, renders a Delete (trash) action. */
   onDelete?: () => void
@@ -82,7 +86,7 @@ interface TriageWhenMenuProps {
 // that a menu you drifted past still tidies itself away.
 const HOVER_CLOSE_MS = 600
 
-export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate, calendarAction, contained = false }: TriageWhenMenuProps) {
+export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate, calendarAction, contained = false, season = true }: TriageWhenMenuProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -135,7 +139,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
 
   return (
     <div ref={containerRef} className={contained ? "flex flex-wrap items-start gap-1" : "flex items-center gap-1"}>
-      {GROUPS.map((group) => {
+      {GROUPS.filter((g) => season || g.primary !== 'this-season').map((group) => {
         const single = group.options.length === 1
         const isOpen = openGroup === group.label
         const isPrimary = group.label === 'Today'

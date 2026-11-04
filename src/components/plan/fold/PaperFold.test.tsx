@@ -196,7 +196,7 @@ describe('PaperFold', () => {
     await waitFor(() => expect(root(container)).toHaveAttribute('data-fold-mode', 'v'))
   })
 
-  it('opens in Duo and folds instantly on leaving Duo', async () => {
+  it('opens in Duo when nothing is remembered, and folds instantly on leaving Duo', async () => {
     mockMedia({ reduce: true, segments: true })
     const { container } = renderFold()
     expect(root(container)).toHaveAttribute('data-fold-mode', 'duo')
@@ -208,6 +208,47 @@ describe('PaperFold', () => {
     await waitFor(() => expect(root(container)).toHaveAttribute('data-fold-mode', 'h'))
     expect(edge()).toHaveAttribute('aria-expanded', 'false')
     expect(aboveRegion(container)).toHaveAttribute('inert')
+  })
+
+  // Fix round 1 (2026-11-04): Duo used to force the sheet open on every
+  // mount. It keeps what the reader left.
+  it('mounting in Duo keeps a remembered fold', () => {
+    localStorage.setItem('symphony-fold:month', 'folded')
+    mockMedia({ reduce: true, segments: true })
+    const { container } = renderFold()
+    expect(root(container)).toHaveAttribute('data-fold-mode', 'duo')
+    expect(edge()).toHaveAttribute('aria-expanded', 'false')
+    expect(aboveRegion(container)).toHaveAttribute('inert')
+  })
+
+  it('mounting in Duo keeps a remembered open sheet', () => {
+    localStorage.setItem('symphony-fold:month', 'open')
+    mockMedia({ reduce: true, segments: true })
+    const { container } = renderFold()
+    expect(root(container)).toHaveAttribute('data-fold-mode', 'duo')
+    expect(screen.getByRole('button', { name: 'Fold Fall 2026 away' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('entering Duo from the desk still opens the sheet, without remembering it', async () => {
+    localStorage.setItem('symphony-fold:month', 'folded')
+    const { container } = renderFold()
+    expect(root(container)).toHaveAttribute('data-fold-mode', 'h')
+    expect(edge()).toHaveAttribute('aria-expanded', 'false')
+    act(() => {
+      mockMedia({ reduce: true, segments: true })
+      window.dispatchEvent(new Event('resize'))
+    })
+    await waitFor(() => expect(root(container)).toHaveAttribute('data-fold-mode', 'duo'))
+    expect(edge()).toHaveAttribute('aria-expanded', 'true')
+    expect(localStorage.getItem('symphony-fold:month')).toBe('folded')
+  })
+
+  it('an iPad in portrait is not a Duo: it starts folded', () => {
+    setViewport(820, 1180)
+    mockMedia({ reduce: true, coarse: true })
+    const { container } = renderFold()
+    expect(root(container)).toHaveAttribute('data-fold-mode', 'h')
+    expect(edge()).toHaveAttribute('aria-expanded', 'false')
   })
 
   describe('ResizeObserver', () => {

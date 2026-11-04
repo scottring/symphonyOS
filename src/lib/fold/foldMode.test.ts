@@ -8,7 +8,11 @@ describe('detectFoldMode', () => {
     [626, 890, true, false, 'duo'],
     [466, 678, true, false, 'v'],
     [1000, 800, false, true, 'duo'],
-    [744, 1133, true, false, 'duo'],
+    // iPad portrait is not a Duo (Scott's iPad would otherwise open the sheet on every visit).
+    [744, 1133, true, false, 'v'],
+    [820, 1180, true, false, 'h'],
+    [720, 900, true, false, 'duo'],
+    [721, 900, true, false, 'v'],
   ]
   it.each(cases)('%i x %i coarse=%s segments=%s -> %s', (width, height, coarse, segments, want) => {
     expect(detectFoldMode({ width, height, coarse, segments })).toBe(want)

@@ -289,9 +289,10 @@ describe('toPlan — the week list stays whole (guided planning, Phase 2)', () =
     expect(alreadyPlaced(e({ weekendStart: new Date(2026, 9, 3) }), new Date(2026, 9, 3))).toBe(false)
   })
 
-  it('a month task copied down says where it came from', () => {
+  // Paper-style horizons (2026-11-04): no tie line ("from September").
+  it('a week task also on a month says nothing about the month', () => {
     const t = onWeek({ id: 'w4', commitments: [{ level: 'week', periodStart: WEEK, status: 'open' }, { level: 'month', periodStart: new Date(2026, 8, 1), status: 'open' }] })
-    expect(selectDayPlan(input({ tasks: [t] })).toPlan[0].context).toBe('from September')
+    expect(selectDayPlan(input({ tasks: [t] })).toPlan[0].context).toBeUndefined()
   })
 
   // Scott, 2026-09-22: "the week tasks are very old (hence most are

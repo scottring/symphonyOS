@@ -190,6 +190,17 @@ describe('WeekCanvas — the month folds beside the week', () => {
 })
 
 describe('WeekCanvas — deleting from No day yet', () => {
+  // Paper-style horizons (spec 2026-11-04): nothing moves up from the week.
+  it('When ▾ offers no This month, Next month or This season', () => {
+    show({ ...writers(), triageTask: vi.fn() })
+    fireEvent.click(screen.getByRole('button', { name: 'When for Call the bank' }))
+    const when = within(screen.getByRole('group', { name: 'When for Call the bank' }))
+    expect(when.getByRole('button', { name: 'Week' })).toBeInTheDocument()
+    expect(when.queryByRole('button', { name: 'Season' })).toBeNull()
+    expect(when.queryByRole('button', { name: 'Month' })).toBeNull()
+    expect(when.queryByText(/This season|This month|Next month/)).toBeNull()
+  })
+
   it('When ▾ offers Delete, which hands the task to the page (it offers Undo)', () => {
     const w = { ...writers(), triageTask: vi.fn(), deleteTask: vi.fn() }
     show(w)

@@ -28,17 +28,23 @@ describe('buildDeck', () => {
     expect(deck.map((c) => c.key)).toEqual(['new', 'old'])
   })
 
-  it('skips completed, goals and decided', () => {
+  it('skips completed and decided', () => {
     const decided = createMockTask({ id: 'decided', commitments: [{ level: 'week', periodStart: LAST, status: 'carried' }] })
     const deck = buildDeck({
       ...base,
       tasks: [
         createMockTask({ id: 'done', bucket: 'inbox', completed: true }),
-        createMockTask({ id: 'goal', bucket: 'inbox', isGoal: true }),
         decided,
       ],
     })
     expect(deck).toEqual([])
+  })
+
+  // Paper-style horizons (2026-11-04): nothing is left out for being marked
+  // a goal; the No day yet list shows it, so the deck deals it.
+  it('deals a task marked is_goal like any other', () => {
+    const deck = buildDeck({ ...base, tasks: [{ ...thisWeek('g'), isGoal: true }, createMockTask({ id: 'gi', bucket: 'inbox', isGoal: true })] })
+    expect(deck.map((c) => [c.key, c.source])).toEqual([['g', 'this-week'], ['gi', 'inbox']])
   })
 
   it('writes the facts', () => {

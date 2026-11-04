@@ -41,7 +41,7 @@ describe("toPlanEntries — the week's list", () => {
     const r = routine({ name: 'Take out recycling' })
     const out = toPlanEntries(args({ tasks: [sat(), week, fri(), leftBehind()], unhomed: [r] }))
     expect(out.map((e) => e.title)).toEqual(['Talk to HEMS', 'Take out recycling'])
-    expect(out.map((e) => e.context)).toEqual(['from September', 'Weekly routine · no set day'])
+    expect(out.map((e) => e.context)).toEqual([undefined, 'Weekly routine · no set day'])
     expect(out.every((e) => e.group === 'plan')).toBe(true)
   })
 
@@ -60,11 +60,12 @@ describe("toPlanEntries — the week's list", () => {
     expect(toPlanEntries(args({ tasks: [onThisWeek], weekStart: WEEK })).map((e) => e.context)).toEqual([undefined])
   })
 
-  it('a week task with no month says nothing extra; one on a month names the month', () => {
+  // Paper-style horizons (2026-11-04): no tie line ("from September").
+  it('a week task says nothing about a month, with or without one', () => {
     const plain = task({ bucket: 'week', weekStart: WEEK })
     const onMonth = task({ bucket: 'week', weekStart: WEEK, commitments: [c('month', SEP), c('week', WEEK)] })
     const out = toPlanEntries(args({ tasks: [plain, onMonth] }))
-    expect(out.map((e) => e.context)).toEqual([undefined, 'from September'])
+    expect(out.map((e) => e.context)).toEqual([undefined, undefined])
   })
 
   it("the day's flexible occurrences ride along with their cadence; a chosen one is on the main list, not here", () => {
