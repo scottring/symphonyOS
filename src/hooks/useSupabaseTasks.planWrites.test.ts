@@ -617,7 +617,9 @@ describe('Let go, against the real writer', () => {
     expect(ok).toBe(true)
     expect(db.rows('task_commitments').filter((c) => c.task_id === 't1').map((c) => c.status)).toEqual(['removed', 'removed', 'removed'])
     expect(db.rows('tasks').find((r) => r.id === 't1')).toMatchObject({ bucket: 'someday', dismissed_at: at.toISOString() })
-    const local = result.current.tasks.find((t) => t.id === 't1')!
+    // Let go is off every list: the hook hands it to search (letGoTasks) only.
+    expect(result.current.tasks.find((t) => t.id === 't1')).toBeUndefined()
+    const local = result.current.letGoTasks.find((t) => t.id === 't1')!
     expect(local.dismissedAt).toEqual(at)
     await act(async () => { ok = await result.current.updateTask('t1', unletGoUpdates(before)) })
     expect(ok).toBe(true)
