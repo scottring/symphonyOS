@@ -3,7 +3,7 @@
 // are filtered to the signed-in person's own row. `patch` reads the row first and
 // keeps every key it was not asked to change; a failed read writes nothing.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type { SessionHorizon } from '@/hooks/usePlanningSession'
@@ -51,8 +51,12 @@ export function usePlanningNotes(horizon: SessionHorizon, token: string) {
   // Which row the notes on hand are: until the row asked for has been read,
   // nothing from another period (or person) is handed out (fix round 1:
   // the Season's chip read Fall's notes for a moment on Winter).
-  const key = `${user?.id ?? ''}|${horizon}|${token}`
+  const key = rowKey(user?.id ?? '', horizon, token)
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
+  // The row asked for now: a patch that lands after the period changed
+  // writes its own row but leaves the notes on hand alone.
+  const requested = useRef(key)
+  useLayoutEffect(() => { requested.current = key }, [key])
 
   const load = useCallback(async () => {
     const req = ++latest.current
@@ -89,7 +93,7 @@ export function usePlanningNotes(horizon: SessionHorizon, token: string) {
       { onConflict: 'author_id,horizon,period_token' },
     )
     if (writeError) return false
-    setNotes(merged as PlanningNotes)
+    if (requested.current === rowKey(uid, horizon, token)) setNotes(merged as PlanningNotes)
     return true
     })
   }, [user?.id, horizon, token])

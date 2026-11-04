@@ -4,18 +4,29 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 let ownRow: { notes: Record<string, unknown> } | null = null
 let readDelay = 0
 let readError: { message: string } | null = null
+// A test may give each period its own row (keyed by period_token), and slow the write.
+let rows: Record<string, Record<string, unknown>> | null = null
+let upsertDelay = 0
 const eqCalls: Array<[string, unknown]> = []
-const upsert = vi.fn(async (...a: unknown[]) => { ownRow = { notes: (a[0] as { notes: Record<string, unknown> }).notes }; return { error: null } })
+const upsert = vi.fn(async (...a: unknown[]) => {
+  const row = a[0] as { notes: Record<string, unknown>; period_token: string }
+  if (upsertDelay) await new Promise(r => setTimeout(r, upsertDelay))
+  if (rows) rows[row.period_token] = row.notes
+  else ownRow = { notes: row.notes }
+  return { error: null }
+})
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
       select: () => {
+        let periodToken = ''
         const chain = {
-          eq: (c: string, v: unknown) => { eqCalls.push([c, v]); return chain },
+          eq: (c: string, v: unknown) => { eqCalls.push([c, v]); if (c === 'period_token') periodToken = String(v); return chain },
           // usePlanningSession's page read (its own test covers it).
           order: async () => ({ data: [], error: null }),
           maybeSingle: async () => {
-            const snap = ownRow ? { notes: { ...ownRow.notes } } : null
+            const own = rows ? (rows[periodToken] ? { notes: rows[periodToken] } : null) : ownRow
+            const snap = own ? { notes: { ...own.notes } } : null
             if (readDelay) await new Promise(r => setTimeout(r, readDelay))
             return { data: snap, error: readError }
           },
@@ -33,7 +44,7 @@ import { usePlanningSession } from './usePlanningSession'
 import { usePeriodReview } from './usePeriodReview'
 
 describe('usePlanningNotes', () => {
-  beforeEach(() => { eqCalls.length = 0; ownRow = null; readError = null; readDelay = 0; upsert.mockClear() })
+  beforeEach(() => { eqCalls.length = 0; ownRow = null; rows = null; readError = null; readDelay = 0; upsertDelay = 0; upsert.mockClear() })
 
   it('reads only my own row', async () => {
     ownRow = { notes: { weekend: 'hike' } }
@@ -108,5 +119,49 @@ describe('usePlanningNotes', () => {
     await waitFor(() => expect(result.current.notes.weekend).toBe('hike'))
     rerender({ t: '' })
     await waitFor(() => expect(result.current.notes).toEqual({}))
+  })
+
+  // Fix round 1: until the row asked for has been read, nothing from another
+  // period is handed out.
+  it('a new period: empty notes and loading until its own row is read', async () => {
+    rows = { '2026-W44': { weekend: 'hike' }, '2026-W45': { weekend: 'rest' } }
+    const { result, rerender } = renderHook(({ t }) => usePlanningNotes('weekly', t), { initialProps: { t: '2026-W44' } })
+    await waitFor(() => expect(result.current.notes.weekend).toBe('hike'))
+    readDelay = 20
+    rerender({ t: '2026-W45' })
+    expect(result.current.notes).toEqual({})
+    expect(result.current.loading).toBe(true)
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.notes).toEqual({ weekend: 'rest' })
+  })
+
+  it('a failed read: empty notes and the error, not the last period\'s notes', async () => {
+    rows = { '2026-W44': { weekend: 'hike' }, '2026-W45': { weekend: 'rest' } }
+    const { result, rerender } = renderHook(({ t }) => usePlanningNotes('weekly', t), { initialProps: { t: '2026-W44' } })
+    await waitFor(() => expect(result.current.notes.weekend).toBe('hike'))
+    readError = { message: 'boom' }
+    rerender({ t: '2026-W45' })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBe('boom')
+    expect(result.current.notes).toEqual({})
+  })
+
+  // A patch that lands after the period changed writes its own row, and
+  // never shows that row's notes as the new period's.
+  it('a patch that resolves after the period changed leaves the new period\'s notes alone', async () => {
+    rows = { '2026-W44': { weekend: 'hike' }, '2026-W45': { weekend: 'rest' } }
+    const { result, rerender } = renderHook(({ t }) => usePlanningNotes('weekly', t), { initialProps: { t: '2026-W44' } })
+    await waitFor(() => expect(result.current.notes.weekend).toBe('hike'))
+    upsertDelay = 30
+    let pending!: Promise<boolean>
+    act(() => { pending = result.current.patch({ weekend: 'swim' }) })
+    rerender({ t: '2026-W45' })
+    await waitFor(() => expect(result.current.notes).toEqual({ weekend: 'rest' }))
+    await act(async () => { expect(await pending).toBe(true) })
+    expect(rows['2026-W44']).toEqual({ weekend: 'swim' })
+    expect(result.current.notes).toEqual({ weekend: 'rest' })
+    // Back on the patched week, its own row shows the patch.
+    rerender({ t: '2026-W44' })
+    await waitFor(() => expect(result.current.notes).toEqual({ weekend: 'swim' }))
   })
 })
