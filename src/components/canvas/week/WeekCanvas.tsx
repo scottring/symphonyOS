@@ -204,7 +204,7 @@ export interface WeekCanvasProps {
   /** A guided session's ribbon (2026-11-04) drives the month's fold: the
    *  step opens it (`drive`), and the look back turns it to last week with
    *  its choices (`look`). Nothing is remembered. */
-  fold?: { drive?: { above?: boolean }; look?: ReactNode | null }
+  fold?: { drive?: { above?: boolean }; look?: ReactNode | null; write?: boolean }
 }
 
 type Drag = { kind: 'task' | 'routine' | 'occ' | 'event'; id: string; groupKey?: string; fromKey?: string }
@@ -285,6 +285,14 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [nodayOpen, setNodayOpen] = useState<boolean | null>(null)
   // The typed add above the days: for the week, or for one day.
   const [composer, setComposer] = useState<{ key: string | null } | null>(null)
+  // A writing step of a guided session (Choose this week's tasks) puts the
+  // pencil on the week's own line: "+ Add to week" opens, focused.
+  const writeStep = !!session?.write
+  const [wroteFor, setWroteFor] = useState(false)
+  if (writeStep !== wroteFor) {
+    setWroteFor(writeStep)
+    if (writeStep && !composer) setComposer({ key: null })
+  }
   // In the strip, a row's when-chips open under it on asking (the floating
   // hover bar overran the narrow strip and covered the rows above).
   const [whenOpen, setWhenOpen] = useState<string | null>(null)
@@ -918,6 +926,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             )}
           </div>
           {dinnerRow}
+          {/* While a guided session plans the week the strip steps aside;
+              its week list (No day yet, + Add to week) stays under the days. */}
+          {hideStrip && <section className="wc-session-week" aria-label="This week, no day yet">{weekTab}</section>}
         </section>
       )}
       </div>

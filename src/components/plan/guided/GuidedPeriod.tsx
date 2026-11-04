@@ -51,6 +51,8 @@ export interface SessionFold {
   drive: { above?: boolean; calendar?: boolean }
   /** The look back's body, for the sheet above; null on every other step. */
   look: ReactNode | null
+  /** A writing step: the page opens its write line. */
+  write?: boolean
 }
 
 type Line = { id: string; title: string }
@@ -166,6 +168,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, bodies, onFinish
     stepId: step?.id ?? null,
     drive: drives ? { above: drives.above || drives.look || undefined, calendar: drives.calendar } : {},
     look: drives?.look ? drawn[step!.id] ?? null : null,
+    write: !!drives?.write,
   }
   const word = periodLabel[0].toUpperCase() + periodLabel.slice(1)
   const status = plannedAt && plannedAt.getTime() < openedAt

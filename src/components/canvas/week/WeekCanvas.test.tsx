@@ -222,6 +222,24 @@ describe('WeekCanvas — filing a task under a goal', () => {
 
   // Guided planning (spec 2026-11-01): while a session runs, its steps stand
   // where the strip does; the days stay.
+  // Fix round 1 (Task 7): planning the week, the week's own list (No day yet,
+  // + Add to week) stays on the page under the days, and Choose this week's
+  // tasks opens the week's line to write on.
+  it('in a session (hideStrip and a fold): the no-day tasks and + Add to week are under the days; a writing step opens the line', async () => {
+    const { MemoryRouter } = await import('react-router-dom')
+    const w = { ...writers(), addTyped: vi.fn(async () => true) }
+    const view = (write: boolean) => <MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w}
+      hideStrip month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={{ drive: { above: write }, look: null, write }} /></MemoryRouter>
+    const { rerender } = render(view(false))
+    const tray = within(screen.getByRole('region', { name: 'This week, no day yet' }))
+    expect(tray.getByRole('list', { name: 'No day yet' })).toHaveTextContent('Call the bank')
+    expect(tray.getByRole('button', { name: '+ Add to week' })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    rerender(view(true))
+    expect(screen.getByRole('textbox')).toHaveFocus()
+    expect(screen.getByText('Add to this week')).toBeInTheDocument()
+  })
+
   it('hideStrip leaves the strip out and keeps the days', () => {
     show(writers(), { hideStrip: true })
     expect(screen.queryByRole('complementary', { name: 'Week strip' })).toBeNull()

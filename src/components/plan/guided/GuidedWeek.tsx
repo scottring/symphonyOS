@@ -43,6 +43,7 @@ export function GuidedWeek({ canvas, bodies, count, monthWord, progress, saveErr
     stepId: step.id,
     drive: drives ? { above: drives.above || drives.look || undefined } : {},
     look: drives?.look ? bodies[step.id] ?? null : null,
+    write: !!drives?.write,
   }
   return (
     <section className="guide-session" aria-label="Planning the week">
