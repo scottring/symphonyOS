@@ -32,7 +32,7 @@
 
 ---
 
-### Task A: GuideCoach replaces the ribbon
+### Task 1: GuideCoach replaces the ribbon
 
 **Files:**
 - Create: `src/components/guide/GuideCoach.tsx`, `src/components/guide/coach.css`, `src/components/guide/GuideCoach.test.tsx`
@@ -58,7 +58,7 @@
 - [ ] **Step 4:** Run the tests and tsc. Expect PASS.
 - [ ] **Step 5:** Commit: `feat(sessions): planning is a few tooltips on the everyday page`.
 
-### Task B: Step editors live on the page
+### Task 2: Step editors live on the page
 
 **Files:**
 - Today (`src/components/schedule/TodayView.tsx` and AlongsideDay):
@@ -85,7 +85,7 @@
 - [ ] **Step 4:** Run `npx vitest run src/components src/lib/guide` and tsc. Expect PASS.
 - [ ] **Step 5:** Commit: `feat(pages): each planning step has a home on the everyday page`.
 
-### Task C: Routines onto the calendar sheets; no strip on Month and Year
+### Task 3: Routines onto the calendar sheets; no strip on Month and Year
 
 **Files:**
 - `src/components/plan/constellation/ConstellationPage.tsx`: remove the RoutinesStrip and its strip layout on Month and Year, so the spread centers.
