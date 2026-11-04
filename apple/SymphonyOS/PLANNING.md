@@ -21,11 +21,15 @@ Weeks start on **Sunday**, as the database triggers do.
 - **Today**: `bucket='timed'`, `scheduled_for` = midnight, `is_all_day`, plus my `task_focus` row.
 - **A week task onto a day**: the same, with no commitment change, so the week stays open.
 - **This week**: `bucket='week'`, `week_start`, and an open `week` commitment.
-- **Someday**: every open commitment → `removed`, then `bucket='someday'`.
-- **Review**:
-  - Keep: old commitment → `carried`, plus a new open commitment.
-  - Drop: that week's commitment → `removed`.
+- **Someday** (Inbox triage): every open commitment → `removed`, then `bucket='someday'`.
+- **The write line** on Month, Season and Week ("Write a November goal", "Write a task for this week"): a new task with the level's `bucket` and period stamp, scope from the life-area lens, and one open commitment. No `goal_task_id`, no `source_id`. On Year it writes a `goals` row.
+- **Review** (last week's leftovers):
+  - Next week: old commitment → `carried`, plus a new open commitment.
+  - Someday: that week's commitment → `removed`; `bucket='someday'` (period stamps cleared) only if no other open commitment holds the task.
+  - Let go (as the web, "not ever"): every open commitment → `removed`, `bucket='someday'`, `dismissed_at` set. A task with `dismissed_at` is on no planning list. Undo clears it, and so does any later placement (a day, today, this week, next week, the task detail's date or bucket other than Someday/Inbox), except on a school paper (`category='paper'`). The rule is `SymphonyTask.bringBackIfLetGo()`, called by PlanWriter and TaskViewModel.
   - Done: complete the task.
+
+Nothing moves an item from one list above the week onto another (paper-style horizons, 2026-11-04). The sheet above (Month ← season, Season ← year goals, Year ← last year's open goals, Week ← month) and this period's calendar fold out beside the page for reading only (`Views/Planner/PaperFoldView.swift`). Open or folded is remembered per horizon in `planner.unfolded.<horizon>` and `planner.unfolded.<horizon>.calendar`; the paper sounds' mute is `planner.paperSound`.
 - **Choose a routine occurrence**: `planned_on` on that day's instance. For a flexible weekly routine it also sets `deferred_to` to local noon. The routine row is never written.
 
 Period stamps are pushed only after a placement change (`placementDirty`). So an ordinary edit never nulls a placement made on the web.

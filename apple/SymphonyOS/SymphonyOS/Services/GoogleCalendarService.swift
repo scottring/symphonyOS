@@ -57,6 +57,65 @@ final class GoogleCalendarService {
         }
     }
 
+    // MARK: - A whole period (the calendar fold, 2026-11-04)
+
+    /// Events for a period (a month, a season, a year), read in one call for
+    /// the fold's calendar sheet. Keyed by its start and end; nil until read.
+    /// Kept apart from the per-day cache, whose "loaded" days Today and Week
+    /// rely on.
+    private(set) var byPeriod: [String: [PeriodCalendar.Entry]] = [:]
+    private(set) var failedPeriods: Set<String> = []
+    private var periodFetchedAt: [String: Date] = [:]
+
+    private static func periodKey(_ start: Date, _ end: Date) -> String {
+        "\(PlanCalendar.ymd(start))…\(PlanCalendar.ymd(end))"
+    }
+
+    func entries(from start: Date, to end: Date) -> [PeriodCalendar.Entry]? { byPeriod[Self.periodKey(start, end)] }
+
+    func periodFailed(from start: Date, to end: Date) -> Bool { failedPeriods.contains(Self.periodKey(start, end)) }
+
+    /// Read `start ..< end` (end exclusive) unless read in the last `maxAge` seconds.
+    func refreshPeriod(from start: Date, to end: Date, maxAge: TimeInterval = 300) async {
+        let key = Self.periodKey(start, end)
+        #if DEBUG
+        if DemoMode.isOn {
+            var entries: [PeriodCalendar.Entry] = []
+            var d = PlanCalendar.day(start)
+            while d < end {
+                entries += DemoMode.events(on: d).map { PeriodCalendar.Entry(day: d, title: $0.title) }
+                d = PlanCalendar.addDays(d, 1)
+            }
+            byPeriod[key] = entries
+            return
+        }
+        #endif
+        if let at = periodFetchedAt[key], Date().timeIntervalSince(at) < maxAge { return }
+        struct Body: Encodable {
+            let startDate: String
+            let endDate: String
+            let domain: String
+        }
+        let iso = ISO8601DateFormatter()
+        let body = Body(startDate: iso.string(from: PlanCalendar.day(start)),
+                        endDate: iso.string(from: PlanCalendar.day(end)), domain: "all")
+        do {
+            let resp: EventsResponse = try await supabase.functions.invoke(
+                "google-calendar-events",
+                options: FunctionInvokeOptions(body: body)
+            )
+            isConnected = true
+            // Each event with its day, all-day ones included (their timeline
+            // item has no start time).
+            byPeriod[key] = (resp.events ?? []).compactMap(\.periodEntry)
+            periodFetchedAt[key] = Date()
+            failedPeriods.remove(key)
+        } catch {
+            // Keep what was read before; say so only when there is nothing.
+            if byPeriod[key] == nil { failedPeriods.insert(key) }
+        }
+    }
+
     /// The web app's settings page (hosts the Google Calendar connect card).
     /// Opened in an in-app Safari view so the connection lands in `calendar_connections`.
     static let connectURL = URL(string: "https://app.symphony-os.com/settings")!
@@ -89,6 +148,8 @@ final class GoogleCalendarService {
             eventItems = []
             byDay = [:]
             fetchedAt = [:]
+            byPeriod = [:]
+            periodFetchedAt = [:]
         } catch {
             // Best-effort; leave state as-is on failure.
         }
@@ -189,6 +250,21 @@ struct GoogleCalendarEvent: Decodable {
             recurringEventId: recurringEventId,
             endTime: isAllDay ? nil : endTime.flatMap(Self.parseISO)
         )
+    }
+
+    /// The event's day and title for the calendar sheet. An all-day event's
+    /// day is the date in its synthetic `YYYY-MM-DDT12:00:00.000Z` start,
+    /// read as a local date (never shifted by the time zone).
+    var periodEntry: PeriodCalendar.Entry? {
+        let start = Self.parseISO(startTime)
+        if allDay ?? (start == nil) {
+            let parts = startTime.prefix(10).split(separator: "-").compactMap { Int($0) }
+            guard parts.count == 3,
+                  let day = PlanCalendar.calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+            else { return nil }
+            return PeriodCalendar.Entry(day: day, title: title)
+        }
+        return start.map { PeriodCalendar.Entry(day: PlanCalendar.day($0), title: title) }
     }
 
     /// Google timed events come as `…-04:00` (no fractional seconds); the edge

@@ -36,9 +36,10 @@ struct PlanSnapshot {
     }
 
     /// Top-level tasks in the current life-area lens. Steps (subtasks) ride
-    /// inside their parent's card and never list on their own.
+    /// inside their parent's card and never list on their own. A task let go
+    /// (`dismissed_at`) is on no planning list.
     var lensTasks: [SymphonyTask] {
-        tasks.filter { $0.parentTaskId == nil && (domain == nil || $0.context == domain) }
+        tasks.filter { $0.parentTaskId == nil && $0.dismissedAt == nil && (domain == nil || $0.context == domain) }
     }
 
     // MARK: Membership
@@ -248,26 +249,30 @@ struct PlanSnapshot {
 
     // MARK: Month / season / year
 
-    struct PeriodList {
-        var goals: [SymphonyTask]
-        var tasks: [SymphonyTask]
-        /// Tasks here that are also on the given week's list.
-        var onWeek: Set<UUID>
+    /// One period's sheet above the week (paper-style horizons, 2026-11-04):
+    /// what was written for it, as one list (no goal/task split above the
+    /// week), oldest first, and how many of its lines are done. Nothing here
+    /// says what an item is for or where else it sits.
+    struct Sheet {
+        var open: [SymphonyTask]
+        var doneCount: Int
     }
 
-    func period(level: String, start: Date, week: Date) -> PeriodList {
+    func sheet(level: String, start: Date) -> Sheet {
         let byTask = commitmentsByTask
-        let held = lensTasks.filter { holds($0, level: level, periodStart: start, byTask: byTask) && !$0.completed }
-        let ws = PlanCalendar.weekStart(week)
-        let onWeek = Set(held.filter { holds($0, level: "week", periodStart: ws, byTask: byTask) }.map(\.id))
-        return PeriodList(goals: held.filter(\.isGoal), tasks: held.filter { !$0.isGoal }, onWeek: onWeek)
+        let held = lensTasks.filter { holds($0, level: level, periodStart: start, byTask: byTask) }
+        return Sheet(open: held.filter { !$0.completed }.sorted { $0.createdAt < $1.createdAt },
+                     doneCount: held.filter(\.completed).count)
     }
 
-    /// The month reference row on Week: its goals, and its tasks not yet on
-    /// this week's list. Reference only — nothing here is a week commitment.
-    func monthReference(for weekDate: Date) -> (goals: Int, tasks: Int) {
-        let list = period(level: "month", start: PlanCalendar.monthStart(weekDate), week: weekDate)
-        return (list.goals.count, list.tasks.filter { !list.onWeek.contains($0.id) }.count)
+    /// A year's goals still open (the Year page's own list; last year's, the
+    /// sheet above the Year).
+    func openYearGoals(_ year: Int) -> [Goal] {
+        yearGoals(year).filter { $0.status != "completed" }
+    }
+
+    func doneYearGoals(_ year: Int) -> Int {
+        yearGoals(year).filter { $0.status == "completed" }.count
     }
 
     func yearGoals(_ year: Int) -> [Goal] {

@@ -118,6 +118,13 @@ final class SymphonyTask {
     /// `scopeDirty`: an UPDATE otherwise leaves those columns alone, so an
     /// ordinary edit here never nulls a placement made on the web.
     var placementDirty: Bool = false
+    /// Let go ("not ever", 2026-11-04): set, the task is off every planning
+    /// list and out of Someday and the Inbox, kept in history. `dismissedAtDirty`
+    /// marks a Let go (or its Undo) made here that hasn't pushed, so an
+    /// ordinary edit never sends a stale value over the web's. Inline
+    /// defaults for SwiftData's lightweight migration.
+    var dismissedAt: Date? = nil
+    var dismissedAtDirty: Bool = false
 
     // Linked activity
     var linkedTo: LinkedActivity?
@@ -228,5 +235,27 @@ extension SymphonyTask {
         completed = done
         completedAt = done ? now : nil
         completedAtDirty = true
+    }
+}
+
+// MARK: - Let go, and back
+
+extension SymphonyTask {
+    /// Any placement brings a task that was let go back (as the web's
+    /// planPlacement): a day, a bucket other than Someday or the Inbox, a
+    /// period. The one rule every placement path calls (PlanWriter,
+    /// TaskViewModel). A school paper keeps its "Not ours" (`dismissed_at`
+    /// means something else there). Let go and its Undo set the field
+    /// themselves.
+    func bringBackIfLetGo() {
+        guard dismissedAt != nil, category != "paper" else { return }
+        dismissedAt = nil
+        dismissedAtDirty = true
+    }
+
+    /// Does this bucket place a task on a list (not Someday, not the Inbox)?
+    static func bucketPlaces(_ bucket: String?) -> Bool {
+        guard let bucket else { return false }
+        return bucket != "someday" && bucket != "inbox"
     }
 }

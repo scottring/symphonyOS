@@ -8,7 +8,10 @@ import SwiftData
 ///
 /// Rules carried over from the web:
 /// • Moving DOWN (week → a day) keeps the higher commitments.
-/// • Someday removes every open commitment.
+/// • Nothing moves an item from one list above the week onto another
+///   (paper-style horizons, 2026-11-04): no bring-down, no copy.
+/// • Someday from Inbox triage removes every open commitment; Someday in a
+///   look back ends only that period's commitment.
 /// • "Chosen for today" is my own `task_focus` row, never the shared column.
 /// • A routine occurrence is chosen on its instance; the rule never changes.
 struct PlanWriter {
@@ -32,6 +35,7 @@ struct PlanWriter {
             let deferCount: Int
             let context: String?
             let scope: String?
+            var dismissedAt: Date? = nil
         }
         var tasks: [TaskState] = []
         var createdCommitments: [UUID] = []
@@ -51,7 +55,7 @@ struct PlanWriter {
         .init(id: t.id, bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay,
               isSomeday: t.isSomeday, weekStart: t.weekStart, monthStart: t.monthStart,
               seasonStart: t.seasonStart, weekendStart: t.weekendStart, deferCount: t.deferCount,
-              context: t.context, scope: t.scope)
+              context: t.context, scope: t.scope, dismissedAt: t.dismissedAt)
     }
 
     // MARK: Destinations
@@ -82,6 +86,7 @@ struct PlanWriter {
             task.context = lifeArea
             TaskViewModel(modelContext: context).reconcileScope(task, members: members)
         }
+        if destination != .someday { revive(task) }
         switch destination {
         case .today:
             let day = PlanCalendar.day(Date())
@@ -120,6 +125,7 @@ struct PlanWriter {
     @discardableResult
     func planTask(_ task: SymphonyTask, on date: Date) -> Snapshot {
         var snap = Snapshot(tasks: [capture(task)])
+        revive(task)
         let day = PlanCalendar.day(date)
         placeOnDay(task, day: day, allDay: true)
         if PlanCalendar.calendar.isDateInToday(day) { snap.createdFocus += focus(task, on: day) }
@@ -128,28 +134,38 @@ struct PlanWriter {
         return snap
     }
 
-    /// Move a task DOWN into a lower period (season → month → week). Its
-    /// higher commitments stay; the new one is added. Mirrors the web's
-    /// planPlacement for a downward move.
+    /// The write line on a period's sheet ("Write a November goal", "Write a
+    /// task for this week"): a plain item on this period only, in its own
+    /// words, with one open commitment and tied to nothing (no goal_task_id,
+    /// no source). Paper-style horizons, 2026-11-04: an item above the week
+    /// belongs to one period, and nothing is copied or brought down from the
+    /// sheet above. `lifeArea` is the page's lens (nil under All).
     @discardableResult
-    func placeDown(_ task: SymphonyTask, level: String, periodStart: Date) -> Snapshot {
-        var snap = Snapshot(tasks: [capture(task)])
+    func createPeriodTask(title: String, level: String, periodStart: Date, context lifeArea: String? = nil) -> SymphonyTask {
         let start = PlanCalendar.day(periodStart)
-        task.bucket = PlanSnapshot.bucket(for: level)
-        task.scheduledFor = nil
-        task.isAllDay = false
-        task.isSomeday = false
+        let t = SymphonyTask(userId: userId, title: title, context: lifeArea)
+        t.bucket = PlanSnapshot.bucket(for: level)
         switch level {
-        case "week": task.weekStart = start; task.weekendStart = nil
-        case "month": task.monthStart = start
-        default: task.seasonStart = start
+        case "week": t.weekStart = start
+        case "month": t.monthStart = start
+        default: t.seasonStart = start
         }
-        task.placementDirty = true
-        snap.merge(ensureCommitment(task, level: level, periodStart: start))
-        touch(task)
+        // Everything rides the INSERT, stamps included.
+        t.placementDirty = true
+        // RLS shares on scope; derive it from the life area, as a goal's is.
+        t.scope = ScopeRule.scopeForDomain(context: lifeArea, assignees: [], selfMemberId: nil)
+        context.insert(t)
+        context.queueSync(table: "tasks", recordId: t.id, type: "insert")
+        _ = ensureCommitment(t, level: level, periodStart: start)
         save()
-        return snap
+        return t
     }
+
+    /// Any placement brings a task that was let go back (as the web): placing
+    /// it is changing your mind. School papers keep their "Not ours"
+    /// (`dismissed_at` means something else for them). The snapshot taken
+    /// before it keeps the old value, so Undo lets it go again.
+    private func revive(_ task: SymphonyTask) { task.bringBackIfLetGo() }
 
     private func placeOnDay(_ task: SymphonyTask, day: Date, allDay: Bool) {
         task.bucket = "timed"
@@ -176,6 +192,10 @@ struct PlanWriter {
             t.seasonStart = state.seasonStart
             t.weekendStart = state.weekendStart
             t.deferCount = state.deferCount
+            if t.dismissedAt != state.dismissedAt {
+                t.dismissedAt = state.dismissedAt
+                t.dismissedAtDirty = true
+            }
             if t.context != state.context {
                 t.context = state.context
                 t.scope = state.scope
@@ -349,6 +369,7 @@ struct PlanWriter {
     @discardableResult
     func keep(_ task: SymphonyTask, from old: TaskCommitment, into week: Date) -> Snapshot {
         var snap = Snapshot(tasks: [capture(task)])
+        revive(task)
         let ws = PlanCalendar.weekStart(week)
         snap.changedCommitments.append((old.id, old.status, old.endedAt, old.carriedTo))
         old.status = "carried"
@@ -367,21 +388,62 @@ struct PlanWriter {
         return snap
     }
 
-    /// Drop: end only that week's commitment. The task survives; with nothing
-    /// else holding it the database returns it to the Inbox.
+    /// Let go ("not ever", 2026-11-04, as the web): the task comes off every
+    /// list. All its open commitments end, it goes to bucket 'someday' with
+    /// `dismissed_at` set, and no planning list, Someday or the Inbox shows
+    /// it again. It stays in history; Undo clears `dismissed_at` and reopens
+    /// the commitments.
     @discardableResult
-    func drop(_ commitment: TaskCommitment) -> Snapshot {
-        var snap = Snapshot()
-        snap.changedCommitments.append((commitment.id, commitment.status, commitment.endedAt, commitment.carriedTo))
-        commitment.status = "removed"
-        commitment.endedAt = Date()
-        queueCommitment(commitment)
+    func letGo(_ task: SymphonyTask) -> Snapshot {
+        var snap = Snapshot(tasks: [capture(task)])
+        snap.merge(removeOpenCommitments(task))
+        task.bucket = "someday"
+        task.scheduledFor = nil
+        task.isAllDay = false
+        task.isSomeday = true
+        task.weekStart = nil
+        task.weekendStart = nil
+        task.monthStart = nil
+        task.seasonStart = nil
+        task.placementDirty = true
+        task.dismissedAt = Date()
+        task.dismissedAtDirty = true
+        touch(task)
         save()
         return snap
     }
 
     @discardableResult
     func someday(_ task: SymphonyTask) -> Snapshot { move(task, to: .someday) }
+
+    /// Someday in a look back ("not now", 2026-11-04): ends this period's
+    /// commitment only. The item goes to Someday only if no other list holds
+    /// it; "Plan winter vacation" left over from last week stays on November.
+    @discardableResult
+    func someday(_ task: SymphonyTask, from commitment: TaskCommitment) -> Snapshot {
+        var snap = Snapshot(tasks: [capture(task)])
+        snap.changedCommitments.append((commitment.id, commitment.status, commitment.endedAt, commitment.carriedTo))
+        commitment.status = "removed"
+        commitment.endedAt = Date()
+        queueCommitment(commitment)
+        let all = (try? context.fetch(FetchDescriptor<TaskCommitment>())) ?? []
+        let stillHeld = all.contains { $0.taskId == task.id && $0.id != commitment.id && $0.status == "open" }
+        if !stillHeld {
+            task.bucket = "someday"
+            task.scheduledFor = nil
+            task.isAllDay = false
+            task.isSomeday = true
+            // Off every period: its stamps go with it, pushed nulls included.
+            task.weekStart = nil
+            task.weekendStart = nil
+            task.monthStart = nil
+            task.seasonStart = nil
+            task.placementDirty = true
+            touch(task)
+        }
+        save()
+        return snap
+    }
 
     func complete(_ task: SymphonyTask) {
         TaskViewModel(modelContext: context).toggleComplete(task)

@@ -60,6 +60,18 @@ enum DemoMode {
         if (2...6).contains(weekday) { out.append(event("Marta", 9, 30, minutes: 120)) }
         if weekday == 2 { out.append(event("Dentist — Mia", 15, 30, minutes: 45)) }
         if weekday == 7 { out.append(event("Soccer — Liam", 9, 0, minutes: 90)) }
+        // A few one-offs each month, for the calendar fold's "already claimed".
+        switch cal.component(.day, from: day) {
+        case 3: out.append(event("Parent-teacher conferences", 17, 0, minutes: 60))
+        case 8:
+            // All day: kept on the calendar sheet by its date.
+            out.append(TimelineItem(id: "demo-picture-day-\(PlanCalendar.ymd(day))", type: .event, title: "Picture day",
+                                    startTime: nil, isAllDay: true, completed: false, context: nil, entityId: UUID(),
+                                    eventKey: "demo-picture-day-\(PlanCalendar.ymd(day))"))
+        case 12: out.append(event("Grandma visits", 12, 0, minutes: 240))
+        case 26: out.append(event("Liam turns 9", 15, 0, minutes: 120))
+        default: break
+        }
         return out
     }
 
@@ -154,10 +166,26 @@ enum DemoMode {
         commit(sGoal, "season", ss)
         let sTask = task("Winterize the sprinklers", "family", alex, bucket: "quarter", created: 141)
         commit(sTask, "season", ss)
+        // More of the season, so the month's sheet above reads like a list.
+        for (i, title) in ["Plan winter vacation", "Get a babysitter bench", "A chore chart the kids run"].enumerated() {
+            let t = task(title, "family", nil, bucket: "quarter", created: 142 + i)
+            commit(t, "season", ss)
+        }
+        let sDone = task("Fix up the kids' rooms", "family", nil, bucket: "quarter", created: 145)
+        sDone.completed = true
+        commit(sDone, "season", ss, "done")
 
         // Year goals
         for (i, name) in ["Family dinner four nights a week", "Run a half marathon", "Grow the consulting practice"].enumerated() {
             let g = Goal(id: UUID(), userId: me, name: name, year: PlanCalendar.year(of: today))
+            g.sortOrder = i
+            ctx.insert(g)
+        }
+        // Last year: two left open (the Year's sheet above), one done, one let go.
+        for (i, (name, status)) in [("Read twenty books together", "active"), ("Paint the porch", "active"),
+                                    ("Learn to bake bread", "completed"), ("Start a podcast", "archived")].enumerated() {
+            let g = Goal(id: UUID(), userId: me, name: name, year: PlanCalendar.year(of: today) - 1)
+            g.status = status
             g.sortOrder = i
             ctx.insert(g)
         }
