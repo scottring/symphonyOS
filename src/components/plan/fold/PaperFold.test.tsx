@@ -133,6 +133,29 @@ describe('PaperFold', () => {
     expect(edge()).toHaveAttribute('aria-expanded', 'false')
   })
 
+  // Final review (2026-11-04): F in a menu or a dialog is the menu's letter.
+  it('F does nothing while focus is in a menu, a dialog, a <dialog> or editable text', () => {
+    renderFold()
+    const host = document.createElement('div')
+    host.innerHTML = '<div role="menu"><button id="in-menu">Show done</button></div>'
+      + '<div role="dialog"><button id="in-dialog">OK</button></div>'
+      + '<dialog open><button id="in-native">Close</button></dialog>'
+      + '<div contenteditable="true"><span id="in-edit" tabindex="0">text</span></div>'
+    document.body.appendChild(host)
+    try {
+      for (const id of ['in-menu', 'in-dialog', 'in-native', 'in-edit']) {
+        const el = document.getElementById(id)!
+        el.focus()
+        fireEvent.keyDown(el, { key: 'f' })
+        expect(edge(), id).toHaveAttribute('aria-expanded', 'false')
+      }
+      // Focus back on the page: F folds again.
+      ;(document.activeElement as HTMLElement | null)?.blur()
+      fireEvent.keyDown(document, { key: 'f' })
+      expect(edge()).toHaveAttribute('aria-expanded', 'true')
+    } finally { host.remove() }
+  })
+
   it('a press that moves less than 4px is a tap and toggles', () => {
     renderFold()
     const b = edge()

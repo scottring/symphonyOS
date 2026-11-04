@@ -133,6 +133,15 @@ export interface FoldMotion {
   handlers: FoldHandlers
 }
 
+/** Focus where a letter key is not the page's: a field, editable text, or
+ *  anything inside a menu or a dialog. */
+function keyBelongsElsewhere(t: EventTarget | null): boolean {
+  if (!(t instanceof HTMLElement)) return false
+  if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return true
+  if (t.isContentEditable) return true
+  return !!t.closest('[role="dialog"], [role="menu"], dialog, [contenteditable=""], [contenteditable="true"]')
+}
+
 export function useFoldMotion({
   side,
   storageKey,
@@ -299,20 +308,14 @@ export function useFoldMotion({
 
   useEffect(() => stop, [stop])
 
-  // The key folds and unfolds it, except while typing.
+  // The key folds and unfolds it, except while typing or inside a menu or a
+  // dialog (its letters are the menu's, not the page's).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (typeof e.key !== 'string' || e.key.toLowerCase() !== keyName) return
       if (!enabledRef.current()) return
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.defaultPrevented) return
-      const t = e.target
-      if (
-        t instanceof HTMLInputElement ||
-        t instanceof HTMLTextAreaElement ||
-        t instanceof HTMLSelectElement ||
-        (t instanceof HTMLElement && t.isContentEditable)
-      )
-        return
+      if (keyBelongsElsewhere(e.target)) return
       toggle()
     }
     addEventListener('keydown', onKey)
