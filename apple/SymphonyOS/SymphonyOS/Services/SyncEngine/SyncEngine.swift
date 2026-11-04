@@ -156,6 +156,7 @@ actor SyncEngine {
                         task.scopeDirty = false
                         task.placementDirty = false
                         task.completedAtDirty = false
+                        task.dismissedAtDirty = false
                     }
                     if change.tableName == "routines",
                        let routine = (try? context.fetch(FetchDescriptor<Routine>()))?.first(where: { $0.id == change.recordId }) {
@@ -545,6 +546,11 @@ actor SyncEngine {
         // SymphonyTask.completedAt) — never a stale nil over the web's stamp.
         if forInsert || t.completedAtDirty {
             row["completed_at"] = d(t.completedAt)
+        }
+        // Only when the phone itself let it go (or undid that): never a stale
+        // nil over a Let go made on the web.
+        if t.dismissedAtDirty {
+            row["dismissed_at"] = d(t.dismissedAt)
         }
         return row
     }

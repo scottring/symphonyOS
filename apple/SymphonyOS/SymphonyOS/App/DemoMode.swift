@@ -63,6 +63,11 @@ enum DemoMode {
         // A few one-offs each month, for the calendar fold's "already claimed".
         switch cal.component(.day, from: day) {
         case 3: out.append(event("Parent-teacher conferences", 17, 0, minutes: 60))
+        case 8:
+            // All day: kept on the calendar sheet by its date.
+            out.append(TimelineItem(id: "demo-picture-day-\(PlanCalendar.ymd(day))", type: .event, title: "Picture day",
+                                    startTime: nil, isAllDay: true, completed: false, context: nil, entityId: UUID(),
+                                    eventKey: "demo-picture-day-\(PlanCalendar.ymd(day))"))
         case 12: out.append(event("Grandma visits", 12, 0, minutes: 240))
         case 26: out.append(event("Liam turns 9", 15, 0, minutes: 120))
         default: break

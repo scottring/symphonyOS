@@ -35,6 +35,7 @@ struct PlanWriter {
             let deferCount: Int
             let context: String?
             let scope: String?
+            var dismissedAt: Date? = nil
         }
         var tasks: [TaskState] = []
         var createdCommitments: [UUID] = []
@@ -54,7 +55,7 @@ struct PlanWriter {
         .init(id: t.id, bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay,
               isSomeday: t.isSomeday, weekStart: t.weekStart, monthStart: t.monthStart,
               seasonStart: t.seasonStart, weekendStart: t.weekendStart, deferCount: t.deferCount,
-              context: t.context, scope: t.scope)
+              context: t.context, scope: t.scope, dismissedAt: t.dismissedAt)
     }
 
     // MARK: Destinations
@@ -183,6 +184,10 @@ struct PlanWriter {
             t.seasonStart = state.seasonStart
             t.weekendStart = state.weekendStart
             t.deferCount = state.deferCount
+            if t.dismissedAt != state.dismissedAt {
+                t.dismissedAt = state.dismissedAt
+                t.dismissedAtDirty = true
+            }
             if t.context != state.context {
                 t.context = state.context
                 t.scope = state.scope
@@ -374,15 +379,27 @@ struct PlanWriter {
         return snap
     }
 
-    /// Drop: end only that week's commitment. The task survives; with nothing
-    /// else holding it the database returns it to the Inbox.
+    /// Let go ("not ever", 2026-11-04, as the web): the task comes off every
+    /// list. All its open commitments end, it goes to bucket 'someday' with
+    /// `dismissed_at` set, and no planning list, Someday or the Inbox shows
+    /// it again. It stays in history; Undo clears `dismissed_at` and reopens
+    /// the commitments.
     @discardableResult
-    func drop(_ commitment: TaskCommitment) -> Snapshot {
-        var snap = Snapshot()
-        snap.changedCommitments.append((commitment.id, commitment.status, commitment.endedAt, commitment.carriedTo))
-        commitment.status = "removed"
-        commitment.endedAt = Date()
-        queueCommitment(commitment)
+    func letGo(_ task: SymphonyTask) -> Snapshot {
+        var snap = Snapshot(tasks: [capture(task)])
+        snap.merge(removeOpenCommitments(task))
+        task.bucket = "someday"
+        task.scheduledFor = nil
+        task.isAllDay = false
+        task.isSomeday = true
+        task.weekStart = nil
+        task.weekendStart = nil
+        task.monthStart = nil
+        task.seasonStart = nil
+        task.placementDirty = true
+        task.dismissedAt = Date()
+        task.dismissedAtDirty = true
+        touch(task)
         save()
         return snap
     }
@@ -407,6 +424,12 @@ struct PlanWriter {
             task.scheduledFor = nil
             task.isAllDay = false
             task.isSomeday = true
+            // Off every period: its stamps go with it, pushed nulls included.
+            task.weekStart = nil
+            task.weekendStart = nil
+            task.monthStart = nil
+            task.seasonStart = nil
+            task.placementDirty = true
             touch(task)
         }
         save()

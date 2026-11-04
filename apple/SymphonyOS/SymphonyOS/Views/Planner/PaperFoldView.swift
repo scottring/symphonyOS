@@ -60,6 +60,19 @@ enum FoldGeometry {
         return x > minPage && x < width - minPage ? x : nil
     }
 
+    /// Only a real Duo opening unfolds the sheet above (with its sound): the
+    /// window widens into a spread and the system reports a fold. Rotating an
+    /// iPhone or widening an iPad window changes the layout and nothing else.
+    static func unfoldsOnWidening(from old: Mode, to new: Mode, foldReported: Bool) -> Bool {
+        old == .vertical && new == .spread && foldReported
+    }
+
+    /// A Duo spread nobody has folded yet starts with the sheet above open
+    /// (two pages); anywhere else it starts as the reader left it.
+    static func opensAboveFirst(mode: Mode, neverSet: Bool, foldReported: Bool) -> Bool {
+        mode == .spread && neverSet && foldReported
+    }
+
     /// On a phone the sheet above hangs up to 62% of the screen high.
     static func maxAboveHeight(viewport: CGFloat) -> CGFloat { (viewport * 0.62).rounded() }
 
@@ -88,6 +101,19 @@ enum FoldGeometry {
 }
 
 enum FoldSide: Hashable { case above, calendar }
+
+/// Has this companion been opened yet? The calendar sheet reads its period
+/// only then, never while it has only lain folded.
+private struct PaperFoldOpenedKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var paperFoldOpened: Bool {
+        get { self[PaperFoldOpenedKey.self] }
+        set { self[PaperFoldOpenedKey.self] = newValue }
+    }
+}
 
 /// The paper, from the prototype's tokens (light; the app has no dark mode).
 enum Paper {
@@ -139,6 +165,10 @@ struct PaperFoldView<Header: View, Sheet: View, Above: View, Calendar: View>: Vi
     @State private var calContent: CGFloat = 0
     @State private var drag: DragInfo?
     @State private var landing: [FoldSide: Int] = [:]
+    /// Each companion's been opened at least once (its content may then load).
+    @State private var opened: Set<FoldSide> = []
+    /// The window just widened into a spread; unfold if it's a Duo opening.
+    @State private var pendingUnfold = false
 
     private struct DragInfo {
         let side: FoldSide
@@ -206,6 +236,7 @@ struct PaperFoldView<Header: View, Sheet: View, Above: View, Calendar: View>: Vi
             if settledMode == nil, r.width > 0 { restore(FoldGeometry.mode(width: r.width)) }
         }
         .onChange(of: mode) { _, new in modeChanged(to: new) }
+        .onChange(of: fold != nil) { _, reported in foldReportChanged(reported) }
     }
 
     // MARK: Layouts
@@ -266,6 +297,7 @@ struct PaperFoldView<Header: View, Sheet: View, Above: View, Calendar: View>: Vi
     private func slot(_ side: FoldSide) -> some View {
         let isAbove = side == .above
         FoldSlot(side: side, mode: mode, progress: isAbove ? pAbove : pCal, page: page(side), edge: edge,
+                 opened: opened.contains(side),
                  label: isAbove ? aboveLabel : (calendarLabel ?? ""), count: isAbove ? aboveCount : nil,
                  reduceMotion: reduceMotion,
                  onToggle: { toggle(side) },
@@ -284,6 +316,7 @@ struct PaperFoldView<Header: View, Sheet: View, Above: View, Calendar: View>: Vi
 
     private func setProgress(_ side: FoldSide, _ p: CGFloat) {
         if side == .above { pAbove = p } else { pCal = p }
+        if p > 0 { opened.insert(side) }
     }
 
     private func other(_ side: FoldSide) -> FoldSide? {
@@ -390,29 +423,54 @@ struct PaperFoldView<Header: View, Sheet: View, Above: View, Calendar: View>: Vi
     private func restore(_ m: FoldGeometry.Mode) {
         settledMode = m
         let neverSet = UserDefaults.standard.object(forKey: Self.key(horizon)) == nil
-        let openAbove = aboveStored || (m == .spread && neverSet)
-        pAbove = openAbove ? 1 : 0
-        pCal = hasCalendar && calendarStored && !openAbove ? 1 : 0
+        let openAbove = aboveStored || FoldGeometry.opensAboveFirst(mode: m, neverSet: neverSet, foldReported: fold != nil)
+        setProgress(.above, openAbove ? 1 : 0)
+        setProgress(.calendar, hasCalendar && calendarStored && !openAbove ? 1 : 0)
     }
 
     /// Opening the Duo unfolds the sheet above with its sound; closing it
-    /// folds both away at once, so nothing is left half-turned.
+    /// (or any narrowing out of a spread) folds both away at once, silently,
+    /// so nothing is left half-turned. Widening anything that isn't a Duo
+    /// (an iPhone turned sideways, an iPad window) only changes the layout.
     private func modeChanged(to new: FoldGeometry.Mode) {
         guard let old = settledMode, old != new else { return }
         settledMode = new
         drag = nil
         landing[.above] = (landing[.above] ?? 0) + 1
         landing[.calendar] = (landing[.calendar] ?? 0) + 1
-        var tx = Transaction()
-        tx.disablesAnimations = true
         if new == .spread {
-            if pCal < 0.5 {
-                withTransaction(tx) { pAbove = 0 }
-                go(.above, to: 1, remember: false)
+            if FoldGeometry.unfoldsOnWidening(from: old, to: new, foldReported: fold != nil) {
+                unfoldForDuo()
+            } else {
+                // The system may report the fold a moment after the window
+                // widens; a Duo opening is still one then.
+                pendingUnfold = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1.5))
+                    pendingUnfold = false
+                }
             }
         } else {
+            pendingUnfold = false
+            var tx = Transaction()
+            tx.disablesAnimations = true
             withTransaction(tx) { pAbove = 0; pCal = 0 }
         }
+    }
+
+    private func foldReportChanged(_ reported: Bool) {
+        guard pendingUnfold, reported, mode == .spread,
+              FoldGeometry.unfoldsOnWidening(from: .vertical, to: .spread, foldReported: reported) else { return }
+        pendingUnfold = false
+        unfoldForDuo()
+    }
+
+    private func unfoldForDuo() {
+        guard pCal < 0.5 else { return }
+        var tx = Transaction()
+        tx.disablesAnimations = true
+        withTransaction(tx) { pAbove = 0 }
+        go(.above, to: 1, remember: false)
     }
 }
 
@@ -439,6 +497,8 @@ private struct FoldSlot<Front: View>: View, Animatable {
     /// The open sheet's width (spread) or height (phone).
     let page: CGFloat
     let edge: CGFloat
+    /// Opened at least once: its content may read what it needs.
+    let opened: Bool
     let label: String
     let count: Int?
     let reduceMotion: Bool
@@ -639,6 +699,7 @@ private struct FoldSlot<Front: View>: View, Animatable {
     private var face: some View {
         ScrollView {
             front()
+                .environment(\.paperFoldOpened, opened)
                 .padding(.horizontal, spread ? 20 : 18)
                 .padding(.top, spread ? 22 : 18)
                 .padding(.bottom, spread ? 22 : 26)
@@ -784,11 +845,17 @@ struct CalendarSheet: View {
     let end: Date
 
     @State private var calendar = GoogleCalendarService.shared
+    @Environment(\.paperFoldOpened) private var opened
 
     static let foot = "For reading. Add events the usual way."
 
+    /// What the read is keyed on: nothing until the sheet has been opened.
+    static func readKey(start: Date, end: Date, opened: Bool) -> String? {
+        opened ? "\(PlanCalendar.ymd(start))…\(PlanCalendar.ymd(end))" : nil
+    }
+
     var body: some View {
-        let events = calendar.items(from: start, to: end)
+        let events = calendar.entries(from: start, to: end)
         VStack(alignment: .leading, spacing: 0) {
             SheetKicker(text: kicker)
             Text(title)
@@ -798,7 +865,7 @@ struct CalendarSheet: View {
                 .padding(.bottom, 8)
                 .accessibilityAddTraits(.isHeader)
             if let events {
-                let read = PeriodCalendar.read(events)
+                let read = PeriodCalendar.read(entries: events)
                 if read.lines.isEmpty && read.repeating.isEmpty {
                     Text("Nothing on the calendar yet.").font(Paper.empty).foregroundStyle(Paper.faint).padding(.vertical, 6)
                 }
@@ -825,7 +892,8 @@ struct CalendarSheet: View {
             }
             SheetFoot(text: Self.foot)
         }
-        .task(id: "\(PlanCalendar.ymd(start))…\(PlanCalendar.ymd(end))") {
+        .task(id: Self.readKey(start: start, end: end, opened: opened)) {
+            guard Self.readKey(start: start, end: end, opened: opened) != nil else { return }
             await calendar.refreshPeriod(from: start, to: end)
         }
     }

@@ -63,7 +63,7 @@ final class GoogleCalendarService {
     /// the fold's calendar sheet. Keyed by its start and end; nil until read.
     /// Kept apart from the per-day cache, whose "loaded" days Today and Week
     /// rely on.
-    private(set) var byPeriod: [String: [TimelineItem]] = [:]
+    private(set) var byPeriod: [String: [PeriodCalendar.Entry]] = [:]
     private(set) var failedPeriods: Set<String> = []
     private var periodFetchedAt: [String: Date] = [:]
 
@@ -71,7 +71,7 @@ final class GoogleCalendarService {
         "\(PlanCalendar.ymd(start))…\(PlanCalendar.ymd(end))"
     }
 
-    func items(from start: Date, to end: Date) -> [TimelineItem]? { byPeriod[Self.periodKey(start, end)] }
+    func entries(from start: Date, to end: Date) -> [PeriodCalendar.Entry]? { byPeriod[Self.periodKey(start, end)] }
 
     func periodFailed(from start: Date, to end: Date) -> Bool { failedPeriods.contains(Self.periodKey(start, end)) }
 
@@ -80,13 +80,13 @@ final class GoogleCalendarService {
         let key = Self.periodKey(start, end)
         #if DEBUG
         if DemoMode.isOn {
-            var items: [TimelineItem] = []
+            var entries: [PeriodCalendar.Entry] = []
             var d = PlanCalendar.day(start)
             while d < end {
-                items += DemoMode.events(on: d)
+                entries += DemoMode.events(on: d).map { PeriodCalendar.Entry(day: d, title: $0.title) }
                 d = PlanCalendar.addDays(d, 1)
             }
-            byPeriod[key] = items
+            byPeriod[key] = entries
             return
         }
         #endif
@@ -105,7 +105,9 @@ final class GoogleCalendarService {
                 options: FunctionInvokeOptions(body: body)
             )
             isConnected = true
-            byPeriod[key] = (resp.events ?? []).map { $0.toTimelineItem() }
+            // Each event with its day, all-day ones included (their timeline
+            // item has no start time).
+            byPeriod[key] = (resp.events ?? []).compactMap(\.periodEntry)
             periodFetchedAt[key] = Date()
             failedPeriods.remove(key)
         } catch {
@@ -248,6 +250,21 @@ struct GoogleCalendarEvent: Decodable {
             recurringEventId: recurringEventId,
             endTime: isAllDay ? nil : endTime.flatMap(Self.parseISO)
         )
+    }
+
+    /// The event's day and title for the calendar sheet. An all-day event's
+    /// day is the date in its synthetic `YYYY-MM-DDT12:00:00.000Z` start,
+    /// read as a local date (never shifted by the time zone).
+    var periodEntry: PeriodCalendar.Entry? {
+        let start = Self.parseISO(startTime)
+        if allDay ?? (start == nil) {
+            let parts = startTime.prefix(10).split(separator: "-").compactMap { Int($0) }
+            guard parts.count == 3,
+                  let day = PlanCalendar.calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+            else { return nil }
+            return PeriodCalendar.Entry(day: day, title: title)
+        }
+        return start.map { PeriodCalendar.Entry(day: PlanCalendar.day($0), title: title) }
     }
 
     /// Google timed events come as `…-04:00` (no fractional seconds); the edge

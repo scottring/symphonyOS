@@ -156,6 +156,17 @@ struct PeriodPlanView: View {
         }
     }
 
+    /// "Write a November goal", "Write an October goal", "Write a 2026 goal".
+    static func writePlaceholder(_ periodWord: String) -> String {
+        "Write \(aOrAn(periodWord)) \(periodWord) goal"
+    }
+
+    /// The web's aOrAn (ConstellationPage): "an" before a vowel or an 8.
+    static func aOrAn(_ word: String) -> String {
+        guard let first = word.lowercased().first else { return "a" }
+        return "aeiou8".contains(first) ? "an" : "a"
+    }
+
     static func range(_ first: Date, _ last: Date) -> String {
         "\(first.formatted(.dateTime.month(.abbreviated).day())) – \(last.formatted(.dateTime.month(.abbreviated).day()))"
     }
@@ -188,7 +199,7 @@ struct PeriodPlanView: View {
     private func periodContent(_ sheet: PlanSnapshot.Sheet, level: String, start: Date) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(sheet.open, id: \.id) { task in SheetLine(task: task) }
-            WriteLine(placeholder: "Write a \(periodWord) goal") { text in
+            WriteLine(placeholder: Self.writePlaceholder(periodWord)) { text in
                 PlanWriter(context: modelContext, userId: userId)
                     .createPeriodTask(title: text, level: level, periodStart: start, context: lens)
             }
@@ -216,7 +227,7 @@ struct PeriodPlanView: View {
                     .buttonStyle(.plain)
                     .accessibilityHint("Edit goal")
             }
-            WriteLine(placeholder: "Write a \(year) goal") { text in
+            WriteLine(placeholder: Self.writePlaceholder(String(year))) { text in
                 PlanWriter(context: modelContext, userId: userId)
                     .createGoal(name: text, notes: nil, context: lens, year: year)
             }

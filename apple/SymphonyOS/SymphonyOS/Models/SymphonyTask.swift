@@ -118,6 +118,13 @@ final class SymphonyTask {
     /// `scopeDirty`: an UPDATE otherwise leaves those columns alone, so an
     /// ordinary edit here never nulls a placement made on the web.
     var placementDirty: Bool = false
+    /// Let go ("not ever", 2026-11-04): set, the task is off every planning
+    /// list and out of Someday and the Inbox, kept in history. `dismissedAtDirty`
+    /// marks a Let go (or its Undo) made here that hasn't pushed, so an
+    /// ordinary edit never sends a stale value over the web's. Inline
+    /// defaults for SwiftData's lightweight migration.
+    var dismissedAt: Date? = nil
+    var dismissedAtDirty: Bool = false
 
     // Linked activity
     var linkedTo: LinkedActivity?

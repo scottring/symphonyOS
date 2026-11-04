@@ -36,9 +36,10 @@ struct PlanSnapshot {
     }
 
     /// Top-level tasks in the current life-area lens. Steps (subtasks) ride
-    /// inside their parent's card and never list on their own.
+    /// inside their parent's card and never list on their own. A task let go
+    /// (`dismissed_at`) is on no planning list.
     var lensTasks: [SymphonyTask] {
-        tasks.filter { $0.parentTaskId == nil && (domain == nil || $0.context == domain) }
+        tasks.filter { $0.parentTaskId == nil && $0.dismissedAt == nil && (domain == nil || $0.context == domain) }
     }
 
     // MARK: Membership

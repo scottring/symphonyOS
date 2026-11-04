@@ -4,7 +4,7 @@ import SwiftData
 /// A dated week (seven days from the household's week start): its list (any
 /// day, the weekend) and its write line, then each day. The month folds out
 /// above it, for reading. Last week's open commitments wait behind one review
-/// line: Next week, Done, Someday or Drop, each a deliberate decision.
+/// line: Done, Next week, Someday or Let go, each a deliberate decision.
 struct WeekPlanView: View {
     var onTitle: () -> Void = {}
 
@@ -373,9 +373,9 @@ private struct DayCard: View {
 // MARK: - Week review
 
 /// Last week's open commitments, one deliberate verdict each:
-/// Next week (carry into the week after, same task), Done, Someday (end that
-/// week's commitment; to Someday if nothing else holds it), Drop (end only
-/// that week's commitment). History is preserved in the commitments themselves.
+/// Done, Next week (carry into the week after, same task), Someday (end that
+/// week's commitment; to Someday if nothing else holds it), Let go (off every
+/// list, kept in history). History is preserved in the commitments themselves.
 struct WeekReviewSheet: View {
     let previousWeek: Date
     let intoWeek: Date
@@ -461,14 +461,14 @@ struct WeekReviewSheet: View {
     @ViewBuilder
     private func verdicts(_ task: SymphonyTask, _ c: TaskCommitment) -> some View {
         let writer = PlanWriter(context: modelContext, userId: userId)
+        verdict("Done", for: task) {
+            writer.complete(task)
+            toast = .init(message: "Marked “\(task.title)” done", snapshot: nil)
+        }
         // Named for where it goes (2026-11-04): the week after that one.
         verdict("Next week", strong: true, for: task) {
             toast = .init(message: "Moved “\(task.title)” to \(WeekPlanView.title(for: intoWeek).lowercased())",
                           snapshot: writer.keep(task, from: c, into: intoWeek))
-        }
-        verdict("Done", for: task) {
-            writer.complete(task)
-            toast = .init(message: "Marked “\(task.title)” done", snapshot: nil)
         }
         // Someday ("not now") ends that week's commitment only; the task
         // goes to Someday unless another list still holds it.
@@ -478,8 +478,9 @@ struct WeekReviewSheet: View {
                                                             : "Took “\(task.title)” off that week",
                           snapshot: snap)
         }
-        verdict("Drop", for: task) {
-            toast = .init(message: "Dropped “\(task.title)” from that week", snapshot: writer.drop(c))
+        // Let go ("not ever"): off every list, kept in history.
+        verdict("Let go", for: task) {
+            toast = .init(message: "Let go of “\(task.title)”", snapshot: writer.letGo(task))
         }
     }
 

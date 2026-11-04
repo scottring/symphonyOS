@@ -20,11 +20,22 @@ enum PeriodCalendar {
 
     static let repeatDays = 3
 
-    static func read(_ events: [TimelineItem]) -> Read {
-        let dated = events.compactMap { e -> (day: Date, title: String)? in
-            guard let at = e.startTime else { return nil }
+    /// One event as the sheet reads it: its local day and its title. An
+    /// all-day event keeps its date here (the timeline item has no time).
+    struct Entry: Equatable {
+        let day: Date
+        let title: String
+    }
+
+    /// Timed items, dated by their start.
+    static func read(_ items: [TimelineItem]) -> Read {
+        read(entries: items.compactMap { item in item.startTime.map { Entry(day: PlanCalendar.day($0), title: item.title) } })
+    }
+
+    static func read(entries: [Entry]) -> Read {
+        let dated = entries.compactMap { e -> (day: Date, title: String)? in
             let title = e.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            return title.isEmpty ? nil : (PlanCalendar.day(at), title)
+            return title.isEmpty ? nil : (PlanCalendar.day(e.day), title)
         }
         var daysByTitle: [String: Set<String>] = [:]
         for e in dated { daysByTitle[e.title, default: []].insert(PlanCalendar.ymd(e.day)) }

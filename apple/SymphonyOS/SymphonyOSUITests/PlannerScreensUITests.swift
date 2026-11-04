@@ -84,6 +84,20 @@ final class PlannerScreensUITests: XCTestCase {
         horizon("This week")
         unfold("fold-edge-above", until: app.staticTexts["For reading. Write this week in its own words."])
         shot("06-week-month-open")
+
+        // Last week's leftovers: Done · Next week · Someday · Let go, as the web.
+        unfold("fold-grip-above", until: nil)
+        tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Review last week'")).firstMatch)
+        let gate = "Fix the gate latch"
+        let verdicts = ["Done", "Next week", "Someday", "Let go"].map { app.buttons["\($0): \(gate)"] }
+        for v in verdicts { XCTAssertTrue(v.waitForExistence(timeout: 4), v.description) }
+        XCTAssertFalse(app.buttons["Drop: \(gate)"].exists)
+        let order = verdicts.map { ($0.frame.minY.rounded(), $0.frame.minX) }
+        XCTAssertTrue(zip(order, order.dropFirst()).allSatisfy { $0 < $1 }, "verdicts in order: \(order)")
+        shot("07-week-review")
+        tap(verdicts[3])
+        XCTAssertTrue(app.staticTexts["All reviewed."].waitForExistence(timeout: 4), "Let go takes it off last week")
+        tap(app.buttons["Done"].firstMatch, scroll: false)
     }
 
     /// Tap a fold's edge (or grip) and wait for what it shows.

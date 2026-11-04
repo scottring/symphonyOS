@@ -170,13 +170,71 @@ struct WeekLookBackTests {
         let week = TaskCommitment(taskId: t.id, level: "week", periodStart: prev, syncStatus: .synced)
         ctx.insert(week)
 
+        t.weekStart = prev
         let writer = PlanWriter(context: ctx, userId: me)
         let snap = writer.someday(t, from: week)
         #expect(week.status == "removed")
         #expect(t.bucket == "someday" && t.isSomeday)
+        // Off every period: its stamps go too, and push (nulls included).
+        #expect(t.weekStart == nil && t.monthStart == nil && t.placementDirty)
 
         writer.undo(snap)
         #expect(week.status == "open" && t.bucket == "week")
+        #expect(PlanCalendar.sameDay(t.weekStart, prev))
+    }
+
+    @Test func letGoTakesItOffEveryListAndUndoBringsItBack() throws {
+        let ctx = try makeContext()
+        let t = SymphonyTask(userId: me, title: "Plan winter vacation", context: "family")
+        t.bucket = "week"
+        ctx.insert(t)
+        let prev = PlanCalendar.addDays(PlanCalendar.weekStart(Date()), -7)
+        let month = PlanCalendar.monthStart(Date())
+        let week = TaskCommitment(taskId: t.id, level: "week", periodStart: prev, syncStatus: .synced)
+        let nov = TaskCommitment(taskId: t.id, level: "month", periodStart: month, syncStatus: .synced)
+        ctx.insert(week); ctx.insert(nov)
+        try ctx.save()
+
+        let writer = PlanWriter(context: ctx, userId: me)
+        let snap = writer.letGo(t)
+        #expect(week.status == "removed" && nov.status == "removed")   // every open commitment ends
+        #expect(t.dismissedAt != nil && t.bucket == "someday" && t.isSomeday)
+        let row = try #require(SyncEngine.serializeRow(table: "tasks", id: t.id, context: ctx))
+        #expect(row["dismissed_at"]?.stringValue != nil)
+        #expect(row["bucket"]?.stringValue == "someday")
+
+        writer.undo(snap)
+        #expect(t.dismissedAt == nil && t.dismissedAtDirty)
+        #expect(week.status == "open" && nov.status == "open")
+    }
+
+    @Test func aPlainEditNeverSendsDismissedAt() throws {
+        let ctx = try makeContext()
+        let t = SymphonyTask(userId: me, title: "Let go on the web")
+        t.dismissedAt = Date()
+        ctx.insert(t)
+        try ctx.save()
+        let row = try #require(SyncEngine.serializeRow(table: "tasks", id: t.id, context: ctx))
+        #expect(row["dismissed_at"] == nil)
+    }
+
+    @Test func aTaskLetGoIsOnNoPlanningList() {
+        let ws = PlanCalendar.weekStart(Date())
+        let ms = PlanCalendar.monthStart(Date())
+        let gone = SymphonyTask(userId: me, title: "Start a podcast", context: "family")
+        gone.dismissedAt = Date()
+        let kept = SymphonyTask(userId: me, title: "Plan school breaks", context: "family")
+        var commitments: [TaskCommitment] = []
+        for t in [gone, kept] {
+            commitments.append(TaskCommitment(taskId: t.id, level: "month", periodStart: ms))
+            commitments.append(TaskCommitment(taskId: t.id, level: "week", periodStart: ws))
+            commitments.append(TaskCommitment(taskId: t.id, level: "week", periodStart: PlanCalendar.addDays(ws, -7)))
+        }
+        let plan = PlanSnapshot(tasks: [gone, kept], commitments: commitments, focus: [], routines: [],
+                                instances: [], userId: me, domain: nil)
+        #expect(plan.sheet(level: "month", start: ms).open.map(\.title) == ["Plan school breaks"])
+        #expect(plan.week(ws).anyDay.map(\.title) == ["Plan school breaks"])
+        #expect(plan.reviewRows(previousWeek: PlanCalendar.addDays(ws, -7)).map(\.task.title) == ["Plan school breaks"])
     }
 }
 
@@ -261,5 +319,49 @@ struct PaperSynthTests {
         #expect(abs(PaperSynth.envelope(0.05, attack: 0.1, peak: 0.2, end: 1) - 0.1) < 1e-9)
         #expect(abs(PaperSynth.envelope(0.1, attack: 0.1, peak: 0.2, end: 1) - 0.2) < 1e-9)
         #expect(PaperSynth.envelope(1, attack: 0.1, peak: 0.2, end: 1) == 0.0005)
+    }
+}
+
+struct FixRoundOneTests {
+    @Test func anAllDayEventKeepsItsDateOnTheCalendarSheet() throws {
+        let json = """
+        [{"google_event_id":"e1","title":"Election Day","start_time":"2026-11-03T12:00:00.000Z","all_day":true},
+         {"google_event_id":"e2","title":"Picture day","start_time":"2026-11-05T09:00:00-05:00","end_time":"2026-11-05T10:00:00-05:00","all_day":false}]
+        """
+        let events = try JSONDecoder().decode([GoogleCalendarEvent].self, from: Data(json.utf8))
+        // The timeline item has no time for an all-day event…
+        #expect(events[0].toTimelineItem().startTime == nil)
+        // …but the sheet keeps its date, read as a local date.
+        let read = PeriodCalendar.read(entries: events.compactMap(\.periodEntry))
+        #expect(read.lines.map(\.text) == ["Nov 3 · Election Day", "Nov 5 · Picture day"])
+    }
+
+    @Test func theWriteLineSaysAnBeforeAVowel() {
+        #expect(PeriodPlanView.writePlaceholder("October") == "Write an October goal")
+        #expect(PeriodPlanView.writePlaceholder("November") == "Write a November goal")
+        #expect(PeriodPlanView.writePlaceholder("Autumn") == "Write an Autumn goal")
+        #expect(PeriodPlanView.writePlaceholder("2026") == "Write a 2026 goal")
+        #expect(PeriodPlanView.aOrAn("8th") == "an")
+    }
+
+    @Test func theCalendarIsReadOnlyOnceOpened() {
+        let s = PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 1))!
+        let e = PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 12, day: 1))!
+        #expect(CalendarSheet.readKey(start: s, end: e, opened: false) == nil)
+        #expect(CalendarSheet.readKey(start: s, end: e, opened: true) == "2026-11-01…2026-12-01")
+    }
+
+    @Test func onlyADuoOpeningUnfoldsTheSheetAbove() {
+        // The Duo opening: wider, and the system reports its fold.
+        #expect(FoldGeometry.unfoldsOnWidening(from: .vertical, to: .spread, foldReported: true))
+        // An iPhone turned sideways, an iPad window widened: layout only.
+        #expect(!FoldGeometry.unfoldsOnWidening(from: .vertical, to: .spread, foldReported: false))
+        // Narrowing never unfolds.
+        #expect(!FoldGeometry.unfoldsOnWidening(from: .spread, to: .vertical, foldReported: true))
+        // A first spread opens with the sheet above only on a Duo.
+        #expect(FoldGeometry.opensAboveFirst(mode: .spread, neverSet: true, foldReported: true))
+        #expect(!FoldGeometry.opensAboveFirst(mode: .spread, neverSet: true, foldReported: false))
+        #expect(!FoldGeometry.opensAboveFirst(mode: .spread, neverSet: false, foldReported: true))
+        #expect(!FoldGeometry.opensAboveFirst(mode: .vertical, neverSet: true, foldReported: true))
     }
 }
