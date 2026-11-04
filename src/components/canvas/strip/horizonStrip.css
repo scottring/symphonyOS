@@ -27,7 +27,7 @@
 .hs-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .hs-rail { align-self: stretch; min-height: 160px; max-height: 420px; padding: 10px 0; border: 1px solid var(--color-neutral-200); border-radius: var(--radius-xl); background: var(--color-bg-elevated); color: var(--color-neutral-600); font-size: 13px; font-weight: 600; writing-mode: vertical-rl; cursor: pointer; }
 .hs-rail:hover { color: var(--color-neutral-900); }
-.hs button:focus-visible, .hs-rail:focus-visible, .ta button:focus-visible, .ta input:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.hs button:focus-visible, .wc-session-week button:focus-visible, .hs-rail:focus-visible, .ta button:focus-visible, .ta input:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 
 /* Inside a tab: a quiet heading, rows, a footnote. */
 .hs-eyebrow { margin: 0; font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-600); }
@@ -92,9 +92,9 @@
   container-type: inline-size;
 }
 .paper-fold.wc-fold[data-fold-mode='v'] > article.paper-fold-current { width: 100%; flex: none; min-height: 0; padding-top: 10px; }
-.hs .wc-noday-chips.hs-noday { grid-template-columns: 1fr; column-gap: 0; margin-top: 6px; }
-.hs .wc-noday-chip { min-height: 32px; padding: 0 4px; }
-.hs .wc-noday-open { font-size: 14px; }
+:is(.hs, .wc-session-week) .wc-noday-chips.hs-noday { grid-template-columns: 1fr; column-gap: 0; margin-top: 6px; }
+:is(.hs, .wc-session-week) .wc-noday-chip { min-height: 32px; padding: 0 4px; }
+:is(.hs, .wc-session-week) .wc-noday-open { font-size: 14px; }
 .wc-addday { margin-top: 6px; font-size: 12.5px; }
 .wc-dinners { display: grid; column-gap: 0; padding-top: 8px; border-top: 1px solid var(--color-neutral-200); }
 .wc-dinners > .wc-dinner { margin: 0; padding: 0 12px; min-width: 0; border-left: 1px solid var(--color-neutral-200); line-height: 1.4; }
@@ -119,17 +119,19 @@
 
 /* No day yet in the strip: the when-chips open under the row, wrapped, on
    "When ▾" — never a floating bar over the rows above. */
-.hs .wc-noday-chip { flex-wrap: wrap; column-gap: 8px; }
-.hs .wc-noday-open { flex: 1 1 0; min-width: 0; }
-.hs .wc-noday-actions { position: static; display: block; flex-basis: 100%; padding: 4px 0 6px 20px; box-shadow: none; background: none; white-space: normal; }
-.hs .wc-noday-chip:hover .wc-noday-actions { display: block; }
+:is(.hs, .wc-session-week) .wc-noday-chip { flex-wrap: wrap; column-gap: 8px; }
+:is(.hs, .wc-session-week) .wc-noday-open { flex: 1 1 0; min-width: 0; }
+:is(.hs, .wc-session-week) .wc-noday-actions { position: static; display: block; flex-basis: 100%; padding: 4px 0 6px 20px; box-shadow: none; background: none; white-space: normal; }
+:is(.hs, .wc-session-week) .wc-noday-chip:hover .wc-noday-actions { display: block; }
 .hs-when { flex: 0 0 auto; min-height: 28px; padding: 0 6px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-neutral-600); font-size: 12px; font-weight: 600; cursor: pointer; }
 .hs-when:hover, .hs-when[aria-expanded='true'] { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 @media (hover: hover) {
-  .hs .wc-noday-chip:not(:hover):not(:focus-within):not(.is-when-open) .hs-when { opacity: 0; }
+  :is(.hs, .wc-session-week) .wc-noday-chip:not(:hover):not(:focus-within):not(.is-when-open) .hs-when { opacity: 0; }
 }
 .hs-body { overflow-x: hidden; }
 
 /* A guided session plans the week (the planning ribbon, 2026-11-04): the
-   strip steps aside, and its week list sits under the days instead. */
-.wc-session-week { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-neutral-200); display: grid; gap: 8px; max-width: 720px; }
+   strip steps aside, and its week list sits under the days instead. Its rows
+   are the strip's No day yet rows and read the same (the .hs row rules above
+   cover it too): one column, a ring, the title, When ▾ on hover. */
+.wc-session-week { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-neutral-200); display: flex; flex-direction: column; gap: 10px; max-width: 720px; color: var(--color-neutral-800); }
