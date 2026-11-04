@@ -377,10 +377,37 @@ describe('PaperFold: the sheet above stays in view and scrolls on its own', () =
     expect(pin(container)).toContainElement(edge())
     expect(pin(container)).toContainElement(container.querySelector('.paper-fold-flap') as HTMLElement)
     expect(pin(container).style.position).toBe('sticky')
-    expect(pin(container).style.top).toBe('76px')
-    expect(pin(container).style.height).toBe('800px') // 900 − 76 − 24
+    expect(pin(container).style.top).toBe('72px') // level with the horizon strip
+    expect(pin(container).style.height).toBe('804px') // 900 − 72 − 24
     expect(pin(container).style.maxHeight).toBe('100%')
     expect(scrollBox(container).style.overscrollBehavior).toBe('contain')
+  })
+
+  // Fix round 1: the landscape stands at the foot of the scroller
+  // (--scenery-clearance, as useColumnsFitWindow reads it), so the sheet ends
+  // above it; the room is the scroller's, not the window's.
+  it('h: the sheet ends above the landscape, measured in its scroller', () => {
+    setViewport(1316, 900)
+    const { container } = render(
+      <div data-testid="scroller" style={{ overflowY: 'auto', ['--scenery-clearance' as string]: '180px', ['--dock-clearance' as string]: '20px' }}>
+        <PaperFold horizon="month" edgeLabel="Fall 2026" above={<p>above</p>}>
+          <h1>November</h1>
+        </PaperFold>
+      </div>,
+    )
+    const scroller = screen.getByTestId('scroller')
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 850 })
+    act(() => { window.dispatchEvent(new Event('resize')) })
+    return waitFor(() => expect(pin(container).style.height).toBe('554px')) // 850 − 72 − 180 − 20 − 24
+  })
+
+  it('a sheet above can be named for what it is for', () => {
+    const { container, unmount } = renderFold({ frontLabel: 'Oct 31 – Nov 6, to pick from' })
+    expect(aboveRegion(container)).toHaveAttribute('aria-label', 'Oct 31 – Nov 6, to pick from')
+    unmount()
+    // Without it, the sheet above is for reading.
+    const plain = renderFold()
+    expect(aboveRegion(plain.container)).toHaveAttribute('aria-label', 'Fall 2026, for reading')
   })
 
   it('duo: pinned the same way', () => {

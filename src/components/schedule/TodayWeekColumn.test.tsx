@@ -118,6 +118,55 @@ describe('TodayWeekFold: the week folded beside the day', () => {
     expect(screen.getByRole('button', { name: 'Plan Book the cabin for Friday' })).toBeInTheDocument()
   })
 
+  it('names its sheet for picking, not reading', () => {
+    view()
+    unfold()
+    expect(screen.getByRole('region', { name: 'Oct 31 – Nov 6, to pick from' })).toBeInTheDocument()
+  })
+
+  // Fix round 1: the column's "Routines today" lives on the sheet, below the
+  // week's tasks, with the column's own + (toToday's routine branch).
+  describe('Routines today', () => {
+    const occ = { key: 'routine:r', kind: 'routine', id: 'r', title: 'Water the plants', completed: false, planned: false, group: 'available' } as DayPlanEntry
+    const weekly = { key: 'routine:w', kind: 'routine', id: 'w', title: 'Mow the lawn', completed: false, planned: false, group: 'available', routine: { id: 'w' } } as unknown as DayPlanEntry
+    const chosen = { key: 'routine:c', kind: 'routine', id: 'c', title: 'Feed the fish', completed: false, planned: true, group: 'available' } as DayPlanEntry
+    const withRoutines = { chooserTasks: rows, chooserRoutines: [occ, weekly, chosen] } as unknown as DayPlan
+
+    it('lists the day’s open routines below the tasks; + chooses an occurrence and places a weekly one', () => {
+      const placeRoutine = vi.fn()
+      const actions = { choose: vi.fn(), unchoose: vi.fn(), complete: vi.fn(), open: vi.fn(), placeRoutine }
+      view({ plan: withRoutines, actions: actions as never })
+      unfold()
+      const list = screen.getByRole('list', { name: 'Routines today' })
+      expect(within(list).getAllByRole('listitem').map((li) => li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Water the plants', 'Mow the lawn'])
+      // Below the week's tasks, above the foot.
+      const tasks = screen.getByRole('list', { name: 'Week 45' })
+      expect(tasks.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(list.compareDocumentPosition(screen.getByText(FOOT)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      fireEvent.click(within(list).getByRole('button', { name: 'Plan Water the plants for today' }))
+      expect(actions.choose).toHaveBeenCalledWith(occ)
+      fireEvent.click(within(list).getByRole('button', { name: 'Plan Mow the lawn for today' }))
+      expect(placeRoutine).toHaveBeenCalledWith(weekly, now)
+      // The edge counts the week's tasks, not the day's routines.
+      expect(screen.getByRole('button', { name: /^Fold Oct 31 – Nov 6 away$/ })).toBeInTheDocument()
+    })
+
+    it('a routine row drags onto the day as a routine', () => {
+      view({ plan: withRoutines })
+      unfold()
+      const set: Record<string, string> = {}
+      fireEvent.dragStart(screen.getByText('Water the plants').closest('li')!, { dataTransfer: { setData: (k: string, v: string) => { set[k] = v }, effectAllowed: '' } })
+      expect(JSON.parse(set[PLAN_MIME])).toEqual({ kind: 'routine', id: 'r', date: '2026-11-04', title: 'Water the plants' })
+    })
+
+    it('says nothing about routines when there are none', () => {
+      view()
+      unfold()
+      expect(screen.queryByRole('list', { name: 'Routines today' })).toBeNull()
+      expect(screen.queryByText(/^Routines today$/)).toBeNull()
+    })
+  })
+
   it('draws next week read-only on the week’s last day', () => {
     const next = e(t('n', 'Order firewood'))
     const { actions } = view({ nextWeek: { weekNo: 46, weekStart: new Date(2026, 10, 7), entries: [next] } })

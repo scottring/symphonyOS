@@ -961,7 +961,7 @@ describe('Today with the week folded beside it', () => {
     const onUpdateTask = vi.fn(async () => true)
     renderView({ tasks: weekTasks, viewedDate: NOV4, onUpdateTask }, { onUpdateTask })
     fireEvent.click(screen.getByRole('button', { name: 'Oct 31 – Nov 6, 2 open. Unfold to read' }))
-    const sheet = screen.getByRole('region', { name: 'Oct 31 – Nov 6, for reading' })
+    const sheet = screen.getByRole('region', { name: 'Oct 31 – Nov 6, to pick from' })
     expect(within(within(sheet).getByRole('list', { name: /^Week \d+$/ })).getAllByRole('listitem').map((li) => li.querySelector('.above-sheet-row-title')?.textContent))
       .toEqual(['Book the cabin', 'Call the bank'])
     expect(within(sheet).getByText('Pick three to five for today.')).toBeInTheDocument()

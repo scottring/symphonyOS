@@ -44,6 +44,9 @@ export interface PaperFoldProps {
    *  sheet above and no F key, while this sheet stays where it is, so what is
    *  on it is never remounted. */
   stowed?: boolean
+  /** The sheet above's accessible name. Default "{edgeLabel}, for reading";
+   *  Today's week sheet, which has a + on each row, is "…, to pick from". */
+  frontLabel?: string
 }
 
 const storageKey = (h: FoldHorizon) => `symphony-fold:${h}`
@@ -83,6 +86,16 @@ function mm(query: string): boolean {
 }
 
 const reducedMotion = () => mm('(prefers-reduced-motion: reduce)')
+
+/** The nearest ancestor that scrolls (the shell's .scenery-scroll), or null
+ *  when the window does. */
+function scrollParent(el: HTMLElement): HTMLElement | null {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const { overflowY } = getComputedStyle(p)
+    if (overflowY === 'auto' || overflowY === 'scroll') return p
+  }
+  return null
+}
 
 function buzz() {
   try {
@@ -152,6 +165,7 @@ function PaperFoldSheet({
   children,
   className,
   stowed = false,
+  frontLabel,
 }: PaperFoldProps) {
   const [open, setOpen] = useState(() => readStored(horizon))
   const frontId = useId()
@@ -285,16 +299,19 @@ function PaperFoldSheet({
 
   // ---------- geometry ----------
   // Beside the page ('h', 'duo') the edge and the sheet above are pinned
-  // under the top bar, as tall as the window allows, so a long page scrolls
+  // under the top bar, as tall as the room allows, so a long page scrolls
   // past them and only the sheet's own list scrolls under the pointer (Scott,
   // 2026-11-04: "the week scrolls while everything else remains fixed"). The
-  // top bar's height is --paper-fold-sticky-top (76px, the planning columns'
-  // offset), with --paper-fold-sticky-gap (24px) left below. On a phone ('v')
-  // the sheet folds down from the top, capped, and is not pinned.
-  const pinSheet = useCallback((mode: FoldMode) => {
+  // room is the scroller's: its height, less the landscape standing at its
+  // foot (--scenery-clearance) and the bar docked under it (--dock-clearance),
+  // as useColumnsFitWindow measures the planning columns. The top bar's height
+  // is --paper-fold-sticky-top (72px, level with the horizon strip), with
+  // --paper-fold-sticky-gap (24px) left below. On a phone ('v') the sheet
+  // folds down from the top, capped, and is not pinned.
+  const pinSheet = useCallback((mode: FoldMode | '') => {
     const pin = pinRef.current
     const root = rootRef.current
-    if (!pin || !root) return
+    if (!pin || !root || !mode) return
     if (mode === 'v') {
       pin.style.position = ''
       pin.style.top = ''
@@ -303,11 +320,17 @@ function PaperFoldSheet({
       return
     }
     const cs = getComputedStyle(root)
-    const top = parseFloat(cs.getPropertyValue('--paper-fold-sticky-top')) || 76
+    const top = parseFloat(cs.getPropertyValue('--paper-fold-sticky-top')) || 72
     const gap = parseFloat(cs.getPropertyValue('--paper-fold-sticky-gap')) || 24
+    const scroller = scrollParent(root)
+    const prop = (name: string) => {
+      if (!scroller) return 0
+      return parseFloat(scroller.style.getPropertyValue(name) || getComputedStyle(scroller).getPropertyValue(name)) || 0
+    }
+    const room = (scroller?.clientHeight || innerHeight) - top - prop('--scenery-clearance') - prop('--dock-clearance') - gap
     pin.style.position = 'sticky'
     pin.style.top = `${top}px`
-    pin.style.height = `${Math.max(160, innerHeight - top - gap)}px`
+    pin.style.height = `${Math.max(160, Math.round(room))}px`
     pin.style.maxHeight = '100%'
   }, [])
 
@@ -432,6 +455,24 @@ function PaperFoldSheet({
       ro?.disconnect()
     }
   }, [layout])
+
+  // The pinned sheet's room changes with its scroller: the scroller resizing,
+  // and the landscape writing its height (--scenery-clearance) onto the
+  // scroller's style after it lays out, and again when the place changes.
+  useEffect(() => {
+    const root = rootRef.current
+    const scroller = root && scrollParent(root)
+    if (!scroller) return
+    const repin = () => pinSheet(m.current.mode)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(repin) : null
+    ro?.observe(scroller)
+    const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(repin) : null
+    mo?.observe(scroller, { attributes: true, attributeFilter: ['style'] })
+    return () => {
+      ro?.disconnect()
+      mo?.disconnect()
+    }
+  }, [pinSheet])
 
   useEffect(() => stop, [stop])
 
@@ -591,7 +632,7 @@ function PaperFoldSheet({
             <section
               id={frontId}
               className="paper-fold-face paper-fold-front"
-              aria-label={`${edgeLabel}, for reading`}
+              aria-label={frontLabel ?? `${edgeLabel}, for reading`}
               inert={!open}
               aria-hidden={!open}
             >

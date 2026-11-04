@@ -140,7 +140,7 @@ describe('#24/#18 the week sheet shows the week still ahead on its last day', ()
     const placed = createMockTask({ id: 'placed', title: 'Placed', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 19), weekStart: new Date(2026, 8, 13),
       commitments: [{ level: 'week', periodStart: new Date(2026, 8, 13), status: 'open' }] as never })
     renderView({ tasks: [placed], viewedDate: friday })
-    const sheet = screen.getByRole('region', { name: /^Sep 13 – Sep 19, for reading$/ })
+    const sheet = screen.getByRole('region', { name: /^Sep 13 – Sep 19, to pick from$/ })
     expect(within(sheet).queryByText('Placed')).toBeNull()
   })
 })

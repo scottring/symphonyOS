@@ -31,7 +31,7 @@ import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { dayWordFor } from '@/components/canvas/week/compactWeek'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
-import { AboveSheet } from '@/components/plan/fold/AboveSheet'
+import { AboveSheet, SheetRows } from '@/components/plan/fold/AboveSheet'
 
 export interface TodayNextWeek { weekNo: number; weekStart: Date; entries: DayPlanEntry[] }
 
@@ -71,12 +71,24 @@ export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek,
   // another day of the week.
   const open = plan.chooserTasks.filter((e) => e.kind === 'task' && !e.completed && !onDay(e) && !alreadyPlaced(e, day))
   const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
-  const byId = new Map(open.map((e) => [e.id, e]))
+  // The day's routines with no time of their own (the column's "Routines
+  // today", fix round 1): flexible occurrences, and weekly routines with no
+  // day. The day's list leaves them off (dayPlan's offMainRoutineItemIds), so
+  // this is their place to be picked. Chosen or done ones are on the day.
+  const routines = plan.chooserRoutines.filter((e) => !e.completed && !onDay(e))
+  // Rows are keyed by entry ("task:…", "routine:…"): a routine and a task
+  // never share a row id.
+  const byKey = new Map([...open, ...routines].map((e) => [e.key, e]))
 
   const toToday = (e: DayPlanEntry) => {
     const run = (cmd: () => Promise<boolean | void>, undo?: () => Promise<boolean | void>) =>
       void activity.run(`Plan for ${dayWord}: “${e.title}”`, cmd, { ids: [e.id], undo, retry: () => toToday(e) })
-    if (chooseTask) {
+    if (e.kind === 'routine' && e.routine && actions.placeRoutine) {
+      // A routine with no day of its own gets one occurrence; there is no
+      // honest inverse here, so no Undo is offered.
+      return run(async () => actions.placeRoutine!(e, day))
+    }
+    if (e.kind === 'task' && chooseTask) {
       const t = e.task
       const focus = ymd === localYmd(new Date())
       const prev: Partial<Task> | null = t ? {
@@ -88,27 +100,38 @@ export function TodayWeekFold({ plan, day, weekNo, weekStart, actions, nextWeek,
         : !t?.scheduledFor ? async () => actions.unchoose(e) : undefined
       return run(() => chooseTask(e.id), undo)
     }
-    // Without an async chooser: choose and unchoose are each other's inverse.
+    // Routine occurrences (and tasks without an async chooser): choose and
+    // unchoose are each other's inverse.
     return run(async () => actions.choose(e), async () => actions.unchoose(e))
   }
   // A row drags onto the day (Scott, 2026-10-07): dropped on the day's hours
   // it gets the time it lands at; dropped on For today it is chosen, no time.
-  const dragRow = (id: string, ev: DragEvent<HTMLLIElement>) => {
-    const e = byId.get(id)
+  const dragRow = (key: string, ev: DragEvent<HTMLLIElement>) => {
+    const e = byKey.get(key)
     if (e) writePlanDrag(ev.dataTransfer, { kind: e.kind, id: e.id, date: ymd, title: e.title })
   }
-  const pick = (id: string) => { const e = byId.get(id); if (e) toToday(e) }
-  const openRow = (id: string) => { const e = byId.get(id); if (e) actions.open?.(e) }
+  const pick = (key: string) => { const e = byKey.get(key); if (e) toToday(e) }
+  const openRow = (key: string) => { const e = byKey.get(key); if (e) actions.open?.(e) }
+  const rowProps = {
+    onPick: pick, pickLabel: (title: string) => `Plan ${title} for ${dayWord}`,
+    onOpen: actions.open ? openRow : undefined, onDragRow: dragRow,
+  }
+  const asRows = (es: DayPlanEntry[]) => es.map((e) => ({ id: e.key, title: e.title }))
 
   const range = formatWeekRangeShort(weekStart)
   const nextById = new Map((nextWeek?.entries ?? []).map((e) => [e.id, e]))
 
   return (
     <PaperFold horizon="day" stowed={stowed} className={['today-fold', className].filter(Boolean).join(' ')} edgeLabel={range} edgeCount={open.length}
+      frontLabel={`${range}, to pick from`}
       above={<>
-        <AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`} rows={open.map((e) => ({ id: e.id, title: e.title }))}
-          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week."
-          onPick={pick} pickLabel={(title) => `Plan ${title} for ${dayWord}`} onOpen={actions.open ? openRow : undefined} onDragRow={dragRow} />
+        <AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`} rows={asRows(open)}
+          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps}>
+          {routines.length > 0 && <>
+            <h3 className="above-sheet-sub">Routines {dayWord}</h3>
+            <SheetRows rows={asRows(routines)} label={`Routines ${dayWord}`} {...rowProps} />
+          </>}
+        </AboveSheet>
         {nextWeek && (
           <section className="above-sheet today-fold-next" aria-label={`Week ${nextWeek.weekNo}, starts tomorrow`}>
             <p className="above-sheet-kicker">Week {nextWeek.weekNo} · Starts tomorrow</p>

@@ -47,6 +47,7 @@ it('unfolded, lists the week’s no-day tasks only, counts the done, and reads t
  expect(screen.getByText('1 done')).toBeInTheDocument()
  expect(screen.getByText('Pick three to five for today.')).toBeInTheDocument()
  expect(localStorage.getItem('symphony-fold:day')).toBe('open')
+ expect(screen.getByRole('region',{name:'Oct 4 – Oct 10, to pick from'})).toBeInTheDocument()
 })
 
 it('"+" places the existing action without replacing its parent link; failed saves can retry',async()=>{

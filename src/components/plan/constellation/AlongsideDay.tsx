@@ -110,6 +110,7 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
           // A session stows the fold rather than unmounting it, so the day
           // under it keeps its state.
           <PaperFold horizon="day" className="today-fold ad-fold" stowed={stepAside} edgeLabel={range} edgeCount={open.length}
+            frontLabel={`${range}, to pick from`}
             above={<AboveSheet kicker={`Week · ${range}`} title={`Week ${weekNo}`}
               rows={open.map((t) => ({ id: t.id, title: t.title }))} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}

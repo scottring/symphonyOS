@@ -1,7 +1,7 @@
 import {AlongsideContext, type AlongsideWorkspace} from '@/components/plan/constellation/AlongsideContext'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ALL_LAYERS } from '@/lib/domains'
-import { screen, fireEvent } from '@testing-library/react'
+import { screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext'
@@ -15,9 +15,12 @@ import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
  */
 const mobile = vi.hoisted(() => ({ value: true }))
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mobile.value }))
-vi.mock('@/hooks/useActionableInstances', () => ({
-  useActionableInstances: () => ({ setPlanned: vi.fn(async () => true), reschedule: vi.fn(async () => null), getInstancesForRange: vi.fn(async () => []) }),
-}))
+const instances = vi.hoisted(() => ({ setPlanned: null as null | ((...a: unknown[]) => Promise<boolean>) }))
+vi.mock('@/hooks/useActionableInstances', async () => {
+  const { vi: v } = await import('vitest')
+  instances.setPlanned = v.fn(async () => true)
+  return { useActionableInstances: () => ({ setPlanned: instances.setPlanned, reschedule: v.fn(async () => null), getInstancesForRange: v.fn(async () => []) }) }
+})
 vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loading: false, error: 'x', requestLocation: vi.fn() }) }))
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
 vi.mock('@/hooks/useRoutineStats', () => ({ useRoutineStats: () => ({ getStats: () => undefined }) }))
@@ -81,7 +84,9 @@ describe('Today — the way to Planning', () => {
     renderView()
     expect(screen.getByText('Call the bank')).toBeInTheDocument()
     expect(screen.getByText('Pick up foot meds')).toBeInTheDocument()
-    expect(screen.queryByText('Kids clean rooms')).not.toBeInTheDocument()
+    // (Off the day's list; it waits on the week sheet beside it.)
+    expect(within(screen.getByRole('region', { name: 'For today' })).queryByText('Kids clean rooms')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'The day' })).queryByText('Kids clean rooms')).not.toBeInTheDocument()
     // No instruction beside the heading, and no count — Today keeps no
     // scoreboard and explains nothing (2026-09-21).
     expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
@@ -108,6 +113,25 @@ describe('Today — the way to Planning', () => {
     // The sheet replaces the dock's Today pin — never both.
     expect(screen.getByTestId('pins')).toHaveTextContent('')
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
+  })
+
+  // Fix round 1 (2026-11-04): a flexible routine with no time is kept off the
+  // day's list (dayPlan's offMainRoutineItemIds); its home was the column's
+  // "Routines today". It is on the week sheet now, below the week's tasks,
+  // with the same + the column had.
+  it('a flexible untimed routine is on the sheet under Routines today, and + plans it for today', async () => {
+    localStorage.setItem('symphony-fold:day', 'open')
+    try {
+      renderView()
+      const sheet = screen.getByRole('region', { name: /, to pick from$/ })
+      const routines = within(sheet).getByRole('list', { name: 'Routines today' })
+      expect(within(routines).getByText('Kids clean rooms')).toBeInTheDocument()
+      expect(within(routines).getByText('Kids clean rooms').closest('li')).toHaveAttribute('draggable', 'true')
+      fireEvent.click(within(routines).getByRole('button', { name: 'Plan Kids clean rooms for today' }))
+      await waitFor(() => expect(instances.setPlanned).toHaveBeenCalledWith('routine', 'r1', expect.any(Date), true))
+    } finally {
+      localStorage.removeItem('symphony-fold:day')
+    }
   })
 
   it('the day is the fold’s sheet on the desk too, with no split columns', () => {

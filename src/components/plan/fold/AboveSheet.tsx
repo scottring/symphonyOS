@@ -11,7 +11,7 @@
 // title tap that opens the task (onOpen). Without them, nothing here is a
 // control.
 
-import type { DragEvent } from 'react'
+import type { DragEvent, ReactNode } from 'react'
 import './sheet.css'
 
 export interface AboveSheetProps {
@@ -34,34 +34,56 @@ export interface AboveSheetProps {
   onOpen?: (id: string) => void
   /** Today's week sheet only: the rows drag onto the day. */
   onDragRow?: (id: string, ev: DragEvent<HTMLLIElement>) => void
+  /** More of the sheet, under the list and above the foot (Today's
+   *  "Routines today", drawn with SheetRows). */
+  children?: ReactNode
 }
 
 const defaultPickLabel = (title: string) => `Plan ${title} for today`
 
-export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel = defaultPickLabel, onOpen, onDragRow }: AboveSheetProps) {
+export interface SheetRowsProps {
+  rows: { id: string; title: string }[]
+  /** The list's accessible name. */
+  label: string
+  onPick?: (id: string) => void
+  pickLabel?: (title: string) => string
+  onOpen?: (id: string) => void
+  onDragRow?: (id: string, ev: DragEvent<HTMLLIElement>) => void
+}
+
+/** The sheet's ruled lines: plain text, or (Today) a title that opens, a +
+ *  and a drag onto the day. */
+export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, onOpen, onDragRow }: SheetRowsProps) {
+  return (
+    <ul className="above-sheet-list" aria-label={label}>
+      {rows.map((r) => onPick || onOpen || onDragRow ? (
+        <li key={r.id} className="above-sheet-row" draggable={onDragRow ? true : undefined}
+          onDragStart={onDragRow ? (ev) => onDragRow(r.id, ev) : undefined}>
+          {onOpen
+            ? <button type="button" className="above-sheet-row-title" onClick={() => onOpen(r.id)}>{r.title}</button>
+            : <span className="above-sheet-row-title">{r.title}</span>}
+          {onPick && (
+            <button type="button" className="above-sheet-pick" aria-label={pickLabel(r.title)} title={pickLabel(r.title)}
+              onClick={() => onPick(r.id)}>+</button>
+          )}
+        </li>
+      ) : <li key={r.id}>{r.title}</li>)}
+    </ul>
+  )
+}
+
+export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onOpen, onDragRow, children }: AboveSheetProps) {
   return (
     <div className="above-sheet">
       <p className="above-sheet-kicker">{kicker}</p>
       <h2 className="above-sheet-title">{title}</h2>
       {rows.length > 0 ? (
-        <ul className="above-sheet-list" aria-label={title}>
-          {rows.map((r) => onPick || onOpen || onDragRow ? (
-            <li key={r.id} className="above-sheet-row" draggable={onDragRow ? true : undefined}
-              onDragStart={onDragRow ? (ev) => onDragRow(r.id, ev) : undefined}>
-              {onOpen
-                ? <button type="button" className="above-sheet-row-title" onClick={() => onOpen(r.id)}>{r.title}</button>
-                : <span className="above-sheet-row-title">{r.title}</span>}
-              {onPick && (
-                <button type="button" className="above-sheet-pick" aria-label={pickLabel(r.title)} title={pickLabel(r.title)}
-                  onClick={() => onPick(r.id)}>+</button>
-              )}
-            </li>
-          ) : <li key={r.id}>{r.title}</li>)}
-        </ul>
+        <SheetRows rows={rows} label={title} onPick={onPick} pickLabel={pickLabel} onOpen={onOpen} onDragRow={onDragRow} />
       ) : empty ? (
         <p className="above-sheet-empty">{empty}</p>
       ) : null}
       {doneCount > 0 && <p className="above-sheet-done">{doneCount} done</p>}
+      {children}
       <p className="above-sheet-foot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
