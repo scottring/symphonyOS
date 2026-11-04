@@ -337,8 +337,6 @@
 .cw-menu button[aria-checked="true"] { font-weight: 600; color: var(--color-primary-800); }
 .cw-menu button[aria-checked="true"]::before { content: '✓ '; }
 .cw-menu-none { margin: 4px 10px; font-family: var(--font-family-sans); font-size: 12.5px; color: var(--color-neutral-500); }
-.cw-row .plan-move { position: static; }
-.cw-row .plan-move-menu { left: auto; right: 0; }
 @media (max-width: 767px) {
   .wc-quiet-link { min-height: 44px; }
   .cw-menu button { min-height: 44px; }

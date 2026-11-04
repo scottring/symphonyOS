@@ -3591,17 +3591,17 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-week .pv2-days [data-testid="week-journal"] { border-top: 0; }
 .pv2-week .pv2-wl-row.is-card { margin-left: 0; margin-right: 0; }
 .pv2-week .pv2-wl .pv2-wl-h:first-of-type { margin-top: 10px; }
-:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref { position: static; padding: 0; border-radius: 0; background: none; overflow: visible; max-height: none; }
-:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
-:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-list { margin-top: 8px; }
+:is(.pv2-week, .pv2-page) .pv2-ref { position: static; padding: 0; border-radius: 0; background: none; overflow: visible; max-height: none; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-list { margin-top: 8px; }
 /* A week across a month end: one block per month, the second set apart. */
 .pv2-refmonth + .pv2-refmonth { margin-top: 22px; }
-:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow { padding: 6px 0; color: var(--color-neutral-600); border-bottom: 1px solid var(--color-neutral-100); flex-wrap: nowrap; }
-:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow > button { line-height: 1.4; }
-:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow:has(> form) { flex-wrap: wrap; }
-:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow .pv2-refacts { opacity: .55; transition: opacity .12s; }
-:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow:hover .pv2-refacts, :is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow:focus-within .pv2-refacts { opacity: 1; }
-@media (hover: none) { :is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow .pv2-refacts { opacity: 1; } }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow { padding: 6px 0; color: var(--color-neutral-600); border-bottom: 1px solid var(--color-neutral-100); flex-wrap: nowrap; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow > button { line-height: 1.4; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:has(> form) { flex-wrap: wrap; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow .pv2-refacts { opacity: .55; transition: opacity .12s; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:hover .pv2-refacts, :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:focus-within .pv2-refacts { opacity: 1; }
+@media (hover: none) { :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow .pv2-refacts { opacity: 1; } }
 .pv2-wtools { display: flex; align-items: center; gap: 8px; }
 .pv2-wtools + .pv2-seg { margin-left: 0; }
 .pv2-rrow-sans { font: 400 14px/1.4 var(--font-family-sans); flex-wrap: wrap; }
@@ -3628,7 +3628,7 @@ div.chooser-action-group { overflow: visible !important; }
   /* One column: the plan first, the level above after it (as on the week). */
   .pv2-grid3 > .pv2-ref, .pv2-grid2.is-ref > .pv2-ref { order: 3; }
   .pv2-grid2.is-cal-last > .pv2-cal, .pv2-grid3 > .pv2-cal { order: 4; }
-  :is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow > button { min-height: 0; }
+  :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow > button { min-height: 0; }
 }
 /* Phones carry the life-area lens in the shell's own header already. */
 @media (max-width: 767px) { .pv2-chrome { display: none; } }

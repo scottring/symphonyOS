@@ -117,7 +117,7 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
   const monthLine = actions.monthLine && (actions.monthLine.lines.length > 0 || actions.monthLine.current(t)) ? actions.monthLine : null
   const forNow = monthLine?.current(t) ?? null
   // The month lines can be long: that list is placed from its measured size,
-  // right edge under ⋯, held inside the screen (as MonthLink's own menu).
+  // right edge under ⋯, held inside the screen.
   const [fit, setFit] = useState<MenuPlace | null>(null)
   // Measured before paint each time the list shows; ignored otherwise.
   useLayoutEffect(() => {

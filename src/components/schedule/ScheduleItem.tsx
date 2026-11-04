@@ -95,11 +95,6 @@ interface ScheduleItemProps {
    * draws the same control (Today, trimmed, 2026-10-14).
    */
   belowTitleAccessory?: React.ReactNode
-  /** What this task serves — "↳ Step toward “goal”" or "↳ From “line”" —
-   *  drawn at rest under the title, on phones too. When given it replaces the
-   *  bare goal-name line (it says the same thing, and also reaches a line the
-   *  task was copied down from). Today supplies it; other hosts don't. */
-  servesLine?: React.ReactNode
   /** The signed-in member. Initials are household INFORMATION only when they
    *  say something the reader doesn't know — someone else's work. Work that
    *  is yours carries none (Today, 2026-09-21). */
@@ -145,7 +140,6 @@ export const ScheduleItem = memo(function ScheduleItem({
   hideTime,
   spineAbove,
   spineBelow,
-  servesLine,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   // Needed-today mark: STATE, so it lives with the title chips. The item
@@ -198,8 +192,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   const plainSubtasks = (item.originalTask?.subtasks ?? []).filter((s) => !isPerPerson(s))
   /** Anything rendering beneath the title makes the title column taller — the
    *  leading columns then need pinning to the title's first line. */
-  const hasBelowTitleContent = !!servesLine
-    || !!(item.goalLabel && !item.completed)
+  const hasBelowTitleContent = !!(item.goalLabel && !item.completed)
     || !!(item.isWaiting && item.waitingFor && !item.completed)
     || hasPerPersonItems
     || fromEmail
@@ -435,7 +428,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           )}
           {/* What this step is for, on the phone too — a phone has no hover to
               reveal it, so the commitment has to be on the row itself. */}
-          {servesLine ? <div className="mt-0.5 min-w-0">{servesLine}</div> : item.goalLabel && !item.completed && (
+          {item.goalLabel && !item.completed && (
             <div className="flex items-center gap-1.5 text-[12px] text-neutral-500 mt-0.5 min-w-0">
               <Target className="w-3 h-3 shrink-0" aria-hidden />
               <span className="truncate">{item.goalLabel}</span>
@@ -800,7 +793,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           {/* What this step is FOR. A commitment made at the month's altitude
               should still be legible on the day you act on it. No count and no
               progress — just the goal's name. */}
-          {servesLine ? <div className="mt-0.5 min-w-0">{servesLine}</div> : item.goalLabel && !item.completed && (
+          {item.goalLabel && !item.completed && (
             <div className="flex items-baseline gap-1.5 text-[12px] text-neutral-500 leading-tight mt-0.5 min-w-0">
               <Target className="w-3 h-3 shrink-0 translate-y-[1px]" aria-hidden />
               <span className="truncate" title={item.goalLabel}>{item.goalLabel}</span>
