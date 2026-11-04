@@ -14,7 +14,7 @@
 //
 // Routines are dated commitments (spec 2026-11-04): the routines at the
 // period's pace sit here too, each with its dates in the period
-// (SheetRoutines), where Month and Year's Routines strip used to float.
+// (CalendarRoutines), where Month and Year's Routines strip used to float.
 
 import type { ReactNode } from 'react'
 import { useDayLoadEvents } from '@/hooks/useDayLoadEvents'
@@ -46,7 +46,7 @@ export function CalendarSheet({ kicker, title, children }: {
 }
 
 /** A routine at the period's pace, with the days it falls on in the period. */
-export interface SheetRoutine { id: string; title: string; dates: Date[] }
+export interface CalendarRoutine { id: string; title: string; dates: Date[] }
 
 type RoutinesWord = 'month' | 'season' | 'year'
 const EMPTY_ROUTINES: Record<RoutinesWord, string> = {
@@ -72,7 +72,7 @@ function routineWhen(dates: Date[], word: RoutinesWord): string[] {
 /** "Routines this month" on the calendar sheet: each routine at the
  *  period's pace with its dates, for reading. The Month session's
  *  Maintenance and fun step points here. */
-export function SheetRoutines({ word, routines }: { word: RoutinesWord; routines: SheetRoutine[] }) {
+export function CalendarRoutines({ word, routines }: { word: RoutinesWord; routines: CalendarRoutine[] }) {
   const label = `Routines this ${word}`
   return (
     <section className="cal-sheet-routines" aria-label={label} data-guide-anchor="routines">

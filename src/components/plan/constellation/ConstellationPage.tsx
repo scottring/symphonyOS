@@ -106,7 +106,7 @@ import { placementOf } from '@/lib/planning/placement'
 import { useRoutines } from '@/hooks/useRoutines'
 import { PaperFold, rememberFolded } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, LookSheet } from '@/components/plan/fold/AboveSheet'
-import { CalendarSheet, MonthGrid, SheetRoutines, type SheetRoutine } from '@/components/plan/fold/CalendarSheet'
+import { CalendarSheet, MonthGrid, CalendarRoutines, type CalendarRoutine } from '@/components/plan/fold/CalendarSheet'
 import { WriteLine } from '@/components/plan/fold/WriteLine'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
 import { GuidedPeriod, type PeriodSessionTools, type SessionFold } from '@/components/plan/guided/GuidedPeriod'
@@ -415,10 +415,10 @@ function Inner() {
 
   // The routines at this page's pace, each with the days it falls on in the
   // period: monthly on Month, quarterly on Season, yearly on Year. They sit
-  // on the calendar sheet (SheetRoutines; spec 2026-11-04: routines are
+  // on the calendar sheet (CalendarRoutines; spec 2026-11-04: routines are
   // dated commitments), where the Routines strip used to float.
   const periodStartMs = bounds.start.getTime(), periodEndMs = bounds.end.getTime()
-  const periodRoutines = useMemo<SheetRoutine[]>(() => {
+  const periodRoutines = useMemo<CalendarRoutine[]>(() => {
     const want = level === 2 ? 'monthly' : level === 1 ? 'quarterly' : 'yearly'
     const found = new Map<string, { title: string; dates: Date[] }>()
     const start = new Date(periodStartMs)
@@ -888,13 +888,13 @@ function Inner() {
     ? <CalendarSheet kicker="What’s already claimed" title={periodWord}>
       <MonthGrid month={bounds.start} weekStartsOn={weekStartsOn} />
       <NextWeeks start={weekStartAnchor(bounds.start, weekStartsOn)} weeks={monthGridWeeks(bounds.start, weekStartsOn).length} />
-      <SheetRoutines word="month" routines={periodRoutines} />
+      <CalendarRoutines word="month" routines={periodRoutines} />
     </CalendarSheet>
     : level === 1
       ? <CalendarSheet kicker={`Fixed dates · ${periodRange(bounds.start, bounds.end)}`} title={periodWord}>
         <SeasonCalendar date={bounds.start} seasons={seasons} />
         {/* A season runs few routines of its own: the section only when it has some. */}
-        {periodRoutines.length > 0 && <SheetRoutines word="season" routines={periodRoutines} />}
+        {periodRoutines.length > 0 && <CalendarRoutines word="season" routines={periodRoutines} />}
       </CalendarSheet>
       : <CalendarSheet kicker="The 12 months" title={periodWord}>
         {/* The year's landscape, as written in its session (read-only, no
@@ -902,7 +902,7 @@ function Inner() {
             dates a month at most. */}
         {hasLandscape(yearNotes.notes.landscape) && <YearLandscapeSection value={yearNotes.notes.landscape} />}
         <MonthsCalendar start={bounds.start} end={bounds.end} allMonths perMonth={4} label={`${periodWord}, month by month`} over={`${periodWord} is over.`} />
-        <SheetRoutines word="year" routines={periodRoutines} />
+        <CalendarRoutines word="year" routines={periodRoutines} />
       </CalendarSheet>
   // The life areas in view (the space filter; a legacy area with no space is
   // Personal): the guide's, and the writing step's chips.

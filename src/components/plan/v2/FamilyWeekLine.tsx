@@ -6,7 +6,7 @@
 // one that did can be taken back (Undo deletes it). Keyed by its week by the
 // page, and not drawn on a week gone by.
 
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { LONGEST_FAMILY_NOTE, postFamilyNotes, takeBackFamilyNote } from '@/lib/wall/tellFamily'
 import '@/components/plan/fold/sheet.css'
@@ -15,15 +15,19 @@ export function FamilyWeekLine({ weekStart }: { weekStart: Date }) {
   const { user } = useAuth()
   const [text, setText] = useState('')
   const [posting, setPosting] = useState(false)
+  // Two quick Returns can land before a render: the ref, not the state, is
+  // what keeps the second from posting the line again (final review).
+  const busy = useRef(false)
   const [posted, setPosted] = useState<{ id: string; line: string }[]>([])
   const [status, setStatus] = useState<'posted' | 'failed' | 'long' | 'undo-failed' | null>(null)
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const line = text.trim()
-    if (!line || posting || !user?.id) return
+    if (!line || busy.current || !user?.id) return
     if (line.length > LONGEST_FAMILY_NOTE) { setStatus('long'); return }
+    busy.current = true
     setPosting(true); setStatus(null)
-    const { posted: done } = await postFamilyNotes(user.id, [line], weekStart)
+    const { posted: done } = await postFamilyNotes(user.id, [line], weekStart).finally(() => { busy.current = false })
     setPosting(false)
     if (done.length === 0) { setStatus('failed'); return }
     setPosted((xs) => [...xs, ...done])

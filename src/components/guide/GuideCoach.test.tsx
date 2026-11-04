@@ -306,7 +306,8 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
         done: () => 'Booked', run }} /></MemoryRouter>)
     fireEvent.click(tip().getByRole('button', { name: 'Book the first Winter session' }))
     const book = tip().getByRole('button', { name: 'Book it' })
-    fireEvent.click(book); fireEvent.click(book)
+    // Both land before React renders again (one batch), as two quick taps can.
+    act(() => { book.click(); book.click() })
     expect(run).toHaveBeenCalledTimes(1)
     await act(async () => { resolve(true) })
     expect(tip().getByRole('status')).toHaveTextContent('Booked')

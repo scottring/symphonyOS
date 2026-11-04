@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { SheetRoutines } from './CalendarSheet'
+import { CalendarRoutines } from './CalendarSheet'
 
 // Routines are dated commitments (spec 2026-11-04): the period's routines
 // sit on its calendar sheet, each with its dates in the period.
@@ -9,9 +9,9 @@ const d = (m: number, day: number) => new Date(2026, m - 1, day)
 const read = (li: HTMLElement) => { const c = li.cloneNode(true) as HTMLElement; c.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove()); return c.textContent }
 const items = () => screen.getAllByRole('listitem').map(read)
 
-describe('SheetRoutines', () => {
+describe('CalendarRoutines', () => {
   it('Month: “Routines this month”, each with its dates, once each and compact', () => {
-    render(<SheetRoutines word="month" routines={[
+    render(<CalendarRoutines word="month" routines={[
       { id: 'w', title: 'Wash comforters', dates: [d(11, 7), d(11, 8)] },
       { id: 'f', title: 'Pay FFG', dates: [d(11, 10)] },
     ]} />)
@@ -27,7 +27,7 @@ describe('SheetRoutines', () => {
   })
 
   it('more than three dates read as their weekdays: “every Tue”', () => {
-    render(<SheetRoutines word="month" routines={[
+    render(<CalendarRoutines word="month" routines={[
       { id: 'b', title: 'Boxing', dates: [d(11, 3), d(11, 10), d(11, 17), d(11, 24)] },
       { id: 'g', title: 'Garden', dates: [d(11, 7), d(11, 8), d(11, 14), d(11, 15)] },
       { id: 's', title: 'Stretch', dates: [d(11, 2), d(11, 3), d(11, 4), d(11, 5)] },
@@ -42,13 +42,13 @@ describe('SheetRoutines', () => {
   })
 
   it('Year: “Routines this year”, dates without the weekday', () => {
-    render(<SheetRoutines word="year" routines={[{ id: 'tx', title: 'File taxes', dates: [d(4, 15)] }]} />)
+    render(<CalendarRoutines word="year" routines={[{ id: 'tx', title: 'File taxes', dates: [d(4, 15)] }]} />)
     expect(screen.getByRole('heading', { name: 'Routines this year' })).toBeInTheDocument()
     expect(items()).toEqual(['File taxes · Apr 15'])
   })
 
   it('none: says so quietly', () => {
-    render(<SheetRoutines word="month" routines={[]} />)
+    render(<CalendarRoutines word="month" routines={[]} />)
     expect(screen.getByRole('region', { name: 'Routines this month' })).toHaveTextContent('No monthly routines.')
     expect(screen.queryByRole('list')).toBeNull()
   })

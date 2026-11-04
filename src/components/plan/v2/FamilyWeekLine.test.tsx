@@ -37,6 +37,22 @@ describe('For the family this week', () => {
     expect(screen.getByRole('status')).toHaveTextContent('On the wall until the week is over.')
   })
 
+  // Final review: two Returns before the first post lands put it up once.
+  it('a double Return posts the line once', async () => {
+    let land: (ok: boolean) => void = () => {}
+    wall.add.mockImplementation(() => new Promise<boolean>((r) => { land = r }))
+    render(<FamilyWeekLine weekStart={weekStart} />)
+    const line = screen.getByRole('textbox', { name: 'What should the family know this week?' })
+    fireEvent.change(line, { target: { value: 'Grandma visits Saturday' } })
+    const form = line.closest('form')!
+    // Both land before React renders again (one batch), as two quick taps can.
+    act(() => { form.requestSubmit(); form.requestSubmit() })
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
+    expect(wall.add).toHaveBeenCalledTimes(1)
+    await act(async () => { land(true) })
+    expect(within(screen.getByRole('list', { name: 'On the wall this week' })).getAllByText('Grandma visits Saturday')).toHaveLength(1)
+  })
+
   it('a note that did not post says so and keeps the words', async () => {
     wall.add.mockResolvedValue(false)
     render(<FamilyWeekLine weekStart={weekStart} />)
