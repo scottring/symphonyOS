@@ -975,13 +975,30 @@ describe('reviewing: the session’s look back',()=>{
  })
 })
 
+describe('a period’s done is what was done in it (2026-11-04)',()=>{
+ it('Month: 2 open, 1 done in it, 1 done before it, 1 moved on, 1 let go: 1 of 3 done, and the fold agrees',()=>{
+  at(new Date(2026,10,4,12))
+  api.tasks=[{id:'o1',title:'Open one',bucket:'month'},{id:'o2',title:'Open two',bucket:'month'},
+   {id:'d',title:'Done in Nov',bucket:'month',completed:true,completedAt:new Date(2026,10,3,9)},
+   {id:'e',title:'Done in Oct',bucket:'month',completed:true,completedAt:new Date(2026,9,20,9)},
+   {id:'m',title:'Moved to Dec',bucket:'month',carried:true,carriedTo:new Date(2026,11,1)},
+   {id:'g',title:'Let go',bucket:'month',dismissedAt:new Date(2026,10,2)}]
+  try{
+   open('/month?view=constellation&horizon=2&start=2026-11-04')
+   expect(facts()).toBe('1 of 3 done')
+   expect(screen.getByRole('button',{name:/1 done, 1 done earlier, 1 moved on/})).toBeInTheDocument()
+   expect(screen.queryByText('Let go')).toBeNull()
+  }finally{vi.useRealTimers()}
+ })
+})
+
 describe('a line moved on is not open here (2026-10-17)',()=>{
  it('Month: out of the count and the verbs, folded with the done, named where it went',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'a',title:'Come up with October business plan',bucket:'month',sourceId:'s',carried:true,carriedTo:new Date(2026,10,1)},
    {id:'b',title:'Book the cabin',bucket:'month'},{id:'c',title:'Pay taxes',bucket:'month',completed:true}]
   month()
-  // Still counted as on October (the "of"), not open: 1 of 3 done.
-  expect(facts()).toBe('1 of 3 done')
+  // Moved on is out of the "of" (2026-11-04): 1 of 2 done.
+  expect(facts()).toBe('1 of 2 done')
   expect(titles('October goals')).toEqual(['Book the cabin'])
   const fold=screen.getByRole('button',{name:/1 done, 1 moved on/})
   fireEvent.click(fold)

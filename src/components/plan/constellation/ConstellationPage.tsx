@@ -455,12 +455,18 @@ function Inner() {
   const nodeArea = (n: PlanNode) => n.goal ? n.goal.areaId : n.task?.areaId
   const areaNameOf = new Map(lifeAreas.map((a) => [a.id, a.name]))
   // One list drawn one way: this period's, and the look back's (the period before).
-  const shapeList = (nodes: PlanNode[], movedOf: (n: PlanNode) => string | null) => {
+  // A period's done is what was done in it: a line finished before the period
+  // began (it only carries a later commitment) is "done earlier", and a line
+  // let go never counts. The header's count and the fold read the same lists.
+  const shapeList = (all: PlanNode[], movedOf: (n: PlanNode) => string | null, b: { start: Date }) => {
+    const nodes = all.filter((n) => !n.task?.dismissedAt)
+    const earlier = (n: PlanNode) => isDone(n) && !!n.task?.completedAt && n.task.completedAt < b.start
     const open = (n: PlanNode) => !isDone(n) && !movedOf(n)
     const openNodes = inOrder(nodes.filter(open))
-    const doneNodes = nodes.filter(isDone)
+    const doneNodes = nodes.filter((n) => isDone(n) && !earlier(n))
+    const earlierNodes = nodes.filter(earlier)
     const movedNodes = nodes.filter((n) => !isDone(n) && !!movedOf(n))
-    const listed = showDone ? [...openNodes, ...movedNodes, ...doneNodes] : openNodes
+    const listed = showDone ? [...openNodes, ...movedNodes, ...doneNodes, ...earlierNodes] : openNodes
     const areaGroups = lifeAreas.length ? groupByArea(listed.map((n) => ({ n, areaId: nodeArea(n) })), lifeAreas) : null
     const items = areaGroups ? areaGroups.flatMap((g) => g.items.map((x) => x.n)) : listed
     // Grouped by area id (two areas may share a name); an area the viewer cannot see is '' (No area).
@@ -469,12 +475,12 @@ function Inner() {
     const onlyNoArea = !!areaGroups && areaGroups.every((g) => g.area === null)
     const headingOf = groupOf && !onlyNoArea ? (n: PlanNode) => areaNameOf.get(groupOf(n)) ?? 'No area' : undefined
     // "5 done, 1 moved on · Taxes, Picnic…": what is no longer open, in one line.
-    const folded = [...doneNodes, ...movedNodes]
-    const doneLine = `${[doneNodes.length ? `${doneNodes.length} done` : '', movedNodes.length ? `${movedNodes.length} moved on` : ''].filter(Boolean).join(', ')} · ${folded.slice(0, 2).map((n) => n.title).join(', ')}${folded.length > 2 ? '…' : ''}`
-    return { openNodes, doneNodes, movedNodes, items, groupOf, headingOf, folded, doneLine }
+    const folded = [...doneNodes, ...movedNodes, ...earlierNodes]
+    const doneLine = `${[doneNodes.length ? `${doneNodes.length} done` : '', earlierNodes.length ? `${earlierNodes.length} done earlier` : '', movedNodes.length ? `${movedNodes.length} moved on` : ''].filter(Boolean).join(', ')} · ${folded.slice(0, 2).map((n) => n.title).join(', ')}${folded.length > 2 ? '…' : ''}`
+    return { openNodes, doneNodes, movedNodes, earlierNodes, items, groupOf, headingOf, folded, doneLine }
   }
   const levelNodes = allNodes.filter((n) => n.level === level)
-  const { openNodes, doneNodes, items, groupOf, headingOf, folded, doneLine } = shapeList(levelNodes, (n) => movedLabel(n))
+  const { openNodes, doneNodes, items, groupOf, headingOf, folded, doneLine } = shapeList(levelNodes, (n) => movedLabel(n), bounds)
 
   // ---- A pending change card, drawn dashed (planPreview.ts) -----------------
   const span = (b: { start: Date; end: Date; label: string }): PeriodSpan => ({ start: localYmd(b.start), end: localYmd(b.end), label: periodWordOf(b) })
@@ -838,7 +844,9 @@ function Inner() {
   // as Looking back counts it: Month "28 of 46 done", Season "Sep 22 – Dec 20
   // · 4 of 21 done", Year "1 of 5 goals done"; a bar. When it was planned is
   // the summary line's, under it (PeriodSummaryLine).
-  const onPeriod = levelNodes.length
+  // Out of what was on the period and still is: open or done in it. Moved on,
+  // done before it began and let go are not in the total.
+  const onPeriod = openNodes.length + doneNodes.length
   const doneWord = level === 0 ? `${onPeriod === 1 ? 'goal' : 'goals'} done` : 'done'
   const countText = `${doneNodes.length} of ${onPeriod} ${doneWord}`
   const facts = !inFlow && dataReady && !error && !goalsError

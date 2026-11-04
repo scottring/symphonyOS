@@ -961,11 +961,17 @@ export function WeekViewV2(props: WeekViewV2Props) {
   )
   // This week's count for the header: done, out of everything the page draws
   // on it (weekShown). The guided session's "{n} of about 15" is onThisWeek.
-  const doneThisWeek = useMemo(
-    () => weekShown.filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) === 'done').length,
-    [weekShown, weekAnchor, weekIsCurrent],
+  // A week's done is what was done in it: a row finished before the week
+  // began, or let go, is not on the count.
+  const countedThisWeek = useMemo(
+    () => weekShown.filter((t) => !t.dismissedAt && !(t.completed && t.completedAt && t.completedAt < weekAnchor)),
+    [weekShown, weekAnchor],
   )
-  const onThisWeek = weekShown.length
+  const doneThisWeek = useMemo(
+    () => countedThisWeek.filter((t) => weekReviewState(t, weekAnchor, { isCurrent: weekIsCurrent }) === 'done').length,
+    [countedThisWeek, weekAnchor, weekIsCurrent],
+  )
+  const onThisWeek = countedThisWeek.length
   const alsoDoneLastWeek = useMemo(
     () => alsoDoneIn(deckTasks, lastWeekStart, weekAnchor, (t) => weekReviewState(t, lastWeekStart, { isCurrent: false }) !== undefined),
     [deckTasks, lastWeekStart, weekAnchor],

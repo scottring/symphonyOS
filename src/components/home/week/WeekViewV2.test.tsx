@@ -1176,6 +1176,20 @@ describe('WeekViewV2 — the deck', () => {
     expect(new URLSearchParams(window.location.search).get('date')).toBeNull()
   })
 
+  // 2026-11-04: a period's done is what was done in it. Finished before the
+  // week began, or let go, is not on this week's count.
+  it('the fact line counts what was done this week, not what was finished before it or let go', () => {
+    const wk = (id: string, extra: object) => createMockTask({ id, title: id, context: 'family', bucket: 'week', weekStart: sat, commitments: [{ level: 'week', periodStart: sat, status: 'open' }], updatedAt: recent, ...extra })
+    const tasks = [
+      wk('open', {}),
+      wk('doneNow', { completed: true, completedAt: new Date(2026, 9, 19) }),
+      wk('doneBefore', { completed: true, completedAt: new Date(2026, 8, 1) }),
+      wk('letGo', { dismissedAt: new Date(2026, 9, 12) }),
+    ]
+    open('', tasks, { layers: familyOnly })
+    expect(document.querySelector('.wk-facts')?.textContent).toBe('1 of 2 done')
+  })
+
   // I3: the strip lists what "Place them" deals, a passed day included.
   it('the strip lists what Place them deals, including a day that passed undone', () => {
     vi.setSystemTime(new Date(2026, 9, 20, 9)) // Tuesday of the week of Oct 17
