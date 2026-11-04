@@ -101,3 +101,35 @@
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run the tests and tsc. Expect PASS.
 - [ ] **Step 5:** Commit: `feat(plan): routines live on the calendar sheet; the strip leaves Month and Year`.
+
+### Task 4: Today stays as it was — leftovers return to the week sheet, energy is asked in the tooltip
+
+Scott, on the permanent From yesterday section and Energy chip: "should not be there, and certainly not permanently. it looks crammed in and breaks the otherwise perfect layout and flow of Today." Then: "just build it."
+
+**Rule:** a step that captures one small fact (energy, a booking date) asks it **inside its own tooltip**. Everything else is just the page. Nothing new is permanently added to Today.
+
+**Files:**
+- Remove the From yesterday section from Today (`src/components/schedule/FromYesterday.tsx` and its use in TodayView and AlongsideDay) and the Energy chips (Today, Season; `EnergyChip.tsx`) with their CSS and tests.
+- Today's week sheet (TodayWeekColumn and AlongsideDay; the shared selector Task 5 of the earlier plan built):
+  - Unfinished tasks given an earlier day of this week (before the viewed day) come back onto the sheet first, each marked in faint type with that day ("Tue").
+  - + plans one for today, using the same handler as the other rows.
+  - The first such row carries `data-guide-anchor="leftovers"`.
+  - The Week page itself is unchanged.
+- `src/lib/guide/steps.ts` and GuideCoach:
+  - The Day "Look back at yesterday" step drives the week fold open and anchors to `leftovers`, falling back to the fold edge when there are none. Its You line: "Plan them for today with +, or leave them on the week."
+  - The Energy steps (Day, Season) carry an inline ask in the tooltip: three choices, "Low" · "Medium" · "High". Picking writes the period's energy note, as the chip did, and the tooltip shows the chosen one.
+  - The tooltip's optional `action` becomes a general `ask` slot used by both Energy and booking.
+- The header line (`PeriodSummaryLine`): the "Energy: {level}" part, when present, is a button. Tapping it opens a tiny inline menu of Low · Medium · High · Clear (a popover), saving through the same note write. Nothing shows when no energy is set.
+
+- [ ] **Step 1: Write failing tests.**
+  - Today has no "From yesterday" section and no energy chip.
+  - A task dated yesterday and not done appears first on Today's week sheet marked "Tue" (for Tue Nov 3 when viewing Wed Nov 4), and + plans it for today.
+  - A task done yesterday doesn't appear.
+  - The Energy step's tooltip shows Low · Medium · High, and picking Medium writes `energy: { level: 'medium' }` for the day.
+  - The header reads "… · Energy: medium", and tapping it offers Low · Medium · High · Clear.
+  - Season's Energy step asks the same way.
+  - The look-back tooltip anchors to the first marked row.
+- [ ] **Step 2:** Run the tests and expect FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run `npx vitest run src/components/schedule src/components/guide src/components/plan src/lib`, tsc, and the full suite once. Expect PASS.
+- [ ] **Step 5:** Commit: `feat(today): Today stays as it was — leftovers return to the week, energy is asked in the tooltip`.
