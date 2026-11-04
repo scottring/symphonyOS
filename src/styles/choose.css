@@ -24,8 +24,6 @@
 .choose-card { display: flex; flex-direction: column; gap: 4px; text-align: left; }
 .choose-card-title { margin: 0; padding-right: 120px; font: 400 30px/1.15 var(--font-family-display); color: var(--color-neutral-900); text-wrap: balance; overflow-wrap: anywhere; }
 .choose-fact { margin: 0 0 14px; font-size: 13.5px; color: var(--color-neutral-500); }
-.choose-menu { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.choose-when { min-height: 32px; padding: 0 11px; border-radius: 99px; border: 1px solid var(--color-primary-200); background: var(--color-bg-elevated); cursor: pointer; font: 500 12.5px var(--font-family-sans); color: var(--color-neutral-800); }
 .choose-status { margin: 6px 0 0; font-size: 12.5px; color: var(--color-neutral-500); }
 .choose-status.is-failed { color: var(--color-error-600, #b42318); }
 
@@ -54,7 +52,6 @@
 .choose-verb.is-quiet:hover:not(:disabled) { background: var(--color-neutral-100); }
 .choose-verb:disabled { opacity: .6; cursor: default; }
 .choose-break { font-size: 12.5px; }
-.choose-add { align-self: flex-start; margin-top: 4px; font-size: 14px; }
 
 .choose-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 22px; }
 .choose-pager .deck-btn { min-width: 150px; }
@@ -87,7 +84,7 @@
 .choose-place-title { flex: 1; min-width: 0; font: 400 18px/1.25 var(--font-family-display); color: var(--color-neutral-900); }
 .choose-place-from { flex: none; max-width: 45%; font-size: 12px; color: var(--color-neutral-500); text-align: right; overflow-wrap: anywhere; }
 
-:is(.choose-verb, .choose-when, .choose-switch-btn, .choose-line-row, .choose-place, .choose-leave):focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+:is(.choose-verb, .choose-switch-btn, .choose-line-row, .choose-place, .choose-leave):focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
 
 @media (max-width: 600px) {
   .choose-h { font-size: 28px; }
@@ -119,8 +116,6 @@
 .choose-settled-line.is-static { cursor: default; margin-top: 10px; }
 
 /* Today: the day session's goal groups and its day picture (guided/day) */
-.choose-today-group + .choose-today-group { margin-top: 10px; }
-.choose-today-goal { margin: 8px 0 6px; font: 500 12px var(--font-family-sans); color: var(--color-primary-500); }
 .choose-daypic-slot { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: start; margin-bottom: 6px; }
 .choose-daypic-time { padding-top: 6px; font-size: 11.5px; color: var(--color-neutral-500); text-align: right; font-variant-numeric: tabular-nums; }
 .choose-daypic-ev { padding: 6px 9px; border-left: 3px solid hsl(207 30% 70%); border-radius: 6px; background: var(--color-neutral-50); font-size: 13px; color: var(--color-neutral-700); }

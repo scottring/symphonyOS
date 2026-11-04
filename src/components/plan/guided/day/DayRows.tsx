@@ -4,5 +4,3 @@
 // unfinished tasks are back on the week sheet beside the day.
 
 export interface DayPictureItem { key: string; time?: string; title: string; kind: 'event' | 'task' | 'routine' }
-
-export type { DayActions } from '@/lib/planning/dayActions'

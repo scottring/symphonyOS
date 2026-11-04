@@ -1002,13 +1002,6 @@ describe('WeekViewV2 — the deck', () => {
     expect(within(noDay).getByText('Plan winter vacation')).toBeInTheDocument()
   })
 
-  it('Weekly ops is handed the routines the page shows: the space filter applies', () => {
-    const swim = createMockRoutine({ id: 'swim', name: 'Swim', context: 'family', recurrence_pattern: { type: 'daily' } as RecurrencePattern })
-    const standup = createMockRoutine({ id: 'standup', name: 'Standup', context: 'work', recurrence_pattern: { type: 'daily' } as RecurrencePattern })
-    open('?plan=1', [], { layers: familyOnly, routines: [swim, standup] })
-    expect((deckMock.deck as unknown as { routines: { id: string }[] }).routines.map((r) => r.id)).toEqual(['swim'])
-  })
-
   // Review Focus 2: last week, the strip's order and its weekend follow weekStartsOn.
   it('in a Saturday week, last week starts the Saturday before and the strip runs Sat → Fri', () => {
     const tasks = [

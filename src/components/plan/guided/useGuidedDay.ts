@@ -15,19 +15,16 @@ import { DAY_COUNT_OF, dayStepTitle } from '@/lib/guide/dayTarget'
 import { dayToken } from '@/hooks/usePlanningSession'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
-import type { DayActions } from '@/lib/planning/dayActions'
 
 const CHOOSING = stepsFor('day').find((s) => s.choosing)!.id
 
-export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onClose, onPlanned }: {
+export function useGuidedDay({ target, isTomorrow, count, onFinish, onClose, onPlanned }: {
   /** The day being planned. */
   target: Date
   isTomorrow: boolean
   /** The day's count, as the page shows it (dayCount); null while the page
    *  shows the day looked back on. */
   count: number | null
-  /** The page's writers; the session's own report a pick that saved. */
-  actions: DayActions
   /** The day's closing writes; false keeps the session open. */
   onFinish: () => Promise<boolean>
   /** Leave the session (the page comes back as it is every day). */
@@ -54,17 +51,6 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
     if (await markPlanned()) latest.current.onPlanned?.()
     else planning.current = false
   }, [loading, markPlanned])
-
-  // The same rule as the Week's (reportingChoose): a choice that saved on the
-  // pick step — put on the day, or marked done — counts as applied.
-  const reported = useMemo<DayActions>(() => {
-    const report = <A extends unknown[]>(run: (...a: A) => Promise<boolean>) => async (...a: A) => {
-      const ok = await run(...a)
-      if (ok) void markPlannedOnce()
-      return ok
-    }
-    return { ...actions, place: report(actions.place), done: report(actions.done) }
-  }, [actions, markPlannedOnce])
 
   // Done planning the day: the closing writes, then the session's own
   // finish, then back to the page. A failed closing write keeps it open.
@@ -108,5 +94,5 @@ export function useGuidedDay({ target, isTomorrow, count, actions, onFinish, onC
   }, [loading, steps, progress, isTomorrow, target, token, dayWord, count, setThreadId, markPlannedOnce])
   useGuidedSessionRegistration(registration)
 
-  return { progress, loading, saveError, actions: reported, markPlannedOnce, jump, next, done, registration }
+  return { progress, loading, saveError, markPlannedOnce, jump, next, done, registration }
 }

@@ -32,11 +32,8 @@ import { GiveThemADay } from '@/components/plan/choose/GiveThemADay'
 import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
 import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
 import { WeekLookBack } from '@/components/plan/guided/week/WeekLookBack'
-import type { AllDayEvent } from '@/components/plan/guided/week/CalendarCheck'
 import { PlanChip, usePlanSessionLoading } from '@/components/guide/GuideCoach'
 import type { SessionFold } from '@/components/plan/guided/GuidedPeriod'
-import type { Routine } from '@/types/actionable'
-import type { ClashEvent } from '@/lib/guide/clashes'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import type { DeckCard, DeckMode } from '@/lib/planning/deck'
 import type { DeckActions } from '@/components/home/week/useDeckActions'
@@ -80,13 +77,6 @@ export interface WeekDeck {
   /** The page's scoped tasks (the deck's list): the guided session counts
    *  the week from these, exactly what the page shows. */
   tasks?: readonly Task[]
-  /** The week's timed events as the page draws them (the calendar check). */
-  events?: readonly ClashEvent[]
-  /** The week's all-day events, each with the days it covers (YYYY-MM-DD,
-   *  inclusive): the calendar check lists them on each of those days. */
-  allDayEvents?: readonly AllDayEvent[]
-  /** The routines the page shows under its filters (Weekly ops lists them by day). */
-  routines?: readonly Routine[]
   /** Hear of each write the week canvas saves (a drag onto a day, an add):
    *  on the choosing step it marks the week planned, as a Choose verb does.
    *  Returns the way to stop listening. */

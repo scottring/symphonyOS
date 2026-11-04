@@ -16,10 +16,9 @@ import { stepsFor } from '@/lib/guide/steps'
 import { GuideCoach, usePlanSessionLoading, type CoachAsk } from '@/components/guide/GuideCoach'
 import { useGuidedDay } from '../useGuidedDay'
 import type { DayPictureItem } from './DayRows'
-import type { DayActions } from '@/lib/planning/dayActions'
 import '@/components/guide/guide.css'
 
-export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, actions, asks, listenPlacements, onFinish, onClose, onPlanned }: {
+export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, asks, listenPlacements, onFinish, onClose, onPlanned }: {
   /** The day being planned (dayTarget). */
   target: Date
   isTomorrow: boolean
@@ -32,8 +31,6 @@ export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, action
   /** The current step, once the session's place has loaded: the page shows
    *  the day that step is about, and opens what it asks for. */
   onStep?: (stepId: string) => void
-  /** The page's writers, each taking the day it acts on. */
-  actions: DayActions
   /** A step's one small fact, by step id, asked in its tooltip (Energy). */
   asks?: Partial<Record<string, CoachAsk>>
   /** Placements saved on the page itself (a task dragged onto the day, + on
@@ -47,7 +44,7 @@ export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, action
   onPlanned?: () => void
 }) {
   const count = dayItems ? dayCount(dayItems) : null
-  const guided = useGuidedDay({ target, isTomorrow, count, actions, onFinish, onClose, onPlanned })
+  const guided = useGuidedDay({ target, isTomorrow, count, onFinish, onClose, onPlanned })
   const { markPlannedOnce } = guided
   usePlanSessionLoading('day', guided.loading)
   const stepNow = guided.loading ? null : guided.progress.current

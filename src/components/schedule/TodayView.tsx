@@ -56,7 +56,6 @@ import { PlanChip, type CoachAsk } from '@/components/guide/GuideCoach'
 import { stepsFor } from '@/lib/guide/steps'
 import { GuidedDay } from '@/components/plan/guided/day/GuidedDay'
 import type { DayPictureItem } from '@/components/plan/guided/day/DayRows'
-import { makeDayActions } from '@/lib/planning/dayActions'
 import { dayTarget } from '@/lib/guide/dayTarget'
 import { usePlanningNotes } from '@/hooks/usePlanningNotes'
 import { PeriodSummaryLine } from '@/components/guide/PeriodSummaryLine'
@@ -762,12 +761,6 @@ export function TodayView({
       kind: (i.type === 'event' ? 'event' : i.type === 'task' ? 'task' : 'routine') as DayPictureItem['kind'],
       time: i.startTime && !i.allDay ? i.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(':00', '').replace(' ', '').toLowerCase() : undefined,
     })), [data.grouped])
-  // The page's own writers, each given the day it acts on.
-  const dayActions = useMemo(() => makeDayActions({
-    plan: planActions,
-    updateTask: ctx.onUpdateTask,
-    toggle: onToggleTask,
-  }), [planActions, ctx, onToggleTask])
   // Done planning: the day is stamped planned (the existing savedAt).
   const finishDay = async () => {
     if (!(await dayPlan.save({ wentWell: dayPlan.mine?.wentWell ?? '', didnt: dayPlan.mine?.didnt ?? '' }))) showToast(`Couldn’t mark ${dayWord} planned — try again.`, 'error', 5000)
@@ -1284,7 +1277,7 @@ export function TodayView({
   // and the step's tooltip pointing into it.
   const inDaySession = (page: ReactNode) => !sessionShown ? page : (
     <GuidedDay key={targetKey} target={day.target} isTomorrow={day.isTomorrow}
-      canvas={page} dayItems={localYmd(viewedDate) === targetKey ? dayPicture : null} onStep={setSessionStep} actions={dayActions} asks={dayAsks}
+      canvas={page} dayItems={localYmd(viewedDate) === targetKey ? dayPicture : null} onStep={setSessionStep} asks={dayAsks}
       listenPlacements={listenPlacements}
       onFinish={finishDay}
       onClose={() => { closeDaySession(); reloadShownNotes() }}

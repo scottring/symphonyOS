@@ -4,7 +4,6 @@ import { useEffect } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { GuidedSessionProvider, useGuidedSession, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import type { DayPictureItem } from './DayRows'
-import type { DayActions } from '@/lib/planning/dayActions'
 
 // The person's notes row for the day, in memory (the real merge is
 // usePlanningNotes' own test).
@@ -35,10 +34,6 @@ const dayItems: DayPictureItem[] = [
   { key: 'task-a', title: 'Fix the gate', kind: 'task' },
   { key: 'task-b', time: '2pm', title: 'Call the bank', kind: 'task' },
 ]
-const actions = (): DayActions => ({
-  place: vi.fn(async () => true), done: vi.fn(async () => true),
-  undone: vi.fn(async () => true), backToWeek: vi.fn(async () => true), restore: vi.fn(async () => true),
-})
 
 const shell = { reg: null as GuidedSessionRegistration | null }
 function Shell() {
@@ -57,7 +52,7 @@ function open(over: Partial<Parameters<typeof GuidedDay>[0]> = {}, url = '/today
   const props = {
     target: MON, isTomorrow: false,
     canvas: <section aria-label="The day itself">the page</section>,
-    dayItems, actions: actions(),
+    dayItems,
     onFinish: vi.fn(async () => { store.order.push('planned'); return true }), onClose: vi.fn(), onPlanned: vi.fn(),
     ...over,
   }
