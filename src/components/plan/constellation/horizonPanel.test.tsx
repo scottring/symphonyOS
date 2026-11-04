@@ -100,7 +100,7 @@ describe('the task panel over a horizon page', () => {
     it('Let go ends all three commitments and marks it let go; Undo restores all three and where it was', async () => {
       show('/month?view=constellation&horizon=2&start=2026-11-01', 'multi')
       fireEvent.click(screen.getByRole('button', { name: 'Let go' }))
-      await waitFor(() => expect(deps.updateTask).toHaveBeenCalledWith('multi', { bucket: 'someday', dismissedAt: new Date(2026, 9, 9, 9) }))
+      await waitFor(() => expect(deps.updateTask).toHaveBeenCalledWith('multi', { bucket: 'someday', dismissedAt: new Date(2026, 9, 9, 9), focus: [] }))
       expect(deps.dropCommitment).not.toHaveBeenCalled()
       expect(last()).toMatchObject({ label: 'Let go: “Plan winter vacation”', ok: true })
       await last().opts.undo!()

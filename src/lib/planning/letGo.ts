@@ -19,15 +19,19 @@ export function isLetGo(t: Pick<Task, 'dismissedAt'>): boolean {
   return !!t.dismissedAt
 }
 
-/** The write: every open commitment ends (planPlacement's let-go branch), and
- *  the item is marked let go. */
+/** The write: every open commitment ends and its day goes (planPlacement's
+ *  let-go branch), this person's pick for a day goes (focus), and the item is
+ *  marked let go. */
 export function letGoUpdates(now: Date = new Date()): Partial<Task> {
-  return { bucket: 'someday', dismissedAt: now }
+  return { bucket: 'someday', dismissedAt: now, focus: [] }
 }
 
-/** Undo: the periods and the place it had, and no longer let go. */
+/** Undo: the periods, the place and the picks it had, and no longer let go. */
 export function unletGoUpdates(t: Task): Partial<Task> {
-  return { ...placementOf(t), commitments: liveCommitments({ commitments: bootstrapCommitments(t) }), dismissedAt: undefined }
+  return {
+    ...placementOf(t), commitments: liveCommitments({ commitments: bootstrapCommitments(t) }),
+    focus: t.focus ?? [], dismissedAt: undefined,
+  }
 }
 
 /** What search says of a let-go item: "Let go Nov 4". Null for anything else

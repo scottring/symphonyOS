@@ -9,17 +9,19 @@ const task = (over: Partial<Task> = {}): Task => ({ id: 't', title: 'Plan winter
 describe('letGo', () => {
   it('lets go: to Someday, marked when', () => {
     const at = new Date(2026, 10, 4, 9)
-    expect(letGoUpdates(at)).toEqual({ bucket: 'someday', dismissedAt: at })
+    // The day goes with the lists, and so does the pick for a day (focus).
+    expect(letGoUpdates(at)).toEqual({ bucket: 'someday', dismissedAt: at, focus: [] })
     expect(isLetGo(task({ dismissedAt: at }))).toBe(true)
     expect(isLetGo(task())).toBe(false)
   })
 
   it('Undo states the periods and the place it had, and clears the mark', () => {
-    const t = task({ bucket: 'month', monthStart: NOV, seasonStart: FALL, commitments: [
+    const picked = [{ userId: 'me', date: new Date(2026, 10, 4) }]
+    const t = task({ bucket: 'month', monthStart: NOV, seasonStart: FALL, focus: picked, commitments: [
       { level: 'season', periodStart: FALL, status: 'open' }, { level: 'month', periodStart: NOV, status: 'open' },
     ] })
     expect(unletGoUpdates(t)).toMatchObject({
-      bucket: 'month', monthStart: NOV, seasonStart: FALL, scheduledFor: null, dismissedAt: undefined,
+      bucket: 'month', monthStart: NOV, seasonStart: FALL, scheduledFor: null, dismissedAt: undefined, focus: picked,
       commitments: [{ level: 'season', periodStart: FALL, status: 'open' }, { level: 'month', periodStart: NOV, status: 'open' }],
     })
     expect('dismissedAt' in unletGoUpdates(t)).toBe(true)

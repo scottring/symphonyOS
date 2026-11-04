@@ -1188,7 +1188,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(lastRun().label).toBe('Someday: “Clear the garage”')
   // Let go: not ever.
   await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Let go: Learn the banjo'}))})
-  expect(api.updateTask).toHaveBeenLastCalledWith('never',{bucket:'someday',dismissedAt:expect.any(Date)})
+  expect(api.updateTask).toHaveBeenLastCalledWith('never',{bucket:'someday',dismissedAt:expect.any(Date),focus:[]})
   expect(lastRun().label).toBe('Let go: “Learn the banjo”')
   expect(lastRun().opts.undo).toEqual(expect.any(Function))
   expect(api.dropCommitment).not.toHaveBeenCalled()
@@ -1314,7 +1314,7 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   expect(api.updateTask).toHaveBeenLastCalledWith('b',{bucket:'someday',scheduledFor:undefined})
   expect(lastRun().label).toBe('Someday: “Learn the banjo”')
   await act(async()=>{fireEvent.click(open.getByRole('button',{name:'Let go: Run a 10k block'}))})
-  expect(api.updateTask).toHaveBeenLastCalledWith('c',{bucket:'someday',dismissedAt:expect.any(Date)})
+  expect(api.updateTask).toHaveBeenLastCalledWith('c',{bucket:'someday',dismissedAt:expect.any(Date),focus:[]})
   expect(lastRun().label).toBe('Let go: “Run a 10k block”')
   expect(lastRun().opts.undo).toEqual(expect.any(Function))
   // The year goal it was for stays on the year.

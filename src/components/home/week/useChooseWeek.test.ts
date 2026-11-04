@@ -50,7 +50,7 @@ describe('useChooseWeek — Look back’s loose ends', () => {
     // Let go: not ever. Every list, and Undo puts it back.
     runs.undo.length = 0
     await act(async () => { await end.letGo() })
-    expect(updateTask).toHaveBeenLastCalledWith('gate', { bucket: 'someday', dismissedAt: expect.any(Date) })
+    expect(updateTask).toHaveBeenLastCalledWith('gate', { bucket: 'someday', dismissedAt: expect.any(Date), focus: [] })
     expect(runs.labels).toContain('Let go: “Fix the gate”')
     await act(async () => { await runs.undo[0]() })
     expect(updateTask).toHaveBeenLastCalledWith('gate', expect.objectContaining({ dismissedAt: undefined }))

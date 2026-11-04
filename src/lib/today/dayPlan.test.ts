@@ -75,6 +75,15 @@ describe('selectDayPlan — dated vs chosen tasks', () => {
     expect(t.bucket).toBe('week')
   })
 
+  // Let go means not ever (Scott, 2026-11-04): a task let go after it was
+  // picked for today does not stay on Today.
+  it('a task let go is not on the day, picked or dated', () => {
+    const picked = createMockTask({ id: 'w1', title: 'Book the plumber', bucket: 'someday', plannedOn: new Date(2026, 8, 19), dismissedAt: new Date(2026, 8, 19, 9) })
+    const plan = selectDayPlan(input({ tasks: [picked, dated({ id: 'd2', dismissedAt: new Date(2026, 8, 19, 9) })] }))
+    expect(plan.plannedExtraTasks).toEqual([])
+    expect(plan.scheduled).toEqual([])
+  })
+
   it('each entry appears once, in its most specific group', () => {
     const plan = selectDayPlan(input({
       tasks: [

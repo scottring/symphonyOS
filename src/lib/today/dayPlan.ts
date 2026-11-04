@@ -37,6 +37,7 @@ import { selectTimed, type Match } from './taskPools'
 import { buildRoutineStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildRoutineDayItems } from './grouping'
 import { deferredInRoutineIds } from './deferredRoutines'
+import { isLetGo } from '@/lib/planning/letGo'
 import { groupRoutineSteps } from './routineCollections'
 import { inTaskWeekend, weekendEnd } from '@/lib/planning/weekend'
 import { committedTo } from '@/lib/placement/model'
@@ -339,7 +340,9 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   const match = makeAssigneeFilter(input.selectedAssignee)
 
   // ── Tasks ──────────────────────────────────────────────────────────────
-  const onDay = selectTimed(input.tasks, input.viewedDate, match)
+  // Let go means not ever: never on a day, even one it was dated or picked for.
+  const live = input.tasks.filter((t) => !isLetGo(t))
+  const onDay = selectTimed(live, input.viewedDate, match)
   const onDayIds = new Set(onDay.map((t) => t.id))
   const scheduled: DayPlanEntry[] = []
   const offMainTaskIds = new Set<string>()
@@ -355,7 +358,7 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
     scheduled.push({ key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed, planned, group: 'scheduled', task: t })
   }
 
-  const plannedExtraTasks = flatten(input.tasks).filter((t) =>
+  const plannedExtraTasks = flatten(live).filter((t) =>
     chosen(t) && !onDayIds.has(t.id) && match(t.assignedTo, t.assignedToAll))
 
   // ── Routine occurrences ────────────────────────────────────────────────
@@ -416,12 +419,12 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
     key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed,
     planned: chosen(t), group, task: t,
   })
-  const week = weekListEntries(input.tasks, match, input.weekStart, ymd, input.userId)
+  const week = weekListEntries(live, match, input.weekStart, ymd, input.userId)
   const isToday = ymd === localYmd(new Date())
-  const carried = selectCarriedOver(input.tasks, isToday, match).filter((t) => !chosen(t)).map(listEntry('carried'))
+  const carried = selectCarriedOver(live, isToday, match).filter((t) => !chosen(t)).map(listEntry('carried'))
   const monthStart = monthStartOf(input.referenceMonth ?? input.viewedDate)
   const currentMonth = monthStartOf(input.now ?? new Date())
-  const month = input.tasks.filter((task) => {
+  const month = live.filter((task) => {
     if (!match(task.assignedTo, task.assignedToAll)) return false
     const commitment = committedTo(task, 'month', monthStart, { isCurrent: localYmd(monthStart) === localYmd(currentMonth) })
     return commitment && (commitment === 'legacy' || !['removed', 'carried'].includes(commitment.status))
@@ -429,11 +432,11 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
 
   const now = input.now ?? new Date()
   const toPlan = toPlanEntries({
-    tasks: input.tasks, match, weekStart: input.weekStart, ymd, userId: input.userId,
+    tasks: live, match, weekStart: input.weekStart, ymd, userId: input.userId,
     available, unhomed: input.unhomedRoutines ?? [], routineById: byId,
   })
-  const unfinished = unfinishedEntries({ tasks: input.tasks, match, ymd, userId: input.userId, now, referenceWeek: input.weekStart > now ? input.weekStart : undefined })
-  const olderUnfinished = flatten(input.tasks).filter((t) =>
+  const unfinished = unfinishedEntries({ tasks: live, match, ymd, userId: input.userId, now, referenceWeek: input.weekStart > now ? input.weekStart : undefined })
+  const olderUnfinished = flatten(live).filter((t) =>
     !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t)
     && isMissedPlacement(t.scheduledFor, t.completed, now) && !isRecentMiss(t.scheduledFor, t.completed, now)).length
 
@@ -444,7 +447,7 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   // Sunday may be in a different calendar week; the explicit weekend window
   // still offers the same task, without making another week commitment.
   const chooserIds = new Set(chooserTasks.map((entry) => entry.id))
-  for (const task of input.tasks) {
+  for (const task of live) {
     if (task.completed || task.isGoal || chooserIds.has(task.id) || !inTaskWeekend(task, input.viewedDate)) continue
     if (!match(task.assignedTo, task.assignedToAll)) continue
     chooserTasks.push({ ...listEntry('week')(task), context: weekRowNoteText(weekRowNote(task, input.weekStart, input.userId, ymd)) })
