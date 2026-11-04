@@ -192,6 +192,37 @@ The prototype is the reference for look, motion and sound. Build what it does:
   phone is half-open like a book (a reported vertical fold): then the split
   sits on the fold, as Today's columns already do.
 
+### The calendar fold (Scott, 2026-11-04: "yes, add the calendar fold on the right")
+
+Best Laid Plans puts every list beside the calendar for the same stretch of
+time: the month's goals beside the month calendar, the season's fixed dates,
+and the year's 12-month landscape. Week and Today already show time as the
+page itself. Year, Season and Month get a second fold on the **right** edge:
+this period's calendar, for reading. Events are added the usual way, never
+from the sheet.
+
+- **Left edge:** the level above (what this period is for). **Right edge:**
+  this period's calendar (what is already claimed). Both open: a full planner
+  spread, Fall | November | November's calendar.
+- **Contents:** Month shows the month grid with events (reuse the guided
+  session's `NextWeeks`, five weeks), Season shows its fixed dates by month
+  (reuse `SeasonCalendar`), and Year shows the 12-month landscape (the 11-01
+  spec's Year section).
+- **Same fold, mirrored:** the hinge is on this sheet's right edge, with the
+  same spring, sound, shading, drag, F-key equivalent (C), memory
+  (`symphony-fold:<horizon>:calendar`) and reduced-motion rules. The edge
+  reads "{period} calendar", e.g. "November calendar".
+- **Wide screens:** both folds can be open when the spread fits (sheet above,
+  this sheet and calendar at their minimum widths). Otherwise opening one
+  folds the other.
+- **Phones and the Duo's outside screen:** the level above folds down from
+  the top edge and the calendar folds up from the bottom edge, one at a time.
+- **iPhone Duo, open:** two pages, and this period's sheet is always one of
+  them. With the level above open, it is Fall | November. With the calendar
+  open, it is November | calendar: November turns over to the left page like
+  a page in a book. One companion at a time. When the phone is half-open
+  (a reported vertical fold), the split sits on the hinge.
+
 ### Where it applies
 
 - **Web:** Year, Season and Month pages (the sheet above: last year's open

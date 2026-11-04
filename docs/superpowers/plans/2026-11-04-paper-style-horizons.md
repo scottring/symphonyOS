@@ -225,6 +225,31 @@
 - [ ] **Step 4:** Run `npx vitest run src/components/schedule src/components/plan/fold`, tsc, and the full suite once. Expect PASS.
 - [ ] **Step 5:** Commit: `feat(today): the week folds beside the day; + plans one for today`.
 
+### Task 5c: The calendar fold on the right (Year, Season, Month)
+
+**Files:**
+- Modify: `src/components/plan/fold/PaperFold.tsx` and `paperFold.css`. Add an optional right companion: props `calendar?: ReactNode`, `calendarLabel?: string` (e.g. "November calendar"). The hinge mirrors on this sheet's right edge (h: origin at the left edge, rotateY(+(1−p)·180); v: from the bottom edge, rotateX(−(1−p)·180) with origin at the top). It has its own spring state, sound, drag, memory (`symphony-fold:<horizon>:calendar`) and key C.
+- Modify: `src/lib/fold/foldMode.ts`. Add `spreadFits(mode, spreadWidth): { both: boolean }`: true in 'h' when spreadWidth ≥ 220 + 420 + 220. Otherwise opening one companion folds the other. In 'duo', with the calendar open, this sheet takes the left page.
+- Modify: `src/components/plan/constellation/ConstellationPage.tsx` to pass the calendar per level: Month uses `NextWeeks` (5 weeks from the month's first week), Season uses `SeasonCalendar`, Year uses the landscape section if built (otherwise the 12 months of exact-date events, read-only).
+- Test: `PaperFold.test.tsx`, `foldMode.test.ts`, `ConstellationPage.test.tsx`
+
+**Interfaces:**
+- Consumes: Tasks 1–3.
+- Produces: the `PaperFold` props above. The left companion is unchanged.
+
+- [ ] **Step 1: Write failing tests.**
+  - Month shows a second edge named "November calendar. Unfold to read", and unfolding it reveals the month's events.
+  - At 1316px both can be open (`data-open` and `data-calendar-open` both true).
+  - At 820px, opening the calendar folds the sheet above.
+  - In 'v', the calendar edge sits below the sheet.
+  - In 'duo', the calendar open sets `data-duo-page="left"` on this sheet.
+  - `spreadFits('h', 860)` is both: true; `spreadFits('h', 859)` is both: false.
+  - Folded, the calendar is inert.
+- [ ] **Step 2:** Run them and expect FAIL.
+- [ ] **Step 3:** Implement. Share the spring and drag code between the two companions rather than duplicating it: extract a `useFoldMotion` hook inside PaperFold.tsx.
+- [ ] **Step 4:** Run `npx vitest run src/components/plan/fold src/lib/fold src/components/plan/constellation`, tsc, and the full suite once. Expect PASS.
+- [ ] **Step 5:** Commit: `feat(fold): this period's calendar folds out on the right`.
+
 ### Task 6: Plain words in headers and week labels
 
 **Files:**
@@ -301,7 +326,7 @@
 
 **Files:**
 - Create:
-  - `apple/SymphonyOS/SymphonyOS/Views/Planner/PaperFoldView.swift`: the fold, with spring `.spring(response: 0.48, dampingFraction: 0.78)`, `rotation3DEffect` about the hinge edge, perspective 0.45, drag, and `@AppStorage("planner.unfolded.<horizon>")`
+  - `apple/SymphonyOS/SymphonyOS/Views/Planner/PaperFoldView.swift`: the fold, with left (level above) and right (this period's calendar) companions, mirroring Task 5c's rules, with spring `.spring(response: 0.48, dampingFraction: 0.78)`, `rotation3DEffect` about the hinge edge, perspective 0.45, drag, and `@AppStorage("planner.unfolded.<horizon>")`
   - `apple/SymphonyOS/SymphonyOS/Services/PaperSound.swift`: AVAudioEngine with a noise buffer, the same four sounds, respecting the silent switch through `.ambient`; mute in `@AppStorage("planner.paperSound")`
   - `apple/SymphonyOS/SymphonyOSTests/PaperFoldTests.swift`
 - Modify:
