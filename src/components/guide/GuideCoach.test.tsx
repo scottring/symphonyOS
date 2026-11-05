@@ -56,7 +56,7 @@ function MonthPage({ titled = true, stacked = false }: { titled?: boolean; stack
       <PlanChip level="month" word="November" onStart={() => setPlanning(true)} />
     </header>
     {planning
-      ? <GuidedPeriod level="month" token="2026-11" periodLabel="November" page={sheet} look={() => <p>Pick a scenery</p>}
+      ? <GuidedPeriod level="month" token="2026-11" periodLabel="November" words={{ prev: 'October', above: 'Fall' }} page={sheet} look={() => <p>Pick a scenery</p>}
           onFinish={async () => { setMarked(true); return true }} onLeave={() => setPlanning(false)} />
       : sheet()}
   </>
@@ -96,8 +96,8 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
     expect(screen.getByRole('button', { name: 'Planning November · 1 of 6' })).toBeInTheDocument()
     expect(tip().getByText('Step 1 of 6')).toBeInTheDocument()
     expect(tip().getByText('Fresh start')).toBeInTheDocument()
-    expect(tip().getByText('A visible reset makes a new month feel like a new start.')).toBeInTheDocument()
-    expect(tip().getByText("Pick this month's scenery.")).toBeInTheDocument()
+    expect(tip().getByText('Mark the turn of the month.')).toBeInTheDocument()
+    expect(tip().getByText(/pick November's scenery\. It's only a visual signal that October is closed/)).toBeInTheDocument()
     expect(tip().getByRole('button', { name: 'Back' })).toBeDisabled()
   })
 
@@ -106,14 +106,14 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
     await start()
     await next()
     expect(tip().getByText('Step 2 of 6')).toBeInTheDocument()
-    expect(tip().getByText('Look back at last month')).toBeInTheDocument()
+    expect(tip().getByText('Look back at October')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Planning November · 2 of 6' })).toBeInTheDocument()
     expect(sound.crinkle).toHaveBeenCalled()
     await next(); await next()
-    expect(tip().getByText('Next 4–5 weeks')).toBeInTheDocument()
+    expect(tip().getByText("November's calendar")).toBeInTheDocument()
     expect(drive()).toEqual({ calendar: true })
     await act(async () => { fireEvent.click(tip().getByRole('button', { name: 'Back' })) })
-    expect(tip().getByText('Read the season list')).toBeInTheDocument()
+    expect(tip().getByText('Read Fall')).toBeInTheDocument()
   })
 
   it('the tooltip’s ✕ hides it and the chip stays; the chip shows it again; Escape hides it too', async () => {
@@ -156,10 +156,11 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
     mockRects()
     show()
     await start()
-    // Next 4–5 weeks: the calendar's edge, the tooltip at its left.
+    // November's calendar: the calendar's edge, the tooltip at its left, low
+    // in the view so the top of November's list stays in sight (2026-11-05).
     expect(coach()).toHaveAttribute('data-at', 'right')
     expect(coach()).toHaveAttribute('data-side', 'right')
-    expect(coach().style.transform).toBe('translate(686px, 196px)')
+    expect(coach().style.transform).toBe('translate(686px, 676px)')
     // The month by area: the write line, the tooltip under it, and lit.
     await next()
     expect(coach()).toHaveAttribute('data-at', 'write')
@@ -276,9 +277,31 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
     expect(tip().queryByRole('button', { name: 'Book the first Winter session' })).toBeNull()
     expect(tip().queryByRole('alert')).toBeNull()
   })
+  // Scott, 2026-11-05: "a way to hide tooltips so experts can breeze through".
+  it('Hide tips keeps the title, Back and Next, remembered for every session; the title opens the words for that step', async () => {
+    localStorage.removeItem('symphony-coach:short')
+    const props = { level: 'month' as const, word: 'November', words: { this: 'November', prev: 'October', above: 'Fall' }, onNext: vi.fn(), onBack: vi.fn(), onFinish: vi.fn(), onStop: vi.fn() }
+    const { rerender, unmount } = render(<MemoryRouter><GuideCoach {...props} current="look-back" /></MemoryRouter>)
+    expect(tip().getByText(/Close out October before planning November/)).toBeInTheDocument()
+    fireEvent.click(tip().getByRole('button', { name: 'Hide tips' }))
+    expect(tip().queryByText(/Close out October/)).toBeNull()
+    expect(tip().getByRole('button', { name: /Look back at October/ })).toBeInTheDocument()
+    expect(tip().getByRole('button', { name: 'Next' })).toBeInTheDocument()
+    fireEvent.click(tip().getByRole('button', { name: /Look back at October/ }))
+    expect(tip().getByText(/Close out October/)).toBeInTheDocument()
+    rerender(<MemoryRouter><GuideCoach {...props} current="read-season" /></MemoryRouter>)
+    expect(tip().queryByText(/Remember what this season is for/)).toBeNull()
+    unmount()
+    render(<MemoryRouter><GuideCoach {...props} current="read-season" /></MemoryRouter>)
+    expect(tip().getByRole('button', { name: 'Show tips' })).toBeInTheDocument()
+    fireEvent.click(tip().getByRole('button', { name: 'Show tips' }))
+    expect(tip().getByText(/Remember what this season is for/)).toBeInTheDocument()
+    expect(localStorage.getItem('symphony-coach:short')).toBeNull()
+  })
+
   it('a step with no ask has no extra button', () => {
     render(<MemoryRouter><GuideCoach level="year" current="refine" word="2026" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()} /></MemoryRouter>)
-    expect(tip().getAllByRole('button').map((b) => b.textContent)).toEqual(['Back', 'Next', '✕'])
+    expect(tip().getAllByRole('button').map((b) => b.textContent)).toEqual(['Hide tips', 'Back', 'Next', '✕'])
   })
 
   // Fix round 1 (ruling): booking keeps a date.

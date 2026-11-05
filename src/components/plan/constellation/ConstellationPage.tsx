@@ -99,7 +99,7 @@ import { monthToken, usePlanningSession, yearToken, type SessionHorizon } from '
 import { showToast } from '@/hooks/useToast'
 import { usePeriodReview } from '@/hooks/usePeriodReview'
 import { nextSeasonStart, seasonLabel, seasonToken } from '@/lib/cadence/seasons'
-import { REVIEW_WINDOW_DAYS, alsoDoneIn, movedOn, reviewTarget, taskReviewState, weekPhrase, yearGoalReviewState } from '@/lib/planning/periodReview'
+import { REVIEW_WINDOW_DAYS, movedOn, reviewTarget, taskReviewState, weekPhrase, yearGoalReviewState } from '@/lib/planning/periodReview'
 import { liveCommitments } from '@/lib/placement/model'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import type { Task } from '@/types/task'
@@ -664,8 +664,6 @@ function Inner() {
     ? selectPeriodTasks(visible, PERIODS[level] as 'season' | 'month', prevB.start, isCurrentPeriod(prevB, now), lens.scopeId, seasons)
     : []
   const prevAll = prevGoals.length + prevTasks.length
-  const prevListed = new Set(prevTasks.map((t) => t.id))
-  const prevAlso = planning && level > 0 ? alsoDoneIn(visible, prevB.start, prevB.end, (t) => prevListed.has(t.id)) : []
   const prevDone = prevGoals.filter((g) => g.status === 'completed').length
     + prevTasks.filter((t) => taskReviewState(t, PERIODS[level] as 'season' | 'month', prevB.start, { isCurrent: isCurrentPeriod(prevB, now), seasons }) === 'done').length
 
@@ -710,7 +708,7 @@ function Inner() {
   const doneOf = (t: Task) => act(`Complete “${t.title}”`, toggleOf(t), { ids: [t.id], undo: toggleOf(t) })
   const lookBackBody = (t: PeriodSessionTools) => {
     if (!planning) return null
-    const common = { prevLabel: prevWord, review: prevReview, draft: t.lookDraft, onDraft: t.setLookDraft, done: prevDone, outOf: prevAll, alsoDone: prevAlso }
+    const common = { prevLabel: prevWord, review: prevReview, draft: t.lookDraft, onDraft: t.setLookDraft, done: prevDone, outOf: prevAll }
     if (level === 0) {
       const open = goalsOf(year - 1).filter((g) => yearGoalReviewState(g, thisYearGoals) === 'open')
         .map((g) => ({ id: g.id, title: g.name, node: { key: `0:${g.id}`, id: g.id, title: g.name, level: 0, parent: null, goal: g } as PlanNode }))
@@ -840,9 +838,12 @@ function Inner() {
   const onPeriod = openNodes.length + doneNodes.length
   const doneWord = level === 0 ? `${onPeriod === 1 ? 'goal' : 'goals'} done` : 'done'
   const countText = `${doneNodes.length} of ${onPeriod} ${doneWord}`
-  // The fact line and the summary line stay through a planning session (the
-  // page never changes shape); a review on its way to the session hides them.
-  const facts = !reviewing && dataReady && !error && !goalsError
+  // While a session runs the plan chip is the one count (Scott, 2026-11-05:
+  // "2 of 12 done" beside "Planning November · 2 of 6", "Planned Sat, Oct 31"
+  // while planning it, and a link to the review already open beside you):
+  // the fact line steps aside, and the summary line keeps only the season's
+  // energy (its step's home). A review on its way to the session hides them.
+  const facts = !reviewing && !planning && dataReady && !error && !goalsError
     ? <p className="wk-facts plan-facts" data-explain="period-facts" data-explain-label={`${periodWord} at a glance`}>
       {level === 1 && <>{periodRange(bounds.start, bounds.end)}{onPeriod > 0 && ' · '}</>}
       {onPeriod > 0 && <>
@@ -856,7 +857,7 @@ function Inner() {
   const plannedAt = periodNotes.notes.guide?.plannedAt
     ?? (!planSession.loading && !planSession.error ? planSession.saved?.at.toISOString() : undefined)
   const summary = !reviewing && dataReady && !error && !goalsError
-    ? <PeriodSummaryLine level={PERIODS[level]} plannedAt={plannedAt} reviewed={!prevReview.error && !!prevReview.reviewed}
+    ? <PeriodSummaryLine level={PERIODS[level]} plannedAt={planning ? undefined : plannedAt} reviewed={!planning && !prevReview.error && !!prevReview.reviewed}
       // Season's energy, asked in its Energy step's tooltip (Task 4): said
       // here, and a tap changes it. Keyed by the period: a menu left open
       // never carries to the next season.
@@ -880,15 +881,18 @@ function Inner() {
   // lies beside the level above, folded at its left edge, and its calendar,
   // folded at its right (PaperFold). In a session each step drives the
   // folds; Done planning stamps it.
-  const footer = proposals.length > 0 || openNodes.length > 0
+  // The way on ("Go to this week →") is not offered mid-session (Scott,
+  // 2026-11-05): the session's last step already leads to the week.
+  const onwardShown = openNodes.length > 0 && !planning
+  const footer = proposals.length > 0 || onwardShown
   // This period's calendar, folded at the sheet's right edge, for reading
   // (Task 5c). It reuses the sessions' read-only steps: Month the month at a
   // glance over its weeks from its first (four to six, the grid's rows), Season its fixed dates by month,
   // Year its 12 months of exact-date events.
   const calendarSheet = level === 2
-    ? <CalendarSheet kicker="What’s already claimed" title={periodWord}>
+    ? <CalendarSheet kicker="Calendar" title={periodWord}>
       <MonthGrid month={bounds.start} weekStartsOn={weekStartsOn} />
-      <NextWeeks start={weekStartAnchor(bounds.start, weekStartsOn)} weeks={monthGridWeeks(bounds.start, weekStartsOn).length} />
+      <NextWeeks start={weekStartAnchor(bounds.start, weekStartsOn)} weeks={monthGridWeeks(bounds.start, weekStartsOn).length} within={{ start: bounds.start, end: bounds.end }} />
       <CalendarRoutines word="month" routines={periodRoutines} />
     </CalendarSheet>
     : level === 1
@@ -960,7 +964,7 @@ function Inner() {
       </button>}
       {footer && <footer className="plan-list-foot">
         {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all</button>}
-        {openNodes.length > 0 && <Link to={onward.to} className="plan-next" data-explain="next" data-explain-label={onward.label.replace(' →', '')}>{onward.label}</Link>}
+        {onwardShown && <Link to={onward.to} className="plan-next" data-explain="next" data-explain-label={onward.label.replace(' →', '')}>{onward.label}</Link>}
       </footer>}
     </section>
     )
@@ -973,11 +977,11 @@ function Inner() {
     <div className="plan-sheet-spread">
       <PaperFold horizon={PERIODS[level]} edgeLabel={fold?.look ? prevB.label : aboveSheet.title} edgeCount={fold?.look ? undefined : aboveSheet.rows.length}
         frontLabel={fold?.look ? `${prevB.label}, looking back` : undefined}
-        above={fold?.look ? <LookSheet title={prevWord}>{fold.look}</LookSheet>
+        above={fold?.look ? <LookSheet>{fold.look}</LookSheet>
           : <AboveSheet {...aboveSheet} foot={`For reading. Write ${periodWord} in its own words.`}>
             {level === 1 && fold?.stepId === 'from-year' && somedayRows()}
           </AboveSheet>}
-        calendar={calendarSheet} calendarLabel={`${periodWord} calendar`} drive={fold?.drive} driveKey={fold?.stepId}>
+        calendar={calendarSheet} calendarLabel={`${periodWord} calendar`} drive={fold?.drive} driveKey={fold?.stepId} wide={!!fold?.look}>
         {sheetFor(fold)}
       </PaperFold>
     </div>
@@ -1067,6 +1071,7 @@ function Inner() {
       // Planning: this same page, one tooltip per step, each step driving
       // the sheet's folds.
       : planning ? <GuidedPeriod key={periodKey} level={PERIODS[level]} token={sessionToken} periodLabel={periodWord}
+          words={{ prev: prevWord, above: level === 2 ? seasonWord : level === 1 ? String(year) : undefined }}
           page={pageBody} look={lookBackBody} asks={sessionAsks} onFinish={closePeriod}
           onLeave={() => { setMode(null); periodNotes.reload(); seasonNotes.reload() }}
           onPlanned={() => { planSession.reload(); periodNotes.reload() }} listenPageWrites={listenPageWrites}

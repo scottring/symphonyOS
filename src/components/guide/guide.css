@@ -256,3 +256,12 @@
 .energy-menu-item:hover, .energy-menu-item:focus-visible { background: var(--color-neutral-100); outline: none; }
 .energy-menu-item.is-clear { color: var(--color-neutral-500); border-top: 1px solid var(--color-neutral-100); border-radius: 0 0 6px 6px; margin-top: 2px; }
 .energy-menu-failed { font-size: 12px; color: var(--color-danger-600, hsl(0 60% 42%)); }
+
+/* Looking back (Scott, 2026-11-05): each row's four calls on one line, no
+   stray "·" opening a wrapped line; a decided row steps back; the heading
+   counts what is decided. The sheet is widened for it (foldSizes `wide`). */
+.look-sheet .gw-row-acts { flex-wrap: nowrap; white-space: nowrap; }
+.look-sheet .gw-row.is-decided { opacity: .62; }
+.gw-h-count { letter-spacing: .04em; text-transform: none; font-weight: 500; color: var(--color-neutral-500); }
+.choose-look-saved:empty { display: none; }
+.choose-look-saved { margin: 2px 0 0; font-size: 12.5px; color: var(--color-neutral-500); }

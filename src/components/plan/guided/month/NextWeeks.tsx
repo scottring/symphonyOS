@@ -18,10 +18,14 @@ const DAY = 86_400_000
 const NO_TASKS: never[] = []
 const short = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
-export function NextWeeks({ start, weeks }: {
+export function NextWeeks({ start, weeks, within }: {
   /** The first week's first day (a week anchor). */
   start: Date
   weeks: number
+  /** The month the weeks are read for (the Month calendar sheet): only its
+   *  own days are listed, so a week that begins in October starts at Nov 1
+   *  (Scott, 2026-11-05), and only what claims a day's time (scope 'month'). */
+  within?: { start: Date; end: Date }
 }) {
   const connected = getCalendarConnected()
   const cal = useDayLoadEvents(connected !== false)
@@ -32,16 +36,20 @@ export function NextWeeks({ start, weeks }: {
 
   const range = cal.range
   const spanEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7 * weeks)
-  const { claims, rhythm } = claimsIn(cal.events, NO_TASKS, start, spanEnd)
+  const from0 = within && within.start > start ? within.start : start
+  const to0 = within && within.end < spanEnd ? within.end : spanEnd
+  const { claims, rhythm } = claimsIn(cal.events, NO_TASKS, from0, to0, within ? { scope: 'month' } : {})
   const line = rhythmLine(rhythm)
   // A claim sits in the week it starts in; a stretch already under way, in the first.
-  const inWeek = (c: Claim, from: Date, to: Date) => { const d = c.at < start ? start : c.at; return d >= from && d < to }
+  const inWeek = (c: Claim, from: Date, to: Date) => { const d = c.at < from0 ? from0 : c.at; return d >= from && d < to }
   return <div className="gw-body">
     {line && <p className="cal-sheet-rhythm">{line}</p>}
     <ul className="gw-rows" aria-label="The next weeks">
       {Array.from({ length: weeks }, (_, i) => {
-        const from = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7 * i)
-        const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 7)
+        const wk = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7 * i)
+        const from = wk < from0 ? from0 : wk
+        const wkEnd = new Date(wk.getFullYear(), wk.getMonth(), wk.getDate() + 7)
+        const to = wkEnd > to0 ? to0 : wkEnd
         const label = `Week of ${short(from)}`
         const lastDay = to.getTime() - DAY
         const unread = !range || from.getTime() > range.end || lastDay < range.start

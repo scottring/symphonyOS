@@ -61,8 +61,6 @@ export interface WeekDeck {
   onThisWeek?: number
   /** Everything that was on last week, done or not (Looking back's "of"). */
   plannedLastWeek?: number
-  /** Finished last week but not on it (Looking back's "Also done"). */
-  alsoDoneLastWeek?: readonly { id: string; title: string }[]
   aged: number
   actions: DeckActions
   stripDays: StripDay[]
@@ -291,7 +289,7 @@ function WeekSession({ weekStart, deck, lastReview, canvas, onFinish, onClose, o
   // tooltip; the steps' old editors (calendar check, inbox, weekly ops, tell
   // the family) are not drawn in a session (2026-11-04: their place is the
   // week itself).
-  const look = <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek} alsoDone={deck.alsoDoneLastWeek}
+  const look = <WeekLookBack review={lastReview} draft={lookDraft} onDraft={setLookDraft} done={deck.doneLastWeek} outOf={deck.plannedLastWeek}
     notDone={choose.notDoneLastWeek} looseEnds={choose.looseEnds ?? []} aged={deck.aged} onSeeAged={deck.onSeeAged} />
   // Where the session is comes first: no flash of step one before a resume.
   // The week stays drawn, as it is, while that loads (final review: the page

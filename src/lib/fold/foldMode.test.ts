@@ -63,3 +63,20 @@ describe('foldSizes with a calendar', () => {
     expect(foldSizes('h', 820, 900)).toMatchObject({ above: 295, current: 525, both: false })
   })
 })
+
+// Scott, 2026-11-05: the look back's rows each on one line.
+describe('foldSizes for a look back (wide)', () => {
+  it('h: the sheet above widens (300–440) and the calendar folds; this sheet keeps 560 when there is room', () => {
+    const s = foldSizes('h', 1180, 900, { calendar: true, wide: true })
+    expect(s.above).toBe(425)
+    expect(s.both).toBe(false)
+    expect(s.current).toBe(560)
+    expect(foldSizes('h', 1180, 900, { calendar: true }).above).toBeLessThan(s.above)
+    expect(foldSizes('h', 700, 900, { wide: true }).above).toBe(300)
+    expect(foldSizes('h', 2000, 900, { wide: true }).above).toBe(440)
+  })
+  it('duo and v are as they are', () => {
+    expect(foldSizes('duo', 640, 900, { calendar: true, wide: true })).toEqual(foldSizes('duo', 640, 900, { calendar: true }))
+    expect(foldSizes('v', 390, 800, { wide: true })).toEqual(foldSizes('v', 390, 800))
+  })
+})

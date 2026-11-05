@@ -206,7 +206,7 @@ describe('GuidedWeek — the Week page while planning', () => {
     open('/week?plan=1', deck)
     // 1 · Look back: the notes save as last week's review; the loose end and the sweep's note.
     fireEvent.change(lookSheet().getByLabelText('What went well'), { target: { value: 'Rested' } })
-    await act(async () => { fireEvent.click(lookSheet().getByRole('button', { name: 'Save notes' })) })
+    await act(async () => { fireEvent.blur(lookSheet().getByLabelText('What went well')) })
     expect(review.finish).toHaveBeenCalledWith({ wentWell: 'Rested', didnt: '' })
     expect(within(lookSheet().getByRole('listitem', { name: 'Fix the gate' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Done', 'Next week', 'Someday', 'Let go'])
     expect(lookSheet().queryByRole('button', { name: /^Back to / })).toBeNull()
@@ -230,7 +230,7 @@ describe('GuidedWeek — the Week page while planning', () => {
     open('/week?plan=1', makeDeck({ onThisWeek: 3 }))
     expect(drive()).toEqual({ above: true })
     await next()
-    expect(stepNow()).toBe('Weekly ops')
+    expect(stepNow()).toBe('Meals, workouts and the weekend')
     expect(drive()).toEqual({})
     expect(screen.queryByLabelText('What the weekend is for')).toBeNull()
     await next()
@@ -264,12 +264,10 @@ describe('GuidedWeek — the Week page while planning', () => {
   it('notes typed in Look back and not saved survive going on and coming back, marked not saved', async () => {
     open('/week?plan=1')
     fireEvent.change(lookSheet().getByLabelText('What went well'), { target: { value: 'Rested' } })
-    expect(lookSheet().getByText('Not saved yet')).toBeInTheDocument()
     await next()
     expect(screen.queryByLabelText('What went well')).toBeNull()
     await back()
     expect(lookSheet().getByLabelText('What went well')).toHaveValue('Rested')
-    expect(lookSheet().getByText('Not saved yet')).toBeInTheDocument()
     expect(review.finish).not.toHaveBeenCalled()
   })
   // The count is the page's own (WeekViewV2 counts the rows it draws), never

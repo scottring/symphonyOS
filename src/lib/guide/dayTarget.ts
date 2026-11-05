@@ -2,7 +2,7 @@
 // looking back on yesterday; from 4 pm, tomorrow, looking back on today.
 // The two steps that name the day say which one.
 
-import type { GuideStep } from './steps'
+import { wordsIn, type GuideStep, type StepWords } from './steps'
 
 /** From this hour the session plans tomorrow. */
 export const EVENING_HOUR = 16
@@ -16,10 +16,12 @@ export function dayTarget(now: Date): { target: Date; lookBackOn: Date; isTomorr
 
 /** "Look back at today" and "Tomorrow's calendar" in the evening. */
 export function dayStepTitle(s: GuideStep, isTomorrow: boolean): string {
-  if (!isTomorrow) return s.title
-  if (s.id === 'look-back') return 'Look back at today'
-  if (s.id === 'calendar') return 'Tomorrow\'s calendar'
-  return s.title
+  return wordsIn(s.title, dayWords(isTomorrow))
+}
+
+/** The day a session plans, and the one before it, for the steps' words. */
+export function dayWords(isTomorrow: boolean): StepWords {
+  return isTomorrow ? { day: 'tomorrow', Day: 'Tomorrow', before: 'today' } : { day: 'today', Day: 'Today', before: 'yesterday' }
 }
 
 /** Three to five a day: stated, never enforced. */

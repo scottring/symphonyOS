@@ -409,3 +409,14 @@ and ship".
 - The done-items fold stays.
 - The three builder-check answers above (nothing moves up; scope of drop
   ties; Carry, Let go and Table act per period).
+
+## Addendum, 2026-11-05: the planning page, section by section
+
+Scott walked Month's step 2 ("this is confusing") section by section. Every horizon now does the same:
+
+- **Look back.** No "Also done, not on the list" (it duplicated *What went well* and pulled the week's and day's lists up). The score accounts for every line: "7 done · 3 moved on · 13 open". The two notes save themselves (a pause in typing, or leaving the box), with "Saved Nov 3" under them; no Save button. Each row's four calls sit on one line (the sheet above widens while it holds a look back, `foldSizes` `wide`, 300–440px) and the calendar folds; decided rows step back, and the heading counts "4 of 13 decided". The look sheet's foot sentence is gone: the tooltip says what each call means.
+- **This period's sheet.** The write line names its space ("Family", or "Space" when none). "Go to this week →" is not offered while planning.
+- **Calendar sheet.** Kicker "Calendar". Month and Season lists hold what claims a day's time (all-day dates, stretches, series, weekend timed events); a weekday meeting is a dot on the Month grid only. The Month list starts on the month's first day. Day headers are two letters.
+- **Header.** While a session runs, the plan chip is the only count: no fact line, no "Planned …" or review link (the season's energy stays).
+- **Tooltips.** Each says what the step is for, what is on the screen and what each call does, naming the real periods (`{this}`, `{prev}`, `{above}`, `{month}`, `{day}` filled by `stepIn`). "Hide tips" leaves the title with Back and Next, remembered on the device (`symphony-coach:short`); the title opens the words for that step. Beside a fold the tooltip sits low in the view, so the top of the period's list stays in sight.
+- **Scrolling.** A pinned sheet is sized from where it is, not where it will pin, and follows the page's scroll, so each sheet ends in view and scrolls on its own to its last line.

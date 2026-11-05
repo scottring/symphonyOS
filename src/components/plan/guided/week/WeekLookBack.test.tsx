@@ -26,14 +26,12 @@ const row = (title: string) => within(screen.getByRole('listitem', { name: title
 describe('WeekLookBack — step 1, look back at last week', () => {
   it('saving the two notes records last week’s review', async () => {
     const p = setup()
-    expect(screen.getByText(/of 5 done · 2 not done/)).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Looking back at Last week' })).toHaveTextContent(/3 done · 2 open/)
     fireEvent.change(screen.getByLabelText('What went well'), { target: { value: 'Shipped the deck' } })
     fireEvent.change(screen.getByLabelText('What didn’t'), { target: { value: 'Too many evenings out' } })
-    expect(screen.getByText('Not saved yet')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save notes' })) })
+    await act(async () => { fireEvent.blur(screen.getByLabelText('What didn’t')) })
     expect(p.review.finish).toHaveBeenCalledWith({ wentWell: 'Shipped the deck', didnt: 'Too many evenings out' })
-    expect(screen.getByText('Saved.')).toBeInTheDocument()
-    expect(screen.queryByText('Not saved yet')).toBeNull()
+    expect(screen.getByText('Saved')).toBeInTheDocument()
   })
 
   it('opens on what was already said', () => {

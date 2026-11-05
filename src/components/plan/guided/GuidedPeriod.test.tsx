@@ -101,14 +101,15 @@ describe('GuidedPeriod — Month, Season and Year while planning: a few tooltips
     expect(drive()).toEqual({})
     await next()
     expect(shell.reg?.stepId).toBe('look-back')
-    expect(drive()).toEqual({ above: true })
+    // The look back has the room to itself: the calendar folds (2026-11-05).
+    expect(drive()).toEqual({ above: true, calendar: false })
     expect(within(screen.getByRole('complementary', { name: 'Sheet above' })).getByLabelText('Went well')).toBeInTheDocument()
     expect(shell.reg).toMatchObject({ token: '2026-11', threadKey: 'monthly:2026-11' })
     await next()
     expect(drive()).toEqual({ above: true })
     expect(screen.queryByRole('complementary', { name: 'Sheet above' })).toBeNull()
     await next()
-    expect(stepNow()).toBe('Next 4–5 weeks')
+    expect(stepNow()).toBe("November's calendar")
     expect(drive()).toEqual({ calendar: true })
     await next()
     // The month by area writes on the sheet, Fall open beside it.
@@ -119,8 +120,8 @@ describe('GuidedPeriod — Month, Season and Year while planning: a few tooltips
   it('resuming opens the saved step', () => {
     store.notes = { guide: { current: 'by-area', done: ['fresh-start', 'look-back', 'read-season', 'next-weeks'], skipped: [] } }
     setup()
-    expect(stepNow()).toBe('The month by area')
-    expect(panel().getByText('The month by area')).toBeInTheDocument()
+    expect(stepNow()).toBe('November’s goals'.replace('’', "'"))
+    expect(panel().getByText("November's goals")).toBeInTheDocument()
   })
 
   it('Next and Back move and are saved; Stop planning writes nothing more', async () => {
@@ -193,7 +194,7 @@ describe('GuidedPeriod — Month, Season and Year while planning: a few tooltips
     expect(screen.getByLabelText('Went well')).toHaveValue('Cabin booked')
     // To the last step, then Done planning November on the tooltip.
     await next(4)
-    expect(stepNow()).toBe('Maintenance and fun')
+    expect(stepNow()).toBe('Upkeep and fun')
     await act(async () => { fireEvent.click(coach().getByRole('button', { name: 'Done planning November' })) })
     expect(p.onFinish).toHaveBeenCalledWith({ wentWell: 'Cabin booked', didnt: '' })
     await waitFor(() => expect(p.onLeave).toHaveBeenCalled())

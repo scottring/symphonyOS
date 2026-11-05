@@ -142,6 +142,26 @@ describe('claimsIn — what claims a planning period', () => {
   })
 })
 
+// Scott, 2026-11-05: a month's or season's list is what claims a day's
+// time; a weekday meeting is a dot on the Month grid, not a line.
+describe('claimsIn — month and season lists', () => {
+  it('keeps all-day dates, stretches, series and weekend timed events; leaves weekday one-off timed events to the grid', () => {
+    const evs = [
+      ev('Scott <> Vinnie', '2026-11-02T12:30:00', { end_time: '2026-11-02T13:00:00' }), // Mon
+      ev('Race', '2026-11-07T08:00:00', { end_time: '2026-11-07T09:00:00' }), // Sat
+      ev('Party', '2026-11-08T14:00:00', { end_time: '2026-11-08T16:00:00' }), // Sun
+      ev('No school', '2026-11-06', { end_time: '2026-11-07', all_day: true }),
+      ev('Conference', '2026-11-10T09:00:00', { end_time: '2026-11-12T17:00:00' }),
+    ]
+    const from = new Date(2026, 10, 1), to = new Date(2026, 11, 1)
+    const titles = (scope?: 'month' | 'season') => claimsIn(evs, [], from, to, scope ? { scope } : {}).claims.map((c) => c.title)
+    expect([...titles('month')].sort()).toEqual(['Conference', 'No school', 'Party', 'Race'])
+    expect(titles('month')).not.toContain('Scott <> Vinnie')
+    expect(titles('season')).not.toContain('Scott <> Vinnie')
+    expect(titles()).toContain('Scott <> Vinnie')
+  })
+})
+
 describe('rhythmLine', () => {
   it('names at most four series, then “and N more”; nothing when empty', () => {
     const r = ['A', 'B', 'C', 'D', 'E', 'F'].map((title) => ({ title, days: 'Mon' }))

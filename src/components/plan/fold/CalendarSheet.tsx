@@ -29,7 +29,7 @@ import './sheet.css'
 export const CALENDAR_FOOT = 'For reading. Add events the usual way.'
 
 export function CalendarSheet({ kicker, title, children }: {
-  /** "What’s already claimed", "Fixed dates · Sep 1 – Nov 30", "The 12 months". */
+  /** "Calendar", "Fixed dates · Sep 1 – Nov 30", "The 12 months". */
   kicker: string
   /** "November", "Fall", "2026". */
   title: string
@@ -114,7 +114,8 @@ export function MonthGrid({ month, weekStartsOn }: { month: Date; weekStartsOn: 
     }
   }
   const weeks = monthGridWeeks(first, weekStartsOn)
-  const heads = weeks[0].map((d) => d.toLocaleDateString('en-US', { weekday: 'narrow' }))
+  // Two letters, so a Saturday-first week never reads "S S M" (Scott, 2026-11-05).
+  const heads = weeks[0].map((d) => d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2))
   return (
     <table className="cal-sheet-grid" aria-label={first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}>
       <thead>

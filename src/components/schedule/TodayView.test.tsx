@@ -837,7 +837,7 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('heading', heading(at(0)))).toBeInTheDocument()
     expect(search().get('date')).toBeNull()
     expect(screen.getByRole('dialog', { name: 'Planning guide' }).dataset.at).toBe('leftovers')
-    expect(coach().getByText('Plan them for today with +, or leave them on the week.')).toBeInTheDocument()
+    expect(coach().getByText('Leftovers are at the top of the week sheet on the left, marked with their day. Tap + to plan one for today, or leave it on the week.')).toBeInTheDocument()
     // The anchor is the first marked row on the week sheet, and the week is open.
     const row = document.querySelector<HTMLElement>('[data-guide-anchor="leftovers"]')!
     expect(row.closest('.above-sheet')).not.toBeNull()

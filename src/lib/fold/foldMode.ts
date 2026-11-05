@@ -43,11 +43,17 @@ export interface FoldSizes {
   both: boolean
 }
 
+/** The sheet above, widened while it holds a look back (Scott, 2026-11-05:
+ *  each row's four calls on one line). */
+function wideAbove(spreadWidth: number): number {
+  return Math.round(Math.min(440, Math.max(300, 0.36 * spreadWidth)))
+}
+
 export function foldSizes(
   mode: FoldMode,
   spreadWidth: number,
   viewportHeight: number,
-  opts: { calendar?: boolean } = {},
+  opts: { calendar?: boolean; wide?: boolean } = {},
 ): FoldSizes {
   if (mode === 'v') {
     return {
@@ -67,7 +73,7 @@ export function foldSizes(
     return { above, calendar: above, current, edge: 22, maxAboveHeight: viewportHeight, both: false }
   }
   if (!opts.calendar) {
-    const above = Math.round(Math.min(340, Math.max(220, 0.36 * spreadWidth)))
+    const above = opts.wide ? wideAbove(spreadWidth) : Math.round(Math.min(340, Math.max(220, 0.36 * spreadWidth)))
     return {
       above,
       calendar: above,
@@ -76,6 +82,13 @@ export function foldSizes(
       maxAboveHeight: viewportHeight,
       both: false,
     }
+  }
+  // A look back: the sheet above wide, and the calendar folded at its edge
+  // (opening it folds the look back: no room for three).
+  if (opts.wide) {
+    const above = wideAbove(spreadWidth)
+    const calendar = Math.round(Math.min(320, Math.max(MIN_COMPANION, 0.26 * spreadWidth)))
+    return { above, calendar, current: Math.min(560, spreadWidth - above - 34), edge: 34, maxAboveHeight: viewportHeight, both: false }
   }
   // Three pages (the prototype's layout()): each companion about a quarter
   // of the spread (220–320). With room for all three, this sheet keeps at

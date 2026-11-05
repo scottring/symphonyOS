@@ -23,12 +23,13 @@ const row = (title: string) => within(screen.getByRole('listitem', { name: title
 describe('PeriodLookBack — look back at the period before', () => {
   it('saves the review notes, and says when they are not saved yet', async () => {
     const p = setup()
-    expect(screen.getByRole('article', { name: 'Looking back at October' })).toHaveTextContent(/of 5 done · 2 not done/)
+    expect(screen.getByRole('article', { name: 'Looking back at October' })).toHaveTextContent(/3 done · 2 open/)
+    expect(screen.queryByRole('button', { name: 'Save notes' })).toBeNull()
     fireEvent.change(screen.getByLabelText('What went well'), { target: { value: 'Cabin booked, energy good' } })
-    expect(screen.getByText('Not saved yet')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save notes' })) })
+    expect(p.review.finish).not.toHaveBeenCalled()
+    // Leaving the box saves it.
+    await act(async () => { fireEvent.blur(screen.getByLabelText('What went well')) })
     expect(p.review.finish).toHaveBeenCalledWith({ wentWell: 'Cabin booked, energy good', didnt: '' })
-    expect(screen.queryByText('Not saved yet')).toBeNull()
   })
 
   // Naming the carry, Someday and Let go (Scott, 2026-11-04): the choice
@@ -67,5 +68,13 @@ describe('PeriodLookBack — look back at the period before', () => {
   it('nothing left open says so', () => {
     setup({ open: [] })
     expect(screen.getByText('Nothing left open from October.')).toBeInTheDocument()
+  })
+
+  // Scott, 2026-11-05: the end is in view.
+  it('counts what is decided in its heading', async () => {
+    setup()
+    expect(screen.getByRole('heading', { name: 'Open from October · 0 of 2 decided' })).toBeInTheDocument()
+    await act(async () => { fireEvent.click(row('Fix the gate').getByRole('button', { name: 'Someday: Fix the gate' })) })
+    expect(screen.getByRole('heading', { name: 'Open from October · 1 of 2 decided' })).toBeInTheDocument()
   })
 })

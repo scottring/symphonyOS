@@ -66,6 +66,9 @@ export interface PaperFoldProps {
   /** Which step drives (a planning session's step id). A new key is a new
    *  ask: it drives the folds again over what the reader did on the last. */
   driveKey?: string | null
+  /** The sheet above holds a look back: it lies wider, with the calendar
+   *  folded (foldSizes `wide`). */
+  wide?: boolean
 }
 
 const storageKey = (h: FoldHorizon) => `symphony-fold:${h}`
@@ -181,6 +184,7 @@ function PaperFoldSheet({
   calendarLabel = 'Calendar',
   drive,
   driveKey,
+  wide = false,
 }: PaperFoldProps) {
   const hasCal = calendar !== undefined && calendar !== null && calendar !== false
   const aboveKey = storageKey(horizon)
@@ -208,6 +212,7 @@ function PaperFoldSheet({
   const seen = useRef({ parentW: NaN, aboveH: NaN, calH: NaN })
   const stowedRef = useRef(stowed)
   const hasCalRef = useRef(hasCal)
+  const wideRef = useRef(wide)
   const driveRef = useRef<Drive>({ above: drive?.above, calendar: drive?.calendar })
   // A drive is given (a planning session is on the page): the reader's moves
   // hold for now and are not remembered.
@@ -313,14 +318,36 @@ function PaperFoldSheet({
       if (!scroller) return 0
       return parseFloat(scroller.style.getPropertyValue(name) || getComputedStyle(scroller).getPropertyValue(name)) || 0
     }
-    const room = (scroller?.clientHeight || innerHeight) - top - prop('--scenery-clearance') - prop('--dock-clearance') - gap
+    // Sized from where the sheet is now, not where it will pin (Scott,
+    // 2026-11-05: "fix the independent scrolling of the individual
+    // columns"): below the header, a sheet as tall as the bar's 72px left
+    // its foot under the bottom of the window, out of reach of its own
+    // scroll. Followed as the page scrolls (onScroll below), so each sheet
+    // always ends in view and scrolls on its own to its last line.
+    const view = scroller?.clientHeight || innerHeight
+    const viewTop = scroller ? scroller.getBoundingClientRect().top : 0
+    const below = prop('--scenery-clearance') + prop('--dock-clearance') + gap
     for (const pin of pins) {
       pin.style.position = 'sticky'
       pin.style.top = `${top}px`
-      pin.style.height = `${Math.max(160, Math.round(room))}px`
+      const at = Math.max(top, pin.getBoundingClientRect().top - viewTop)
+      pin.style.height = `${Math.max(160, Math.round(view - at - below))}px`
       pin.style.maxHeight = '100%'
     }
   }, [])
+  // The sheets' heights follow the page's scroll (pinSheet), once a frame.
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    const scroller: HTMLElement | Window = scrollParent(root) ?? window
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => { raf = 0; if (modeRef.current && modeRef.current !== 'v') pinSheet(modeRef.current) })
+    }
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    return () => { scroller.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf) }
+  }, [pinSheet])
 
   const layout = useCallback(() => {
     const root = rootRef.current
@@ -348,7 +375,7 @@ function PaperFoldSheet({
         parent.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
     }
     if (!(spread > 0)) spread = innerWidth - 32
-    const sizes = foldSizes(mode, spread, innerHeight, { calendar: !!calFlap })
+    const sizes = foldSizes(mode, spread, innerHeight, { calendar: !!calFlap, wide: wideRef.current })
     bothRef.current = sizes.both
     patchA({ edge: sizes.edge })
     patchC({ edge: sizes.edge })
@@ -432,8 +459,9 @@ function PaperFoldSheet({
       const grain = paperGrain(getComputedStyle(root).getPropertyValue('--paper-fold-grain-alpha'))
       if (grain) root.style.setProperty('--paper-fold-grain', grain)
     }
+    wideRef.current = wide
     layout()
-  }, [layout, hasCal])
+  }, [layout, hasCal, wide])
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | undefined

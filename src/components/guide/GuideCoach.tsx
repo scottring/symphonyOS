@@ -23,7 +23,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { stepsFor, type GuideLevel, type GuideStep } from '@/lib/guide/steps'
+import { stepsFor, wordsIn, type GuideLevel, type GuideStep, type StepWords } from '@/lib/guide/steps'
 import { paperSound } from '@/lib/fold/paperSound'
 import './coach.css'
 
@@ -149,8 +149,10 @@ function placeCoach(coach: HTMLElement | null, at: string, fallback?: string) {
   let x: number, y: number, arrow = side
   if (side === 'none' || !r) { x = W - cw - 16; y = 72 }
   else if (sheet && !stacked(sheet)) { x = sheet.getBoundingClientRect().right + 14; y = r.top + r.height / 2 - 28; arrow = 'left' }
-  else if (side === 'left') { x = r.right + 14; y = r.top + 96 }
-  else if (side === 'right') { x = r.left - 14 - cw; y = r.top + 96 }
+  // Beside a fold's sheet, low in the view (Scott, 2026-11-05: it sat over
+  // the top of November's list): the period's first lines stay in sight.
+  else if (side === 'left') { x = r.right + 14; y = Math.max(r.top + 96, Math.min(r.bottom, H) - ch - 24) }
+  else if (side === 'right') { x = r.left - 14 - cw; y = Math.max(r.top + 96, Math.min(r.bottom, H) - ch - 24) }
   else {
     x = r.left + 8; y = r.bottom + 12
     if (y + ch > H - 12 && r.top - ch - 12 > 12) { y = r.top - 12 - ch; arrow = 'bottom' }
@@ -182,6 +184,15 @@ function perFrame(fn: () => void): { run: () => void; cancel: () => void } {
     run: () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; fn() }) },
     cancel: () => { cancelAnimationFrame(raf); raf = 0 },
   }
+}
+
+/** The short form, remembered on this device (every level, every session). */
+const SHORT_KEY = 'symphony-coach:short'
+function readShort(): boolean {
+  try { return localStorage.getItem(SHORT_KEY) === '1' } catch { return false }
+}
+function writeShort(v: boolean) {
+  try { if (v) localStorage.setItem(SHORT_KEY, '1'); else localStorage.removeItem(SHORT_KEY) } catch { /* private mode: not remembered */ }
 }
 
 const buzz = () => { try { navigator.vibrate?.(6) } catch { /* no haptics */ } }
@@ -297,9 +308,11 @@ export interface GuideCoachProps {
   error?: string | null
   /** The current step's one small fact, asked in the tooltip, if it has one. */
   ask?: CoachAsk
+  /** The words the steps name ("October", "Fall"): wordsIn. */
+  words?: StepWords
 }
 
-export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onFinish, onStop, error, ask }: GuideCoachProps) {
+export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onFinish, onStop, error, ask, words }: GuideCoachProps) {
   const steps = stepsFor(level)
   const index = Math.max(0, steps.findIndex((s) => s.id === current))
   const step = steps[index]
@@ -312,6 +325,13 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
   if (shownFor !== step.id) { setShownFor(step.id); setHidden(false) }
   const [shows, setShows] = useState(0)
   const show = useCallback(() => { setHidden(false); setShows((n) => n + 1) }, [])
+  // The short form (Scott, 2026-11-05: "a way to hide tooltips so experts can
+  // breeze through"): the step's title with Back and Next, remembered on this
+  // device for every session. Its title opens the step's words, for this step.
+  const [short, setShort] = useState(readShort)
+  const [openFor, setOpenFor] = useState<string | null>(null)
+  const full = !short || openFor === step.id
+  const setShortForm = (v: boolean) => { setShort(v); writeShort(v); setOpenFor(null); setShows((n) => n + 1) }
   const hide = useCallback(() => { setHidden(true); unlight() }, [])
 
   // The chip in the header follows the session.
@@ -337,7 +357,7 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
     if (!matches('(prefers-reduced-motion: reduce)')) { void coach.offsetWidth; coach.classList.add('is-in') }
     placeCoach(coach, at, fallback)
     return follow(900, () => placeCoach(coach, at, fallback))
-  }, [step.id, hidden, shows, at, fallback])
+  }, [step.id, hidden, shows, at, fallback, full])
   // On scroll (any scroller, so capture) and resize.
   useEffect(() => {
     const coach = ref.current
@@ -387,13 +407,20 @@ export function GuideCoach({ level, current, word, titleFor, onNext, onBack, onF
     return () => cancelAnimationFrame(id)
   }, [step.id, write])
 
-  const title = titleFor ? titleFor(step) : step.title
+  const title = wordsIn(titleFor ? titleFor(step) : step.title, words)
   return createPortal(
-    <div ref={ref} className="coach" role="dialog" aria-label="Planning guide" hidden={hidden} data-level={level}>
-      <div className="coach-k">Step {n} of {m}</div>
-      <div className="coach-t">{title}</div>
-      <p className="coach-why">{step.why}</p>
-      <p className="coach-you">{step.you}</p>
+    <div ref={ref} className={`coach${full ? '' : ' is-short'}`} role="dialog" aria-label="Planning guide" hidden={hidden} data-level={level}>
+      <div className="coach-k">
+        <span>Step {n} of {m}</span>
+        <button type="button" className="coach-form" onClick={() => setShortForm(!short)}
+          aria-pressed={short}>{short ? 'Show tips' : 'Hide tips'}</button>
+      </div>
+      {full
+        ? <div className="coach-t">{title}</div>
+        : <button type="button" className="coach-t coach-t-open" aria-expanded={false}
+          onClick={() => { setOpenFor(step.id); setShows((x) => x + 1) }}>{title} <span aria-hidden="true">▾</span></button>}
+      {full && <p className="coach-why">{wordsIn(step.why, words)}</p>}
+      {full && <p className="coach-you">{wordsIn(step.you, words)}</p>}
       {/* Keyed by the step: what was picked or booked is that step's alone. */}
       {ask?.kind === 'choice' && <ChoiceAsk key={step.id} ask={ask} />}
       {ask?.kind === 'book' && <BookAsk key={step.id} ask={ask} />}

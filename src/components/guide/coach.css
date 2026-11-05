@@ -136,3 +136,17 @@ button.plan-chip:disabled { opacity: .5; cursor: default; }
   .coach.is-in, .plan-stamp, .plan-chip-pip { animation: none; }
   [data-guide-lit] { transition: none; }
 }
+
+/* The short form (Scott, 2026-11-05): the title, Back and Next. */
+.coach-k { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-right: 18px; }
+.coach-form {
+  border: 0; background: none; padding: 2px 0; cursor: pointer;
+  font: 500 11px/1 var(--font-family-sans); letter-spacing: 0; text-transform: none; color: var(--coach-ink-faint);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.coach-form:hover { color: var(--coach-accent); }
+.coach-t-open { display: block; border: 0; background: none; padding: 0 18px 0 0; text-align: left; color: inherit; cursor: pointer; }
+.coach-t-open span { font-size: 13px; color: var(--coach-ink-faint); }
+.coach-t-open:hover span { color: var(--coach-accent); }
+.coach.is-short .coach-t { margin: 4px 0 2px; font-size: 16px; }
+:is(.coach-form, .coach-t-open):focus-visible { outline: 2px solid var(--coach-accent); outline-offset: 2px; border-radius: 4px; }

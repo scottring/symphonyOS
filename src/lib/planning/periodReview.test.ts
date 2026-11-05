@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { createMockActionableInstance, createMockTask } from '@/test/mocks/factories'
 import type { JournalDay, JournalEntry } from '@/lib/week/journalDays'
 import type { Goal } from '@/types/goal'
-import { alsoDoneIn, dayNote, movedOn, reviewSentence, reviewTarget, weekPhrase, taskReviewState, weekReviewState, weekRoutineOccurrences, yearGoalReviewState } from './periodReview'
+import { dayNote, movedOn, reviewSentence, reviewTarget, weekPhrase, taskReviewState, weekReviewState, weekRoutineOccurrences, yearGoalReviewState } from './periodReview'
 
 const OCT = new Date(2026, 9, 1)
 const onOctober = (status: 'open' | 'done' | 'carried' | 'removed', completed = false) =>
@@ -121,14 +121,3 @@ describe('reviewTarget (2026-10-17)', () => {
   })
 })
 
-describe('alsoDoneIn', () => {
-  it('lists what was finished in the period and not on its list, steps included, oldest first', () => {
-    const SEP = new Date(2026, 8, 1), OCT = new Date(2026, 9, 1)
-    const listed = createMockTask({ id: 'l', completed: true, completedAt: new Date(2026, 8, 5) })
-    const step = createMockTask({ id: 's', title: 'Step', completed: true, completedAt: new Date(2026, 8, 3) })
-    const dated = createMockTask({ id: 'd', title: 'Dentist', completed: true, completedAt: new Date(2026, 8, 10), subtasks: [step] })
-    const october = createMockTask({ id: 'o', completed: true, completedAt: new Date(2026, 9, 2) })
-    const open = createMockTask({ id: 'x', completed: false })
-    expect(alsoDoneIn([listed, dated, october, open], SEP, OCT, (t) => t.id === 'l').map((t) => t.title)).toEqual(['Step', 'Dentist'])
-  })
-})

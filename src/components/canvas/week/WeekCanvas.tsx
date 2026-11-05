@@ -776,9 +776,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const look = session?.look ?? null
   const withMonth = (node: ReactNode) => month ? (
     <PaperFold horizon="week" className="wc-fold" edgeLabel={look ? 'Last week' : month.word} edgeCount={look ? undefined : month.rows.length}
-      drive={session?.drive} driveKey={session?.stepId}
+      drive={session?.drive} driveKey={session?.stepId} wide={!!look}
       frontLabel={look ? 'Last week, looking back' : undefined}
-      above={look ? <LookSheet title="last week">{look}</LookSheet>
+      above={look ? <LookSheet>{look}</LookSheet>
         : <AboveSheet kicker={month.kicker} title={month.word} rows={month.rows} doneCount={month.doneCount}
           foot="For reading. Write this week in its own words." empty={`No ${month.word} goals yet.`} />}>
       {node}

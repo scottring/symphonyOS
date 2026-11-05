@@ -32,6 +32,8 @@ describe('SeasonCalendar — the season’s fixed dates, month by month', () => 
       ev('1', 'School starts', '2026-09-08', { all_day: true }),
       ev('2', 'Dentist', '2026-10-06T09:30:00'),
       ev('3', 'Dentist', '2026-10-06T09:30:00', { calendar_id: 'other' }),
+      ev('6', 'Race', '2026-10-10T09:00:00'),
+      ev('7', 'Race', '2026-10-10T09:00:00', { calendar_id: 'other' }),
       ev('4', 'Thanksgiving', '2026-11-26', { all_day: true }),
       ev('5', 'Winter break', '2026-12-01', { all_day: true }),
     ]
@@ -40,7 +42,10 @@ describe('SeasonCalendar — the season’s fixed dates, month by month', () => 
     expect(cal.asked[0]).toEqual([new Date(2026, 8, 1), new Date(2026, 11, 1), true])
     expect(months().map((m) => m.getAttribute('aria-label'))).toEqual(['September', 'October', 'November'])
     expect(within(months()[0]).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Tue 8All day School starts'])
-    expect(within(months()[1]).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Tue 69:30 AM Dentist'])
+    // A weekday meeting is not a claim on the season (Scott, 2026-11-05);
+    // a timed event on a weekend is, once across calendars.
+    expect(within(months()[1]).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Sat 109:00 AM Race'])
+    expect(screen.queryByText('Dentist')).toBeNull()
     expect(within(months()[2]).getByText('Thanksgiving')).toBeInTheDocument()
     expect(screen.queryByText('Late August trip')).toBeNull()
     expect(screen.queryByText('Winter break')).toBeNull()

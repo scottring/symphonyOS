@@ -25,7 +25,7 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState, type 
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
 import { useOpenOnStep } from '@/hooks/useOpenOnStep'
 import type { ReviewNotes } from '@/hooks/usePeriodReview'
-import { HORIZON_OF, choosingStep, stepsFor } from '@/lib/guide/steps'
+import { HORIZON_OF, choosingStep, stepIn, stepsFor, type StepWords } from '@/lib/guide/steps'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
 import { GuideCoach, usePlanSessionLoading, type CoachAsk } from '@/components/guide/GuideCoach'
@@ -57,12 +57,18 @@ type Line = { id: string; title: string }
 type Area = { id: string; name: string; context: TaskContext | null }
 const NONE: readonly never[] = []
 
-export function GuidedPeriod({ level, token, periodLabel, page, look, asks, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites }: {
+const PREV_WORD: Record<PeriodLevel, string> = { month: 'last month', season: 'last season', year: 'last year' }
+const ABOVE_WORD: Record<PeriodLevel, string> = { month: 'the season', season: 'the year', year: 'last year' }
+
+export function GuidedPeriod({ level, token, periodLabel, page, look, asks, onFinish, onLeave, onPlanned, aboveLines = NONE, areas = NONE, listenPageWrites, words: wordsGiven }: {
   level: PeriodLevel
   /** The period's planning token (monthToken, seasonToken, yearToken). */
   token: string
   /** "November", "Fall", "2027": "Planning November", "Done planning November". */
   periodLabel: string
+  /** The period before and the level above, by name, for the steps' words
+   *  ("Look back at October", "Read Fall"); `this` is periodLabel. */
+  words?: { prev: string; above?: string }
   /** The period's page itself, without its strip, drawn with the folds the
    *  current step asks for. */
   page: ReactNode | ((fold: SessionFold) => ReactNode)
@@ -130,10 +136,15 @@ export function GuidedPeriod({ level, token, periodLabel, page, look, asks, onFi
     return { id, name, context: (context || null) as TaskContext | null }
   }) : [], [areasKey])
 
+  const prevWord = wordsGiven?.prev, aboveWord = wordsGiven?.above
+  // Unnamed, the period before and the level above read generically.
+  const words = useMemo<StepWords>(() => ({
+    this: periodLabel, prev: prevWord ?? PREV_WORD[level], above: aboveWord ?? ABOVE_WORD[level],
+  }), [periodLabel, prevWord, aboveWord, level])
   const registration = useMemo<GuidedSessionRegistration | null>(() => {
     if (loading) return null
     const index = Math.max(0, steps.findIndex((s) => s.id === progress.current))
-    const step = steps[index]
+    const step = stepIn(steps[index], words)
     return {
       level, periodLabel, token, stepId: step.id,
       header: createElement(GuideHeader, {
@@ -149,7 +160,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, look, asks, onFi
       threadId: progress.threadId,
       onApplied: () => { void markPlannedOnce() },
     }
-  }, [loading, steps, progress, level, periodLabel, token, above, areaList, setThreadId, markPlannedOnce])
+  }, [loading, steps, progress, level, periodLabel, token, above, areaList, setThreadId, markPlannedOnce, words])
   useGuidedSessionRegistration(registration)
 
   const index = Math.max(0, steps.findIndex((s) => s.id === progress.current))
@@ -157,7 +168,9 @@ export function GuidedPeriod({ level, token, periodLabel, page, look, asks, onFi
   const drives = step?.drives
   const fold: SessionFold = {
     stepId: step?.id ?? null,
-    drive: drives ? { above: drives.above || drives.look || undefined, calendar: drives.calendar } : {},
+    // The look back has the room to itself: the calendar folds (Scott,
+    // 2026-11-05: October, November and the calendar were all open at once).
+    drive: drives ? { above: drives.above || drives.look || undefined, calendar: drives.calendar ?? (drives.look ? false : undefined) } : {},
     look: drives?.look ? look({ lookDraft, setLookDraft }) : null,
     write: !!drives?.write,
   }
@@ -170,7 +183,7 @@ export function GuidedPeriod({ level, token, periodLabel, page, look, asks, onFi
       {pageNode}
       <GuideCoach level={level} current={progress.current} word={periodLabel}
         onNext={() => { void next() }} onBack={() => { if (index > 0) void jump(steps[index - 1].id) }}
-        onStop={onLeave} onFinish={() => { void done() }} error={saveError} ask={asks?.[progress.current]} />
+        onStop={onLeave} onFinish={() => { void done() }} error={saveError} ask={asks?.[progress.current]} words={words} />
     </section>
   )
 }

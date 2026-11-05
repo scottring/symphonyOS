@@ -7,7 +7,7 @@
 // writers (receipt and Undo); nothing writes until a button is pressed. What
 // a call did is said on its row (receipts.tsx).
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReviewNotes, Reviewed } from '@/hooks/usePeriodReview'
 import { LookingBack } from '@/components/plan/choose/LookingBack'
 import { useReceipts, withReceipts } from '../receipts'
@@ -29,7 +29,7 @@ export interface LooseEnd {
   letGo: () => Promise<boolean>
 }
 
-export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, alsoDone, looseEnds, aged, onSeeAged }: {
+export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, looseEnds, aged, onSeeAged }: {
   /** Last week's review (usePeriodReview): what was said, and its save. */
   review: { mine: ReviewNotes | null; reviewed: Reviewed | null; loading: boolean; finish: (notes: ReviewNotes) => Promise<boolean> }
   /** What is typed and not yet saved, kept by the session so it survives
@@ -39,7 +39,6 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
   done: number
   outOf?: number
   notDone: number
-  alsoDone?: readonly { id: string; title: string }[]
   looseEnds: readonly LooseEnd[]
   /** Untouched things the opening sweep moved to Later, and where to see them. */
   aged: number
@@ -62,24 +61,34 @@ export function WeekLookBack({ review, draft, onDraft, done, outOf, notDone, als
   const savedNotes = review.mine ?? { wentWell: '', didnt: '' }
   const notes = draft ?? savedNotes
   const unsaved = !!draft && (draft.wentWell.trim() !== savedNotes.wentWell || draft.didnt.trim() !== savedNotes.didnt)
+  // Saving runs while typing may go on (the notes save themselves): the
+  // draft is let go only when it is still what was saved.
+  const draftRef = useRef(draft)
+  useEffect(() => { draftRef.current = draft })
   const save = async (n: ReviewNotes) => {
     const ok = await review.finish(n)
-    if (ok) onDraft(null)
+    const d = draftRef.current
+    if (ok && (!d || (d.wentWell.trim() === n.wentWell && d.didnt.trim() === n.didnt))) onDraft(null)
     return ok
   }
-  const reviewedOn = review.reviewed ? `Reviewed ${review.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
+  const reviewedOn = review.reviewed ? `Saved ${review.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
+
+  // Each line, decided or not; how many are decided, so the end is in view
+  // (Scott, 2026-11-05).
+  const rows = withReceipts(looseEnds, (e) => e.key, said)
+  const decided = rows.filter((r) => 'gone' in r || !!said[r.key]).length
 
   return <div className="gw-body gw-look">
     {review.loading ? <p className="choose-status" role="status">Loading…</p>
-      : <LookingBack compact periodWord="Last week" done={done} outOf={outOf} notDone={notDone} alsoDone={alsoDone}
+      : <LookingBack compact periodWord="Last week" done={done} outOf={outOf} notDone={notDone}
           value={notes} onChange={onDraft} unsaved={unsaved} reviewed={reviewedOn} nextLabel="Save notes" onContinue={save} />}
     {aged > 0 && <p className="choose-was">
       Moved {aged} untouched {aged === 1 ? 'thing' : 'things'} to Later · <button type="button" className="deck-link" onClick={onSeeAged}>See them</button>
     </p>}
-    <h4 className="gw-h">Not done last week</h4>
+    <h4 className="gw-h">Not done last week{rows.length > 0 && <span className="gw-h-count"> · {decided} of {rows.length} decided</span>}</h4>
     {looseEnds.length === 0 && Object.keys(said).length === 0 ? <p className="choose-empty">Nothing left open from last week.</p>
       : <ul className="gw-rows" aria-label="Not done last week">
-        {withReceipts(looseEnds, (e) => e.key, said).map((row) => {
+        {rows.map((row) => {
           if ('gone' in row) return <li key={row.key} className="gw-row is-decided" aria-label={row.gone.title}>
             <span className="gw-row-title">{row.gone.title}</span>
             <ReceiptLine text={row.gone.text} />

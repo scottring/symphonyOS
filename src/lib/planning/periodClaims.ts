@@ -23,7 +23,10 @@
 //              Today and Week.
 //
 // Year keeps only what shapes a year: all-day dates, stretches and monthly or
-// yearly series, never a one-off timed event.
+// yearly series, never a one-off timed event. Month and Season lists keep what
+// claims a day's time (Scott, 2026-11-05): those, plus a timed event on a
+// weekend; a weekday meeting ("Scott <> Vinnie 12:30") is left to the Month
+// grid's dots (claimsIn with no scope) and the week.
 
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -83,6 +86,8 @@ export function claimsIn(
   opts: { scope?: ClaimScope } = {},
 ): PeriodClaims {
   const year = opts.scope === 'year'
+  // A month's or season's list: no weekday one-off timed events.
+  const lists = opts.scope === 'month' || opts.scope === 'season'
   const weekly = weeklySeries(events)
   const claims: Claim[] = []
   const seen = new Set<string>()
@@ -127,6 +132,7 @@ export function claimsIn(
     const inPeriod = stretch ? at < end && lastDay >= dayOf(start) : at >= start && at < end
     if (!inPeriod) continue
     if (year && !allDay && !stretch && !series) continue
+    if (lists && !allDay && !stretch && !series && at.getDay() !== 0 && at.getDay() !== 6) continue
     if (seen.has(key)) continue
     seen.add(key)
     claims.push({

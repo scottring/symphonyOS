@@ -7,7 +7,7 @@
 // call saves through the page's writers (receipt and Undo); nothing writes
 // until a button is pressed. What a call did is said on its row (receipts.tsx).
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReviewNotes, Reviewed } from '@/hooks/usePeriodReview'
 import { LookingBack } from '@/components/plan/choose/LookingBack'
 import { useReceipts, withReceipts } from '../receipts'
@@ -15,7 +15,7 @@ import { ReceiptLine } from '../ReceiptLine'
 
 type Write<T> = (line: T) => Promise<boolean>
 
-export function PeriodLookBack<T extends { id: string; title: string }>({ prevLabel, review, draft, onDraft, done, outOf, alsoDone, open, verbs, toLabel }: {
+export function PeriodLookBack<T extends { id: string; title: string }>({ prevLabel, review, draft, onDraft, done, outOf, open, verbs, toLabel }: {
   /** "October", "Summer", "2025" */
   prevLabel: string
   /** The period before's review (usePeriodReview): what was said, and its save. */
@@ -27,7 +27,6 @@ export function PeriodLookBack<T extends { id: string; title: string }>({ prevLa
   done: number
   /** Everything that was on the period before ("3 of 5 done"). */
   outOf?: number
-  alsoDone?: readonly { id: string; title: string }[]
   /** What the period before left open, as the page lists it. */
   open: readonly T[]
   /** Done; To the next period (this period's commitment carried on); Someday
@@ -49,12 +48,17 @@ export function PeriodLookBack<T extends { id: string; title: string }>({ prevLa
   const savedNotes = review.mine ?? { wentWell: '', didnt: '' }
   const notes = draft ?? savedNotes
   const unsaved = !!draft && (draft.wentWell.trim() !== savedNotes.wentWell || draft.didnt.trim() !== savedNotes.didnt)
+  // Saving runs while typing may go on (the notes save themselves): the
+  // draft is let go only when it is still what was saved.
+  const draftRef = useRef(draft)
+  useEffect(() => { draftRef.current = draft })
   const save = async (n: ReviewNotes) => {
     const ok = await review.finish(n)
-    if (ok) onDraft(null)
+    const d = draftRef.current
+    if (ok && (!d || (d.wentWell.trim() === n.wentWell && d.didnt.trim() === n.didnt))) onDraft(null)
     return ok
   }
-  const reviewedOn = review.reviewed ? `Reviewed ${review.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
+  const reviewedOn = review.reviewed ? `Saved ${review.reviewed.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null
   const calls = (line: T) => [
     { label: 'Done', write: verbs.done, quiet: true, text: 'Marked done' },
     { label: toLabel, write: verbs.to, quiet: false, text: toLabel },
@@ -63,14 +67,19 @@ export function PeriodLookBack<T extends { id: string; title: string }>({ prevLa
   ].map((c) => <button key={c.label} type="button" className={`choose-verb${c.quiet ? ' is-quiet' : ''}`} disabled={pending !== null}
     aria-label={`${c.label}: ${line.title}`} onClick={() => { void run(line, () => c.write(line), c.text) }}>{c.label}</button>)
 
+  // Each line, decided or not; how many are decided, so the end is in view
+  // (Scott, 2026-11-05).
+  const rows = withReceipts(open, (l) => l.id, said)
+  const decided = rows.filter((r) => 'gone' in r || !!said[r.key]).length
+
   return <div className="gw-body gw-look">
     {review.loading ? <p className="choose-status" role="status">Loading…</p>
-      : <LookingBack compact periodWord={prevLabel} done={done} outOf={outOf} notDone={open.length} alsoDone={alsoDone}
+      : <LookingBack compact periodWord={prevLabel} done={done} outOf={outOf} notDone={open.length}
           value={notes} onChange={onDraft} unsaved={unsaved} reviewed={reviewedOn} nextLabel="Save notes" onContinue={save} />}
-    <h4 className="gw-h">Open from {prevLabel}</h4>
+    <h4 className="gw-h">Open from {prevLabel}{rows.length > 0 && <span className="gw-h-count"> · {decided} of {rows.length} decided</span>}</h4>
     {open.length === 0 && Object.keys(said).length === 0 ? <p className="choose-empty">Nothing left open from {prevLabel}.</p>
       : <ul className="gw-rows" aria-label={`Open from ${prevLabel}`}>
-        {withReceipts(open, (l) => l.id, said).map((row) => {
+        {rows.map((row) => {
           if ('gone' in row) return <li key={row.key} className="gw-row is-decided" aria-label={row.gone.title}>
             <span className="gw-row-title">{row.gone.title}</span>
             <ReceiptLine text={row.gone.text} />

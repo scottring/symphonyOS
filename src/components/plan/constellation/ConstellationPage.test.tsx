@@ -216,7 +216,9 @@ const CAL_FOOT='For reading. Add events the usual way.'
 describe('this period’s calendar, folded on the right',()=>{
  it('Month: “November calendar”; unfolding it shows the month’s events, five weeks from its first',async()=>{
   cal.events=[{id:'e1',title:'Thanksgiving',start_time:'2026-11-26',end_time:'2026-11-27',all_day:true},
-   {id:'e2',title:'Dentist',start_time:'2026-11-10T15:00:00',end_time:'2026-11-10T16:00:00',all_day:false}]
+   {id:'e2',title:'Dentist',start_time:'2026-11-10T15:00:00',end_time:'2026-11-10T16:00:00',all_day:false},
+   {id:'e3',title:'Halloween',start_time:'2026-10-31',end_time:'2026-11-01',all_day:true},
+   {id:'e4',title:'Race',start_time:'2026-11-07T08:00:00',end_time:'2026-11-07T09:00:00',all_day:false}]
   open(NOV)
   expect(calSheet()).toHaveAttribute('inert')
   fireEvent.keyDown(screen.getByRole('button',{name:'November calendar. Unfold to read'}),{key:'Enter'})
@@ -224,9 +226,17 @@ describe('this period’s calendar, folded on the right',()=>{
   expect(within(sheet).getByRole('heading',{name:'November'})).toBeInTheDocument()
   const weeks=within(within(sheet).getByRole('list',{name:'The next weeks'})).getAllByRole('listitem',{name:/^Week of/})
   expect(weeks).toHaveLength(5)
-  expect(weeks[0]).toHaveAccessibleName(/^Week of (Oct|Nov) /)
+  // From the month's own first day (Scott, 2026-11-05: October leaked in).
+  expect(weeks[0]).toHaveAccessibleName('Week of Nov 1')
+  expect(within(sheet).queryByText('Halloween')).toBeNull()
   expect(within(sheet).getAllByText('Thanksgiving').length).toBeGreaterThan(0)
-  expect(within(sheet).getAllByText('Dentist').length).toBeGreaterThan(0)
+  // What claims a day's time: a weekend race, not a weekday appointment,
+  // which is a dot on the grid only.
+  expect(within(sheet).getAllByText('Race').length).toBeGreaterThan(0)
+  expect(within(sheet).queryByText('Dentist')).toBeNull()
+  expect(sheet.querySelector('td[data-day="2026-11-10"] .cal-sheet-dots')).not.toBeNull()
+  expect(within(sheet).getAllByRole('columnheader').map((h) => h.textContent)).toHaveLength(7)
+  expect(within(sheet).getAllByRole('columnheader').every((h) => (h.textContent ?? '').length === 2)).toBe(true)
   // The month at a glance: a grid, its days with events marked.
   expect(within(sheet).getByRole('table',{name:'November 2026'})).toBeInTheDocument()
   expect(sheet.querySelector('td[data-day="2026-11-26"] .cal-sheet-dots')).not.toBeNull()
@@ -402,7 +412,8 @@ describe('a sheet: the period in its own words, the level above folded beside it
   localStorage.setItem('symphony-plan-v2.add-area','work')
   month()
   const form=screen.getByRole('textbox',{name:'Write an October goal'}).closest('form')!
-  expect(within(form).getByRole('button',{name:'Set context'})).toHaveAttribute('title','Space: Work')
+  // The space is named on the line (Scott, 2026-11-05), not an unlabeled tag.
+  expect(within(form).getByRole('button',{name:'Space: Work. Change'})).toHaveTextContent('Work')
   await writeOn('Write an October goal','Quarterly numbers')
   expect(api.addTask).toHaveBeenCalledWith('Quarterly numbers',undefined,undefined,undefined,expect.objectContaining({bucket:'month',context:'work'}))
  })
@@ -854,7 +865,9 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   expect(summary()).toBe('Planned Sat, Oct 3')
   expect(menu()).toContain('Back to this month')
  })
- it('while planning, the header has no other button or offer, and keeps its fact line and summary line (the page never changes shape)',()=>{
+ // Scott, 2026-11-05: while planning, the plan chip is the one count: no
+ // "1 of 2 done" beside "2 of 6", no "Planned Sat, Oct 3" while planning it.
+ it('while planning, the header has no other button or offer, and no fact line or planned line',()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers();plan.saved=null})
   plan.saved={at:new Date(2026,9,3),authorId:'u1',notes:{}}
   api.tasks=[{id:'m',title:'Picnic',bucket:'month'},{id:'d',title:'Pay taxes',bucket:'month',completed:true,completedAt:new Date(2026,9,9)}]
@@ -862,8 +875,8 @@ describe('the calm header (approved mockup 2026-10-18)',()=>{
   expect(primaries()).toEqual([])
   expect(menu().filter(t=>/^(Plan|Review) |guided/.test(t??''))).toEqual([])
   expect(screen.getByRole('dialog',{name:'Planning guide'})).toBeInTheDocument()
-  expect(facts()).toBe('1 of 2 done')
-  expect(summary()).toBe('Planned Sat, Oct 3')
+  expect(facts()).toBeNull()
+  expect(summary()).toBeNull()
  })
 })
 
@@ -987,10 +1000,11 @@ describe('reviewing: the session’s look back',()=>{
    fireEvent.click(screen.getByRole('button',{name:'Review October'}))
    expect(screen.getByTestId('where').textContent).toContain('plan=1')
    expect(screen.getByTestId('where').textContent).toContain('start=2026-11-01')
-   expect(stepNow()).toBe('Look back at last month')
+   expect(stepNow()).toBe('Look back at October')
    const look=within(screen.getByRole('article',{name:'Looking back at October'}))
    fireEvent.change(look.getByRole('textbox',{name:'What went well'}),{target:{value:'Cabin booked'}})
-   await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Save notes'}))})
+   // The notes save themselves when the box is left (2026-11-05).
+   await act(async()=>{fireEvent.blur(look.getByRole('textbox',{name:'What went well'}))})
    expect(review.finish).toHaveBeenCalledWith({wentWell:'Cabin booked',didnt:''})
   }finally{vi.useRealTimers()}
  })
@@ -1000,7 +1014,7 @@ describe('reviewing: the session’s look back',()=>{
    atStep('by-area')
    month()
    fireEvent.click(screen.getByRole('button',{name:'Review October'}))
-   expect(stepNow()).toBe('Look back at last month')
+   expect(stepNow()).toBe('Look back at October')
    expect(screen.getByTestId('where').textContent).not.toContain('step=')
   }finally{vi.useRealTimers()}
  })
@@ -1029,7 +1043,7 @@ describe('reviewing: the session’s look back',()=>{
   try{
    atStep('look-back')
    open('/month?view=constellation&horizon=2&start=2026-11-09&plan=1')
-   expect(screen.getByText('Reviewed Oct 31')).toBeInTheDocument()
+   expect(screen.getByText('Saved Oct 31')).toBeInTheDocument()
    expect(screen.getByRole('textbox',{name:'What went well'})).toHaveValue('Cabin booked')
   }finally{vi.useRealTimers();review.prevReviewed=null;review.mine=null}
  })
@@ -1197,9 +1211,9 @@ describe('Done planning October (spec 2026-11-01)',()=>{
   atStep('upkeep-fun')
   month()
   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
-  expect(stepNow()).toBe('Look back at last month')
+  expect(stepNow()).toBe('Look back at October')
   await next(4)
-  expect(stepNow()).toBe('Maintenance and fun')
+  expect(stepNow()).toBe('Upkeep and fun')
   await act(async()=>{fireEvent.click(coach().getByRole('button',{name:'Done planning November'}))})
   expect(review.finish).toHaveBeenCalledWith({wentWell:'',didnt:''})
   cleanup()
@@ -1235,14 +1249,14 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(screen.getByTestId('where').textContent).toContain('plan=1')
   const seen:string[]=[]
   for(let i=0;i<6;i++){seen.push(stepNow()??'');if(i<5)await next()}
-  expect(seen).toEqual(['Fresh start','Look back at last month','Read the season list','Next 4–5 weeks','The month by area','Maintenance and fun'])
+  expect(seen).toEqual(['Fresh start','Look back at September','Read Fall',"October's calendar","October's goals",'Upkeep and fun'])
   expect(coach().getByRole('button',{name:'Done planning October'})).toBeInTheDocument()
   expect(chip()).toBe('Planning October · 6 of 6✕')
   // The page's own list, without its strip.
   expect(titles('October goals')).toEqual(['Hike Bear Mountain'])
   expect(screen.queryByRole('region',{name:'Fall strip'})).toBeNull()
   expect(document.querySelector('.hs-layout')).toBeNull()
-  expect(guidePanel().getByText('Maintenance and fun')).toBeInTheDocument()
+  expect(guidePanel().getByText('Upkeep and fun')).toBeInTheDocument()
   expect(shell.reg).toMatchObject({level:'month',token:'2026-10',threadKey:'monthly:2026-10'})
   expect(shell.reg?.sessionContext.guide.aboveLines).toEqual([{id:'s',title:'Get outside'}])
  })
@@ -1252,7 +1266,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   month('&plan=1')
   expect(aboveOpen()).toBe(true)
   await next(3)
-  expect(stepNow()).toBe('Next 4–5 weeks')
+  expect(stepNow()).toBe("October's calendar")
   expect(screen.getByRole('dialog',{name:'Planning guide'})).toHaveAttribute('data-at','right')
   expect(calendarOpen()).toBe(true)
   expect(screen.getAllByRole('listitem',{name:/^Week of /}).length).toBeGreaterThan(0)
@@ -1274,7 +1288,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
    {id:'n1',title:'Book flights',bucket:'month',monthStart:NOV}]
   month()
   fireEvent.click(screen.getByRole('button',{name:'Review October'}))
-  expect(stepNow()).toBe('Look back at last month')
+  expect(stepNow()).toBe('Look back at October')
   // This page stays November's; the sheet beside it is October, looking back.
   expect(titles('November goals')).toEqual(['Book flights'])
   expect(aboveOpen()).toBe(true)
@@ -1283,7 +1297,10 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   expect(within(october.getByRole('list',{name:'Open from October'})).getAllByRole('listitem').map((li)=>li.getAttribute('aria-label'))).toEqual(['Hike Bear Mountain'])
   // The only sheet beside you that takes a choice: exactly these four.
   expect(within(october.getByRole('listitem',{name:'Hike Bear Mountain'})).getAllByRole('button').map((b)=>b.textContent)).toEqual(['Done','To November','Someday','Let go'])
-  expect(october.getByText('Only here, while planning, does the sheet beside you take a choice. To and Someday act on October only. Let go takes it off every list.')).toBeInTheDocument()
+  // What each call means is the tooltip's to say, not a foot line; the
+  // heading counts what is decided (2026-11-05).
+  expect(october.queryByText(/Only here, while planning/)).toBeNull()
+  expect(october.getByRole('heading',{name:/Open from October · 0 of 1 decided/})).toBeInTheDocument()
   expect(document.querySelector('.ribbon-card')).toBeNull()
   expect(shell.reg).toMatchObject({level:'month',token:'2026-11',stepId:'look-back'})
   await act(async()=>{fireEvent.click(coach().getByRole('button',{name:'Next'}))})
@@ -1409,7 +1426,7 @@ describe('planning a month: the guided session (spec 2026-11-01)',()=>{
   at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
   atStep('upkeep-fun')
   month('&plan=1')
-  expect(stepNow()).toBe('Maintenance and fun')
+  expect(stepNow()).toBe('Upkeep and fun')
   // It opens the calendar and points at the month's routines there.
   expect(calendarOpen()).toBe(true)
   expect(calSheet().querySelector('[data-guide-anchor="routines"]')).not.toBeNull()
@@ -1462,7 +1479,7 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   inSession()
   season('&plan=1')
   expect(coach().getByText('Step 1 of 7')).toBeInTheDocument()
-  expect(stepNow()).toBe('Look back at last season')
+  expect(stepNow()).toBe('Look back at Summer')
   expect(chip()).toBe('Planning Fall · 1 of 7✕')
   expect(screen.getByRole('region',{name:'Summer 2026, looking back'})).toBeInTheDocument()
   expect(screen.getByRole('list',{name:'Fall goals'})).toBeInTheDocument()
@@ -1478,7 +1495,7 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   await act(async()=>{fireEvent.click(coach().getByRole('button',{name:'Next'}))})
   expect(screen.queryByRole('region',{name:'Summer 2026, looking back'})).toBeNull()
   expect(within(screen.getByRole('region',{name:'2026, for reading'})).getByText('Together')).toBeInTheDocument()
-  expect(stepNow()).toBe('Choose from the year')
+  expect(stepNow()).toBe('Read 2026')
   expect(shell.reg).toMatchObject({token:'2026-fall',stepId:'from-year'})
  })
  it('Look back: Summer’s open goals — Done, To Fall, Someday (off Summer only), Let go (not ever) — each through the page’s writers',async()=>{
@@ -1703,7 +1720,7 @@ describe('planning a year: the guided session (spec 2026-11-01)',()=>{
   inSession()
   year()
   expect(coach().getByText('Step 1 of 7')).toBeInTheDocument()
-  expect(stepNow()).toBe('Look back at last year')
+  expect(stepNow()).toBe('Look back at 2025')
   expect(chip()).toBe('Planning 2026 · 1 of 7✕')
   expect(screen.getByRole('region',{name:'2025, looking back'})).toBeInTheDocument()
   expect(screen.getByRole('list',{name:'2026 goals'})).toBeInTheDocument()

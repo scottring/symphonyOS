@@ -10,8 +10,8 @@
 import { createElement, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
 import { useOpenOnStep } from '@/hooks/useOpenOnStep'
-import { stepsFor } from '@/lib/guide/steps'
-import { DAY_COUNT_OF, dayStepTitle } from '@/lib/guide/dayTarget'
+import { stepIn, stepsFor } from '@/lib/guide/steps'
+import { DAY_COUNT_OF, dayStepTitle, dayWords } from '@/lib/guide/dayTarget'
 import { dayToken } from '@/hooks/usePlanningSession'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
@@ -74,7 +74,7 @@ export function useGuidedDay({ target, isTomorrow, count, onFinish, onClose, onP
     return {
       level: 'day', periodLabel, token, stepId: step.id,
       header: createElement(GuideHeader, {
-        level: 'day', step: { ...step, title: stepTitle }, index, total: steps.length,
+        level: 'day', step: stepIn(step, dayWords(isTomorrow)), index, total: steps.length,
       }),
       sessionContext: {
         horizon: 'daily', periodLabel, stepId: step.id, stepTitle,

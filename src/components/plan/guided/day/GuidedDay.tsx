@@ -11,7 +11,7 @@
 // and looks back on today (dayTarget). Mounted only while it runs.
 
 import { useEffect, type ReactNode } from 'react'
-import { dayCount, dayStepTitle } from '@/lib/guide/dayTarget'
+import { dayCount, dayStepTitle, dayWords } from '@/lib/guide/dayTarget'
 import { stepsFor } from '@/lib/guide/steps'
 import { GuideCoach, usePlanSessionLoading, type CoachAsk } from '@/components/guide/GuideCoach'
 import { useGuidedDay } from '../useGuidedDay'
@@ -61,7 +61,7 @@ export function GuidedDay({ target, isTomorrow, canvas, dayItems, onStep, asks, 
   return (
     <section className="guide-session" aria-label={`Planning ${dayWord}`}>
       {canvas}
-      <GuideCoach level="day" current={guided.progress.current} word={dayWord} titleFor={(s) => dayStepTitle(s, isTomorrow)}
+      <GuideCoach level="day" current={guided.progress.current} word={dayWord} titleFor={(s) => dayStepTitle(s, isTomorrow)} words={dayWords(isTomorrow)}
         onNext={() => { void guided.next() }} onBack={() => { if (index > 0) void guided.jump(steps[index - 1].id) }}
         onStop={onClose} onFinish={() => { void guided.done() }} error={guided.saveError} ask={asks?.[guided.progress.current]} />
     </section>

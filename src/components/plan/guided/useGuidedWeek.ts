@@ -13,7 +13,7 @@
 import { createElement, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useGuidedProgress } from '@/hooks/useGuidedProgress'
 import { useOpenOnStep } from '@/hooks/useOpenOnStep'
-import { stepsFor, type GuideStep } from '@/lib/guide/steps'
+import { stepIn, stepsFor, wordsIn, type GuideStep } from '@/lib/guide/steps'
 import { weekToken } from '@/hooks/usePlanningSession'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { GuideHeader } from '@/components/guide/GuideHeader'
@@ -24,7 +24,7 @@ export const WEEK_COUNT_OF = 'about 15'
 
 /** "Read November": the one step titled by the month above. */
 export function weekStepTitle(s: GuideStep, monthWord: string): string {
-  return s.id === 'read-month' ? `Read ${monthWord}` : s.title
+  return wordsIn(s.title, { month: monthWord })
 }
 
 const CHOOSING = stepsFor('week').find((s) => s.choosing)!.id
@@ -88,7 +88,7 @@ export function useGuidedWeek({ weekStart, count, choose, onFinish, onClose, onP
     return {
       level: 'week', periodLabel, token, stepId: step.id,
       header: createElement(GuideHeader, {
-        level: 'week', step: { ...step, title: stepTitle }, index, total: steps.length,
+        level: 'week', step: stepIn(step, { month: monthWord }), index, total: steps.length,
       }),
       sessionContext: {
         horizon: 'weekly', periodLabel, stepId: step.id, stepTitle,

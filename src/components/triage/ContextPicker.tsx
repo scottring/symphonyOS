@@ -14,6 +14,9 @@ interface ContextPickerProps {
   /** Name the life area beside a dot instead of the bare tag icon — for a
    *  detail pane's labeled Area row, where an icon alone said nothing. */
   showLabel?: boolean
+  /** With showLabel and nothing chosen: what the button says (default
+   *  "Not set"; a write line says "Space"). */
+  emptyLabel?: string
 }
 
 const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
@@ -22,7 +25,7 @@ const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
   { value: 'personal', label: 'Personal', color: 'rgb(147 51 234)' }, // Purple-600 (matches domain switcher)
 ]
 
-export function ContextPicker({ value, onChange, size = 'md', showLabel = false }: ContextPickerProps) {
+export function ContextPicker({ value, onChange, size = 'md', showLabel = false, emptyLabel = 'Not set' }: ContextPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 0 })
   const triggerRef = useRef<HTMLDivElement>(null)
@@ -146,7 +149,7 @@ export function ContextPicker({ value, onChange, size = 'md', showLabel = false 
             className="h-2.5 w-2.5 shrink-0 rounded-full"
             style={selectedContext ? { backgroundColor: selectedContext.color } : { boxShadow: 'inset 0 0 0 1.5px rgb(163 163 163)' }}
           />
-          {selectedContext ? selectedContext.label : 'Not set'}
+          {selectedContext ? selectedContext.label : emptyLabel}
         </button>
       ) : (
         <button

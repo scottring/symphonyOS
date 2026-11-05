@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { GUIDE_STEPS, HORIZON_OF, choosingStep, stepsFor, type GuideLevel } from './steps'
+import { GUIDE_STEPS, HORIZON_OF, choosingStep, stepIn, stepsFor, wordsIn, type GuideLevel } from './steps'
+import { dayWords } from './dayTarget'
 
 const LEVELS: GuideLevel[] = ['day', 'week', 'month', 'season', 'year']
 
@@ -84,7 +85,9 @@ describe('guide step catalog', () => {
 
   it('no step asks to carry, table, or send anything back up', () => {
     const all = JSON.stringify(GUIDE_STEPS)
-    expect(all).not.toMatch(/back to the season|carry it|table it|under its (season|year|month) goal|tied to/i)
+    // Carrying forward (To November) is the look back's own call; nothing
+    // is carried up or back to the level above.
+    expect(all).not.toMatch(/back to the season|carry it (up|back)|table it|under its (season|year|month) goal|tied to/i)
   })
 
   it('maps levels to horizons', () => {
@@ -100,8 +103,23 @@ describe('guide step catalog', () => {
   // tooltip; leftovers are planned from the week sheet.
   it('says where the small facts are asked, and how leftovers are planned', () => {
     const step = (level: GuideLevel, id: string) => stepsFor(level).find((s) => s.id === id)!
-    expect(step('day', 'look-back').you).toBe('Plan them for today with +, or leave them on the week.')
+    expect(wordsIn(step('day', 'look-back').you, dayWords(false))).toBe('Leftovers are at the top of the week sheet on the left, marked with their day. Tap + to plan one for today, or leave it on the week.')
     for (const level of ['day', 'season'] as const) expect(step(level, 'energy').you).not.toMatch(/chip/i)
-    expect(step('month', 'upkeep-fun').you).toMatch(/…?then write a fun line on the sheet\.$/)
+    expect(step('month', 'upkeep-fun').you).toMatch(/then write at least one fun thing on \{this\}'s list\.$/)
+  })
+
+  // Scott, 2026-11-05: each tooltip says what its step is for, what is on the
+  // screen and what each call does, naming the real periods.
+  it('names the periods, and says what each look back call means', () => {
+    const month = stepIn(stepsFor('month').find((s) => s.id === 'look-back')!, { this: 'November', prev: 'October', above: 'Fall' })
+    expect(month.title).toBe('Look back at October')
+    expect(month.you).toContain('Done (it finished, just wasn’t checked off)'.replace('’', "'"))
+    expect(month.you).toContain('To November (carry it forward), Someday (not now), or Let go (not ever)')
+    expect(month.you).not.toMatch(/energy/i)
+    expect(wordsIn('Read {above}', { above: 'Fall' })).toBe('Read Fall')
+    expect(wordsIn('Read {above}')).toBe('Read {above}')
+    for (const level of ['day', 'week', 'month', 'season', 'year'] as const) {
+      for (const s of stepsFor(level)) expect(s.why.length + s.you.length, `${level}/${s.id}`).toBeGreaterThan(40)
+    }
   })
 })

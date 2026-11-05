@@ -25,7 +25,8 @@ export function useAddArea(): { area: TaskContext | undefined; picker: ReactNode
   const area = soleDomain ?? stored ?? undefined
   const picker = (
     <span className="pv2-addarea" title="Space for what you add">
-      <ContextPicker size="sm" value={area ?? null} onChange={(c) => { setStored(c ?? null); write(c ?? null) }} />
+      {/* Named, not an unlabeled tag (Scott, 2026-11-05): "Family ▾". */}
+      <ContextPicker size="sm" showLabel emptyLabel="Space" value={area ?? null} onChange={(c) => { setStored(c ?? null); write(c ?? null) }} />
     </span>
   )
   return { area, picker }

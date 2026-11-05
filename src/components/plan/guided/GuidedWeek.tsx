@@ -47,7 +47,7 @@ export function GuidedWeek({ canvas, look, monthWord, progress, saveError, onJum
   return (
     <section className="guide-session" aria-label="Planning the week" aria-busy={progress ? undefined : true}>
       {typeof canvas === 'function' ? canvas(fold) : canvas}
-      {progress && <GuideCoach level="week" current={progress.current} word="the week" titleFor={(s) => weekStepTitle(s, monthWord)}
+      {progress && <GuideCoach level="week" current={progress.current} word="the week" titleFor={(s) => weekStepTitle(s, monthWord)} words={{ month: monthWord }}
         onNext={onNext} onBack={() => { if (index > 0) onJump(steps[index - 1].id) }}
         onStop={onLeave} onFinish={onFinish} error={saveError} />}
     </section>
