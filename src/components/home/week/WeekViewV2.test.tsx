@@ -1311,3 +1311,19 @@ describe('every Week step has its home on the everyday page', () => {
     expect(home!.closest('[hidden]')).toBeNull()
   })
 })
+
+// Scott, 2026-11-05: the Week's rows had lost their space and people.
+describe('WeekViewV2 — a row’s space', () => {
+  const sunday = new Date(2026, 8, 13) // Sun Sep 13 – Sat Sep 19, 2026
+  it('a day’s task takes a space from its row, through the page’s own update', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
+    const onUpdateTask = vi.fn()
+    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14, 9), isAllDay: false })]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} onUpdateTask={onUpdateTask} />)
+    vi.useRealTimers()
+    const row = within(screen.getByTestId('journal-day-2026-09-14')).getByText('List supplies to buy').closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: 'Set context' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Family' }))
+    await waitFor(() => expect(onUpdateTask).toHaveBeenCalledWith('a', { context: 'family' }))
+  })
+})

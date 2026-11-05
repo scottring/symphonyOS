@@ -264,6 +264,19 @@
 .wc-people { display: flex; padding-top: 3px; }
 .wc-avatar { width: 18px; height: 18px; font-size: 8px; box-shadow: 0 0 0 1.5px var(--color-bg-elevated); }
 .wc-avatar + .wc-avatar { margin-left: -4px; }
+/* A task's space and people under its title (toolsOf). On touch they stay,
+   and stand in for the faces; with a pointer they come up on hover or focus
+   (or while one is open), and the faces step aside for them. */
+.wc-tools { display: flex; align-items: center; gap: 4px; padding-top: 3px; }
+.cw-row:has(.wc-tools) .wc-people { display: none; }
+@media (hover: hover) {
+  .cw-row:has(.wc-tools) .wc-people { display: flex; }
+  .cw-row .wc-tools { display: none; }
+  .cw-row:is(:hover, :focus-within):has(.wc-tools) .wc-people,
+  .cw-row:has(.wc-tools [aria-expanded='true']) .wc-people { display: none; }
+  .cw-row:is(:hover, :focus-within) .wc-tools,
+  .cw-row:has(.wc-tools [aria-expanded='true']) .wc-tools { display: flex; }
+}
 .wc-days-head .wc-rhythm { margin: 0; }
 .wc-day .wk-free { margin-top: 8px; }
 /* "+3 more" / "Show less": a day's folded rest (foldDay). */

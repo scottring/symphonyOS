@@ -3,6 +3,9 @@ import { createPortal } from 'react-dom'
 import type { FamilyMember } from '@/types/family'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 
+/** The menu's widest likely width (min-w-[220px] plus room for its heading). */
+const MENU_WIDTH = 232
+
 interface MultiAssigneeDropdownProps {
   members: FamilyMember[]
   selectedIds: string[]
@@ -52,7 +55,9 @@ export function MultiAssigneeDropdown({
 
       setMenuPosition({
         top: placeAbove ? rect.top - 8 : rect.bottom + 8,
-        right: window.innerWidth - rect.right,
+        // Lined up with the trigger's right side, but never off the left
+        // edge (a Week row in the first column, 2026-11-05).
+        right: Math.min(window.innerWidth - rect.right, Math.max(8, window.innerWidth - MENU_WIDTH - 8)),
         placeAbove,
       })
     }

@@ -25,6 +25,9 @@ const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
   { value: 'personal', label: 'Personal', color: 'rgb(147 51 234)' }, // Purple-600 (matches domain switcher)
 ]
 
+/** The menu's widest likely width (min-w-[120px] plus its padding). */
+const MENU_WIDTH = 136
+
 export function ContextPicker({ value, onChange, size = 'md', showLabel = false, emptyLabel = 'Not set' }: ContextPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 0 })
@@ -42,7 +45,8 @@ export function ContextPicker({ value, onChange, size = 'md', showLabel = false,
       setMenuPosition({
         top: openUp ? undefined : rect.bottom + 4,
         bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
-        right: window.innerWidth - rect.right,
+        // Never off the left edge (a Week row in the first column).
+        right: Math.min(window.innerWidth - rect.right, Math.max(8, window.innerWidth - MENU_WIDTH - 8)),
       })
     }
   }, [isOpen])
@@ -156,6 +160,8 @@ export function ContextPicker({ value, onChange, size = 'md', showLabel = false,
           type="button"
           onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
           className={`${padClass} rounded-lg transition-colors hover:bg-neutral-100 ${hasValue ? '' : 'tag-needs-context'}`}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
           aria-label="Set context"
           // The tag names its life area on hover (walkthrough 2026-10-02: an
           // unlabeled mark in task details).

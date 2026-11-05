@@ -53,9 +53,12 @@ import {
   type DragEndEvent, type DragMoveEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { createPortal } from 'react-dom'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
+import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
+import { ContextPicker } from '@/components/triage/ContextPicker'
+import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { Link } from 'react-router-dom'
 import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu'
@@ -154,6 +157,10 @@ export interface WeekCanvasWriters {
   moveEvent?: (event: CanvasDayItem, day: Date) => void
   /** No day yet: delete a task (the caller offers Undo). Absent: no Delete. */
   deleteTask?: (task: Task) => void
+  /** A task's space (Work, Family, Personal), from its row. Absent: no picker. */
+  setTaskContext?: (task: Task, context: TaskContext | undefined) => void
+  /** Who carries a task, from its row (every id; none unassigns). Absent: no picker. */
+  assignTask?: (task: Task, memberIds: string[]) => void
   /** "+ Add to week" / "+ Add to day": a typed sentence, landed by its date. */
   addTyped?: (parse: HorizonParse, landing: HorizonLanding) => Promise<boolean>
 }
@@ -501,6 +508,21 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       </span>
     )
   }
+  // A task's space and people, on its row (Scott, 2026-11-05: the Week's
+  // rows had lost them). With a pointer they come up under the title on
+  // hover or focus, standing in for the faces; on touch they stay.
+  const toolsOf = (t: Task) => {
+    if (t.completed || (!writers.setTaskContext && !(writers.assignTask && members.length > 0))) return null
+    return (
+      <span className="wc-tools" onPointerDown={(e) => e.stopPropagation()}>
+        {writers.setTaskContext && <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => writers.setTaskContext!(t, c)} />}
+        {writers.assignTask && members.length > 0 && (
+          <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={assigneesOf(t)} size="sm"
+            onSelect={(ids) => writers.assignTask!(t, ids)} triggerLabel={`Assign people to ${t.title}`} />
+        )}
+      </span>
+    )
+  }
   const dayRow = (it: CanvasDayItem, day: CanvasDay, order?: { index: number; count: number }) => {
     if (it.proposed) {
       return (
@@ -535,7 +557,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           ? startDrag(ev, { kind: 'task', id: x.task.id, date: day.key, title: x.title }, { kind: 'task', id: x.task.id, fromKey: day.key })
           : x.routineId ? startDrag(ev, { kind: 'routine', id: x.routineId, date: day.key, title: x.title }, { kind: 'occ', id: x.routineId, fromKey: day.key }) : undefined}
         onDragEnd={endDrag}
-        under={peopleOf(it)} />
+        under={<>{peopleOf(it)}{it.task && toolsOf(it.task)}</>} />
     )
   }
   const dayColumn = (day: CanvasDay, col?: number) => {
@@ -664,6 +686,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         className={`wc-dayrow wc-weekrow${pointedTask(t.id) ? ' is-pointed' : ''}${whenOpen === key ? ' is-when-open' : ''}`}
         onComplete={() => writers.toggleTask(t)}
         onOpen={() => writers.open(`task-${t.id}`)}
+        under={toolsOf(t)}
         onDragStart={phone || coarse ? undefined : (_, ev) => startDrag(ev, payload, { kind: 'task', id: t.id })}
         onDragEnd={endDrag}
         extra={triage && (

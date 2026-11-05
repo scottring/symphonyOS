@@ -821,6 +821,17 @@ export function WeekViewV2(props: WeekViewV2Props) {
         }, opts)
       },
       open: (id) => handleSelectBlock(id),
+      // A row's space and people (Scott, 2026-11-05), with Undo. Not
+      // choosing: no word to a listening session.
+      setTaskContext: (t, context) => {
+        const word = context ? context[0].toUpperCase() + context.slice(1) : 'no space'
+        write(`“${t.title}” → ${word}`, t, { context }, undefined, false)
+      },
+      assignTask: (t, ids) => {
+        const names = ids.flatMap((id) => familyMembers.find((m) => m.id === id)?.name ?? [])
+        write(names.length ? `Assign “${t.title}” to ${names.join(', ')}` : `Unassign “${t.title}”`, t,
+          { assignedToAll: ids, assignedTo: ids[0] ?? undefined }, undefined, false)
+      },
       // Delete from No day yet, with Undo: the same row back (restoreDeleted).
       deleteTask: (t) => {
         void activity.run(`Delete “${t.title}”`, async () => { await deleteTask(t.id); return true }, {
@@ -889,7 +900,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, addTask, deleteTask, meId, layers])
+  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, addTask, deleteTask, meId, layers, familyMembers])
   const canvasSpans = useMemo(() => toCanvasSpans(journalSpans, journalDays), [journalSpans, journalDays])
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),

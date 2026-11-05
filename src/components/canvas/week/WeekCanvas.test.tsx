@@ -1033,3 +1033,47 @@ describe('WeekCanvas — one band: the month’s fold, then Sometime this week',
     })
   })
 })
+
+// Scott, 2026-11-05: the Week's rows had lost their space and people.
+describe('WeekCanvas — a task’s space and people on its row', () => {
+  const members = [{ id: 'm-scott', name: 'Scott' }, { id: 'm-iris', name: 'Iris' }]
+  const pickers = () => ({ ...writers(), setTaskContext: vi.fn(), assignTask: vi.fn() })
+
+  it('a day’s task and a Sometime this week task each get Set space and Assign people', () => {
+    show(pickers(), { members })
+    const dayRow = screen.getByText('Pick up the keys').closest('li')!
+    expect(within(dayRow).getByRole('button', { name: 'Set context' })).toBeInTheDocument()
+    expect(within(dayRow).getByRole('button', { name: /^Assign people to Pick up the keys/ })).toBeInTheDocument()
+    const weekRow = within(weekCol()).getByText('Call the bank').closest('li')!
+    expect(within(weekRow).getByRole('button', { name: 'Set context' })).toBeInTheDocument()
+    expect(within(weekRow).getByRole('button', { name: /^Assign people to Call the bank/ })).toBeInTheDocument()
+  })
+
+  it('picking a space hands the task and the space to the page', () => {
+    const w = show(pickers(), { members }) as ReturnType<typeof pickers>
+    const row = screen.getByText('Pick up the keys').closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: 'Set context' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Family' }))
+    expect(w.setTaskContext).toHaveBeenCalledWith(placed, 'family')
+  })
+
+  it('picking a person hands the task and every person to the page', () => {
+    const w = show(pickers(), { members }) as ReturnType<typeof pickers>
+    const row = within(weekCol()).getByText('Call the bank').closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: /^Assign people to Call the bank/ }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Iris/ }))
+    expect(w.assignTask).toHaveBeenCalledWith(bank, ['m-iris'])
+  })
+
+  it('no pickers on a routine, a done task, or a page that cannot write them', () => {
+    show(writers(), { members })
+    expect(screen.queryByRole('button', { name: 'Set context' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Assign people/ })).toBeNull()
+  })
+
+  it('no people picker without a household', () => {
+    show(pickers())
+    expect(screen.queryByRole('button', { name: /^Assign people/ })).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'Set context' }).length).toBeGreaterThan(0)
+  })
+})
