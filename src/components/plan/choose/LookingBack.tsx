@@ -52,7 +52,7 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, initial,
   const [failed, setFailed] = useState(false)
   const [saved, setSaved] = useState(false)
   const set = (n: ReviewNotes) => {
-    setSaved(false)
+    setSaved(false); setFailed(false)
     if (onChange) onChange(n)
     else { setOwnWell(n.wentWell); setOwnDidnt(n.didnt) }
   }
@@ -67,13 +67,15 @@ export function LookingBack({ kicker, periodWord, done, outOf, notDone, initial,
   // Compact: saved after a pause in typing, and when the box is left.
   const goRef = useRef(go)
   useEffect(() => { goRef.current = go })
-  const autosave = compact && unsaved && !saving
+  // A save that failed waits for more typing (or leaving the box) before
+  // trying again: no retry loop.
+  const autosave = compact && unsaved && !saving && !failed
   useEffect(() => {
     if (!autosave) return
     const t = setTimeout(() => { void goRef.current() }, AUTOSAVE_MS)
     return () => clearTimeout(t)
   }, [autosave, wentWell, didnt])
-  const onBlur = () => { if (autosave) void go() }
+  const onBlur = () => { if (compact && unsaved && !saving) void go() }
   // Moved on: on the period, neither done nor still open (carried on).
   const moved = hasTotal ? Math.max(0, (outOf ?? 0) - done - notDone) : 0
 

@@ -51,4 +51,23 @@ describe('LookingBack', () => {
     await act(async () => { fireEvent.blur(screen.getByRole('textbox', { name: 'What didn’t' })) })
     expect(onContinue).toHaveBeenLastCalledWith({ wentWell: 'Baseball', didnt: 'Sleep' })
   })
+
+  // Final review: a failed autosave must not retry on its own forever.
+  it('compact: a failed save waits for more typing or leaving the box before trying again', async () => {
+    vi.useFakeTimers()
+    const onContinue = vi.fn(() => new Promise<boolean>((r) => setTimeout(() => r(false), 300)))
+    function Host() {
+      const [v, setV] = useState<ReviewNotes>({ wentWell: '', didnt: '' })
+      return <LookingBack compact periodWord="October" done={1} notDone={0} nextLabel="Save notes" value={v} onChange={setV}
+        unsaved={v.wentWell.trim() !== ''} onContinue={onContinue} />
+    }
+    render(<Host />)
+    fireEvent.change(screen.getByRole('textbox', { name: 'What went well' }), { target: { value: 'Baseball' } })
+    await act(async () => { vi.advanceTimersByTime(10_000) })
+    expect(onContinue).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('alert')).toHaveTextContent('Didn’t save')
+    await act(async () => { fireEvent.blur(screen.getByRole('textbox', { name: 'What went well' })) })
+    await act(async () => { vi.advanceTimersByTime(400) })
+    expect(onContinue).toHaveBeenCalledTimes(2)
+  })
 })

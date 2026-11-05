@@ -335,19 +335,6 @@ function PaperFoldSheet({
       pin.style.maxHeight = '100%'
     }
   }, [])
-  // The sheets' heights follow the page's scroll (pinSheet), once a frame.
-  useEffect(() => {
-    const root = rootRef.current
-    if (!root) return
-    const scroller: HTMLElement | Window = scrollParent(root) ?? window
-    let raf = 0
-    const onScroll = () => {
-      if (raf) return
-      raf = requestAnimationFrame(() => { raf = 0; if (modeRef.current && modeRef.current !== 'v') pinSheet(modeRef.current) })
-    }
-    scroller.addEventListener('scroll', onScroll, { passive: true })
-    return () => { scroller.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf) }
-  }, [pinSheet])
 
   const layout = useCallback(() => {
     const root = rootRef.current
@@ -507,6 +494,26 @@ function PaperFoldSheet({
       ro?.disconnect()
     }
   }, [layout, hasCal])
+
+  // The sheets' heights follow the page's scroll (pinSheet), once a frame.
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    const scroller: HTMLElement | Window = scrollParent(root) ?? window
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => { raf = 0; if (modeRef.current && modeRef.current !== 'v') pinSheet(modeRef.current) })
+    }
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    // What sits above the sheets can change height without a scroll (the
+    // header's lines coming back after a session): the page's content is
+    // watched too.
+    const content = scroller instanceof HTMLElement ? scroller.firstElementChild : document.body
+    const ro = typeof ResizeObserver === 'function' && content ? new ResizeObserver(onScroll) : null
+    if (ro && content) ro.observe(content)
+    return () => { scroller.removeEventListener('scroll', onScroll); ro?.disconnect(); cancelAnimationFrame(raf) }
+  }, [pinSheet])
 
   // The pinned sheets' room changes with their scroller: the scroller resizing,
   // and the landscape writing its height (--scenery-clearance) onto the
