@@ -1327,3 +1327,23 @@ describe('WeekViewV2 — a row’s space', () => {
     await waitFor(() => expect(onUpdateTask).toHaveBeenCalledWith('a', { context: 'family' }))
   })
 })
+
+// Scott, 2026-11-05: "we need same triage with calendar events on week".
+describe('WeekViewV2 — an event’s space', () => {
+  const sunday = new Date(2026, 8, 13) // Sun Sep 13 – Sat Sep 19, 2026
+  it('shows the event’s space (its override) and writes a new one, with Undo putting the old one back', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
+    const onUpdateEventContext = vi.fn()
+    const events = [mockEvent({ id: 'pt', title: 'PT appointment', start: '2026-09-14T10:00:00', end: '2026-09-14T11:00:00' })]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[]} events={events}
+      eventContextOverrides={new Map([['pt', 'personal' as const]])} onUpdateEventContext={onUpdateEventContext} />)
+    vi.useRealTimers()
+    const row = within(screen.getByTestId('journal-day-2026-09-14')).getByText('PT appointment').closest('li')!
+    const picker = within(row).getByRole('button', { name: 'Set context' })
+    expect(picker).toHaveAttribute('title', 'Space: Personal')
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('button', { name: 'Family' }))
+    await waitFor(() => expect(onUpdateEventContext).toHaveBeenCalledWith('pt', 'family'))
+  })
+})
+

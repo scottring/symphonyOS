@@ -456,6 +456,11 @@ export function HomeView({
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
             onReorderTasks={ctx.onReorderTasks}
+            eventNotesMap={ctx.eventNotesMap}
+            eventContextOverrides={ctx.eventContextOverrides}
+            getDomainForCalendar={ctx.getDomainForCalendar}
+            onAssignEventAll={ctx.onAssignEventAll}
+            onUpdateEventContext={ctx.onUpdateEventContext}
           />
         </>
       )
@@ -506,6 +511,11 @@ export function HomeView({
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
             onReorderTasks={ctx.onReorderTasks}
+            eventNotesMap={ctx.eventNotesMap}
+            eventContextOverrides={ctx.eventContextOverrides}
+            getDomainForCalendar={ctx.getDomainForCalendar}
+            onAssignEventAll={ctx.onAssignEventAll}
+            onUpdateEventContext={ctx.onUpdateEventContext}
           />
         </>
       )

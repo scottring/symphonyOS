@@ -91,8 +91,12 @@ export interface CanvasDayItem {
   completed: boolean
   task?: Task
   routineId?: string
-  /** Who carries it (household member ids); none for a calendar event. */
+  /** Who carries it (household member ids); a calendar event's, for its
+   *  people picker only (no faces on an event chip). */
   people?: string[]
+  /** A calendar event's space (its override, else its calendar's), for its
+   *  space picker. */
+  context?: TaskContext | null
   /** A calendar event: when it ends, to keep its length on another day. */
   end?: Date
   /** A calendar event that may be dragged to another day (timed, writable). */
@@ -161,6 +165,10 @@ export interface WeekCanvasWriters {
   setTaskContext?: (task: Task, context: TaskContext | undefined) => void
   /** Who carries a task, from its row (every id; none unassigns). Absent: no picker. */
   assignTask?: (task: Task, memberIds: string[]) => void
+  /** A calendar event's space, from its chip. Absent: no picker. */
+  setEventContext?: (event: CanvasDayItem, context: TaskContext | undefined) => void
+  /** Who goes to a calendar event, from its chip. Absent: no picker. */
+  assignEvent?: (event: CanvasDayItem, memberIds: string[]) => void
   /** "+ Add to week" / "+ Add to day": a typed sentence, landed by its date. */
   addTyped?: (parse: HorizonParse, landing: HorizonLanding) => Promise<boolean>
 }
@@ -511,18 +519,27 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // A task's space and people, on its row (Scott, 2026-11-05: the Week's
   // rows had lost them). With a pointer they come up under the title on
   // hover or focus, standing in for the faces; on touch they stay.
-  const toolsOf = (t: Task) => {
-    if (t.completed || (!writers.setTaskContext && !(writers.assignTask && members.length > 0))) return null
+  // Calendar events get the same two (Scott, 2026-11-05), under their chip.
+  const tools = (title: string, context: TaskContext | null, people: string[],
+    onContext?: (c: TaskContext | undefined) => void, onPeople?: (ids: string[]) => void) => {
+    const who = onPeople && members.length > 0
+    if (!onContext && !who) return null
     return (
       <span className="wc-tools" onPointerDown={(e) => e.stopPropagation()}>
-        {writers.setTaskContext && <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => writers.setTaskContext!(t, c)} />}
-        {writers.assignTask && members.length > 0 && (
-          <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={assigneesOf(t)} size="sm"
-            onSelect={(ids) => writers.assignTask!(t, ids)} triggerLabel={`Assign people to ${t.title}`} />
+        {onContext && <ContextPicker size="sm" value={context} onChange={onContext} />}
+        {who && (
+          <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={people} size="sm"
+            onSelect={onPeople} triggerLabel={`Assign people to ${title}`} />
         )}
       </span>
     )
   }
+  const toolsOf = (t: Task) => t.completed ? null : tools(t.title, t.context ?? null, assigneesOf(t),
+    writers.setTaskContext && ((c) => writers.setTaskContext!(t, c)),
+    writers.assignTask && ((ids) => writers.assignTask!(t, ids)))
+  const eventTools = (ev: CanvasDayItem) => tools(ev.title, ev.context ?? null, ev.people ?? [],
+    writers.setEventContext && ((c) => writers.setEventContext!(ev, c)),
+    writers.assignEvent && ((ids) => writers.assignEvent!(ev, ids)))
   const dayRow = (it: CanvasDayItem, day: CanvasDay, order?: { index: number; count: number }) => {
     if (it.proposed) {
       return (
@@ -597,13 +614,14 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
               const movable = !!writers.moveEvent && !!ev.movable && !phone
               const lift: Lift | null = movable && coarse ? { payload: null, drag: { kind: 'event', id: ev.id, fromKey: day.key }, title: ev.title } : null
               return (
-                <li key={ev.id}>
+                <li key={ev.id} className="wc-eventrow">
                   <EventButton liftId={`${day.key}:${ev.id}`} lift={lift} className={`wc-event${movable ? ' is-movable' : ''}`} onClick={() => writers.open(ev.id)}
                     draggable={movable && !coarse} onDragStart={movable && !coarse ? (e) => startEventDrag(e, ev, day.key) : undefined}
                     onDragEnd={movable && !coarse ? endDrag : undefined}>
                     {ev.time && <span className="wc-event-time">{formatTimeCompact(ev.time)}</span>}
                     <span className="wc-event-title">{ev.title}{ev.subtitle && <span className="wc-event-sub">{ev.subtitle}</span>}</span>
                   </EventButton>
+                  {eventTools(ev)}
                 </li>
               )
             })}

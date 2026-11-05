@@ -1077,3 +1077,35 @@ describe('WeekCanvas — a task’s space and people on its row', () => {
     expect(screen.getAllByRole('button', { name: 'Set context' }).length).toBeGreaterThan(0)
   })
 })
+
+// Scott, 2026-11-05: "we need same triage with calendar events on week".
+describe('WeekCanvas — a calendar event’s space and people', () => {
+  const members = [{ id: 'm-scott', name: 'Scott' }, { id: 'm-iris', name: 'Iris' }]
+  const withPeople = () => days().map((d, i) => i === 2
+    ? { ...d, events: [{ id: 'event-e1', kind: 'event' as const, title: 'Dentist', time: new Date(2026, 9, 5, 9), completed: false, people: ['m-scott'], context: 'family' as const }] }
+    : d)
+  const eventRow = () => screen.getByText('Dentist').closest('li')!
+
+  it('an event gets the space and people pickers under its chip, showing what it has now', () => {
+    const w = { ...writers(), setEventContext: vi.fn(), assignEvent: vi.fn() }
+    render(<WeekCanvas weekStart={weekStart} days={withPeople()} shelf={[]} routinesToPlace={[]} isCurrent writers={w} members={members} />)
+    expect(within(eventRow()).getByRole('button', { name: 'Set context' })).toHaveAttribute('title', 'Space: Family')
+    expect(within(eventRow()).getByRole('button', { name: /^Assign people to Dentist\. Assigned: Scott/ })).toBeInTheDocument()
+  })
+
+  it('picking a space or a person hands the event to the page', () => {
+    const w = { ...writers(), setEventContext: vi.fn(), assignEvent: vi.fn() }
+    render(<WeekCanvas weekStart={weekStart} days={withPeople()} shelf={[]} routinesToPlace={[]} isCurrent writers={w} members={members} />)
+    fireEvent.click(within(eventRow()).getByRole('button', { name: 'Set context' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Work' }))
+    expect(w.setEventContext).toHaveBeenCalledWith(expect.objectContaining({ id: 'event-e1' }), 'work')
+    fireEvent.click(within(eventRow()).getByRole('button', { name: /^Assign people to Dentist/ }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Iris/ }))
+    expect(w.assignEvent).toHaveBeenCalledWith(expect.objectContaining({ id: 'event-e1' }), ['m-scott', 'm-iris'])
+  })
+
+  it('a page that cannot write them draws no pickers on events', () => {
+    render(<WeekCanvas weekStart={weekStart} days={withPeople()} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} members={members} />)
+    expect(within(eventRow()).queryByRole('button', { name: 'Set context' })).toBeNull()
+  })
+})

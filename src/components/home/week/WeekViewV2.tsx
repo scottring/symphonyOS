@@ -13,7 +13,9 @@ import {
   type CollisionDetection,
   type DragMoveEvent,
 } from '@dnd-kit/core'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
+import type { EventNote } from '@/hooks/useEventNotes'
+import { resolveEventContext } from '@/lib/today/eventContext'
 import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
 import { timeOnDay } from '@/lib/planning/clockText'
 import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
@@ -169,6 +171,13 @@ interface WeekViewV2Props {
    *  shows at once, and the next drag plans from it. A null order puts a row
    *  back to never-ordered (Undo). */
   onReorderTasks?: (writes: { id: string; sortOrder: number | null }[]) => Promise<boolean>
+  /** A calendar event's people and space, read and written as Today does
+   *  (the schedule context's). Absent: no pickers on events. */
+  eventNotesMap?: Map<string, EventNote>
+  eventContextOverrides?: Map<string, TaskContext>
+  getDomainForCalendar?: (calendarId?: string | null, calendarName?: string | null) => TaskContext | null
+  onAssignEventAll?: (eventId: string, memberIds: string[]) => void
+  onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
 }
 
 const weekIsCurrentFor = (anchor: Date) => sameDay(anchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
@@ -193,6 +202,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
     densityEvents,
     pushAction,
     onReorderTasks,
+    eventNotesMap,
+    eventContextOverrides,
+    getDomainForCalendar,
+    onAssignEventAll,
+    onUpdateEventContext,
   } = props
 
   // A step planned for a week or given a day is week work, even when it is
@@ -734,9 +748,23 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const eventCalendar = useMemo(() => new Map(events.map((ev) => [`event-${ev.google_event_id || ev.id}`, ev.calendar_id ?? ev.calendarId ?? null])), [events])
   const canMoveEvent = useCallback((id: string) => !!onUpdateEvent && eventCalendar.has(id) && !isReadOnlyCalendar(eventCalendar.get(id)),
     [onUpdateEvent, eventCalendar, isReadOnlyCalendar])
-  const canvasDays = useMemo(() => toCanvasDays({
-    days: journalDays, weekend: journalWeekend, shelf, dailyShown, forecast, plannedDinners, eventsReady: sources?.events === 'ready', canMoveEvent,
-  }), [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners, sources?.events, canMoveEvent])
+  const eventById = useMemo(() => new Map(events.map((ev) => [`event-${ev.google_event_id || ev.id}`, ev])), [events])
+  const canvasDays = useMemo(() => {
+    const built = toCanvasDays({
+      days: journalDays, weekend: journalWeekend, shelf, dailyShown, forecast, plannedDinners, eventsReady: sources?.events === 'ready', canMoveEvent,
+    })
+    // Each calendar event's people and space, for its pickers (Today's reads).
+    const withMeta = (ev: CanvasDayItem): CanvasDayItem => {
+      const key = ev.id.replace(/^event-/, '')
+      const source = eventById.get(ev.id)
+      return {
+        ...ev,
+        people: eventNotesMap?.get(key)?.assignedToAll ?? [],
+        context: source ? resolveEventContext(source, eventContextOverrides, getDomainForCalendar ? (id, name) => getDomainForCalendar(id, name) : undefined) : eventContextOverrides?.get(key) ?? null,
+      }
+    }
+    return { ...built, days: built.days.map((d) => ({ ...d, events: d.events.map(withMeta) })) }
+  }, [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners, sources?.events, canMoveEvent, eventById, eventNotesMap, eventContextOverrides, getDomainForCalendar])
   // Beta: drafts stay in chat. The week always shows the stored plan;
   // successful writes reach it through the shared task hooks.
 
@@ -832,6 +860,27 @@ export function WeekViewV2(props: WeekViewV2Props) {
         write(names.length ? `Assign “${t.title}” to ${names.join(', ')}` : `Unassign “${t.title}”`, t,
           { assignedToAll: ids, assignedTo: ids[0] ?? undefined }, undefined, false)
       },
+      // A calendar event's space and people, with Undo: the override (or
+      // none) and the people it had.
+      ...(onUpdateEventContext ? {
+        setEventContext: (ev: CanvasDayItem, context: TaskContext | undefined) => {
+          const id = ev.id.replace(/^event-/, '')
+          const was = eventContextOverrides?.get(id) ?? null
+          const word = context ? context[0].toUpperCase() + context.slice(1) : 'no space'
+          void activity.run(`“${ev.title}” → ${word}`, async () => { await onUpdateEventContext(id, context ?? null) }, {
+            ids: [ev.id], undo: async () => { await onUpdateEventContext(id, was) },
+          })
+        },
+      } : {}),
+      ...(onAssignEventAll ? {
+        assignEvent: (ev: CanvasDayItem, ids: string[]) => {
+          const id = ev.id.replace(/^event-/, '')
+          const was = ev.people ?? []
+          const names = ids.flatMap((m) => familyMembers.find((x) => x.id === m)?.name ?? [])
+          void activity.run(names.length ? `Assign “${ev.title}” to ${names.join(', ')}` : `Unassign “${ev.title}”`,
+            async () => { await onAssignEventAll(id, ids) }, { ids: [ev.id], undo: async () => { await onAssignEventAll(id, was) } })
+        },
+      } : {}),
       // Delete from No day yet, with Undo: the same row back (restoreDeleted).
       deleteTask: (t) => {
         void activity.run(`Delete “${t.title}”`, async () => { await deleteTask(t.id); return true }, {
@@ -900,7 +949,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, addTask, deleteTask, meId, layers, familyMembers])
+  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, addTask, deleteTask, meId, layers, familyMembers, onUpdateEventContext, onAssignEventAll, eventContextOverrides])
   const canvasSpans = useMemo(() => toCanvasSpans(journalSpans, journalDays), [journalSpans, journalDays])
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),

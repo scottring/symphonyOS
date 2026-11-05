@@ -271,12 +271,16 @@
 .cw-row:has(.wc-tools) .wc-people { display: none; }
 @media (hover: hover) {
   .cw-row:has(.wc-tools) .wc-people { display: flex; }
-  .cw-row .wc-tools { display: none; }
+  .cw-row .wc-tools, .wc-eventrow .wc-tools { display: none; }
   .cw-row:is(:hover, :focus-within):has(.wc-tools) .wc-people,
   .cw-row:has(.wc-tools [aria-expanded='true']) .wc-people { display: none; }
   .cw-row:is(:hover, :focus-within) .wc-tools,
-  .cw-row:has(.wc-tools [aria-expanded='true']) .wc-tools { display: flex; }
+  .cw-row:has(.wc-tools [aria-expanded='true']) .wc-tools,
+  .wc-eventrow:is(:hover, :focus-within) .wc-tools,
+  .wc-eventrow:has(.wc-tools [aria-expanded='true']) .wc-tools { display: flex; }
 }
+/* An event's pickers sit under its chip, in from its bar. */
+.wc-eventrow .wc-tools { padding: 2px 0 2px 8px; }
 .wc-days-head .wc-rhythm { margin: 0; }
 .wc-day .wk-free { margin-top: 8px; }
 /* "+3 more" / "Show less": a day's folded rest (foldDay). */
