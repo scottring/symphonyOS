@@ -60,8 +60,9 @@
    are a day's rows; When ▾ opens the when-chips under the row, wrapped, never
    a floating bar over the rows above. */
 .wc-weekcol .wc-dayhead { flex-wrap: wrap; column-gap: 6px; row-gap: 0; }
-.wc-weekcol-word { font-family: var(--font-family-display); font-size: 19px; line-height: 1; color: var(--color-neutral-900); white-space: nowrap; }
-.wc-weekcol-count { font-family: var(--font-family-sans); font-size: 12px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+/* Like a day's column; only the dashed rule under its head sets it apart. */
+.wc-weekcol .wc-dayhead { border-bottom-style: dashed; }
+.wc-weekcol-count { font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
 .wc-weekcol .cw-row { flex-wrap: wrap; column-gap: 6px; }
 .wc-weekcol .cw-row > .canvas-item-title { flex: 1 1 0; min-width: 0; }
 .wc-weekcol .wc-noday-actions { position: static; display: block; flex-basis: 100%; padding: 2px 0 6px 22px; box-shadow: none; background: none; white-space: normal; }

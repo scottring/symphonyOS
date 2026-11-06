@@ -754,8 +754,10 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       aria-label="Sometime this week" data-testid="week-sometime" data-explain="still-to-place" data-explain-label="Sometime this week"
       style={phone ? undefined : { gridColumn: 1 }} {...shelfDrop}>
       <header className="wc-dayhead">
-        {/* As a day reads "Mon 2": the small word, then the large one. */}
-        <span className="wc-dayname">Sometime</span> <span className="wc-weekcol-word">this week</span>
+        {/* Headed like a day ("MON 2"), in the same small capitals (Scott,
+            2026-11-06: the larger lowercase serif read as out of place); the
+            dashed rule under it is what sets it apart. */}
+        <span className="wc-dayname">Sometime this week</span>
         {weekCount > 0 && <span className="wc-weekcol-count">{weekCount}</span>}
       </header>
       <div className="wc-daybody">
