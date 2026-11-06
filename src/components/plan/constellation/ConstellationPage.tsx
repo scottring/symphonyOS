@@ -273,6 +273,13 @@ function Inner() {
 
   // A conversation's saved item: bring it into view.
   const dataReady = !loading && !goalsLoading
+  // Only the first load blanks the page. Every save reloads the plans
+  // (refetch turns `loading` on with the list already shown): that reload
+  // must not flash "Loading your plans…", nor remount the sheet, which took
+  // the write line's focus and reset the session's tooltip ("Booked: …").
+  const [loadedOnce, setLoadedOnce] = useState(false)
+  if (dataReady && !loadedOnce) setLoadedOnce(true)
+  const pageReady = dataReady || loadedOnce
   useEffect(() => {
     if (!savedKey || !dataReady) return
     mainRef.current?.querySelector(`[data-plan-key="${savedKey}"]`)?.scrollIntoView?.({ block: 'center' })
@@ -408,7 +415,7 @@ function Inner() {
   // one's. Otherwise nothing: planning is the guided session (the Plan
   // button), which replaced the "Plan this season with me" walk.
   const talk = talkFor(PERIODS[level], now, seasons)
-  const talkDue = !!talk && dataReady && (current || localYmd(bounds.start) === localYmd(talk.start))
+  const talkDue = !!talk && pageReady && (current || localYmd(bounds.start) === localYmd(talk.start))
     && listIsEmpty(talk, { tasks, goals, meId, seasons, today: now }) && !isPutOff(talk, now, readDismissals())
   const dueTalk = talk && talkDue && !planning && requested !== 3 ? talk : null
   // The talk rides in the docked bar where there is one (desktop).
@@ -843,7 +850,7 @@ function Inner() {
   // while planning it, and a link to the review already open beside you):
   // the fact line steps aside, and the summary line keeps only the season's
   // energy (its step's home). A review on its way to the session hides them.
-  const facts = !reviewing && !planning && dataReady && !error && !goalsError
+  const facts = !reviewing && !planning && pageReady && !error && !goalsError
     ? <p className="wk-facts plan-facts" data-explain="period-facts" data-explain-label={`${periodWord} at a glance`}>
       {level === 1 && <>{periodRange(bounds.start, bounds.end)}{onPeriod > 0 && ' · '}</>}
       {onPeriod > 0 && <>
@@ -856,7 +863,7 @@ function Inner() {
   // "Planned Wed, Nov 4 · Last month’s review", and the season's energy.
   const plannedAt = periodNotes.notes.guide?.plannedAt
     ?? (!planSession.loading && !planSession.error ? planSession.saved?.at.toISOString() : undefined)
-  const summary = !reviewing && dataReady && !error && !goalsError
+  const summary = !reviewing && pageReady && !error && !goalsError
     ? <PeriodSummaryLine level={PERIODS[level]} plannedAt={planning ? undefined : plannedAt} reviewed={!planning && !prevReview.error && !!prevReview.reviewed}
       // Season's energy, asked in its Energy step's tooltip (Task 4): said
       // here, and a tap changes it. Keyed by the period: a menu left open
@@ -865,7 +872,7 @@ function Inner() {
       {...(level === 1 && !seasonNotes.loading && !seasonNotes.error ? { energy: seasonEnergy, onEnergy: (energy: EnergyNote | undefined) => patchSeasonNotes({ energy }) } : {})} />
     : null
   const menuChoices: PageMenuChoice[] = [
-    ...(dataReady ? offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run })) : []),
+    ...(pageReady ? offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run })) : []),
     // Month's Fresh start lives here, every day (its step points at ⋯).
     ...(level === 2 ? [{ id: 'fresh-start', label: 'Fresh start', onSelect: () => setFreshOpen(true) }] : []),
     ...(!current ? [{ id: 'back', label: `Back to this ${PERIODS[level]}`, onSelect: () => setStart(null) }] : []),
@@ -1042,8 +1049,8 @@ function Inner() {
         {summary}
       </div>
       <div className="plan-head-tools">
-        {plannable && !reviewing && <PlanChip level={PERIODS[level]} word={periodWord} onStart={() => setMode('plan')} disabled={!dataReady} />}
-        {primary && <button type="button" className="pv2-btn wk-plan plan-primary" disabled={!dataReady} onClick={primary.run}
+        {plannable && !reviewing && <PlanChip level={PERIODS[level]} word={periodWord} onStart={() => setMode('plan')} disabled={!pageReady} />}
+        {primary && <button type="button" className="pv2-btn wk-plan plan-primary" disabled={!pageReady} onClick={primary.run}
           data-explain="plan-primary" data-explain-label={primary.label}>{primary.label}</button>}
         {/* Without the docked bar (phones), ⋯ offers the talk that is due. */}
         <PageHelpContext.Provider value={help}>
@@ -1061,10 +1068,10 @@ function Inner() {
         : !periodNotes.loading && <FreshStart monthWord={periodWord} value={periodNotes.notes.scenery} patch={periodNotes.patch} />}
     </div>}
 
-    {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
+    {!pageReady && <p className="plan-status" role="status">Loading your plans…</p>}
     {(error || goalsError)
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
-      : !dataReady ? null
+      : !pageReady ? null
       // Reviewing a period is the first card of planning the one after it
       // (spec 2026-10-19): Review October opens Plan November on Looking back.
       : reviewing ? <Navigate replace to={`${pathname}?${(() => { const q = new URLSearchParams(params); q.delete('review'); q.delete('focus'); q.set('plan', '1'); q.set('step', 'look-back'); q.set('start', localYmd(bounds.next)); return q.toString() })()}`} />
