@@ -205,6 +205,30 @@ describe('GuideCoach — planning is a few tooltips on the everyday page', () =>
     } finally { vi.unstubAllGlobals() }
   })
 
+  it('a write line above the sheet folded open at the left: the tooltip sits beside what it draws, never over the sheet (2026-11-06)', async () => {
+    // The Week as drawn: a full-width composer row with a short card at its
+    // left, and the month's sheet open below it, on the left.
+    const at = (el: HTMLElement) => el.getAttribute('data-guide-anchor') ?? el.parentElement?.getAttribute('data-guide-anchor')
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const own = this.getAttribute('data-guide-anchor')
+      const r = own === 'write' ? { left: 50, top: 100, right: 990, bottom: 240 }
+        : own === 'left' ? { left: 50, top: 260, right: 400, bottom: 760 }
+          : !own && at(this) === 'write' ? { left: 60, top: 110, right: 360, bottom: 230 }
+            : { left: 0, top: 0, right: 0, bottom: 0 }
+      return { ...r, x: r.left, y: r.top, width: r.right - r.left, height: r.bottom - r.top, toJSON: () => r } as DOMRect
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(290)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(210)
+    render(<MemoryRouter><GuidedSessionProvider>
+      <div data-guide-anchor="write"><form><input aria-label="Add to this week" /></form></div>
+      <div data-fold-mode="h"><div data-guide-anchor="left"><ul><li>Make a budget</li></ul></div></div>
+      <GuideCoach level="week" current="choose" word="this week" onNext={vi.fn()} onBack={vi.fn()} onFinish={vi.fn()} onStop={vi.fn()} />
+    </GuidedSessionProvider></MemoryRouter>)
+    await frame()
+    expect(coach()).toHaveAttribute('data-side', 'left')
+    expect(coach().style.transform).toBe('translate(374px, 100px)')
+  })
+
   it('on a stacked fold (a phone) it sits under the calendar’s edge, not beside it', async () => {
     store.notes = { guide: { current: 'next-weeks', done: [], skipped: [] } }
     mockRects()

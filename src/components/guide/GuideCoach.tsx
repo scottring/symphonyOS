@@ -156,6 +156,18 @@ function placeCoach(coach: HTMLElement | null, at: string, fallback?: string) {
   else {
     x = r.left + 8; y = r.bottom + 12
     if (y + ch > H - 12 && r.top - ch - 12 > 12) { y = r.top - 12 - ch; arrow = 'bottom' }
+    // Never over the sheet folded open at the left: it is the list the step
+    // chooses from (Scott, 2026-11-06: "Choose this week's tasks" sat on top
+    // of November's list). Beside what the anchor draws (the Week's composer
+    // is a short card in a full-width row), else past the sheet's edge.
+    const open = findAnchor('left')
+    const s = el && open && !stacked(open) && sized(open) && !open.contains(el) ? open.getBoundingClientRect() : null
+    if (s && x < s.right && x + cw > s.left && y < s.bottom && y + ch > s.top) {
+      const drawn = [...el!.children].map((c) => c.getBoundingClientRect()).filter((c) => c.width > 0)
+      const end = drawn.length ? Math.max(...drawn.map((c) => c.right)) : r.right
+      if (end + 14 + cw <= W - 12) { x = end + 14; y = r.top; arrow = 'left' }
+      else x = s.right + 14
+    }
   }
   x = Math.max(12, Math.min(W - cw - 12, x))
   y = Math.max(12, Math.min(H - ch - 12, y))
