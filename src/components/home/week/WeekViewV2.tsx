@@ -903,20 +903,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
         if (ok && !layers.has(parse.quick.context ?? 'unsorted')) showToast('Added, but hidden by your current view', 'warning', 8000)
         return ok !== false
       },
-      // A month line dragged onto the week: a new task in the same words, on
-      // the day it was dropped on (or this week, no day). A copy: the month
-      // line stays as it is, and nothing ties the two (Scott, 2026-11-06).
-      copyLine: async (sourceId, day) => {
-        const src = planLines.find((t) => t.id === sourceId)
-        if (!src) return false
-        const id = crypto.randomUUID()
-        const at = day ? atMidnight(day) : undefined
-        const ok = await run(`Copy “${src.title}” to ${day ? short(day) : 'this week'}`, async () => !!(await addTask(src.title, undefined, undefined, at, {
-          id, assignedTo: meId ?? undefined, context: src.context ?? undefined,
-          ...(at ? { isAllDay: true } : { bucket: 'week' as const, weekStart: weekAnchor }),
-        })), { ids: [id], undo: async () => { await deleteTask(id) } })
-        return ok !== false
-      },
       foreignDrop: (day, payload) => { void planActions.drop(payload, { type: 'day', day }).then((ok) => { if (ok === true) canvasWriteListener.current?.() }) },
       // No day yet triage: the Inbox's when-vocabulary, through the same gated
       // writes (applyTriageWhen); Undo puts back where the task was.
@@ -964,7 +950,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, addTask, deleteTask, meId, layers, familyMembers, onUpdateEventContext, onAssignEventAll, eventContextOverrides, planLines])
+  }, [activity, onUpdateTask, onUpdateEvent, toggleTask, writeOrders, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated, addTask, deleteTask, meId, layers, familyMembers, onUpdateEventContext, onAssignEventAll, eventContextOverrides])
   const canvasSpans = useMemo(() => toCanvasSpans(journalSpans, journalDays), [journalSpans, journalDays])
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),

@@ -1120,36 +1120,3 @@ describe('WeekCanvas — a calendar event’s space and people', () => {
     expect(within(eventRow()).queryByRole('button', { name: 'Set context' })).toBeNull()
   })
 })
-
-// Scott, 2026-11-06: a month line can be dragged onto the week. It is a copy:
-// the week gets a new task in the same words, the month line stays.
-describe('WeekCanvas — a month line copied onto the week', () => {
-  const month = { word: 'October', kicker: 'Month', rows: [{ id: 'm1', title: 'Book lodging for winter trip' }], doneCount: 0 }
-  it('its rows drag only when the page can copy, and a drop on a day copies it there', async () => {
-    const { MemoryRouter } = await import('react-router-dom')
-    const w = { ...writers(), copyLine: vi.fn(async () => true) }
-    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w}
-      month={month} fold={{ drive: { above: true }, look: null }} /></MemoryRouter>)
-    const row = screen.getByText('Book lodging for winter trip').closest('li')!
-    expect(row).toHaveAttribute('draggable', 'true')
-    let x = dt()
-    fireEvent.dragStart(row, { dataTransfer: x.t })
-    x.arm()
-    expect(x.data['text/plain']).toBe('Book lodging for winter trip')
-    fireEvent.drop(screen.getByTestId('journal-day-2026-10-06'), { dataTransfer: x.t })
-    expect(w.copyLine).toHaveBeenCalledWith('m1', dayOf(3))
-    x = dt()
-    fireEvent.dragStart(row, { dataTransfer: x.t })
-    x.arm()
-    fireEvent.drop(weekCol(), { dataTransfer: x.t })
-    expect(w.copyLine).toHaveBeenLastCalledWith('m1', null)
-    expect(w.placeTask).not.toHaveBeenCalled()
-  })
-
-  it('without the writer the month stays for reading only', async () => {
-    const { MemoryRouter } = await import('react-router-dom')
-    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
-      month={month} fold={{ drive: { above: true }, look: null }} /></MemoryRouter>)
-    expect(screen.getByText('Book lodging for winter trip').closest('li')).not.toHaveAttribute('draggable')
-  })
-})
