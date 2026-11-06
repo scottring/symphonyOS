@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { Task } from '@/types/task'
 import { buildShelf } from './weekShelf'
 
@@ -41,5 +41,23 @@ describe('buildShelf', () => {
   it('a day that passed undone comes back with a quiet “from Mon”', () => {
     const missed = task({ id: 'm', title: 'Return books', scheduledFor: new Date(2026, 10, 2), isAllDay: true })
     expect(buildShelf({ weekTasks: [missed], weekStart, now })[0].rows[0].meta).toBe('from Mon')
+  })
+})
+
+// The week of Sat Oct 31, 2026 holds the clock change (Nov 1, America/New_York).
+// Counted in 24-hour steps its sixth day ended on Thursday, so a task given
+// Friday Nov 6 stayed in Sometime this week while Today showed it on Friday
+// (Scott, 2026-11-06).
+describe('buildShelf across the clock change', () => {
+  const tz = process.env.TZ
+  beforeAll(() => { process.env.TZ = 'America/New_York' })
+  afterAll(() => { process.env.TZ = tz })
+
+  it('puts a task given the week’s last day on that day, not in Sometime', () => {
+    const start = new Date(2026, 9, 31) // Sat Oct 31
+    const friday = task({ id: 'f', title: 'Text Mike', weekStart: start, scheduledFor: new Date(2026, 10, 6), isAllDay: true,
+      commitments: [{ level: 'week', periodStart: start, status: 'open' }] as Task['commitments'] })
+    const rows = buildShelf({ weekTasks: [friday], weekStart: start, now: new Date(2026, 10, 6, 11) }).flatMap((g) => g.rows)
+    expect(rows).toEqual([])
   })
 })

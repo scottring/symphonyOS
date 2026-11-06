@@ -19,6 +19,7 @@
 
 import type { Task } from '@/types/task'
 import { localYmd } from '@/lib/cadence/config'
+import { addDays } from '@/lib/dateUtils'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
 
 export interface ShelfRow {
@@ -42,7 +43,6 @@ export interface BuildShelfArgs {
   now?: Date
 }
 
-const DAY = 86_400_000
 
 export function shelfRowMeta(t: Task, weekStart: Date, now: Date): string | null {
   if (t.scheduledFor) {
@@ -51,16 +51,20 @@ export function shelfRowMeta(t: Task, weekStart: Date, now: Date): string | null
     }
     return t.scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }
-  const prev = new Date(weekStart.getTime() - 7 * DAY)
+  const prev = addDays(weekStart, -7)
   const kept = (t.commitments ?? []).some((c) => c.level === 'week' && c.status === 'carried' && localYmd(c.periodStart) === localYmd(prev))
   return kept ? 'from last week' : null
 }
 
-/** Has this task a day inside the week (and not one that passed undone)? */
+/** Has this task a day inside the week (and not one that passed undone)?
+ *  Days are counted on the calendar, not in 24-hour steps: the week of
+ *  Oct 31, 2026 holds the clock change, and six 24-hour steps from it ended
+ *  on Thursday, so a task given Friday stayed in Sometime this week
+ *  (Scott, 2026-11-06). */
 export function placedInWeek(t: Task, weekStart: Date, now: Date): boolean {
   if (!t.scheduledFor) return false
   const k = localYmd(t.scheduledFor)
-  const inWeek = k >= localYmd(weekStart) && k <= localYmd(new Date(weekStart.getTime() + 6 * DAY))
+  const inWeek = k >= localYmd(weekStart) && k <= localYmd(addDays(weekStart, 6))
   return inWeek && !isMissedPlacement(t.scheduledFor, t.completed, now)
 }
 

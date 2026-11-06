@@ -92,6 +92,7 @@ import type { SessionFold } from '@/components/plan/guided/GuidedPeriod'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref, type PlannedMeal } from '@/lib/mealDayRecipes'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
+import { addDays } from '@/lib/dateUtils'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
  *  a full-day span (midnight start, 24h+ duration — how a holiday reads from
@@ -966,7 +967,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const todayLine = null
 
   // A past week is a look-back, not a plan.
-  const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
+  const weekIsPast = addDays(weekAnchor, 7).getTime() <= Date.now()
 
   // ── The deck (Friday session, Stage 1) ────────────────────────────────
   // Review and Plan (?review=1, ?plan=1) open the full deck; "Place them"
@@ -1248,7 +1249,7 @@ function weekEventItems(extras: ReturnType<typeof partitionWeekExtras>) {
 /** The week's own list on the canvas: what is chosen for the week (`listed`,
  *  through the people lens) less what waits for its weekend, flat. */
 function weekShelf(anchor: Date, listed: Task[]) {
-  const end = anchor.getTime() + 7 * 86_400_000
+  const end = addDays(anchor, 7).getTime()
   const inWeekend = (t: Task) => !!t.weekendStart && !t.scheduledFor && t.weekendStart.getTime() >= anchor.getTime() && t.weekendStart.getTime() < end
   return buildShelf({ weekTasks: listed.filter((t) => !inWeekend(t)), weekStart: anchor })
 }
