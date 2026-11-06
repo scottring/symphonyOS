@@ -172,7 +172,16 @@ export interface WeekCanvasWriters {
   assignEvent?: (event: CanvasDayItem, memberIds: string[]) => void
   /** "+ Add to week" / "+ Add to day": a typed sentence, landed by its date. */
   addTyped?: (parse: HorizonParse, landing: HorizonLanding) => Promise<boolean>
+  /** A month line dragged onto the week: a new week task in the same words,
+   *  on `day` or (null) in Sometime this week. The month line is untouched
+   *  and nothing ties the two (Scott, 2026-11-06). Absent: the month's lines
+   *  don't drag. */
+  copyLine?: (sourceId: string, day: Date | null) => Promise<boolean>
 }
+
+/** A month line on its way to the week (a copy, never a move). */
+const COPY_MIME = 'application/x-symphony-line-copy'
+const isCopyDrag = (dt: DataTransfer | null) => !!dt && [...dt.types].includes(COPY_MIME)
 
 /** The month above this week, for reading beside the days: its open lines,
  *  titles only, and how many are done. */
@@ -390,8 +399,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   }
   const dayDrop = (day: CanvasDay) => ({
     onDragOver: (e: DragEvent) => {
-      if (!isPlanDrag(e.dataTransfer) && !isEventDrag(e.dataTransfer)) return
-      e.preventDefault(); e.dataTransfer.dropEffect = 'move'
+      const copy = isCopyDrag(e.dataTransfer)
+      if (!copy && !isPlanDrag(e.dataTransfer) && !isEventDrag(e.dataTransfer)) return
+      e.preventDefault(); e.dataTransfer.dropEffect = copy ? 'copy' : 'move'
       if (overDay !== day.key) setOverDay(day.key)
       if (reorders(drag, day.key)) showGap(day.key, e.currentTarget, e.clientY)
       else if (overGap) setOverGap(null)
@@ -401,6 +411,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       setOverDay((k) => (k === day.key ? null : k))
     },
     onDrop: (e: DragEvent) => {
+      const copied = isCopyDrag(e.dataTransfer) ? e.dataTransfer.getData(COPY_MIME) : ''
+      if (copied) { e.preventDefault(); e.stopPropagation(); endDrag(); void writers.copyLine?.(copied, day.date); return }
       const moved = readEventDrag(e.dataTransfer)
       if (moved) { e.preventDefault(); e.stopPropagation(); dropEventOnDay(day, moved); return }
       const p = readPlanDrag(e.dataTransfer)
@@ -466,11 +478,14 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // A day's task dropped back on the shelf loses its day, keeps its week.
   const shelfDrop = {
     onDragOver: (e: DragEvent) => {
+      if (isCopyDrag(e.dataTransfer)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOverShelf(true); return }
       if (!drag || drag.kind !== 'task' || !drag.fromKey) return
       e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOverShelf(true)
     },
     onDragLeave: (e: DragEvent) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOverShelf(false) },
     onDrop: (e: DragEvent) => {
+      const copied = isCopyDrag(e.dataTransfer) ? e.dataTransfer.getData(COPY_MIME) : ''
+      if (copied) { e.preventDefault(); e.stopPropagation(); endDrag(); void writers.copyLine?.(copied, null); return }
       const p = readPlanDrag(e.dataTransfer)
       const placed = p?.kind === 'task' ? dayTask(p.id) : null
       endDrag()
@@ -829,7 +844,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       frontLabel={look ? 'Last week, looking back' : undefined}
       above={look ? <LookSheet>{look}</LookSheet>
         : <AboveSheet kicker={month.kicker} title={month.word} rows={month.rows} doneCount={month.doneCount}
-          foot="For reading. Write this week in its own words." empty={`No ${month.word} goals yet.`} />}>
+          foot={writers.copyLine && !phone ? 'For reading. Write this week in its own words, or drag a line onto the week to copy it.' : 'For reading. Write this week in its own words.'} empty={`No ${month.word} goals yet.`}
+          onDragRow={writers.copyLine && !phone ? (id, ev) => {
+            ev.dataTransfer.setData(COPY_MIME, id)
+            ev.dataTransfer.setData('text/plain', month.rows.find((r) => r.id === id)?.title ?? '')
+            ev.dataTransfer.effectAllowed = 'copy'
+          } : undefined} />}>
       {node}
     </PaperFold>
   ) : node
