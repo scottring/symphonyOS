@@ -2349,3 +2349,88 @@ describe('the homes belong to the period on screen, once its notes are in',()=>{
   expect(screen.queryByRole('dialog',{name:'Fresh start'})).toBeNull()
  })
 })
+
+// Every save reloads the plans (refetch), and the real hook turns `loading`
+// on while it does, with the list already on screen. Only the first load
+// blanks the page: a save never flashes "Loading your plans…", never
+// remounts the sheet (the write line keeps its focus, ready for the next
+// goal) and never resets the session's tooltip ("Booked: …" stays).
+describe('a save reloads the plans behind the page',()=>{
+ /** refetch as the real hook does it: loading on now, off at `finish()`. */
+ const reloads=()=>{
+  const pending:(()=>void)[]=[]
+  api.refetch.mockImplementation(()=>new Promise<void>((res)=>{(api as any).loading=true;api.redraw();pending.push(()=>{delete (api as any).loading;api.redraw();res()})}))
+  onTestFinished(()=>{api.refetch.mockReset();delete (api as any).loading})
+  return{finish:()=>act(async()=>{for(const f of pending.splice(0))f()})}
+ }
+ const loadingShown=()=>screen.queryByText('Loading your plans…')
+ it('Month: writing a goal keeps the page, the facts and the same write line, focused',async()=>{
+  api.tasks=[{id:'m',title:'Pick dates',bucket:'month'}]
+  const r=reloads()
+  open(NOV)
+  const line=screen.getByRole('textbox',{name:'Write a November goal'})
+  line.focus()
+  await writeOn('Write a November goal','Book trains')
+  expect(api.refetch).toHaveBeenCalled()
+  // Mid-reload: nothing blanks, the line is the same one, still focused.
+  expect(loadingShown()).toBeNull()
+  expect(document.querySelector('.plan-facts')).not.toBeNull()
+  expect(screen.getByRole('textbox',{name:'Write a November goal'})).toBe(line)
+  expect(document.activeElement).toBe(line)
+  expect(line).toHaveValue('')
+  await r.finish()
+  expect(loadingShown()).toBeNull()
+  expect(screen.getByRole('textbox',{name:'Write a November goal'})).toBe(line)
+  expect(document.activeElement).toBe(line)
+ })
+ it('Season and Year: a goal written shows no loading line and keeps the line',async()=>{
+  const r=reloads()
+  season()
+  const line=screen.getByRole('textbox',{name:'Write a Fall goal'})
+  line.focus()
+  await writeOn('Write a Fall goal','Walk daily')
+  expect(loadingShown()).toBeNull()
+  expect(document.activeElement).toBe(line)
+  await r.finish()
+  cleanup()
+  open()
+  const y=screen.getByRole('textbox',{name:'Write a 2026 goal'})
+  y.focus()
+  await writeOn('Write a 2026 goal','A meaningful year')
+  expect(api.addGoal).toHaveBeenCalled()
+  expect(loadingShown()).toBeNull()
+  expect(screen.getByRole('textbox',{name:'Write a 2026 goal'})).toBe(y)
+  expect(document.activeElement).toBe(y)
+  await r.finish()
+ })
+ it('in a session: the step stays put and the write line keeps its focus',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  const r=reloads()
+  atStep('by-area')
+  month('&plan=1')
+  const step=stepNow()
+  const line=screen.getByRole('textbox',{name:'Write an October goal'})
+  await waitFor(()=>expect(document.activeElement).toBe(line))
+  await writeOn('Write an October goal','Paint the fence')
+  expect(loadingShown()).toBeNull()
+  expect(stepNow()).toBe(step)
+  expect(screen.getByRole('textbox',{name:'Write an October goal'})).toBe(line)
+  expect(document.activeElement).toBe(line)
+  await r.finish()
+  expect(screen.getByRole('textbox',{name:'Write an October goal'})).toBe(line)
+  expect(document.activeElement).toBe(line)
+ })
+ it('Year’s Share and book: “Booked: …” shows after booking, through the reload',async()=>{
+  at(new Date(2026,9,17,12)); onTestFinished(()=>{vi.useRealTimers()})
+  const r=reloads()
+  atStep('share-book')
+  open('/year?view=constellation&start=2026-10-09&plan=1')
+  fireEvent.click(coach().getByRole('button',{name:'Book the first Winter session'}))
+  fireEvent.change(coach().getByLabelText('First Winter session'),{target:{value:'2026-11-28'}})
+  await act(async()=>{fireEvent.click(coach().getByRole('button',{name:'Book it'}))})
+  expect(loadingShown()).toBeNull()
+  expect(coach().getByRole('status')).toHaveTextContent('Booked: Plan Winter, Sat, Nov 28')
+  await r.finish()
+  expect(coach().getByRole('status')).toHaveTextContent('Booked: Plan Winter, Sat, Nov 28')
+ })
+})
