@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f1ea;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ea;padding:32px 16px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#fffdf8;border:1px solid #e6e0d4;border-radius:12px;">
+          <tr><td style="padding:32px 32px 8px;font-family:'Crimson Pro',Georgia,serif;font-size:26px;color:#1f2a33;">Symphony</td></tr>
+          <tr><td style="padding:8px 32px 0;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55;color:#33404a;">
+            Someone asked to reset the password for your Symphony account. Choose a new one below.
+          </td></tr>
+          <tr><td style="padding:24px 32px;">
+            <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#2c5d7c;color:#ffffff;text-decoration:none;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;padding:12px 22px;border-radius:10px;">Choose a new password</a>
+          </td></tr>
+          <tr><td style="padding:0 32px 32px;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#6b7680;">
+            Sent to {{ .Email }}. If you didn't ask for this, ignore this email; your password stays the same.
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>
