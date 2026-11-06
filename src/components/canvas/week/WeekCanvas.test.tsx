@@ -225,7 +225,7 @@ describe('WeekCanvas — filing a task under a goal', () => {
   // Final review (2026-11-04): the Week page never changes shape in a
   // session. Sometime this week stays, with its no-day tasks and + Add to
   // week, and Choose this week's tasks opens the week's line to write on.
-  it('in a session (a fold): Sometime this week keeps the no-day tasks and + Add to week; a writing step opens the line, the Choose step’s anchor', async () => {
+  it('in a session (a fold): Sometime this week keeps the no-day tasks and its open line to write on, the Choose step’s anchor', async () => {
     const { MemoryRouter } = await import('react-router-dom')
     const w = { ...writers(), addTyped: vi.fn(async () => true) }
     const view = (write: boolean) => <MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w}
@@ -233,12 +233,11 @@ describe('WeekCanvas — filing a task under a goal', () => {
     const { rerender } = render(view(false))
     const col = within(weekCol())
     expect(col.getByRole('list')).toHaveTextContent('Call the bank')
-    expect(col.getByRole('button', { name: '+ Add to week' })).toHaveAttribute('data-guide-anchor', 'write')
-    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(col.getByRole('textbox', { name: 'Add to this week' }).closest('[data-guide-anchor="write"]')).not.toBeNull()
+    // A writing step opens no second box on the desk: the line is already open
+    // (the coach puts the cursor in it).
     rerender(view(true))
-    expect(screen.getByRole('textbox')).toHaveFocus()
-    expect(screen.getByText('Add to this week')).toBeInTheDocument()
-    expect(screen.getByRole('textbox').closest('[data-guide-anchor="write"]')).not.toBeNull()
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
   })
 
   // Fix round 1 ruling: the week carries the bookmark on the top edge of its
@@ -634,14 +633,13 @@ describe('the week’s planning homes', () => {
     expect(empty).toHaveTextContent('Dinner No dinners planned yet')
   })
 
-  it('the week’s line to write on is the Choose step’s anchor: + Add to week, and the line once open', async () => {
+  it('the week’s line to write on is the Choose step’s anchor, always open', async () => {
     const { MemoryRouter } = await import('react-router-dom')
     const w = { ...writers(), addTyped: vi.fn(async () => true) }
     render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w}
       month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={{ drive: {}, look: null }} /></MemoryRouter>)
-    expect(screen.getByRole('button', { name: '+ Add to week' })).toHaveAttribute('data-guide-anchor', 'write')
-    fireEvent.click(screen.getByRole('button', { name: '+ Add to week' }))
-    expect(screen.getByRole('textbox').closest('[data-guide-anchor="write"]')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: '+ Add to week' })).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Add to this week' }).closest('[data-guide-anchor="write"]')).not.toBeNull()
   })
 })
 
@@ -972,7 +970,7 @@ describe('WeekCanvas — one band: the month’s fold, then Sometime this week',
     for (const li of within(weekCol()).getAllByRole('listitem')) expect(li).toHaveClass('cw-row')
   })
 
-  it('holds the no-day tasks with When ▾, the routines that need a day, and + Add to week at the bottom', async () => {
+  it('holds the no-day tasks with When ▾ and the routines that need a day, under its open line to write on', async () => {
     const w = { ...writers(), triageTask: vi.fn(), addTyped: vi.fn(async () => true) }
     await page({}, w)
     const col = within(weekCol())
@@ -982,11 +980,24 @@ describe('WeekCanvas — one band: the month’s fold, then Sometime this week',
     fireEvent.click(within(col.getByRole('group', { name: 'When for Call the bank' })).getByRole('button', { name: /Someday/ }))
     expect(w.triageTask).toHaveBeenCalledWith(bank, 'someday')
     expect(col.queryByRole('button', { name: 'Complete Mow the lawn' })).toBeNull()
-    const add = col.getByRole('button', { name: '+ Add to week' })
-    expect(add).toHaveAttribute('data-guide-anchor', 'write')
-    expect(col.getByRole('list').compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    fireEvent.click(add)
-    expect(screen.getByRole('textbox')).toBeInTheDocument()
+    // Scott, 2026-11-06: the line sits at the top of the column, before the list.
+    const line = col.getByRole('textbox', { name: 'Add to this week' })
+    expect(line.compareDocumentPosition(col.getByRole('list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('its line adds one item after another: Return writes it, clears the line and keeps the cursor there', async () => {
+    const w = { ...writers(), addTyped: vi.fn(async () => true) }
+    await page({}, w)
+    const line = within(weekCol()).getByRole('textbox', { name: 'Add to this week' }) as HTMLInputElement
+    line.focus()
+    for (const words of ['Call the plumber', 'Return the library books']) {
+      fireEvent.change(line, { target: { value: words } })
+      await act(async () => { fireEvent.submit(line.closest('form')!) })
+      expect(line.value).toBe('')
+      expect(line).toHaveFocus()
+    }
+    expect(w.addTyped).toHaveBeenCalledTimes(2)
+    expect((w.addTyped.mock.calls[1] as unknown[])[0]).toMatchObject({ title: 'Return the library books' })
   })
 
   it('a task is done from its check; a task or a routine dragged onto a day is given that day', async () => {

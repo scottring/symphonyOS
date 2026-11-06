@@ -76,6 +76,7 @@ import { isWeekend } from '@/lib/dateUtils'
 import { dragPointerY } from '@/lib/today/dragPointer'
 import { gapAt, gapToListIndex } from '@/lib/week/dayReorder'
 import { TypedAdd } from '@/components/canvas/strip/TypedAdd'
+import { WriteLine } from '@/components/plan/fold/WriteLine'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, LookSheet } from '@/components/plan/fold/AboveSheet'
 import type { HorizonLanding, HorizonParse } from '@/lib/planning/horizonInput'
@@ -289,12 +290,14 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // The typed add above the days: for the week, or for one day.
   const [composer, setComposer] = useState<{ key: string | null } | null>(null)
   // A writing step of a guided session (Choose this week's tasks) puts the
-  // pencil on the week's own line: "+ Add to week" opens, focused.
+  // pencil on the week's own line. On the desk that line is always open at
+  // the top of Sometime this week (the coach focuses it); the phone has no
+  // such line, so its typed add opens instead.
   const writeStep = !!session?.write
   const [wroteFor, setWroteFor] = useState(false)
   if (writeStep !== wroteFor) {
     setWroteFor(writeStep)
-    if (writeStep && !composer) setComposer({ key: null })
+    if (writeStep && phone && !composer) setComposer({ key: null })
   }
   // In Sometime this week, a row's when-chips open under it on asking (a
   // floating hover bar would overrun the narrow column and cover the rows above).
@@ -756,16 +759,21 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {weekCount > 0 && <span className="wc-weekcol-count">{weekCount}</span>}
       </header>
       <div className="wc-daybody">
+        {/* The week's line to write on, always open at the top of its list
+            (Scott, 2026-11-06: one item after another, without reopening a
+            box). Return adds and keeps the cursor here for the next one. The
+            Week session's Choose step points at it (data-guide-anchor). */}
+        {!phone && writers.addTyped && (
+          <WriteLine placeholder="Add to this week" periodWord="this week"
+            period={{ start: weekStart, end: new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6) }}
+            onWrite={writers.addTyped} />
+        )}
         {draggingPlaced && <p className="wc-drop-hint" aria-live="polite">Drop here to take its day away</p>}
         {weekCount > 0
           ? <ul className="cw-rows wc-items">{unplaced.map(weekTaskRow)}{routinesToPlace.map(weekRoutineRow)}</ul>
           : !draggingPlaced && <p className="wc-weekcol-note">Everything on this week has a day.</p>}
         {unplaced.length > 0 && onPlaceUnplaced && (
           <button type="button" className="canvas-link wc-quiet-link wc-more" onClick={onPlaceUnplaced}>Place them one at a time</button>
-        )}
-        {/* The Week session's Choose step points at the week's line to write on. */}
-        {!phone && writers.addTyped && (
-          <button type="button" className="canvas-link wc-quiet-link wc-addday" data-guide-anchor="write" onClick={() => setComposer({ key: null })}>+ Add to week</button>
         )}
         {!phone && everyDay.length > 0 && (
           <p className="wc-weekcol-note">Every-day routines are on <Link to="/today">Today</Link>: {everyDay.slice(0, 3).join(', ')}{everyDay.length > 3 ? ` and ${everyDay.length - 3} more` : ''}.</p>
