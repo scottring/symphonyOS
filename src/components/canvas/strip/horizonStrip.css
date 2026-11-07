@@ -107,7 +107,9 @@
   25% { transform: none; opacity: 1; box-shadow: 0 0 0 2px var(--color-primary-600); }
   100% { box-shadow: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 14%, transparent), 0 0 0 1px color-mix(in srgb, var(--color-neutral-900) 5%, transparent); }
 }
-@media (prefers-reduced-motion: reduce) { .wc-weekcol .wc-items .cw-row.is-new { animation: none; } }
+/* A card just put on a day arrives the same way (canvas.css canvas-arrive). */
+.wc-day:not(.wc-weekcol) .wc-dayrow.is-new { animation: canvas-arrive 1.6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .wc-weekcol .wc-items .cw-row.is-new, .wc-day .wc-dayrow.is-new { animation: none; } }
 @media (max-width: 1100px) { .wc-strip > .wc-day.wc-weekcol { margin-right: 0; } }
 /* The tally: how the week has moved through here. */
 .wc-tray-flow { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 10px 0 0; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--color-neutral-900) 10%, transparent); font-family: var(--font-family-sans); font-size: 12px; color: var(--color-neutral-600); }

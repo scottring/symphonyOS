@@ -1146,3 +1146,22 @@ describe('WeekCanvas — Sometime this week is the week’s tray', () => {
     expect(within(weekCol()).getByText('Call the bank').closest('li')).not.toHaveClass('is-new')
   })
 })
+
+// Scott, 2026-11-07: a card dragged onto a full day vanished behind "+N more".
+describe('WeekCanvas — what lands on a day stays in sight', () => {
+  it('a task put on a day that already shows its few is shown, not folded away', () => {
+    const w = writers()
+    const full = (extra: CanvasDay['items']) => days().map((d, i) => i !== 1 ? d : { ...d, items: [
+      { id: 'task-f1', kind: 'task' as const, title: 'First', completed: false, task: task({ id: 'f1', title: 'First' }) },
+      { id: 'task-f2', kind: 'task' as const, title: 'Second', completed: false, task: task({ id: 'f2', title: 'Second' }) },
+      { id: 'task-f3', kind: 'task' as const, title: 'Third', completed: false, task: task({ id: 'f3', title: 'Third' }) },
+      ...extra,
+    ] })
+    const { rerender } = render(<WeekCanvas weekStart={weekStart} days={full([])} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w} />)
+    expect(screen.queryByText('Third')).not.toBeInTheDocument()
+    rerender(<WeekCanvas weekStart={weekStart} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w}
+      days={full([{ id: 'task-n', kind: 'task', title: 'Text Mike Carlin', completed: false, task: task({ id: 'n', title: 'Text Mike Carlin' }) }])} />)
+    expect(screen.getByText('Text Mike Carlin').closest('li')).toHaveClass('is-new')
+    expect(screen.queryByText('Third')).not.toBeInTheDocument()
+  })
+})

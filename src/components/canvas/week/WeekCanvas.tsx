@@ -248,12 +248,15 @@ function DropZone({ id, as: Tag = 'div', ...rest }: { id: string; as?: 'div' | '
   return <Tag ref={setNodeRef as (el: HTMLElement | null) => void} {...rest} />
 }
 
-/** The tray's newcomers: ids that came onto it since the page opened (or
- *  since the week shown changed), marked for a moment so they slide in. */
-function useNewcomers(scope: string, ids: string[]): Set<string> {
+/** Newcomers: ids that came in since the page opened (or since the week
+ *  shown changed). `fresh` marks them for a moment so they slide in;
+ *  `landed` keeps every one for the visit, so a day can keep what was just
+ *  put on it in sight rather than behind "+N more" (Scott, 2026-11-07). */
+function useNewcomers(scope: string, ids: string[]): { fresh: ReadonlySet<string>; landed: ReadonlySet<string> } {
   const seen = useRef<{ scope: string; ids: Set<string> } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [fresh, setFresh] = useState<Set<string>>(() => new Set())
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set())
+  const [landed, setLanded] = useState<{ scope: string; ids: ReadonlySet<string> }>(() => ({ scope, ids: new Set() }))
   const key = ids.join('|')
   useEffect(() => {
     const now = key ? key.split('|') : []
@@ -262,12 +265,14 @@ function useNewcomers(scope: string, ids: string[]): Set<string> {
     now.forEach((id) => seen.current!.ids.add(id))
     if (!added.length) return
     setFresh(new Set(added))
+    setLanded((was) => ({ scope, ids: new Set([...(was.scope === scope ? was.ids : []), ...added]) }))
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => setFresh(new Set()), 1800)
   }, [scope, key])
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
-  return fresh
+  return { fresh, landed: landed.scope === scope ? landed.ids : EMPTY_IDS }
 }
+const EMPTY_IDS: ReadonlySet<string> = new Set()
 
 /** A day's row that lifts on a held press (touch only; the desk drags natively). */
 function LiftableRow<T>({ liftId, lift, ...props }: CompactWeekRowProps<T> & { liftId: string; lift: Lift | null }) {
@@ -331,6 +336,10 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     return next
   })
 
+  // What lands on a day while the page is open stays in sight there, past
+  // the day's few, and slides in (Scott, 2026-11-07: a card dragged onto a
+  // full day vanished behind "+N more").
+  const { fresh: dayFresh, landed: dayLanded } = useNewcomers(localYmd(weekStart), days.flatMap((d) => d.items.map((it) => `${d.key}:${it.id}`)))
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
@@ -515,7 +524,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const all = day.items.filter((it) => showDone || !it.completed)
     const fold = foldDay([
       ...day.events.map(() => ({ event: true, it: null })),
-      ...all.map((it) => ({ event: false, pinned: !!it.proposed || pointedTask(it.task?.id), it })),
+      ...all.map((it) => ({ event: false, pinned: !!it.proposed || pointedTask(it.task?.id) || dayLanded.has(`${day.key}:${it.id}`), it })),
     ])
     const shown = openDays.has(day.key) ? all : fold.shown.flatMap((x) => (x.it ? [x.it] : []))
     return { all, fold, shown }
@@ -590,7 +599,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         : it.routineId ? { payload: { kind: 'routine', id: it.routineId, date: day.key, title: it.title }, drag: { kind: 'occ', id: it.routineId, fromKey: day.key }, title: it.title }
           : null
     return (
-      <LiftableRow key={key} liftId={key} lift={lift} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}${pointedTask(it.task?.id) ? ' is-pointed' : ''}${gapCls}`}
+      <LiftableRow key={key} liftId={key} lift={lift} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}${pointedTask(it.task?.id) ? ' is-pointed' : ''}${dayFresh.has(key) ? ' is-new' : ''}${gapCls}`}
         liProps={{ 'data-order-id': order && it.task ? it.task.id : undefined }}
         onComplete={(x) => (x.task ? writers.toggleTask(x.task) : writers.toggleRoutine(x, day.date))}
         onOpen={(x) => writers.open(x.id)}
@@ -713,7 +722,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // routines that still need a day. Rows read as a day's rows do. On the
   // phone, touch can't drag: a + beside each gives it a day.
   const weekKey = localYmd(weekStart)
-  const fresh = useNewcomers(weekKey, [...unplaced.map((t) => t.id), ...routinesToPlace.map((r) => r.id)])
+  const { fresh } = useNewcomers(weekKey, [...unplaced.map((t) => t.id), ...routinesToPlace.map((r) => r.id)])
   const everyDay = rhythm.flatMap((r) => r.items.map((it) => it.title))
   const weekTaskRow = (t: Task) => {
     const key = `noday:task:${t.id}`
