@@ -55,6 +55,22 @@
   .wc-sheet .wc-strip > .wc-day.wc-weekcol { margin-right: 0; }
   .wc-sheet .wc-bars, .wc-sheet .wc-dinners { display: none; }
 }
+/* Room for the days, but not much (the look back's wide sheet open beside
+   them, or a smaller window): every day the same width, the tray a little
+   wider, tighter gutters, and words wrap whole rather than letter by letter
+   (Scott, 2026-11-07: "Kal eb — Uk ul ele"). */
+@container (width > 820px) and (width <= 1180px) {
+  .wc-sheet .wc-strip, .wc-sheet .wc-bars, .wc-sheet .wc-dinners { grid-template-columns: minmax(0, 1.2fr) repeat(var(--wc-n, 7), minmax(0, 1fr)) !important; }
+  .wc-sheet .wc-strip > .wc-day { padding-left: 7px; padding-right: 7px; }
+  .wc-sheet .wc-strip > .wc-day.wc-weekcol { margin-right: 6px; padding-left: 8px; padding-right: 8px; }
+  .wc-sheet .wc-dinners > .wc-dinner { padding: 0 7px; }
+  .wc-sheet .wc-event { flex-wrap: wrap; column-gap: 4px; padding-left: 5px; padding-right: 5px; }
+  .wc-sheet .wc-event-title, .wc-sheet .wc-day .canvas-item-title { overflow-wrap: break-word; hyphens: auto; }
+  /* The weather takes its own line under the day's name; the tray's name wraps. */
+  .wc-sheet .wc-strip .wc-dayhead { flex-wrap: wrap; row-gap: 0; }
+  .wc-sheet .wc-strip .wc-weather { flex-basis: 100%; margin-left: 0; }
+  .wc-sheet .wc-strip > .wc-day.wc-weekcol .wc-dayname { white-space: normal; }
+}
 
 /* Sometime this week: the week's first column, a day's column with the
    week's name in its header (2026-11-04, from the strip's Week tab). Its rows

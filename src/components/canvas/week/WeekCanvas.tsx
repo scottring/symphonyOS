@@ -919,7 +919,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       <span className="wc-dinner-label">Dinner</span> No dinners planned yet
     </p>
   ) : (
-    <div className="wc-dinners" style={{ gridTemplateColumns: stripCols }} aria-label="Dinners" data-guide-anchor="dinner">
+    <div className="wc-dinners" style={{ ['--wc-n' as string]: stripDays.length, gridTemplateColumns: stripCols }} aria-label="Dinners" data-guide-anchor="dinner">
       {/* under Sometime this week: no dinner */}
       <p className="wc-dinner" aria-hidden="true" />
       {stripDays.map((d) => (
@@ -949,11 +949,11 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             </ul>
           )}
           {weekendFold}
-          <div className={`wc-strip${bars.length ? ' has-bars' : ''}`} style={{ ['--wc-days' as string]: stripDays.length + 1, gridTemplateColumns: stripCols }}>
+          <div className={`wc-strip${bars.length ? ' has-bars' : ''}`} style={{ ['--wc-days' as string]: stripDays.length + 1, ['--wc-n' as string]: stripDays.length, gridTemplateColumns: stripCols }}>
             {weekColumn}
             {stripDays.map((d, i) => dayColumn(d, i + 2))}
             {bars.length > 0 && (
-              <div className="wc-bars" aria-hidden="true" style={{ gridTemplateColumns: stripCols }}>
+              <div className="wc-bars" aria-hidden="true" style={{ ['--wc-n' as string]: stripDays.length, gridTemplateColumns: stripCols }}>
                 {bars.map(({ sp, start, end }) => (
                   <button key={sp.id} type="button" tabIndex={-1} className="wc-bar" style={{ gridColumn: `${start} / ${end + 1}` }} onClick={() => writers.open(sp.id)}>
                     <span className="wc-bar-title">{sp.title}</span>{barTail(sp) && <span className="wc-bar-tail">{barTail(sp)}</span>}
