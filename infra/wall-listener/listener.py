@@ -301,9 +301,22 @@ def play_wav_bytes(data: bytes) -> None:
         play(audio, w.getframerate())
 
 
+SOUNDS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds")
+CHIME_GAIN = 0.5  # the cue sits under the room, not over it
+
+
 def chime(rising: bool = True) -> None:
-    """A short two-note cue: rising when listening starts, falling when it stops."""
+    """The listening cue: an opening bloom when listening starts, a settling one
+    when it stops (Scott chose the pair, 2026-10-14). Falls back to two quick
+    tones when the sound files are missing."""
     try:
+        path = os.path.join(SOUNDS, "open.wav" if rising else "close.wav")
+        if os.path.exists(path):
+            with wave.open(path, "rb") as w:
+                audio = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+                rate = w.getframerate()
+            play((audio.astype(np.float32) / 32767 * CHIME_GAIN), rate, blocking=False)
+            return
         sr = 22050
         notes = (660, 880) if rising else (880, 660)
         t = np.linspace(0, 0.09, int(sr * 0.09), endpoint=False)
