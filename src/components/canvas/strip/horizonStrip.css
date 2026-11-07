@@ -52,6 +52,7 @@
   .wc-sheet .wc-strip > .wc-day.is-today { order: -1; }
   .wc-sheet .wc-strip > .wc-day.is-past { order: 1; }
   .wc-sheet .wc-strip > .wc-weekcol { order: -2; }
+  .wc-sheet .wc-strip > .wc-day.wc-weekcol { margin-right: 0; }
   .wc-sheet .wc-bars, .wc-sheet .wc-dinners { display: none; }
 }
 
@@ -60,9 +61,57 @@
    are a day's rows; When ▾ opens the when-chips under the row, wrapped, never
    a floating bar over the rows above. */
 .wc-weekcol .wc-dayhead { flex-wrap: wrap; column-gap: 6px; row-gap: 0; }
-/* Like a day's column; only the dashed rule under its head sets it apart. */
-.wc-weekcol .wc-dayhead { border-bottom-style: dashed; }
-.wc-weekcol-count { font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+/* The week's tray (Scott, 2026-11-07: "it needs to be obvious that things
+   frequently go in and out here"): a sunken surface beside the days, its
+   line to write on as the way in, loose cards that are meant to move, and
+   the week's tally at its foot. Doubled class: canvas-today.css loads after. */
+.wc-day.wc-weekcol {
+  --wc-tray: var(--color-primary-100);
+  margin-right: 12px; padding: 8px 10px 12px; border-left-color: transparent; border-radius: var(--radius-lg);
+  background: var(--wc-tray);
+  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--color-neutral-900) 12%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--color-neutral-900) 6%, transparent);
+}
+.wc-day.wc-weekcol + .wc-day { border-left-color: transparent; }
+.wc-day.wc-weekcol.is-over { background: var(--color-primary-50); }
+.wc-day.wc-weekcol .wc-dayhead { --wc-head-tint: var(--wc-tray); align-items: center; flex-wrap: nowrap; border-bottom: 0; }
+.wc-day.wc-weekcol .wc-dayname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wc-weekcol-count {
+  margin-left: auto; min-width: 20px; padding: 2px 7px; border-radius: 999px; text-align: center;
+  background: var(--color-primary-600); color: #fff;
+  font-family: var(--font-family-sans); font-size: 11px; font-weight: 600; line-height: 1.4; font-variant-numeric: tabular-nums;
+}
+/* The way in: the write line, on a card of its own. */
+.wc-weekcol .sheet-write { margin-bottom: 8px; padding: 4px 8px; border: 1px dashed color-mix(in srgb, var(--color-primary-600) 35%, transparent); border-radius: var(--radius-md); background: var(--color-bg-elevated); }
+/* Loose cards, each with a grip: these move. */
+.wc-weekcol .wc-items { display: flex; flex-direction: column; gap: 6px; }
+.wc-weekcol .wc-items .cw-row {
+  margin: 0; padding: 6px 6px 6px 14px; border: 0; border-radius: var(--radius-md);
+  background: var(--color-bg-elevated); font-size: 13.5px;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 14%, transparent), 0 0 0 1px color-mix(in srgb, var(--color-neutral-900) 5%, transparent);
+}
+.wc-weekcol .wc-items .cw-row:hover, .wc-weekcol .wc-items .cw-row:focus-within {
+  background: var(--color-bg-elevated);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-neutral-900) 16%, transparent), 0 0 0 1px var(--color-primary-200);
+}
+.wc-weekcol .wc-items .cw-row[draggable='true'] { cursor: grab; }
+.wc-weekcol .wc-items .cw-row::before {
+  content: ''; position: absolute; left: 4px; top: 10px; width: 6px; height: 12px;
+  background: radial-gradient(circle, var(--color-neutral-400) 1px, transparent 1.3px) 0 0 / 3px 4px;
+}
+.wc-weekcol .wc-items .cw-row .cw-meta { color: var(--color-neutral-500); }
+/* Just in: it slides in, outlined a moment, and says so. */
+.wc-weekcol .wc-items .cw-row.is-new { animation: wc-tray-in 1.8s ease-out both; }
+.wc-weekcol .wc-items .cw-row.is-new .cw-meta { color: var(--color-primary-700); font-weight: 600; }
+@keyframes wc-tray-in {
+  0% { transform: translateY(-6px); opacity: 0; box-shadow: 0 0 0 2px var(--color-primary-600); }
+  25% { transform: none; opacity: 1; box-shadow: 0 0 0 2px var(--color-primary-600); }
+  100% { box-shadow: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 14%, transparent), 0 0 0 1px color-mix(in srgb, var(--color-neutral-900) 5%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .wc-weekcol .wc-items .cw-row.is-new { animation: none; } }
+@media (max-width: 1100px) { .wc-strip > .wc-day.wc-weekcol { margin-right: 0; } }
+/* The tally: how the week has moved through here. */
+.wc-tray-flow { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 10px 0 0; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--color-neutral-900) 10%, transparent); font-family: var(--font-family-sans); font-size: 12px; color: var(--color-neutral-600); }
+.wc-tray-flow b { font-weight: 600; color: var(--color-neutral-900); font-variant-numeric: tabular-nums; }
 .wc-weekcol .cw-row { flex-wrap: wrap; column-gap: 6px; }
 .wc-weekcol .cw-row > .canvas-item-title { flex: 1 1 0; min-width: 0; }
 .wc-weekcol .wc-noday-actions { position: static; display: block; flex-basis: 100%; padding: 2px 0 6px 22px; box-shadow: none; background: none; white-space: normal; }
@@ -84,5 +133,5 @@
 .wc-weekcol-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .wc-weekcol .wc-addday { display: block; }
 /* The phone: the first section above the days, on its own. */
-.wc-phone .wc-weekcol { padding: 4px 2px 6px; border-bottom: 1px solid var(--color-neutral-200); }
+.wc-phone .wc-day.wc-weekcol { margin: 0 0 8px; padding: 8px 10px 10px; }
 

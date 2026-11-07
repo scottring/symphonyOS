@@ -761,7 +761,7 @@ describe('WeekCanvas — a few things a day', () => {
     show()
     const strip = screen.getByTestId('journal-day-2026-10-03').parentElement!
     const cols = getComputedStyle(strip).gridTemplateColumns.replace(/\s+/g, '')
-    expect(cols).toBe(['1.25fr', '1.5fr', '1.5fr', '1fr', '1fr', '1fr', '1fr', '1fr'].map((f) => `minmax(0,${f})`).join(''))
+    expect(cols).toBe(['1.6fr', '1.5fr', '1.5fr', '1fr', '1fr', '1fr', '1fr', '1fr'].map((f) => `minmax(0,${f})`).join(''))
   })
 })
 
@@ -1118,5 +1118,31 @@ describe('WeekCanvas — a calendar event’s space and people', () => {
   it('a page that cannot write them draws no pickers on events', () => {
     render(<WeekCanvas weekStart={weekStart} days={withPeople()} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} members={members} />)
     expect(within(eventRow()).queryByRole('button', { name: 'Set context' })).toBeNull()
+  })
+})
+
+// The tray (Scott, 2026-11-07: "it needs to be obvious that things frequently
+// go in and out here"): its cards say where they came from, its foot tallies
+// the week, and a card that comes onto it slides in.
+describe('WeekCanvas — Sometime this week is the week’s tray', () => {
+  it('tallies the week at the tray’s foot', () => {
+    show()
+    expect(screen.getByTestId('week-flow')).toHaveTextContent('5 in1 onto days1 done')
+  })
+
+  it('a card says where it came from', () => {
+    const fresh = task({ id: 'n', title: 'Email Ms. Kroger', createdAt: new Date(2026, 9, 3, 8, 58) })
+    show(writers(), { shelf: buildShelf({ weekTasks: [fresh], weekStart, now: new Date(2026, 9, 3, 9) }) })
+    expect(within(weekCol()).getByText('Email Ms. Kroger').closest('li')).toHaveTextContent('just added')
+  })
+
+  it('a card that comes onto the tray is marked new; the ones already there are not', () => {
+    const w = writers()
+    const { rerender } = render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w} />)
+    const added = task({ id: 'z', title: 'Text Mike Carlin' })
+    rerender(<WeekCanvas weekStart={weekStart} days={days()} routinesToPlace={[]} isCurrent writers={w}
+      shelf={buildShelf({ weekTasks: [cabin, bank, car, maps, placed, added], weekStart, now: new Date(2026, 9, 3, 9) })} />)
+    expect(within(weekCol()).getByText('Text Mike Carlin').closest('li')).toHaveClass('is-new')
+    expect(within(weekCol()).getByText('Call the bank').closest('li')).not.toHaveClass('is-new')
   })
 })

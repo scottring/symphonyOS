@@ -47,7 +47,7 @@
 // Phone (<768px): Sometime this week, a row of day chips, then the chosen
 // day; tap opens a chip's task; press and hold orders the day.
 
-import { useContext, useState, type ButtonHTMLAttributes, type DragEvent, type HTMLAttributes, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type DragEvent, type HTMLAttributes, type ReactNode } from 'react'
 import {
   DndContext, DragOverlay, MouseSensor, TouchSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragMoveEvent, type DragStartEvent,
@@ -246,6 +246,27 @@ const MOUSE_MOVE = { distance: 5 }
 function DropZone({ id, as: Tag = 'div', ...rest }: { id: string; as?: 'div' | 'section' } & HTMLAttributes<HTMLElement> & Record<`data-${string}`, string | undefined>) {
   const { setNodeRef } = useDroppable({ id })
   return <Tag ref={setNodeRef as (el: HTMLElement | null) => void} {...rest} />
+}
+
+/** The tray's newcomers: ids that came onto it since the page opened (or
+ *  since the week shown changed), marked for a moment so they slide in. */
+function useNewcomers(scope: string, ids: string[]): Set<string> {
+  const seen = useRef<{ scope: string; ids: Set<string> } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set())
+  const key = ids.join('|')
+  useEffect(() => {
+    const now = key ? key.split('|') : []
+    if (!seen.current || seen.current.scope !== scope) { seen.current = { scope, ids: new Set(now) }; return }
+    const added = now.filter((id) => !seen.current!.ids.has(id))
+    now.forEach((id) => seen.current!.ids.add(id))
+    if (!added.length) return
+    setFresh(new Set(added))
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setFresh(new Set()), 1800)
+  }, [scope, key])
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  return fresh
 }
 
 /** A day's row that lifts on a held press (touch only; the desk drags natively). */
@@ -681,6 +702,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     <b>Past week</b> · <Link className="canvas-link" to="/week?view=alongside">Back to this week</Link>
   </span>
   const unplaced = shelf.flatMap((g) => g.rows.map((r) => r.task))
+  const shelfMeta = new Map(shelf.flatMap((g) => g.rows.map((r) => [r.task.id, r.meta] as const)))
+  const flow = shelf[0]?.flow
   // Dragging a day's task: the column says so (even empty), so it can be dropped back.
   const draggingPlaced = drag?.kind === 'task' && !!drag.fromKey
   // ── Sometime this week ────────────────────────────────────────────────
@@ -690,6 +713,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // routines that still need a day. Rows read as a day's rows do. On the
   // phone, touch can't drag: a + beside each gives it a day.
   const weekKey = localYmd(weekStart)
+  const fresh = useNewcomers(weekKey, [...unplaced.map((t) => t.id), ...routinesToPlace.map((r) => r.id)])
   const everyDay = rhythm.flatMap((r) => r.items.map((it) => it.title))
   const weekTaskRow = (t: Task) => {
     const key = `noday:task:${t.id}`
@@ -703,8 +727,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       />
     )
     return (
-      <LiftableRow key={key} liftId={key} lift={lift} row={{ key, id: t.id, title: t.title, item: t, completed: t.completed }}
-        className={`wc-dayrow wc-weekrow${pointedTask(t.id) ? ' is-pointed' : ''}${whenOpen === key ? ' is-when-open' : ''}`}
+      <LiftableRow key={key} liftId={key} lift={lift} row={{ key, id: t.id, title: t.title, item: t, completed: t.completed, meta: shelfMeta.get(t.id) ?? undefined }}
+        className={`wc-dayrow wc-weekrow${pointedTask(t.id) ? ' is-pointed' : ''}${whenOpen === key ? ' is-when-open' : ''}${fresh.has(t.id) ? ' is-new' : ''}`}
         onComplete={() => writers.toggleTask(t)}
         onOpen={() => writers.open(`task-${t.id}`)}
         under={toolsOf(t)}
@@ -734,7 +758,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const lift: Lift | null = coarse && !phone ? { payload, drag: { kind: 'routine', id: r.id }, title: r.title } : null
     return (
       <LiftableRow key={key} liftId={key} lift={lift} row={{ key, id: r.id, title: r.title, item: r }}
-        className="wc-dayrow wc-weekrow is-routine"
+        className={`wc-dayrow wc-weekrow is-routine${fresh.has(r.id) ? ' is-new' : ''}`}
         onOpen={() => writers.open(`routine-${r.id}`)}
         onDragStart={phone || coarse ? undefined : (_, ev) => startDrag(ev, payload, { kind: 'routine', id: r.id })}
         onDragEnd={endDrag}
@@ -755,10 +779,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       style={phone ? undefined : { gridColumn: 1 }} {...shelfDrop}>
       <header className="wc-dayhead">
         {/* Headed like a day ("MON 2"), in the same small capitals (Scott,
-            2026-11-06: the larger lowercase serif read as out of place); the
-            dashed rule under it is what sets it apart. */}
+            2026-11-06); the tray it heads is what sets it apart (2026-11-07). */}
         <span className="wc-dayname">Sometime this week</span>
-        {weekCount > 0 && <span className="wc-weekcol-count">{weekCount}</span>}
+        {weekCount > 0 && <span className="wc-weekcol-count" aria-label={`${weekCount} without a day`}>{weekCount}</span>}
       </header>
       <div className="wc-daybody">
         {/* The week's line to write on, always open at the top of its list
@@ -776,6 +799,15 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           : !draggingPlaced && <p className="wc-weekcol-note">Everything on this week has a day.</p>}
         {unplaced.length > 0 && onPlaceUnplaced && (
           <button type="button" className="canvas-link wc-quiet-link wc-more" onClick={onPlaceUnplaced}>Place them one at a time</button>
+        )}
+        {/* The week's tally: everything that came onto it, how much has a
+            day, how much is done. Things go in and out of here all week. */}
+        {flow && flow.in > 0 && (
+          <p className="wc-tray-flow" data-testid="week-flow">
+            <span><b>{flow.in}</b> in</span>
+            <span><b>{flow.onDays}</b> onto days</span>
+            <span><b>{flow.done}</b> done</span>
+          </p>
         )}
         {!phone && everyDay.length > 0 && (
           <p className="wc-weekcol-note">Every-day routines are on <Link to="/today">Today</Link>: {everyDay.slice(0, 3).join(', ')}{everyDay.length > 3 ? ` and ${everyDay.length - 3} more` : ''}.</p>
@@ -810,8 +842,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   })
   // The weekend's days are wider: family and household plans live there. Set
   // from the days themselves, so a Saturday-first week widens its first two.
-  // Sometime this week a little wider than a weekday: its rows carry When ▾.
-  const stripCols = ['minmax(0,1.25fr)', ...stripDays.map((d) => (isWeekend(d.date) ? 'minmax(0,1.5fr)' : 'minmax(0,1fr)'))].join(' ')
+  // Sometime this week wider than a weekday: the tray's cards carry When ▾.
+  const stripCols = ['minmax(0,1.6fr)', ...stripDays.map((d) => (isWeekend(d.date) ? 'minmax(0,1.5fr)' : 'minmax(0,1fr)'))].join(' ')
   const barTail = (sp: CanvasSpan) => sp.tail?.replace(/^,\s*/, '')
   // Last week's progress and "Today: …" are the header's fact line (WeekV2,
   // calm pass 2); the canvas keeps only a past week's note.

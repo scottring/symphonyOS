@@ -14,8 +14,10 @@
 // list (finding #15 — a month line committed to this week, marked is_goal,
 // was on Today and missing here).
 //
-// A row's meta is quiet: "from Fri" for a day that passed, "from last week"
-// for work kept, the date for a day outside this week. No warnings.
+// A row's meta says where it came from (the tray, Scott 2026-11-07: things
+// go in and out of here all week): "just added", "from Fri" for a day that
+// passed, "from last week" for work kept, "from November" for the month's
+// work, the date for a day outside this week. No warnings.
 
 import type { Task } from '@/types/task'
 import { localYmd } from '@/lib/cadence/config'
@@ -34,7 +36,15 @@ export interface ShelfGroup {
   rows: ShelfRow[]
   /** Done rows, shown only on "Show done". */
   done: ShelfRow[]
+  /** The week's flow, for the tray's tally: everything on the week's list,
+   *  how many have a day this week, how many are done. */
+  flow?: ShelfFlow
 }
+
+export interface ShelfFlow { in: number; onDays: number; done: number }
+
+/** Written this recently, a row reads "just added". */
+const JUST_ADDED_MS = 10 * 60 * 1000
 
 export interface BuildShelfArgs {
   /** The week's list, filtered as the page draws it. */
@@ -52,8 +62,13 @@ export function shelfRowMeta(t: Task, weekStart: Date, now: Date): string | null
     return t.scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }
   const prev = addDays(weekStart, -7)
-  const kept = (t.commitments ?? []).some((c) => c.level === 'week' && c.status === 'carried' && localYmd(c.periodStart) === localYmd(prev))
-  return kept ? 'from last week' : null
+  const commitments = t.commitments ?? []
+  const kept = commitments.some((c) => c.level === 'week' && c.status === 'carried' && localYmd(c.periodStart) === localYmd(prev))
+  if (kept) return 'from last week'
+  const created = t.createdAt instanceof Date ? t.createdAt.getTime() : NaN
+  if (now.getTime() - created >= 0 && now.getTime() - created < JUST_ADDED_MS) return 'just added'
+  const month = commitments.find((c) => c.level === 'month' && c.status !== 'removed')
+  return month ? `from ${month.periodStart.toLocaleDateString('en-US', { month: 'long' })}` : null
 }
 
 /** Has this task a day inside the week (and not one that passed undone)?
@@ -69,11 +84,12 @@ export function placedInWeek(t: Task, weekStart: Date, now: Date): boolean {
 }
 
 export function buildShelf({ weekTasks, weekStart, now = new Date() }: BuildShelfArgs): ShelfGroup[] {
-  const week: ShelfGroup = { key: 'week', rows: [], done: [] }
+  const flow: ShelfFlow = { in: weekTasks.length, onDays: 0, done: weekTasks.filter((t) => t.completed).length }
+  const week: ShelfGroup = { key: 'week', rows: [], done: [], flow }
   for (const t of weekTasks) {
     // Placed on a day this week: it is on that day. Done work stays with its
     // day too, when it has one.
-    if (placedInWeek(t, weekStart, now)) continue
+    if (placedInWeek(t, weekStart, now)) { flow.onDays++; continue }
     if (t.completed) week.done.push({ task: t, meta: null })
     else week.rows.push({ task: t, meta: shelfRowMeta(t, weekStart, now) })
   }

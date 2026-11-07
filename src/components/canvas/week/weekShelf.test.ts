@@ -44,6 +44,29 @@ describe('buildShelf', () => {
   })
 })
 
+// The tray (Scott, 2026-11-07): each card says where it came from, and the
+// tray's foot tallies how the week has moved through it.
+describe('buildShelf, the tray', () => {
+  it('a card written minutes ago reads “just added”', () => {
+    const fresh = task({ id: 'n', title: 'Email Ms. Kroger', createdAt: new Date(2026, 10, 4, 8, 55) })
+    expect(buildShelf({ weekTasks: [fresh], weekStart, now })[0].rows[0].meta).toBe('just added')
+  })
+
+  it('a card brought down from the month reads “from November”', () => {
+    const fromMonth = task({ id: 'm', title: 'Choose a kitchen weekend',
+      commitments: [...onWeek!, { level: 'month', periodStart: new Date(2026, 10, 1), status: 'open' }] as Task['commitments'] })
+    expect(buildShelf({ weekTasks: [fromMonth], weekStart, now })[0].rows[0].meta).toBe('from November')
+  })
+
+  it('tallies the week: everything on it, what has a day, what is done', () => {
+    const placed = task({ id: 'p', scheduledFor: new Date(2026, 10, 5), isAllDay: true })
+    const placedDone = task({ id: 'pd', scheduledFor: new Date(2026, 10, 3), isAllDay: true, completed: true })
+    const loose = task({ id: 'l' })
+    const done = task({ id: 'd', completed: true })
+    expect(buildShelf({ weekTasks: [placed, placedDone, loose, done], weekStart, now })[0].flow).toEqual({ in: 4, onDays: 2, done: 2 })
+  })
+})
+
 // The week of Sat Oct 31, 2026 holds the clock change (Nov 1, America/New_York).
 // Counted in 24-hour steps its sixth day ended on Thursday, so a task given
 // Friday Nov 6 stayed in Sometime this week while Today showed it on Friday
