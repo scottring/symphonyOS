@@ -499,6 +499,20 @@ describe('PaperFold: the calendar on the right', () => {
     expect(root(container)).toHaveAttribute('data-calendar-open', 'true')
   })
 
+  // Scott, 2026-11-07: the Mac app (WebKit) would not scroll a list inside a
+  // 3D-turned sheet. Open and at rest, the sheet lies flat; folded, it is turned.
+  it('an open sheet at rest lies flat (no 3D); a folded one is turned', () => {
+    localStorage.setItem('symphony-fold:month:calendar', 'open')
+    const { container } = renderCal()
+    expect(calFlap(container)).toHaveAttribute('data-flat')
+    expect(calFlap(container).style.transform).toBe('none')
+    localStorage.removeItem('symphony-fold:month:calendar')
+  })
+  it('a folded sheet is not flat', () => {
+    const { container } = renderCal()
+    expect(calFlap(container)).not.toHaveAttribute('data-flat')
+  })
+
   it('C toggles it, but not while typing; F still folds the sheet above', () => {
     const { container } = renderCal()
     fireEvent.keyDown(document, { key: 'c' })

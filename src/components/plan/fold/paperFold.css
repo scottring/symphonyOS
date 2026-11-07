@@ -135,6 +135,11 @@
   background-color: var(--paper-fold-paper-back); background-image: var(--paper-fold-grain, none);
   transform: rotateY(180deg);
 }
+/* Open and at rest (useFoldMotion sets data-flat): no 3D, so WebKit scrolls
+   the sheet's list. The back is out of sight anyway. */
+.paper-fold-flap[data-flat] { transform-style: flat; will-change: auto; }
+.paper-fold-flap[data-flat] .paper-fold-face { backface-visibility: visible; -webkit-backface-visibility: visible; }
+.paper-fold-flap[data-flat] .paper-fold-back { display: none; }
 /* light falling across the sheet as it turns; deepest at the hinge */
 .paper-fold-front::after,
 .paper-fold-back::after {

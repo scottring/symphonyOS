@@ -237,6 +237,12 @@ export function useFoldMotion({
         flap.style.transform = `rotateY(${(-sign * ang).toFixed(2)}deg)`
       }
       flap.style.visibility = q < 0.002 ? 'hidden' : 'visible'
+      // Open and at rest, the sheet lies flat: no 3D at all. Safari (the Mac
+      // app's WebKit) would not scroll a list inside a 3D-turned sheet (Scott,
+      // 2026-11-07: "unable to scroll down on Not done last week").
+      const flat = Math.abs(q - 1) < 0.001
+      if (flat) flap.style.transform = 'none'
+      flap.toggleAttribute('data-flat', flat)
       const isOpen = q > 0.5
       if (isOpen !== s.open) {
         s.open = isOpen
