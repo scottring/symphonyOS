@@ -107,11 +107,15 @@ const ctxValue = {
 
 // Use the actual current date so computeIsToday() returns true for today-mode tests
 const TODAY = new Date()
-/** A household week that started two days ago, so yesterday, today and
- *  tomorrow are all in it whatever day the suite runs (Task 4: the week
- *  sheet brings back what an earlier day of this week left open). */
+/** A household week that holds yesterday, today and tomorrow whatever day
+ *  the suite runs (Task 4: the week sheet brings back what an earlier day of
+ *  this week left open). Only Sunday, Monday and Saturday are week starts
+ *  (isWeekStart): any other value reads as Sunday, which on a Saturday put
+ *  tomorrow in next week and failed the suite every Saturday (2026-11-07). */
 function weekHoldsYesterday() {
-  localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: (new Date().getDay() + 5) % 7 }))
+  const today = new Date().getDay()
+  const start = ([0, 1, 6] as const).find((s) => { const off = (today - s + 7) % 7; return off >= 1 && off <= 5 })
+  localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: start }))
   onTestFinished(() => { localStorage.removeItem('symphony-cadence-config') })
 }
 const TOMORROW = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + 1)
