@@ -1096,7 +1096,8 @@ describe('WeekViewV2 — the deck', () => {
     const lookBack = render(<>{guided().canvas({ stepId: 'look-back', drive: { above: true }, look: <p>Last week’s leftovers</p> })}</>)
     const shown = within(lookBack.container)
     // This week stays on the page.
-    expect(within(shown.getByTestId('journal-day-2026-10-19')).getByText('Clean the garage')).toBeInTheDocument()
+    // (A session uses the list, 2026-11-07: the task is on it, with its day.)
+    expect(within(shown.getByTestId('week-row-garage')).getByText('Clean the garage')).toBeInTheDocument()
     expect(shown.queryByText('Fix the porch')).toBeNull()
     // The sheet beside it is last week, looking back, with the step's choices.
     // (Folded or open, it is the same sheet; the fold's motion is PaperFold's own test.)
@@ -1117,7 +1118,7 @@ describe('WeekViewV2 — the deck', () => {
     open('?plan=1', [])
     const guided = () => deckMock.guided as unknown as { canvas: (fold: unknown) => React.ReactNode }
     const choose = render(<>{guided().canvas({ stepId: 'choose', drive: { above: true }, look: null, write: true })}</>)
-    expect(within(choose.container).getByRole('region', { name: 'Sometime this week' })).toBeInTheDocument()
+    expect(within(choose.container).getByRole('region', { name: 'The week’s list' })).toBeInTheDocument()
     expect(within(choose.container).queryAllByRole('tab')).toEqual([])
     expect(choose.container.querySelector('[data-guide-anchor="write"]')).not.toBeNull()
     expect(choose.container.querySelector('.wc-session-week')).toBeNull()

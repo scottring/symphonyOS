@@ -81,6 +81,7 @@ import type { WeekDeck } from '@/components/plan/v2/WeekV2'
 import { buildDeck, deckModeOf, deckWeekAllowed } from '@/lib/planning/deck'
 import { staleForDrain } from '@/lib/planning/drain'
 import { withPlacedSubtasks } from '@/lib/planning/plannedSubtasks'
+import { stepsInstead } from '@/lib/planning/weekSteps'
 import { useChooseWeek } from './useChooseWeek'
 import { restoreDeleted } from '@/lib/planning/restoreDeleted'
 import { doableBy } from '@/lib/planning/poolViews'
@@ -736,7 +737,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // the page draws for this week (its list and its days), through exactly
   // their filters.
   const weekShown = useMemo(() => weekShownTasks({ listed: weekListed, drawn: drawnTasks, weekStart: weekAnchor }), [weekListed, drawnTasks, weekAnchor])
-  const shelf = useMemo(() => weekShelf(weekAnchor, weekListed), [weekAnchor, weekListed])
+  // A goal or parent on the week stands for its steps (Scott, 2026-11-07).
+  const shelf = useMemo(() => weekShelf(weekAnchor, stepsInstead(weekListed, tasks)), [weekAnchor, weekListed, tasks])
   const routinesToPlace = useMemo(() => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }, { weekStart: weekAnchor, instances: weekInstances })
     .map((r) => ({ id: r.id, title: r.name })), [routines, selectedAssignees, layers, weekAnchor, weekInstances])
   // Every-day routines: written once above the days (default), or in each

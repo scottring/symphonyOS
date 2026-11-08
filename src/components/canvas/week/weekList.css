@@ -11,7 +11,7 @@
   color: var(--paper-fold-ink-faint, var(--color-neutral-400));
 }
 .wl-some { border-radius: 6px; transition: background-color .15s; }
-.wl-some.is-over, .wl-day.is-over { background: color-mix(in srgb, var(--paper-fold-accent, var(--color-primary-500)) 7%, transparent); }
+.wl-some.is-over { background: color-mix(in srgb, var(--paper-fold-accent, var(--color-primary-500)) 7%, transparent); }
 
 /* Rows read as lines on the paper: a rule under each, the display face. */
 .wc.wc-list .wl-items { display: block; margin: 0; padding: 0; }
@@ -19,31 +19,20 @@
   padding: 7px 0 8px; border-bottom: 1px solid var(--paper-fold-rule, var(--color-neutral-200)); border-radius: 0; background: none; box-shadow: none;
 }
 .wc.wc-list .wl-some .wl-items > .cw-row .cw-title { font: 400 18px/1.35 var(--font-family-display); color: var(--paper-fold-ink, var(--color-neutral-900)); }
-.wc.wc-list .wl-days .wl-items > .cw-row { padding: 3px 0; border-bottom: 0; }
-.wc.wc-list .wl-days .wl-items > .cw-row .cw-title { font: 400 16.5px/1.35 var(--font-family-display); color: var(--paper-fold-ink, var(--color-neutral-900)); }
 .wc.wc-list .wl-items > .cw-row.is-done .cw-title { color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
-/* When ▾ comes up on hover or focus, as on the grid's Sometime column. */
+/* Day ▾ and When ▾ come up on hover or focus, as on the grid's Sometime column. */
 @media (hover: hover) and (pointer: fine) {
   .wl-some .cw-row:not(:hover):not(:focus-within):not(.is-when-open) .wc-when { opacity: 0; pointer-events: none; }
 }
 .wl-some .sheet-write { margin-top: 2px; }
 
-/* The days: quiet lines, a short name and what is placed on the day. */
-.wl-days { list-style: none; margin: 0; padding: 0; }
-.wl-day {
-  display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; align-items: start;
-  padding: 7px 4px 8px 0; border-bottom: 1px solid var(--paper-fold-rule, var(--color-neutral-200)); border-radius: 4px;
-  transition: background-color .15s;
-}
-.wl-d {
-  font: 600 11px/2.1 var(--font-family-sans); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
-  color: var(--paper-fold-ink-faint, var(--color-neutral-400)); font-variant-numeric: tabular-nums;
-}
-.wl-day.is-today .wl-d { color: var(--paper-fold-accent, var(--color-primary-600)); }
-.wl-day.is-past .wl-items { opacity: .7; }
-.wl-day.is-pointed { box-shadow: inset 3px 0 0 var(--color-teal-400, var(--color-primary-400)); }
-.wl-none { font: italic 400 15px/2 var(--font-family-display); color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
 .wl-onward { display: flex; justify-content: flex-end; margin: 20px 0 0; }
+/* A task with a day keeps its place on the list; the day is its mark. */
+.wc.wc-list .wl-row.has-day .cw-meta { font-weight: 600; letter-spacing: .02em; }
+.wc.wc-list .wl-row.is-today .cw-meta { color: var(--paper-fold-accent, var(--color-primary-600)); }
+.wc.wc-list .wl-items > .cw-row .cw-title { font: 400 18px/1.35 var(--font-family-display); color: var(--paper-fold-ink, var(--color-neutral-900)); }
+.wl-some .cw-giveday { margin: 6px 0 2px; }
+.cw-daychip-clear { color: var(--color-neutral-600); }
 
 /* The calendar sheet folded at the right: each day's fixed points. */
 .wl-cal-spans { list-style: none; margin: 0 0 8px; padding: 0; font: 400 14.5px/1.35 var(--font-family-display); }

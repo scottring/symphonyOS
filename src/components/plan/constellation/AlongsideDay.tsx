@@ -26,6 +26,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { weekListTasks, earlierThisWeek, earlierDayMark } from '@/lib/planning/weekList'
+import { stepsInstead } from '@/lib/planning/weekSteps'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
@@ -36,7 +37,6 @@ import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows } from '@/components/plan/fold/AboveSheet'
 import { TODAY_WEEK_FOOT } from '@/components/schedule/TodayWeekColumn'
 import { AlongsideContext, type AlongsideWorkspace } from './AlongsideContext'
-import { writePlanDrag } from '@/lib/planning/planDrag'
 import './alongside.css'
 
 const WEEK_ACTION_MIME = 'application/x-symphony-week-action'
@@ -81,7 +81,8 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
   const week = weekStartAnchor(date, wso)
   const lens = planPeopleLens(people, getCurrentUserMember()?.id ?? null)
   const visible = filterTasksForLayers(tasks, layers).filter(lens.keep)
-  const weekTasks = weekListTasks(visible, week, lens.scopeId, { isCurrent: localYmd(week) === localYmd(weekStartAnchor(new Date(), wso)) })
+  // A goal or parent on the week stands for its steps (Scott, 2026-11-07).
+  const weekTasks = stepsInstead(weekListTasks(visible, week, lens.scopeId, { isCurrent: localYmd(week) === localYmd(weekStartAnchor(new Date(), wso)) }), visible)
   const ymd = localYmd(date)
   const dayLabel = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
   const { word: dayWord } = dayWordFor(date)
@@ -123,11 +124,10 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
   }
 
   const range = formatWeekRangeShort(week)
-  // A week row dropped on the day's hours gets the time it lands at: the
-  // row carries the plan-drag payload too, and the grid (TodayDayScale) takes
-  // that drop and stops it there (Scott, 2026-11-04: "drag directly from the
-  // week strip to the calendar grid"). Dropped anywhere else on the day it
-  // bubbles here and is placed for the day with no time, the same as +.
+  // A week row dropped anywhere on the day, its hours included, is placed
+  // for the day with no time, the same as + (Scott, 2026-11-07: a task gets
+  // a time only when it is certain to be done then; it was 2026-11-04's
+  // "drag directly from the week strip to the calendar grid").
   const day = (
     <div className="ad-day vt-sheet-day"
       onDragOver={(e) => { if (e.dataTransfer.types.includes(WEEK_ACTION_MIME)) e.preventDefault() }}
@@ -153,21 +153,16 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
               onOpen={onSelect} onDragRow={(id, ev) => {
-                const t = open.find((x) => x.id === id)
-                // The plan payload is what the day's hours read (TodayView's
-                // own sheet writes the same); ours places it anywhere else.
-                if (t) writePlanDrag(ev.dataTransfer, { kind: 'task', id, date: ymd, title: t.title })
+                // Dropped anywhere on the day, the hours included, it is
+                // planned for the day with no time (Scott, 2026-11-07: tasks
+                // get a time only when it is certain; set one on the task).
                 ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move'
               }}>
               {later.length > 0 && <>
                 <h3 className="above-sheet-sub above-sheet-rows-h">Later this week</h3>
                 <SheetRows rows={later.map((t) => ({ id: t.id, title: t.title, mark: t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) }))}
                   label="Later this week" onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-                  onOpen={onSelect} onDragRow={(id, ev) => {
-                    const t = later.find((x) => x.id === id)
-                    if (t) writePlanDrag(ev.dataTransfer, { kind: 'task', id, date: ymd, title: t.title })
-                    ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move'
-                  }} />
+                  onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
               </>}
               <div ref={setRoutinesSlot} className="ad-routines" />
             </AboveSheet>}>

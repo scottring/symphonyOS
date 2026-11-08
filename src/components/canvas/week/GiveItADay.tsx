@@ -10,7 +10,7 @@ import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { localYmd } from '@/lib/cadence/config'
 import { dayChipLabel } from './compactWeek'
 
-export function GiveItADay({ title, days, current, onPick, onClose, inline = false, label = 'Give it a day', describe }: {
+export function GiveItADay({ title, days, current, onPick, onClose, inline = false, label = 'Give it a day', describe, onClear }: {
   /** A day's spoken label with what is already on it, by YYYY-MM-DD. */
   describe?: Record<string, string>
   title: string
@@ -21,6 +21,9 @@ export function GiveItADay({ title, days, current, onPick, onClose, inline = fal
   onClose: () => void
   inline?: boolean
   label?: string
+  /** "No day": takes the day away, the task stays on the week (the Week's
+   *  list, 2026-11-07). Absent: not offered. */
+  onClear?: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const today = localYmd(new Date())
@@ -59,6 +62,7 @@ export function GiveItADay({ title, days, current, onPick, onClose, inline = fal
             </button>
           )
         })}
+        {onClear && <button type="button" className="cw-daychip cw-daychip-clear" onClick={onClear}>No day</button>}
       </div>
     </div>
   )

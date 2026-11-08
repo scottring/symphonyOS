@@ -931,28 +931,57 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const thisWeekStart = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
     const next = weekStart.getTime() > thisWeekStart.getTime() && weekStart.getTime() - thisWeekStart.getTime() < 8 * 86_400_000
     const sheetTitle = isCurrent ? 'This week' : next ? 'Next week' : past ? 'That week' : `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-    const dayLine = (day: CanvasDay) => {
-      // The day's tasks only. Routines are on Today, on the day they happen
-      // (Scott, 2026-11-07: "with all the +N more it's interminably long";
-      // "routines show in the Today view on the day they happen"); the grid
-      // still draws them.
-      const { all } = dayLists(day)
-      const rows = [...all, ...(day.sometime ?? []).filter((it) => showDone || !it.completed)].filter((it) => it.kind !== 'routine')
-      const orderable = rows.filter((it) => it.task && !it.proposed)
-      const orderOf = (it: CanvasDayItem) => { const index = orderable.indexOf(it); return index === -1 ? undefined : { index, count: orderable.length } }
-      const over = overDay === day.key
-      const ordering = over && reorders(drag, day.key)
+    // One list (Scott, 2026-11-07: "keep the week list, and if we need to
+    // put it on a day, copy it over to that day"): a task given a day stays
+    // where it was written, with the day as its mark, and shows on that
+    // day's Today. The same task, not a copy: done on Today is done here.
+    // No times: a day is a day. Routines are on Today, on their days.
+    const listed = new Set<string>()
+    type ListRow = { task: Task; day: CanvasDay | null }
+    const rowsOf = (ts: Task[]): ListRow[] => ts.flatMap((t) => (listed.has(t.id) ? [] : (listed.add(t.id), [{ task: t, day: null }])))
+    const ownList = rowsOf(ownRows)
+    const olderList = rowsOf(older)
+    const dayed: ListRow[] = days.flatMap((d) => d.items
+      .filter((it) => it.kind === 'task' && it.task && !it.proposed && (showDone || !it.completed) && !listed.has(it.task.id))
+      .map((it) => (listed.add(it.task!.id), { task: it.task!, day: d })))
+    const byWritten = (a: ListRow, b: ListRow) => (a.task.createdAt?.getTime?.() ?? 0) - (b.task.createdAt?.getTime?.() ?? 0)
+    const mainList = [...ownList, ...dayed].sort(byWritten)
+    const dayMark = (d: CanvasDay) => (d.key === todayKey ? 'Today' : d.date.toLocaleDateString('en-US', { weekday: 'short' }))
+    const listRow = ({ task: t, day }: ListRow) => {
+      const key = `list:${t.id}`
+      const triage = !day && writers.triageTask && (
+        <TriageWhenMenu contained season={false} months={false}
+          onPick={(when) => { setWhenOpen(null); writers.triageTask!(t, when) }}
+          onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
+          onDelete={writers.deleteTask ? () => { setWhenOpen(null); writers.deleteTask!(t) } : undefined} />
+      )
       return (
-        <DropZone as="li" id={`day:${day.key}`} key={day.key}
-          className={`wl-day${day.key === todayKey ? ' is-today' : ''}${day.key < todayKey ? ' is-past' : ''}${over && !ordering ? ' is-over' : ''}${pointedDay(day.key) ? ' is-pointed' : ''}`}
-          aria-label={longDay(day.date)} data-testid={`journal-day-${day.key}`} data-day-key={day.key} {...dayDrop(day)}>
-          <span className="wl-d">{day.date.toLocaleDateString('en-US', { weekday: 'short' })} {day.date.getDate()}</span>
-          <div className="wl-daybody">
-            {rows.length > 0
-              ? <ul className="cw-rows wc-items wl-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{rows.map((it) => dayRow(it, day, orderOf(it)))}</ul>
-              : <span className="wl-none" aria-label="Nothing yet">{over ? `Drop on ${dayChipLabel(day.date)}` : '—'}</span>}
-          </div>
-        </DropZone>
+        <LiftableRow key={key} liftId={key} lift={null}
+          row={{ key, id: t.id, title: t.title, item: t, completed: t.completed, meta: day ? dayMark(day) : shelfMeta.get(t.id) ?? undefined }}
+          className={`wc-dayrow wc-weekrow wl-row${day ? ' has-day' : ''}${day?.key === todayKey ? ' is-today' : ''}${pointedTask(t.id) ? ' is-pointed' : ''}${whenOpen === key || picker?.key === key ? ' is-when-open' : ''}${fresh.has(t.id) || dayFresh.has(`${day?.key}:task-${t.id}`) ? ' is-new' : ''}`}
+          liProps={{ 'data-testid': `week-row-${t.id}` }}
+          onComplete={() => writers.toggleTask(t)}
+          onOpen={() => writers.open(`task-${t.id}`)}
+          under={toolsOf(t)}
+          extra={<>
+            {!t.completed && (
+              <button type="button" className="wc-when wl-dayset" aria-expanded={picker?.key === key}
+                aria-label={day ? `Change the day for ${t.title}` : `Give ${t.title} a day`}
+                onClick={() => { setWhenOpen(null); setPicker(picker?.key === key ? null : { key }) }}>Day ▾</button>
+            )}
+            {triage && (
+              <button type="button" className="wc-when" aria-expanded={whenOpen === key} aria-label={`When for ${t.title}`}
+                onClick={() => { setPicker(null); setWhenOpen(whenOpen === key ? null : key) }}>When ▾</button>
+            )}
+          </>}>
+          {triage && whenOpen === key && <div className="wc-noday-actions" role="group" aria-label={`When for ${t.title}`}>{triage}</div>}
+          {picker?.key === key && (
+            <GiveItADay title={t.title} days={dates} current={day?.key ?? null} describe={dayDescriptions} label="Give it a day"
+              onPick={(d) => { setPicker(null); if (day) writers.moveTask(t, d); else writers.placeTask(t, d) }}
+              onClear={day ? () => { setPicker(null); writers.unplaceTask(t) } : undefined}
+              onClose={() => setPicker(null)} />
+          )}
+        </LiftableRow>
       )
     }
     const timeOf = (it: CanvasDayItem) => (it.time ? formatTimeCompact(it.time) : 'All day')
@@ -984,35 +1013,45 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         </ul>
       </CalendarSheet>
     )
+    const listRoutineRow = (r: ShelfRoutine) => {
+      const key = `list:routine:${r.id}`
+      return (
+        <LiftableRow key={key} liftId={key} lift={null} row={{ key, id: r.id, title: r.title, item: r }}
+          className={`wc-dayrow wc-weekrow wl-row is-routine${picker?.key === key ? ' is-when-open' : ''}`}
+          onOpen={() => writers.open(`routine-${r.id}`)}
+          extra={<button type="button" className="wc-when wl-dayset" aria-expanded={picker?.key === key} aria-label={`Give ${r.title} a day`}
+            onClick={() => setPicker(picker?.key === key ? null : { key })}>Day ▾</button>}>
+          {picker?.key === key && (
+            <GiveItADay title={r.title} days={dates} describe={dayDescriptions} label="Give it a day"
+              onPick={(d) => { setPicker(null); writers.placeRoutine(r, d) }} onClose={() => setPicker(null)} />
+          )}
+        </LiftableRow>
+      )
+    }
     const sheet = (
       <section className="wl-sheet vt-sheet-week" aria-label={sheetTitle} data-guide-anchor="day">
         <p className="above-sheet-kicker">Week · {range}</p>
         <h2 className="above-sheet-title wl-title">{sheetTitle}</h2>
-        <DropZone as="section" id="noday" className={`wl-some${overShelf ? ' is-over' : ''}`} aria-label="Sometime this week"
-          data-testid="week-sometime" data-explain="still-to-place" data-explain-label="Sometime this week" {...shelfDrop}>
-          <h3 className="wl-h">Sometime this week</h3>
-          {ownRows.length > 0 && <ul className="cw-rows wc-items wl-items">{ownRows.map(weekTaskRow)}</ul>}
-          {older.length > 0 && (
-            <button type="button" className="wl-fold-line" aria-expanded={olderOpen} onClick={() => setOlderOpen((o) => !o)}>
-              <span>{older.length} from before this week</span><span className="canvas-link">{olderOpen ? 'Hide' : 'Show'}</span>
-            </button>
-          )}
-          {olderOpen && older.length > 0 && <ul className="cw-rows wc-items wl-items wl-older" aria-label="From before this week">{older.map(weekTaskRow)}</ul>}
-          {routinesToPlace.length > 0 && (
-            <button type="button" className="wl-fold-line" aria-expanded={routinesOpen} onClick={() => setRoutinesOpen((o) => !o)}>
-              <span>{routinesToPlace.length} {routinesToPlace.length === 1 ? 'routine needs' : 'routines need'} a day</span><span className="canvas-link">{routinesOpen ? 'Hide' : 'Show'}</span>
-            </button>
-          )}
-          {routinesOpen && routinesToPlace.length > 0 && <ul className="cw-rows wc-items wl-items" aria-label="Routines that need a day">{routinesToPlace.map(weekRoutineRow)}</ul>}
-          {draggingPlaced && <p className="wc-drop-hint" aria-live="polite">Drop here to take its day away</p>}
+        <section className="wl-some" aria-label="The week’s list" data-testid="week-sometime" data-explain="still-to-place" data-explain-label="This week’s list">
+          {mainList.length > 0 && <ul className="cw-rows wc-items wl-items">{mainList.map(listRow)}</ul>}
           {writers.addTyped && (
             <WriteLine placeholder="Write a task for this week" periodWord="this week"
               period={{ start: weekStart, end: new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6) }}
               onWrite={writers.addTyped} />
           )}
-        </DropZone>
-        <h3 className="wl-h">On a day</h3>
-        <ul className="wl-days" aria-label="The days">{days.map(dayLine)}</ul>
+          {older.length > 0 && (
+            <button type="button" className="wl-fold-line" aria-expanded={olderOpen} onClick={() => setOlderOpen((o) => !o)}>
+              <span>{older.length} from before this week</span><span className="canvas-link">{olderOpen ? 'Hide' : 'Show'}</span>
+            </button>
+          )}
+          {olderOpen && olderList.length > 0 && <ul className="cw-rows wc-items wl-items wl-older" aria-label="From before this week">{olderList.map(listRow)}</ul>}
+          {routinesToPlace.length > 0 && (
+            <button type="button" className="wl-fold-line" aria-expanded={routinesOpen} onClick={() => setRoutinesOpen((o) => !o)}>
+              <span>{routinesToPlace.length} {routinesToPlace.length === 1 ? 'routine needs' : 'routines need'} a day</span><span className="canvas-link">{routinesOpen ? 'Hide' : 'Show'}</span>
+            </button>
+          )}
+          {routinesOpen && routinesToPlace.length > 0 && <ul className="cw-rows wc-items wl-items" aria-label="Routines that need a day">{routinesToPlace.map(listRoutineRow)}</ul>}
+        </section>
         {isCurrent && !session && (
           <p className="wl-onward"><Link to="/today?view=alongside" viewTransition className="plan-next" onClick={() => markLevelStep('week', 'today')}>Go to today →</Link></p>
         )}

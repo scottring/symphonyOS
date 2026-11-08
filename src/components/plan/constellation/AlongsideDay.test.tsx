@@ -81,9 +81,10 @@ it('a row drags onto the day with the same payload, and the day places it; unrel
  const row=screen.getByText('Choose picnic spot').closest('li')!
  expect(row).toHaveAttribute('draggable','true')
  fireEvent.dragStart(row,{dataTransfer:{setData:(k:string,v:string)=>{set[k]=v},effectAllowed:''}})
- // Its own payload, and the plan payload the day's hours read (TodayView's sheet writes the same).
+ // Its own payload only: the day's hours do not read it, so it lands with no
+ // time (Scott, 2026-11-07).
  expect(set['application/x-symphony-week-action']).toBe('same-id')
- expect(JSON.parse(set[PLAN_MIME])).toEqual({kind:'task',id:'same-id',date:'2026-10-09',title:'Choose picnic spot'})
+ expect(set[PLAN_MIME]).toBeUndefined()
  const target=screen.getByText('Day drop area')
  fireEvent.drop(target,{dataTransfer:{getData:()=>''}})
  expect(update).not.toHaveBeenCalled()
@@ -168,14 +169,12 @@ it('a placement that saved is heard by the day; one that failed is not',async()=
  await waitFor(()=>expect(heard).toHaveBeenCalledTimes(1))
 })
 
-// Scott, 2026-11-04: "we need to be able to drag directly from the week strip
-// to the calendar grid in Today." A row dropped on the day's hours gets the
-// time it lands at (the grid takes the drop); anywhere else on the day it is
-// placed for the day with no time, as before.
-it('a week row dropped on the day’s hours at 3pm is timed at 3pm; dropped elsewhere on the day it is placed untimed',async()=>{
+// Scott, 2026-11-07: a task gets a time only when it is certain to be done
+// then. A week row dropped on the day's hours is placed for the day with no
+// time, the same as anywhere else on the day (it was timed, 2026-11-04).
+it('a week row dropped on the day’s hours is placed for the day with no time; the hours take no drop of it',async()=>{
  const update=vi.fn().mockResolvedValue(true),onPlanDrop=vi.fn()
  render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={update} loading={false} error={false} retry={()=>{}}>
-  <p>Elsewhere on the day</p>
   <DndContext><TodayDayScale items={[]} viewedDate={date} now={null} isMobile={false} selectedItemId={null} peopleOf={()=>[]} isReadOnlyEvent={()=>false} onSelect={vi.fn()} onPlanDrop={onPlanDrop}/></DndContext>
  </AlongsideDay></MemoryRouter>)
  unfold()
@@ -184,20 +183,11 @@ it('a week row dropped on the day’s hours at 3pm is timed at 3pm; dropped else
  const dataTransfer={types:Object.keys(data),getData:(k:string)=>data[k]??'',dropEffect:'none'}
  const track=screen.getByTestId('today-day-scale')
  track.getBoundingClientRect=()=>({top:100,left:0,right:400,bottom:800,width:400,height:700,x:0,y:100,toJSON:()=>({})})
- // 7a at the top, 48px an hour: 100 + 8 × 48 is 3:00 PM.
  const drop=createEvent.drop(track,{dataTransfer})
  Object.defineProperty(drop,'clientY',{value:100+8*48})
  fireEvent(track,drop)
- expect(onPlanDrop).toHaveBeenCalledOnce()
- const [payload,when]=onPlanDrop.mock.calls[0]
- expect(payload).toEqual({kind:'task',id:'same-id',date:'2026-10-09',title:'Choose picnic spot'})
- expect([when.getHours(),when.getMinutes()]).toEqual([15,0])
- // The grid kept the drop: the day did not place it untimed as well.
- await new Promise((r)=>setTimeout(r,0))
- expect(update).not.toHaveBeenCalled()
- fireEvent.drop(screen.getByText('Elsewhere on the day'),{dataTransfer})
+ expect(onPlanDrop).not.toHaveBeenCalled()
  await waitFor(()=>expect(update).toHaveBeenCalledWith('same-id',{isAllDay:true,scheduledFor:date,bucket:'timed'}))
- expect(onPlanDrop).toHaveBeenCalledOnce()
 })
 
 it('a routine row (plan payload) dropped on the day’s hours reaches the grid’s timed placement, not the day’s untimed one',()=>{
