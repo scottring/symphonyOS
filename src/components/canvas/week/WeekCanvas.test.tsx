@@ -1195,6 +1195,13 @@ describe('WeekCanvas — the list', () => {
     expect(w.placeTask).toHaveBeenCalledWith(bank, dayOf(2))
   })
 
+  it('When ▾ is on a task with a day too', async () => {
+    const w = await list({ ...writers(), triageTask: vi.fn() })
+    fireEvent.click(within(row('p')).getByRole('button', { name: 'When for Pick up the keys' }))
+    fireEvent.click(within(within(row('p')).getByRole('group', { name: 'When for Pick up the keys' })).getByRole('button', { name: 'Someday' }))
+    expect(w.triageTask).toHaveBeenCalledWith(placed, 'someday')
+  })
+
   it('Day ▾ on a task with a day moves it, or takes the day away with No day', async () => {
     const w = await list()
     fireEvent.click(within(row('p')).getByRole('button', { name: 'Change the day for Pick up the keys' }))

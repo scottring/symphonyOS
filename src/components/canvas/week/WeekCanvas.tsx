@@ -949,7 +949,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const dayMark = (d: CanvasDay) => (d.key === todayKey ? 'Today' : d.date.toLocaleDateString('en-US', { weekday: 'short' }))
     const listRow = ({ task: t, day }: ListRow) => {
       const key = `list:${t.id}`
-      const triage = !day && writers.triageTask && (
+      // When ▾ on every open row, a day or not (Scott, 2026-11-08): Week takes
+      // the day away and keeps the week; Someday, a date or Delete as anywhere.
+      const triage = !t.completed && writers.triageTask && (
         <TriageWhenMenu contained season={false} months={false}
           onPick={(when) => { setWhenOpen(null); writers.triageTask!(t, when) }}
           onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
