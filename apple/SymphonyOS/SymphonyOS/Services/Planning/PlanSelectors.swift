@@ -174,9 +174,10 @@ struct PlanSnapshot {
         let week = PlanCalendar.weekStart(date)
         let byTask = commitmentsByTask
         let weekendDays = PlanCalendar.weekendWindow(for: date) ?? []
-        return lensTasks.filter { t in
-            guard !t.completed, !t.isGoal, t.scheduledFor == nil, !isFocused(t, on: date),
-                  holds(t, level: "week", periodStart: week, byTask: byTask) else { return false }
+        // A goal or parent on the week stands for its open steps (2026-11-07).
+        let held = lensTasks.filter { !$0.completed && holds($0, level: "week", periodStart: week, byTask: byTask) }
+        return stepsInstead(held).filter { t in
+            guard !t.completed, t.scheduledFor == nil, !isFocused(t, on: date) else { return false }
             if let sat = t.weekendStart {
                 return weekendDays.contains { PlanCalendar.sameDay($0, sat) || PlanCalendar.sameDay($0, PlanCalendar.addDays(sat, 1)) }
             }
@@ -205,7 +206,59 @@ struct PlanSnapshot {
         return offers.sorted { ($0.flexible ? 1 : 0, $0.routine.name) < ($1.flexible ? 1 : 0, $1.routine.name) }
     }
 
+    /// What is placed on a later day of `date`'s week (the web's "Later this
+    /// week" on Today's week sheet, 2026-11-07): its + brings it to `date`.
+    func laterThisWeek(after date: Date) -> [SymphonyTask] {
+        let day = PlanCalendar.day(date)
+        return weekLines(date).compactMap { line in
+            guard let d = line.day, d > day, !isFocused(line.task, on: date) else { return nil }
+            return line.task
+        }
+        .sorted { ($0.scheduledFor ?? .distantFuture) < ($1.scheduledFor ?? .distantFuture) }
+    }
+
     // MARK: Week
+
+    /// A goal or parent on the week stands for its open steps (Scott,
+    /// 2026-11-07: "we want the subgoals to show, not the top level"; the
+    /// web's lib/planning/weekSteps.ts). One with no open step shows itself.
+    func stepsInstead(_ listed: [SymphonyTask]) -> [SymphonyTask] {
+        func open(_ t: SymphonyTask) -> Bool { !t.completed && t.dismissedAt == nil }
+        var seen = Set<UUID>()
+        var out: [SymphonyTask] = []
+        for t in listed {
+            let steps = t.completed ? [] : tasks.filter { s in
+                s.id != t.id && open(s) && (s.parentTaskId == t.id || (t.isGoal && s.goalTaskId == t.id))
+            }.sorted { $0.createdAt < $1.createdAt }
+            for x in (steps.isEmpty ? [t] : steps) where seen.insert(x.id).inserted { out.append(x) }
+        }
+        return out
+    }
+
+    /// One line on the week's list: the task, and its day if it has one.
+    struct WeekLine: Identifiable {
+        let task: SymphonyTask
+        let day: Date?
+        var id: UUID { task.id }
+    }
+
+    /// The Week's one list (Scott, 2026-11-07: "keep the week list, and if
+    /// we need to put it on a day, copy it over to that day"): what the week
+    /// holds and what is dated in it, open, in the order written. A task given
+    /// a day keeps its place, the day its mark; it is the same task on Today.
+    func weekLines(_ start: Date) -> [WeekLine] {
+        let ws = PlanCalendar.weekStart(start)
+        let days = PlanCalendar.weekDays(ws)
+        let byTask = commitmentsByTask
+        let held = lensTasks.filter { !$0.completed && holds($0, level: "week", periodStart: ws, byTask: byTask) }
+        let dated = lensTasks.filter { t in !t.completed && days.contains { isDated(t, on: $0) } }
+        var seen = Set<UUID>()
+        let base = (held + dated).filter { seen.insert($0.id).inserted }
+        return stepsInstead(base)
+            .filter { !$0.completed }
+            .sorted { $0.createdAt < $1.createdAt }
+            .map { t in WeekLine(task: t, day: days.first { isDated(t, on: $0) }) }
+    }
 
     func weekList(_ weekStart: Date) -> [SymphonyTask] {
         let byTask = commitmentsByTask

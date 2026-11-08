@@ -809,6 +809,27 @@ struct SheetAbove: View {
     }
 }
 
+/// This period's own sheet, named like the sheets folded beside it (Scott,
+/// 2026-11-07): "Month · Nov 1 – 30" over "November goals".
+struct SheetHeading: View {
+    let kicker: String
+    let title: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SheetKicker(text: kicker)
+            Text(title)
+                .font(Paper.titleAbove)
+                .foregroundStyle(Color.textPrimary)
+                .padding(.top, 6)
+                .padding(.bottom, 6)
+                .accessibilityAddTraits(.isHeader)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
+    }
+}
+
 struct SheetKicker: View {
     let text: String
     var body: some View {

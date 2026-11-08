@@ -37,6 +37,7 @@ struct ChooserSheet: View {
     var body: some View {
         let plan = plan
         let offeredTasks = plan.chooserTasks(on: date)
+        let laterTasks = plan.laterThisWeek(after: date)
         let offeredRoutines = plan.chooserRoutines(on: date)
 
         NavigationStack {
@@ -49,12 +50,21 @@ struct ChooserSheet: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 4)
 
-                    Eyebrow(text: "This week's tasks", count: offeredTasks.count)
+                    // The week's list, as the web's week sheet beside Today
+                    // reads it (2026-11-07): Sometime this week, then what is
+                    // on a later day, each with its +.
+                    Eyebrow(text: "Sometime this week", count: offeredTasks.count)
                     if offeredTasks.isEmpty {
                         quiet("Nothing else on this week's list.")
                     }
                     ForEach(offeredTasks, id: \.id) { task in
                         taskRow(task)
+                    }
+                    if !laterTasks.isEmpty {
+                        Eyebrow(text: "Later this week", count: laterTasks.count)
+                        ForEach(laterTasks, id: \.id) { task in
+                            taskRow(task, meta: task.scheduledFor?.formatted(.dateTime.weekday(.abbreviated)))
+                        }
                     }
 
                     Eyebrow(text: isToday ? "Routines due today" : "Routines due \(date.formatted(.dateTime.weekday(.wide)))",
@@ -119,8 +129,8 @@ struct ChooserSheet: View {
 
     // MARK: Tasks
 
-    private func taskRow(_ task: SymphonyTask) -> some View {
-        PlanTaskRow(task: task, meta: weekendMeta(task)) {
+    private func taskRow(_ task: SymphonyTask, meta: String? = nil) -> some View {
+        PlanTaskRow(task: task, meta: meta ?? weekendMeta(task)) {
             AddButton(title: task.title, added: false) {
                 if PlanWriter.needsLifeArea(task) { needsArea = task } else { add(task) }
             }

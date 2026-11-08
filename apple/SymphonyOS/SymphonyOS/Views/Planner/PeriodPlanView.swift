@@ -78,7 +78,7 @@ struct PeriodPlanView: View {
     var body: some View {
         let plan = plan
         let above = aboveSheet(plan)
-        PaperFoldView(horizon: unit, aboveLabel: above.title, aboveCount: above.rows.count,
+        PaperFoldView(horizon: unit, aboveLabel: above.edge, aboveCount: above.rows.count,
                       calendarLabel: "\(periodWord) calendar") {
             header
         } above: {
@@ -96,6 +96,9 @@ struct PeriodPlanView: View {
         }
         .background(Color.bgBase.ignoresSafeArea())
         .statusBarScrim()
+        // Room for the dock, as on Week and Today: the calendar's edge at the
+        // foot of a long sheet scrolls clear of it.
+        .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: appState.bottomInset) }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
@@ -128,6 +131,8 @@ struct PeriodPlanView: View {
 
     private struct Above {
         var kicker: String
+        /// The edge's name ("Fall 2026"); the sheet's title says what it holds ("Fall goals").
+        var edge: String
         var title: String
         var rows: [(id: UUID, title: String)]
         var doneCount: Int
@@ -142,17 +147,29 @@ struct PeriodPlanView: View {
         case .month:
             let s = plan.sheet(level: "season", start: season.start)
             return Above(kicker: "Season · \(Self.range(season.start, season.lastDay))",
-                         title: "\(season.name) \(PlanCalendar.year(of: season.start))",
+                         edge: "\(season.name) \(PlanCalendar.year(of: season.start))", title: "\(season.name) goals",
                          rows: s.open.map { ($0.id, $0.title) }, doneCount: s.doneCount,
                          empty: "No \(season.name) goals yet.")
         case .season:
-            return Above(kicker: "Year", title: String(year),
+            return Above(kicker: "Year", edge: String(year), title: "\(year) goals",
                          rows: plan.openYearGoals(year).map { ($0.id, $0.name) }, doneCount: plan.doneYearGoals(year),
                          empty: "No \(year) goals yet.")
         case .year:
-            return Above(kicker: "Last year", title: String(year - 1),
+            return Above(kicker: "Last year", edge: String(year - 1), title: "\(year - 1) goals",
                          rows: plan.openYearGoals(year - 1).map { ($0.id, $0.name) }, doneCount: plan.doneYearGoals(year - 1),
                          empty: "Nothing left open from \(year - 1).")
+        }
+    }
+
+    /// This sheet's kicker: "Month · Nov 1 – 30", "Season · Sep 1 – Nov 30", "Year".
+    private var sheetKicker: String {
+        switch level {
+        case .month:
+            let start = PlanCalendar.monthStart(date)
+            let end = PlanCalendar.addDays(PlanCalendar.calendar.date(byAdding: .month, value: 1, to: start) ?? start, -1)
+            return "Month · \(Self.range(start, end))"
+        case .season: return "Season · \(Self.range(season.start, season.lastDay))"
+        case .year: return "Year"
         }
     }
 
@@ -198,6 +215,7 @@ struct PeriodPlanView: View {
     @ViewBuilder
     private func periodContent(_ sheet: PlanSnapshot.Sheet, level: String, start: Date) -> some View {
         VStack(alignment: .leading, spacing: 0) {
+            SheetHeading(kicker: sheetKicker, title: "\(periodWord) goals")
             ForEach(sheet.open, id: \.id) { task in SheetLine(task: task) }
             WriteLine(placeholder: Self.writePlaceholder(periodWord)) { text in
                 PlanWriter(context: modelContext, userId: userId)
@@ -222,6 +240,7 @@ struct PeriodPlanView: View {
     private func yearContent(_ plan: PlanSnapshot) -> some View {
         let year = PlanCalendar.year(of: date)
         VStack(alignment: .leading, spacing: 0) {
+            SheetHeading(kicker: sheetKicker, title: "\(periodWord) goals")
             ForEach(plan.openYearGoals(year), id: \.id) { goal in
                 Button { editing = .existing(goal) } label: { goalLine(goal) }
                     .buttonStyle(.plain)

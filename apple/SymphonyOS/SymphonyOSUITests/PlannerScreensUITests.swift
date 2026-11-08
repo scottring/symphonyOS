@@ -44,7 +44,8 @@ final class PlannerScreensUITests: XCTestCase {
         XCTAssertFalse(monthFoot.exists, "folded, the sheet above is out of reach")
         shot("01-month-folded")
         unfold("fold-edge-above", until: monthFoot)
-        XCTAssertTrue(app.staticTexts["\(seasonName()) \(seasonYear())"].exists, "the season is the sheet above")
+        XCTAssertTrue(app.staticTexts["\(seasonName()) goals"].exists, "the season is the sheet above")
+        XCTAssertTrue(app.staticTexts["\(month) goals"].exists, "this sheet is named like the one beside it (2026-11-07)")
         shot("02-month-season-open")
         unfold("fold-grip-above", until: nil)
         XCTAssertFalse(monthFoot.waitForExistence(timeout: 1.5))
@@ -79,9 +80,13 @@ final class PlannerScreensUITests: XCTestCase {
         unfold("fold-edge-above", until: app.staticTexts["For reading. Write \(yearName()) in its own words."])
         XCTAssertTrue(app.staticTexts["Read twenty books together"].exists, "last year's open goals")
         shot("05-year-last-year-open")
-        XCTAssertTrue(app.staticTexts[lastYear].exists)
+        XCTAssertTrue(app.staticTexts["\(lastYear) goals"].exists)
 
         horizon("This week")
+        // The Week is one list (2026-11-07), its month folded at one edge
+        // and its calendar at the other.
+        XCTAssertTrue(app.textFields["Write a task for this week"].waitForExistence(timeout: 4))
+        shot("05b-week-list")
         unfold("fold-edge-above", until: app.staticTexts["For reading. Write this week in its own words."])
         shot("06-week-month-open")
 
@@ -98,6 +103,10 @@ final class PlannerScreensUITests: XCTestCase {
         tap(verdicts[3])
         XCTAssertTrue(app.staticTexts["All reviewed."].waitForExistence(timeout: 4), "Let go takes it off last week")
         tap(app.buttons["Done"].firstMatch, scroll: false)
+
+        // This week's calendar folds out at the other edge, for reading.
+        unfold("fold-edge-calendar", until: app.staticTexts["For reading. Add events the usual way."])
+        shot("08-week-calendar-open")
     }
 
     /// Tap a fold's edge (or grip) and wait for what it shows.

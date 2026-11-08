@@ -7,13 +7,21 @@ struct PlannerView: View {
     @Environment(AppState.self) private var appState
     @Query private var households: [Household]
     @State private var showHorizons = false
+    /// The horizon on screen, a step behind `appState.horizon` so the slide
+    /// knows its direction (Scott, 2026-11-07): going down a level (Month to
+    /// Week, Week to Today) the page slides in from the right, up from the left.
+    @State private var shown: Horizon?
+    @State private var goingDown = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let order: [Horizon] = [.today, .week, .month, .season, .year]
 
     private var seasons: [SeasonBoundary]? { households.first?.seasons }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             Group {
-                switch appState.horizon {
+                switch shown ?? appState.horizon {
                 case .today:
                     TodayView(onTitle: openSwitcher)
                 case .week:
@@ -26,6 +34,10 @@ struct PlannerView: View {
                     PeriodPlanView(level: .year, onTitle: openSwitcher)
                 }
             }
+            .id(shown ?? appState.horizon)
+            .transition(reduceMotion ? .opacity : .asymmetric(
+                insertion: .move(edge: goingDown ? .trailing : .leading).combined(with: .opacity),
+                removal: .move(edge: goingDown ? .leading : .trailing).combined(with: .opacity)))
             .accessibilityHidden(showHorizons)
 
             if showHorizons {
@@ -43,6 +55,11 @@ struct PlannerView: View {
             }
         }
         .animation(.easeOut(duration: 0.18), value: showHorizons)
+        .onAppear { if shown == nil { shown = appState.horizon } }
+        .onChange(of: appState.horizon) { old, new in
+            goingDown = (Self.order.firstIndex(of: new) ?? 0) < (Self.order.firstIndex(of: old) ?? 0)
+            withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.42, dampingFraction: 0.9)) { shown = new }
+        }
     }
 
     private func openSwitcher() { showHorizons = true }

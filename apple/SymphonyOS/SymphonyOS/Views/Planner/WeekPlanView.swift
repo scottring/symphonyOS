@@ -21,6 +21,9 @@ struct WeekPlanView: View {
     @Query private var eventNotes: [EventNote]
 
     @State private var showReview = false
+    /// The list is the Week (Scott, 2026-11-07); the days, card by card, are
+    /// the optional view. Remembered on this device.
+    @AppStorage("planner.week.layout") private var layout = "list"
     @State private var toast: TriageController.Toast?
     @State private var calendar = GoogleCalendarService.shared
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -80,11 +83,16 @@ struct WeekPlanView: View {
         // The month folds out above the week, for reading (paper-style
         // horizons, 2026-11-04). Nothing on it is a week item, and nothing
         // moves from it onto the week: this week is written in its own words.
-        PaperFoldView(horizon: "week", aboveLabel: monthWord, aboveCount: month.open.count) {
+        let lines = plan.weekLines(weekStart)
+        PaperFoldView(horizon: "week", aboveLabel: monthWord, aboveCount: month.open.count, calendarLabel: "Week calendar") {
             VStack(alignment: .leading, spacing: 0) {
                 PlannerHeader(title: Self.title(for: weekStart), subtitle: Self.range(weekStart), onTitle: onTitle) {
                     HStack(spacing: 0) {
                         PaperSoundToggle()
+                        CircleIconButton(systemImage: layout == "list" ? "calendar" : "list.bullet",
+                                         label: layout == "list" ? "Show the week by day" : "Show the week as a list") {
+                            layout = layout == "list" ? "days" : "list"
+                        }
                         CircleIconButton(systemImage: "chevron.left", label: "Previous week") { appState.step(-1) }
                         CircleIconButton(systemImage: "chevron.right", label: "Next week") { appState.step(1) }
                     }
@@ -97,16 +105,128 @@ struct WeekPlanView: View {
                     .padding(.top, 10)
             }
         } above: {
-            SheetAbove(kicker: "Month · \(PeriodPlanView.range(monthStart, monthEnd))", title: monthWord,
+            SheetAbove(kicker: "Month · \(PeriodPlanView.range(monthStart, monthEnd))", title: "\(monthWord) goals",
                        rows: month.open.map { ($0.id, $0.title) }, doneCount: month.doneCount,
                        foot: "For reading. Write this week in its own words.", empty: "No \(monthWord) goals yet.")
+        } calendar: {
+            // This week's fixed points, for reading: events, by day.
+            CalendarSheet(kicker: "Calendar", title: Self.shortRange(weekStart), start: weekStart,
+                          end: PlanCalendar.addDays(weekStart, 7))
         } sheet: {
             VStack(alignment: .leading, spacing: 0) {
+                SheetHeading(kicker: "Week · \(Self.shortRange(weekStart))", title: Self.title(for: weekStart))
+                    .padding(.horizontal, 20)
                 if !review.isEmpty {
                     CalmRow(text: "Review last week · \(Self.shortRange(previous))",
                             detail: "\(review.count) open") { showReview = true }
                 }
+                if layout == "list" {
+                    listSheet(lines)
+                } else {
+                    daysSheet(week)
+                }
+            }
+        }
+        .background(Color.bgBase.ignoresSafeArea())
+        .statusBarScrim()
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                if let toast {
+                    PlannerToast(message: toast.message, actionTitle: toast.snapshot == nil ? nil : "Undo") {
+                        if let snap = toast.snapshot { PlanWriter(context: modelContext, userId: userId).undo(snap) }
+                        self.toast = nil
+                    }
+                    .padding(.bottom, 8)
+                }
+            }
+            .padding(.bottom, appState.bottomInset)
+        }
+        #if os(iOS)
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
+        // Each day's events, from the same cache Today reads.
+        .task(id: weekStart) { await calendar.refreshWeek(weekStart) }
+        .sheet(isPresented: $showReview) {
+            WeekReviewSheet(previousWeek: previous, intoWeek: weekStart)
+                .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+    }
 
+    /// The Week's one list (Scott, 2026-11-07): every task on the week in the
+    /// order written, a day as its mark ("Wed", "Today"), never a time. Day ▾
+    /// gives, changes or takes away the day; the task stays where it is and
+    /// shows on that day's Today. A goal or parent shows its open steps.
+    /// Routines are on Today, on their days; events on the calendar fold.
+    @ViewBuilder
+    private func listSheet(_ lines: [PlanSnapshot.WeekLine]) -> some View {
+        if lines.isEmpty {
+            Text("Nothing on this week yet.").font(Paper.empty).foregroundStyle(Paper.faint)
+                .padding(.horizontal, 20).padding(.vertical, 6)
+        }
+        ForEach(lines) { line in lineRow(line) }
+        WriteLine(placeholder: "Write a task for this week") { text in
+            PlanWriter(context: modelContext, userId: userId)
+                .createPeriodTask(title: text, level: "week", periodStart: weekStart,
+                                  context: appState.domainFilter.contextValue)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 4)
+    }
+
+    /// "Today", "Wed", or "This weekend" for a weekend task with no day.
+    static func dayMark(_ line: PlanSnapshot.WeekLine) -> String? {
+        if let d = line.day {
+            return PlanCalendar.calendar.isDateInToday(d) ? "Today" : d.formatted(.dateTime.weekday(.abbreviated))
+        }
+        return line.task.weekendStart != nil ? "This weekend" : nil
+    }
+
+    private func lineRow(_ line: PlanSnapshot.WeekLine) -> some View {
+        let task = line.task
+        return PlanTaskRow(task: task, meta: Self.dayMark(line)) {
+            Menu {
+                ForEach(PlanCalendar.weekDays(weekStart), id: \.self) { day in
+                    Button {
+                        let snap = PlanWriter(context: modelContext, userId: userId).planTask(task, on: day)
+                        toast = TriageController.Toast(message: "“\(task.title)” on \(day.formatted(.dateTime.weekday(.wide)))", snapshot: snap)
+                    } label: {
+                        if let d = line.day, PlanCalendar.sameDay(d, day) {
+                            Label(day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()), systemImage: "checkmark")
+                        } else {
+                            Text(day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
+                        }
+                    }
+                }
+                if line.day != nil {
+                    Divider()
+                    Button("No day") {
+                        let snap = PlanWriter(context: modelContext, userId: userId).clearDay(task)
+                        toast = TriageController.Toast(message: "“\(task.title)” has no day; it stays on the week", snapshot: snap)
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Day")
+                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
+                }
+                .font(.bodySmallBold)
+                .foregroundStyle(Color.ink)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 32)
+                .background(Color.bgSurface, in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.cardBorder, lineWidth: 1))
+                .frame(minHeight: 44)
+            }
+            .accessibilityLabel(line.day == nil ? "Give \(task.title) a day" : "Change the day for \(task.title)")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 3)
+    }
+
+    /// The optional view: the days, card by card, as Today would show them.
+    @ViewBuilder
+    private func daysSheet(_ week: PlanSnapshot.WeekView) -> some View {
                 Eyebrow(text: "Any day", count: week.anyDay.count)
                 ForEach(week.anyDay, id: \.id) { task in row(task) }
 
@@ -135,32 +255,6 @@ struct WeekPlanView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 4)
                 }
-            }
-        }
-        .background(Color.bgBase.ignoresSafeArea())
-        .statusBarScrim()
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                if let toast {
-                    PlannerToast(message: toast.message, actionTitle: toast.snapshot == nil ? nil : "Undo") {
-                        if let snap = toast.snapshot { PlanWriter(context: modelContext, userId: userId).undo(snap) }
-                        self.toast = nil
-                    }
-                    .padding(.bottom, 8)
-                }
-            }
-            .padding(.bottom, appState.bottomInset)
-        }
-        #if os(iOS)
-        .toolbar(.hidden, for: .navigationBar)
-        #endif
-        // Each day's events, from the same cache Today reads.
-        .task(id: weekStart) { await calendar.refreshWeek(weekStart) }
-        .sheet(isPresented: $showReview) {
-            WeekReviewSheet(previousWeek: previous, intoWeek: weekStart)
-                .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
     }
 
     /// The day card's single "Also due" line: "Also due: Piano practice",

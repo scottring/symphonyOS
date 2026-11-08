@@ -134,6 +134,24 @@ struct PlanWriter {
         return snap
     }
 
+    /// "No day" on the week's list (2026-11-07): the task loses its day and
+    /// keeps its week, with an open week commitment for that week.
+    @discardableResult
+    func clearDay(_ task: SymphonyTask) -> Snapshot {
+        var snap = Snapshot(tasks: [capture(task)])
+        let ws = PlanCalendar.weekStart(task.scheduledFor ?? Date())
+        task.bucket = "week"
+        task.scheduledFor = nil
+        task.isAllDay = false
+        task.isSomeday = false
+        task.weekStart = ws
+        task.placementDirty = true
+        snap.merge(ensureCommitment(task, level: "week", periodStart: ws))
+        touch(task)
+        save()
+        return snap
+    }
+
     /// The write line on a period's sheet ("Write a November goal", "Write a
     /// task for this week"): a plain item on this period only, in its own
     /// words, with one open commitment and tied to nothing (no goal_task_id,

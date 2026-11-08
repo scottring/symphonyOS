@@ -241,6 +241,51 @@ struct PlanSelectorTests {
         ])
         #expect(pulled?.id == local.id)
     }
+
+    // Scott, 2026-11-07: the Week is one list; a day is a mark; steps, not goals.
+    @Test func weekLinesKeepADayedTaskOnTheListWithItsDay() {
+        let ws = day(2026, 11, 8)
+        let any = task("Book trains")
+        let dated = task("Dentist forms")
+        dated.scheduledFor = day(2026, 11, 11)
+        dated.bucket = "timed"
+        let plan = snapshot(tasks: [any, dated],
+                            commitments: [any, dated].map { TaskCommitment(taskId: $0.id, level: "week", periodStart: ws) })
+        let lines = plan.weekLines(ws)
+        #expect(Set(lines.map(\.task.title)) == ["Book trains", "Dentist forms"])
+        #expect(lines.first { $0.task.title == "Dentist forms" }?.day.map(PlanCalendar.ymd) == "2026-11-11")
+        #expect(lines.first { $0.task.title == "Book trains" }?.day == nil)
+    }
+
+    @Test func aGoalOnTheWeekShowsItsOpenStepsInstead() {
+        let ws = day(2026, 11, 8)
+        let goal = task("Plan winter vacation")
+        goal.isGoal = true
+        let dates = task("Pick dates with Iris")
+        dates.goalTaskId = goal.id
+        let trains = task("Book trains")
+        trains.goalTaskId = goal.id
+        let gone = task("Ask about time off")
+        gone.goalTaskId = goal.id
+        gone.completed = true
+        let plan = snapshot(tasks: [goal, dates, trains, gone],
+                            commitments: [TaskCommitment(taskId: goal.id, level: "week", periodStart: ws)])
+        #expect(Set(plan.weekLines(ws).map(\.task.title)) == ["Pick dates with Iris", "Book trains"])
+        #expect(Set(plan.chooserTasks(on: day(2026, 11, 9)).map(\.title)) == ["Pick dates with Iris", "Book trains"])
+    }
+
+    @Test func laterThisWeekOffersWhatIsOnALaterDay() {
+        let ws = day(2026, 11, 8)
+        let thu = task("Renew the registration")
+        thu.scheduledFor = day(2026, 11, 12)
+        thu.bucket = "timed"
+        let mon = task("Drop off donations")
+        mon.scheduledFor = day(2026, 11, 9)
+        mon.bucket = "timed"
+        let plan = snapshot(tasks: [thu, mon],
+                            commitments: [thu, mon].map { TaskCommitment(taskId: $0.id, level: "week", periodStart: ws) })
+        #expect(plan.laterThisWeek(after: day(2026, 11, 10)).map(\.title) == ["Renew the registration"])
+    }
 }
 
 // MARK: - Writes
@@ -410,5 +455,18 @@ struct PlanWriterTests {
         #expect(i.entityId == r.id.uuidString.lowercased())
         #expect(r.recurrencePattern.days == [])
         #expect(!pending(ctx).contains { $0.tableName == "routines" })
+    }
+
+    @Test func noDayKeepsTheWeekAndTakesTheDayAway() throws {
+        let ctx = try makeContext()
+        let t = task("Dentist forms")
+        ctx.insert(t)
+        let writer = PlanWriter(context: ctx, userId: me)
+        writer.planTask(t, on: day(2026, 11, 11))
+        writer.clearDay(t)
+        #expect(t.scheduledFor == nil)
+        #expect(t.bucket == "week")
+        let c = try ctx.fetch(FetchDescriptor<TaskCommitment>())
+        #expect(c.contains { $0.level == "week" && $0.status == "open" && PlanCalendar.sameDay($0.periodStart, PlanCalendar.weekStart(day(2026, 11, 11))) })
     }
 }
