@@ -1270,10 +1270,18 @@ function toCanvasDays({ days: journalDays, weekend: journalWeekend, shelf, daily
   canMoveEvent: (id: string) => boolean
 }) {
   const onShelf = new Set(shelf.flatMap((g) => g.rows.map((r) => r.task.id)))
+  // Routines are Today's, on their days (Scott, 2026-11-08): the grid shows
+  // one only with "Show on the week" on, or given its day this week. The
+  // open-time count below still reads the whole day.
+  const shown = journalDays.map((d) => ({
+    ...d,
+    entries: d.entries.filter((e) => e.kind !== 'routine' || e.onWeek),
+    foldedRoutines: d.foldedRoutines.filter((e) => e.onWeek),
+  }))
   // Repeated tasks too ("Pick up from FFG" each weekday), and repeats on
   // part of the week ("Mon–Thu"): written once above.
-  const found = weekRhythm(journalDays, undefined, { tasks: true, partial: true })
-  const rhythm = dailyShown ? { everyDay: [], weekdays: [], repeats: [], days: journalDays } : found
+  const found = weekRhythm(shown, undefined, { tasks: true, partial: true })
+  const rhythm = dailyShown ? { everyDay: [], weekdays: [], repeats: [], days: shown } : found
   const toItem = (e: JournalEntry): CanvasDayItem => ({
     id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId, people: e.people,
     ...(e.kind === 'event' ? { end: e.end, movable: !!e.time && canMoveEvent(e.id) } : {}),

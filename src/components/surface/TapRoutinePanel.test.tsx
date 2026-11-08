@@ -100,7 +100,22 @@ describe('TapRoutinePanel', () => {
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} viewedDate={WED} />)
     const where = screen.getByRole('region', { name: 'Where it shows' })
     expect(within(where).getAllByText('Not on Wednesdays — runs Tue')).toHaveLength(2) // Today and the kiosk
-    expect(within(where).getByText('On the week on Tue at 8:00 PM')).toBeInTheDocument()
+    expect(within(where).getByText(/On Today on its days, not the week/)).toBeInTheDocument()
+  })
+
+  // Scott, 2026-11-08: routines stay off the week's grid unless tagged.
+  it('Show on the week puts it on the week, with Undo', async () => {
+    const onShowOnWeekChange = vi.fn()
+    const { rerender } = render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+      onVisibilityChange={vi.fn()} onShowOnWeekChange={onShowOnWeekChange} viewedDate={TUE} />)
+    const sw = screen.getByRole('switch', { name: 'Show on the week' })
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(sw)
+    await waitFor(() => expect(onShowOnWeekChange).toHaveBeenCalledWith(true))
+    rerender(<TapRoutinePanel routine={{ ...routine, show_on_week: true }} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+      onVisibilityChange={vi.fn()} onShowOnWeekChange={onShowOnWeekChange} viewedDate={TUE} />)
+    expect(screen.getByRole('switch', { name: 'Show on the week' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByRole('region', { name: 'Where it shows' })).getByText('On the week on Tue at 8:00 PM')).toBeInTheDocument()
   })
 
   it('offers three distinct controls: Hide for today, Rest until…, Off', () => {
@@ -201,7 +216,7 @@ describe('TapRoutinePanel', () => {
         onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnKioskChange={vi.fn()} viewedDate={TUE} />,
     )
     expect(screen.getByRole('switch', { name: 'Kiosk' })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByText(/Still runs, and still on Today and the week/)).toBeInTheDocument()
+    expect(screen.getByText(/Still runs, and still on Today\./)).toBeInTheDocument()
     expect(screen.getByText('Hidden from the kitchen kiosk (Kiosk off)')).toBeInTheDocument()
   })
 

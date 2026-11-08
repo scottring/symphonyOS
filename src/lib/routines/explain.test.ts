@@ -77,7 +77,7 @@ describe('explainRoutine — Today', () => {
   })
 
   it('Hide for today: skipped for today only, back tomorrow — the week and kiosk keep it', () => {
-    const e = explainRoutine(r(), { ...ctx, skippedToday: true })
+    const e = explainRoutine(r({ show_on_week: true }), { ...ctx, skippedToday: true })
     expect(e.today).toMatchObject({ shows: false, rung: 'skipped', reason: 'Skipped for today only — back tomorrow' })
     expect(e.week.shows).toBe(true)
     expect(e.kiosk.reason).toBe('Still on the kitchen kiosk — Hide for today only clears Today')
@@ -97,12 +97,19 @@ describe('explainRoutine — Today', () => {
 
 describe('explainRoutine — Week', () => {
   it('names the days it lands on this week', () => {
-    const e = explainRoutine(r({ recurrence_pattern: { type: 'weekly', days: ['tue', 'thu'] }, time_of_day: '18:30' }), ctx)
+    const e = explainRoutine(r({ show_on_week: true, recurrence_pattern: { type: 'weekly', days: ['tue', 'thu'] }, time_of_day: '18:30' }), ctx)
     expect(e.week).toMatchObject({ shows: true, reason: 'On the week on Tue & Thu at 6:30 PM' })
   })
 
   it('every day', () => {
-    expect(explainRoutine(r(), ctx).week.reason).toBe('On the week every day')
+    expect(explainRoutine(r({ show_on_week: true }), ctx).week.reason).toBe('On the week every day')
+  })
+
+  // Scott, 2026-11-08: a routine is Today's, on its days, unless tagged.
+  it('is off the week unless Show on the week is on', () => {
+    const e = explainRoutine(r({ recurrence_pattern: { type: 'weekly', days: ['tue'] }, time_of_day: '18:30' }), ctx)
+    expect(e.week).toMatchObject({ shows: false, rung: 'not-on-week' })
+    expect(e.today.rung).not.toBe('not-on-week')
   })
 
   it('a weekly rule with no day has nothing to place', () => {
@@ -124,7 +131,7 @@ describe('explainRoutine — Kiosk', () => {
   })
 
   it('Kiosk off hides it from the kiosk only — Today and the week keep it', () => {
-    const e = explainRoutine(r({ show_on_kiosk: false, time_of_day: '07:00' }), ctx)
+    const e = explainRoutine(r({ show_on_kiosk: false, show_on_week: true, time_of_day: '07:00' }), ctx)
     expect(e.kiosk).toMatchObject({ shows: false, rung: 'kiosk-off', reason: 'Hidden from the kitchen kiosk (Kiosk off)' })
     expect(e.today.shows).toBe(true)
     expect(e.week.shows).toBe(true)

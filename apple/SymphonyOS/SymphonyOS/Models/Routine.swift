@@ -90,6 +90,9 @@ final class Routine {
     // Read-only on the phone (never pushed): what `resolveRoutine` needs.
     var showOnTimeline: Bool = true
     var pinToTimeline: Bool = false
+    /// "Show on the week" (web switch, 2026-11-08): a routine is Today's, on
+    /// its days; on, the Week's By day view shows it too. Default off.
+    var showOnWeek: Bool = false
     /// Set on a collection's Step — the collection renders it, not the day.
     var parentRoutineId: UUID? = nil
     var pausedUntil: Date? = nil

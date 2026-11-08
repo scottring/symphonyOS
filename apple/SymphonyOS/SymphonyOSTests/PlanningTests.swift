@@ -282,6 +282,16 @@ struct PlanSelectorTests {
         #expect(all.map(\.0) == [z, x, y] && all.map(\.1) == [0, 1000, 2000])
     }
 
+    // Scott, 2026-11-08: routines are Today's, on their days; the week shows
+    // one only when tagged Show on the week, or chosen for that day.
+    @Test func aRoutineIsOnTheWeekOnlyWhenTaggedOrChosen() {
+        let r = routine("Walk the dog", RecurrencePattern(type: "daily"), time: "07:00")
+        #expect(!WeekPlanView.showsOnWeek(r, chosen: false))
+        #expect(WeekPlanView.showsOnWeek(r, chosen: true))
+        r.showOnWeek = true
+        #expect(WeekPlanView.showsOnWeek(r, chosen: false))
+    }
+
     @Test func aGoalOnTheWeekShowsItsOpenStepsInstead() {
         let ws = day(2026, 11, 8)
         let goal = task("Plan winter vacation")

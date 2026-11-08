@@ -36,15 +36,25 @@ struct WeekPlanView: View {
                      instances: instances, userId: auth.currentUser?.id, domain: appState.domainFilter.contextValue)
     }
 
-    /// Everything Today would show for `day` — tasks, routine occurrences,
-    /// calendar events — built by the same view model, untimed first.
+    /// What Today would show for `day` — tasks, calendar events, and the
+    /// routines the week shows (Scott, 2026-11-08: a routine is Today's, on
+    /// its days; the week shows one with Show on the week on, or one chosen
+    /// for this day). Built by the same view model, untimed first.
     private func dayItems(_ day: Date) -> [TimelineItem] {
         let vm = TimelineViewModel()
         vm.buildTimeline(tasks: tasks, routines: routines, instances: instances, date: day,
                          domainFilter: appState.domainFilter, eventItems: calendar.items(for: day) ?? [],
                          eventNotes: eventNotes, focus: focusRows, userId: auth.currentUser?.id)
-        return vm.forToday + vm.schedule
+        let plan = fullPlan
+        return (vm.forToday + vm.schedule).filter { item in
+            guard item.type == .routine else { return true }
+            guard let r = routines.first(where: { $0.id == item.entityId }) else { return false }
+            return Self.showsOnWeek(r, chosen: plan.isChosen(r, on: day))
+        }
     }
+
+    /// A routine on the week: tagged Show on the week, or chosen for the day.
+    static func showsOnWeek(_ r: Routine, chosen: Bool) -> Bool { r.showOnWeek || chosen }
 
     private var userId: UUID { auth.currentUser?.id ?? UUID() }
     private var weekStart: Date { PlanCalendar.weekStart(appState.selectedDate) }
@@ -296,7 +306,7 @@ struct WeekPlanView: View {
                 ForEach(PlanCalendar.weekDays(weekStart), id: \.self) { day in
                     DayCard(day: day, items: dayItems(day),
                             alsoDue: fullPlan.chooserRoutines(on: day)
-                                .filter { !$0.flexible && !$0.chosen }.map(\.routine.name),
+                                .filter { !$0.flexible && !$0.chosen && $0.routine.showOnWeek }.map(\.routine.name),
                             eventsLoading: calendar.items(for: day) == nil && calendar.isLoading(day)) {
                         appState.selectedDate = day
                         appState.horizon = .today

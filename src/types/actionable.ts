@@ -104,6 +104,10 @@ export interface Routine {
   show_on_timeline: boolean // Whether to display on Today view (default true)
   /** The Kiosk switch: false keeps it off the kitchen kiosk and the kids' tablets. Default true. */
   show_on_kiosk?: boolean
+  /** "Show on the week": on the Week's grid of days. Default false — a
+   *  routine is Today's, on its days (Scott, 2026-11-08); one given a day
+   *  this week shows there regardless. */
+  show_on_week?: boolean
   pin_to_timeline?: boolean // Always show on Today even when "hide daily routines" is on (tracked obligations, e.g. PT exercises)
   /** Daily quantity goal — "read 20 minutes" = 20/'minutes'. Both null = plain checkbox step. */
   target_amount?: number | null

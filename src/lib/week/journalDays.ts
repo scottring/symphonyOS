@@ -36,6 +36,10 @@ export interface JournalEntry {
   routineId?: string
   /** Who carries it (family member ids); none for a calendar event. */
   people?: string[]
+  /** Routines: on the week's grid (Scott, 2026-11-08: none shows there
+   *  unless tagged): its "Show on the week" switch is on, or someone gave
+   *  this occurrence its day. */
+  onWeek?: boolean
 }
 
 export interface JournalDay {
@@ -159,6 +163,7 @@ export function buildJournalDays(a: BuildJournalDaysArgs): { days: JournalDay[];
     }
     const entry: JournalEntry = {
       id: r.id, kind: 'routine', time: r.startTime ?? undefined, end: r.startTime ? r.endTime ?? undefined : undefined, title: r.title, completed, routineId, people: routinePeople(r),
+      onWeek: !!r.originalRoutine?.show_on_week || planned,
     }
     if (r.startTime) timed.get(day.key)!.push(entry)
     else if (planned || pinned || dayBound || completed) day.foldedRoutines.push(entry)

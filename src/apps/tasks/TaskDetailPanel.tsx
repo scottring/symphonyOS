@@ -556,6 +556,7 @@ function RoutinePanelBody({ id, date }: { id: string; date?: string }) {
       onVisibilityChange={(v) => updateRoutine(routine.id, { visibility: v })}
       onShowOnTodayChange={(next) => updateRoutine(routine.id, { show_on_timeline: next })}
       onShowOnKioskChange={(next) => updateRoutine(routine.id, { show_on_kiosk: next })}
+      onShowOnWeekChange={(next) => updateRoutine(routine.id, { show_on_week: next })}
       onAssignChange={(ids) => updateRoutine(routine.id, { assigned_to_all: ids })}
       onTargetChange={(t) => updateRoutine(routine.id, { target_amount: t?.amount ?? null, target_unit: t?.unit ?? null })}
       onScheduleChange={(pattern, timeOfDay) =>

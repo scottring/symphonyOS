@@ -70,6 +70,9 @@ interface TapRoutinePanelProps {
    *  tablets without stopping it (writes show_on_kiosk). Rendered only when
    *  provided, and only while the routine is Active. */
   onShowOnKioskChange?: (next: boolean) => unknown
+  /** "Show on the week" (Scott, 2026-11-08): a routine is Today's, on its
+   *  days; on, it shows on the Week's grid too (writes show_on_week). */
+  onShowOnWeekChange?: (next: boolean) => unknown
   /** The day "Where it shows" and "Hide for today" are about. Defaults to today. */
   viewedDate?: Date
   /** The occurrence the panel was opened from (a day on Week or Routines).
@@ -210,6 +213,16 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
     await run(next ? `Take "${routine.name}" off the kiosk` : `Show "${routine.name}" on the kiosk`,
       () => write(() => fn(!next)),
       { ids: [routine.id], undo: () => write(() => fn(next)) })
+  }
+
+  const onWeek = !!routine.show_on_week
+  const setOnWeek = async (next: boolean) => {
+    const fn = props.onShowOnWeekChange
+    if (!fn) return
+    if (props.unsaved) { fn(next); return }
+    await run(next ? `Show "${routine.name}" on the week` : `Take "${routine.name}" off the week`,
+      () => write(() => fn(next)),
+      { ids: [routine.id], undo: () => write(() => fn(!next)) })
   }
 
   // "<day> only": one occurrence changes, the routine does not. Each write
@@ -512,7 +525,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
                 </span>
                 <span className="routine-hide-control-hint">
                   {kioskOff
-                    ? 'Still runs, and still on Today and the week. Turn Kiosk back on to show it there again.'
+                    ? 'Still runs, and still on Today. Turn Kiosk back on to show it there again.'
                     : 'On the kitchen kiosk and the kids’ tablets when it’s due.'}
                 </span>
               </div>
@@ -529,6 +542,37 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
                 <span
                   className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
                     !kioskOff ? 'translate-x-[22px]' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+
+          {/* Show on the week (Scott, 2026-11-08: routines stay off the
+              week's grid unless tagged). Off by default. */}
+          {onTimeline && props.onShowOnWeekChange && (
+            <div className="routine-hide-control">
+              <div className="routine-hide-control-text">
+                <span className="routine-hide-control-title">Show on the week</span>
+                <span className="routine-hide-control-hint">
+                  {onWeek
+                    ? 'On the week’s grid on its days, as well as on Today.'
+                    : 'On Today on its days. Turn on to plan around it on the week too.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={onWeek}
+                aria-label="Show on the week"
+                onClick={() => { void setOnWeek(!onWeek) }}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  onWeek ? 'bg-primary-600' : 'bg-neutral-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    onWeek ? 'translate-x-[22px]' : 'translate-x-0.5'
                   }`}
                 />
               </button>

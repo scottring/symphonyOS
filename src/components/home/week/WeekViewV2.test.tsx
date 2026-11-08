@@ -248,8 +248,8 @@ describe('WeekViewV2 routine visibility', () => {
     // week (2026-10-04), so the filter is seen on a day's own routine.
     const someDays = { type: 'weekly', days: ['mon', 'wed'] } as RecurrencePattern
     const routines = [
-      createMockRoutine({ name: 'Scott Routine', assigned_to: 'scott', recurrence_pattern: someDays }),
-      createMockRoutine({ name: 'Iris Routine', assigned_to: 'iris', recurrence_pattern: someDays }),
+      createMockRoutine({ show_on_week: true, name: 'Scott Routine', assigned_to: 'scott', recurrence_pattern: someDays }),
+      createMockRoutine({ show_on_week: true, name: 'Iris Routine', assigned_to: 'iris', recurrence_pattern: someDays }),
     ]
 
     render(
@@ -489,7 +489,7 @@ describe('WeekViewV2 journal spread', () => {
   // toolbar switch that hid them all is retired — one routine is hidden with
   // its own "Show in Today and planning".
   it('always shows routines, with no Routines switch', () => {
-    const routines = [createMockRoutine({ name: 'Morning stretch', recurrence_pattern: { type: 'weekly', days: ['mon', 'wed'] } as RecurrencePattern })]
+    const routines = [createMockRoutine({ show_on_week: true, name: 'Morning stretch', recurrence_pattern: { type: 'weekly', days: ['mon', 'wed'] } as RecurrencePattern })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     expect(screen.getAllByText('Morning stretch').length).toBeGreaterThan(0)
     expect(screen.queryByRole('switch', { name: 'Routines' })).toBeNull()
@@ -500,7 +500,7 @@ describe('WeekViewV2 journal spread', () => {
   // details pane needs the routine's own id.
   it('a routine clicked in the days opens its details by the routine’s own id', () => {
     const onSelectItem = vi.fn()
-    const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
+    const routines = [createMockRoutine({ show_on_week: true, id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
     render(<WeekViewV2 {...defaultProps} onSelectItem={onSelectItem} routines={routines} weekStart={sunday} />)
     fireEvent.click(onDay('2026-09-13').getByRole('button', { name: 'Water houseplants' }))
     expect(onSelectItem).toHaveBeenLastCalledWith('routine-wp')
@@ -509,7 +509,7 @@ describe('WeekViewV2 journal spread', () => {
   // Scott, 2026-09-27: Show in Today ON + due = on the day, untimed, in the
   // journal — as on Today.
   it('a due routine with Show in Today on is a Sunday entry, untimed', () => {
-    const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
+    const routines = [createMockRoutine({ show_on_week: true, id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     // A day's own routine is on that day, once (2026-10-26: a drop onto a
     // day must show there; 2026-11-04: no strip listing it again).
@@ -562,7 +562,7 @@ describe('WeekViewV2 — untimed placements', () => {
     }]
     // Done waits behind Show done (the header's ⋯), as a done task does.
     localStorage.setItem(WEEK_PREF_KEYS.done, 'shown')
-    render(<WeekViewV2 {...defaultProps} routines={[createMockRoutine({ id: 'read', name: 'Read', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } })]} weekStart={sunday} />)
+    render(<WeekViewV2 {...defaultProps} routines={[createMockRoutine({ show_on_week: true, id: 'read', name: 'Read', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } })]} weekStart={sunday} />)
     // Done stays in the day's record, ticked, on Saturday.
     await waitFor(() => expect(instancesMock.rows.length).toBe(1))
     const saturday = onDay('2026-09-19')
@@ -577,9 +577,9 @@ describe('WeekViewV2 — untimed placements', () => {
       completed_at: null, skipped_at: null, progress: null, created_at: '', updated_at: '',
     }]
     const routines = [
-      createMockRoutine({ id: 'chosen', name: 'Family reading time', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } }),
+      createMockRoutine({ show_on_week: true, id: 'chosen', name: 'Family reading time', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } }),
       // Show in Today not positively set: only available until chosen.
-      createMockRoutine({ id: 'waiting', name: 'Kids clean rooms', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] }, show_on_timeline: null as unknown as boolean }),
+      createMockRoutine({ show_on_week: true, id: 'waiting', name: 'Kids clean rooms', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] }, show_on_timeline: null as unknown as boolean }),
     ]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     await screen.findByTestId('journal-day-2026-09-19')
@@ -591,6 +591,38 @@ describe('WeekViewV2 — untimed placements', () => {
     // Ticking the entry completes THAT occurrence — Saturday's instance.
     fireEvent.click(saturday.getByRole('button', { name: 'Complete Family reading time' }))
     expect(instancesMock.markDone).toHaveBeenCalledWith('routine', 'chosen', new Date(2026, 8, 19))
+  })
+})
+
+// Scott, 2026-11-08: "routines should not show on the calendar grid at all,
+// unless explicitly tagged". A routine is Today's, on its days; the grid shows
+// one with Show on the week on, or one someone gave its day.
+describe('WeekViewV2 — routines on the grid only when tagged or given a day', () => {
+  const sunday = new Date(2026, 8, 13) // Sun Sep 13 – Sat Sep 19, 2026
+  it('leaves an untagged routine off the grid, timed or not; shows a tagged one', async () => {
+    instancesMock.rows = []
+    const routines = [
+      createMockRoutine({ id: 'walk', name: 'Walk the dog', time_of_day: '07:00:00', recurrence_pattern: { type: 'daily' } as RecurrencePattern, show_on_timeline: true }),
+      createMockRoutine({ id: 'plants', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true }),
+      createMockRoutine({ id: 'soccer', show_on_week: true, name: 'Soccer practice', time_of_day: '16:00:00', recurrence_pattern: { type: 'weekly', days: ['sat'] } as RecurrencePattern, show_on_timeline: true }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
+    await screen.findByTestId('journal-day-2026-09-19')
+    expect(screen.queryByText('Walk the dog')).toBeNull()
+    expect(screen.queryByText('Water houseplants')).toBeNull()
+    expect(onDay('2026-09-19').getByText('Soccer practice')).toBeInTheDocument()
+  })
+
+  it('shows an untagged routine on a day someone gave it', async () => {
+    instancesMock.rows = [{
+      id: 'i1', user_id: 'u', entity_type: 'routine', entity_id: 'read', date: '2026-09-19', status: 'pending',
+      assignee: null, assigned_to_override: null, deferred_to: null, planned_on: '2026-09-19',
+      completed_at: null, skipped_at: null, progress: null, created_at: '', updated_at: '',
+    }]
+    const routines = [createMockRoutine({ id: 'read', name: 'Family reading time', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } })]
+    render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
+    await screen.findByTestId('journal-day-2026-09-19')
+    expect(await onDay('2026-09-19').findByText('Family reading time')).toBeInTheDocument()
   })
 })
 
@@ -647,7 +679,7 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   })
 
   it('every-day routines are written once until "Show daily routines in each day" (⋯), which is remembered', () => {
-    const daily = createMockRoutine({ id: 'dog', name: 'Walk the dog', time_of_day: '07:00:00', recurrence_pattern: { type: 'daily' } as RecurrencePattern, show_on_timeline: true })
+    const daily = createMockRoutine({ show_on_week: true, id: 'dog', name: 'Walk the dog', time_of_day: '07:00:00', recurrence_pattern: { type: 'daily' } as RecurrencePattern, show_on_timeline: true })
     render(<WeekViewV2 {...defaultProps} routines={[daily]} weekStart={sunday} />)
     // Written once, with its time (rhythmLines), as Today's, under Sometime
     // this week (the strip's footer, 2026-11-04).
@@ -663,7 +695,7 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   // Calm pass 2: a repeat on Mon–Thu folds once, labelled with its days;
   // "Show daily" puts it back in each day.
   it('a Mon–Thu routine is written once as "Mon–Thu" until "Show daily routines in each day"', () => {
-    const home = createMockRoutine({ id: 'home', name: 'Home from school', time_of_day: '17:45:00', recurrence_pattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu'] } as RecurrencePattern, show_on_timeline: true })
+    const home = createMockRoutine({ show_on_week: true, id: 'home', name: 'Home from school', time_of_day: '17:45:00', recurrence_pattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu'] } as RecurrencePattern, show_on_timeline: true })
     render(<WeekViewV2 {...defaultProps} routines={[home]} weekStart={sunday} />)
     expect(screen.getAllByText(/Home from school/)).toHaveLength(1)
     expect(screen.getByText(/Every-day routines are on/)).toHaveTextContent('5:45p Home from school')

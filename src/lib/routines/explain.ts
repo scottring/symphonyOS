@@ -50,6 +50,7 @@ export type ExplainRung =
   | 'private'      // never on the shared kiosk
   | 'not-family'   // the kiosk reads the Family layer only
   | 'no-day'       // a weekly rule with no day yet: nothing to place on the week
+  | 'not-on-week'  // "Show on the week" off: Today's, on its days (2026-11-08)
 
 export interface SurfaceExplanation {
   surface: ExplainSurface
@@ -235,6 +236,11 @@ function explainWeek(r: Routine, ctx: ExplainCtx, prefs: RoutinePrefs): SurfaceE
   }
   const at = clockText(r.time_of_day)
   const when = onDays.length === 7 ? 'every day' : daysText(onDays)
+  // A routine is Today's, on its days (Scott, 2026-11-08): the week's grid
+  // shows it only with "Show on the week" on, or on a day it was given.
+  if (!r.show_on_week) {
+    return { ...base, shows: false, rung: 'not-on-week', reason: 'On Today on its days, not the week — turn on Show on the week, or give it a day there' }
+  }
   return { ...base, shows: true, rung: 'shows', reason: `On the week ${onDays.length === 7 ? '' : 'on '}${when}${at ? ` at ${at}` : ''}` }
 }
 
