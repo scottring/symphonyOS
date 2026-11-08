@@ -224,7 +224,8 @@ struct TodayView: View {
             ForEach(forToday) { item in card(item) }
         }
         if offerTasks + offerRoutines > 0 {
-            CalmRow(text: "Choose from this week", detail: offerDetail(offerTasks, offerRoutines)) {
+            CalmRow(text: "Choose from this week", detail: offerDetail(offerTasks, offerRoutines),
+                    shortDetail: "\(offerTasks + offerRoutines)") {
                 showChooser = true
             }
         }
@@ -321,18 +322,14 @@ struct TodayView: View {
     private var header: some View {
         PlannerHeader(
             title: appState.isToday ? "Today" : date.formatted(.dateTime.weekday(.wide)),
-            subtitle: date.formatted(.dateTime.weekday(.wide).month(.wide).day()),
+            // Short, so the controls share the title's line (Scott, 2026-11-08).
+            subtitle: appState.isToday
+                ? date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+                : date.formatted(.dateTime.month(.wide).day()),
             onTitle: onTitle
         ) {
             HStack(spacing: 0) {
                 DomainMenu()
-                CircleIconButton(systemImage: "magnifyingglass", label: showSearch ? "Close search" : "Search", active: showSearch) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showSearch.toggle()
-                        if !showSearch { searchText = "" }
-                    }
-                    searchFocused = showSearch
-                }
                 CircleIconButton(systemImage: "chevron.left", label: "Previous day") {
                     withAnimation(.easeInOut(duration: 0.2)) { appState.goToPreviousDay() }
                 }
@@ -350,8 +347,24 @@ struct TodayView: View {
                 CircleIconButton(systemImage: "chevron.right", label: "Next day") {
                     withAnimation(.easeInOut(duration: 0.2)) { appState.goToNextDay() }
                 }
+                PlannerOptionsMenu {
+                    Button { openSearch() } label: { Label("Search tasks", systemImage: "magnifyingglass") }
+                }
             }
         }
+    }
+
+    private func openSearch() {
+        withAnimation(.easeInOut(duration: 0.2)) { showSearch = true }
+        searchFocused = true
+    }
+
+    private func closeSearch() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showSearch = false
+            searchText = ""
+        }
+        searchFocused = false
     }
 
     // MARK: - Search
@@ -380,16 +393,15 @@ struct TodayView: View {
                 .focused($searchFocused)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
-            if !searchText.isEmpty {
-                Button { searchText = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(Color.textTertiary)
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
+            // Search lives in ⋯ now, so the field closes itself.
+            Button { closeSearch() } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.textTertiary)
+                    .frame(minWidth: 44, minHeight: 44)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close search")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 4)

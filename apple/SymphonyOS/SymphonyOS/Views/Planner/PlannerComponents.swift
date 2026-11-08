@@ -16,14 +16,22 @@ struct PlannerHeader<Trailing: View>: View {
             HStack(alignment: .center, spacing: 8) {
                 titleBlock
                 Spacer(minLength: 4)
-                trailing()
+                controls
             }
-            // Large text: stack instead of squeezing the title.
+            // Very large text: stack instead of squeezing the title.
             VStack(alignment: .leading, spacing: 10) {
                 titleBlock
-                trailing()
+                controls
             }
         }
+        // Like a navigation bar, the header grows with text size only so
+        // far, so it stays one line at the larger everyday sizes
+        // (Scott, 2026-11-08: it stacked to three rows on his phone).
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+    }
+
+    private var controls: some View {
+        trailing().dynamicTypeSize(...DynamicTypeSize.large)
     }
 
     /// Smaller than the old 34pt masthead (Scott, 2026-11-08: "be much more
@@ -161,24 +169,18 @@ struct Eyebrow: View {
 struct CalmRow: View {
     let text: String
     var detail: String? = nil
+    /// Shown instead of `detail` when both won't fit on one line, so the
+    /// row never wraps (Scott, 2026-11-08: large text wrapped it to two).
+    var shortDetail: String? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Text(text)
-                    .font(.bodyMedium)
-                    .foregroundStyle(Color.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if let detail {
-                    Text(detail)
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.ink)
-                        .multilineTextAlignment(.trailing)
-                }
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.ink)
+            ViewThatFits(in: .horizontal) {
+                line(detail)
+                if shortDetail != nil { line(shortDetail) }
+                // Very large text: let the words wrap rather than clip.
+                line(shortDetail ?? detail, wraps: true)
             }
             .padding(.vertical, 8)
             .frame(minHeight: 44)
@@ -188,6 +190,27 @@ struct CalmRow: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
         .padding(.top, 2)
+    }
+
+    private func line(_ detail: String?, wraps: Bool = false) -> some View {
+        HStack(spacing: 8) {
+            Text(text)
+                .font(.bodyMedium)
+                .foregroundStyle(Color.textSecondary)
+                .lineLimit(wraps ? nil : 1)
+                .fixedSize(horizontal: !wraps, vertical: false)
+            Spacer(minLength: 8)
+            if let detail {
+                Text(detail)
+                    .font(.bodySmallBold)
+                    .foregroundStyle(Color.ink)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.ink)
+        }
     }
 }
 
