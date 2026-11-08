@@ -1,0 +1,26 @@
+{
+  "" : {
+    "const-values" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Functions-primary.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Functions-primary.d",
+    "diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Functions-primary.dia",
+    "emit-module-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Functions-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Functions-primary-emit-module.dia",
+    "pch" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Functions-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Functions-primary.swiftdeps"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Functions/Exports.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Exports.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Exports.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Exports.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Functions/FunctionsClient.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/FunctionsClient.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/FunctionsClient.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/FunctionsClient.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Functions/Types.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Types.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Types.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Functions-t.build/Objects-normal/x86_64/Types.o"
+  }
+}

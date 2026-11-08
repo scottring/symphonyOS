@@ -1,0 +1,61 @@
+{
+  "" : {
+    "const-values" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPTypes-primary.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPTypes-primary.d",
+    "diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPTypes-primary.dia",
+    "emit-module-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPTypes-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPTypes-primary-emit-module.dia",
+    "pch" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPTypes-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPTypes-primary.swiftdeps"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTP2ErrorCode.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTP2ErrorCode.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTP2ErrorCode.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTP2ErrorCode.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTP3ErrorCode.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTP3ErrorCode.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTP3ErrorCode.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTP3ErrorCode.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTPField.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPField.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPField.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPField.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTPFieldName.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPFieldName.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPFieldName.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPFieldName.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTPFieldValue.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPFieldValue.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPFieldValue.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPFieldValue.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTPFields.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPFields.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPFields.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPFields.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTPParsedFields.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPParsedFields.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPParsedFields.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPParsedFields.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTPRequest+URL.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPRequest+URL.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPRequest+URL.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPRequest+URL.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTPRequest.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPRequest.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPRequest.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPRequest.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/Sources/HTTPTypes/HTTPResponse.swift" : {
+    "index-unit-output-path" : "/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPResponse.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPResponse.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-http-types/build/swift-http-types.build/Release/HTTPTypes-t.build/Objects-normal/arm64/HTTPResponse.o"
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "" : {
+    "const-values" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Helpers-primary.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Helpers-primary.d",
+    "diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Helpers-primary.dia",
+    "emit-module-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Helpers-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Helpers-primary-emit-module.dia",
+    "pch" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Helpers-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Helpers-primary.swiftdeps"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/APIKeyFormat.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/APIKeyFormat.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/APIKeyFormat.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/APIKeyFormat.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/AnyJSON/AnyJSON+Codable.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/AnyJSON+Codable.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/AnyJSON+Codable.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/AnyJSON+Codable.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/AnyJSON/AnyJSON.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/AnyJSON.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/AnyJSON.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/AnyJSON.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/Base64URL.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Base64URL.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Base64URL.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Base64URL.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/Codable.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Codable.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Codable.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Codable.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/DateFormatter.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/DateFormatter.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/DateFormatter.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/DateFormatter.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/EventEmitter.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/EventEmitter.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/EventEmitter.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/EventEmitter.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/FoundationExtensions.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/FoundationExtensions.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/FoundationExtensions.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/FoundationExtensions.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/HTTP/HTTPClient.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPClient.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPClient.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPClient.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/HTTP/HTTPFields.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPFields.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPFields.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPFields.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/HTTP/HTTPRequest.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPRequest.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPRequest.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPRequest.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/HTTP/HTTPResponse.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPResponse.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPResponse.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPResponse.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/HTTP/LoggerInterceptor.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/LoggerInterceptor.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/LoggerInterceptor.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/LoggerInterceptor.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/HTTP/RetryRequestInterceptor.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/RetryRequestInterceptor.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/RetryRequestInterceptor.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/RetryRequestInterceptor.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/JWT.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/JWT.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/JWT.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/JWT.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/Logger/OSLogSupabaseLogger.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/OSLogSupabaseLogger.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/OSLogSupabaseLogger.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/OSLogSupabaseLogger.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/Logger/SupabaseLogger.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/SupabaseLogger.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/SupabaseLogger.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/SupabaseLogger.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/PostgRESTFilterValue.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/PostgRESTFilterValue.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/PostgRESTFilterValue.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/PostgRESTFilterValue.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/SharedModels/HTTPError.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPError.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPError.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/HTTPError.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/SharedModels/PostgrestError.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/PostgrestError.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/PostgrestError.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/PostgrestError.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/Task+withTimeout.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Task+withTimeout.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Task+withTimeout.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Task+withTimeout.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/TaskLocalHelpers.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/TaskLocalHelpers.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/TaskLocalHelpers.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/TaskLocalHelpers.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Helpers/Version.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Version.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Version.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Helpers-t.build/Objects-normal/x86_64/Version.o"
+  }
+}

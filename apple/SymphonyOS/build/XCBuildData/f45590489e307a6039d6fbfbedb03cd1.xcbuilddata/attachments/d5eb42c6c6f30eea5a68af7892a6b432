@@ -1,0 +1,126 @@
+{
+  "" : {
+    "const-values" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporting-primary.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporting-primary.d",
+    "diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporting-primary.dia",
+    "emit-module-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporting-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporting-primary-emit-module.dia",
+    "pch" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporting-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporting-primary.swiftdeps"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/ErrorReporting.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/ErrorReporting.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/ErrorReporting.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/ErrorReporting.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/ExpectReportsIssue.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/ExpectReportsIssue.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/ExpectReportsIssue.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/ExpectReportsIssue.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/AppHostWarning.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/AppHostWarning.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/AppHostWarning.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/AppHostWarning.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/Deprecations.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Deprecations.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Deprecations.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Deprecations.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/FailureObserver.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/FailureObserver.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/FailureObserver.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/FailureObserver.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/LockIsolated.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/LockIsolated.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/LockIsolated.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/LockIsolated.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/Rethrows.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Rethrows.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Rethrows.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Rethrows.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/SwiftTesting.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/SwiftTesting.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/SwiftTesting.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/SwiftTesting.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/UncheckedSendable.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/UncheckedSendable.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/UncheckedSendable.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/UncheckedSendable.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/Warn.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Warn.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Warn.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Warn.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/XCTest.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/XCTest.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/XCTest.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/XCTest.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IsTesting.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IsTesting.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IsTesting.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IsTesting.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueReporter.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporter.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporter.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueReporter.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueReporters/BreakpointReporter.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/BreakpointReporter.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/BreakpointReporter.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/BreakpointReporter.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueReporters/DefaultReporter.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/DefaultReporter.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/DefaultReporter.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/DefaultReporter.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueReporters/FatalErrorReporter.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/FatalErrorReporter.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/FatalErrorReporter.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/FatalErrorReporter.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueSeverity.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueSeverity.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueSeverity.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/IssueSeverity.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/ReportIssue.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/ReportIssue.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/ReportIssue.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/ReportIssue.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Symbolic Links/IssueReportingPackageSupport/_Test.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/_Test.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/_Test.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/_Test.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/TestContext.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/TestContext.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/TestContext.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/TestContext.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Unimplemented.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Unimplemented.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Unimplemented.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/Unimplemented.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/WithIssueContext.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/WithIssueContext.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/WithIssueContext.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/WithIssueContext.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/_WithKnownIssue.swift" : {
+    "index-unit-output-path" : "/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/_WithKnownIssue.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/_WithKnownIssue.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/build/swift-issue-reporting.build/Release/IssueReporting-t.build/Objects-normal/arm64/_WithKnownIssue.o"
+  }
+}

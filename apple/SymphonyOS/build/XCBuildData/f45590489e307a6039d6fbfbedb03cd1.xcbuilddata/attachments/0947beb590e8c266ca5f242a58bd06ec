@@ -1,0 +1,23 @@
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/ErrorReporting.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/ExpectReportsIssue.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/AppHostWarning.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/Deprecations.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/FailureObserver.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/LockIsolated.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/Rethrows.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/SwiftTesting.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/UncheckedSendable.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/Warn.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Internal/XCTest.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IsTesting.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueReporter.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueReporters/BreakpointReporter.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueReporters/DefaultReporter.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueReporters/FatalErrorReporter.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/IssueSeverity.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/ReportIssue.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Symbolic\ Links/IssueReportingPackageSupport/_Test.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/TestContext.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/Unimplemented.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/WithIssueContext.swift
+/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/swift-issue-reporting/Sources/IssueReporting/_WithKnownIssue.swift

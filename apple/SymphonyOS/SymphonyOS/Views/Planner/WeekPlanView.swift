@@ -27,6 +27,11 @@ struct WeekPlanView: View {
     /// the optional view. Remembered on this device.
     @AppStorage("planner.week.layout") private var layout = "list"
     @State private var toast: TriageController.Toast?
+    /// A line deleted from its menu (Scott, 2026-11-08): hidden at once with
+    /// Undo, and deleted for good when the Undo goes — after a few seconds,
+    /// another change, or leaving the page. Undo just shows it again.
+    @State private var deleting: SymphonyTask?
+    @State private var deleteToast: UUID?
     @State private var calendar = GoogleCalendarService.shared
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -134,7 +139,7 @@ struct WeekPlanView: View {
                         .accessibilityHint("\(Self.shortRange(previous))")
                 }
                 if layout == "list" {
-                    listSheet(lines)
+                    listSheet(lines.filter { $0.id != deleting?.id })
                 } else {
                     daysSheet(week)
                 }
@@ -145,8 +150,10 @@ struct WeekPlanView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 if let toast {
-                    PlannerToast(message: toast.message, actionTitle: toast.snapshot == nil ? nil : "Undo") {
-                        if let snap = toast.snapshot { PlanWriter(context: modelContext, userId: userId).undo(snap) }
+                    PlannerToast(message: toast.message,
+                                 actionTitle: toast.snapshot == nil && toast.id != deleteToast ? nil : "Undo") {
+                        if toast.id == deleteToast { deleting = nil; deleteToast = nil }
+                        else if let snap = toast.snapshot { PlanWriter(context: modelContext, userId: userId).undo(snap) }
                         self.toast = nil
                     }
                     .padding(.bottom, 8)
@@ -154,6 +161,16 @@ struct WeekPlanView: View {
             }
             .padding(.bottom, appState.bottomInset)
         }
+        // A delete's Undo lasts a few seconds, then the line goes for good.
+        .task(id: deleteToast) {
+            guard deleteToast != nil else { return }
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled else { return }
+            if toast?.id == deleteToast { toast = nil }
+            finishDelete()
+        }
+        .onChange(of: toast?.id) { _, now in if deleteToast != nil && now != deleteToast { finishDelete() } }
+        .onDisappear { finishDelete() }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
@@ -220,6 +237,24 @@ struct WeekPlanView: View {
         return line.task.weekendStart != nil ? "This weekend" : nil
     }
 
+    /// Delete a line from its menu, with Undo (see `deleting`).
+    private func delete(_ task: SymphonyTask) {
+        finishDelete()
+        let t = TriageController.Toast(message: "Deleted “\(task.title)”", snapshot: nil)
+        deleting = task
+        deleteToast = t.id
+        toast = t
+    }
+
+    /// The Undo has gone: the line is deleted for good, as the task page's
+    /// Delete does (the web reads it gone on its next pull).
+    private func finishDelete() {
+        guard let task = deleting else { return }
+        deleting = nil
+        deleteToast = nil
+        TaskViewModel(modelContext: modelContext).deleteTask(task)
+    }
+
     /// Order the list: the same shared order the web's Week and Today read.
     private func move(_ task: SymphonyTask, in lines: [PlanSnapshot.WeekLine], toIndex: Int) {
         let from = lines.firstIndex { $0.id == task.id } ?? 0
@@ -264,6 +299,8 @@ struct WeekPlanView: View {
                         Button { move(task, in: lines, toIndex: at + 2) } label: { Label("Move down", systemImage: "arrow.down") }
                     }
                 }
+                Divider()
+                Button(role: .destructive) { delete(task) } label: { Label("Delete", systemImage: "trash") }
             } label: {
                 HStack(spacing: 3) {
                     if line.day != nil, let mark = Self.dayMark(line) {
@@ -281,6 +318,7 @@ struct WeekPlanView: View {
         .padding(.horizontal, 20)
         .accessibilityAction(named: "Move up") { if at > 0 { move(task, in: lines, toIndex: at - 1) } }
         .accessibilityAction(named: "Move down") { if at < lines.count - 1 { move(task, in: lines, toIndex: at + 2) } }
+        .accessibilityAction(named: "Delete") { delete(task) }
     }
 
     /// The optional view: the days, card by card, as Today would show them.

@@ -1,0 +1,889 @@
+{
+  "" : {
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyOS-primary.dia",
+    "emit-module-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyOS-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyOS-primary-emit-module.dia",
+    "pch" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyOS-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyOS-primary.swiftdeps"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/App/AppState.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AppState.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AppState.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AppState.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AppState.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AppState.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AppState.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AppState.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AppState~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/App/ContentView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContentView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContentView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContentView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContentView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContentView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContentView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContentView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/App/DemoMode.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DemoMode.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DemoMode.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DemoMode.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DemoMode.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DemoMode.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DemoMode.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DemoMode.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DemoMode~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/App/MainView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MainView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MainView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MainView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MainView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MainView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MainView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MainView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MainView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/App/SymphonyApp.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyApp.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyApp.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyApp.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyApp.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyApp.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyApp.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyApp.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyApp~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/DesignSystem/CardStyle.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CardStyle.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CardStyle.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CardStyle.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CardStyle.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CardStyle.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CardStyle.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CardStyle.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CardStyle~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/DesignSystem/NordicColors.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NordicColors.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NordicColors.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NordicColors.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NordicColors.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NordicColors.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NordicColors.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NordicColors.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NordicColors~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/DesignSystem/Typography.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Typography.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Typography.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Typography.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Typography.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Typography.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Typography.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Typography.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Typography~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Extensions/Date+Extensions.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Date+Extensions.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Date+Extensions.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Date+Extensions.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Date+Extensions.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Date+Extensions.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Date+Extensions.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Date+Extensions.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Date+Extensions~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Extensions/View+Extensions.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/View+Extensions.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/View+Extensions.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/View+Extensions.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/View+Extensions.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/View+Extensions.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/View+Extensions.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/View+Extensions.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/View+Extensions~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Intents/LogMedicationIntent.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/LogMedicationIntent.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/LogMedicationIntent.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/LogMedicationIntent.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/LogMedicationIntent.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/LogMedicationIntent.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/LogMedicationIntent.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/LogMedicationIntent.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/LogMedicationIntent~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Intents/MedTokenStore.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MedTokenStore.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MedTokenStore.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MedTokenStore.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MedTokenStore.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MedTokenStore.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MedTokenStore.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MedTokenStore.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/MedTokenStore~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/ActionableInstance.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ActionableInstance.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ActionableInstance.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ActionableInstance.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ActionableInstance.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ActionableInstance.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ActionableInstance.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ActionableInstance.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ActionableInstance~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/Contact.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Contact.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Contact.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Contact.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Contact.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Contact.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Contact.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Contact.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Contact~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/Dinner.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Dinner.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Dinner.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Dinner.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Dinner.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Dinner.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Dinner.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Dinner.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Dinner~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/EventNote.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventNote.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventNote.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventNote.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventNote.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventNote.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventNote.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventNote.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventNote~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/FamilyMember.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/FamilyMember.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/FamilyMember.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/FamilyMember.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/FamilyMember.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/FamilyMember.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/FamilyMember.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/FamilyMember.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/FamilyMember~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/Household.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Household.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Household.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Household.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Household.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Household.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Household.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Household.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Household~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/PendingChange.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PendingChange.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PendingChange.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PendingChange.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PendingChange.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PendingChange.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PendingChange.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PendingChange.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PendingChange~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/Planning.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Planning.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Planning.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Planning.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Planning.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Planning.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Planning.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Planning.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Planning~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/Project.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Project.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Project.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Project.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Project.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Project.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Project.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Project.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Project~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/Routine.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Routine.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Routine.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Routine.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Routine.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Routine.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Routine.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Routine.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/Routine~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/SymphonyList.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyList.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyList.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyList.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyList.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyList.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyList.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyList.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyList~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/SymphonyTask.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyTask.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyTask.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyTask.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyTask.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyTask.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyTask.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyTask.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SymphonyTask~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/SyncStatus.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncStatus.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncStatus.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncStatus.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncStatus.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncStatus.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncStatus.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncStatus.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncStatus~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/UserProfile.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UserProfile.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UserProfile.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UserProfile.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UserProfile.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UserProfile.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UserProfile.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UserProfile.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UserProfile~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Models/WeeklyTemplate.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeeklyTemplate.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeeklyTemplate.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeeklyTemplate.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeeklyTemplate.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeeklyTemplate.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeeklyTemplate.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeeklyTemplate.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeeklyTemplate~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Platform/iOS/DockEdge.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DockEdge.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DockEdge.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DockEdge.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DockEdge.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DockEdge.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DockEdge.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DockEdge.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DockEdge~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Platform/macOS/KeyboardShortcuts.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/KeyboardShortcuts.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/KeyboardShortcuts.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/KeyboardShortcuts.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/KeyboardShortcuts.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/KeyboardShortcuts.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/KeyboardShortcuts.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/KeyboardShortcuts.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/KeyboardShortcuts~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/AuthService.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthService.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthService.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthService.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthService.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthService.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthService.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthService.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthService~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/DinnerService.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerService.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerService.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerService.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerService.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerService.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerService.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerService.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerService~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/DocumentIngest.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentIngest.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentIngest.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentIngest.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentIngest.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentIngest.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentIngest.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentIngest.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentIngest~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/DomainFilter.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainFilter.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainFilter.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainFilter.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainFilter.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainFilter.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainFilter.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainFilter.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainFilter~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/GoogleCalendarService.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoogleCalendarService.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoogleCalendarService.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoogleCalendarService.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoogleCalendarService.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoogleCalendarService.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoogleCalendarService.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoogleCalendarService.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoogleCalendarService~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/NotesHTML.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NotesHTML.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NotesHTML.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NotesHTML.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NotesHTML.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NotesHTML.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NotesHTML.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NotesHTML.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NotesHTML~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/PageIngest.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageIngest.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageIngest.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageIngest.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageIngest.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageIngest.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageIngest.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageIngest.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageIngest~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/PageParse.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageParse.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageParse.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageParse.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageParse.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageParse.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageParse.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageParse.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageParse~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/PaperSound.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperSound.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperSound.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperSound.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperSound.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperSound.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperSound.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperSound.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperSound~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/PhotoCaptureService.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PhotoCaptureService.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PhotoCaptureService.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PhotoCaptureService.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PhotoCaptureService.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PhotoCaptureService.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PhotoCaptureService.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PhotoCaptureService.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PhotoCaptureService~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/Planning/DayScale.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DayScale.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DayScale.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DayScale.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DayScale.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DayScale.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DayScale.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DayScale.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DayScale~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/Planning/PeriodCalendar.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodCalendar.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodCalendar.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodCalendar.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodCalendar.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodCalendar.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodCalendar.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodCalendar.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodCalendar~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/Planning/PlanCalendar.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanCalendar.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanCalendar.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanCalendar.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanCalendar.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanCalendar.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanCalendar.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanCalendar.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanCalendar~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/Planning/PlanSelectors.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanSelectors.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanSelectors.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanSelectors.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanSelectors.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanSelectors.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanSelectors.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanSelectors.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanSelectors~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/Planning/PlanWriter.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanWriter.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanWriter.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanWriter.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanWriter.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanWriter.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanWriter.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanWriter.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlanWriter~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/Planning/RoutineRules.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineRules.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineRules.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineRules.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineRules.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineRules.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineRules.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineRules.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineRules~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/ScopeRule.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ScopeRule.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ScopeRule.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ScopeRule.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ScopeRule.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ScopeRule.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ScopeRule.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ScopeRule.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ScopeRule~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/SupabaseClient.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SupabaseClient.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SupabaseClient.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SupabaseClient.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SupabaseClient.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SupabaseClient.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SupabaseClient.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SupabaseClient.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SupabaseClient~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/SyncEngine/RowMapper.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RowMapper.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RowMapper.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RowMapper.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RowMapper.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RowMapper.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RowMapper.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RowMapper.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RowMapper~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Services/SyncEngine/SyncEngine.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncEngine.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncEngine.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncEngine.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncEngine.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncEngine.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncEngine.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncEngine.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SyncEngine~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/ViewModels/TaskViewModel.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskViewModel.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskViewModel.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskViewModel.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskViewModel.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskViewModel.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskViewModel.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskViewModel.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskViewModel~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/ViewModels/TimelineViewModel.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineViewModel.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineViewModel.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineViewModel.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineViewModel.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineViewModel.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineViewModel.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineViewModel.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineViewModel~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Capture/CameraPicker.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CameraPicker.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CameraPicker.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CameraPicker.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CameraPicker.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CameraPicker.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CameraPicker.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CameraPicker.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CameraPicker~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Capture/DocumentScanner.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentScanner.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentScanner.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentScanner.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentScanner.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentScanner.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentScanner.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentScanner.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DocumentScanner~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Capture/PageReviewSheet.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageReviewSheet.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageReviewSheet.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageReviewSheet.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageReviewSheet.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageReviewSheet.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageReviewSheet.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageReviewSheet.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PageReviewSheet~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Capture/QuickCaptureBar.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/QuickCaptureBar.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/QuickCaptureBar.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/QuickCaptureBar.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/QuickCaptureBar.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/QuickCaptureBar.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/QuickCaptureBar.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/QuickCaptureBar.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/QuickCaptureBar~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Components/SafariView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SafariView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SafariView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SafariView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SafariView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SafariView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SafariView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SafariView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SafariView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Components/SlideRow.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SlideRow.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SlideRow.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SlideRow.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SlideRow.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SlideRow.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SlideRow.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SlideRow.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SlideRow~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Contact/ContactListView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContactListView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContactListView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContactListView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContactListView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContactListView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContactListView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContactListView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ContactListView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Event/EventDetailView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventDetailView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventDetailView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventDetailView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventDetailView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventDetailView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventDetailView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventDetailView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/EventDetailView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Inbox/InboxView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/InboxView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/InboxView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/InboxView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/InboxView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/InboxView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/InboxView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/InboxView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/InboxView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Lists/ListsView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ListsView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ListsView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ListsView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ListsView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ListsView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ListsView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ListsView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ListsView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Planner/ChooserSheet.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ChooserSheet.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ChooserSheet.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ChooserSheet.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ChooserSheet.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ChooserSheet.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ChooserSheet.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ChooserSheet.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ChooserSheet~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Planner/GoalEditorSheet.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoalEditorSheet.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoalEditorSheet.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoalEditorSheet.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoalEditorSheet.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoalEditorSheet.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoalEditorSheet.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoalEditorSheet.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GoalEditorSheet~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Planner/PaperFoldView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperFoldView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperFoldView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperFoldView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperFoldView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperFoldView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperFoldView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperFoldView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PaperFoldView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Planner/PeriodPlanView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodPlanView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodPlanView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodPlanView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodPlanView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodPlanView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodPlanView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodPlanView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PeriodPlanView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Planner/PlannerComponents.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerComponents.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerComponents.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerComponents.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerComponents.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerComponents.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerComponents.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerComponents.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerComponents~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Planner/PlannerView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/PlannerView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Planner/TriageController.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TriageController.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TriageController.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TriageController.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TriageController.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TriageController.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TriageController.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TriageController.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TriageController~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Planner/UnfinishedSheet.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UnfinishedSheet.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UnfinishedSheet.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UnfinishedSheet.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UnfinishedSheet.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UnfinishedSheet.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UnfinishedSheet.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UnfinishedSheet.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/UnfinishedSheet~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Planner/WeekPlanView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeekPlanView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeekPlanView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeekPlanView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeekPlanView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeekPlanView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeekPlanView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeekPlanView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/WeekPlanView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Project/ProjectDetailView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectDetailView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectDetailView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectDetailView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectDetailView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectDetailView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectDetailView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectDetailView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectDetailView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Project/ProjectListView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectListView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectListView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectListView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectListView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectListView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectListView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectListView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/ProjectListView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Routine/RoutineDetailView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineDetailView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineDetailView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineDetailView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineDetailView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineDetailView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineDetailView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineDetailView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineDetailView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Routine/RoutineListView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineListView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineListView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineListView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineListView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineListView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineListView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineListView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineListView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Settings/CalendarSettingsView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CalendarSettingsView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CalendarSettingsView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CalendarSettingsView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CalendarSettingsView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CalendarSettingsView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CalendarSettingsView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CalendarSettingsView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/CalendarSettingsView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Settings/SettingsView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SettingsView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SettingsView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SettingsView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SettingsView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SettingsView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SettingsView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SettingsView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/SettingsView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Shared/AuthView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/AuthView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Task/TaskAttachmentsSection.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskAttachmentsSection.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskAttachmentsSection.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskAttachmentsSection.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskAttachmentsSection.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskAttachmentsSection.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskAttachmentsSection.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskAttachmentsSection.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskAttachmentsSection~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Task/TaskDetailView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskDetailView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskDetailView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskDetailView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskDetailView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskDetailView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskDetailView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskDetailView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TaskDetailView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Timeline/DateNavigator.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DateNavigator.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DateNavigator.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DateNavigator.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DateNavigator.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DateNavigator.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DateNavigator.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DateNavigator.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DateNavigator~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Timeline/DinnerCard.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerCard.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerCard.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerCard.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerCard.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerCard.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerCard.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerCard.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DinnerCard~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Timeline/DomainSwitcher.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainSwitcher.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainSwitcher.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainSwitcher.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainSwitcher.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainSwitcher.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainSwitcher.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainSwitcher.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/DomainSwitcher~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Timeline/NextUpCard.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NextUpCard.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NextUpCard.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NextUpCard.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NextUpCard.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NextUpCard.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NextUpCard.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NextUpCard.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/NextUpCard~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Timeline/RoutineOccurrenceSheet.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineOccurrenceSheet.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineOccurrenceSheet.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineOccurrenceSheet.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineOccurrenceSheet.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineOccurrenceSheet.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineOccurrenceSheet.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineOccurrenceSheet.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/RoutineOccurrenceSheet~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Timeline/TimelineItemCard.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineItemCard.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineItemCard.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineItemCard.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineItemCard.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineItemCard.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineItemCard.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineItemCard.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TimelineItemCard~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Timeline/TodayDayColumn.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayDayColumn.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayDayColumn.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayDayColumn.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayDayColumn.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayDayColumn.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayDayColumn.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayDayColumn.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayDayColumn~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/SymphonyOS/Views/Timeline/TodayView.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayView.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayView.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayView.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayView.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayView.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayView.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayView.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/TodayView~partial.swiftmodule"
+  },
+  "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/scottkaufman/.claude-worktrees/symphonyOS/sometime-header/apple/SymphonyOS/build/SymphonyOS.build/Debug/SymphonyOS.build/Objects-normal/x86_64/GeneratedAssetSymbols~partial.swiftmodule"
+  }
+}

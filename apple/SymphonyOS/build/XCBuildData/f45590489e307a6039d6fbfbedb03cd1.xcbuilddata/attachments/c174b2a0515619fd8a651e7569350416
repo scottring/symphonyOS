@@ -1,0 +1,181 @@
+{
+  "" : {
+    "const-values" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Auth-primary.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Auth-primary.d",
+    "diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Auth-primary.dia",
+    "emit-module-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Auth-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Auth-primary-emit-module.dia",
+    "pch" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Auth-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Auth-primary.swiftdeps"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/AuthAdmin.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthAdmin.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthAdmin.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthAdmin.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/AuthAdminOAuth.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthAdminOAuth.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthAdminOAuth.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthAdminOAuth.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/AuthClient.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthClient.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthClient.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthClient.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/AuthClientConfiguration.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthClientConfiguration.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthClientConfiguration.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthClientConfiguration.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/AuthError.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthError.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthError.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthError.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/AuthMFA.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthMFA.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthMFA.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthMFA.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/AuthOAuthServer.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthOAuthServer.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthOAuthServer.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthOAuthServer.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/AuthStateChangeListener.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthStateChangeListener.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthStateChangeListener.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthStateChangeListener.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Defaults.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Defaults.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Defaults.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Defaults.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Deprecated.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Deprecated.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Deprecated.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Deprecated.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Exports.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Exports.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Exports.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Exports.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/APIClient.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/APIClient.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/APIClient.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/APIClient.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/CodeVerifierStorage.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/CodeVerifierStorage.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/CodeVerifierStorage.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/CodeVerifierStorage.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/Constants.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Constants.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Constants.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Constants.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/Dependencies.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Dependencies.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Dependencies.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Dependencies.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/EventEmitter.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/EventEmitter.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/EventEmitter.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/EventEmitter.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/FixedWidthInteger+Random.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/FixedWidthInteger+Random.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/FixedWidthInteger+Random.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/FixedWidthInteger+Random.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/Helpers.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Helpers.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Helpers.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Helpers.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/JWK+RSA.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/JWK+RSA.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/JWK+RSA.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/JWK+RSA.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/JWTAlgorithm.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/JWTAlgorithm.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/JWTAlgorithm.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/JWTAlgorithm.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/Keychain.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Keychain.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Keychain.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Keychain.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/PKCE.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/PKCE.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/PKCE.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/PKCE.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/SessionManager.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/SessionManager.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/SessionManager.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/SessionManager.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/SessionStorage.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/SessionStorage.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/SessionStorage.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/SessionStorage.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Internal/URLOpener.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/URLOpener.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/URLOpener.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/URLOpener.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Storage/AuthLocalStorage.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthLocalStorage.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthLocalStorage.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthLocalStorage.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Storage/KeychainLocalStorage.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/KeychainLocalStorage.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/KeychainLocalStorage.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/KeychainLocalStorage.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Storage/WinCredLocalStorage.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/WinCredLocalStorage.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/WinCredLocalStorage.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/WinCredLocalStorage.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/Types.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Types.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Types.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/Types.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/WebAuthn/AuthAdmin+Passkey.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthAdmin+Passkey.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthAdmin+Passkey.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthAdmin+Passkey.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/WebAuthn/AuthClient+Passkey.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthClient+Passkey.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthClient+Passkey.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthClient+Passkey.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/WebAuthn/AuthMFA+WebAuthn.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthMFA+WebAuthn.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthMFA+WebAuthn.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/AuthMFA+WebAuthn.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/WebAuthn/WebAuthnAuthenticator.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/WebAuthnAuthenticator.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/WebAuthnAuthenticator.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/WebAuthnAuthenticator.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/Auth/WebAuthn/WebAuthnTypes.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/WebAuthnTypes.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/WebAuthnTypes.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/Auth-t.build/Objects-normal/x86_64/WebAuthnTypes.o"
+  }
+}

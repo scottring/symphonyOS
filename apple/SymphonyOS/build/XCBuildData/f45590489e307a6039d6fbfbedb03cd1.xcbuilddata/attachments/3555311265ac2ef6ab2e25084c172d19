@@ -1,0 +1,136 @@
+{
+  "" : {
+    "const-values" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeV2-primary.swiftconstvalues",
+    "dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeV2-primary.d",
+    "diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeV2-primary.dia",
+    "emit-module-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeV2-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeV2-primary-emit-module.dia",
+    "pch" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeV2-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeV2-primary.swiftdeps"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/CallbackManager.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/CallbackManager.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/CallbackManager.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/CallbackManager.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/ChannelEvent.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/ChannelEvent.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/ChannelEvent.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/ChannelEvent.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/ChannelStateManager.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/ChannelStateManager.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/ChannelStateManager.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/ChannelStateManager.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/ConnectionManager.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/ConnectionManager.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/ConnectionManager.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/ConnectionManager.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/Exports.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/Exports.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/Exports.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/Exports.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/PostgresAction.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PostgresAction.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PostgresAction.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PostgresAction.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/PostgresActionData.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PostgresActionData.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PostgresActionData.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PostgresActionData.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/PresenceAction.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PresenceAction.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PresenceAction.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PresenceAction.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/PushV2.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PushV2.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PushV2.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/PushV2.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeChannel+AsyncAwait.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeChannel+AsyncAwait.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeChannel+AsyncAwait.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeChannel+AsyncAwait.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeChannel+Status.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeChannel+Status.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeChannel+Status.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeChannel+Status.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeChannelV2.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeChannelV2.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeChannelV2.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeChannelV2.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeClient+HeartbeatStatus.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeClient+HeartbeatStatus.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeClient+HeartbeatStatus.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeClient+HeartbeatStatus.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeClient+Status.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeClient+Status.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeClient+Status.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeClient+Status.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeClientV2.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeClientV2.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeClientV2.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeClientV2.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeError.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeError.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeError.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeError.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeJoinConfig.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeJoinConfig.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeJoinConfig.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeJoinConfig.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeLifecycleManager.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeLifecycleManager.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeLifecycleManager.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeLifecycleManager.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeMessageV2.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeMessageV2.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeMessageV2.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeMessageV2.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimePostgresFilter.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimePostgresFilter.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimePostgresFilter.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimePostgresFilter.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimePostgresFilterValue.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimePostgresFilterValue.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimePostgresFilterValue.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimePostgresFilterValue.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/RealtimeSerializer.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeSerializer.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeSerializer.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/RealtimeSerializer.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/Types.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/Types.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/Types.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/Types.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/WebSocket/URLSessionWebSocket.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/URLSessionWebSocket.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/URLSessionWebSocket.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/URLSessionWebSocket.o"
+  },
+  "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/Sources/RealtimeV2/WebSocket/WebSocket.swift" : {
+    "index-unit-output-path" : "/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/WebSocket.o",
+    "llvm-bc" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/WebSocket.bc",
+    "object" : "/Users/scottkaufman/Library/Developer/Xcode/DerivedData/SymphonyOS-ctaqictwtvddyyeigdzdhmhrnakk/SourcePackages/checkouts/supabase-swift/build/Supabase.build/Release/RealtimeV2-t.build/Objects-normal/arm64/WebSocket.o"
+  }
+}

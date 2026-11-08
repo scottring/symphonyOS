@@ -1,0 +1,4 @@
+module _IssueReporting {
+header "_IssueReporting-Swift.h"
+export *
+}

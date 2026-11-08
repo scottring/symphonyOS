@@ -102,6 +102,17 @@ final class PlannerScreensUITests: XCTestCase {
         let moved = NSPredicate { _, _ in cake.frame.minY < report.frame.minY }
         wait(for: [expectation(for: moved, evaluatedWith: nil)], timeout: 4)
         shot("05d-week-moved")
+        // Delete in the same menu (2026-11-08): the line goes with Undo, and Undo brings it back.
+        app.buttons["Give Order the cake a day"].tap()
+        let del = app.buttons["Delete"]
+        XCTAssertTrue(del.waitForExistence(timeout: 3), "Delete is in the day menu")
+        del.tap()
+        let undo = app.buttons["Undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3), "a delete offers Undo")
+        XCTAssertFalse(cake.exists, "the deleted line leaves the list")
+        shot("05e-week-deleted")
+        undo.tap()
+        XCTAssertTrue(cake.waitForExistence(timeout: 3), "Undo brings the line back")
         unfold("fold-edge-above", until: app.staticTexts["For reading. Write this week in its own words."])
         shot("06-week-month-open")
 
