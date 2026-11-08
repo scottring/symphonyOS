@@ -13,9 +13,9 @@ struct PlannerHeader<Trailing: View>: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .bottom, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 titleBlock
-                Spacer(minLength: 8)
+                Spacer(minLength: 4)
                 trailing()
             }
             // Large text: stack instead of squeezing the title.
@@ -26,12 +26,16 @@ struct PlannerHeader<Trailing: View>: View {
         }
     }
 
+    /// Smaller than the old 34pt masthead (Scott, 2026-11-08: "be much more
+    /// efficient with our use of space"), so the controls share its line.
+    static var titleFont: Font { .custom("CrimsonPro-Regular", size: 28) }
+
     private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 0) {
             if let onTitle {
                 Button(action: onTitle) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(title).font(.displayLarge).foregroundStyle(Color.textPrimary)
+                        Text(title).font(Self.titleFont).foregroundStyle(Color.textPrimary)
                         Image(systemName: "chevron.down")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Color.textTertiary)
@@ -42,7 +46,7 @@ struct PlannerHeader<Trailing: View>: View {
                 .accessibilityLabel("\(title). Switch horizon")
                 .accessibilityHint("Today, this week, month, season or year")
             } else {
-                Text(title).font(.displayLarge).foregroundStyle(Color.textPrimary)
+                Text(title).font(Self.titleFont).foregroundStyle(Color.textPrimary)
                     .accessibilityAddTraits(.isHeader)
             }
             Text(subtitle)
@@ -75,6 +79,63 @@ struct CircleIconButton: View {
     }
 }
 
+/// The life area as one small chip in the header ("All ▾"), not a row of
+/// pills under it (Scott, 2026-11-08: space).
+struct DomainMenu: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        @Bindable var state = appState
+        Menu {
+            Picker("Life area", selection: $state.domainFilter) {
+                ForEach(DomainFilter.allCases) { Text($0.rawValue).tag($0) }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(appState.domainFilter.rawValue).font(.captionBold).lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+            }
+            .fixedSize()
+            .foregroundStyle(Color.ink)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 30)
+            .background(Color.bgSurface, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.cardBorder, lineWidth: 1))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Life area: \(appState.domainFilter.rawValue)")
+    }
+}
+
+/// The header's ⋯: the page's less-used controls (paper sounds, the Week's
+/// list or days), so the header stays one line.
+struct PlannerOptionsMenu<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+    @AppStorage(PaperSound.storageKey) private var soundOn = true
+
+    var body: some View {
+        Menu {
+            content()
+            Toggle(isOn: $soundOn) { Label("Paper sounds", systemImage: "speaker.wave.2") }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.textTertiary)
+                .frame(width: 32, height: 32)
+                .background(Color.bgSurface, in: Circle())
+                .overlay(Circle().strokeBorder(Color.cardBorder, lineWidth: 1))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("More options")
+    }
+}
+
+extension PlannerOptionsMenu where Content == EmptyView {
+    init() { self.init { EmptyView() } }
+}
+
 // MARK: - Section pieces
 
 struct Eyebrow: View {
@@ -90,8 +151,8 @@ struct Eyebrow: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 22)
-        .padding(.bottom, 4)
+        .padding(.top, 14)
+        .padding(.bottom, 2)
     }
 }
 
@@ -119,16 +180,14 @@ struct CalmRow: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.ink)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
             .frame(minHeight: 44)
-            .background(Color.bgWarm, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.cardBorder, lineWidth: 1))
+            .overlay(alignment: .bottom) { Rectangle().fill(Color.cardBorder).frame(height: 1) }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
+        .padding(.horizontal, 20)
+        .padding(.top, 2)
     }
 }
 
@@ -139,6 +198,9 @@ struct CalmRow: View {
 struct PlanTaskRow<Trailing: View>: View {
     let task: SymphonyTask
     var meta: String? = nil
+    /// A ruled line on the sheet instead of a card (the Week's list,
+    /// 2026-11-08: the cards' padding wrapped titles to four lines).
+    var lined = false
     @ViewBuilder var trailing: () -> Trailing
 
     @Environment(\.modelContext) private var modelContext
@@ -170,13 +232,18 @@ struct PlanTaskRow<Trailing: View>: View {
                 }
             }
         }
-        .padding(.leading, 14)
-        .padding(.trailing, 10)
-        .padding(.vertical, 8)
-        .frame(minHeight: 52)
-        .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.cardBorder, lineWidth: 1))
-        .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
+        .padding(.leading, lined ? 0 : 14)
+        .padding(.trailing, lined ? 0 : 10)
+        .padding(.vertical, lined ? 4 : 8)
+        .frame(minHeight: lined ? 44 : 52)
+        .background {
+            if !lined {
+                RoundedRectangle(cornerRadius: 14).fill(Color.bgElevated)
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.cardBorder, lineWidth: 1))
+                    .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
+            }
+        }
+        .overlay(alignment: .bottom) { if lined { Rectangle().fill(Paper.rule).frame(height: 1) } }
         .sheet(isPresented: $showDetail) {
             NavigationStack {
                 TaskDetailView(task: task)
@@ -189,7 +256,7 @@ struct PlanTaskRow<Trailing: View>: View {
     }
 
     private var circle: some View {
-        CheckCircle(checked: task.completed, size: 24, label: task.title) {
+        CheckCircle(checked: task.completed, size: lined ? 22 : 24, label: task.title) {
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             #endif

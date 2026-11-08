@@ -113,17 +113,15 @@ struct PeriodPlanView: View {
         VStack(alignment: .leading, spacing: 0) {
             PlannerHeader(title: title, subtitle: subtitle, onTitle: onTitle) {
                 HStack(spacing: 0) {
-                    PaperSoundToggle()
+                    DomainMenu()
                     CircleIconButton(systemImage: "chevron.left", label: "Previous \(unit)") { appState.step(-1, seasons: seasons) }
                     CircleIconButton(systemImage: "chevron.right", label: "Next \(unit)") { appState.step(1, seasons: seasons) }
+                    PlannerOptionsMenu()
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 8)
-
-            DomainSwitcher()
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
+            .padding(.top, 4)
+            .padding(.bottom, 6)
         }
     }
 

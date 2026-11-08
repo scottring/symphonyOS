@@ -31,6 +31,7 @@ final class PlannerScreensUITests: XCTestCase {
         }
         app.launch()
         XCTAssertTrue(app.buttons["Today. Switch horizon"].waitForExistence(timeout: 15))
+        shot("00-today")
 
         let month = monthName()
         horizon(month)
@@ -45,7 +46,10 @@ final class PlannerScreensUITests: XCTestCase {
         shot("01-month-folded")
         unfold("fold-edge-above", until: monthFoot)
         XCTAssertTrue(app.staticTexts["\(seasonName()) goals"].exists, "the season is the sheet above")
-        XCTAssertTrue(app.staticTexts["\(month) goals"].exists, "this sheet is named like the one beside it (2026-11-07)")
+        // On a phone the page's header names this sheet; it carries no second heading (2026-11-08).
+        if app.windows.firstMatch.frame.width < 600 {
+            XCTAssertFalse(app.staticTexts["\(month) goals"].exists, "no second heading on a phone")
+        }
         shot("02-month-season-open")
         unfold("fold-grip-above", until: nil)
         XCTAssertFalse(monthFoot.waitForExistence(timeout: 1.5))

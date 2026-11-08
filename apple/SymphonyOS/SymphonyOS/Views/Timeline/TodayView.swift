@@ -193,7 +193,7 @@ struct TodayView: View {
         Group {
             header
                 .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .padding(.top, 4)
 
             if showSearch {
                 searchField
@@ -201,10 +201,6 @@ struct TodayView: View {
                     .padding(.top, 10)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
-
-            DomainSwitcher()
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
         }
     }
 
@@ -329,6 +325,7 @@ struct TodayView: View {
             onTitle: onTitle
         ) {
             HStack(spacing: 0) {
+                DomainMenu()
                 CircleIconButton(systemImage: "magnifyingglass", label: showSearch ? "Close search" : "Search", active: showSearch) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showSearch.toggle()

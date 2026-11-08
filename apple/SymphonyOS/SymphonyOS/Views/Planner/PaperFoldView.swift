@@ -26,7 +26,7 @@ enum FoldGeometry {
     /// Width decides, not the device (as Today's two columns).
     static let spreadMinWidth: CGFloat = 600
     /// The folded edge: a strip on phones, a spine on a spread.
-    static let verticalEdge: CGFloat = 46
+    static let verticalEdge: CGFloat = 36
     static let spreadEdge: CGFloat = 22
     /// The Duo spread gives the sheet above 38%.
     static let spreadShare: CGFloat = 0.38
@@ -814,8 +814,15 @@ struct SheetAbove: View {
 struct SheetHeading: View {
     let kicker: String
     let title: String
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
+        // On a phone the page's own header names the period right above
+        // the sheet; saying it twice costs a screenful (2026-11-08).
+        if sizeClass != .compact { heading }
+    }
+
+    private var heading: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetKicker(text: kicker)
             Text(title)

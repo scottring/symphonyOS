@@ -88,21 +88,22 @@ struct WeekPlanView: View {
             VStack(alignment: .leading, spacing: 0) {
                 PlannerHeader(title: Self.title(for: weekStart), subtitle: Self.range(weekStart), onTitle: onTitle) {
                     HStack(spacing: 0) {
-                        PaperSoundToggle()
-                        CircleIconButton(systemImage: layout == "list" ? "calendar" : "list.bullet",
-                                         label: layout == "list" ? "Show the week by day" : "Show the week as a list") {
-                            layout = layout == "list" ? "days" : "list"
-                        }
+                        DomainMenu()
                         CircleIconButton(systemImage: "chevron.left", label: "Previous week") { appState.step(-1) }
                         CircleIconButton(systemImage: "chevron.right", label: "Next week") { appState.step(1) }
+                        PlannerOptionsMenu {
+                            Button {
+                                layout = layout == "list" ? "days" : "list"
+                            } label: {
+                                Label(layout == "list" ? "Show by day" : "Show as a list",
+                                      systemImage: layout == "list" ? "calendar" : "list.bullet")
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 8)
-
-                DomainSwitcher()
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
+                .padding(.top, 4)
+                .padding(.bottom, 6)
             }
         } above: {
             SheetAbove(kicker: "Month · \(PeriodPlanView.range(monthStart, monthEnd))", title: "\(monthWord) goals",
@@ -117,8 +118,8 @@ struct WeekPlanView: View {
                 SheetHeading(kicker: "Week · \(Self.shortRange(weekStart))", title: Self.title(for: weekStart))
                     .padding(.horizontal, 20)
                 if !review.isEmpty {
-                    CalmRow(text: "Review last week · \(Self.shortRange(previous))",
-                            detail: "\(review.count) open") { showReview = true }
+                    CalmRow(text: "Review last week", detail: "\(review.count) open") { showReview = true }
+                        .accessibilityHint("\(Self.shortRange(previous))")
                 }
                 if layout == "list" {
                     listSheet(lines)
@@ -184,7 +185,9 @@ struct WeekPlanView: View {
 
     private func lineRow(_ line: PlanSnapshot.WeekLine) -> some View {
         let task = line.task
-        return PlanTaskRow(task: task, meta: Self.dayMark(line)) {
+        // The day is the menu's own label ("Sat ⌄"), so it takes no line of
+        // its own; a task with none shows a small calendar.
+        return PlanTaskRow(task: task, meta: line.day == nil ? Self.dayMark(line) : nil, lined: true) {
             Menu {
                 ForEach(PlanCalendar.weekDays(weekStart), id: \.self) { day in
                     Button {
@@ -206,22 +209,20 @@ struct WeekPlanView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
-                    Text("Day")
-                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
+                HStack(spacing: 3) {
+                    if line.day != nil, let mark = Self.dayMark(line) {
+                        Text(mark).font(.captionBold).foregroundStyle(mark == "Today" ? Color.amberStrong : Color.ink)
+                    } else {
+                        Image(systemName: "calendar").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.textTertiary)
+                    }
+                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(Color.textTertiary)
                 }
-                .font(.bodySmallBold)
-                .foregroundStyle(Color.ink)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 32)
-                .background(Color.bgSurface, in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.cardBorder, lineWidth: 1))
-                .frame(minHeight: 44)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
             }
-            .accessibilityLabel(line.day == nil ? "Give \(task.title) a day" : "Change the day for \(task.title)")
+            .accessibilityLabel(line.day == nil ? "Give \(task.title) a day" : "\(Self.dayMark(line) ?? "") — change the day for \(task.title)")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 3)
+        .padding(.horizontal, 20)
     }
 
     /// The optional view: the days, card by card, as Today would show them.
