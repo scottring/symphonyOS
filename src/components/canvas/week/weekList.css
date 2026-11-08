@@ -79,3 +79,14 @@
 .wl-fold-line:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
 .cal-sheet .wl-cal .gw-days li.is-done span { text-decoration: line-through; color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
 
+
+/* When ▾ and Day ▾ open UNDER their row, full width (Scott, 2026-11-08: the
+   open When menu sat beside the title and squeezed it to a letter a line). */
+.wc.wc-list .wl-some .cw-row { flex-wrap: wrap; column-gap: 6px; position: relative; }
+.wc.wc-list .wl-some .cw-row > .canvas-item-title { flex: 1 1 0; min-width: 0; }
+.wc.wc-list .wl-some .wc-noday-actions {
+  position: static; display: block; flex-basis: 100%; min-width: 0; max-width: 100%;
+  padding: 4px 0 8px 30px; box-shadow: none; background: none; white-space: normal;
+}
+.wc.wc-list .wl-some .wc-noday-actions * { max-width: 100%; }
+.wc.wc-list .wl-some .wc-noday-actions input { min-width: 0; }
