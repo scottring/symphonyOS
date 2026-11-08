@@ -1179,6 +1179,9 @@ describe('WeekCanvas — the list', () => {
     expect(sheet).toHaveTextContent(/^Week · Oct 3 – Oct 9This week/)
     expect(within(sheet).getByRole('heading', { name: 'Sometime this week' })).toBeInTheDocument()
     expect(within(weekCol()).getByText('Call the bank')).toBeInTheDocument()
+    // A weekly routine with no day waits behind one line.
+    expect(within(weekCol()).queryByText('Mow the lawn')).toBeNull()
+    fireEvent.click(within(weekCol()).getByRole('button', { name: /1 routine needs a day/ }))
     expect(within(weekCol()).getByText('Mow the lawn')).toBeInTheDocument()
     const lines = within(sheet).getByRole('list', { name: 'The days' })
     expect(lines.querySelectorAll('[data-testid^="journal-day-"]')).toHaveLength(7)
@@ -1228,5 +1231,40 @@ describe('WeekCanvas — the list', () => {
     await list()
     expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Go to today →' })).toBeNull()
+  })
+})
+
+// Scott, 2026-11-07: "with all the +N more it's interminably long"; "routines
+// should show only on the days they're relevant".
+describe('WeekCanvas — the list stays short', () => {
+  beforeEach(() => { localStorage.removeItem('symphony-week-layout') })
+  const list = async (d = days(), sh = shelf()) => {
+    const { MemoryRouter } = await import('react-router-dom')
+    const w = writers()
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={d} shelf={sh} routinesToPlace={[]} isCurrent writers={w} /></MemoryRouter>)
+    return w
+  }
+
+  it('a day’s routines are one faint line on that day only, not rows', async () => {
+    const d = days()
+    d[2] = { ...d[2], items: [{ id: 'routine-r9', kind: 'routine', title: 'Swim bag by the door', routineId: 'r9', completed: false }] }
+    const w = await list(d)
+    const mon = screen.getByTestId('journal-day-2026-10-05')
+    const line = within(mon).getByLabelText('Monday routines')
+    expect(line).toHaveTextContent('Swim bag by the door')
+    expect(within(mon).queryByRole('listitem')).toBeNull()
+    expect(screen.getAllByText('Swim bag by the door')).toHaveLength(1)
+    fireEvent.click(within(line).getByRole('button', { name: 'Swim bag by the door' }))
+    expect(w.open).toHaveBeenCalledWith('routine-r9')
+  })
+
+  it('work from before this week folds into one line; this week’s own stays', async () => {
+    const own = task({ id: 'own', title: 'Book the plumber', commitments: [{ level: 'week', periodStart: weekStart, status: 'open' }] })
+    const old = task({ id: 'old', title: 'Clean the gutters', commitments: [{ level: 'week', periodStart: new Date(2026, 8, 26), status: 'open' }] })
+    await list(days(), buildShelf({ weekTasks: [own, old], weekStart, now: new Date(2026, 9, 3, 9) }))
+    expect(within(weekCol()).getByText('Book the plumber')).toBeInTheDocument()
+    expect(within(weekCol()).queryByText('Clean the gutters')).toBeNull()
+    fireEvent.click(within(weekCol()).getByRole('button', { name: /1 from before this week/ }))
+    expect(within(weekCol()).getByText('Clean the gutters')).toBeInTheDocument()
   })
 })

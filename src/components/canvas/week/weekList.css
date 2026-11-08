@@ -78,3 +78,23 @@
 .wk-layout button[aria-pressed='true'] { background: var(--color-bg-elevated); color: var(--color-neutral-900); box-shadow: 0 1px 3px hsl(215 32% 14% / .14); }
 .wk-layout button:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 @media (max-width: 767px) { .wk-layout { display: none; } }
+
+/* The list's folded lines: what came from before this week, and the weekly
+   routines that still need a day. One quiet line each until asked. */
+.wl-fold-line {
+  display: flex; width: 100%; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin: 0; padding: 8px 0; border: 0; border-bottom: 1px solid var(--paper-fold-rule, var(--color-neutral-200)); background: none; cursor: pointer;
+  font: 400 13px/1.4 var(--font-family-sans); color: var(--paper-fold-ink-soft, var(--color-neutral-500)); text-align: left;
+}
+.wl-fold-line:hover .canvas-link { text-decoration: underline; }
+.wl-fold-line:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
+.cal-sheet .wl-cal .gw-days li.is-done span { text-decoration: line-through; color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
+
+/* A day's routines: one faint line under its tasks, on its days only. */
+.wl-daybody { min-width: 0; }
+.wl-routines { margin: 2px 0 0; font: 400 13px/1.5 var(--font-family-sans); color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
+.wl-routine { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.wl-routine:hover { color: var(--paper-fold-ink-soft, var(--color-neutral-600)); text-decoration: underline; }
+.wl-routine.is-done { text-decoration: line-through; }
+.wl-routine:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
+.wl-routines + .wl-none, .wl-items + .wl-routines { margin-top: 2px; }
