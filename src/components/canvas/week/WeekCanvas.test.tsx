@@ -1245,17 +1245,12 @@ describe('WeekCanvas — the list stays short', () => {
     return w
   }
 
-  it('a day’s routines are one faint line on that day only, not rows', async () => {
+  it('a day’s routines are not on the list: they are on Today, the day they happen', async () => {
     const d = days()
     d[2] = { ...d[2], items: [{ id: 'routine-r9', kind: 'routine', title: 'Swim bag by the door', routineId: 'r9', completed: false }] }
-    const w = await list(d)
-    const mon = screen.getByTestId('journal-day-2026-10-05')
-    const line = within(mon).getByLabelText('Monday routines')
-    expect(line).toHaveTextContent('Swim bag by the door')
-    expect(within(mon).queryByRole('listitem')).toBeNull()
-    expect(screen.getAllByText('Swim bag by the door')).toHaveLength(1)
-    fireEvent.click(within(line).getByRole('button', { name: 'Swim bag by the door' }))
-    expect(w.open).toHaveBeenCalledWith('routine-r9')
+    await list(d)
+    expect(screen.queryByText('Swim bag by the door')).toBeNull()
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByLabelText('Nothing yet')).toBeInTheDocument()
   })
 
   it('work from before this week folds into one line; this week’s own stays', async () => {

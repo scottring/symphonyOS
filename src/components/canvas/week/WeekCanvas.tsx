@@ -932,14 +932,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const next = weekStart.getTime() > thisWeekStart.getTime() && weekStart.getTime() - thisWeekStart.getTime() < 8 * 86_400_000
     const sheetTitle = isCurrent ? 'This week' : next ? 'Next week' : past ? 'That week' : `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
     const dayLine = (day: CanvasDay) => {
-      // The day's tasks, each a line; its routines (only on the days they
-      // fall on) one faint line under them (Scott, 2026-11-07: "with all the
-      // +N more it's interminably long"; "routines should show only on the
-      // days they're relevant"). Every-day ones are written once, on the
-      // calendar sheet.
+      // The day's tasks only. Routines are on Today, on the day they happen
+      // (Scott, 2026-11-07: "with all the +N more it's interminably long";
+      // "routines show in the Today view on the day they happen"); the grid
+      // still draws them.
       const { all } = dayLists(day)
       const rows = [...all, ...(day.sometime ?? []).filter((it) => showDone || !it.completed)].filter((it) => it.kind !== 'routine')
-      const dayRoutines = day.items.filter((it) => it.kind === 'routine' && !it.proposed)
       const orderable = rows.filter((it) => it.task && !it.proposed)
       const orderOf = (it: CanvasDayItem) => { const index = orderable.indexOf(it); return index === -1 ? undefined : { index, count: orderable.length } }
       const over = overDay === day.key
@@ -952,14 +950,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           <div className="wl-daybody">
             {rows.length > 0
               ? <ul className="cw-rows wc-items wl-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{rows.map((it) => dayRow(it, day, orderOf(it)))}</ul>
-              : dayRoutines.length === 0 && <span className="wl-none" aria-label="Nothing yet">{over ? `Drop on ${dayChipLabel(day.date)}` : '—'}</span>}
-            {dayRoutines.length > 0 && (
-              <p className="wl-routines" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} routines`}>
-                <span aria-hidden="true">↻ </span>
-                {dayRoutines.map((r, i) => <span key={r.id}>{i > 0 && ' · '}<button type="button" className={`wl-routine${r.completed ? ' is-done' : ''}`}
-                  onClick={() => writers.open(r.id)}>{r.time ? `${formatTimeCompact(r.time)} ` : ''}{r.title}</button></span>)}
-              </p>
-            )}
+              : <span className="wl-none" aria-label="Nothing yet">{over ? `Drop on ${dayChipLabel(day.date)}` : '—'}</span>}
           </div>
         </DropZone>
       )
@@ -991,9 +982,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             )
           })}
         </ul>
-        {shownLines.length > 0 && (
-          <p className="cal-sheet-rhythm wl-cal-rhythm">{shownLines.map((r, i) => <span key={r.label}>{i > 0 && ' · '}{r.label}: {r.items.map((it) => it.title).join(', ')}</span>)}</p>
-        )}
       </CalendarSheet>
     )
     const sheet = (

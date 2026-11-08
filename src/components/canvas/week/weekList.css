@@ -90,11 +90,3 @@
 .wl-fold-line:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
 .cal-sheet .wl-cal .gw-days li.is-done span { text-decoration: line-through; color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
 
-/* A day's routines: one faint line under its tasks, on its days only. */
-.wl-daybody { min-width: 0; }
-.wl-routines { margin: 2px 0 0; font: 400 13px/1.5 var(--font-family-sans); color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
-.wl-routine { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
-.wl-routine:hover { color: var(--paper-fold-ink-soft, var(--color-neutral-600)); text-decoration: underline; }
-.wl-routine.is-done { text-decoration: line-through; }
-.wl-routine:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
-.wl-routines + .wl-none, .wl-items + .wl-routines { margin-top: 2px; }
