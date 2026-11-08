@@ -90,3 +90,22 @@
 }
 .wc.wc-list .wl-some .wc-noday-actions * { max-width: 100%; }
 .wc.wc-list .wl-some .wc-noday-actions input { min-width: 0; }
+
+/* Hovering a row changes nothing but what shows (Scott, 2026-11-08: "strange
+   behavior on hover"): space and people sit on the row's own line beside
+   Day ▾ and When ▾, faded until hover or focus, so the row never grows. */
+.wc.wc-list .wl-some .cw-row > .wc-tools { display: flex; align-self: flex-start; padding-top: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .wc.wc-list .wl-some .cw-row:not(:hover):not(:focus-within):not(.is-when-open):not(:has(.wc-tools [aria-expanded='true'])) > .wc-tools {
+    opacity: 0; pointer-events: none;
+  }
+}
+/* When ▾ open: its chips on one line with the bin; a submenu or the date
+   picker floats under its own button instead of pushing the row apart. */
+.wc.wc-list .wl-some .wc-noday-actions > div { align-items: center; }
+.wc.wc-list .wl-some .wc-noday-actions .relative > .relative.pt-1,
+.wc.wc-list .wl-some .wc-noday-actions .relative > .mt-1.w-56 {
+  position: absolute; top: 100%; z-index: 40;
+}
+.wc.wc-list .wl-some .wc-noday-actions .relative > .relative.pt-1 { left: 0; }
+.wc.wc-list .wl-some .wc-noday-actions .relative > .mt-1.w-56 { right: 0; max-width: none; }

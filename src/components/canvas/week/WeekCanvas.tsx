@@ -962,8 +962,10 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           liProps={{ 'data-testid': `week-row-${t.id}` }}
           onComplete={() => writers.toggleTask(t)}
           onOpen={() => writers.open(`task-${t.id}`)}
-          under={toolsOf(t)}
           extra={<>
+            {/* Space and people beside Day ▾ and When ▾, on the same line, so
+                hovering a row never makes it taller (Scott, 2026-11-08). */}
+            {toolsOf(t)}
             {!t.completed && (
               <button type="button" className="wc-when wl-dayset" aria-expanded={picker?.key === key}
                 aria-label={day ? `Change the day for ${t.title}` : `Give ${t.title} a day`}
