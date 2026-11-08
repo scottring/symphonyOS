@@ -36,6 +36,7 @@ struct PlanWriter {
             let context: String?
             let scope: String?
             var dismissedAt: Date? = nil
+            var sortOrder: Int? = nil
         }
         var tasks: [TaskState] = []
         var createdCommitments: [UUID] = []
@@ -55,7 +56,7 @@ struct PlanWriter {
         .init(id: t.id, bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay,
               isSomeday: t.isSomeday, weekStart: t.weekStart, monthStart: t.monthStart,
               seasonStart: t.seasonStart, weekendStart: t.weekendStart, deferCount: t.deferCount,
-              context: t.context, scope: t.scope, dismissedAt: t.dismissedAt)
+              context: t.context, scope: t.scope, dismissedAt: t.dismissedAt, sortOrder: t.sortOrder)
     }
 
     // MARK: Destinations
@@ -152,6 +153,51 @@ struct PlanWriter {
         return snap
     }
 
+    /// Order the Week's list (Scott, 2026-11-08): put `task` in the gap at
+    /// `toIndex` of `ordered` (0 is above the first line, `count` below the
+    /// last), as read before the move. The web's `reorderTasksToIndex`:
+    /// usually one write, a midpoint between the new neighbours; the whole
+    /// list laid out again only when a neighbour has no order or the gap is
+    /// spent. Empty snapshot when nothing moves.
+    @discardableResult
+    func reorder(_ task: SymphonyTask, in ordered: [SymphonyTask], toIndex: Int) -> Snapshot {
+        var snap = Snapshot()
+        for (t, order) in Self.orderWrites(ordered.map { ($0.id, $0.sortOrder) }, moving: task.id, toIndex: toIndex) {
+            guard let row = ordered.first(where: { $0.id == t }) else { continue }
+            snap.tasks.append(capture(row))
+            row.sortOrder = order
+            row.sortOrderDirty = true
+            touch(row)
+        }
+        save()
+        return snap
+    }
+
+    static let sortOrderGap = 1000
+
+    /// The writes a move makes: (id, new order) pairs. Pure, for tests.
+    static func orderWrites(_ list: [(UUID, Int?)], moving id: UUID, toIndex: Int) -> [(UUID, Int)] {
+        guard let from = list.firstIndex(where: { $0.0 == id }) else { return [] }
+        let to = max(0, min(toIndex, list.count))
+        if to == from || to == from + 1 { return [] }
+        var moved = list
+        let item = moved.remove(at: from)
+        moved.insert(item, at: to > from ? to - 1 : to)
+        let pos = moved.firstIndex { $0.0 == id }!
+        let before = pos > 0 ? moved[pos - 1] : nil
+        let after = pos < moved.count - 1 ? moved[pos + 1] : nil
+        let renormalise = moved.enumerated().map { ($0.element.0, $0.offset * sortOrderGap) }
+        if (before != nil && before!.1 == nil) || (after != nil && after!.1 == nil) { return renormalise }
+        switch (before?.1, after?.1) {
+        case (nil, nil): return renormalise
+        case (nil, let a?): return [(id, a - sortOrderGap)]
+        case (let b?, nil): return [(id, b + sortOrderGap)]
+        case let (b?, a?):
+            if a - b <= 1 { return renormalise }
+            return [(id, Int((Double(b + a) / 2).rounded(.down)))]
+        }
+    }
+
     /// The write line on a period's sheet ("Write a November goal", "Write a
     /// task for this week"): a plain item on this period only, in its own
     /// words, with one open commitment and tied to nothing (no goal_task_id,
@@ -213,6 +259,10 @@ struct PlanWriter {
             if t.dismissedAt != state.dismissedAt {
                 t.dismissedAt = state.dismissedAt
                 t.dismissedAtDirty = true
+            }
+            if t.sortOrder != state.sortOrder {
+                t.sortOrder = state.sortOrder
+                t.sortOrderDirty = true
             }
             if t.context != state.context {
                 t.context = state.context

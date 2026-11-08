@@ -109,3 +109,9 @@
 }
 .wc.wc-list .wl-some .wc-noday-actions .relative > .relative.pt-1 { left: 0; }
 .wc.wc-list .wl-some .wc-noday-actions .relative > .mt-1.w-56 { right: 0; max-width: none; }
+
+/* Move up / Move down, under When ▾ (the list's order is the priority). */
+.wc.wc-list .wl-move { display: flex; gap: 14px; padding: 6px 2px 2px; }
+.wc.wc-list .wl-move button:disabled { opacity: 0.35; cursor: default; }
+/* A list row drags to reorder on the desk. */
+.wc.wc-list .wl-items > li[draggable="true"] { cursor: grab; }

@@ -58,9 +58,11 @@ export interface PlanOrderListProps<T> {
   headingOf?: (t: T) => string | null
   /** The group a line belongs to (a life area's id, '' for none). With it, a line only orders within its own group. */
   groupOf?: (t: T) => string
+  /** The list's own classes in place of the period list's (the Week's rows). */
+  className?: string
 }
 
-export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, renderRow, onReorder, tail, headingOf, groupOf }: PlanOrderListProps<T>) {
+export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, renderRow, onReorder, tail, headingOf, groupOf, className = 'plan-items plan-goal-list' }: PlanOrderListProps<T>) {
   const coarse = useMediaQuery('(pointer: coarse)')
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: MOUSE_MOVE }),
@@ -179,7 +181,7 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, rend
 
   return <DndContext sensors={sensors} onDragStart={onTouchStart} onDragMove={onTouchMove} onDragEnd={onTouchEnd} onDragCancel={endDrag}>
     {/* The period's list: a planning step's tooltip can point here (GuideCoach). */}
-    <ul ref={listRef} className={`plan-items plan-goal-list${dragId ? ' is-ordering' : ''}`} aria-label={label} data-guide-anchor="list" {...listDrop}>
+    <ul ref={listRef} className={`${className}${dragId ? ' is-ordering' : ''}`} aria-label={label} data-guide-anchor="list" {...listDrop}>
       {headingOf && groupOf
         ? items.map((t, i) => {
           const h = headingOf(t)

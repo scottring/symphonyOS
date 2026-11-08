@@ -86,6 +86,7 @@ enum RowMapper {
         task.goalTaskId = row.uuid("goal_task_id")
         task.goalId = row.uuid("goal_id")
         task.plannedOn = row.date("planned_on")
+        task.sortOrder = row.int("sort_order")
         task.dismissedAt = row.date("dismissed_at")
         task.linkedTo = row.codable("linked_to")
         task.linkType = row.string("link_type")

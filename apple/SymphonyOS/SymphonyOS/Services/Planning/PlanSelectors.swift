@@ -244,7 +244,8 @@ struct PlanSnapshot {
 
     /// The Week's one list (Scott, 2026-11-07: "keep the week list, and if
     /// we need to put it on a day, copy it over to that day"): what the week
-    /// holds and what is dated in it, open, in the order written. A task given
+    /// holds and what is dated in it, open, in the shared order (the web's
+    /// sort_order; never ordered after, oldest written first). A task given
     /// a day keeps its place, the day its mark; it is the same task on Today.
     func weekLines(_ start: Date) -> [WeekLine] {
         let ws = PlanCalendar.weekStart(start)
@@ -256,8 +257,19 @@ struct PlanSnapshot {
         let base = (held + dated).filter { seen.insert($0.id).inserted }
         return stepsInstead(base)
             .filter { !$0.completed }
-            .sorted { $0.createdAt < $1.createdAt }
+            .sorted(by: PlanSnapshot.inManualOrder)
             .map { t in WeekLine(task: t, day: days.first { isDated(t, on: $0) }) }
+    }
+
+    /// Ordered first, by sortOrder; never ordered after, oldest first. Like
+    /// the web's `compareSortOrder`: nil is not 0, which is a real first place.
+    static func inManualOrder(_ a: SymphonyTask, _ b: SymphonyTask) -> Bool {
+        switch (a.sortOrder, b.sortOrder) {
+        case let (x?, y?) where x != y: return x < y
+        case (.some, nil): return true
+        case (nil, .some): return false
+        default: return a.createdAt < b.createdAt
+        }
     }
 
     func weekList(_ weekStart: Date) -> [SymphonyTask] {

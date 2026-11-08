@@ -91,6 +91,17 @@ final class PlannerScreensUITests: XCTestCase {
         // and its calendar at the other.
         XCTAssertTrue(app.textFields["Write a task for this week"].waitForExistence(timeout: 4))
         shot("05b-week-list")
+        // The list orders (2026-11-08): Move up in a line's day menu.
+        let cake = app.descendants(matching: .any)["Order the cake"].firstMatch, report = app.descendants(matching: .any)["Send the quarterly report"].firstMatch
+        XCTAssertTrue(cake.frame.minY > report.frame.minY)
+        app.buttons["Give Order the cake a day"].tap()
+        let up = app.buttons["Move up"]
+        XCTAssertTrue(up.waitForExistence(timeout: 3), "Move up is in the day menu")
+        shot("05c-week-move-menu")
+        up.tap()
+        let moved = NSPredicate { _, _ in cake.frame.minY < report.frame.minY }
+        wait(for: [expectation(for: moved, evaluatedWith: nil)], timeout: 4)
+        shot("05d-week-moved")
         unfold("fold-edge-above", until: app.staticTexts["For reading. Write this week in its own words."])
         shot("06-week-month-open")
 

@@ -118,6 +118,13 @@ final class SymphonyTask {
     /// `scopeDirty`: an UPDATE otherwise leaves those columns alone, so an
     /// ordinary edit here never nulls a placement made on the web.
     var placementDirty: Bool = false
+    /// The shared manual order (web `tasks.sort_order`, gaps of 1000): the
+    /// Week list's order, and a day's and Today's. nil = never ordered.
+    /// Pushed only when `sortOrderDirty`, so an ordinary edit never sends a
+    /// stale value over an order made on the web. Inline defaults for
+    /// SwiftData's lightweight migration.
+    var sortOrder: Int? = nil
+    var sortOrderDirty: Bool = false
     /// Let go ("not ever", 2026-11-04): set, the task is off every planning
     /// list and out of Someday and the Inbox, kept in history. `dismissedAtDirty`
     /// marks a Let go (or its Undo) made here that hasn't pushed, so an

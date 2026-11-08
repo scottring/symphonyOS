@@ -157,6 +157,7 @@ actor SyncEngine {
                         task.placementDirty = false
                         task.completedAtDirty = false
                         task.dismissedAtDirty = false
+                        task.sortOrderDirty = false
                     }
                     if change.tableName == "routines",
                        let routine = (try? context.fetch(FetchDescriptor<Routine>()))?.first(where: { $0.id == change.recordId }) {
@@ -541,6 +542,11 @@ actor SyncEngine {
         // on an UPDATE the phone itself just changed.
         if (forInsert || t.scopeDirty), let scope = t.scope {
             row["scope"] = .string(scope)
+        }
+        // Only when the phone itself reordered it (the Week list): never a
+        // stale order over one made on the web.
+        if t.sortOrderDirty {
+            row["sort_order"] = i(t.sortOrder)
         }
         // Only when the phone itself completed or reopened it (see
         // SymphonyTask.completedAt) — never a stale nil over the web's stamp.

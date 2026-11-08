@@ -1188,6 +1188,37 @@ describe('WeekCanvas — the list', () => {
     expect(screen.queryByRole('region', { name: 'The days' })).toBeNull()
   })
 
+  // Scott, 2026-11-08: "sort the This Week list". The order is the shared
+  // sort_order, so a day and Today read the same priority.
+  const titles = () => within(listCol()).getAllByRole('listitem').map((li) => li.querySelector('.cw-title')?.textContent)
+  const orderedDays = () => days().map((d) => ({ ...d, items: d.items.map((it) => it.task?.id === 'p' ? { ...it, task: { ...it.task!, sortOrder: 0 } } : it) }))
+
+  it('reads in the shared order, an ordered task above a never-ordered one', async () => {
+    await list(writers(), { days: orderedDays() })
+    const t = titles()
+    expect(t.indexOf('Pick up the keys')).toBeLessThan(t.indexOf('Call the bank'))
+  })
+
+  it('Move up under When ▾ makes the same write a drag does', async () => {
+    const w = { ...writers(), triageTask: vi.fn(), reorderTask: vi.fn() }
+    await list(w, { days: orderedDays() })
+    const open = titles().filter((x) => x !== 'Buy maps' && x !== 'Old receipt')
+    const at = open.indexOf('Call the bank')
+    expect(at).toBeGreaterThan(0)
+    fireEvent.click(within(row('c')).getByRole('button', { name: 'When for Call the bank' }))
+    fireEvent.click(within(row('c')).getByRole('button', { name: '↑ Move up' }))
+    expect(w.reorderTask).toHaveBeenCalledWith(expect.objectContaining({ id: 'c' }), expect.any(Array), at - 1)
+    const [, ordered] = (w.reorderTask as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect((ordered as Task[]).map((x) => x.title)).toEqual(open)
+  })
+
+  it('the first line cannot move up', async () => {
+    const w = { ...writers(), triageTask: vi.fn(), reorderTask: vi.fn() }
+    await list(w, { days: orderedDays() })
+    fireEvent.click(within(row('p')).getByRole('button', { name: 'When for Pick up the keys' }))
+    expect(within(row('p')).getByRole('button', { name: '↑ Move up' })).toBeDisabled()
+  })
+
   it('Day ▾ gives a task a day, and it stays on the list', async () => {
     const w = await list()
     fireEvent.click(within(row('c')).getByRole('button', { name: 'Give Call the bank a day' }))

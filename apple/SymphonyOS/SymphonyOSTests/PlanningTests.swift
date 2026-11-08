@@ -257,6 +257,31 @@ struct PlanSelectorTests {
         #expect(lines.first { $0.task.title == "Book trains" }?.day == nil)
     }
 
+    // Scott, 2026-11-08: "sort the This Week list" — the shared sort_order.
+    @Test func weekLinesReadInTheSharedOrderNeverOrderedLast() {
+        let ws = day(2026, 11, 8)
+        let a = task("Written first"), b = task("Ordered second"), c = task("Ordered first")
+        a.createdAt = day(2026, 11, 1); b.createdAt = day(2026, 11, 2); c.createdAt = day(2026, 11, 3)
+        b.sortOrder = 1000; c.sortOrder = 0
+        let plan = snapshot(tasks: [a, b, c],
+                            commitments: [a, b, c].map { TaskCommitment(taskId: $0.id, level: "week", periodStart: ws) })
+        #expect(plan.weekLines(ws).map(\.task.title) == ["Ordered first", "Ordered second", "Written first"])
+    }
+
+    @Test func aMoveIsOneMidpointWriteOrALayoutWhenANeighbourHasNoOrder() {
+        let (x, y, z) = (UUID(), UUID(), UUID())
+        // z between x and y: one write at the midpoint.
+        let one = PlanWriter.orderWrites([(x, 0), (y, 1000), (z, 2000)], moving: z, toIndex: 1)
+        #expect(one.count == 1 && one[0].0 == z && one[0].1 == 500)
+        // To the top: one write above the first.
+        #expect(PlanWriter.orderWrites([(x, 0), (y, 1000)], moving: y, toIndex: 0).map(\.1) == [-1000])
+        // Where it already is: nothing.
+        #expect(PlanWriter.orderWrites([(x, 0), (y, 1000)], moving: x, toIndex: 1).isEmpty)
+        // A never-ordered neighbour: the whole list laid out, in the new order.
+        let all = PlanWriter.orderWrites([(x, nil), (y, nil), (z, nil)], moving: z, toIndex: 0)
+        #expect(all.map(\.0) == [z, x, y] && all.map(\.1) == [0, 1000, 2000])
+    }
+
     @Test func aGoalOnTheWeekShowsItsOpenStepsInstead() {
         let ws = day(2026, 11, 8)
         let goal = task("Plan winter vacation")
@@ -468,5 +493,18 @@ struct PlanWriterTests {
         #expect(t.bucket == "week")
         let c = try ctx.fetch(FetchDescriptor<TaskCommitment>())
         #expect(c.contains { $0.level == "week" && $0.status == "open" && PlanCalendar.sameDay($0.periodStart, PlanCalendar.weekStart(day(2026, 11, 11))) })
+    }
+
+    @Test func reorderingMarksTheRowsToPushAndUndoPutsTheOrderBack() throws {
+        let ctx = try makeContext()
+        let a = task("A"), b = task("B")
+        a.sortOrder = 0; b.sortOrder = 1000
+        ctx.insert(a); ctx.insert(b)
+        let writer = PlanWriter(context: ctx, userId: me)
+        let snap = writer.reorder(b, in: [a, b], toIndex: 0)
+        #expect(b.sortOrder == -1000 && b.sortOrderDirty)
+        #expect(a.sortOrderDirty == false)
+        writer.undo(snap)
+        #expect(b.sortOrder == 1000)
     }
 }

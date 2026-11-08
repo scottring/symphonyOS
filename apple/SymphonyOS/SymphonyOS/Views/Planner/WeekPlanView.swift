@@ -21,6 +21,8 @@ struct WeekPlanView: View {
     @Query private var eventNotes: [EventNote]
 
     @State private var showReview = false
+    /// The line a dragged line would land on (drawn as a rule above it).
+    @State private var dropTarget: UUID?
     /// The list is the Week (Scott, 2026-11-07); the days, card by card, are
     /// the optional view. Remembered on this device.
     @AppStorage("planner.week.layout") private var layout = "list"
@@ -154,8 +156,8 @@ struct WeekPlanView: View {
         }
     }
 
-    /// The Week's one list (Scott, 2026-11-07): every task on the week in the
-    /// order written, a day as its mark ("Wed", "Today"), never a time. Day ▾
+    /// The Week's one list (Scott, 2026-11-07): every task on the week in its
+    /// shared order (drag or Move up/down), a day as its mark, never a time. Day ▾
     /// gives, changes or takes away the day; the task stays where it is and
     /// shows on that day's Today. A goal or parent shows its open steps.
     /// Routines are on Today, on their days; events on the calendar fold.
@@ -165,7 +167,32 @@ struct WeekPlanView: View {
             Text("Nothing on this week yet.").font(Paper.empty).foregroundStyle(Paper.faint)
                 .padding(.horizontal, 20).padding(.vertical, 6)
         }
-        ForEach(lines) { line in lineRow(line) }
+        ForEach(lines) { line in
+            lineRow(line, in: lines)
+                // Press, hold and drag a line onto another to order the
+                // list (Scott, 2026-11-08); Move up / Move down are in its
+                // day menu and VoiceOver's actions.
+                .draggable(line.id.uuidString) {
+                    Text(line.task.title).font(.bodyMedium).padding(10)
+                        .background(Color.bgSurface, in: RoundedRectangle(cornerRadius: 10))
+                }
+                .dropDestination(for: String.self) { ids, _ in
+                    dropTarget = nil
+                    guard let raw = ids.first, let id = UUID(uuidString: raw),
+                          let from = lines.firstIndex(where: { $0.id == id }),
+                          let to = lines.firstIndex(where: { $0.id == line.id }) else { return false }
+                    // Onto a line takes its place: below it moving down, above it moving up.
+                    move(lines[from].task, in: lines, toIndex: to > from ? to + 1 : to)
+                    return true
+                } isTargeted: { over in
+                    if over { dropTarget = line.id } else if dropTarget == line.id { dropTarget = nil }
+                }
+                .overlay(alignment: .top) {
+                    if dropTarget == line.id {
+                        Rectangle().fill(Color.amberStrong).frame(height: 2).padding(.horizontal, 20)
+                    }
+                }
+        }
         WriteLine(placeholder: "Write a task for this week") { text in
             PlanWriter(context: modelContext, userId: userId)
                 .createPeriodTask(title: text, level: "week", periodStart: weekStart,
@@ -183,8 +210,18 @@ struct WeekPlanView: View {
         return line.task.weekendStart != nil ? "This weekend" : nil
     }
 
-    private func lineRow(_ line: PlanSnapshot.WeekLine) -> some View {
+    /// Order the list: the same shared order the web's Week and Today read.
+    private func move(_ task: SymphonyTask, in lines: [PlanSnapshot.WeekLine], toIndex: Int) {
+        let from = lines.firstIndex { $0.id == task.id } ?? 0
+        let snap = PlanWriter(context: modelContext, userId: userId)
+            .reorder(task, in: lines.map(\.task), toIndex: toIndex)
+        guard !snap.tasks.isEmpty else { return }
+        toast = TriageController.Toast(message: "Moved “\(task.title)” \(toIndex <= from ? "up" : "down")", snapshot: snap)
+    }
+
+    private func lineRow(_ line: PlanSnapshot.WeekLine, in lines: [PlanSnapshot.WeekLine]) -> some View {
         let task = line.task
+        let at = lines.firstIndex { $0.id == line.id } ?? 0
         // The day is the menu's own label ("Sat ⌄"), so it takes no line of
         // its own; a task with none shows a small calendar.
         return PlanTaskRow(task: task, meta: line.day == nil ? Self.dayMark(line) : nil, lined: true) {
@@ -208,6 +245,15 @@ struct WeekPlanView: View {
                         toast = TriageController.Toast(message: "“\(task.title)” has no day; it stays on the week", snapshot: snap)
                     }
                 }
+                if lines.count > 1 {
+                    Divider()
+                    if at > 0 {
+                        Button { move(task, in: lines, toIndex: at - 1) } label: { Label("Move up", systemImage: "arrow.up") }
+                    }
+                    if at < lines.count - 1 {
+                        Button { move(task, in: lines, toIndex: at + 2) } label: { Label("Move down", systemImage: "arrow.down") }
+                    }
+                }
             } label: {
                 HStack(spacing: 3) {
                     if line.day != nil, let mark = Self.dayMark(line) {
@@ -223,6 +269,8 @@ struct WeekPlanView: View {
             .accessibilityLabel(line.day == nil ? "Give \(task.title) a day" : "\(Self.dayMark(line) ?? "") — change the day for \(task.title)")
         }
         .padding(.horizontal, 20)
+        .accessibilityAction(named: "Move up") { if at > 0 { move(task, in: lines, toIndex: at - 1) } }
+        .accessibilityAction(named: "Move down") { if at < lines.count - 1 { move(task, in: lines, toIndex: at + 2) } }
     }
 
     /// The optional view: the days, card by card, as Today would show them.

@@ -78,6 +78,8 @@ import { useWeekViewPrefs, useWeekLayout } from '@/hooks/useWeekViewPrefs'
 import { isWeekend } from '@/lib/dateUtils'
 import { dragPointerY } from '@/lib/today/dragPointer'
 import { gapAt, gapToListIndex } from '@/lib/week/dayReorder'
+import { compareSortOrder } from '@/lib/today/taskOrdering'
+import { PlanOrderList, type RowOrder } from '@/components/plan/constellation/PlanOrderList'
 import { TypedAdd } from '@/components/canvas/strip/TypedAdd'
 import { WriteLine } from '@/components/plan/fold/WriteLine'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
@@ -944,11 +946,23 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const dayed: ListRow[] = days.flatMap((d) => d.items
       .filter((it) => it.kind === 'task' && it.task && !it.proposed && (showDone || !it.completed) && !listed.has(it.task.id))
       .map((it) => (listed.add(it.task!.id), { task: it.task!, day: d })))
-    const byWritten = (a: ListRow, b: ListRow) => (a.task.createdAt?.getTime?.() ?? 0) - (b.task.createdAt?.getTime?.() ?? 0)
-    const mainList = [...ownList, ...dayed].sort(byWritten)
+    // The order is the priority (Scott, 2026-11-08: "sort the This Week
+    // list"): the shared sort_order a day and Today read too, so the list's
+    // order is the order on every day. Never ordered: oldest written first.
+    const byOrder = (a: ListRow, b: ListRow) => compareSortOrder(a.task.sortOrder, b.task.sortOrder)
+      || (a.task.createdAt?.getTime?.() ?? 0) - (b.task.createdAt?.getTime?.() ?? 0)
+    const mainList = [...ownList, ...dayed].sort(byOrder)
+    const openMain = mainList.filter((r) => !r.task.completed).map((r) => r.task)
+    // Move up / Move down (the When ▾ panel): the same write a drag makes.
+    const moveBy = (t: Task, by: -1 | 1) => {
+      const from = openMain.findIndex((x) => x.id === t.id)
+      if (from === -1) return
+      writers.reorderTask?.(t, openMain, by < 0 ? from - 1 : from + 2)
+    }
     const dayMark = (d: CanvasDay) => (d.key === todayKey ? 'Today' : d.date.toLocaleDateString('en-US', { weekday: 'short' }))
-    const listRow = ({ task: t, day }: ListRow) => {
+    const listRow = ({ task: t, day }: ListRow, order?: RowOrder) => {
       const key = `list:${t.id}`
+      const at = order?.orderable ? openMain.findIndex((x) => x.id === t.id) : -1
       // When ▾ on every open row, a day or not (Scott, 2026-11-08): Week takes
       // the day away and keeps the week; Someday, a date or Delete as anywhere.
       const triage = !t.completed && writers.triageTask && (
@@ -958,10 +972,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           onDelete={writers.deleteTask ? () => { setWhenOpen(null); writers.deleteTask!(t) } : undefined} />
       )
       return (
-        <LiftableRow key={key} liftId={key} lift={null}
+        <CompactWeekRow key={key}
           row={{ key, id: t.id, title: t.title, item: t, completed: t.completed, meta: day ? dayMark(day) : shelfMeta.get(t.id) ?? undefined }}
-          className={`wc-dayrow wc-weekrow wl-row${day ? ' has-day' : ''}${day?.key === todayKey ? ' is-today' : ''}${pointedTask(t.id) ? ' is-pointed' : ''}${whenOpen === key || picker?.key === key ? ' is-when-open' : ''}${fresh.has(t.id) || dayFresh.has(`${day?.key}:task-${t.id}`) ? ' is-new' : ''}`}
-          liProps={{ 'data-testid': `week-row-${t.id}` }}
+          className={`wc-dayrow wc-weekrow wl-row${day ? ' has-day' : ''}${day?.key === todayKey ? ' is-today' : ''}${pointedTask(t.id) ? ' is-pointed' : ''}${whenOpen === key || picker?.key === key ? ' is-when-open' : ''}${fresh.has(t.id) || dayFresh.has(`${day?.key}:task-${t.id}`) ? ' is-new' : ''}${order?.liProps.className ? ` ${order.liProps.className}` : ''}`}
+          liProps={{ ...order?.liProps, className: undefined, 'data-testid': `week-row-${t.id}` }}
+          onDragStart={order?.onDragStart ? (_, ev) => order.onDragStart!(ev) : undefined}
+          onDragEnd={order?.onDragEnd}
           onComplete={() => writers.toggleTask(t)}
           onOpen={() => writers.open(`task-${t.id}`)}
           extra={<>
@@ -978,14 +994,22 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
                 onClick={() => { setPicker(null); setWhenOpen(whenOpen === key ? null : key) }}>When ▾</button>
             )}
           </>}>
-          {triage && whenOpen === key && <div className="wc-noday-actions" role="group" aria-label={`When for ${t.title}`}>{triage}</div>}
+          {triage && whenOpen === key && <div className="wc-noday-actions" role="group" aria-label={`When for ${t.title}`}>
+            {triage}
+            {at !== -1 && writers.reorderTask && openMain.length > 1 && (
+              <div className="wl-move" role="group" aria-label={`Order of ${t.title}`}>
+                <button type="button" className="canvas-link" disabled={at === 0} onClick={() => { setWhenOpen(null); moveBy(t, -1) }}>↑ Move up</button>
+                <button type="button" className="canvas-link" disabled={at === openMain.length - 1} onClick={() => { setWhenOpen(null); moveBy(t, 1) }}>↓ Move down</button>
+              </div>
+            )}
+          </div>}
           {picker?.key === key && (
             <GiveItADay title={t.title} days={dates} current={day?.key ?? null} describe={dayDescriptions} label="Give it a day"
               onPick={(d) => { setPicker(null); if (day) writers.moveTask(t, d); else writers.placeTask(t, d) }}
               onClear={day ? () => { setPicker(null); writers.unplaceTask(t) } : undefined}
               onClose={() => setPicker(null)} />
           )}
-        </LiftableRow>
+        </CompactWeekRow>
       )
     }
     const timeOf = (it: CanvasDayItem) => (it.time ? formatTimeCompact(it.time) : 'All day')
@@ -1037,7 +1061,18 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         <p className="above-sheet-kicker">Week · {range}</p>
         <h2 className="above-sheet-title wl-title">{sheetTitle}</h2>
         <section className="wl-some" aria-label="The week’s list" data-testid="week-sometime" data-explain="still-to-place" data-explain-label="This week’s list">
-          {mainList.length > 0 && <ul className="cw-rows wc-items wl-items">{mainList.map(listRow)}</ul>}
+          {mainList.length > 0 && (
+            <PlanOrderList label={sheetTitle} className="cw-rows wc-items wl-items" items={mainList}
+              keyOf={(r) => `list:${r.task.id}`} titleOf={(r) => r.task.title}
+              // An open task orders; a done one keeps its place.
+              orderIdOf={(r) => (writers.reorderTask && !r.task.completed ? r.task.id : null)}
+              renderRow={(r, order) => listRow(r, order)}
+              onReorder={(id, orderedIds, toIndex) => {
+                const t = openMain.find((x) => x.id === id)
+                const ordered = orderedIds.flatMap((x) => openMain.filter((y) => y.id === x))
+                if (t) writers.reorderTask?.(t, ordered, toIndex)
+              }} />
+          )}
           {writers.addTyped && (
             <WriteLine placeholder="Write a task for this week" periodWord="this week"
               period={{ start: weekStart, end: new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6) }}
@@ -1048,7 +1083,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
               <span>{older.length} from before this week</span><span className="canvas-link">{olderOpen ? 'Hide' : 'Show'}</span>
             </button>
           )}
-          {olderOpen && olderList.length > 0 && <ul className="cw-rows wc-items wl-items wl-older" aria-label="From before this week">{olderList.map(listRow)}</ul>}
+          {olderOpen && olderList.length > 0 && <ul className="cw-rows wc-items wl-items wl-older" aria-label="From before this week">{olderList.map((r) => listRow(r))}</ul>}
           {routinesToPlace.length > 0 && (
             <button type="button" className="wl-fold-line" aria-expanded={routinesOpen} onClick={() => setRoutinesOpen((o) => !o)}>
               <span>{routinesToPlace.length} {routinesToPlace.length === 1 ? 'routine needs' : 'routines need'} a day</span><span className="canvas-link">{routinesOpen ? 'Hide' : 'Show'}</span>
