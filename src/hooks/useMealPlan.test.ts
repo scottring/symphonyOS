@@ -149,7 +149,7 @@ describe('useMealPlan', () => {
     const updateCalls: any[] = []
     vi.mocked(__mockFrom as any).mockImplementation(makeMoveMock(planRow, [e1], updateCalls))
 
-    const { result } = renderHook(() => useMealPlan(new Date('2026-04-27')))
+    const { result } = renderHook(() => useMealPlan(new Date(2026, 3, 26)))
     await waitFor(() => expect(result.current.loading).toBe(false))
     await act(async () => { await result.current.moveMeal('e1', 2, 'lunch') })
 
@@ -166,7 +166,7 @@ describe('useMealPlan', () => {
     const updateCalls: any[] = []
     vi.mocked(__mockFrom as any).mockImplementation(makeMoveMock(planRow, [e1, e2], updateCalls))
 
-    const { result } = renderHook(() => useMealPlan(new Date('2026-04-27')))
+    const { result } = renderHook(() => useMealPlan(new Date(2026, 3, 26)))
     await waitFor(() => expect(result.current.loading).toBe(false))
     await act(async () => { await result.current.moveMeal('e1', 2, 'lunch') })
 
