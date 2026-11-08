@@ -6,7 +6,7 @@ import { DomainProvider } from '@/hooks/useDomain'
 import { DomainGateProvider } from '@/components/domain/DomainGate'
 import { DesktopPageControls } from '@/components/layout/DesktopNavigation'
 import { deriveActiveView, pageOwnsFilterChrome, ShellLayout } from './ShellLayout'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useGuidedSessionRegistration, type GuidedSessionRegistration } from '@/contexts/GuidedSessionContext'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
@@ -720,8 +720,15 @@ describe('change cards on a let-go item', () => {
     tasksState.letGoTasks = [{ id: 'lg1', title: 'Old idea', completed: false, createdAt: new Date(2026, 8, 1), updatedAt: new Date(Date.parse(seen)), bucket: 'someday', dismissedAt: new Date(2026, 9, 1) }]
     tasksState.updateTask.mockClear()
     let activity: ReturnType<typeof useCanvasActivity> | null = null
-    function P() { activity = useCanvasActivity(); return null }
-    render(<MemoryRouter initialEntries={['/week']}><DomainProvider><DomainGateProvider><ShellLayout><P /></ShellLayout></DomainGateProvider></DomainProvider></MemoryRouter>)
+    // The hook's value is handed out through a callback, not written from
+    // inside the component (React's rule: a component does not reassign
+    // what is outside it).
+    function P({ onReady }: { onReady: (a: ReturnType<typeof useCanvasActivity>) => void }) {
+      const a = useCanvasActivity()
+      useEffect(() => { onReady(a) })
+      return null
+    }
+    render(<MemoryRouter initialEntries={['/week']}><DomainProvider><DomainGateProvider><ShellLayout><P onReady={(a) => { activity = a }} /></ShellLayout></DomainGateProvider></DomainProvider></MemoryRouter>)
     act(() => activity!.setChangeSet({ key: 'lg', title: '1 change', ops: [{ key: 'lg:0', op: 'place', taskId: 'lg1', title: 'Old idea', date: '2026-11-06', seen }] }))
     let ok = false
     await act(async () => { ok = await activity!.approveChangeSet() })
