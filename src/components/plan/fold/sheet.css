@@ -23,9 +23,25 @@
    and the row drags onto the day. */
 .above-sheet-row { display: flex; align-items: baseline; gap: 8px; }
 .above-sheet-row[draggable="true"] { cursor: grab; }
-/* Today's week sheet: where a row dragged among the rows would land. */
-.above-sheet-row.is-gap-above { box-shadow: inset 0 2px 0 var(--color-primary-500); }
-.above-sheet-row.is-gap-below { box-shadow: inset 0 -2px 0 var(--color-primary-500); }
+/* Today's week sheet: where a row dragged among the rows would land — a
+   line with a dot across the gap (Scott, 2026-11-08: "see a drop target"),
+   and the row being dragged faded. */
+.above-sheet-list > li { position: relative; }
+.above-sheet-row.is-lifted { opacity: .4; }
+.above-sheet-row.is-gap-above::before,
+.above-sheet-row.is-gap-below::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; pointer-events: none;
+  background: var(--paper-fold-accent, var(--color-primary-500));
+}
+.above-sheet-row.is-gap-above::before { top: -2px; }
+.above-sheet-row.is-gap-below::after { bottom: -2px; }
+.above-sheet-row.is-gap-above::after,
+.above-sheet-row.is-gap-below::before {
+  content: ''; position: absolute; left: -4px; width: 9px; height: 9px; border-radius: 50%; pointer-events: none;
+  background: var(--paper-fold-accent, var(--color-primary-500));
+}
+.above-sheet-row.is-gap-above::after { top: -5px; }
+.above-sheet-row.is-gap-below::before { bottom: -5px; }
 .above-sheet-row-title { flex: 1; min-width: 0; }
 button.above-sheet-row-title {
   padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer;

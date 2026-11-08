@@ -173,7 +173,7 @@ export function PlanOrderList<T>({ label, items, keyOf, titleOf, orderIdOf, rend
           ...(lift ? { ref, ...listeners } : {}),
           'data-order-id': id ?? undefined,
           ...(groupOf ? { 'data-group': groupOf(t) } : {}),
-          className: `${gapCls.trim()}${isLifted ? ' is-lifted' : ''}`.trim() || undefined,
+          className: `${gapCls.trim()}${isLifted || (id !== null && id === dragId) ? ' is-lifted' : ''}`.trim() || undefined,
         },
       })}
     </Liftable>

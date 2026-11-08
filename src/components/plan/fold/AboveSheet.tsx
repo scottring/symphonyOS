@@ -97,7 +97,7 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
   return (
     <ul ref={listRef} className="above-sheet-list" aria-label={label} {...ordering}>
       {rows.map((r, i) => onPick || onOpen || onDragRow ? (
-        <li key={r.id} className={`above-sheet-row${gapCls(i)}`} draggable={onDragRow || onReorder ? true : undefined}
+        <li key={r.id} className={`above-sheet-row${gapCls(i)}${dragId === r.id ? ' is-lifted' : ''}`} draggable={onDragRow || onReorder ? true : undefined}
           onDragStart={onDragRow || onReorder ? (ev) => {
             onDragRow?.(r.id, ev)
             if (onReorder) { setDragId(r.id); if (!onDragRow) { ev.dataTransfer.setData('text/plain', r.title); ev.dataTransfer.effectAllowed = 'move' } }

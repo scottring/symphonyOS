@@ -115,3 +115,23 @@
 .wc.wc-list .wl-move button:disabled { opacity: 0.35; cursor: default; }
 /* A list row drags to reorder on the desk. */
 .wc.wc-list .wl-items > li[draggable="true"] { cursor: grab; }
+
+/* Where a dragged row would land (Scott, 2026-11-08: "see a drop target"):
+   a line with a dot across the gap; the row being dragged is faded. The
+   rows' own rule turns box-shadow off, so the marker is drawn on its own. */
+.wc.wc-list .wl-items > .cw-row { position: relative; }
+.wc.wc-list .wl-items > .cw-row.is-lifted { opacity: .4; }
+.wc.wc-list .wl-items > .cw-row.is-gap-above::before,
+.wc.wc-list .wl-items > .cw-row.is-gap-below::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; pointer-events: none; z-index: 1;
+  background: var(--paper-fold-accent, var(--color-primary-500));
+}
+.wc.wc-list .wl-items > .cw-row.is-gap-above::before { top: -2px; }
+.wc.wc-list .wl-items > .cw-row.is-gap-below::after { bottom: -2px; }
+.wc.wc-list .wl-items > .cw-row.is-gap-above::after,
+.wc.wc-list .wl-items > .cw-row.is-gap-below::before {
+  content: ''; position: absolute; left: -4px; width: 9px; height: 9px; border-radius: 50%; pointer-events: none; z-index: 1;
+  background: var(--paper-fold-accent, var(--color-primary-500));
+}
+.wc.wc-list .wl-items > .cw-row.is-gap-above::after { top: -5px; }
+.wc.wc-list .wl-items > .cw-row.is-gap-below::before { bottom: -5px; }
