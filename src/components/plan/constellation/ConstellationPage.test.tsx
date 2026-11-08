@@ -158,6 +158,15 @@ describe('where you are',()=>{
   expect(screen.getAllByRole('heading',{level:1})[1]).toHaveTextContent('Fall 2026')
   expect(document.querySelectorAll('.plan-facts')[1]).toHaveTextContent(/^Sep 1 – Nov 30/)
  })
+ // Scott, 2026-11-07: this period's sheet is named like the sheets beside it.
+ it('names its own sheet, as the sheets folded beside it are named',()=>{
+  month()
+  const sheet=document.querySelector('.plan-sheet.vt-sheet-month') as HTMLElement
+  expect(within(sheet).getByRole('heading',{level:2,name:'October goals'})).toBeInTheDocument()
+  expect(sheet).toHaveTextContent(/^Month · Oct 1 – 31October goals/)
+  expect(document.querySelector('.vt-sheet-season .above-sheet-title')).toHaveTextContent('Fall goals')
+ })
+
  it('steps periods with the arrows and offers the way back in ⋯',()=>{
   season()
   expect(menu()).not.toContain('Back to this season')
@@ -1532,7 +1541,7 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   season('&plan=1')
   expect(aboveOpen()).toBe(true)
   const sheet=within(screen.getByRole('region',{name:'2026, for reading'}))
-  const year=within(sheet.getByRole('list',{name:'2026'}))
+  const year=within(sheet.getByRole('list',{name:'2026 goals'}))
   expect(year.getAllByRole('listitem').map((li)=>li.textContent)).toEqual(['Together','Health'])
   expect(year.queryAllByRole('button')).toHaveLength(0)
   const someday=within(sheet.getByRole('list',{name:'Someday'}))
@@ -1554,7 +1563,7 @@ describe('planning a season: the guided session (spec 2026-11-01)',()=>{
   for(const start of ['2026-12-01','2027-01-15']){
    atStep('from-year')
    open(`/season?view=constellation&horizon=1&start=${start}&plan=1`)
-   const year=within(within(screen.getByRole('region',{name:'2026, for reading'})).getByRole('list',{name:'2026'}))
+   const year=within(within(screen.getByRole('region',{name:'2026, for reading'})).getByRole('list',{name:'2026 goals'}))
    expect(year.getByText('Calmer mornings')).toBeInTheDocument()
    expect(year.queryByText('Learn Spanish')).toBeNull()
    cleanup()

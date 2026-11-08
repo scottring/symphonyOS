@@ -20,9 +20,10 @@ import { DesktopNavigation } from '@/components/layout/DesktopNavigation'
 
 // These tests cover the Lists view; Open journal is the default since
 // 2026-10-08, so they make the device's choice explicit.
-beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists') })
+// These are the grid's tests (the Week's optional view since 2026-11-07).
+beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists'); localStorage.setItem('symphony-week-layout', 'grid') })
 // The Week page's view choices (useWeekViewPrefs) are per device: none leaks between tests.
-afterEach(() => { for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.removeItem(k) })
+afterEach(() => { for (const k of Object.values(WEEK_PREF_KEYS)) localStorage.removeItem(k); localStorage.removeItem('symphony-week-layout') })
 // A routine with a day is on its day (2026-11-04: the strip that also listed
 // them by day is gone).
 const onDay = (key: string) => within(screen.getByTestId(`journal-day-${key}`))

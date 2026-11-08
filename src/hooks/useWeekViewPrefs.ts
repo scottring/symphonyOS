@@ -58,3 +58,17 @@ export function useWeekViewPrefs(): {
   const set = useCallback((k: WeekViewPref, v: boolean) => write(WEEK_PREF_KEYS[k], v ? ON : OFF), [])
   return { freeTime, weather, done, dailyInDays, set }
 }
+
+// The Week's layout (Scott, 2026-11-07): the list, a sheet like every other
+// horizon's, is the page; the grid of days is the optional view. Remembered
+// on this device. Planning always uses the list (WeekCanvas reads `fold`).
+export type WeekLayout = 'list' | 'grid'
+const LAYOUT_KEY = 'symphony-week-layout'
+const getLayout = (): WeekLayout => (read(LAYOUT_KEY) === 'grid' ? 'grid' : 'list')
+const listLayout = (): WeekLayout => 'list'
+
+export function useWeekLayout(): [WeekLayout, (v: WeekLayout) => void] {
+  const layout = useSyncExternalStore(subscribe, getLayout, listLayout)
+  const set = useCallback((v: WeekLayout) => write(LAYOUT_KEY, v), [])
+  return [layout, set]
+}

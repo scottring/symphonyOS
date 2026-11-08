@@ -224,3 +224,9 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .sheet-refine .choose-verb:not(.is-quiet) { color: var(--color-primary-700); font-weight: 600; }
 .sheet-refine .choose-verb + .choose-verb::before { content: '·'; display: inline-block; margin-right: 7px; color: var(--color-neutral-300); }
 .sheet-refine .choose-empty { margin: 0; padding: 4px 0; font: italic 400 15px/1.4 var(--font-family-display); color: var(--color-neutral-400); }
+
+/* This period's own sheet, named like the sheets beside it (Scott,
+   2026-11-07): "Month · Nov 1 – 30", "November goals". */
+.plan-sheet-kicker { margin-bottom: 0; }
+.plan-sheet-title { margin-bottom: 12px; }
+.above-sheet-rows-h { margin-top: 14px; }

@@ -10,6 +10,7 @@ import { HeaderPeopleFilter } from './HeaderPeopleFilter'
 import { DesktopCenterContext } from '@/components/layout/DesktopNavigation'
 import { railEntries } from '@/lib/planning/horizonNumerals'
 import { readCadenceConfig } from '@/lib/cadence/config'
+import { markLevelStep } from '@/lib/fold/levelStep'
 
 /** Phone: a page's own header controls (filters, ⋯) join the horizon-tab row
  *  instead of adding rows above the date. Falls back to inline rendering. */
@@ -133,6 +134,7 @@ function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
       {/* A plain Link: the current horizon comes from the page shown, not
           the path (/month can show Year), so NavLink's own matching is off. */}
       <Link to={period === value && value !== 'today' && value !== 'week' ? here(pathname, search) : connectedDestination(steps[value].to, search)}
+        viewTransition={period !== value} onClick={() => markLevelStep(period, value)}
         aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : undefined}
         aria-label={HORIZON_NAMES[value]} title={railTitle(value, steps[value])}>
         <span className="horizon-rail-l">{HORIZON_NAMES[value]}</span>

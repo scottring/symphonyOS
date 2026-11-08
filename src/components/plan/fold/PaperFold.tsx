@@ -29,6 +29,7 @@ import {
 import { detectFoldMode, foldSizes, type FoldMode } from '@/lib/fold/foldMode'
 import { hasStored, readStored, writeStored, useFoldMotion, type FoldMotion, type FoldSide, type GoOptions } from './useFoldMotion'
 import './paperFold.css'
+import '@/lib/fold/levelStep.css'
 
 export type FoldHorizon = 'year' | 'season' | 'month' | 'week' | 'day'
 

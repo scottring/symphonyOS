@@ -1,0 +1,29 @@
+/* Stepping between horizons (levelStep.ts). Each page names its sheets; a
+   sheet on both pages (November: the Month's page, then the Week's left fold)
+   moves between them; one only on the page left slides out, one only on the
+   page arrived at slides in. A folded sheet carries no name: nothing moves
+   into a closed fold. */
+.vt-sheet-year { view-transition-name: sheet-year; }
+.vt-sheet-season { view-transition-name: sheet-season; }
+.vt-sheet-month { view-transition-name: sheet-month; }
+.vt-sheet-week { view-transition-name: sheet-week; }
+.vt-sheet-day { view-transition-name: sheet-day; }
+.paper-fold-slot:not([data-open='true']) [class*='vt-sheet-'] { view-transition-name: none; }
+
+::view-transition-group(*) { animation-duration: .55s; animation-timing-function: cubic-bezier(.25, .8, .25, 1); }
+::view-transition-old(*), ::view-transition-new(*) { height: 100%; object-fit: cover; object-position: left top; }
+::view-transition-old(root) { animation: level-fade .22s ease-out both; }
+::view-transition-new(root) { animation: level-fade .3s ease-in .12s reverse both; }
+html[data-level-step='down']::view-transition-old(*):only-child { animation: level-out-left .4s cubic-bezier(.4, 0, .6, 1) both; }
+html[data-level-step='down']::view-transition-new(*):only-child { animation: level-in-right .5s cubic-bezier(.2, .8, .2, 1) .08s both; }
+html[data-level-step='up']::view-transition-old(*):only-child { animation: level-out-right .4s cubic-bezier(.4, 0, .6, 1) both; }
+html[data-level-step='up']::view-transition-new(*):only-child { animation: level-in-left .5s cubic-bezier(.2, .8, .2, 1) .08s both; }
+@keyframes level-fade { to { opacity: 0; } }
+@keyframes level-out-left { to { opacity: 0; transform: translateX(-60px); } }
+@keyframes level-out-right { to { opacity: 0; transform: translateX(60px); } }
+@keyframes level-in-right { from { opacity: 0; transform: translateX(70px); } }
+@keyframes level-in-left { from { opacity: 0; transform: translateX(-70px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

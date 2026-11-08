@@ -48,9 +48,12 @@ it('unfolded, lists the week’s no-day tasks only, counts the done, and reads t
  const done={id:'done',title:'Pick a date',createdAt:date,completed:true} as Task
  render(<MemoryRouter><AlongsideDay tasks={[task,onDay,elsewhere,done]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
  unfold()
- const list=screen.getByRole('list',{name:'Oct 4 – Oct 10'})
+ const list=(document.querySelector('.vt-sheet-week .above-sheet-list') as HTMLElement)
  expect(within(list).getAllByRole('listitem').map((li)=>li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Choose picnic spot'])
- expect(screen.getByText('Week')).toBeInTheDocument()
+ expect(screen.getByText('Week · Oct 4 – Oct 10')).toBeInTheDocument()
+ expect(screen.getByRole('heading',{name:'This week'})).toBeInTheDocument()
+ // A day later this week is on the sheet too, under it, with its +.
+ expect(within(screen.getByRole('list',{name:'Later this week'})).getByText('Buy a blanket')).toBeInTheDocument()
  expect(screen.getByText('1 done')).toBeInTheDocument()
  expect(screen.getByText('Pick three to five for today.')).toBeInTheDocument()
  expect(localStorage.getItem('symphony-fold:day')).toBe('open')
@@ -99,7 +102,7 @@ it('an open task from earlier this week is first on the sheet, marked with its d
  render(<MemoryRouter><AlongsideDay tasks={[task,wed,wedDone,letGo]} date={date} update={update} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
  expect(screen.getByRole('button',{name:'Oct 4 – Oct 10, 2 open. Unfold to read'})).toBeInTheDocument()
  unfold()
- const rows=within(screen.getByRole('list',{name:'Oct 4 – Oct 10'})).getAllByRole('listitem')
+ const rows=within((document.querySelector('.vt-sheet-week .above-sheet-list') as HTMLElement)).getAllByRole('listitem')
  expect(rows.map((li)=>li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Call the vet','Choose picnic spot'])
  expect(rows[0].querySelector('.above-sheet-row-mark')).toHaveTextContent('Wed')
  expect(rows[0]).toHaveAttribute('data-guide-anchor','leftovers')

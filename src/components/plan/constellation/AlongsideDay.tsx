@@ -33,7 +33,7 @@ import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { dayWordFor } from '@/components/canvas/week/compactWeek'
 import { placedInWeek } from '@/components/canvas/week/weekShelf'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
-import { AboveSheet } from '@/components/plan/fold/AboveSheet'
+import { AboveSheet, SheetRows } from '@/components/plan/fold/AboveSheet'
 import { TODAY_WEEK_FOOT } from '@/components/schedule/TodayWeekColumn'
 import { AlongsideContext, type AlongsideWorkspace } from './AlongsideContext'
 import { writePlanDrag } from '@/lib/planning/planDrag'
@@ -96,9 +96,18 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
     && !(t.scheduledFor && localYmd(t.scheduledFor) === ymd)
     && !placedInWeek(t, week, now))]
   const doneCount = weekTasks.filter((t) => t.completed).length
+  // What is placed on a later day of this week, by day (Scott, 2026-11-07:
+  // the sheet beside the day is the Week's own list, Sometime this week and
+  // then the days). Its + brings it to this day.
+  const weekEnd = new Date(week.getFullYear(), week.getMonth(), week.getDate() + 7)
+  const openIds = new Set(open.map((t) => t.id))
+  const later = visible.filter((t) => !t.completed && !openIds.has(t.id) && !!t.scheduledFor
+    && localYmd(t.scheduledFor) > ymd && t.scheduledFor.getTime() < weekEnd.getTime())
+    .sort((a, b) => a.scheduledFor!.getTime() - b.scheduledFor!.getTime())
+  const isThisWeek = localYmd(week) === localYmd(weekStartAnchor(new Date(), wso))
 
   const place = async (id: string) => {
-    const task = [...earlier, ...weekTasks].find((t) => t.id === id && !t.completed)
+    const task = [...earlier, ...weekTasks, ...later].find((t) => t.id === id && !t.completed)
     if (!task || lock.current) return
     lock.current = true; setPending(id); setMessage('')
     const patch = lineDropUpdates(task, { kind: 'day', at: date })
@@ -120,7 +129,7 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
   // week strip to the calendar grid"). Dropped anywhere else on the day it
   // bubbles here and is placed for the day with no time, the same as +.
   const day = (
-    <div className="ad-day"
+    <div className="ad-day vt-sheet-day"
       onDragOver={(e) => { if (e.dataTransfer.types.includes(WEEK_ACTION_MIME)) e.preventDefault() }}
       onDrop={stepAside ? undefined : (e) => { const id = e.dataTransfer.getData(WEEK_ACTION_MIME); if (id) { e.preventDefault(); e.stopPropagation(); void place(id) } }}>
       {children}
@@ -136,7 +145,8 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
           <PaperFold horizon="day" className="today-fold ad-fold" stowed={stepAside} edgeLabel={range} edgeCount={open.length}
             drive={weekDrive === undefined ? undefined : { above: weekDrive }}
             frontLabel={`${range}, to pick from`}
-            above={<AboveSheet kicker="Week" title={range}
+            above={<AboveSheet kicker={`Week · ${range}`} title={isThisWeek ? 'This week' : range} className="vt-sheet-week"
+              rowsHeading={open.length > 0 ? 'Sometime this week' : undefined}
               rows={open.map((t, i) => earlierIds.has(t.id)
                 ? { id: t.id, title: t.title, mark: earlierDayMark(t), anchor: i === 0 ? 'leftovers' : undefined }
                 : { id: t.id, title: t.title })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
@@ -149,6 +159,16 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
                 if (t) writePlanDrag(ev.dataTransfer, { kind: 'task', id, date: ymd, title: t.title })
                 ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move'
               }}>
+              {later.length > 0 && <>
+                <h3 className="above-sheet-sub above-sheet-rows-h">Later this week</h3>
+                <SheetRows rows={later.map((t) => ({ id: t.id, title: t.title, mark: t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) }))}
+                  label="Later this week" onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
+                  onOpen={onSelect} onDragRow={(id, ev) => {
+                    const t = later.find((x) => x.id === id)
+                    if (t) writePlanDrag(ev.dataTransfer, { kind: 'task', id, date: ymd, title: t.title })
+                    ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move'
+                  }} />
+              </>}
               <div ref={setRoutinesSlot} className="ad-routines" />
             </AboveSheet>}>
             {day}

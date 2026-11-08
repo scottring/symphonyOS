@@ -72,7 +72,9 @@ describe('WeekV2 header — the plan chip, at most one button, and the ⋯ menu'
     expect(slots.controls.querySelectorAll('.pv2-btn')).toHaveLength(0)
     expect(controls.getByRole('button', { name: 'Plan the week' })).toHaveClass('plan-chip')
     expect(controls.getByRole('button', { name: 'Week options' })).toHaveAttribute('aria-haspopup', 'menu')
-    expect(controls.getAllByRole('button')).toHaveLength(2)
+    // List | Grid (2026-11-07), the plan chip and ⋯.
+    expect(within(controls.getByRole('group', { name: 'Show the week as' })).getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true')
+    expect(controls.getAllByRole('button')).toHaveLength(4)
     slots.done()
   })
 

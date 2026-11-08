@@ -33,6 +33,7 @@ import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
 import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
 import { WeekLookBack } from '@/components/plan/guided/week/WeekLookBack'
 import { PlanChip, usePlanSessionLoading } from '@/components/guide/GuideCoach'
+import { WeekLayoutSwitch } from '@/components/canvas/week/WeekLayoutSwitch'
 import type { SessionFold } from '@/components/plan/guided/GuidedPeriod'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import type { DeckCard, DeckMode } from '@/lib/planning/deck'
@@ -198,6 +199,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
   ) : null
   const controls = (
     <>
+      {!deckMode && <WeekLayoutSwitch />}
       {(plannable || deckMode === 'full') && <PlanChip level="week" word="the week" onStart={() => setMode('plan')} />}
       {primary && <button type="button" className="pv2-btn wk-plan" onClick={primary.run} data-explain="plan-deck" data-explain-label={primary.label}>{primary.label}</button>}
       <WeekMenu offers={offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run }))} />

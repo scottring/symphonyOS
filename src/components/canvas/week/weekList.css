@@ -1,0 +1,80 @@
+/* The Week as a sheet (Scott, 2026-11-07): the list every horizon has, with
+   the month folded at its left and this week's calendar at its right. The
+   grid of days is the optional view (horizonStrip.css). Doubled classes: the
+   app loads canvas-today.css (.wc, .cw-row) after this file. */
+.wc.wc-list { gap: 12px; }
+.paper-fold.wl-fold > article.paper-fold-current { container-type: inline-size; }
+.wl-sheet { min-width: 0; }
+.wl-sheet .wl-title { margin-bottom: 4px; }
+.wl-sheet .wl-h {
+  margin: 22px 0 4px; font: 600 10.5px/1 var(--font-family-sans); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--paper-fold-ink-faint, var(--color-neutral-400));
+}
+.wl-some { border-radius: 6px; transition: background-color .15s; }
+.wl-some.is-over, .wl-day.is-over { background: color-mix(in srgb, var(--paper-fold-accent, var(--color-primary-500)) 7%, transparent); }
+
+/* Rows read as lines on the paper: a rule under each, the display face. */
+.wc.wc-list .wl-items { display: block; margin: 0; padding: 0; }
+.wc.wc-list .wl-items > .cw-row {
+  padding: 7px 0 8px; border-bottom: 1px solid var(--paper-fold-rule, var(--color-neutral-200)); border-radius: 0; background: none; box-shadow: none;
+}
+.wc.wc-list .wl-some .wl-items > .cw-row .cw-title { font: 400 18px/1.35 var(--font-family-display); color: var(--paper-fold-ink, var(--color-neutral-900)); }
+.wc.wc-list .wl-days .wl-items > .cw-row { padding: 3px 0; border-bottom: 0; }
+.wc.wc-list .wl-days .wl-items > .cw-row .cw-title { font: 400 16.5px/1.35 var(--font-family-display); color: var(--paper-fold-ink, var(--color-neutral-900)); }
+.wc.wc-list .wl-items > .cw-row.is-done .cw-title { color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
+/* When ▾ comes up on hover or focus, as on the grid's Sometime column. */
+@media (hover: hover) and (pointer: fine) {
+  .wl-some .cw-row:not(:hover):not(:focus-within):not(.is-when-open) .wc-when { opacity: 0; pointer-events: none; }
+}
+.wl-some .sheet-write { margin-top: 2px; }
+
+/* The days: quiet lines, a short name and what is placed on the day. */
+.wl-days { list-style: none; margin: 0; padding: 0; }
+.wl-day {
+  display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; align-items: start;
+  padding: 7px 4px 8px 0; border-bottom: 1px solid var(--paper-fold-rule, var(--color-neutral-200)); border-radius: 4px;
+  transition: background-color .15s;
+}
+.wl-d {
+  font: 600 11px/2.1 var(--font-family-sans); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+  color: var(--paper-fold-ink-faint, var(--color-neutral-400)); font-variant-numeric: tabular-nums;
+}
+.wl-day.is-today .wl-d { color: var(--paper-fold-accent, var(--color-primary-600)); }
+.wl-day.is-past .wl-items { opacity: .7; }
+.wl-day.is-pointed { box-shadow: inset 3px 0 0 var(--color-teal-400, var(--color-primary-400)); }
+.wl-none { font: italic 400 15px/2 var(--font-family-display); color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
+.wl-onward { display: flex; justify-content: flex-end; margin: 20px 0 0; }
+
+/* The calendar sheet folded at the right: each day's fixed points. */
+.wl-cal-spans { list-style: none; margin: 0 0 8px; padding: 0; font: 400 14.5px/1.35 var(--font-family-display); }
+.wl-cal-spans li { padding: 4px 0; }
+.cal-sheet .wl-cal { list-style: none; margin: 0; padding: 0; display: block; }
+.cal-sheet .wl-cal > .gw-row {
+  display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 8px; align-items: baseline;
+  padding: 7px 0 8px; border-bottom: 1px solid var(--paper-fold-rule, var(--color-neutral-200));
+}
+.cal-sheet .wl-cal .gw-day-label {
+  white-space: nowrap; font: 600 11px/1.9 var(--font-family-sans); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--paper-fold-ink-faint, var(--color-neutral-400));
+}
+.cal-sheet .wl-cal > .gw-row[data-now] .gw-day-label { color: var(--paper-fold-accent, var(--color-primary-600)); }
+.cal-sheet .wl-cal .gw-day-label .gw-row-note { display: block; font: 500 10.5px/1.3 var(--font-family-sans); letter-spacing: 0; text-transform: none; }
+.cal-sheet .wl-cal > .gw-row > .gw-row-note { font: italic 400 14.5px/1.9 var(--font-family-display); color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
+.cal-sheet .wl-cal .gw-days { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.cal-sheet .wl-cal .gw-days li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 6px; align-items: baseline; }
+.cal-sheet .wl-cal .gw-days b { font: 500 11px/1.6 var(--font-family-sans); letter-spacing: 0; text-transform: none; color: var(--paper-fold-ink-faint, var(--color-neutral-400)); font-variant-numeric: tabular-nums; }
+.cal-sheet .wl-cal .gw-days span { font: 400 15px/1.3 var(--font-family-display); color: var(--paper-fold-ink-soft, var(--color-neutral-700)); overflow-wrap: anywhere; }
+.wl-cal-rhythm { margin-top: 12px; }
+
+/* List | Grid on the header (WeekLayoutSwitch). */
+.wk-layout {
+  display: inline-flex; padding: 2px; border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-bg-elevated) 70%, transparent); box-shadow: inset 0 0 0 1px var(--color-neutral-200);
+}
+.wk-layout button {
+  min-height: 28px; padding: 0 12px; border: 0; border-radius: var(--radius-full); background: none; cursor: pointer;
+  font: 500 12.5px/1 var(--font-family-sans); color: var(--color-neutral-600);
+}
+.wk-layout button[aria-pressed='true'] { background: var(--color-bg-elevated); color: var(--color-neutral-900); box-shadow: 0 1px 3px hsl(215 32% 14% / .14); }
+.wk-layout button:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+@media (max-width: 767px) { .wk-layout { display: none; } }

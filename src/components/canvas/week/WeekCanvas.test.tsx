@@ -13,6 +13,11 @@ import { WEEK_PREF_KEYS } from '@/hooks/useWeekViewPrefs'
 // week's first column (2026-11-04); drag places it; done waits behind "Show
 // done" in the header's ⋯ menu (calm pass 2).
 
+// The list is the Week's default (2026-11-07); these tests are the grid's,
+// the optional view, unless they say otherwise.
+beforeEach(() => { localStorage.setItem('symphony-week-layout', 'grid') })
+afterEach(() => { localStorage.removeItem('symphony-week-layout') })
+
 const weekStart = new Date(2026, 9, 3) // Sat Oct 3 – Fri Oct 9
 const dayOf = (i: number) => new Date(2026, 9, 3 + i)
 const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -184,10 +189,10 @@ describe('WeekCanvas — the month folds beside the week', () => {
     for (const li of lines) expect(li).not.toHaveAttribute('draggable', 'true')
   })
 
-  it('the month’s fold stays while a guided session plans the week; the step drives it', () => {
+  it('the month’s fold stays while a guided session plans the week, beside the list; the step drives it', () => {
     show(writers(), { month, fold: { drive: {}, look: null } })
     expect(screen.getByRole('button', { name: 'November, 2 open. Unfold to read' })).toBeInTheDocument()
-    expect(document.querySelector('.paper-fold.wc-fold')).toContainElement(screen.getByRole('region', { name: 'The days' }))
+    expect(document.querySelector('.paper-fold.wl-fold')).toContainElement(screen.getByRole('region', { name: 'This week' }))
   })
 })
 
@@ -222,9 +227,8 @@ describe('WeekCanvas — filing a task under a goal', () => {
     expect(screen.queryByRole('button', { name: /Show October goals/ })).toBeNull()
   })
 
-  // Final review (2026-11-04): the Week page never changes shape in a
-  // session. Sometime this week stays, with its no-day tasks and + Add to
-  // week, and Choose this week's tasks opens the week's line to write on.
+  // Planning always uses the list (Scott, 2026-11-07). Sometime this week
+  // keeps its no-day tasks, and Choose this week's tasks writes on its line.
   it('in a session (a fold): Sometime this week keeps the no-day tasks and its open line to write on, the Choose step’s anchor', async () => {
     const { MemoryRouter } = await import('react-router-dom')
     const w = { ...writers(), addTyped: vi.fn(async () => true) }
@@ -233,7 +237,7 @@ describe('WeekCanvas — filing a task under a goal', () => {
     const { rerender } = render(view(false))
     const col = within(weekCol())
     expect(col.getByRole('list')).toHaveTextContent('Call the bank')
-    expect(col.getByRole('textbox', { name: 'Add to this week' }).closest('[data-guide-anchor="write"]')).not.toBeNull()
+    expect(col.getByRole('textbox', { name: 'Write a task for this week' }).closest('[data-guide-anchor="write"]')).not.toBeNull()
     // A writing step opens no second box on the desk: the line is already open
     // (the coach puts the cursor in it).
     rerender(view(true))
@@ -249,27 +253,18 @@ describe('WeekCanvas — filing a task under a goal', () => {
     expect(within(days).queryByRole('button', { name: /^Plan / })).toBeNull()
   })
 
-  // Final review (2026-11-04): the week's column and the days are the same in
-  // and out of a session.
-  it('the week’s column and the days are laid out the same in and out of a session', async () => {
+  // Scott, 2026-11-07: the list is the only view while planning. With the
+  // grid chosen, a session shows the list, and the grid comes back after.
+  it('a session shows the list even when the grid is chosen, and the grid comes back after', async () => {
     const { MemoryRouter } = await import('react-router-dom')
-    const d = days()
-    d[3] = { ...d[3], items: Array.from({ length: 6 }, (_, i) => ({ id: `task-x${i}`, kind: 'task' as const, title: `Errand ${i + 1}`, completed: false, task: task({ id: `x${i}`, title: `Errand ${i + 1}` }) })) }
-    const shape = (fold?: { drive: { above?: boolean }; look: null }) => {
-      const { container, unmount: done } = render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
-        month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={fold} /></MemoryRouter>)
-      const out = {
-        strip: screen.queryByRole('region', { name: 'Sometime this week' })?.textContent ?? null,
-        days: screen.getByRole('region', { name: 'The days' }).querySelector('.wc-strip')?.innerHTML,
-        layout: container.firstElementChild?.className,
-      }
-      done()
-      return out
-    }
-    const everyDay = shape()
-    expect(everyDay.strip).not.toBeNull()
-    expect(shape({ drive: {}, look: null })).toEqual(everyDay)
-    expect(shape({ drive: { above: true }, look: null })).toEqual(everyDay)
+    const view = (fold?: { drive: { above?: boolean }; look: null }) => <MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
+      month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={fold} /></MemoryRouter>
+    const { rerender } = render(view({ drive: {}, look: null }))
+    expect(screen.getByRole('region', { name: 'This week' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'The days' })).toBeNull()
+    rerender(view())
+    expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'This week' })).toBeNull()
   })
 })
 
@@ -639,7 +634,7 @@ describe('the week’s planning homes', () => {
     render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w}
       month={{ word: 'November', kicker: 'Month', rows: [], doneCount: 0 }} fold={{ drive: {}, look: null }} /></MemoryRouter>)
     expect(screen.queryByRole('button', { name: '+ Add to week' })).toBeNull()
-    expect(screen.getByRole('textbox', { name: 'Add to this week' }).closest('[data-guide-anchor="write"]')).not.toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Write a task for this week' }).closest('[data-guide-anchor="write"]')).not.toBeNull()
   })
 })
 
@@ -700,13 +695,13 @@ describe('WeekCanvas — a few things a day', () => {
     expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
   })
 
-  it('planning the week (a guided session), a day keeps its few and its "+N more", as every day (final review, 2026-11-04)', () => {
+  it('planning the week (a guided session) uses the list, where a day’s line holds all it has, with no "+N more"', () => {
     const d = days()
     d[3] = { ...d[3], items: untimed(7) }
     render(<WeekCanvas weekStart={weekStart} days={d} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} fold={{ drive: {}, look: null }} />)
     const day = screen.getByTestId('journal-day-2026-10-06')
-    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(2)
-    expect(within(day).getByRole('button', { name: '+5 more' })).toBeInTheDocument()
+    expect(within(day).getAllByText(/^Errand \d$/)).toHaveLength(7)
+    expect(within(day).queryByRole('button', { name: /more$/ })).toBeNull()
   })
 
   it('a day with 2 events and 5 tasks shows both events, 2 tasks and "+3 more"', () => {
@@ -1163,5 +1158,75 @@ describe('WeekCanvas — what lands on a day stays in sight', () => {
       days={full([{ id: 'task-n', kind: 'task', title: 'Text Mike Carlin', completed: false, task: task({ id: 'n', title: 'Text Mike Carlin' }) }])} />)
     expect(screen.getByText('Text Mike Carlin').closest('li')).toHaveClass('is-new')
     expect(screen.queryByText('Third')).not.toBeInTheDocument()
+  })
+})
+
+// Scott, 2026-11-07: the list is the Week, a sheet like every other
+// horizon's; the grid is the optional view.
+describe('WeekCanvas — the list', () => {
+  beforeEach(() => { localStorage.removeItem('symphony-week-layout') })
+  const month = { word: 'November', kicker: 'Month · Nov 1 – 30', rows: [{ id: 'm1', title: 'Plan winter vacation' }], doneCount: 0 }
+  const list = async (w = writers(), extra: Partial<Parameters<typeof WeekCanvas>[0]> = {}) => {
+    const { MemoryRouter } = await import('react-router-dom')
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[{ id: 'r1', title: 'Mow the lawn' }]}
+      isCurrent writers={w} month={month} {...extra} /></MemoryRouter>)
+    return w
+  }
+
+  it('is the default: the week’s sheet, named, with Sometime this week and then the days as lines', async () => {
+    await list()
+    const sheet = screen.getByRole('region', { name: 'This week' })
+    expect(sheet).toHaveTextContent(/^Week · Oct 3 – Oct 9This week/)
+    expect(within(sheet).getByRole('heading', { name: 'Sometime this week' })).toBeInTheDocument()
+    expect(within(weekCol()).getByText('Call the bank')).toBeInTheDocument()
+    expect(within(weekCol()).getByText('Mow the lawn')).toBeInTheDocument()
+    const lines = within(sheet).getByRole('list', { name: 'The days' })
+    expect(lines.querySelectorAll('[data-testid^="journal-day-"]')).toHaveLength(7)
+    expect(within(screen.getByTestId('journal-day-2026-10-07')).getByText('Pick up the keys')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'The days' })).toBeNull()
+  })
+
+  it('November folds at its left as “November goals”, this week’s calendar at its right', async () => {
+    await list()
+    expect(screen.getByRole('button', { name: /^November, 1 open/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Week calendar/ })).toBeInTheDocument()
+    expect(document.querySelector('.vt-sheet-month .above-sheet-title')).toHaveTextContent('November goals')
+    // The calendar holds the events, not the list.
+    fireEvent.click(screen.getByRole('button', { name: /^Week calendar/ }))
+    expect(document.querySelector('.wl-cal')).toHaveTextContent('Dentist')
+    expect(within(screen.getByRole('region', { name: 'This week' })).queryByText('Dentist')).toBeNull()
+  })
+
+  it('a no-day task dropped on a day’s line is given that day', async () => {
+    const w = await list()
+    const { t, arm } = dt()
+    fireEvent.dragStart(within(weekCol()).getByText('Call the bank').closest('li')!, { dataTransfer: t })
+    arm()
+    const day = screen.getByTestId('journal-day-2026-10-05')
+    fireEvent.dragOver(day, { dataTransfer: t })
+    fireEvent.drop(day, { dataTransfer: t })
+    expect(w.placeTask).toHaveBeenCalledWith(bank, dayOf(2))
+  })
+
+  it('a day’s task dropped back on Sometime this week loses its day', async () => {
+    const w = await list()
+    const { t, arm } = dt()
+    fireEvent.dragStart(within(screen.getByTestId('journal-day-2026-10-07')).getByText('Pick up the keys').closest('li')!, { dataTransfer: t })
+    arm()
+    fireEvent.dragOver(weekCol(), { dataTransfer: t })
+    fireEvent.drop(weekCol(), { dataTransfer: t })
+    expect(w.unplaceTask).toHaveBeenCalledWith(placed)
+  })
+
+  it('ends with Go to today → on this week, and not on another', async () => {
+    await list()
+    expect(screen.getByRole('link', { name: 'Go to today →' })).toHaveAttribute('href', '/today?view=alongside')
+  })
+
+  it('the grid, once chosen, is remembered on this device', async () => {
+    localStorage.setItem('symphony-week-layout', 'grid')
+    await list()
+    expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Go to today →' })).toBeNull()
   })
 })

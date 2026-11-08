@@ -36,7 +36,11 @@ export interface AboveSheetProps {
   onDragRow?: (id: string, ev: DragEvent<HTMLLIElement>) => void
   /** More of the sheet, under the list and above the foot (Today's
    *  "Routines today", drawn with SheetRows). */
-  children?: ReactNode
+  children?: ReactNode  /** A heading over the rows (Today's week sheet: "Sometime this week"). */
+  rowsHeading?: string
+  /** Extra classes: the sheet's name as it slides from one level's page to
+   *  the next (vt-sheet-month, levelStep). */
+  className?: string
 }
 
 const defaultPickLabel = (title: string) => `Plan ${title} for today`
@@ -78,11 +82,12 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
   )
 }
 
-export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onOpen, onDragRow, children }: AboveSheetProps) {
+export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onOpen, onDragRow, children, className, rowsHeading }: AboveSheetProps) {
   return (
-    <div className="above-sheet">
+    <div className={className ? `above-sheet ${className}` : 'above-sheet'}>
       <p className="above-sheet-kicker">{kicker}</p>
       <h2 className="above-sheet-title">{title}</h2>
+      {rowsHeading && <h3 className="above-sheet-sub above-sheet-rows-h">{rowsHeading}</h3>}
       {rows.length > 0 ? (
         <SheetRows rows={rows} label={title} onPick={onPick} pickLabel={pickLabel} onOpen={onOpen} onDragRow={onDragRow} />
       ) : empty ? (

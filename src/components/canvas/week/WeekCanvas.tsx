@@ -62,7 +62,10 @@ import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { Link } from 'react-router-dom'
 import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu'
-import { formatTimeCompact } from '@/lib/dateHelpers'
+import { formatTimeCompact, formatWeekRangeShort } from '@/lib/dateHelpers'
+import { CalendarSheet } from '@/components/plan/fold/CalendarSheet'
+import { markLevelStep } from '@/lib/fold/levelStep'
+import './weekList.css'
 import { isPlanDrag, readPlanDrag, writePlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { PlanMastheadSlotsContext } from '@/components/plan/v2/planMastheadSlots'
@@ -71,7 +74,7 @@ import { GiveItADay } from './GiveItADay'
 import { dayChipLabel } from './compactWeek'
 import type { ShelfGroup } from './weekShelf'
 import { foldDay } from '@/lib/week/foldDay'
-import { useWeekViewPrefs } from '@/hooks/useWeekViewPrefs'
+import { useWeekViewPrefs, useWeekLayout } from '@/hooks/useWeekViewPrefs'
 import { isWeekend } from '@/lib/dateUtils'
 import { dragPointerY } from '@/lib/today/dragPointer'
 import { gapAt, gapToListIndex } from '@/lib/week/dayReorder'
@@ -243,7 +246,7 @@ const TOUCH_HOLD = { delay: 250, tolerance: 5 }
 const MOUSE_MOVE = { distance: 5 }
 
 /** A day (or Sometime this week) a touch drag can land on. */
-function DropZone({ id, as: Tag = 'div', ...rest }: { id: string; as?: 'div' | 'section' } & HTMLAttributes<HTMLElement> & Record<`data-${string}`, string | undefined>) {
+function DropZone({ id, as: Tag = 'div', ...rest }: { id: string; as?: 'div' | 'section' | 'li' } & HTMLAttributes<HTMLElement> & Record<`data-${string}`, string | undefined>) {
   const { setNodeRef } = useDroppable({ id })
   return <Tag ref={setNodeRef as (el: HTMLElement | null) => void} {...rest} />
 }
@@ -305,6 +308,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // The page's view choices, remembered on this device (calm pass 2).
   const prefs = useWeekViewPrefs()
   const showDone = prefs.done
+  // The list is the Week (Scott, 2026-11-07): a sheet like every other
+  // horizon's, with the month folded at its left and this week's calendar at
+  // its right. The grid of days is the optional view; planning always uses
+  // the list. The phone keeps its own day-by-day page.
+  const [layout] = useWeekLayout()
+  const listView = !phone && (layout === 'list' || !!session)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [overDay, setOverDay] = useState<string | null>(null)
   const [overShelf, setOverShelf] = useState(false)
@@ -866,12 +875,13 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // fold (`session`): Read November opens it, and the look back turns it to
   // last week with its choices.
   const look = session?.look ?? null
-  const withMonth = (node: ReactNode) => month ? (
-    <PaperFold horizon="week" className="wc-fold" edgeLabel={look ? 'Last week' : month.word} edgeCount={look ? undefined : month.rows.length}
+  const withMonth = (node: ReactNode, calendar?: ReactNode) => month ? (
+    <PaperFold horizon="week" className={calendar ? 'wl-fold' : 'wc-fold'} edgeLabel={look ? 'Last week' : month.word} edgeCount={look ? undefined : month.rows.length}
       drive={session?.drive} driveKey={session?.stepId} wide={!!look}
       frontLabel={look ? 'Last week, looking back' : undefined}
+      calendar={calendar} calendarLabel={calendar ? 'Week calendar' : undefined}
       above={look ? <LookSheet>{look}</LookSheet>
-        : <AboveSheet kicker={month.kicker} title={month.word} rows={month.rows} doneCount={month.doneCount}
+        : <AboveSheet kicker={month.kicker} title={`${month.word} goals`} rows={month.rows} doneCount={month.doneCount} className="vt-sheet-month"
           foot="For reading. Write this week in its own words." empty={`No ${month.word} goals yet.`} />}>
       {node}
     </PaperFold>
@@ -896,6 +906,95 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           {sel && dayColumn(sel)}
           {rhythmNode}
         </>)}
+      </div>,
+    )
+  }
+  // ── the list: the Week as a sheet ─────────────────────────────────────
+  // Sometime this week (its line to write on, When ▾, drag onto a day), then
+  // the days as quiet lines holding what is placed on them, each a drop
+  // target. The calendar (events, stays, dinners, every-day routines) is the
+  // sheet folded at the right, for reading.
+  if (listView) {
+    const range = formatWeekRangeShort(weekStart)
+    const thisWeekStart = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
+    const next = weekStart.getTime() > thisWeekStart.getTime() && weekStart.getTime() - thisWeekStart.getTime() < 8 * 86_400_000
+    const sheetTitle = isCurrent ? 'This week' : next ? 'Next week' : past ? 'That week' : `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    const dayLine = (day: CanvasDay) => {
+      const { all } = dayLists(day)
+      const rows = [...all, ...(day.sometime ?? []).filter((it) => showDone || !it.completed)]
+      const orderable = rows.filter((it) => it.task && !it.proposed)
+      const orderOf = (it: CanvasDayItem) => { const index = orderable.indexOf(it); return index === -1 ? undefined : { index, count: orderable.length } }
+      const over = overDay === day.key
+      const ordering = over && reorders(drag, day.key)
+      return (
+        <DropZone as="li" id={`day:${day.key}`} key={day.key}
+          className={`wl-day${day.key === todayKey ? ' is-today' : ''}${day.key < todayKey ? ' is-past' : ''}${over && !ordering ? ' is-over' : ''}${pointedDay(day.key) ? ' is-pointed' : ''}`}
+          aria-label={longDay(day.date)} data-testid={`journal-day-${day.key}`} data-day-key={day.key} {...dayDrop(day)}>
+          <span className="wl-d">{day.date.toLocaleDateString('en-US', { weekday: 'short' })} {day.date.getDate()}</span>
+          {rows.length > 0
+            ? <ul className="cw-rows wc-items wl-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{rows.map((it) => dayRow(it, day, orderOf(it)))}</ul>
+            : <span className="wl-none" aria-label="Nothing yet">{over ? `Drop on ${dayChipLabel(day.date)}` : '—'}</span>}
+        </DropZone>
+      )
+    }
+    const timeOf = (it: CanvasDayItem) => (it.time ? formatTimeCompact(it.time) : 'All day')
+    const calendar = (
+      <CalendarSheet kicker="Calendar" title={range}>
+        {spans.length > 0 && (
+          <ul className="wl-cal-spans" aria-label="Across these days">
+            {spans.map((sp) => <li key={sp.id}><span className="gw-row-note">{sp.when}</span> {sp.title}{sp.tail && <span className="gw-row-note">{sp.tail}</span>}</li>)}
+          </ul>
+        )}
+        <ul className="gw-rows wl-cal" aria-label="This week's days">
+          {days.map((d) => {
+            const dinners = d.dinners ?? []
+            const specials = d.specials ?? []
+            const empty = d.events.length === 0 && dinners.length === 0 && specials.length === 0
+            return (
+              <li key={d.key} className="gw-row gw-day" data-now={d.key === todayKey ? '' : undefined}>
+                <span className="gw-day-label">{d.date.toLocaleDateString('en-US', { weekday: 'short' })} {d.date.getDate()}{prefs.weather && d.weather && <span className="gw-row-note">{d.weather}</span>}</span>
+                {empty ? <span className="gw-row-note">Nothing fixed</span> : (
+                  <ul className="gw-days">
+                    {d.events.map((ev) => <li key={ev.id}><b>{timeOf(ev)}</b><span>{ev.title}</span></li>)}
+                    {specials.map((sp) => <li key={`sp:${sp.who}`}><b>{sp.who}</b><span>{sp.special}</span></li>)}
+                    {dinners.map((x) => <li key={x.id}><b>Dinner</b><span>{x.label}</span></li>)}
+                  </ul>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+        {shownLines.length > 0 && (
+          <p className="cal-sheet-rhythm wl-cal-rhythm">{shownLines.map((r, i) => <span key={r.label}>{i > 0 && ' · '}{r.label}: {r.items.map((it) => it.title).join(', ')}</span>)}</p>
+        )}
+      </CalendarSheet>
+    )
+    const sheet = (
+      <section className="wl-sheet vt-sheet-week" aria-label={sheetTitle} data-guide-anchor="day">
+        <p className="above-sheet-kicker">Week · {range}</p>
+        <h2 className="above-sheet-title wl-title">{sheetTitle}</h2>
+        <DropZone as="section" id="noday" className={`wl-some${overShelf ? ' is-over' : ''}`} aria-label="Sometime this week"
+          data-testid="week-sometime" data-explain="still-to-place" data-explain-label="Sometime this week" {...shelfDrop}>
+          <h3 className="wl-h">Sometime this week</h3>
+          {weekCount > 0 && <ul className="cw-rows wc-items wl-items">{unplaced.map(weekTaskRow)}{routinesToPlace.map(weekRoutineRow)}</ul>}
+          {draggingPlaced && <p className="wc-drop-hint" aria-live="polite">Drop here to take its day away</p>}
+          {writers.addTyped && (
+            <WriteLine placeholder="Write a task for this week" periodWord="this week"
+              period={{ start: weekStart, end: new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6) }}
+              onWrite={writers.addTyped} />
+          )}
+        </DropZone>
+        <h3 className="wl-h">On a day</h3>
+        <ul className="wl-days" aria-label="The days">{days.map(dayLine)}</ul>
+        {isCurrent && !session && (
+          <p className="wl-onward"><Link to="/today?view=alongside" viewTransition className="plan-next" onClick={() => markLevelStep('week', 'today')}>Go to today →</Link></p>
+        )}
+      </section>
+    )
+    return withTouch(
+      <div className={`wc wc-list${drag ? ' is-dragging' : ''}`}>
+        {subtitleNode}
+        {withMonth(sheet, calendar)}
       </div>,
     )
   }
@@ -937,7 +1036,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       {subtitleNode}
       {composerNode}
       {withMonth(
-        <section className="wc-days" aria-label="The days" data-guide-anchor="day">
+        <section className="wc-days vt-sheet-week" aria-label="The days" data-guide-anchor="day">
           <h2 className="wc-label sr-only">The days</h2>
           {spans.length > 0 && (
             <ul className="wc-spans" aria-label="Across these days">

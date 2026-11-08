@@ -106,6 +106,7 @@ import type { Task } from '@/types/task'
 import { placementOf } from '@/lib/planning/placement'
 import { useRoutines } from '@/hooks/useRoutines'
 import { PaperFold, rememberFolded } from '@/components/plan/fold/PaperFold'
+import { markLevelStep } from '@/lib/fold/levelStep'
 import { AboveSheet, LookSheet } from '@/components/plan/fold/AboveSheet'
 import { CalendarSheet, MonthGrid, CalendarRoutines, type CalendarRoutine } from '@/components/plan/fold/CalendarSheet'
 import { WriteLine } from '@/components/plan/fold/WriteLine'
@@ -948,8 +949,12 @@ function Inner() {
         className={`sheet-area${picked?.id === a.id ? ' is-on' : ''}`} onClick={() => setWriteAreaId(picked?.id === a.id ? null : a.id)}>{a.name}</button>)}
     </div>
     return (
-    <section className="plan-list plan-sheet" data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
+    <section className={`plan-list plan-sheet vt-sheet-${PERIODS[level]}`} data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
       {justMarked && !planning && <PlannedStamp at={justMarkedAt} />}
+      {/* Named like the sheets folded beside it (Scott, 2026-11-07): "Fall
+          2026" at its left, "November" at its right, so this one too. */}
+      <p className="above-sheet-kicker plan-sheet-kicker">{level === 0 ? 'Year' : `${level === 1 ? 'Season' : 'Month'} · ${periodRange(bounds.start, bounds.end)}`}</p>
+      <h2 className="above-sheet-title plan-sheet-title">{periodWord} goals</h2>
       <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items} headingOf={headingOf} groupOf={groupOf}
         keyOf={(n) => n.key} titleOf={(n) => n.title}
         // Only an open line orders; done and moved-on lines keep their place.
@@ -971,7 +976,8 @@ function Inner() {
       </button>}
       {footer && <footer className="plan-list-foot">
         {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all</button>}
-        {onwardShown && <Link to={onward.to} className="plan-next" data-explain="next" data-explain-label={onward.label.replace(' →', '')}>{onward.label}</Link>}
+        {onwardShown && <Link to={onward.to} viewTransition onClick={() => markLevelStep(PERIODS[level], level === 2 ? 'week' : PERIODS[level + 1])}
+          className="plan-next" data-explain="next" data-explain-label={onward.label.replace(' →', '')}>{onward.label}</Link>}
       </footer>}
     </section>
     )
@@ -985,7 +991,8 @@ function Inner() {
       <PaperFold horizon={PERIODS[level]} edgeLabel={fold?.look ? prevB.label : aboveSheet.title} edgeCount={fold?.look ? undefined : aboveSheet.rows.length}
         frontLabel={fold?.look ? `${prevB.label}, looking back` : undefined}
         above={fold?.look ? <LookSheet>{fold.look}</LookSheet>
-          : <AboveSheet {...aboveSheet} foot={`For reading. Write ${periodWord} in its own words.`}>
+          : <AboveSheet {...aboveSheet} title={`${level === 2 ? seasonWord : aboveSheet.title} goals`} className={level > 0 ? `vt-sheet-${PERIODS[level - 1]}` : undefined}
+            foot={`For reading. Write ${periodWord} in its own words.`}>
             {level === 1 && fold?.stepId === 'from-year' && somedayRows()}
           </AboveSheet>}
         calendar={calendarSheet} calendarLabel={`${periodWord} calendar`} drive={fold?.drive} driveKey={fold?.stepId} wide={!!fold?.look}>
