@@ -37,6 +37,7 @@ import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { dayWordFor } from '@/components/canvas/week/compactWeek'
 import { earlierDayMark } from '@/lib/planning/weekList'
+import { compareSortOrder, reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows, type SheetRow } from '@/components/plan/fold/AboveSheet'
 
@@ -138,7 +139,7 @@ const earlierEntry = (t: Task): DayPlanEntry => ({
   key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: false, planned: false, group: 'week', task: t,
 })
 
-export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nextWeek, chooseTask, restoreTask, className, stowed, drive, children }: {
+export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nextWeek, chooseTask, restoreTask, reorderTasks, className, stowed, drive, children }: {
   plan: DayPlan
   day: Date
   weekStart: Date
@@ -153,6 +154,9 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
   chooseTask?: (id: string) => Promise<boolean>
   /** The task writer, for an exact Undo of a choice. */
   restoreTask?: (id: string, prev: Partial<Task>) => Promise<unknown> | unknown
+  /** Writes the shared sort_order (the Week list's order): a row dragged
+   *  among the week's rows takes that place (Scott, 2026-11-08). */
+  reorderTasks?: (writes: { id: string; sortOrder: number | null }[]) => Promise<boolean>
   className?: string
   /** A session runs on the page: the fold is put away, the day stays mounted. */
   stowed?: boolean
@@ -168,8 +172,24 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
   // another day of the week.
   // Earlier this week's come first, each once.
   const earlierIds = new Set(earlier.map((t) => t.id))
-  const left = earlier.map(earlierEntry)
-  const open = [...left, ...plan.chooserTasks.filter((e) => e.kind === 'task' && !e.completed && !earlierIds.has(e.id) && !onViewedDay(e, ymd) && !alreadyPlaced(e, day))]
+  // In the week's priority (Scott, 2026-11-08): the shared sort_order the
+  // Week list is ordered in; never ordered after, oldest written first.
+  const byOrder = (a: DayPlanEntry, b: DayPlanEntry) => compareSortOrder(a.task?.sortOrder, b.task?.sortOrder)
+    || (a.task?.createdAt?.getTime?.() ?? 0) - (b.task?.createdAt?.getTime?.() ?? 0)
+  const left = earlier.map(earlierEntry).sort(byOrder)
+  const open = [...left, ...plan.chooserTasks.filter((e) => e.kind === 'task' && !e.completed && !earlierIds.has(e.id) && !onViewedDay(e, ymd) && !alreadyPlaced(e, day)).sort(byOrder)]
+  const activity = useCanvasActivity()
+  const reorder = reorderTasks ? (key: string, toIndex: number) => {
+    const entry = open.find((e) => e.key === key)
+    if (!entry?.task) return
+    const was = new Map(open.map((e) => [e.id, e.task?.sortOrder ?? null]))
+    const writes = reorderTasksToIndex(open.map((e) => e.id), entry.id, toIndex, was)
+    if (writes.length === 0) return
+    const up = toIndex < open.indexOf(entry)
+    void activity.run(`Move “${entry.title}” ${up ? 'up' : 'down'}`, () => reorderTasks(writes), {
+      ids: writes.map((w) => w.id), undo: async () => { await reorderTasks(writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))) },
+    })
+  } : undefined
   const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
   const firstLeft = left[0]?.key
   const { rows, ...rowProps } = sheetRowProps(open, day, actions, toToday, (e) => earlierIds.has(e.id) && e.task
@@ -184,7 +204,7 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
       frontLabel={`${range}, to pick from`}
       above={<>
         <AboveSheet kicker="Week" title={range} rows={rows}
-          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps}>
+          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps} onReorder={reorder}>
           <SheetRoutines plan={plan} day={day} actions={actions} />
         </AboveSheet>
         {nextWeek && (

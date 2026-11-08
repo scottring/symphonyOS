@@ -23,6 +23,9 @@
    and the row drags onto the day. */
 .above-sheet-row { display: flex; align-items: baseline; gap: 8px; }
 .above-sheet-row[draggable="true"] { cursor: grab; }
+/* Today's week sheet: where a row dragged among the rows would land. */
+.above-sheet-row.is-gap-above { box-shadow: inset 0 2px 0 var(--color-primary-500); }
+.above-sheet-row.is-gap-below { box-shadow: inset 0 -2px 0 var(--color-primary-500); }
 .above-sheet-row-title { flex: 1; min-width: 0; }
 button.above-sheet-row-title {
   padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer;

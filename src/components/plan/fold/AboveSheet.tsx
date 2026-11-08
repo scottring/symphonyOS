@@ -11,7 +11,8 @@
 // title tap that opens the task (onOpen). Without them, nothing here is a
 // control.
 
-import type { DragEvent, ReactNode } from 'react'
+import { useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { gapAt } from '@/lib/week/dayReorder'
 import './sheet.css'
 
 export interface AboveSheetProps {
@@ -34,6 +35,10 @@ export interface AboveSheetProps {
   onOpen?: (id: string) => void
   /** Today's week sheet only: the rows drag onto the day. */
   onDragRow?: (id: string, ev: DragEvent<HTMLLIElement>) => void
+  /** Today's week sheet only: a row dropped among the rows takes that place
+   *  (the shared order, Scott 2026-11-08); `toIndex` is the gap, 0 above the
+   *  first row, as the list read before the move. */
+  onReorder?: (id: string, toIndex: number) => void
   /** More of the sheet, under the list and above the foot (Today's
    *  "Routines today", drawn with SheetRows). */
   children?: ReactNode  /** A heading over the rows (Today's week sheet: "Sometime this week"). */
@@ -58,16 +63,46 @@ export interface SheetRowsProps {
   pickLabel?: (title: string) => string
   onOpen?: (id: string) => void
   onDragRow?: (id: string, ev: DragEvent<HTMLLIElement>) => void
+  onReorder?: (id: string, toIndex: number) => void
 }
 
 /** The sheet's ruled lines: plain text, or (Today) a title that opens, a +
  *  and a drag onto the day. */
-export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, onOpen, onDragRow }: SheetRowsProps) {
+export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, onOpen, onDragRow, onReorder }: SheetRowsProps) {
+  // A row dragged within its own list: the gap it would land in, as a rule.
+  // Dropped on the day instead, the day's own drop places it (onDragRow).
+  const listRef = useRef<HTMLUListElement>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [gap, setGap] = useState<number | null>(null)
+  const gapIn = (y: number) => gapAt(y, [...(listRef.current?.querySelectorAll<HTMLElement>(':scope > li') ?? [])].map((li) => li.getBoundingClientRect()))
+  const ordering = onReorder ? {
+    onDragOver: (e: DragEvent<HTMLUListElement>) => {
+      if (!dragId) return
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move'
+      const g = gapIn(e.clientY)
+      if (g !== gap) setGap(g)
+    },
+    onDragLeave: (e: DragEvent<HTMLUListElement>) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setGap(null)
+    },
+    onDrop: (e: DragEvent<HTMLUListElement>) => {
+      if (!dragId) return
+      e.preventDefault(); e.stopPropagation()
+      const id = dragId
+      setDragId(null); setGap(null)
+      onReorder(id, gapIn(e.clientY))
+    },
+  } : {}
+  const gapCls = (i: number) => gap === null ? '' : gap === i ? ' is-gap-above' : gap === rows.length && i === rows.length - 1 ? ' is-gap-below' : ''
   return (
-    <ul className="above-sheet-list" aria-label={label}>
-      {rows.map((r) => onPick || onOpen || onDragRow ? (
-        <li key={r.id} className="above-sheet-row" draggable={onDragRow ? true : undefined}
-          onDragStart={onDragRow ? (ev) => onDragRow(r.id, ev) : undefined} data-guide-anchor={r.anchor}>
+    <ul ref={listRef} className="above-sheet-list" aria-label={label} {...ordering}>
+      {rows.map((r, i) => onPick || onOpen || onDragRow ? (
+        <li key={r.id} className={`above-sheet-row${gapCls(i)}`} draggable={onDragRow || onReorder ? true : undefined}
+          onDragStart={onDragRow || onReorder ? (ev) => {
+            onDragRow?.(r.id, ev)
+            if (onReorder) { setDragId(r.id); if (!onDragRow) { ev.dataTransfer.setData('text/plain', r.title); ev.dataTransfer.effectAllowed = 'move' } }
+          } : undefined}
+          onDragEnd={onReorder ? () => { setDragId(null); setGap(null) } : undefined} data-guide-anchor={r.anchor}>
           {onOpen
             ? <button type="button" className="above-sheet-row-title" onClick={() => onOpen(r.id)}>{r.title}</button>
             : <span className="above-sheet-row-title">{r.title}</span>}
@@ -82,14 +117,14 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
   )
 }
 
-export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onOpen, onDragRow, children, className, rowsHeading }: AboveSheetProps) {
+export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onOpen, onDragRow, onReorder, children, className, rowsHeading }: AboveSheetProps) {
   return (
     <div className={className ? `above-sheet ${className}` : 'above-sheet'}>
       <p className="above-sheet-kicker">{kicker}</p>
       <h2 className="above-sheet-title">{title}</h2>
       {rowsHeading && <h3 className="above-sheet-sub above-sheet-rows-h">{rowsHeading}</h3>}
       {rows.length > 0 ? (
-        <SheetRows rows={rows} label={title} onPick={onPick} pickLabel={pickLabel} onOpen={onOpen} onDragRow={onDragRow} />
+        <SheetRows rows={rows} label={title} onPick={onPick} pickLabel={pickLabel} onOpen={onOpen} onDragRow={onDragRow} onReorder={onReorder} />
       ) : empty ? (
         <p className="above-sheet-empty">{empty}</p>
       ) : null}

@@ -183,7 +183,8 @@ struct PlanSnapshot {
             }
             return true
         }
-        .sorted { $0.createdAt < $1.createdAt }
+        // The Week list's priority (2026-11-08): the shared sort_order.
+        .sorted(by: PlanSnapshot.inManualOrder)
     }
 
     /// Routine occurrences for the DISPLAYED date: untimed ones due that day,

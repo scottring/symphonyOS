@@ -1303,7 +1303,8 @@ export function TodayView({
       // A + that saved counts as a pick on the Day session's Pick step, as a
       // drag onto the day does (notePlaced).
       chooseTask={async (id) => { const ok = await planActions.chooseTaskDay(id, viewedDate); if (ok) notePlaced(); return ok }}
-      restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)}>
+      restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)}
+      reorderTasks={ctx.onReorderTasks}>
       {day}
     </TodayWeekFold>
   )

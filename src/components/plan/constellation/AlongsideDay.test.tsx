@@ -206,3 +206,29 @@ it('a routine row (plan payload) dropped on the dayâ€™s hours reaches the gridâ€
  expect(onPlanDrop.mock.calls[0][1].getHours()).toBe(15)
  expect(update).not.toHaveBeenCalled()
 })
+
+// Scott, 2026-11-08: Today's week sheet reads in the Week list's priority (the
+// shared sort_order), and a row dragged among the rows takes that place.
+it('lists the week in the shared order, and a drag among the rows reorders it',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,9,9));onTestFinished(()=>{vi.useRealTimers()})
+ const a={id:'a',title:'Written first',createdAt:new Date(2026,9,5),completed:false} as Task
+ const b={id:'b',title:'Ordered second',createdAt:new Date(2026,9,6),completed:false,sortOrder:1000} as Task
+ const c={id:'c',title:'Ordered first',createdAt:new Date(2026,9,7),completed:false,sortOrder:0} as Task
+ const update=vi.fn(async()=>true)
+ render(<MemoryRouter><AlongsideDay tasks={[a,b,c]} date={date} update={update} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ unfold()
+ const list=document.querySelector('.vt-sheet-week .above-sheet-list') as HTMLElement
+ const rows=within(list).getAllByRole('listitem')
+ expect(rows.map((li)=>li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Ordered first','Ordered second','Written first'])
+ // Rows are 20px tall from y=0; "Written first" let go above the first row.
+ rows.forEach((li,i)=>{li.getBoundingClientRect=()=>({top:i*20,bottom:i*20+20,left:0,right:100,width:100,height:20,x:0,y:i*20,toJSON:()=>({})}) as DOMRect})
+ const data:Record<string,string>={}
+ const dataTransfer={setData:(k:string,v:string)=>{data[k]=v},getData:(k:string)=>data[k]??'',types:[] as string[],effectAllowed:'',dropEffect:''}
+ fireEvent.dragStart(rows[2],{dataTransfer})
+ const at=(ev:Event)=>{Object.defineProperty(ev,'clientY',{value:2});Object.defineProperty(ev,'dataTransfer',{value:dataTransfer});return ev}
+ fireEvent(list,at(createEvent.dragOver(list)))
+ fireEvent(list,at(createEvent.drop(list)))
+ // Above an ordered first row: one write, a gap above it.
+ await waitFor(()=>expect(update).toHaveBeenCalledWith('a',{sortOrder:-1000}))
+ expect(update).toHaveBeenCalledTimes(1)
+})

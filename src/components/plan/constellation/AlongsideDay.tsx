@@ -29,6 +29,7 @@ import { weekListTasks, earlierThisWeek, earlierDayMark } from '@/lib/planning/w
 import { stepsInstead } from '@/lib/planning/weekSteps'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { lineDropUpdates } from '@/lib/planning/v2/planV2'
+import { compareSortOrder, reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { dayWordFor } from '@/components/canvas/week/compactWeek'
@@ -93,9 +94,12 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
   const now = new Date()
   const earlier = earlierThisWeek(visible, { weekStart: week, day: date, scopeId: lens.scopeId })
   const earlierIds = new Set(earlier.map((t) => t.id))
-  const open = [...earlier, ...weekTasks.filter((t) => !t.completed && !earlierIds.has(t.id)
+  // In the week's priority (Scott, 2026-11-08): the shared sort_order the
+  // Week list is ordered in; never ordered after, oldest written first.
+  const byOrder = (a: Task, b: Task) => compareSortOrder(a.sortOrder, b.sortOrder) || (a.createdAt?.getTime?.() ?? 0) - (b.createdAt?.getTime?.() ?? 0)
+  const open = [...[...earlier].sort(byOrder), ...weekTasks.filter((t) => !t.completed && !earlierIds.has(t.id)
     && !(t.scheduledFor && localYmd(t.scheduledFor) === ymd)
-    && !placedInWeek(t, week, now))]
+    && !placedInWeek(t, week, now)).sort(byOrder)]
   const doneCount = weekTasks.filter((t) => t.completed).length
   // What is placed on a later day of this week, by day (Scott, 2026-11-07:
   // the sheet beside the day is the Week's own list, Sometime this week and
@@ -121,6 +125,22 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
       setMessage(ok ? `Planned “${task.title}” for ${dayLabel}.` : 'Could not place this action. It remains available; try again.')
       if (ok) placedListeners.current.forEach((l) => l())
     } finally { lock.current = false; setPending(null) }
+  }
+
+  // A row dragged among the week's rows takes that place in the shared
+  // order (the Week list's, Scott 2026-11-08); dragged onto the day, it is
+  // planned for the day instead. Undo writes back every order it changed.
+  const reorder = (id: string, toIndex: number) => {
+    const task = open.find((t) => t.id === id)
+    if (!task) return
+    const was = new Map(open.map((t) => [t.id, t.sortOrder ?? null]))
+    const writes = reorderTasksToIndex(open.map((t) => t.id), id, toIndex, was)
+    if (writes.length === 0) return
+    const write = (ws: { id: string; sortOrder: number | null }[]) => Promise.all(ws.map((w) => update(w.id, { sortOrder: w.sortOrder }))).then((r) => r.every((x) => x !== false))
+    const up = toIndex < open.findIndex((t) => t.id === id)
+    void activity.run(`Move “${task.title}” ${up ? 'up' : 'down'}`, () => write(writes), {
+      ids: writes.map((w) => w.id), undo: async () => { await write(writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))) },
+    })
   }
 
   const range = formatWeekRangeShort(week)
@@ -152,7 +172,7 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
                 : { id: t.id, title: t.title })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-              onOpen={onSelect} onDragRow={(id, ev) => {
+              onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
                 // Dropped anywhere on the day, the hours included, it is
                 // planned for the day with no time (Scott, 2026-11-07: tasks
                 // get a time only when it is certain; set one on the task).

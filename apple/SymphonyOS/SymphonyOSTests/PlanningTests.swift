@@ -268,6 +268,16 @@ struct PlanSelectorTests {
         #expect(plan.weekLines(ws).map(\.task.title) == ["Ordered first", "Ordered second", "Written first"])
     }
 
+    @Test func todaysChooserReadsTheWeeksOrder() {
+        let ws = day(2026, 11, 8)
+        let a = task("Written first"), b = task("Ordered first")
+        a.createdAt = day(2026, 11, 1); b.createdAt = day(2026, 11, 2)
+        b.sortOrder = 0
+        let plan = snapshot(tasks: [a, b],
+                            commitments: [a, b].map { TaskCommitment(taskId: $0.id, level: "week", periodStart: ws) })
+        #expect(plan.chooserTasks(on: day(2026, 11, 9)).map(\.title) == ["Ordered first", "Written first"])
+    }
+
     @Test func aMoveIsOneMidpointWriteOrALayoutWhenANeighbourHasNoOrder() {
         let (x, y, z) = (UUID(), UUID(), UUID())
         // z between x and y: one write at the midpoint.
