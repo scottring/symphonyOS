@@ -82,6 +82,7 @@ import { planNodes, type PlanNode } from './model'
 import { planPreview, type PeriodSpan } from './planPreview'
 import { isDone, periodRange } from '@/components/canvas/plan/planGroups'
 import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
+import { restoreDeleted } from '@/lib/planning/restoreDeleted'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -577,7 +578,17 @@ function Inner() {
     const onOpen = node.goal
       ? () => setExpanded((k) => k === node.key ? null : node.key)
       : () => selection?.setSelection({ kind: 'task', id: node.id })
-    return <PlanItemRow key={node.key} node={node}
+    // Delete, with Undo (Scott, 2026-11-08). A month or season line is a
+    // task: it goes, and Undo writes it back with the same id. A year goal is
+    // put away (archived, as Let go does), so its strategy and history stay.
+    // A line moved on stays as the record.
+    const moved = !!movedLabel(node) && !isDone(node)
+    const task = node.task
+    const onDelete = moved ? undefined : node.goal
+      ? () => { setExpanded(null); void setGoalStatus(node, 'archived', `Delete “${node.title}”`) }
+      : task ? () => { void act(`Delete “${node.title}”`, () => deleteTask(task.id), { ids: [task.id], undo: () => restoreDeleted(addTask, task) }) }
+      : undefined
+    return <PlanItemRow key={node.key} node={node} onDelete={onDelete}
       done={isDone(node)} movedTo={movedLabel(node) ?? undefined} saved={savedKey === node.key}
       onOpen={onOpen} expanded={expanded === node.key} more={more}
       editing={editing}

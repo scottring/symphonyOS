@@ -433,3 +433,16 @@
 /* Next week, on the week's last day: a second, quieter block on the sheet. */
 .today-fold-next { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--paper-fold-rule-above, var(--color-neutral-200)); }
 .today-fold-next .today-fold-next-title { font-size: 21px; }
+
+/* Delete on a list row (Scott, 2026-11-08): a quiet bin at the row's end,
+   up on hover or focus with the row's other controls; Undo follows. */
+.row-delete { flex: 0 0 auto; align-self: flex-start; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; margin-top: 1px; padding: 0; border: 0; border-radius: var(--radius-md);
+  background: transparent; color: var(--color-neutral-500); cursor: pointer; }
+.row-delete:hover { background: var(--color-danger-50, #fef2f2); color: var(--color-danger-600, #dc2626); }
+.row-delete:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.row-delete:disabled { opacity: .4; cursor: default; }
+@media (hover: hover) and (pointer: fine) {
+  .cw-row:not(:hover):not(:focus-within):not(.is-when-open) .row-delete,
+  .plan-item > .canvas-item:not(:hover):not(:focus-within) .row-delete { opacity: 0; pointer-events: none; }
+}

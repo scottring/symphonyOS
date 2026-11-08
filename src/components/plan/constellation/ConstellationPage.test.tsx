@@ -215,7 +215,9 @@ const writeOn=async(name:string,text:string)=>{
  await act(async()=>{fireEvent.submit(line.closest('form')!)})
  return line
 }
-const ROW_VERB=/^(This week|Done|Later|Let go|Off |Back to|Delete|Someday|November|October|Fall|Next )/
+// A row's one verb is its bin (Scott, 2026-11-08); nothing else moves it.
+const ROW_VERB=/^(This week|Done|Later|Let go|Off |Back to|Someday|November|October|Fall|Next )/
+const verbsOf=(li:HTMLElement)=>within(li).getAllByRole('button').filter(b=>!b.classList.contains('row-delete')).map(b=>b.textContent)
 
 // Task 5c (Scott, 2026-11-04: "yes, add the calendar fold on the right"):
 // this period's calendar lies folded at the sheet's right edge, for reading.
@@ -335,7 +337,7 @@ describe('a sheet: the period in its own words, the level above folded beside it
   expect(document.querySelector('.plan-item-parent')).toBeNull()
   expect(document.querySelector('.plan-tag-below')).toBeNull()
   expect(within(row('Pick dates')).queryAllByRole('button',{name:ROW_VERB})).toHaveLength(0)
-  expect(within(row('Pick dates')).getAllByRole('button').map(b=>b.textContent)).toEqual(['Pick dates'])
+  expect(verbsOf(row('Pick dates'))).toEqual(['Pick dates'])
   expect(screen.queryByText('+ Piece')).toBeNull()
   expect(screen.getByPlaceholderText('Write a November goal')).toBeInTheDocument()
   // The sheet above: Fall's open lines, for reading.
@@ -432,14 +434,14 @@ describe('a sheet: the period in its own words, the level above folded beside it
    subtasks:[{id:'st',title:'Inventory everything',parentTaskId:'m',bucket:'week'}]},{id:'w',title:'Book the shelter',bucket:'week',sourceId:'m'}]
   month()
   expect(row('Picnic')).not.toHaveTextContent(/For |This week|Week of/)
-  expect(within(row('Picnic')).getAllByRole('button').map(b=>b.textContent)).toEqual(['Picnic'])
+  expect(verbsOf(row('Picnic'))).toEqual(['Picnic'])
   cleanup();season()
   expect(row('Autumn outings')).not.toHaveTextContent(/For |October/)
-  expect(within(row('Autumn outings')).getAllByRole('button').map(b=>b.textContent)).toEqual(['Autumn outings'])
+  expect(verbsOf(row('Autumn outings'))).toEqual(['Autumn outings'])
   cleanup();open()
   // No "Fall" tag on a year goal with Fall goals under it, and no verbs.
   expect(row('Together')).not.toHaveTextContent(/Fall/)
-  expect(within(row('Together')).getAllByRole('button').map(b=>b.textContent)).toEqual(['Together'])
+  expect(verbsOf(row('Together'))).toEqual(['Together'])
   expect(document.querySelector('.plan-item-quick')).toBeNull()
  })
  it('Month: no + Piece; a goal’s steps stay in its panel',()=>{
@@ -591,7 +593,7 @@ describe('a list to look at (spec 2026-10-14, "The pages")',()=>{
   fireEvent.click(title)
   expect(title).toHaveAttribute('aria-expanded','true')
   expect(selection.setSelection).not.toHaveBeenCalled()
-  const verbs=within(row('Together')).getAllByRole('button').map(b=>b.textContent)
+  const verbs=verbsOf(row('Together'))
   expect(verbs).toEqual(['Together','Done','Let go','Edit wording'])
   fireEvent.click(within(row('Together')).getByRole('button',{name:'Done'}))
   await waitFor(()=>expect(api.updateGoal).toHaveBeenCalledWith('g',{status:'completed'}))
@@ -2150,7 +2152,24 @@ describe('the list, ordered by drag',()=>{
   month()
   expect(row('Picnic')).toHaveAttribute('draggable','true')
   expect(row('Pay taxes')).toHaveAttribute('draggable','false')
-  expect(within(row('Picnic')).getAllByRole('button').map(b=>b.textContent)).toEqual(['Picnic'])
+  expect(verbsOf(row('Picnic'))).toEqual(['Picnic'])
+ })
+ it('a month line deletes from its row, and Undo writes it back with the same id',async()=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'}]
+  month()
+  fireEvent.click(within(row('Picnic')).getByRole('button',{name:'Delete Picnic'}))
+  await waitFor(()=>expect(api.deleteTask).toHaveBeenCalledWith('m'))
+  expect(lastRun().label).toBe('Delete “Picnic”')
+  await lastRun().opts.undo()
+  expect(api.addTask).toHaveBeenLastCalledWith('Picnic',undefined,undefined,undefined,expect.objectContaining({id:'m',bucket:'month'}))
+ })
+ it('a year goal deletes by being put away, with Undo',async()=>{
+  open()
+  fireEvent.click(within(row('Together')).getByRole('button',{name:'Delete Together'}))
+  await waitFor(()=>expect(api.updateGoal).toHaveBeenCalledWith('g',{status:'archived'}))
+  expect(lastRun().label).toBe('Delete “Together”')
+  await lastRun().opts.undo()
+  expect(api.updateGoal).toHaveBeenLastCalledWith('g',{status:'active'})
  })
  describe('on touch',()=>{
   const original=window.matchMedia

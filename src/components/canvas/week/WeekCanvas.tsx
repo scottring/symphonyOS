@@ -53,6 +53,7 @@ import {
   type DragEndEvent, type DragMoveEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { createPortal } from 'react-dom'
+import { Trash2 } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
@@ -992,6 +993,13 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             {triage && (
               <button type="button" className="wc-when" aria-expanded={whenOpen === key} aria-label={`When for ${t.title}`}
                 onClick={() => { setPicker(null); setWhenOpen(whenOpen === key ? null : key) }}>When ▾</button>
+            )}
+            {/* Delete on the row, with Undo (Scott, 2026-11-08). */}
+            {writers.deleteTask && (
+              <button type="button" className="row-delete" aria-label={`Delete ${t.title}`} title="Delete"
+                onClick={() => { setWhenOpen(null); setPicker(null); writers.deleteTask!(t) }}>
+                <Trash2 size={14} aria-hidden="true" />
+              </button>
             )}
           </>}>
           {triage && whenOpen === key && <div className="wc-noday-actions" role="group" aria-label={`When for ${t.title}`}>

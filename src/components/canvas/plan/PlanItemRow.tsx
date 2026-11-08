@@ -16,6 +16,7 @@
 // natively; touch holds it, through `liProps` (PlanOrderList).
 
 import type { DragEvent, HTMLAttributes, Ref } from 'react'
+import { Trash2 } from 'lucide-react'
 import { useArrived } from '@/contexts/CanvasActivityContext'
 import type { PlanNode } from '@/components/plan/constellation/model'
 import type { PlanMark } from '@/components/plan/constellation/planPreview'
@@ -58,6 +59,9 @@ export interface PlanItemRowProps {
   liProps?: HTMLAttributes<HTMLLIElement> & { ref?: Ref<HTMLLIElement>; 'data-order-id'?: string }
   /** It orders by drag: a grip shows on hover. */
   orderable?: boolean
+  /** A delete button at the end of the row, shown on hover (Scott,
+   *  2026-11-08: "a delete button please"). The page gives it Undo. */
+  onDelete?: () => void
 }
 
 export function PlanItemRow(p: PlanItemRowProps) {
@@ -82,6 +86,12 @@ export function PlanItemRow(p: PlanItemRowProps) {
       {p.saved && <span className="canvas-tag">Saved</span>}
       {p.done && !p.preview && <span className="canvas-tag plan-tag-done">{node.goal ? 'Met' : 'Done'}</span>}
       {p.movedTo && !p.done && !p.preview && <span className="canvas-tag plan-tag-moved">{p.movedTo}</span>}
+      {p.onDelete && !p.editing && !p.preview && (
+        <button type="button" className="row-delete" aria-label={`Delete ${node.title}`} title="Delete"
+          disabled={p.disabled} onClick={p.onDelete}>
+          <Trash2 size={14} aria-hidden="true" />
+        </button>
+      )}
     </div>
     {p.preview && <span className="wc-proposed-note plan-preview-note">{p.preview.note}</span>}
     {open && <div className="plan-item-more">

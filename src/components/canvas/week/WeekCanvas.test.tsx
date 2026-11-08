@@ -1219,6 +1219,13 @@ describe('WeekCanvas — the list', () => {
     expect(within(row('p')).getByRole('button', { name: '↑ Move up' })).toBeDisabled()
   })
 
+  it('a row deletes from its own bin, beside When ▾', async () => {
+    const w = { ...writers(), deleteTask: vi.fn() }
+    await list(w, { days: orderedDays() })
+    fireEvent.click(within(row('c')).getByRole('button', { name: 'Delete Call the bank' }))
+    expect(w.deleteTask).toHaveBeenCalledWith(expect.objectContaining({ id: 'c' }))
+  })
+
   it('Day ▾ gives a task a day, and it stays on the list', async () => {
     const w = await list()
     fireEvent.click(within(row('c')).getByRole('button', { name: 'Give Call the bank a day' }))
