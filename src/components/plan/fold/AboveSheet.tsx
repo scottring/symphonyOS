@@ -11,7 +11,7 @@
 // title tap that opens the task (onOpen), and a check that marks it done
 // (onComplete; Scott 2026-11-09). Without them, nothing here is a control.
 
-import { useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { gapAt } from '@/lib/week/dayReorder'
 import './sheet.css'
 
@@ -80,28 +80,37 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
   const listRef = useRef<HTMLUListElement>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [gap, setGap] = useState<number | null>(null)
-  const gapIn = (y: number) => gapAt(y, [...(listRef.current?.querySelectorAll<HTMLElement>(':scope > li') ?? [])].map((li) => li.getBoundingClientRect()))
-  const ordering = onReorder ? {
-    onDragOver: (e: DragEvent<HTMLUListElement>) => {
-      if (!dragId) return
-      e.preventDefault(); e.dataTransfer.dropEffect = 'move'
-      const g = gapIn(e.clientY)
-      if (g !== gap) setGap(g)
-    },
-    onDragLeave: (e: DragEvent<HTMLUListElement>) => {
-      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setGap(null)
-    },
-    onDrop: (e: DragEvent<HTMLUListElement>) => {
-      if (!dragId) return
+  // While a row is being moved, the whole sheet takes the drop (Scott,
+  // 2026-11-09: aiming for the very top lands on the heading, not a row).
+  // Above the first row is the top; below the last row is the end.
+  useEffect(() => {
+    const list = listRef.current
+    if (!dragId || !onReorder || !list) return
+    const zone = list.closest<HTMLElement>('.above-sheet') ?? list
+    const gapIn = (y: number) => gapAt(y, [...list.querySelectorAll<HTMLElement>(':scope > li')].map((li) => li.getBoundingClientRect()))
+    const over = (e: globalThis.DragEvent) => {
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+      setGap(gapIn(e.clientY))
+    }
+    const leave = (e: globalThis.DragEvent) => { if (!zone.contains(e.relatedTarget as Node | null)) setGap(null) }
+    const drop = (e: globalThis.DragEvent) => {
       e.preventDefault(); e.stopPropagation()
-      const id = dragId
       setDragId(null); setGap(null)
-      onReorder(id, gapIn(e.clientY))
-    },
-  } : {}
+      onReorder(dragId, gapIn(e.clientY))
+    }
+    zone.addEventListener('dragover', over)
+    zone.addEventListener('dragleave', leave)
+    zone.addEventListener('drop', drop)
+    return () => {
+      zone.removeEventListener('dragover', over)
+      zone.removeEventListener('dragleave', leave)
+      zone.removeEventListener('drop', drop)
+    }
+  }, [dragId, onReorder])
   const gapCls = (i: number) => gap === null ? '' : gap === i ? ' is-gap-above' : gap === rows.length && i === rows.length - 1 ? ' is-gap-below' : ''
   return (
-    <ul ref={listRef} className="above-sheet-list" aria-label={label} {...ordering}>
+    <ul ref={listRef} className="above-sheet-list" aria-label={label}>
       {rows.map((r, i) => onPick || onOpen || onDragRow ? (
         <li key={r.id} className={`above-sheet-row${gapCls(i)}${dragId === r.id ? ' is-lifted' : ''}`} draggable={onDragRow || onReorder ? true : undefined}
           onDragStart={onDragRow || onReorder ? (ev) => {

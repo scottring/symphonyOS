@@ -82,6 +82,22 @@ describe('AboveSheet: the level above, for reading', () => {
       expect(titles()).toHaveLength(19)
     })
 
+    it('a row dropped above the list, on the heading, goes to the very top', () => {
+      const onReorder = vi.fn()
+      sheet(5, { onReorder, onOpen: vi.fn(), rowsHeading: 'Sometime this week' })
+      const list = screen.getByRole('list', { name: 'This week' })
+      within(list).getAllByRole('listitem').forEach((li, i) => { li.getBoundingClientRect = () => ({ top: 100 + i * 10, bottom: 110 + i * 10, height: 10, left: 0, right: 0, width: 0, x: 0, y: 100 + i * 10, toJSON: () => ({}) }) })
+      const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' }
+      fireEvent.dragStart(within(list).getAllByRole('listitem')[2], { dataTransfer })
+      const heading = screen.getByRole('heading', { level: 3, name: 'Sometime this week' })
+      const at = (ev: Event) => { Object.defineProperty(ev, 'clientY', { value: 60 }); return ev }
+      const over = at(createEvent.dragOver(heading, { dataTransfer }))
+      fireEvent(heading, over)
+      expect(over.defaultPrevented).toBe(true)
+      fireEvent(heading, at(createEvent.drop(heading, { dataTransfer })))
+      expect(onReorder).toHaveBeenCalledWith('r2', 0)
+    })
+
     it('a row moved in the opened list drops at its place in the whole list', () => {
       const onReorder = vi.fn()
       sheet(19, { onReorder, onOpen: vi.fn() })
