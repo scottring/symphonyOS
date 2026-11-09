@@ -1288,6 +1288,16 @@ describe('WeekCanvas — the list', () => {
     expect(screen.queryByText('Swim bag by the door')).toBeNull()
   })
 
+  it('the older tasks keep the shared order, the one Today’s sheet shows', async () => {
+    const old = (id: string, title: string, sortOrder: number) => task({ id, title, sortOrder, commitments: [{ level: 'week', periodStart: new Date(2026, 8, 26), status: 'open' }] })
+    const later = old('later', 'Reschedule dentist', 1000)
+    const first = old('first', 'Sign Scherr agreement', -2000)
+    await list(writers(), { shelf: buildShelf({ weekTasks: [later, first], weekStart, now: new Date(2026, 9, 3, 9) }) })
+    fireEvent.click(within(listCol()).getByRole('button', { name: /2 from before this week/ }))
+    const rows = within(screen.getByRole('list', { name: 'From before this week' })).getAllByRole('listitem')
+    expect(rows.map((r) => r.textContent)).toEqual([expect.stringContaining('Sign Scherr agreement'), expect.stringContaining('Reschedule dentist')])
+  })
+
   it('work from before this week folds into one line; this week’s own stays', async () => {
     const own = task({ id: 'own', title: 'Book the plumber', commitments: [{ level: 'week', periodStart: weekStart, status: 'open' }] })
     const old = task({ id: 'old', title: 'Clean the gutters', commitments: [{ level: 'week', periodStart: new Date(2026, 8, 26), status: 'open' }] })

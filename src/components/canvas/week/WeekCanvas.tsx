@@ -953,6 +953,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const byOrder = (a: ListRow, b: ListRow) => compareSortOrder(a.task.sortOrder, b.task.sortOrder)
       || (a.task.createdAt?.getTime?.() ?? 0) - (b.task.createdAt?.getTime?.() ?? 0)
     const mainList = [...ownList, ...dayed].sort(byOrder)
+    olderList.sort(byOrder)
     const openMain = mainList.filter((r) => !r.task.completed).map((r) => r.task)
     // Move up / Move down (the When ▾ panel): the same write a drag makes.
     const moveBy = (t: Task, by: -1 | 1) => {
