@@ -372,3 +372,22 @@ describe('computeTodayData — a no-school day', () => {
     expect(d.schoolOff).toBeNull()
   })
 })
+
+describe('computeTodayData — Background routines', () => {
+  const NOW = new Date('2026-05-19T00:00:00')
+  const routine = (over: Partial<Routine>) => ({
+    id: 'r', name: 'Run', visibility: 'active', recurrence_pattern: { type: 'daily' }, show_on_timeline: true, context: 'family', ...over,
+  }) as Routine
+  const allItems = (d: ReturnType<typeof computeTodayData>) => Object.values(d.grouped).flat()
+
+  it('keeps a timed Background routine in the day, so its time counts', () => {
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines: [routine({ background: true, time_of_day: '17:15' })] }))
+    expect(allItems(d).map((i) => i.id)).toEqual(['routine-r'])
+  })
+
+  it('drops an untimed Background routine from the day and the chooser', () => {
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines: [routine({ background: true, time_of_day: null })] }))
+    expect(allItems(d)).toEqual([])
+    expect(d.dayPlan.chooserRoutines).toEqual([])
+  })
+})

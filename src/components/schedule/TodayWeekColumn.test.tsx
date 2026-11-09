@@ -126,7 +126,7 @@ describe('TodayWeekFold: the week folded beside the day', () => {
 
   // Fix round 1: the column's "Routines today" lives on the sheet, below the
   // week's tasks, with the column's own + (toToday's routine branch).
-  describe('Routines today', () => {
+  describe('Routines to pick from', () => {
     const occ = { key: 'routine:r', kind: 'routine', id: 'r', title: 'Water the plants', completed: false, planned: false, group: 'available' } as DayPlanEntry
     const weekly = { key: 'routine:w', kind: 'routine', id: 'w', title: 'Mow the lawn', completed: false, planned: false, group: 'available', routine: { id: 'w' } } as unknown as DayPlanEntry
     const chosen = { key: 'routine:c', kind: 'routine', id: 'c', title: 'Feed the fish', completed: false, planned: true, group: 'available' } as DayPlanEntry
@@ -137,7 +137,7 @@ describe('TodayWeekFold: the week folded beside the day', () => {
       const actions = { choose: vi.fn(), unchoose: vi.fn(), complete: vi.fn(), open: vi.fn(), placeRoutine }
       view({ plan: withRoutines, actions: actions as never })
       unfold()
-      const list = screen.getByRole('list', { name: 'Routines today' })
+      const list = screen.getByRole('list', { name: 'Routines to pick from' })
       expect(within(list).getAllByRole('listitem').map((li) => li.querySelector('.above-sheet-row-title')?.textContent)).toEqual(['Water the plants', 'Mow the lawn'])
       // Below the week's tasks, above the foot.
       const tasks = screen.getByRole('list', { name: 'Oct 31 – Nov 6' })
@@ -162,8 +162,8 @@ describe('TodayWeekFold: the week folded beside the day', () => {
     it('says nothing about routines when there are none', () => {
       view()
       unfold()
-      expect(screen.queryByRole('list', { name: 'Routines today' })).toBeNull()
-      expect(screen.queryByText(/^Routines today$/)).toBeNull()
+      expect(screen.queryByRole('list', { name: 'Routines to pick from' })).toBeNull()
+      expect(screen.queryByText(/^Routines to pick from$/)).toBeNull()
     })
   })
 

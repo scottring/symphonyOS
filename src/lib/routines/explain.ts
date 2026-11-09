@@ -191,6 +191,7 @@ function explainToday(r: Routine, ctx: ExplainCtx, prefs: RoutinePrefs): Surface
     const reason = res.reason === 'not-today' ? notTodayReason(r, ctx.date) : sharedReason(r, res.reason)
     return { ...base, shows: false, rung: res.reason, reason }
   }
+  if (r.background) return { ...base, shows: false, rung: 'background', reason: 'Background: no row on Today, and its time still counts against the hours open' }
   if (ctx.skippedToday) {
     const back = matchesRecurrenceForDate(r, addDays(ctx.date, 1), ctx.lastCompletedAt ?? null)
     return { ...base, shows: false, rung: 'skipped', reason: `Skipped for today only — back ${back ? 'tomorrow' : 'next time it’s due'}` }
@@ -198,7 +199,7 @@ function explainToday(r: Routine, ctx: ExplainCtx, prefs: RoutinePrefs): Surface
   const doses = (r.times_per_day ?? []).map(clockText).filter((t): t is string => !!t)
   if (doses.length > 0) return { ...base, shows: true, rung: 'shows', reason: `On Today at ${doses.length > 1 ? `${doses.slice(0, -1).join(', ')} & ${doses[doses.length - 1]}` : doses[0]}` }
   const at = clockText(r.time_of_day)
-  if (at) return { ...base, shows: true, rung: 'shows', reason: `On Today at ${at}` }
+  if (at) return { ...base, shows: true, rung: 'shows', reason: `On Today’s ${r.show_on_day_grid || ctx.deferredInto?.has(r.id) ? 'grid' : 'checklist'} at ${at}` }
   if (routineSwitches(r).placedToday) return { ...base, shows: true, rung: 'shows', reason: 'Any time today' }
   // A rule that leaves the day open waits in Today's pin to be chosen (dayPlan.ts).
   return { ...base, shows: true, rung: 'shows', reason: 'Offered on Today to choose — it has no set day' }
@@ -280,10 +281,14 @@ function explainKiosk(r: Routine, ctx: ExplainCtx, today: SurfaceExplanation): S
     if (ctx.parent.show_on_kiosk === false) {
       return { ...base, shows: false, rung: 'kiosk-off', reason: `Inside ${ctx.parent.name}, which is off the kitchen kiosk` }
     }
+    if (ctx.parent.background) {
+      return { ...base, shows: false, rung: 'background', reason: `Inside ${ctx.parent.name}, which is in the background` }
+    }
   }
   // The Kiosk switch: the routine's own choice to stay off the wall and the
   // kids' tablets. Said before the day's rule, like Off is on Today.
   if (r.show_on_kiosk === false) return { ...base, shows: false, rung: 'kiosk-off', reason: KIOSK_OFF_REASON }
+  if (r.background) return { ...base, shows: false, rung: 'background', reason: 'Background: not on the kitchen kiosk' }
 
   const steps = ctx.steps ?? []
   if (steps.length > 0) {

@@ -189,6 +189,8 @@ export interface UpdateRoutineInput {
   show_on_timeline?: boolean
   show_on_kiosk?: boolean // the Kiosk switch: off the kitchen kiosk and the kids' tablets
   show_on_week?: boolean // "Show on the week": on the Week's grid (default off)
+  show_on_day_grid?: boolean // pinned to Today's grid (default off: on the checklist)
+  background?: boolean // no row on Today or the kiosk; its time still counts
   pin_to_timeline?: boolean // always show on Today, even when "hide daily" is on
   target_amount?: number | null
   target_unit?: TargetUnit | null
@@ -472,6 +474,8 @@ export function useRoutines(supabase = defaultSupabase) {
       if (input.show_on_timeline !== undefined) updates.show_on_timeline = input.show_on_timeline
       if (input.show_on_kiosk !== undefined) updates.show_on_kiosk = input.show_on_kiosk
       if (input.show_on_week !== undefined) updates.show_on_week = input.show_on_week
+      if (input.show_on_day_grid !== undefined) updates.show_on_day_grid = input.show_on_day_grid
+      if (input.background !== undefined) updates.background = input.background
       if (input.location !== undefined) updates.location = input.location
       if (input.location_place_id !== undefined) updates.location_place_id = input.location_place_id
       if (input.prep_task_templates !== undefined) updates.prep_task_templates = input.prep_task_templates

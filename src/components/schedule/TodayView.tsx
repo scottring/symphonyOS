@@ -80,6 +80,9 @@ import { DailyEditionPreview, useEditionPreview } from './DailyEditionPreview'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
 import { TodayDayScale, type DayScaleHandle } from './TodayDayScale'
+import { TodayRoutineChecklist } from './TodayRoutineChecklist'
+import { splitDayRoutines, quietBands } from '@/lib/today/dayRoutines'
+import { deferredInRoutineIds } from '@/lib/today/deferredRoutines'
 import { ForTodayDropZone } from './TodayDropZones'
 import { resolveDrop, writeMoveAndRegisterUndo, SCALE_DROP_ID, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
@@ -757,7 +760,7 @@ export function TodayView({
   // The day as this page shows it, under its filters: the session's count
   // and pictures read exactly what is drawn.
   const dayPicture = useMemo<DayPictureItem[]>(() => SECTIONS_ORDER.flatMap((sec) => data.grouped[sec] ?? [])
-    .filter((i) => !i.skipped)
+    .filter((i) => !i.skipped && !i.originalRoutine?.background)
     .map((i) => ({
       key: i.id, title: i.title,
       kind: (i.type === 'event' ? 'event' : i.type === 'task' ? 'task' : 'routine') as DayPictureItem['kind'],
@@ -818,7 +821,8 @@ export function TodayView({
   }, [tasks, viewedDate, userId, selectedAssignees])
 
   // ── A pending change card, drawn dashed on the day (todayPreview.ts).
-  const { changeSet } = useCanvasActivity()
+  const canvasActivity = useCanvasActivity()
+  const { changeSet } = canvasActivity
   const preview: TodayPreview = useMemo(() => todayPreview(changeSet, viewedDate), [changeSet, viewedDate])
   // Viewing another day: "Tomorrow"/"Yesterday" reads better than repeating the
   // weekday the date line above already shows.
@@ -1240,7 +1244,32 @@ export function TodayView({
     for (const key of Object.keys(out) as DaySection[]) out[key] = (out[key] ?? []).filter(notHidden)
     return out
   }, [focusWork.active, notHidden])
-  const shownTimedItems = useMemo(() => timedItems.filter(notHidden), [timedItems, notHidden])
+  // Routines leave the grid unless pinned or placed on this day; their time
+  // still counts (dayRoutines.ts). A row a change card marks stays where the
+  // card can mark it.
+  const routineSplit = useMemo(() => splitDayRoutines(timedItems, {
+    placed: deferredInRoutineIds(dateInstances, viewedDate),
+    keep: (item) => markForRow(preview, item.id) !== undefined,
+  }), [timedItems, dateInstances, viewedDate, preview])
+  const dayBands = useMemo(() => quietBands(routineSplit.quiet), [routineSplit.quiet])
+  const shownTimedItems = useMemo(() => routineSplit.grid.filter(notHidden), [routineSplit.grid, notHidden])
+  const toggleDayItem = (item: TimelineItem) => {
+    if (item.type === 'task') onToggleTask(item.id.replace('task-', ''))
+    else if (item.type === 'routine' && onCompleteRoutine) {
+      const { routineId, slot } = parseRoutineTimelineId(item.id)
+      onCompleteRoutine(slot === null ? routineId : `${routineId}#${slot}`, !item.completed)
+    }
+  }
+  const setDayGridPin = (item: TimelineItem, next: boolean) => {
+    const routine = item.originalRoutine
+    const update = ctx.onUpdateRoutine
+    if (!routine || !update) return
+    void canvasActivity.run(
+      next ? `Keep “${item.title}” on the grid` : `Take “${item.title}” off the grid`,
+      async () => { await update(routine.id, { show_on_day_grid: next }) },
+      { ids: [routine.id], undo: async () => { await update(routine.id, { show_on_day_grid: !next }) } },
+    )
+  }
   const proposedUntimed = preview.added.filter((a) => !a.time)
   const proposedTimed = preview.added.filter((a) => a.time)
 
@@ -1604,6 +1633,14 @@ export function TodayView({
               </div>
             )}
           </ForTodayDropZone>
+          <TodayRoutineChecklist
+            items={routineSplit.checklist}
+            heading={data.isToday ? 'Routines today' : 'Routines this day'}
+            peopleOf={peopleOf}
+            onSelect={handleSelectItem}
+            onToggleDone={toggleDayItem}
+            onPin={ctx.onUpdateRoutine ? (item) => setDayGridPin(item, true) : undefined}
+          />
           </section>
 
           <section aria-labelledby="today-day-heading" className="daybook-journal-section today-day-section" data-guide-anchor="day">
@@ -1668,13 +1705,9 @@ export function TodayView({
               isReadOnlyEvent={isReadOnlyEvent}
               onSelect={handleSelectItem}
               // The same tick-off the list's checks do (Scott, 2026-10-17).
-              onToggleDone={(item) => {
-                if (item.type === 'task') onToggleTask(item.id.replace('task-', ''))
-                else if (item.type === 'routine' && onCompleteRoutine) {
-                  const { routineId, slot } = parseRoutineTimelineId(item.id)
-                  onCompleteRoutine(slot === null ? routineId : `${routineId}#${slot}`, !item.completed)
-                }
-              }}
+              onToggleDone={toggleDayItem}
+              quiet={dayBands}
+              onUnpin={ctx.onUpdateRoutine ? (item) => setDayGridPin(item, false) : undefined}
               onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }).then((ok) => { if (ok === true && payload.kind === 'task') notePlaced() }) }}
               // Dragging a block's bottom edge: a task's length (with Undo,
               // as a move has), an event's end.

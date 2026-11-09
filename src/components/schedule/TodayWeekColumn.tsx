@@ -126,11 +126,10 @@ export function SheetRoutines({ plan, day, actions }: { plan: DayPlan; day: Date
   const toToday = useToToday(day, actions)
   const routines = sheetRoutines(plan, day)
   if (routines.length === 0) return null
-  const { word: dayWord } = dayWordFor(day)
   // The Day session's Habits step points here (planning as tooltips, Task 2).
   return <div className="sheet-routines" data-guide-anchor="routines">
-    <h3 className="above-sheet-sub">Routines {dayWord}</h3>
-    <SheetRows label={`Routines ${dayWord}`} {...sheetRowProps(routines, day, actions, toToday)} />
+    <h3 className="above-sheet-sub">Routines to pick from</h3>
+    <SheetRows label="Routines to pick from" {...sheetRowProps(routines, day, actions, toToday)} />
   </div>
 }
 

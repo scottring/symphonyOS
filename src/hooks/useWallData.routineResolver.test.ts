@@ -197,6 +197,19 @@ describe('useWallData — resolveRoutine adoption (Task 8b)', () => {
   // assigned collection Step (the exact shape the wall board's downstream
   // filters read via item.assignedTo) must still reach day.items, with a
   // sibling non-Step control from the same fetch.
+  it('a Background routine and its Steps do NOT reach the wall; a sibling does', async () => {
+    const parent = createMockRoutine({ name: 'Background Parent', context: 'family', background: true })
+    ROUTINES = [
+      parent,
+      createMockRoutine({ name: 'Background Step', context: 'family', parent_routine_id: parent.id }),
+      createMockRoutine({ name: 'Family Control', context: 'family' }),
+    ]
+    const names = routineNamesOnWall(await fetchDays())
+    expect(names).not.toContain('Background Parent')
+    expect(names).not.toContain('Background Step')
+    expect(names).toContain('Family Control')
+  })
+
   it('a kid-assigned collection Step still reaches days[].items (feeds the wall board)', async () => {
     const parent = createMockRoutine({
       name: 'Bedtime Collection',

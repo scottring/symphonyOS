@@ -20,7 +20,7 @@ const ctx = { date: WED, weekStart: WEEK_START, familyMembers: MEMBERS }
 describe('explainRoutine — Today', () => {
   it('a timed routine is on Today at its time', () => {
     const e = explainRoutine(r({ time_of_day: '07:00:00' }), ctx)
-    expect(e.today).toMatchObject({ shows: true, rung: 'shows', reason: 'On Today at 7:00 AM' })
+    expect(e.today).toMatchObject({ shows: true, rung: 'shows', reason: 'On Today’s checklist at 7:00 AM' })
   })
 
   it('an untimed day-bound routine is on Today any time', () => {
@@ -136,6 +136,24 @@ describe('explainRoutine — Kiosk', () => {
     expect(e.today.shows).toBe(true)
     expect(e.week.shows).toBe(true)
     expect(e.state).toBe('running')
+  })
+
+  it('Background is off Today and off the kiosk, and says its time still counts', () => {
+    const e = explainRoutine(r({ background: true, time_of_day: '17:15' }), ctx)
+    expect(e.today).toMatchObject({ shows: false, rung: 'background', reason: 'Background: no row on Today, and its time still counts against the hours open' })
+    expect(e.kiosk).toMatchObject({ shows: false, rung: 'background', reason: 'Background: not on the kitchen kiosk' })
+    expect(e.state).toBe('running')
+  })
+
+  it('a routine with a time is on Today’s checklist unless pinned', () => {
+    expect(explainRoutine(r({ time_of_day: '07:00' }), ctx).today.reason).toBe('On Today’s checklist at 7:00 AM')
+    expect(explainRoutine(r({ time_of_day: '07:00', show_on_day_grid: true }), ctx).today.reason).toBe('On Today’s grid at 7:00 AM')
+  })
+
+  it('a Step rides its collection’s Background switch on the kiosk', () => {
+    const parent = r({ id: 'p', name: 'Morning Steps', background: true })
+    const step = r({ id: 's', parent_routine_id: 'p' })
+    expect(explainRoutine(step, { ...ctx, parent }).kiosk).toMatchObject({ shows: false, rung: 'background' })
   })
 
   it('a Step rides its collection’s Kiosk switch', () => {

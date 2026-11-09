@@ -519,9 +519,13 @@ export function useWallData(): UseWallDataReturn {
         // No school on the calendar: the school routines are off that day,
         // on the wall as on Today (lib/today/noSchool.ts).
         const offIds = noSchoolReason(events, date) ? new Set(schoolRoutinesOff(routines).map((r) => r.id)) : null
+        // Background routines (and their Steps) stay off the wall and the tablets.
+        const backgroundIds = new Set(routines.filter((r) => r.background).map((r) => r.id))
         const dayRoutines = routines.filter(
           (r) =>
             r.show_on_kiosk !== false &&
+            !backgroundIds.has(r.id) &&
+            !(r.parent_routine_id && backgroundIds.has(r.parent_routine_id)) &&
             !offIds?.has(r.id) &&
             resolveRoutine(
               { ...r, show_on_timeline: true, parent_routine_id: null },

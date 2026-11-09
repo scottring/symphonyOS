@@ -347,6 +347,7 @@ export type RoutineHideReason =
   | 'in-collection'  // rung 6 — it's a step; the collection renders it
   | 'everyday'       // rung 7 — swept by "hide daily routines"
   | 'kiosk-off'      // the kiosk only — show_on_kiosk === false (resolveRoutineOnWall)
+  | 'background'     // the kiosk only — Background (resolveRoutineOnWall)
 
 export interface RoutinePrefs {
   /** The "hide daily routines" toggle (rung 7). */
@@ -504,6 +505,7 @@ export function resolveRoutineOnWall(
   lastCompletedAt?: Date | null,
 ): RoutineResolution {
   if (routine.show_on_kiosk === false) return { shows: false, reason: 'kiosk-off', owners: routineOwners(routine) }
+  if (routine.background) return { shows: false, reason: 'background', owners: routineOwners(routine) }
   return resolveRoutine(
     { ...routine, show_on_timeline: true, parent_routine_id: null },
     { date, prefs: { hideRoutines: false, layers: WALL_LAYERS }, lastCompletedAt: lastCompletedAt ?? null },

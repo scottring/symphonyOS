@@ -108,6 +108,12 @@ export interface Routine {
    *  routine is Today's, on its days (Scott, 2026-11-08); one given a day
    *  this week shows there regardless. */
   show_on_week?: boolean
+  /** Pinned to Today's grid. Default false: a routine is on the day's checklist
+   *  unless someone pins it or places it on that day (Scott, 2026-11-09). */
+  show_on_day_grid?: boolean
+  /** Background: no row on Today, the kitchen kiosk or the kids' tablets. Its
+   *  time still counts against the hours open (Scott, 2026-11-09). */
+  background?: boolean
   pin_to_timeline?: boolean // Always show on Today even when "hide daily routines" is on (tracked obligations, e.g. PT exercises)
   /** Daily quantity goal — "read 20 minutes" = 20/'minutes'. Both null = plain checkbox step. */
   target_amount?: number | null

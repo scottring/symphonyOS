@@ -92,7 +92,7 @@ describe('TapRoutinePanel', () => {
     expect(within(where).getByText('Today')).toBeInTheDocument()
     expect(within(where).getByText('Week')).toBeInTheDocument()
     expect(within(where).getByText('Kiosk')).toBeInTheDocument()
-    expect(within(where).getByText('On Today at 8:00 PM')).toBeInTheDocument()
+    expect(within(where).getByText('On Today’s checklist at 8:00 PM')).toBeInTheDocument()
     expect(within(where).getByText('On the kitchen kiosk at 8:00 PM')).toBeInTheDocument()
   })
 
@@ -104,6 +104,29 @@ describe('TapRoutinePanel', () => {
   })
 
   // Scott, 2026-11-08: routines stay off the week's grid unless tagged.
+  it('Keep on the day grid writes the pin', async () => {
+    const onShowOnDayGridChange = vi.fn()
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onShowOnDayGridChange={onShowOnDayGridChange} />)
+    fireEvent.click(screen.getByRole('switch', { name: 'Keep on the day grid' }))
+    await waitFor(() => expect(onShowOnDayGridChange).toHaveBeenCalledWith(true))
+  })
+
+  it('Background writes the switch and says its time still counts', async () => {
+    const onBackgroundChange = vi.fn()
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onBackgroundChange={onBackgroundChange} />)
+    fireEvent.click(screen.getByRole('switch', { name: 'Background' }))
+    await waitFor(() => expect(onBackgroundChange).toHaveBeenCalledWith(true))
+  })
+
+  it('a Background routine offers no Kiosk or day-grid switch', () => {
+    render(<TapRoutinePanel routine={{ ...routine, background: true }} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+      onBackgroundChange={vi.fn()} onShowOnDayGridChange={vi.fn()} onShowOnKioskChange={vi.fn()} />)
+    expect(screen.getByRole('switch', { name: 'Background' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText(/time still counts against the hours open/)).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Kiosk' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Keep on the day grid' })).toBeNull()
+  })
+
   it('Show on the week puts it on the week, with Undo', async () => {
     const onShowOnWeekChange = vi.fn()
     const { rerender } = render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
@@ -241,7 +264,7 @@ describe('TapRoutinePanel', () => {
     expect(screen.getAllByText('Not on Wednesdays — runs Tue').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: /Edit schedule/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Wed' }))
-    expect(screen.getByText('On Today at 8:00 PM')).toBeInTheDocument()
+    expect(screen.getByText('On Today’s checklist at 8:00 PM')).toBeInTheDocument()
   })
 
   it('On Today says what it will actually do: at its time, on its day, or offered to choose', () => {

@@ -25,6 +25,32 @@ function renderScale(items: TimelineItem[], over: Record<string, unknown> = {}) 
 }
 
 describe('TodayDayScale', () => {
+  it('draws a quiet band for routines off the grid, and their time is not open', () => {
+    renderScale([], {
+      now: null,
+      quiet: [{ id: 'quiet-1', start: at(12), end: at(13), count: 2 }],
+    })
+    expect(document.querySelector('.today-scale-quiet')).toHaveTextContent('2 routines')
+    expect([...document.querySelectorAll('.today-scale-free')].map((f) => f.textContent)).toEqual(['5 hours open', '8 hours open'])
+  })
+
+  it('says one routine in the singular', () => {
+    renderScale([], { quiet: [{ id: 'quiet-1', start: at(17, 15), end: at(17, 45), count: 1 }] })
+    expect(document.querySelector('.today-scale-quiet')).toHaveTextContent(/^1 routine$/)
+  })
+
+  it('offers a pinned routine a way off the grid, and nothing else', () => {
+    const onUnpin = vi.fn()
+    renderScale([
+      item({ id: 'routine-dose', type: 'routine', title: 'Dose', startTime: at(9), originalRoutine: { id: 'dose', show_on_day_grid: true } as TimelineItem['originalRoutine'] }),
+      item({ id: 'routine-lib', type: 'routine', title: 'Library', startTime: at(11), originalRoutine: { id: 'lib' } as TimelineItem['originalRoutine'] }),
+      item({ id: 'task-a', title: 'A', startTime: at(14) }),
+    ], { onUnpin })
+    expect(screen.getAllByRole('button', { name: /^Take .* off the grid$/ })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Take Dose off the grid' }))
+    expect(onUnpin).toHaveBeenCalledWith(expect.objectContaining({ id: 'routine-dose' }))
+  })
+
   it('keeps recorded tasks visible but makes no open-time claims without calendar coverage', () => {
     renderScale([item({ id: 'task-library', title: 'Library books', startTime: at(10) })], { showOpenTime: false })
     expect(screen.getByRole('button', { name: 'Library books, 10:00 AM' })).toBeInTheDocument()

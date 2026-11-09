@@ -43,7 +43,7 @@ vi.mock('@/hooks/useTimelineInsert', () => ({
 const TODAY = new Date()
 const midnight = new Date(TODAY); midnight.setHours(0, 0, 0, 0)
 
-const ctxValue = { onToggleTask: vi.fn(), onUpdateTask: vi.fn(), onPushTask: vi.fn(), projects: [], contacts: [], familyMembers: [], lists: [] }
+const ctxValue = { onUpdateRoutine: vi.fn(), onToggleTask: vi.fn(), onUpdateTask: vi.fn(), onPushTask: vi.fn(), projects: [], contacts: [], familyMembers: [], lists: [] }
 
 const datedOnly = createMockTask({ id: 'meds', title: 'Pick up foot meds', bucket: 'timed', isAllDay: true, scheduledFor: midnight })
 const chosen = createMockTask({ id: 'bank', title: 'Call the bank', bucket: 'timed', isAllDay: true, scheduledFor: midnight, plannedOn: midnight })
@@ -76,6 +76,39 @@ function renderView(props: Record<string, unknown> = {}, workspace: AlongsideWor
 }
 
 beforeEach(() => { sessionStorage.clear(); localStorage.removeItem('symphony-plan-v2.view.today'); mobile.value = true })
+
+describe('Today — routines off the grid (Scott, 2026-11-09)', () => {
+  const timed = (over: Parameters<typeof createMockRoutine>[0]) =>
+    createMockRoutine({ time_of_day: '12:00', recurrence_pattern: { type: 'daily' }, show_on_timeline: true, ...over })
+  const dayRegion = () => within(screen.getByRole('region', { name: 'The day' }))
+  const forToday = () => within(screen.getByRole('region', { name: 'For today' }))
+
+  it('a timed routine is on the checklist, with a quiet band on the grid', () => {
+    renderView({ routines: [timed({ id: 'a', name: 'School morning' })] })
+    expect(within(forToday().getByRole('list', { name: 'Routines today' })).getByText('School morning')).toBeInTheDocument()
+    expect(dayRegion().queryByText(/School morning/)).toBeNull()
+    expect(document.querySelector('.today-scale-quiet')).toHaveTextContent('1 routine')
+  })
+
+  it('a pinned routine is on the grid and not the checklist', () => {
+    renderView({ routines: [timed({ id: 'b', name: 'The dose', show_on_day_grid: true })] })
+    expect(dayRegion().getByRole('button', { name: /^The dose, / })).toBeInTheDocument()
+    expect(forToday().queryByText('The dose')).toBeNull()
+  })
+
+  it('a Background routine has no row anywhere, and the grid keeps its time', () => {
+    renderView({ routines: [timed({ id: 'c', name: 'FFG pickup', background: true })] })
+    expect(screen.queryByText(/FFG pickup/)).toBeNull()
+    expect(document.querySelector('.today-scale-quiet')).toHaveTextContent('1 routine')
+  })
+
+  it('the pin on a checklist row saves it to the grid', async () => {
+    ctxValue.onUpdateRoutine.mockClear()
+    renderView({ routines: [timed({ id: 'a', name: 'School morning' })] })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep School morning on the grid' }))
+    await waitFor(() => expect(ctxValue.onUpdateRoutine).toHaveBeenCalledWith('a', { show_on_day_grid: true }))
+  })
+})
 
 describe('Today — the way to Planning', () => {
   // Scott, 2026-09-21: Today shows what you scheduled for today plus what you
@@ -120,12 +153,12 @@ describe('Today — the way to Planning', () => {
   // day's list (dayPlan's offMainRoutineItemIds); its home was the column's
   // "Routines today". It is on the week sheet now, below the week's tasks,
   // with the same + the column had.
-  it('a flexible untimed routine is on the sheet under Routines today, and + plans it for today', async () => {
+  it('a flexible untimed routine is on the sheet under Routines to pick from, and + plans it for today', async () => {
     localStorage.setItem('symphony-fold:day', 'open')
     try {
       renderView()
       const sheet = screen.getByRole('region', { name: /, to pick from$/ })
-      const routines = within(sheet).getByRole('list', { name: 'Routines today' })
+      const routines = within(sheet).getByRole('list', { name: 'Routines to pick from' })
       expect(within(routines).getByText('Kids clean rooms')).toBeInTheDocument()
       expect(within(routines).getByText('Kids clean rooms').closest('li')).toHaveAttribute('draggable', 'true')
       fireEvent.click(within(routines).getByRole('button', { name: 'Plan Kids clean rooms for today' }))
@@ -158,7 +191,7 @@ describe('Today — the way to Planning', () => {
       // One fold: the workspace's.
       expect(document.querySelectorAll('.paper-fold')).toHaveLength(1)
       const sheet = screen.getByRole('region', { name: /, to pick from$/ })
-      const routines = await within(sheet).findByRole('list', { name: 'Routines today' })
+      const routines = await within(sheet).findByRole('list', { name: 'Routines to pick from' })
       expect(within(routines).getByText('Kids clean rooms').closest('li')).toHaveAttribute('draggable', 'true')
       // Below the week's tasks, above the foot.
       expect(routines.compareDocumentPosition(within(sheet).getByText('Pick three to five for today.')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()

@@ -31,7 +31,10 @@ export function computeTodayData(given: TodayDataInput): TodayData {
   const noSchool = noSchoolReason(given.events, given.viewedDate)
   const off = noSchool && !given.showSchoolRoutines ? schoolRoutinesOff(given.routines) : []
   const offIds = new Set(off.map((r) => r.id))
-  const input: TodayDataInput = offIds.size ? { ...given, routines: given.routines.filter((r) => !offIds.has(r.id)) } : given
+  // A Background routine with no time has no row and no time to count. One
+  // with a time stays in the data, so the hours open still count it (dayRoutines.ts).
+  const onDay = given.routines.filter((r) => !offIds.has(r.id) && !(r.background && !r.time_of_day))
+  const input: TodayDataInput = onDay.length !== given.routines.length ? { ...given, routines: onDay } : given
   // The names a person reads: the routines, not each checklist step.
   const offNames = off.filter((r) => !r.parent_routine_id || !offIds.has(r.parent_routine_id)).map((r) => r.name)
   const schoolOff = noSchool && (offNames.length || given.showSchoolRoutines)

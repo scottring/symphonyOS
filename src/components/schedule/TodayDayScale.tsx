@@ -1,9 +1,11 @@
 import { useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
+import { Pin } from 'lucide-react'
 import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember, FamilyMemberColor } from '@/types/family'
 import { FAMILY_COLORS } from '@/types/family'
 import { buildDayScale, timeAtOffset, MIN_BLOCK, type DayScale, type ScaleBlock } from '@/lib/today/dayScale'
+import type { QuietBand } from '@/lib/today/dayRoutines'
 import { SCALE_DROP_ID, refusalFor } from '@/lib/today/todayDrop'
 import { dragPointerY } from '@/lib/today/dragPointer'
 import { isPlanDrag, readPlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
@@ -80,6 +82,8 @@ interface BlockProps {
   /** A new end, from dragging the bottom edge. Unset: it cannot be resized
    *  (a routine has no length of its own; a read-only event cannot change). */
   onResize?: (end: Date) => void
+  /** Takes a routine pinned to the grid back to the checklist. */
+  onUnpin?: () => void
 }
 
 /** Lengths snap to the quarter hour, as drops do, and never go below one. */
@@ -89,7 +93,7 @@ const SNAP_MINUTES = 15
  *  side by side "looks stupid"): "9:00–10:15 · Boxing" and who carries it.
  *  A task or routine leads with the same check "For today" has (Scott,
  *  2026-10-17); an event has none. A click on the rest opens its details. */
-function ScaleItem({ item, start, end: savedEnd, hasEnd: savedHasEnd, block, pxPerHour, people, selected, upNext, past, refused, mark, onSelect, onToggleDone, onResize }: BlockProps) {
+function ScaleItem({ item, start, end: savedEnd, hasEnd: savedHasEnd, block, pxPerHour, people, selected, upNext, past, refused, mark, onSelect, onToggleDone, onResize, onUnpin }: BlockProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: refused })
   // Dragging the bottom edge (Scott, 2026-10-30): the block follows the
   // pointer in quarter hours and the new end is written on release.
@@ -186,6 +190,13 @@ function ScaleItem({ item, start, end: savedEnd, hasEnd: savedHasEnd, block, pxP
         {people.length > 0 && (
           <span className="today-scale-people">{people.slice(0, 3).map((m) => <MiniAvatar key={m.id} member={m} />)}</span>
         )}
+        {onUnpin && (
+          // Pressing the pin is not picking the block up.
+          <button type="button" className="today-routine-pin is-pinned" aria-label={`Take ${item.title} off the grid`} title="Take off the grid"
+            onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} onClick={onUnpin}>
+            <Pin aria-hidden="true" />
+          </button>
+        )}
         {resizeHandle && (
           <span className="today-scale-resize" aria-hidden="true" data-testid="scale-resize" {...resizeHandle} />
         )}
@@ -237,6 +248,8 @@ export function TodayDayScale({
   showOpenTime = true,
   onResize,
   create,
+  quiet = [],
+  onUnpin,
 }: {
   /** The day's timed rows (a group's children ride with their parent). */
   items: TimelineItem[]
@@ -266,6 +279,10 @@ export function TodayDayScale({
   showOpenTime?: boolean
   /** A new end for a task or event, from dragging its bottom edge. */
   onResize?: (item: TimelineItem, end: Date) => void
+  /** Routines off the grid: a quiet band each, and their time is not open. */
+  quiet?: readonly QuietBand[]
+  /** Takes a pinned routine off the grid. Unset: no pin on the block. */
+  onUnpin?: (item: TimelineItem) => void
   /** Typing straight onto an empty stretch. Unset: the column takes no clicks
    *  of its own. Without onCreateEvent it adds tasks only. */
   create?: {
@@ -292,10 +309,11 @@ export function TodayDayScale({
       [
         ...timed.map((t) => ({ id: t.item.id, start: t.start, end: t.hasEnd ? t.end : null })),
         ...[...proposedById].map(([id, p]) => ({ id, start: p.time!, end: null })),
+        ...quiet.map((q) => ({ id: q.id, start: q.start, end: q.end })),
       ],
       { now, pxPerHour: isMobile ? 40 : 48, fromHour },
     ),
-    [timed, proposedById, now, isMobile, fromHour],
+    [timed, proposedById, quiet, now, isMobile, fromHour],
   )
   const trackRef = useRef<HTMLDivElement | null>(null)
   const { setNodeRef, isOver } = useDroppable({ id: SCALE_DROP_ID })
@@ -356,6 +374,7 @@ export function TodayDayScale({
   } : {}
 
   const byId = useMemo(() => new Map(timed.map((t) => [t.item.id, t])), [timed])
+  const quietById = useMemo(() => new Map(quiet.map((q) => [q.id, q])), [quiet])
 
   // ── Typing onto the grid ──
   // A click lands on the quarter hour it falls in (4:00–4:14 is 4:00), not
@@ -371,7 +390,7 @@ export function TodayDayScale({
   }
   // Only the column itself, its hour lines and its free stretches open a box.
   const onEmpty = (target: EventTarget) =>
-    target instanceof Element && !target.closest('.today-scale-item, .today-scale-draft')
+    target instanceof Element && !target.closest('.today-scale-item, .today-scale-quiet, .today-scale-draft')
   const createHandlers = create ? {
     onClick: (e: React.MouseEvent) => {
       if (!onEmpty(e.target) || draft) return
@@ -413,6 +432,17 @@ export function TodayDayScale({
       {scale.blocks.map((b) => {
         const arriving = proposedById.get(b.id)
         if (arriving) return <ProposedBlock key={b.id} row={arriving} block={b} />
+        const band = quietById.get(b.id)
+        if (band) {
+          return (
+            <div key={b.id} className="today-scale-quiet" style={{
+              top: b.top,
+              height: b.height,
+              left: `calc(var(--scale-gutter) + (100% - var(--scale-gutter)) * ${b.lane / b.lanes})`,
+              width: `calc((100% - var(--scale-gutter)) / ${b.lanes} - ${b.lanes > 1 ? 6 : 0}px)`,
+            }}>{band.count} {band.count === 1 ? 'routine' : 'routines'}</div>
+          )
+        }
         const entry = byId.get(b.id)
         if (!entry) return null
         const { item, start, end, hasEnd } = entry
@@ -435,6 +465,7 @@ export function TodayDayScale({
             onSelect={onSelect}
             onToggleDone={onToggleDone && (item.type === 'task' || item.type === 'routine') ? () => onToggleDone(item) : undefined}
             onResize={onResize && (item.type === 'task' || item.type === 'event') && !item.isSubtask && !markOf?.(item) ? (to) => onResize(item, to) : undefined}
+            onUnpin={onUnpin && item.originalRoutine?.show_on_day_grid ? () => onUnpin(item) : undefined}
           />
         )
       })}

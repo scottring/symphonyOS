@@ -73,6 +73,10 @@ interface TapRoutinePanelProps {
   /** "Show on the week" (Scott, 2026-11-08): a routine is Today's, on its
    *  days; on, it shows on the Week's grid too (writes show_on_week). */
   onShowOnWeekChange?: (next: boolean) => unknown
+  /** Pins it to Today's grid; off, it is on the day's checklist (writes show_on_day_grid). */
+  onShowOnDayGridChange?: (next: boolean) => unknown
+  /** Background: no row on Today or the kiosk; its time still counts (writes background). */
+  onBackgroundChange?: (next: boolean) => unknown
   /** The day "Where it shows" and "Hide for today" are about. Defaults to today. */
   viewedDate?: Date
   /** The occurrence the panel was opened from (a day on Week or Routines).
@@ -223,6 +227,14 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
     await run(next ? `Show "${routine.name}" on the week` : `Take "${routine.name}" off the week`,
       () => write(() => fn(next)),
       { ids: [routine.id], undo: () => write(() => fn(!next)) })
+  }
+
+  const onDayGrid = !!routine.show_on_day_grid
+  const background = !!routine.background
+  const setSwitch = async (fn: ((next: boolean) => unknown) | undefined, next: boolean, label: string) => {
+    if (!fn) return
+    if (props.unsaved) { fn(next); return }
+    await run(label, () => write(() => fn(next)), { ids: [routine.id], undo: () => write(() => fn(!next)) })
   }
 
   // "<day> only": one occurrence changes, the routine does not. Each write
@@ -517,7 +529,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
 
           {/* Kiosk — the one surface Off leaves alone (Scott, 2026-10-27: the
               panel said where it shows but gave no way off the kiosk). */}
-          {onTimeline && props.onShowOnKioskChange && (
+          {onTimeline && !background && props.onShowOnKioskChange && (
             <div className="routine-hide-control">
               <div className="routine-hide-control-text">
                 <span className="routine-hide-control-title">
@@ -573,6 +585,60 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
                 <span
                   className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
                     onWeek ? 'translate-x-[22px]' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+
+          {onTimeline && !background && props.onShowOnDayGridChange && (
+            <div className="routine-hide-control">
+              <div className="routine-hide-control-text">
+                <span className="routine-hide-control-title">Keep on the day grid</span>
+                <span className="routine-hide-control-hint">
+                  {onDayGrid ? 'On Today’s grid at its time.' : 'On Today’s checklist. Turn on when the exact time matters.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={onDayGrid}
+                aria-label="Keep on the day grid"
+                onClick={() => { void setSwitch(props.onShowOnDayGridChange, !onDayGrid, onDayGrid ? `Take "${routine.name}" off the day grid` : `Keep "${routine.name}" on the day grid`) }}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  onDayGrid ? 'bg-primary-600' : 'bg-neutral-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    onDayGrid ? 'translate-x-[22px]' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+
+          {onTimeline && props.onBackgroundChange && (
+            <div className="routine-hide-control">
+              <div className="routine-hide-control-text">
+                <span className="routine-hide-control-title">Background</span>
+                <span className="routine-hide-control-hint">
+                  {background ? 'No row on Today or the kiosk. Its time still counts against the hours open.' : 'Turn on for something that happens the same way most days.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={background}
+                aria-label="Background"
+                onClick={() => { void setSwitch(props.onBackgroundChange, !background, background ? `Bring "${routine.name}" back` : `Put "${routine.name}" in the background`) }}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  background ? 'bg-primary-600' : 'bg-neutral-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    background ? 'translate-x-[22px]' : 'translate-x-0.5'
                   }`}
                 />
               </button>

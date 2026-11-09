@@ -107,6 +107,13 @@ describe('buildMemberDayModel', () => {
     expect(model.isEmpty).toBe(true)
   })
 
+  it('hides a Background routine, and a Background collection', () => {
+    const bg = routine({ background: true })
+    const parent = routine({ name: 'Morning Steps', visibility: 'reference', background: true })
+    const step = routine({ name: 'Brush teeth', parent_routine_id: parent.id })
+    expect(build([bg, parent, step]).isEmpty).toBe(true)
+  })
+
   it('hides resting and not-today routines', () => {
     const resting = routine({ visibility: 'reference' })
     const notToday = routine({ recurrence_pattern: { type: 'weekly', days: ['mon'] } })
