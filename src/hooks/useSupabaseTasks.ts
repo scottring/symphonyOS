@@ -141,6 +141,7 @@ export interface DbTask {
   location: string | null
   location_place_id: string | null
   directions: TaskDirections | null
+  started_at?: string | null
   is_waiting: boolean | null
   waiting_since: string | null
   waiting_for: string | null
@@ -235,6 +236,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     location: dbTask.location ?? undefined,
     locationPlaceId: dbTask.location_place_id ?? undefined,
     directions: dbTask.directions ?? undefined,
+    startedAt: dbTask.started_at ? new Date(dbTask.started_at) : undefined,
     isWaiting: dbTask.is_waiting ?? undefined,
     waitingSince: dbTask.waiting_since ? new Date(dbTask.waiting_since) : undefined,
     waitingFor: dbTask.waiting_for ?? undefined,
@@ -2039,6 +2041,7 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     if ('location' in updates) dbUpdates.location = updates.location ?? null
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
     if ('directions' in updates) dbUpdates.directions = updates.directions ?? null
+    if ('startedAt' in updates) dbUpdates.started_at = updates.startedAt?.toISOString() ?? null
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
     if ('waitingFor' in updates) dbUpdates.waiting_for = updates.waitingFor?.trim() || null
@@ -2337,6 +2340,7 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     if ('location' in updates) dbUpdates.location = updates.location ?? null
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
     if ('directions' in updates) dbUpdates.directions = updates.directions ?? null
+    if ('startedAt' in updates) dbUpdates.started_at = updates.startedAt?.toISOString() ?? null
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
     if ('waitingFor' in updates) dbUpdates.waiting_for = updates.waitingFor?.trim() || null

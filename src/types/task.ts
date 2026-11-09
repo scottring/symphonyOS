@@ -95,6 +95,8 @@ export interface Task {
   captureMeta?: TaskCaptureMeta // Photo-first capture state (AI enrichment + suggested merge destination)
   isAllDay?: boolean // True = all day task, false/undefined = specific time
   isSomeday?: boolean // Legacy — replaced by bucket system
+  /** Someone has started this (Today's week sheet, 2026-11-09). Null/undefined = not started. */
+  startedAt?: Date | null
   isWaiting?: boolean // True = waiting on someone else (all actions done, pending response)
   waitingSince?: Date // When the task entered waiting state
   /** WHAT you're waiting for, in your own words — e.g. "Guy's response on

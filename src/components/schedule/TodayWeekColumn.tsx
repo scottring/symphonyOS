@@ -42,6 +42,8 @@ import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows, type SheetRow } from '@/components/plan/fold/AboveSheet'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 import { assigneesOf, assignmentWrite } from '@/lib/planning/v2/planV2'
+import { sheetRowStatus, statusWrite } from '@/lib/planning/sheetStatus'
+import { SheetStatusMenu } from '@/components/plan/fold/SheetStatusMenu'
 import type { FamilyMember } from '@/types/family'
 
 export interface TodayNextWeek { weekStart: Date; entries: DayPlanEntry[] }
@@ -51,12 +53,22 @@ export const TODAY_WEEK_FOOT = 'Pick three to five for today.'
 /** The week sheet shows this many tasks, in the shared order; the rest fold (Scott, 2026-11-09). */
 export const TODAY_WEEK_SHORT_LIST = 5
 
-/** Who a week task is for, on its sheet row: the Week page's chooser. */
-export function SheetPeople({ members, title, selected, onSelect }: { members: readonly FamilyMember[]; title: string; selected: string[]; onSelect: (ids: string[]) => void }) {
+/** A week task's one control on its sheet row (Scott, 2026-11-09): its faces,
+ *  opening who is on it and where it stands. `write` saves with an Undo. */
+export function SheetTaskTools({ task, members, write }: {
+  task: Task
+  members: readonly FamilyMember[]
+  write: (change: { label: string; patch: Partial<Task>; prev: Partial<Task> }) => void
+}) {
   if (members.length === 0) return null
+  const selected = assigneesOf(task)
   return (
     <span className={`above-sheet-people${selected.length ? '' : ' is-empty'}`}>
-      <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={selected} size="sm" onSelect={onSelect} triggerLabel={`Assign people to ${title}`} />
+      <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={selected} size="sm" label="Who’s on it"
+        triggerLabel={`Status and people for ${task.title}`}
+        onSelect={(ids) => write(assignmentWrite(task, ids, members))}
+        menuTop={<SheetStatusMenu status={sheetRowStatus(task).status} waitingFor={task.waitingFor}
+          people={members.map((m) => m.name.split(' ')[0])} onChange={(change) => write(statusWrite(task, change))} />} />
     </span>
   )
 }
@@ -211,8 +223,7 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
     const entry = open.find((e) => e.key === key)
     const task = entry?.task
     if (!task) return null
-    return <SheetPeople members={members} title={task.title} selected={assigneesOf(task)} onSelect={(ids) => {
-      const { label, patch, prev } = assignmentWrite(task, ids, members)
+    return <SheetTaskTools task={task} members={members} write={({ label, patch, prev }) => {
       void activity.run(label, async () => { await restoreTask(task.id, patch) }, { ids: [task.id], undo: async () => { await restoreTask(task.id, prev) } })
     }} />
   } : undefined
@@ -224,8 +235,10 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
     })
   }
   const firstLeft = left[0]?.key
-  const { rows, ...rowProps } = sheetRowProps(open, day, actions, toToday, (e) => earlierIds.has(e.id) && e.task
-    ? { mark: earlierDayMark(e.task), anchor: e.key === firstLeft ? 'leftovers' : undefined } : {})
+  const { rows, ...rowProps } = sheetRowProps(open, day, actions, toToday, (e) => ({
+    ...(e.task ? sheetRowStatus(e.task) : {}),
+    ...(earlierIds.has(e.id) && e.task ? { mark: earlierDayMark(e.task), anchor: e.key === firstLeft ? 'leftovers' : undefined } : {}),
+  }))
 
   const range = formatWeekRangeShort(weekStart)
   const nextById = new Map((nextWeek?.entries ?? []).map((e) => [e.id, e]))

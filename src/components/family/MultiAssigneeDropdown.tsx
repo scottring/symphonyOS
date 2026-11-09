@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { FamilyMember } from '@/types/family'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
@@ -18,6 +18,8 @@ interface MultiAssigneeDropdownProps {
   /** Say who beside the avatars ("Scott, Iris" / "No one") — a detail pane's
    *  labeled Who row, where initials alone were the whole answer. */
   showNames?: boolean
+  /** More of the menu, above the people (the week sheet's status). */
+  menuTop?: ReactNode
 }
 
 const sizeClasses = {
@@ -36,6 +38,7 @@ export function MultiAssigneeDropdown({
   label = 'Assign to family members',
   triggerLabel,
   showNames = false,
+  menuTop,
 }: MultiAssigneeDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0, placeAbove: false })
@@ -44,12 +47,13 @@ export function MultiAssigneeDropdown({
   const menuRef = useRef<HTMLDivElement>(null)
 
   const selectedMembers = members.filter(m => selectedIds.includes(m.id))
+  const hasMenuTop = !!menuTop
 
   // Calculate menu position when opening — flip above if near bottom of viewport
   useEffect(() => {
     if (isOpen && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
-      const menuHeight = 300 // approximate max height of the dropdown
+      const menuHeight = hasMenuTop ? 440 : 300 // approximate max height of the dropdown
       const spaceBelow = window.innerHeight - rect.bottom
       const placeAbove = spaceBelow < menuHeight && rect.top > menuHeight
 
@@ -61,7 +65,7 @@ export function MultiAssigneeDropdown({
         placeAbove,
       })
     }
-  }, [isOpen])
+  }, [isOpen, hasMenuTop])
 
   // The menu is portalled to <body>, so Tab from the trigger never reaches
   // it: focus moves in when it opens, or a keyboard user could open the list
@@ -151,6 +155,7 @@ export function MultiAssigneeDropdown({
         right: menuPosition.right,
       }}
     >
+      {menuTop}
       {/* Header */}
       <div className="px-3 py-1.5 text-xs font-medium text-neutral-500 uppercase tracking-wide">
         {label}

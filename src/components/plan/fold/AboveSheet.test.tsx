@@ -36,6 +36,18 @@ describe('AboveSheet: the level above, for reading', () => {
     expect(tools.compareDocumentPosition(screen.getByRole('button', { name: 'Plan Call KKI for today' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('shows a row in progress on its circle, adding no words', () => {
+    render(<AboveSheet kicker="Week" title="This week" rows={[{ id: 'a', title: 'Call KKI', status: 'started' }]} doneCount={0} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Mark Call KKI complete' })).toHaveClass('is-started')
+    expect(screen.getByRole('listitem')).toHaveTextContent(/^In progressCall KKI$/)
+  })
+
+  it('shows who a row is waiting on under its title', () => {
+    render(<AboveSheet kicker="Week" title="This week" rows={[{ id: 'a', title: 'Call KKI', status: 'waiting', note: 'Waiting on Iris' }]} doneCount={0} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Mark Call KKI complete' })).toHaveClass('is-waiting')
+    expect(screen.getByText('Waiting on Iris')).toHaveClass('above-sheet-row-note')
+  })
+
   describe('a check on Today’s week sheet', () => {
     const rows = [{ id: 'a', title: 'Call KKI' }, { id: 'b', title: 'Book transport' }]
 

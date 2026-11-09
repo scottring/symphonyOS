@@ -137,9 +137,40 @@ describe('TodayWeekFold: the week folded beside the day', () => {
       const restoreTask = vi.fn()
       view({ members: [{ id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' }] as never, restoreTask })
       unfold()
-      fireEvent.click(screen.getByRole('button', { name: /^Assign people to Book the cabin/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^Status and people for Book the cabin/ }))
       fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Iris/ }))
       await waitFor(() => expect(restoreTask).toHaveBeenCalledWith('a', { assignedToAll: ['iris'], assignedTo: 'iris' }))
+    })
+
+    it('marks a task in progress from the same menu, and draws it on the circle', async () => {
+      const restoreTask = vi.fn()
+      view({ members: [{ id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' }] as never, restoreTask })
+      unfold()
+      fireEvent.click(screen.getByRole('button', { name: /^Status and people for Book the cabin/ }))
+      fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'In progress' }))
+      await waitFor(() => expect(restoreTask).toHaveBeenCalledWith('a', expect.objectContaining({ startedAt: expect.any(Date), isWaiting: false })))
+    })
+
+    it('says something is needed from a household member', async () => {
+      const restoreTask = vi.fn()
+      view({ members: [{ id: 'iris', name: 'Iris Kaufman', initials: 'IR', color: 'purple' }] as never, restoreTask })
+      unfold()
+      fireEvent.click(screen.getByRole('button', { name: /^Status and people for Book the cabin/ }))
+      fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Waiting on…' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Iris' }))
+      await waitFor(() => expect(restoreTask).toHaveBeenCalledWith('a', expect.objectContaining({ isWaiting: true, waitingFor: 'Iris', startedAt: null })))
+    })
+
+    it('says something is needed from someone outside the household', async () => {
+      const restoreTask = vi.fn()
+      view({ members: [{ id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' }] as never, restoreTask })
+      unfold()
+      fireEvent.click(screen.getByRole('button', { name: /^Status and people for Book the cabin/ }))
+      fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Waiting on…' }))
+      const input = screen.getByRole('textbox', { name: 'Waiting on someone else' })
+      fireEvent.change(input, { target: { value: 'Guy’s reply' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await waitFor(() => expect(restoreTask).toHaveBeenCalledWith('a', expect.objectContaining({ isWaiting: true, waitingFor: 'Guy’s reply' })))
     })
 
     it('a task checks off from the sheet', async () => {

@@ -28,7 +28,8 @@ import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { weekListTasks, earlierThisWeek, earlierDayMark } from '@/lib/planning/weekList'
 import { stepsInstead } from '@/lib/planning/weekSteps'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
-import { assigneesOf, assignmentWrite, lineDropUpdates } from '@/lib/planning/v2/planV2'
+import { lineDropUpdates } from '@/lib/planning/v2/planV2'
+import { sheetRowStatus } from '@/lib/planning/sheetStatus'
 import { compareSortOrder, reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
@@ -36,7 +37,7 @@ import { dayWordFor } from '@/components/canvas/week/compactWeek'
 import { placedInWeek } from '@/components/canvas/week/weekShelf'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows } from '@/components/plan/fold/AboveSheet'
-import { TODAY_WEEK_FOOT, TODAY_WEEK_SHORT_LIST, SheetPeople } from '@/components/schedule/TodayWeekColumn'
+import { TODAY_WEEK_FOOT, TODAY_WEEK_SHORT_LIST, SheetTaskTools } from '@/components/schedule/TodayWeekColumn'
 import { AlongsideContext, type AlongsideWorkspace } from './AlongsideContext'
 import './alongside.css'
 
@@ -145,8 +146,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
   const peopleTools = (id: string) => {
     const task = [...open, ...later].find((t) => t.id === id)
     if (!task) return null
-    return <SheetPeople members={members} title={task.title} selected={assigneesOf(task)} onSelect={(ids) => {
-      const { label, patch, prev } = assignmentWrite(task, ids, members)
+    return <SheetTaskTools task={task} members={members} write={({ label, patch, prev }) => {
       void activity.run(label, () => update(id, patch), { ids: [id], undo: async () => { await update(id, prev) } })
     }} />
   }
@@ -181,8 +181,8 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
             above={<AboveSheet kicker={`Week · ${range}`} title={isThisWeek ? 'This week' : range} className="vt-sheet-week"
               rowsHeading={open.length > 0 ? 'Sometime this week' : undefined} shortList={TODAY_WEEK_SHORT_LIST}
               rows={open.map((t, i) => earlierIds.has(t.id)
-                ? { id: t.id, title: t.title, mark: earlierDayMark(t), anchor: i === 0 ? 'leftovers' : undefined }
-                : { id: t.id, title: t.title })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
+                ? { id: t.id, title: t.title, ...sheetRowStatus(t), mark: earlierDayMark(t), anchor: i === 0 ? 'leftovers' : undefined }
+                : { id: t.id, title: t.title, ...sheetRowStatus(t) })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
               onComplete={completeTask} rowTools={peopleTools} onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
@@ -193,7 +193,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
               }}>
               {later.length > 0 && <>
                 <h3 className="above-sheet-sub above-sheet-rows-h">Later this week</h3>
-                <SheetRows rows={later.map((t) => ({ id: t.id, title: t.title, mark: t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) }))}
+                <SheetRows rows={later.map((t) => ({ id: t.id, title: t.title, ...sheetRowStatus(t), mark: t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) }))}
                   label="Later this week" onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
                   onComplete={completeTask} rowTools={peopleTools} onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
               </>}
