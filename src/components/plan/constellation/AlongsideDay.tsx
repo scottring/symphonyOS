@@ -36,13 +36,13 @@ import { dayWordFor } from '@/components/canvas/week/compactWeek'
 import { placedInWeek } from '@/components/canvas/week/weekShelf'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows } from '@/components/plan/fold/AboveSheet'
-import { TODAY_WEEK_FOOT } from '@/components/schedule/TodayWeekColumn'
+import { TODAY_WEEK_FOOT, TODAY_WEEK_SHORT_LIST } from '@/components/schedule/TodayWeekColumn'
 import { AlongsideContext, type AlongsideWorkspace } from './AlongsideContext'
 import './alongside.css'
 
 const WEEK_ACTION_MIME = 'application/x-symphony-week-action'
 
-export function AlongsideDay({ children, tasks, date, update, loading, error, weekView = false, onSelect, stepAside = false }: {
+export function AlongsideDay({ children, tasks, date, update, complete, loading, error, weekView = false, onSelect, stepAside = false }: {
   children: ReactNode
   /** The old Review today link (?review=1) is on its way to ?plan=1: the
    *  week steps aside for that moment. A Day session itself keeps the week
@@ -52,8 +52,7 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
   tasks: Task[]
   date: Date
   update: (id: string, patch: Partial<Task>) => Promise<boolean | void>
-  /** Toggles a task's done state. The week sheet carries no check (the sheet
-   *  above has no controls but its +), so it is unused here. */
+  /** Toggles a task's done state: the check on the week sheet's rows. */
   complete?: (id: string) => Promise<boolean | void>
   loading: boolean
   error: boolean
@@ -143,6 +142,12 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
     })
   }
 
+  const completeTask = complete ? (id: string) => {
+    const task = [...open, ...later].find((t) => t.id === id)
+    if (!task) return
+    void activity.run(`Done: “${task.title}”`, () => complete(id), { ids: [id], undo: async () => { await complete(id) } })
+  } : undefined
+
   const range = formatWeekRangeShort(week)
   // A week row dropped anywhere on the day, its hours included, is placed
   // for the day with no time, the same as + (Scott, 2026-11-07: a task gets
@@ -166,13 +171,13 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
             drive={weekDrive === undefined ? undefined : { above: weekDrive }}
             frontLabel={`${range}, to pick from`}
             above={<AboveSheet kicker={`Week · ${range}`} title={isThisWeek ? 'This week' : range} className="vt-sheet-week"
-              rowsHeading={open.length > 0 ? 'Sometime this week' : undefined}
+              rowsHeading={open.length > 0 ? 'Sometime this week' : undefined} shortList={TODAY_WEEK_SHORT_LIST}
               rows={open.map((t, i) => earlierIds.has(t.id)
                 ? { id: t.id, title: t.title, mark: earlierDayMark(t), anchor: i === 0 ? 'leftovers' : undefined }
                 : { id: t.id, title: t.title })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-              onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
+              onComplete={completeTask} onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
                 // Dropped anywhere on the day, the hours included, it is
                 // planned for the day with no time (Scott, 2026-11-07: tasks
                 // get a time only when it is certain; set one on the task).
@@ -182,7 +187,7 @@ export function AlongsideDay({ children, tasks, date, update, loading, error, we
                 <h3 className="above-sheet-sub above-sheet-rows-h">Later this week</h3>
                 <SheetRows rows={later.map((t) => ({ id: t.id, title: t.title, mark: t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) }))}
                   label="Later this week" onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-                  onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
+                  onComplete={completeTask} onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
               </>}
               <div ref={setRoutinesSlot} className="ad-routines" />
             </AboveSheet>}>

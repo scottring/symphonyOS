@@ -75,6 +75,20 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
   margin: 0; padding: 8px 0; font: italic 400 17px/1.4 var(--font-family-display);
   color: var(--paper-fold-ink-faint, var(--color-neutral-400));
 }
+/* The check on Today's week sheet (Scott, 2026-11-09), quiet like the Week list's. */
+.above-sheet-check { position: relative; flex: none; align-self: flex-start; width: 16px; height: 16px; min-width: 0; min-height: 0; margin: 3px 2px 0 0; padding: 0; border: 1.5px solid var(--color-neutral-400); border-radius: 999px; background: none; cursor: pointer; }
+.above-sheet-check:hover { border-color: var(--paper-fold-accent, var(--color-primary-600)); background: var(--color-primary-50); }
+.above-sheet-check:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
+@media (pointer: coarse) { .above-sheet-check::before { content: ''; position: absolute; inset: -14px; } }
+/* A long week sheet's "14 more" (Scott, 2026-11-09). */
+.above-sheet-more { display: block; margin: 12px 0 0; padding: 0; background: none; border: 0; font-size: 13px; color: var(--paper-fold-accent, var(--color-primary-600)); cursor: pointer; }
+.above-sheet-more:hover { text-decoration: underline; text-underline-offset: 3px; }
+.above-sheet-more:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
+/* The + shows on the row you're pointing at; a finger always sees it. */
+@media (hover: hover) and (pointer: fine) {
+  .above-sheet-pick { opacity: 0; transition: opacity .12s; }
+  .above-sheet-row:hover .above-sheet-pick, .above-sheet-row:focus-within .above-sheet-pick { opacity: 1; }
+}
 .above-sheet-done { margin: 14px 0 0; font-size: 13px; color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
 .above-sheet-foot {
   display: flex; align-items: center; gap: 6px; margin: 16px 0 0; font-size: 12px;

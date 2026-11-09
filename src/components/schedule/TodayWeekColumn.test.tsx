@@ -42,6 +42,7 @@ function view(props: Partial<Parameters<typeof TodayWeekFold>[0]> = {}) {
   return { ...r, actions }
 }
 const unfold = () => fireEvent.click(screen.getByRole('button', { name: /Unfold to read$/ }))
+const manyRows = (n: number) => Array.from({ length: n }, (_, i) => e(t(`m${i}`, `Task ${i + 1}`)))
 
 // Reduced motion: the fold jumps to its state, so a tap opens it at once.
 const originalMatchMedia = window.matchMedia
@@ -127,6 +128,21 @@ describe('TodayWeekFold: the week folded beside the day', () => {
   // Fix round 1: the column's "Routines today" lives on the sheet, below the
   // week's tasks, with the column's own + (toToday's routine branch).
   describe('Routines to pick from', () => {
+    it('a task checks off from the sheet', async () => {
+      const complete = vi.fn()
+      view({ actions: { choose: vi.fn(), unchoose: vi.fn(), complete, open: vi.fn() } as never })
+      unfold()
+      fireEvent.click(screen.getByRole('button', { name: 'Mark Book the cabin complete' }))
+      await waitFor(() => expect(complete).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' })))
+    })
+
+    it('shows the week’s first five tasks and folds the rest', () => {
+      view({ plan: { chooserTasks: manyRows(19), chooserRoutines: [] } as unknown as DayPlan })
+      unfold()
+      expect(document.querySelectorAll('.above-sheet-list > li')).toHaveLength(5)
+      expect(screen.getByRole('button', { name: '14 more' })).toBeInTheDocument()
+    })
+
     const occ = { key: 'routine:r', kind: 'routine', id: 'r', title: 'Water the plants', completed: false, planned: false, group: 'available' } as DayPlanEntry
     const weekly = { key: 'routine:w', kind: 'routine', id: 'w', title: 'Mow the lawn', completed: false, planned: false, group: 'available', routine: { id: 'w' } } as unknown as DayPlanEntry
     const chosen = { key: 'routine:c', kind: 'routine', id: 'c', title: 'Feed the fish', completed: false, planned: true, group: 'available' } as DayPlanEntry

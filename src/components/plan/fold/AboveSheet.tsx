@@ -8,8 +8,8 @@
 // The one exception is Today (Scott, 2026-11-04: "add today with the + on the
 // week sheet"): week and day share items, so the week sheet beside the day
 // keeps a + on each row (onPick), its drag onto the day (onDragRow) and a
-// title tap that opens the task (onOpen). Without them, nothing here is a
-// control.
+// title tap that opens the task (onOpen), and a check that marks it done
+// (onComplete; Scott 2026-11-09). Without them, nothing here is a control.
 
 import { useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { gapAt } from '@/lib/week/dayReorder'
@@ -31,6 +31,8 @@ export interface AboveSheetProps {
   onPick?: (id: string) => void
   /** The +'s name. Default "Plan {title} for today". */
   pickLabel?: (title: string) => string
+  /** Today's week sheet only: a circle before the title marks the row done. */
+  onComplete?: (id: string) => void
   /** Today's week sheet only: a title tap opens the task. */
   onOpen?: (id: string) => void
   /** Today's week sheet only: the rows drag onto the day. */
@@ -39,6 +41,9 @@ export interface AboveSheetProps {
    *  (the shared order, Scott 2026-11-08); `toIndex` is the gap, 0 above the
    *  first row, as the list read before the move. */
   onReorder?: (id: string, toIndex: number) => void
+  /** Today's week sheet only: how many rows show before the rest fold into
+   *  an "N more" line (Scott, 2026-11-09). A single extra row is not folded. */
+  shortList?: number
   /** More of the sheet, under the list and above the foot (Today's
    *  "Routines today", drawn with SheetRows). */
   children?: ReactNode  /** A heading over the rows (Today's week sheet: "Sometime this week"). */
@@ -61,6 +66,7 @@ export interface SheetRowsProps {
   label: string
   onPick?: (id: string) => void
   pickLabel?: (title: string) => string
+  onComplete?: (id: string) => void
   onOpen?: (id: string) => void
   onDragRow?: (id: string, ev: DragEvent<HTMLLIElement>) => void
   onReorder?: (id: string, toIndex: number) => void
@@ -68,7 +74,7 @@ export interface SheetRowsProps {
 
 /** The sheet's ruled lines: plain text, or (Today) a title that opens, a +
  *  and a drag onto the day. */
-export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, onOpen, onDragRow, onReorder }: SheetRowsProps) {
+export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, onComplete, onOpen, onDragRow, onReorder }: SheetRowsProps) {
   // A row dragged within its own list: the gap it would land in, as a rule.
   // Dropped on the day instead, the day's own drop places it (onDragRow).
   const listRef = useRef<HTMLUListElement>(null)
@@ -103,6 +109,7 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
             if (onReorder) { setDragId(r.id); if (!onDragRow) { ev.dataTransfer.setData('text/plain', r.title); ev.dataTransfer.effectAllowed = 'move' } }
           } : undefined}
           onDragEnd={onReorder ? () => { setDragId(null); setGap(null) } : undefined} data-guide-anchor={r.anchor}>
+          {onComplete && <button type="button" className="above-sheet-check" aria-label={`Mark ${r.title} complete`} title="Mark complete" onClick={() => onComplete(r.id)} />}
           {onOpen
             ? <button type="button" className="above-sheet-row-title" onClick={() => onOpen(r.id)}>{r.title}</button>
             : <span className="above-sheet-row-title">{r.title}</span>}
@@ -117,17 +124,25 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
   )
 }
 
-export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onOpen, onDragRow, onReorder, children, className, rowsHeading }: AboveSheetProps) {
+export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onComplete, onOpen, onDragRow, onReorder, shortList, children, className, rowsHeading }: AboveSheetProps) {
+  const [showAll, setShowAll] = useState(false)
+  const canFold = shortList !== undefined && rows.length > shortList + 1
+  const shown = canFold && !showAll ? rows.slice(0, shortList) : rows
   return (
     <div className={className ? `above-sheet ${className}` : 'above-sheet'}>
       <p className="above-sheet-kicker">{kicker}</p>
       <h2 className="above-sheet-title">{title}</h2>
       {rowsHeading && <h3 className="above-sheet-sub above-sheet-rows-h">{rowsHeading}</h3>}
       {rows.length > 0 ? (
-        <SheetRows rows={rows} label={title} onPick={onPick} pickLabel={pickLabel} onOpen={onOpen} onDragRow={onDragRow} onReorder={onReorder} />
+        <SheetRows rows={shown} label={title} onPick={onPick} pickLabel={pickLabel} onComplete={onComplete} onOpen={onOpen} onDragRow={onDragRow} onReorder={onReorder} />
       ) : empty ? (
         <p className="above-sheet-empty">{empty}</p>
       ) : null}
+      {canFold && (
+        <button type="button" className="above-sheet-more" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
+          {showAll ? 'Show fewer' : `${rows.length - shortList} more`}
+        </button>
+      )}
       {doneCount > 0 && <p className="above-sheet-done">{doneCount} done</p>}
       {children}
       <SheetFoot>{foot}</SheetFoot>

@@ -232,3 +232,19 @@ it('lists the week in the shared order, and a drag among the rows reorders it',a
  await waitFor(()=>expect(update).toHaveBeenCalledWith('a',{sortOrder:-1000}))
  expect(update).toHaveBeenCalledTimes(1)
 })
+
+it('the workspace’s week sheet shows the first five tasks and folds the rest',()=>{
+ const many=Array.from({length:19},(_,i)=>({id:`m${i}`,title:`Task ${i+1}`,createdAt:date,completed:false,sourceId:'month'}) as Task)
+ render(<MemoryRouter><AlongsideDay tasks={many} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ unfold()
+ expect(within(document.querySelector('.vt-sheet-week .above-sheet-list') as HTMLElement).getAllByRole('listitem')).toHaveLength(5)
+ expect(screen.getByRole('button',{name:'14 more'})).toBeInTheDocument()
+})
+
+it('checks a week task off from the sheet, and Undo is the same toggle',async()=>{
+ const complete=vi.fn(async()=>true)
+ render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={vi.fn()} complete={complete} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ unfold()
+ fireEvent.click(screen.getByRole('button',{name:'Mark Choose picnic spot complete'}))
+ await waitFor(()=>expect(complete).toHaveBeenCalledWith('same-id'))
+})

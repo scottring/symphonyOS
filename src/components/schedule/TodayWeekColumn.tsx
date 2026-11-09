@@ -45,6 +45,8 @@ export interface TodayNextWeek { weekStart: Date; entries: DayPlanEntry[] }
 
 /** "Pick three to five for today." — the sheet's foot (spec 2026-11-04). */
 export const TODAY_WEEK_FOOT = 'Pick three to five for today.'
+/** The week sheet shows this many tasks, in the shared order; the rest fold (Scott, 2026-11-09). */
+export const TODAY_WEEK_SHORT_LIST = 5
 
 /** On the viewed day already: chosen for it, or dated to it. */
 function onViewedDay(e: DayPlanEntry, ymd: string): boolean {
@@ -190,6 +192,13 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
     })
   } : undefined
   const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
+  const completeRow = (key: string) => {
+    const entry = open.find((e) => e.key === key)
+    if (!entry) return
+    void activity.run(`Done: “${entry.title}”`, async () => actions.complete(entry), {
+      ids: [entry.id], undo: async () => actions.complete({ ...entry, completed: true }),
+    })
+  }
   const firstLeft = left[0]?.key
   const { rows, ...rowProps } = sheetRowProps(open, day, actions, toToday, (e) => earlierIds.has(e.id) && e.task
     ? { mark: earlierDayMark(e.task), anchor: e.key === firstLeft ? 'leftovers' : undefined } : {})
@@ -203,7 +212,7 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
       frontLabel={`${range}, to pick from`}
       above={<>
         <AboveSheet kicker="Week" title={range} rows={rows}
-          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps} onReorder={reorder}>
+          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps} onReorder={reorder} shortList={TODAY_WEEK_SHORT_LIST} onComplete={completeRow}>
           <SheetRoutines plan={plan} day={day} actions={actions} />
         </AboveSheet>
         {nextWeek && (

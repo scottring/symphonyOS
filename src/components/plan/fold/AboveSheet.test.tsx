@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AboveSheet } from '@/components/plan/fold/AboveSheet'
 
@@ -27,6 +27,75 @@ describe('AboveSheet: the level above, for reading', () => {
     ])
     expect(screen.getByText('3 done')).toBeInTheDocument()
     expect(screen.getByText(FOOT)).toBeInTheDocument()
+  })
+
+  describe('a check on Today’s week sheet', () => {
+    const rows = [{ id: 'a', title: 'Call KKI' }, { id: 'b', title: 'Book transport' }]
+
+    it('marks a row done', () => {
+      const onComplete = vi.fn()
+      render(<AboveSheet kicker="Week" title="This week" rows={rows} doneCount={0} foot={FOOT} onOpen={vi.fn()} onComplete={onComplete} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Mark Call KKI complete' }))
+      expect(onComplete).toHaveBeenCalledWith('a')
+    })
+
+    it('comes before the title', () => {
+      render(<AboveSheet kicker="Week" title="This week" rows={rows} doneCount={0} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} />)
+      const check = screen.getByRole('button', { name: 'Mark Call KKI complete' })
+      expect(check.compareDocumentPosition(screen.getByRole('button', { name: 'Call KKI' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('is absent without onComplete', () => {
+      render(<AboveSheet kicker="Week" title="This week" rows={rows} doneCount={0} foot={FOOT} onOpen={vi.fn()} />)
+      expect(screen.queryByRole('button', { name: /complete$/ })).toBeNull()
+    })
+  })
+
+  describe('a long list shows only its first rows', () => {
+    const rows = Array.from({ length: 19 }, (_, i) => ({ id: `r${i}`, title: `Task ${i + 1}` }))
+    const titles = () => within(screen.getByRole('list', { name: 'This week' })).getAllByRole('listitem').map((li) => li.textContent)
+    const sheet = (n = rows.length, extra = {}) => render(<AboveSheet kicker="Week" title="This week" rows={rows.slice(0, n)} doneCount={0} foot={FOOT} shortList={5} {...extra} />)
+
+    it('shows the first 5 in order, and says how many more there are', () => {
+      sheet()
+      expect(titles()).toEqual(['Task 1', 'Task 2', 'Task 3', 'Task 4', 'Task 5'])
+      expect(screen.getByRole('button', { name: '14 more' })).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('opens in place, and folds back', () => {
+      sheet()
+      fireEvent.click(screen.getByRole('button', { name: '14 more' }))
+      expect(titles()).toHaveLength(19)
+      expect(titles()[18]).toBe('Task 19')
+      fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }))
+      expect(titles()).toHaveLength(5)
+    })
+
+    it('does not fold away a single row', () => {
+      sheet(6)
+      expect(titles()).toHaveLength(6)
+      expect(screen.queryByRole('button', { name: /more$/ })).toBeNull()
+    })
+
+    it('folds nothing without shortList', () => {
+      render(<AboveSheet kicker="Week" title="This week" rows={rows} doneCount={0} foot={FOOT} />)
+      expect(titles()).toHaveLength(19)
+    })
+
+    it('a row moved in the opened list drops at its place in the whole list', () => {
+      const onReorder = vi.fn()
+      sheet(19, { onReorder, onOpen: vi.fn() })
+      fireEvent.click(screen.getByRole('button', { name: '14 more' }))
+      const list = screen.getByRole('list', { name: 'This week' })
+      const lis = within(list).getAllByRole('listitem')
+      lis.forEach((li, i) => { li.getBoundingClientRect = () => ({ top: i * 10, bottom: i * 10 + 10, height: 10, left: 0, right: 0, width: 0, x: 0, y: i * 10, toJSON: () => ({}) }) })
+      const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' }
+      fireEvent.dragStart(lis[0], { dataTransfer })
+      const at = (ev: Event) => { Object.defineProperty(ev, 'clientY', { value: 121 }); return ev }
+      fireEvent(list, at(createEvent.dragOver(list, { dataTransfer })))
+      fireEvent(list, at(createEvent.drop(list, { dataTransfer })))
+      expect(onReorder).toHaveBeenCalledWith('r0', 12)
+    })
   })
 
   it('has no controls of any kind', () => {
