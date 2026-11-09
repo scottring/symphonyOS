@@ -10,7 +10,7 @@ import {useEffect} from 'react'
 import type {Task} from '@/types/task'
 vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[]})}))
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
-vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null})}))
+vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null,members:[{id:'iris',name:'Iris',initials:'IR',color:'purple'},{id:'scott',name:'Scott',initials:'SK',color:'blue'}]})}))
 vi.mock('@/lib/today/domainFilter',()=>({filterTasksForLayers:(t:Task[])=>t}))
 vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,scopeId:null})}))
 vi.mock('@/lib/planning/weekList',async(orig)=>({...await orig<object>(),// A let-go item is on no week's list (letGo ends its commitments).
@@ -247,4 +247,21 @@ it('checks a week task off from the sheet, and Undo is the same toggle',async()=
  unfold()
  fireEvent.click(screen.getByRole('button',{name:'Mark Choose picnic spot complete'}))
  await waitFor(()=>expect(complete).toHaveBeenCalledWith('same-id'))
+})
+
+it('shows who a week task is for, and assigns from the sheet with Undo data',async()=>{
+ const update=vi.fn(async()=>true)
+ const assigned={...task,assignedToAll:['iris'],assignedTo:'iris'} as Task
+ render(<MemoryRouter><AlongsideDay tasks={[assigned]} date={date} update={update} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ unfold()
+ const row=screen.getByRole('button',{name:/^Assign people to Choose picnic spot/})
+ expect(row).toHaveTextContent('IR')
+ fireEvent.click(row)
+ fireEvent.click(screen.getByRole('menuitemcheckbox',{name:/Scott/}))
+ await waitFor(()=>expect(update).toHaveBeenCalledWith('same-id',{assignedToAll:['iris','scott'],assignedTo:'iris'}))
+})
+
+it('the workspace’s week sheet lies wide enough for its checks, people and +',()=>{
+ render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ expect(document.querySelector<HTMLElement>('.paper-fold-flap')?.style.width).toBe('357px')
 })

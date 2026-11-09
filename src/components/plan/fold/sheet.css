@@ -80,6 +80,8 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .above-sheet-check:hover { border-color: var(--paper-fold-accent, var(--color-primary-600)); background: var(--color-primary-50); }
 .above-sheet-check:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
 @media (pointer: coarse) { .above-sheet-check::before { content: ''; position: absolute; inset: -14px; } }
+/* Who a week task is for (Scott, 2026-11-09): faces always; the empty chooser on hover. */
+.above-sheet-people { flex: none; align-self: flex-start; display: inline-flex; }
 /* A long week sheet's "14 more" (Scott, 2026-11-09). */
 .above-sheet-more { display: block; margin: 12px 0 0; padding: 0; background: none; border: 0; font-size: 13px; color: var(--paper-fold-accent, var(--color-primary-600)); cursor: pointer; }
 .above-sheet-more:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -88,6 +90,8 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 @media (hover: hover) and (pointer: fine) {
   .above-sheet-pick { opacity: 0; transition: opacity .12s; }
   .above-sheet-row:hover .above-sheet-pick, .above-sheet-row:focus-within .above-sheet-pick { opacity: 1; }
+  .above-sheet-people.is-empty { opacity: 0; transition: opacity .12s; }
+  .above-sheet-row:hover .above-sheet-people.is-empty, .above-sheet-row:focus-within .above-sheet-people.is-empty, .above-sheet-people:has([aria-expanded='true']) { opacity: 1; }
 }
 .above-sheet-done { margin: 14px 0 0; font-size: 13px; color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
 .above-sheet-foot {

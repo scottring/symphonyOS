@@ -40,6 +40,9 @@ import { earlierDayMark } from '@/lib/planning/weekList'
 import { compareSortOrder, reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows, type SheetRow } from '@/components/plan/fold/AboveSheet'
+import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
+import { assigneesOf, assignmentWrite } from '@/lib/planning/v2/planV2'
+import type { FamilyMember } from '@/types/family'
 
 export interface TodayNextWeek { weekStart: Date; entries: DayPlanEntry[] }
 
@@ -47,6 +50,16 @@ export interface TodayNextWeek { weekStart: Date; entries: DayPlanEntry[] }
 export const TODAY_WEEK_FOOT = 'Pick three to five for today.'
 /** The week sheet shows this many tasks, in the shared order; the rest fold (Scott, 2026-11-09). */
 export const TODAY_WEEK_SHORT_LIST = 5
+
+/** Who a week task is for, on its sheet row: the Week page's chooser. */
+export function SheetPeople({ members, title, selected, onSelect }: { members: readonly FamilyMember[]; title: string; selected: string[]; onSelect: (ids: string[]) => void }) {
+  if (members.length === 0) return null
+  return (
+    <span className={`above-sheet-people${selected.length ? '' : ' is-empty'}`}>
+      <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={selected} size="sm" onSelect={onSelect} triggerLabel={`Assign people to ${title}`} />
+    </span>
+  )
+}
 
 /** On the viewed day already: chosen for it, or dated to it. */
 function onViewedDay(e: DayPlanEntry, ymd: string): boolean {
@@ -140,7 +153,7 @@ const earlierEntry = (t: Task): DayPlanEntry => ({
   key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: false, planned: false, group: 'week', task: t,
 })
 
-export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nextWeek, chooseTask, restoreTask, reorderTasks, className, stowed, drive, children }: {
+export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nextWeek, chooseTask, restoreTask, reorderTasks, members = [], className, stowed, drive, children }: {
   plan: DayPlan
   day: Date
   weekStart: Date
@@ -158,6 +171,8 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
   /** Writes the shared sort_order (the Week list's order): a row dragged
    *  among the week's rows takes that place (Scott, 2026-11-08). */
   reorderTasks?: (writes: { id: string; sortOrder: number | null }[]) => Promise<boolean>
+  /** The household, for who a row is for. Empty: no chooser. */
+  members?: readonly FamilyMember[]
   className?: string
   /** A session runs on the page: the fold is put away, the day stays mounted. */
   stowed?: boolean
@@ -192,6 +207,15 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
     })
   } : undefined
   const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
+  const peopleTools = restoreTask ? (key: string) => {
+    const entry = open.find((e) => e.key === key)
+    const task = entry?.task
+    if (!task) return null
+    return <SheetPeople members={members} title={task.title} selected={assigneesOf(task)} onSelect={(ids) => {
+      const { label, patch, prev } = assignmentWrite(task, ids, members)
+      void activity.run(label, async () => { await restoreTask(task.id, patch) }, { ids: [task.id], undo: async () => { await restoreTask(task.id, prev) } })
+    }} />
+  } : undefined
   const completeRow = (key: string) => {
     const entry = open.find((e) => e.key === key)
     if (!entry) return
@@ -207,12 +231,12 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
   const nextById = new Map((nextWeek?.entries ?? []).map((e) => [e.id, e]))
 
   return (
-    <PaperFold horizon="day" stowed={stowed} className={['today-fold', className].filter(Boolean).join(' ')} edgeLabel={range} edgeCount={open.length}
+    <PaperFold horizon="day" wide stowed={stowed} className={['today-fold', className].filter(Boolean).join(' ')} edgeLabel={range} edgeCount={open.length}
       drive={drive === undefined ? undefined : { above: drive }}
       frontLabel={`${range}, to pick from`}
       above={<>
         <AboveSheet kicker="Week" title={range} rows={rows}
-          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps} onReorder={reorder} shortList={TODAY_WEEK_SHORT_LIST} onComplete={completeRow}>
+          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps} onReorder={reorder} shortList={TODAY_WEEK_SHORT_LIST} onComplete={completeRow} rowTools={peopleTools}>
           <SheetRoutines plan={plan} day={day} actions={actions} />
         </AboveSheet>
         {nextWeek && (

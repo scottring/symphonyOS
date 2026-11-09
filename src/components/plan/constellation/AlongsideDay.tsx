@@ -28,7 +28,7 @@ import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { weekListTasks, earlierThisWeek, earlierDayMark } from '@/lib/planning/weekList'
 import { stepsInstead } from '@/lib/planning/weekSteps'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
-import { lineDropUpdates } from '@/lib/planning/v2/planV2'
+import { assigneesOf, assignmentWrite, lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { compareSortOrder, reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
@@ -36,7 +36,7 @@ import { dayWordFor } from '@/components/canvas/week/compactWeek'
 import { placedInWeek } from '@/components/canvas/week/weekShelf'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows } from '@/components/plan/fold/AboveSheet'
-import { TODAY_WEEK_FOOT, TODAY_WEEK_SHORT_LIST } from '@/components/schedule/TodayWeekColumn'
+import { TODAY_WEEK_FOOT, TODAY_WEEK_SHORT_LIST, SheetPeople } from '@/components/schedule/TodayWeekColumn'
 import { AlongsideContext, type AlongsideWorkspace } from './AlongsideContext'
 import './alongside.css'
 
@@ -61,7 +61,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
   weekView?: boolean
   onSelect?: (id: string) => void
 }) {
-  const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember } = useFamilyMembers()
+  const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember, members = [] } = useFamilyMembers()
   const activity = useCanvasActivity()
   const [pending, setPending] = useState<string | null>(null), [message, setMessage] = useState('')
   // Where Today draws "Routines {day}" on this sheet (TodayView holds the
@@ -142,6 +142,14 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
     })
   }
 
+  const peopleTools = (id: string) => {
+    const task = [...open, ...later].find((t) => t.id === id)
+    if (!task) return null
+    return <SheetPeople members={members} title={task.title} selected={assigneesOf(task)} onSelect={(ids) => {
+      const { label, patch, prev } = assignmentWrite(task, ids, members)
+      void activity.run(label, () => update(id, patch), { ids: [id], undo: async () => { await update(id, prev) } })
+    }} />
+  }
   const completeTask = complete ? (id: string) => {
     const task = [...open, ...later].find((t) => t.id === id)
     if (!task) return
@@ -167,7 +175,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
         {weekView ? day : (
           // A session stows the fold rather than unmounting it, so the day
           // under it keeps its state.
-          <PaperFold horizon="day" className="today-fold ad-fold" stowed={stepAside} edgeLabel={range} edgeCount={open.length}
+          <PaperFold horizon="day" wide className="today-fold ad-fold" stowed={stepAside} edgeLabel={range} edgeCount={open.length}
             drive={weekDrive === undefined ? undefined : { above: weekDrive }}
             frontLabel={`${range}, to pick from`}
             above={<AboveSheet kicker={`Week · ${range}`} title={isThisWeek ? 'This week' : range} className="vt-sheet-week"
@@ -177,7 +185,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
                 : { id: t.id, title: t.title })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-              onComplete={completeTask} onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
+              onComplete={completeTask} rowTools={peopleTools} onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
                 // Dropped anywhere on the day, the hours included, it is
                 // planned for the day with no time (Scott, 2026-11-07: tasks
                 // get a time only when it is certain; set one on the task).
@@ -187,7 +195,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
                 <h3 className="above-sheet-sub above-sheet-rows-h">Later this week</h3>
                 <SheetRows rows={later.map((t) => ({ id: t.id, title: t.title, mark: t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) }))}
                   label="Later this week" onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-                  onComplete={completeTask} onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
+                  onComplete={completeTask} rowTools={peopleTools} onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
               </>}
               <div ref={setRoutinesSlot} className="ad-routines" />
             </AboveSheet>}>

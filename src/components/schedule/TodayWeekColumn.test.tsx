@@ -128,6 +128,20 @@ describe('TodayWeekFold: the week folded beside the day', () => {
   // Fix round 1: the column's "Routines today" lives on the sheet, below the
   // week's tasks, with the column's own + (toToday's routine branch).
   describe('Routines to pick from', () => {
+    it('lies wide enough for its checks, people and +', () => {
+      view()
+      expect(document.querySelector<HTMLElement>('.paper-fold-flap')?.style.width).toBe('357px')
+    })
+
+    it('assigns a task from the sheet', async () => {
+      const restoreTask = vi.fn()
+      view({ members: [{ id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' }] as never, restoreTask })
+      unfold()
+      fireEvent.click(screen.getByRole('button', { name: /^Assign people to Book the cabin/ }))
+      fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Iris/ }))
+      await waitFor(() => expect(restoreTask).toHaveBeenCalledWith('a', { assignedToAll: ['iris'], assignedTo: 'iris' }))
+    })
+
     it('a task checks off from the sheet', async () => {
       const complete = vi.fn()
       view({ actions: { choose: vi.fn(), unchoose: vi.fn(), complete, open: vi.fn() } as never })

@@ -33,6 +33,8 @@ export interface AboveSheetProps {
   pickLabel?: (title: string) => string
   /** Today's week sheet only: a circle before the title marks the row done. */
   onComplete?: (id: string) => void
+  /** Today's week sheet only: drawn on each row before the + (who it's for). */
+  rowTools?: (id: string) => ReactNode
   /** Today's week sheet only: a title tap opens the task. */
   onOpen?: (id: string) => void
   /** Today's week sheet only: the rows drag onto the day. */
@@ -67,6 +69,7 @@ export interface SheetRowsProps {
   onPick?: (id: string) => void
   pickLabel?: (title: string) => string
   onComplete?: (id: string) => void
+  rowTools?: (id: string) => ReactNode
   onOpen?: (id: string) => void
   onDragRow?: (id: string, ev: DragEvent<HTMLLIElement>) => void
   onReorder?: (id: string, toIndex: number) => void
@@ -74,7 +77,7 @@ export interface SheetRowsProps {
 
 /** The sheet's ruled lines: plain text, or (Today) a title that opens, a +
  *  and a drag onto the day. */
-export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, onComplete, onOpen, onDragRow, onReorder }: SheetRowsProps) {
+export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, onComplete, rowTools, onOpen, onDragRow, onReorder }: SheetRowsProps) {
   // A row dragged within its own list: the gap it would land in, as a rule.
   // Dropped on the day instead, the day's own drop places it (onDragRow).
   const listRef = useRef<HTMLUListElement>(null)
@@ -123,6 +126,7 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
             ? <button type="button" className="above-sheet-row-title" onClick={() => onOpen(r.id)}>{r.title}</button>
             : <span className="above-sheet-row-title">{r.title}</span>}
           {r.mark && <span className="above-sheet-row-mark">{r.mark}</span>}
+          {rowTools?.(r.id)}
           {onPick && (
             <button type="button" className="above-sheet-pick" aria-label={pickLabel(r.title)} title={pickLabel(r.title)}
               onClick={() => onPick(r.id)}>+</button>
@@ -133,7 +137,7 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
   )
 }
 
-export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onComplete, onOpen, onDragRow, onReorder, shortList, children, className, rowsHeading }: AboveSheetProps) {
+export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onComplete, rowTools, onOpen, onDragRow, onReorder, shortList, children, className, rowsHeading }: AboveSheetProps) {
   const [showAll, setShowAll] = useState(false)
   const canFold = shortList !== undefined && rows.length > shortList + 1
   const shown = canFold && !showAll ? rows.slice(0, shortList) : rows
@@ -143,7 +147,7 @@ export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick
       <h2 className="above-sheet-title">{title}</h2>
       {rowsHeading && <h3 className="above-sheet-sub above-sheet-rows-h">{rowsHeading}</h3>}
       {rows.length > 0 ? (
-        <SheetRows rows={shown} label={title} onPick={onPick} pickLabel={pickLabel} onComplete={onComplete} onOpen={onOpen} onDragRow={onDragRow} onReorder={onReorder} />
+        <SheetRows rows={shown} label={title} onPick={onPick} pickLabel={pickLabel} onComplete={onComplete} rowTools={rowTools} onOpen={onOpen} onDragRow={onDragRow} onReorder={onReorder} />
       ) : empty ? (
         <p className="above-sheet-empty">{empty}</p>
       ) : null}

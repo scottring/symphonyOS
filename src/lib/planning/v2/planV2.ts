@@ -42,6 +42,16 @@ export function assigneesOf(t: Pick<Task, 'assignedToAll' | 'assignedTo'>): stri
   return t.assignedToAll ?? (t.assignedTo ? [t.assignedTo] : [])
 }
 
+/** The write and its receipt, the same words as the Week page's. */
+export function assignmentWrite(t: Pick<Task, 'title' | 'assignedTo' | 'assignedToAll'>, ids: string[], members: readonly { id: string; name: string }[]) {
+  const names = ids.flatMap((id) => members.find((m) => m.id === id)?.name ?? [])
+  return {
+    label: names.length ? `Assign “${t.title}” to ${names.join(', ')}` : `Unassign “${t.title}”`,
+    patch: { assignedToAll: ids, assignedTo: ids[0] ?? undefined } as Partial<Task>,
+    prev: { assignedToAll: t.assignedToAll, assignedTo: t.assignedTo } as Partial<Task>,
+  }
+}
+
 export type PlanView = 'list' | 'ref' | 'focus'
 export function readPlanView(level: string): PlanView {
   try {

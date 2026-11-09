@@ -29,6 +29,13 @@ describe('AboveSheet: the level above, for reading', () => {
     expect(screen.getByText(FOOT)).toBeInTheDocument()
   })
 
+  it('draws rowTools on each row, before the +', () => {
+    render(<AboveSheet kicker="Week" title="This week" rows={[{ id: 'a', title: 'Call KKI' }]} doneCount={0} foot={FOOT} onOpen={vi.fn()} onPick={vi.fn()}
+      rowTools={(id) => <button type="button">{`Tools ${id}`}</button>} />)
+    const tools = screen.getByRole('button', { name: 'Tools a' })
+    expect(tools.compareDocumentPosition(screen.getByRole('button', { name: 'Plan Call KKI for today' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   describe('a check on Today’s week sheet', () => {
     const rows = [{ id: 'a', title: 'Call KKI' }, { id: 'b', title: 'Book transport' }]
 
