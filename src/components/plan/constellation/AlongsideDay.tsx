@@ -29,7 +29,7 @@ import { weekListTasks, earlierThisWeek, earlierDayMark } from '@/lib/planning/w
 import { stepsInstead } from '@/lib/planning/weekSteps'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { lineDropUpdates } from '@/lib/planning/v2/planV2'
-import { sheetRowStatus } from '@/lib/planning/sheetStatus'
+import { openSteps, sheetRowStatus, stepWrites, type StepSavers } from '@/lib/planning/sheetStatus'
 import { compareSortOrder, reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
@@ -43,7 +43,7 @@ import './alongside.css'
 
 const WEEK_ACTION_MIME = 'application/x-symphony-week-action'
 
-export function AlongsideDay({ children, tasks, date, update, complete, loading, error, weekView = false, onSelect, stepAside = false }: {
+export function AlongsideDay({ children, tasks, date, update, complete, addStep, removeStep, loading, error, weekView = false, onSelect, stepAside = false }: {
   children: ReactNode
   /** The old Review today link (?review=1) is on its way to ?plan=1: the
    *  week steps aside for that moment. A Day session itself keeps the week
@@ -55,6 +55,9 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
   update: (id: string, patch: Partial<Task>) => Promise<boolean | void>
   /** Toggles a task's done state: the check on the week sheet's rows. */
   complete?: (id: string) => Promise<boolean | void>
+  /** Steps on a task in progress. Without addStep, none can be added here. */
+  addStep?: StepSavers['add']
+  removeStep?: StepSavers['remove']
   loading: boolean
   error: boolean
   /** Reloads the tasks. The day page offers its own Try again. */
@@ -82,8 +85,10 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
   const week = weekStartAnchor(date, wso)
   const lens = planPeopleLens(people, getCurrentUserMember()?.id ?? null)
   const visible = filterTasksForLayers(tasks, layers).filter(lens.keep)
-  // A goal or parent on the week stands for its steps (Scott, 2026-11-07).
-  const weekTasks = stepsInstead(weekListTasks(visible, week, lens.scopeId, { isCurrent: localYmd(week) === localYmd(weekStartAnchor(new Date(), wso)) }), visible)
+  // A goal or parent on the week stands for its steps (Scott, 2026-11-07),
+  // unless someone is working it or waiting on it: then it stays one row and
+  // shows its next step (Scott, 2026-11-09).
+  const weekTasks = stepsInstead(weekListTasks(visible, week, lens.scopeId, { isCurrent: localYmd(week) === localYmd(weekStartAnchor(new Date(), wso)) }), visible, { keep: (t) => !!t.startedAt || !!t.isWaiting })
   const ymd = localYmd(date)
   const dayLabel = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
   const { word: dayWord } = dayWordFor(date)
@@ -143,12 +148,18 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
     })
   }
 
+  const steps = stepWrites(activity.run, { add: addStep, remove: removeStep, toggle: complete })
+  const tickNext = (id: string) => {
+    const task = [...open, ...later].find((t) => t.id === id)
+    const next = task && openSteps(task)[0]
+    if (next) steps.done(next)
+  }
   const peopleTools = (id: string) => {
     const task = [...open, ...later].find((t) => t.id === id)
     if (!task) return null
     return <SheetTaskTools task={task} members={members} write={({ label, patch, prev }) => {
       void activity.run(label, () => update(id, patch), { ids: [id], undo: async () => { await update(id, prev) } })
-    }} />
+    }} steps={steps} />
   }
   const completeTask = complete ? (id: string) => {
     const task = [...open, ...later].find((t) => t.id === id)
@@ -185,7 +196,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
                 : { id: t.id, title: t.title, ...sheetRowStatus(t) })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-              onComplete={completeTask} rowTools={peopleTools} onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
+              onComplete={completeTask} rowTools={peopleTools} onNextStep={tickNext} onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
                 // Dropped anywhere on the day, the hours included, it is
                 // planned for the day with no time (Scott, 2026-11-07: tasks
                 // get a time only when it is certain; set one on the task).
@@ -195,7 +206,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
                 <h3 className="above-sheet-sub above-sheet-rows-h">Later this week</h3>
                 <SheetRows rows={later.map((t) => ({ id: t.id, title: t.title, ...sheetRowStatus(t), mark: t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) }))}
                   label="Later this week" onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-                  onComplete={completeTask} rowTools={peopleTools} onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
+                  onComplete={completeTask} rowTools={peopleTools} onNextStep={tickNext} onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
               </>}
               <div ref={setRoutinesSlot} className="ad-routines" />
             </AboveSheet>}>

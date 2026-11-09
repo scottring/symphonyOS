@@ -24,6 +24,32 @@ describe('sheetRowStatus', () => {
   })
 })
 
+describe('steps on an in-progress row', () => {
+  const step = (id: string, completed = false) => ({ id, title: `Step ${id}`, completed }) as Task
+
+  it('shows the first open step and how far along it is', () => {
+    expect(sheetRowStatus(t({ startedAt: now, subtasks: [step('1', true), step('2'), step('3'), step('4', true)] })))
+      .toEqual({ status: 'started', fill: 50, nextStep: 'Step 2' })
+  })
+
+  it('always shows some fill once there are steps, so it still reads as started', () => {
+    expect(sheetRowStatus(t({ startedAt: now, subtasks: [step('1'), step('2'), step('3'), step('4'), step('5'), step('6'), step('7'), step('8'), step('9'), step('10')] })).fill).toBe(12)
+  })
+
+  it('is full with no next step when every step is done', () => {
+    expect(sheetRowStatus(t({ startedAt: now, subtasks: [step('1', true)] }))).toEqual({ status: 'started', fill: 100 })
+  })
+
+  it('leaves out steps that were let go', () => {
+    expect(sheetRowStatus(t({ startedAt: now, subtasks: [{ ...step('1'), dismissedAt: now }, step('2')] })).nextStep).toBe('Step 2')
+  })
+
+  it('shows no step on a task that is not in progress', () => {
+    expect(sheetRowStatus(t({ subtasks: [step('1')] }))).toEqual({})
+    expect(sheetRowStatus(t({ isWaiting: true, waitingFor: 'Iris', subtasks: [step('1')] }))).toEqual({ status: 'waiting', note: 'Waiting on Iris' })
+  })
+})
+
 describe('statusWrite', () => {
   it('starts a task, ending any wait', () => {
     const { label, patch } = statusWrite(t({ isWaiting: true, waitingFor: 'Iris', waitingSince: now }), { to: 'started' }, now)

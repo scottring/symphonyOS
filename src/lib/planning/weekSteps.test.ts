@@ -26,3 +26,16 @@ describe('stepsInstead', () => {
     expect(stepsInstead([goal, plain, step, goal2], [goal, plain, step, goal2]).map((x) => x.title)).toEqual(['Plan winter vacation', 'Call the bank', 'Book trains'])
   })
 })
+
+describe('a parent someone is working', () => {
+  const started = (t: Task) => !!t.startedAt
+  const parent = { id: 'p', title: 'Book lodging', completed: false, startedAt: new Date(), subtasks: [{ id: 's', title: 'Compare', completed: false }] } as unknown as Task
+
+  it('stays one row when asked to keep it', () => {
+    expect(stepsInstead([parent], [parent], { keep: started }).map((t) => t.id)).toEqual(['p'])
+  })
+
+  it('still draws its steps where no one asked to keep it', () => {
+    expect(stepsInstead([parent], [parent]).map((t) => t.id)).toEqual(['s'])
+  })
+})

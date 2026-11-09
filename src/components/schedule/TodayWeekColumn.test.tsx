@@ -173,6 +173,34 @@ describe('TodayWeekFold: the week folded beside the day', () => {
       await waitFor(() => expect(restoreTask).toHaveBeenCalledWith('a', expect.objectContaining({ isWaiting: true, waitingFor: 'Guy’s reply' })))
     })
 
+    it('adds a step from the row’s menu once the task is in progress', async () => {
+      const addStep = vi.fn(async () => 'new')
+      const started = e(t('s', 'Book lodging', { startedAt: now }))
+      view({ members: [{ id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' }] as never, restoreTask: vi.fn(), addStep, removeStep: vi.fn(), toggleStep: vi.fn(), plan: { chooserTasks: [started], chooserRoutines: [] } as never })
+      unfold()
+      fireEvent.click(screen.getByRole('button', { name: /^Status and people for Book lodging/ }))
+      const input = screen.getByRole('textbox', { name: 'Add a step' })
+      fireEvent.change(input, { target: { value: 'Compare two places' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await waitFor(() => expect(addStep).toHaveBeenCalledWith('s', 'Compare two places'))
+    })
+
+    it('offers no steps until the task is in progress', () => {
+      view({ members: [{ id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' }] as never, restoreTask: vi.fn(), addStep: vi.fn(), removeStep: vi.fn(), toggleStep: vi.fn() })
+      unfold()
+      fireEvent.click(screen.getByRole('button', { name: /^Status and people for Book the cabin/ }))
+      expect(screen.queryByRole('textbox', { name: 'Add a step' })).toBeNull()
+    })
+
+    it('ticks the next step from the row', async () => {
+      const toggleStep = vi.fn()
+      const started = e(t('s', 'Book lodging', { startedAt: now, subtasks: [t('k', 'Compare two places')] }))
+      view({ members: [{ id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' }] as never, restoreTask: vi.fn(), addStep: vi.fn(), removeStep: vi.fn(), toggleStep, plan: { chooserTasks: [started], chooserRoutines: [] } as never })
+      unfold()
+      fireEvent.click(screen.getByRole('button', { name: 'Mark Compare two places done' }))
+      await waitFor(() => expect(toggleStep).toHaveBeenCalledWith('k'))
+    })
+
     it('a task checks off from the sheet', async () => {
       const complete = vi.fn()
       view({ actions: { choose: vi.fn(), unchoose: vi.fn(), complete, open: vi.fn() } as never })

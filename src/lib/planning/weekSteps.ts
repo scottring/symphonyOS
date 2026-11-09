@@ -4,17 +4,20 @@
 // for the work under it: the week draws that work's open steps instead. A
 // goal or parent with no open step is drawn itself, so nothing on the week
 // disappears. Each step is the same task wherever it shows.
+//
+// The exception is `keep` (Scott, 2026-11-09): Today's week sheet keeps a task
+// someone is working as one row, its steps folded behind the next one.
 
 import type { Task } from '@/types/task'
 
 const open = (t: Task) => !t.completed && !t.dismissedAt
 
-export function stepsInstead(listed: readonly Task[], all: readonly Task[]): Task[] {
+export function stepsInstead(listed: readonly Task[], all: readonly Task[], opts: { keep?: (t: Task) => boolean } = {}): Task[] {
   const out: Task[] = []
   const seen = new Set<string>()
   const add = (t: Task) => { if (!seen.has(t.id)) { seen.add(t.id); out.push(t) } }
   for (const t of listed) {
-    const steps = t.completed ? [] : [
+    const steps = t.completed || opts.keep?.(t) ? [] : [
       ...(t.subtasks ?? []).filter(open),
       ...(t.isGoal ? all.filter((s) => s.goalTaskId === t.id && s.id !== t.id && open(s)) : []),
     ]

@@ -42,7 +42,7 @@ import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows, type SheetRow } from '@/components/plan/fold/AboveSheet'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 import { assigneesOf, assignmentWrite } from '@/lib/planning/v2/planV2'
-import { sheetRowStatus, statusWrite } from '@/lib/planning/sheetStatus'
+import { openSteps, sheetRowStatus, statusWrite, stepWrites, type StepSavers, type StepWrites } from '@/lib/planning/sheetStatus'
 import { SheetStatusMenu } from '@/components/plan/fold/SheetStatusMenu'
 import type { FamilyMember } from '@/types/family'
 
@@ -55,20 +55,26 @@ export const TODAY_WEEK_SHORT_LIST = 5
 
 /** A week task's one control on its sheet row (Scott, 2026-11-09): its faces,
  *  opening who is on it and where it stands. `write` saves with an Undo. */
-export function SheetTaskTools({ task, members, write }: {
+export function SheetTaskTools({ task, members, write, steps }: {
   task: Task
   members: readonly FamilyMember[]
   write: (change: { label: string; patch: Partial<Task>; prev: Partial<Task> }) => void
+  steps?: StepWrites
 }) {
   if (members.length === 0) return null
   const selected = assigneesOf(task)
+  const status = sheetRowStatus(task).status
+  // One level of steps: a step in progress has none of its own.
+  const open = status === 'started' && steps?.canAdd && !task.parentTaskId ? openSteps(task) : undefined
   return (
     <span className={`above-sheet-people${selected.length ? '' : ' is-empty'}`}>
-      <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={selected} size="sm" label="Who’s on it"
+      <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={selected} size="sm" bare label="Who’s on it"
         triggerLabel={`Status and people for ${task.title}`}
         onSelect={(ids) => write(assignmentWrite(task, ids, members))}
-        menuTop={<SheetStatusMenu status={sheetRowStatus(task).status} waitingFor={task.waitingFor}
-          people={members.map((m) => m.name.split(' ')[0])} onChange={(change) => write(statusWrite(task, change))} />} />
+        menuTop={<SheetStatusMenu status={status} waitingFor={task.waitingFor}
+          people={members.map((m) => m.name.split(' ')[0])} onChange={(change) => write(statusWrite(task, change))}
+          steps={open} onAddStep={(title) => steps?.add(task, title)}
+          onDoneStep={(id) => { const step = open?.find((s) => s.id === id); if (step) steps?.done(step) }} />} />
     </span>
   )
 }
@@ -165,7 +171,7 @@ const earlierEntry = (t: Task): DayPlanEntry => ({
   key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: false, planned: false, group: 'week', task: t,
 })
 
-export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nextWeek, chooseTask, restoreTask, reorderTasks, members = [], className, stowed, drive, children }: {
+export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nextWeek, chooseTask, restoreTask, reorderTasks, members = [], addStep, removeStep, toggleStep, className, stowed, drive, children }: {
   plan: DayPlan
   day: Date
   weekStart: Date
@@ -185,6 +191,10 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
   reorderTasks?: (writes: { id: string; sortOrder: number | null }[]) => Promise<boolean>
   /** The household, for who a row is for. Empty: no chooser. */
   members?: readonly FamilyMember[]
+  /** Steps on a task in progress: the task writers. Without addStep, none can be added. */
+  addStep?: StepSavers['add']
+  removeStep?: StepSavers['remove']
+  toggleStep?: StepSavers['toggle']
   className?: string
   /** A session runs on the page: the fold is put away, the day stays mounted. */
   stowed?: boolean
@@ -219,13 +229,19 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
     })
   } : undefined
   const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
+  const steps = stepWrites(activity.run, { add: addStep, remove: removeStep, toggle: toggleStep })
+  const tickNext = (key: string) => {
+    const task = open.find((e) => e.key === key)?.task
+    const next = task && openSteps(task)[0]
+    if (next) steps.done(next)
+  }
   const peopleTools = restoreTask ? (key: string) => {
     const entry = open.find((e) => e.key === key)
     const task = entry?.task
     if (!task) return null
     return <SheetTaskTools task={task} members={members} write={({ label, patch, prev }) => {
       void activity.run(label, async () => { await restoreTask(task.id, patch) }, { ids: [task.id], undo: async () => { await restoreTask(task.id, prev) } })
-    }} />
+    }} steps={steps} />
   } : undefined
   const completeRow = (key: string) => {
     const entry = open.find((e) => e.key === key)
@@ -249,7 +265,7 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
       frontLabel={`${range}, to pick from`}
       above={<>
         <AboveSheet kicker="Week" title={range} rows={rows}
-          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps} onReorder={reorder} shortList={TODAY_WEEK_SHORT_LIST} onComplete={completeRow} rowTools={peopleTools}>
+          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps} onReorder={reorder} shortList={TODAY_WEEK_SHORT_LIST} onComplete={completeRow} rowTools={peopleTools} onNextStep={tickNext}>
           <SheetRoutines plan={plan} day={day} actions={actions} />
         </AboveSheet>
         {nextWeek && (

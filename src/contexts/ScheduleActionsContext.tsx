@@ -26,6 +26,8 @@ export interface ScheduleActionsValue {
   onUpdateTask?: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onDeleteTask?: (id: string) => void
+  /** Adds a step under a task; says the new step's id when it saved. */
+  onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
   /** Mark or clear "needed today". Pass null to clear. */
   onSetNeededToday?: (taskId: string, neededOn: Date | null) => void
   /**

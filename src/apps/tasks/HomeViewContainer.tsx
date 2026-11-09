@@ -68,7 +68,7 @@ const sameLocalDay = (a: Date, b: Date) =>
 
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
-  const { tasks, loading: tasksLoading, error: tasksError, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders, userId } = useSupabaseTasks();
+  const { tasks, loading: tasksLoading, error: tasksError, addTask, addSubtask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders, userId } = useSupabaseTasks();
   // A failed read leaves `tasks` empty; that must not read as an empty day.
   // (`error` is also set by failed writes, so it only means "didn't load"
   // when nothing arrived.)
@@ -799,6 +799,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUpdateTasksBulk: gated.updateTasksBulk,
       onPushTask: gated.pushTask,
       onDeleteTask: deleteTask,
+      onAddSubtask: addSubtask,
       onSetNeededToday,
       viewedDate,
       onCreateTask: onCreateTaskFromValue,
@@ -880,7 +881,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, gated, deleteTask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onScheduleListItemAsTask, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
+      toggleTask, toggleWaiting, gated, deleteTask, addSubtask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onScheduleListItemAsTask, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventFree, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
@@ -913,7 +914,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
           ?plan=1, steps the week aside. The workspace shell stays: swapping
           it for a bare fragment remounted the day page, which lost its way
           back (walk, 2026-11-01). */}
-      <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside'} stepAside={fixedView !== 'week' && searchParams.get('review') === '1'} tasks={tasks} date={viewedDate} update={gated.updateTask} complete={toggleTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
+      <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside'} stepAside={fixedView !== 'week' && searchParams.get('review') === '1'} tasks={tasks} date={viewedDate} update={gated.updateTask} complete={toggleTask} addStep={addSubtask} removeStep={deleteTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
       <HomeView
         registerUndo={undo.pushAction}
         // The week reminder is Today's, below its schedule (2026-09-22): a

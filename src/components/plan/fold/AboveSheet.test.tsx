@@ -48,6 +48,15 @@ describe('AboveSheet: the level above, for reading', () => {
     expect(screen.getByText('Waiting on Iris')).toHaveClass('above-sheet-row-note')
   })
 
+  it('shows only the next step of a row in progress, and ticks it', () => {
+    const onNextStep = vi.fn()
+    render(<AboveSheet kicker="Week" title="This week" rows={[{ id: 'a', title: 'Call KKI', status: 'started', fill: 25, nextStep: 'Find the number' }]} doneCount={0} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} onNextStep={onNextStep} />)
+    expect(screen.getByText('Find the number')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mark Call KKI complete' }).style.getPropertyValue('--fill')).toBe('25%')
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Find the number done' }))
+    expect(onNextStep).toHaveBeenCalledWith('a')
+  })
+
   describe('a check on Today’s week sheet', () => {
     const rows = [{ id: 'a', title: 'Call KKI' }, { id: 'b', title: 'Book transport' }]
 

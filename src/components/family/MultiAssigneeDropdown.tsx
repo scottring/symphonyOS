@@ -20,6 +20,8 @@ interface MultiAssigneeDropdownProps {
   showNames?: boolean
   /** More of the menu, above the people (the week sheet's status). */
   menuTop?: ReactNode
+  /** Just the people: no Select all or Clear, no note about sharing (the week sheet). */
+  bare?: boolean
 }
 
 const sizeClasses = {
@@ -39,6 +41,7 @@ export function MultiAssigneeDropdown({
   triggerLabel,
   showNames = false,
   menuTop,
+  bare = false,
 }: MultiAssigneeDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0, placeAbove: false })
@@ -162,7 +165,7 @@ export function MultiAssigneeDropdown({
       </div>
 
       {/* Quick actions */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-neutral-100 mb-1">
+      {!bare && <div className="flex items-center gap-2 px-3 py-1.5 border-b border-neutral-100 mb-1">
         <button
           type="button"
           onClick={handleSelectAll}
@@ -178,7 +181,7 @@ export function MultiAssigneeDropdown({
         >
           Clear
         </button>
-      </div>
+      </div>}
 
       {/* Family members with checkboxes */}
       {members.map(member => {
@@ -228,7 +231,7 @@ export function MultiAssigneeDropdown({
       })}
 
       {/* Selection summary */}
-      {selectedIds.length >= 2 && (
+      {!bare && selectedIds.length >= 2 && (
         <div className="mt-1 pt-2 px-3 border-t border-neutral-100">
           <div className="flex items-center gap-1 text-xs text-primary-600">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

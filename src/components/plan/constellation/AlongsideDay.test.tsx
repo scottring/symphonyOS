@@ -276,6 +276,14 @@ it('draws a waiting week task with who it is waiting on',()=>{
  expect(screen.getByText('Waiting on Iris')).toBeInTheDocument()
 })
 
+it('keeps a task in progress as one row with its next step, instead of splitting it',()=>{
+ const started={...task,startedAt:date,subtasks:[{id:'k',title:'Pack the blanket',completed:false,createdAt:date}]} as unknown as Task
+ render(<MemoryRouter><AlongsideDay tasks={[started]} date={date} update={vi.fn()} complete={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ unfold()
+ expect(screen.getByText('Choose picnic spot')).toBeInTheDocument()
+ expect(screen.getByText('Pack the blanket')).toBeInTheDocument()
+})
+
 it('the workspace’s week sheet lies wide enough for its checks, people and +',()=>{
  render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
  expect(document.querySelector<HTMLElement>('.paper-fold-flap')?.style.width).toBe('357px')

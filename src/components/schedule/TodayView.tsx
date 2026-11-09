@@ -1333,7 +1333,8 @@ export function TodayView({
       // drag onto the day does (notePlaced).
       chooseTask={async (id) => { const ok = await planActions.chooseTaskDay(id, viewedDate); if (ok) notePlaced(); return ok }}
       restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)}
-      reorderTasks={ctx.onReorderTasks} members={familyMembers}>
+      reorderTasks={ctx.onReorderTasks} members={familyMembers}
+      addStep={ctx.onAddSubtask} removeStep={ctx.onDeleteTask} toggleStep={onToggleTask}>
       {day}
     </TodayWeekFold>
   )
