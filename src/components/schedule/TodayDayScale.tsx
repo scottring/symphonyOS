@@ -13,6 +13,7 @@ import { useTravelTime } from '@/hooks/useTravelTime'
 import { effectiveStartTime, formatTimeLong } from '@/lib/timeUtils'
 import type { ProposedRow, RowMark } from './todayPreview'
 import { TaskCheckbox } from './TaskCheckbox'
+import { TodayQuietBand } from './TodayQuietBand'
 import { TimelineQuickInput, type TimelineCaptureResult } from './TimelineQuickInput'
 import type { ParserContext } from '@/lib/quickInputParser'
 
@@ -250,6 +251,7 @@ export function TodayDayScale({
   create,
   quiet = [],
   onUnpin,
+  onPin,
 }: {
   /** The day's timed rows (a group's children ride with their parent). */
   items: TimelineItem[]
@@ -283,6 +285,8 @@ export function TodayDayScale({
   quiet?: readonly QuietBand[]
   /** Takes a pinned routine off the grid. Unset: no pin on the block. */
   onUnpin?: (item: TimelineItem) => void
+  /** Keeps a routine from a quiet band on the grid. Unset: no pin in the band's list. */
+  onPin?: (item: TimelineItem) => void
   /** Typing straight onto an empty stretch. Unset: the column takes no clicks
    *  of its own. Without onCreateEvent it adds tasks only. */
   create?: {
@@ -435,12 +439,12 @@ export function TodayDayScale({
         const band = quietById.get(b.id)
         if (band) {
           return (
-            <div key={b.id} className="today-scale-quiet" style={{
+            <TodayQuietBand key={b.id} band={band} style={{
               top: b.top,
               height: b.height,
               left: `calc(var(--scale-gutter) + (100% - var(--scale-gutter)) * ${b.lane / b.lanes})`,
               width: `calc((100% - var(--scale-gutter)) / ${b.lanes} - ${b.lanes > 1 ? 6 : 0}px)`,
-            }}>{band.count} {band.count === 1 ? 'routine' : 'routines'}</div>
+            }} peopleOf={peopleOf} onSelect={onSelect} onToggleDone={onToggleDone} onPin={onPin} />
           )
         }
         const entry = byId.get(b.id)

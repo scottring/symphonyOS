@@ -46,6 +46,9 @@ export interface QuietBand {
   end: Date
   /** How many routines the band stands for. */
   count: number
+  /** The routines themselves, in time order: the band names them and opens
+   *  them (Scott, 2026-11-10: a count with no way in was no help). */
+  items: TimelineItem[]
 }
 
 /** The grid's quiet bands: routines off the grid, joined where their time overlaps. */
@@ -55,7 +58,7 @@ export function quietBands(items: readonly TimelineItem[]): QuietBand[] {
     if (!start) return []
     const own = item.allDay ? null : item.endTime
     const end = own && own.getTime() > start.getTime() ? own : new Date(start.getTime() + DEFAULT_MINUTES * 60_000)
-    return [{ id: item.id, start, end }]
+    return [{ item, id: item.id, start, end }]
   }).sort((a, b) => a.start.getTime() - b.start.getTime())
 
   const bands: QuietBand[] = []
@@ -63,10 +66,19 @@ export function quietBands(items: readonly TimelineItem[]): QuietBand[] {
     const last = bands[bands.length - 1]
     if (last && t.start.getTime() < last.end.getTime()) {
       last.count += 1
+      last.items.push(t.item)
       if (t.end.getTime() > last.end.getTime()) last.end = t.end
     } else {
-      bands.push({ id: `quiet-${t.id}`, start: t.start, end: t.end, count: 1 })
+      bands.push({ id: `quiet-${t.id}`, start: t.start, end: t.end, count: 1, items: [t.item] })
     }
   }
   return bands
+}
+
+/** Routine rows in time order; a row with no time is left out. */
+export function timedRoutineRows(items: readonly TimelineItem[]): { item: TimelineItem; start: Date }[] {
+  return items.flatMap((item) => {
+    const start = effectiveStartTime(item)
+    return start ? [{ item, start }] : []
+  }).sort((a, b) => a.start.getTime() - b.start.getTime())
 }

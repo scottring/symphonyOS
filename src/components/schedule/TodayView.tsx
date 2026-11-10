@@ -1709,6 +1709,7 @@ export function TodayView({
               onToggleDone={toggleDayItem}
               quiet={dayBands}
               onUnpin={ctx.onUpdateRoutine ? (item) => setDayGridPin(item, false) : undefined}
+              onPin={ctx.onUpdateRoutine ? (item) => setDayGridPin(item, true) : undefined}
               onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }).then((ok) => { if (ok === true && payload.kind === 'task') notePlaced() }) }}
               // Dragging a block's bottom edge: a task's length (with Undo,
               // as a move has), an event's end.

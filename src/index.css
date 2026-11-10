@@ -2148,6 +2148,15 @@ html.desktop-shell a {
 .today-scale-item { position: absolute; box-sizing: border-box; display: flex; align-items: flex-start; gap: 8px; padding: 0 8px 0 11px; border-radius: 8px; overflow: hidden; font-size: 13px; line-height: 1.25; cursor: grab; touch-action: manipulation; background: var(--scale-item-bg); box-shadow: inset 3px 0 0 var(--scale-item-bar); }
 /* Routines off the grid (Scott, 2026-11-09): their time, said quietly. */
 .today-scale-quiet { position: absolute; box-sizing: border-box; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; background: color-mix(in srgb, var(--color-neutral-200) 45%, transparent); color: var(--color-neutral-500); font-size: 11.5px; line-height: 1.2; overflow: hidden; white-space: nowrap; }
+.today-scale-quiet.is-opener { min-width: 0; min-height: 0; justify-content: flex-start; text-align: left; cursor: pointer; font: inherit; font-size: 11.5px; color: var(--color-neutral-600); }
+.today-scale-quiet-names { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-scale-quiet.is-opener:hover, .today-scale-quiet.is-opener.is-open { background: color-mix(in srgb, var(--color-neutral-200) 80%, transparent); color: var(--color-neutral-800); }
+.today-scale-quiet.is-opener:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
+.today-scale-quiet .is-done { text-decoration: line-through; color: var(--color-neutral-400); }
+.today-quiet-pop { position: fixed; z-index: 60; box-sizing: border-box; max-width: calc(100vw - 16px); padding: 4px 12px; border-radius: 12px; background: var(--color-bg-elevated, #fff); box-shadow: 0 12px 36px rgba(30, 38, 40, .18), 0 0 0 1px rgba(30, 38, 40, .06); }
+.today-quiet-pop .today-routines-list { margin: 0; }
+.today-quiet-pop .today-routine-row:last-child { border-bottom: 0; }
+.today-quiet-pop .today-routine-time { width: 58px; }
 .today-routine-pin { flex: none; display: grid; place-items: center; width: 22px; height: 22px; min-width: 0; min-height: 0; border-radius: 5px; color: var(--color-neutral-400); }
 .today-routine-pin:hover { color: var(--color-primary-700); background: color-mix(in srgb, var(--color-primary-300) 30%, transparent); }
 .today-routine-pin svg { width: 13px; height: 13px; }

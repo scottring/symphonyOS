@@ -84,6 +84,7 @@ describe('quietBands', () => {
     const bands = quietBands([routine('school', 6, 45), routine('jax', 7, 0)])
     expect(bands).toHaveLength(1)
     expect(bands[0]).toMatchObject({ count: 2, start: at(6, 45), end: at(7, 30) })
+    expect(ids(bands[0].items)).toEqual(['routine-school', 'routine-jax'])
   })
 
   it('starts a new band across a gap', () => {

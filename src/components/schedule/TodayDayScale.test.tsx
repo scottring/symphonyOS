@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, createEvent } from '@testing-library/react'
+import { render, screen, fireEvent, createEvent, within } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'
 import type { TimelineItem } from '@/types/timeline'
 import { TodayDayScale } from './TodayDayScale'
@@ -25,17 +25,40 @@ function renderScale(items: TimelineItem[], over: Record<string, unknown> = {}) 
 }
 
 describe('TodayDayScale', () => {
-  it('draws a quiet band for routines off the grid, and their time is not open', () => {
+  const routine = (id: string, h: number, m = 0, over: Partial<TimelineItem> = {}) =>
+    item({ id: `routine-${id}`, type: 'routine', title: id, startTime: at(h, m), originalRoutine: { id } as TimelineItem['originalRoutine'], ...over })
+
+  it('draws a quiet band for routines off the grid, naming them, and their time is not open', () => {
     renderScale([], {
       now: null,
-      quiet: [{ id: 'quiet-1', start: at(12), end: at(13), count: 2 }],
+      quiet: [{ id: 'quiet-1', start: at(12), end: at(13), count: 2, items: [routine('Lunch', 12), routine('Walk', 12, 30)] }],
     })
-    expect(document.querySelector('.today-scale-quiet')).toHaveTextContent('2 routines')
+    expect(document.querySelector('.today-scale-quiet')).toHaveTextContent('Lunch · Walk')
     expect([...document.querySelectorAll('.today-scale-free')].map((f) => f.textContent)).toEqual(['5 hours open', '8 hours open'])
   })
 
-  it('says one routine in the singular', () => {
-    renderScale([], { quiet: [{ id: 'quiet-1', start: at(17, 15), end: at(17, 45), count: 1 }] })
+  it('a band opens its routines as rows: tick, open, pin', () => {
+    const onToggleDone = vi.fn()
+    const onPin = vi.fn()
+    const lunch = routine('Lunch', 12, 0, { completed: true })
+    const walk = routine('Walk', 12, 30)
+    const props = renderScale([], { onToggleDone, onPin, quiet: [{ id: 'quiet-1', start: at(12), end: at(13), count: 2, items: [lunch, walk] }] })
+    // A routine already done reads crossed out on the band.
+    expect(screen.getByText('Lunch')).toHaveClass('is-done')
+    fireEvent.click(screen.getByRole('button', { name: /^Routines at 12:00 PM: Lunch, Walk$/ }))
+    const pop = screen.getByRole('dialog', { name: 'Routines at 12:00 PM' })
+    fireEvent.click(within(pop).getByRole('button', { name: 'Mark Walk complete' }))
+    expect(onToggleDone).toHaveBeenCalledWith(walk)
+    fireEvent.click(within(pop).getByRole('button', { name: 'Keep Walk on the grid' }))
+    expect(onPin).toHaveBeenCalledWith(walk)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Routines at 12:00 PM/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Lunch, / }))
+    expect(props.onSelect).toHaveBeenCalledWith('routine-Lunch')
+  })
+
+  it('a band with nothing it can name still holds the time, as a count', () => {
+    renderScale([], { quiet: [{ id: 'quiet-1', start: at(17, 15), end: at(17, 45), count: 1, items: [] }] })
     expect(document.querySelector('.today-scale-quiet')).toHaveTextContent(/^1 routine$/)
   })
 

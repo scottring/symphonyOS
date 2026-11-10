@@ -86,8 +86,9 @@ describe('Today — routines off the grid (Scott, 2026-11-09)', () => {
   it('a timed routine is on the checklist, with a quiet band on the grid', () => {
     renderView({ routines: [timed({ id: 'a', name: 'School morning' })] })
     expect(within(forToday().getByRole('list', { name: 'Routines today' })).getByText('School morning')).toBeInTheDocument()
-    expect(dayRegion().queryByText(/School morning/)).toBeNull()
-    expect(document.querySelector('.today-scale-quiet')).toHaveTextContent('1 routine')
+    // On the grid only as the quiet band, which names it (Scott, 2026-11-10).
+    expect(dayRegion().queryByRole('button', { name: /^School morning, / })).toBeNull()
+    expect(document.querySelector('.today-scale-quiet')).toHaveTextContent('School morning')
   })
 
   it('a pinned routine is on the grid and not the checklist', () => {
@@ -96,10 +97,25 @@ describe('Today — routines off the grid (Scott, 2026-11-09)', () => {
     expect(forToday().queryByText('The dose')).toBeNull()
   })
 
-  it('a Background routine has no row anywhere, and the grid keeps its time', () => {
+  it('a Background routine has no checklist row; its band names it and opens it, with no pin', () => {
     renderView({ routines: [timed({ id: 'c', name: 'FFG pickup', background: true })] })
-    expect(screen.queryByText(/FFG pickup/)).toBeNull()
-    expect(document.querySelector('.today-scale-quiet')).toHaveTextContent('1 routine')
+    expect(forToday().queryByText(/FFG pickup/)).toBeNull()
+    fireEvent.click(dayRegion().getByRole('button', { name: /^Routines at .*FFG pickup/ }))
+    const pop = screen.getByRole('dialog', { name: /^Routines at / })
+    expect(within(pop).getByRole('button', { name: /^FFG pickup, / })).toBeInTheDocument()
+    expect(within(pop).queryByRole('button', { name: 'Keep FFG pickup on the grid' })).toBeNull()
+  })
+
+  it('a band opens its routines: tick one off, or keep it on the grid', async () => {
+    ctxValue.onUpdateRoutine.mockClear()
+    const onCompleteRoutine = vi.fn()
+    renderView({ routines: [timed({ id: 'a', name: 'School morning' })], onCompleteRoutine })
+    fireEvent.click(dayRegion().getByRole('button', { name: /^Routines at .*School morning/ }))
+    const pop = screen.getByRole('dialog', { name: /^Routines at / })
+    fireEvent.click(within(pop).getByRole('button', { name: 'Mark School morning complete' }))
+    expect(onCompleteRoutine).toHaveBeenCalledWith('a', true)
+    fireEvent.click(within(pop).getByRole('button', { name: 'Keep School morning on the grid' }))
+    await waitFor(() => expect(ctxValue.onUpdateRoutine).toHaveBeenCalledWith('a', { show_on_day_grid: true }))
   })
 
   it('the pin on a checklist row saves it to the grid', async () => {
