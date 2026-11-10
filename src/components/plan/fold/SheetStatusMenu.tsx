@@ -176,13 +176,11 @@ export function SheetStatusButton({ open, onOpenChange, title, children }: {
     <>
       <button ref={triggerRef} type="button" className="above-sheet-status-btn" aria-haspopup="dialog" aria-expanded={open}
         aria-label={`Where ${title} stands`} title="Where it stands" onClick={() => onOpenChange(!open)}>
-        {/* The row's own circle, half full, and a caret: "set how far along
-            this is" (Scott, 2026-11-10: no word, and nothing at rest). */}
-        <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-          <circle cx="10" cy="10" r="7" /><path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor" />
-        </svg>
-        <svg viewBox="0 0 20 20" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M5 8l5 5 5-5" />
+        {/* A progress meter: "how far along is it" (Scott, 2026-11-10). Not
+            a circle, so it never reads as the row's own status. No word, and
+            nothing at rest. */}
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m12 14 4-4" /><path d="M3.34 19a10 10 0 1 1 17.32 0" />
         </svg>
       </button>
       {open && pos && createPortal(

@@ -143,7 +143,7 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 /* The row's Status button: an icon, shown only on the row you're pointing at
    (like the +); a finger always sees it. */
 .above-sheet-status-btn {
-  flex: none; display: inline-flex; align-items: center; gap: 2px; height: 28px; min-height: 0; min-width: 0; padding: 0 6px;
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-height: 0; min-width: 0; padding: 0;
   border: 0; border-radius: 999px; background: none; font: 500 12px/1 var(--font-family-sans);
   color: var(--paper-fold-ink-soft, var(--color-neutral-600)); cursor: pointer;
 }
