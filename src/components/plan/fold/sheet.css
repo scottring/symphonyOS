@@ -140,16 +140,22 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .sheet-status-input { box-sizing: border-box; width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--color-neutral-200); border-radius: 8px; font: 400 13px/1.3 var(--font-family-sans); }
 .sheet-status-input:focus { outline: none; border-color: var(--color-primary-500); }
 .sheet-status-other { width: 120px; padding: 5px 10px; border-style: dashed; border-radius: 999px; background: none; }
-/* The row's Status button: quiet until you point at the row; a finger always sees it. */
+/* The row's Status button: an icon, shown only on the row you're pointing at
+   (like the +); a finger always sees it. */
 .above-sheet-status-btn {
-  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 26px; min-height: 0; min-width: 0; padding: 0 8px;
+  flex: none; display: inline-flex; align-items: center; gap: 2px; height: 28px; min-height: 0; min-width: 0; padding: 0 6px;
   border: 0; border-radius: 999px; background: none; font: 500 12px/1 var(--font-family-sans);
   color: var(--paper-fold-ink-soft, var(--color-neutral-600)); cursor: pointer;
 }
 .above-sheet-status-btn:hover, .above-sheet-status-btn[aria-expanded='true'] { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 .above-sheet-status-btn:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) {
-  .above-sheet-status-btn { opacity: .5; transition: opacity .12s; }
+  /* Takes no room at rest, so titles keep the width; it sits left of the +
+     (and of the empty people chooser, when no one is on it yet). */
+  .above-sheet-tools > .above-sheet-status-btn { position: absolute; top: 0; right: calc(100% + 28px); background-color: var(--paper-fold-paper-above, var(--color-bg-elevated)); opacity: 0; transition: opacity .12s; }
+  .above-sheet-tools:not(:has(.above-sheet-pick)) > .above-sheet-status-btn { right: calc(100% + 4px); }
+  .above-sheet-tools:has(> .above-sheet-people.is-empty) > .above-sheet-status-btn { right: calc(100% + 58px); }
+  .above-sheet-tools > .above-sheet-status-btn:hover, .above-sheet-tools > .above-sheet-status-btn[aria-expanded='true'] { background-color: var(--color-neutral-100); }
   .above-sheet-row:hover .above-sheet-status-btn, .above-sheet-row:focus-within .above-sheet-status-btn, .above-sheet-status-btn[aria-expanded='true'] { opacity: 1; }
 }
 /* The status line under a title opens the same menu. */
