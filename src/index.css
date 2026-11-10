@@ -2117,6 +2117,12 @@ html.desktop-shell a {
 .today-cols .today-focus-card .row-title { display: block; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; overflow-wrap: anywhere; }
 .today-cols + .daybook-journal-section { margin-top: var(--ds-section-gap, 36px); }
 .today-scale { margin-bottom: 8px; }
+/* Squeezed but not a phone (a side pane open, Scott 2026-11-10): the day
+   stays first, as it reads when the columns sit side by side, so opening the
+   pane doesn't flip the order. A phone keeps the short list on top. */
+@container (min-width: 28rem) and (max-width: 49.99rem) {
+  .today-cols-grid > .today-day-section { order: -1; }
+}
 @container (min-width: 50rem) {
   .today-cols-grid { display: grid; grid-template-columns: minmax(320px, 5fr) minmax(0, 6fr); column-gap: 40px; align-items: start; }
   .today-cols-grid > .today-day-section { grid-column: 1; grid-row: 1; }
