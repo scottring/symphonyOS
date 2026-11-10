@@ -11,8 +11,8 @@ describe('sheetRowStatus', () => {
     expect(sheetRowStatus(t())).toEqual({})
   })
 
-  it('reads a started task as in progress, with no extra line', () => {
-    expect(sheetRowStatus(t({ startedAt: now }))).toEqual({ status: 'started' })
+  it('reads a started task as started, in words as well as on the circle', () => {
+    expect(sheetRowStatus(t({ startedAt: now }))).toEqual({ status: 'started', note: 'Started' })
   })
 
   it('reads a wait as who it is waiting on', () => {
@@ -99,7 +99,7 @@ describe('owed to someone (the wall’s Waiting on us)', () => {
   it('keeps an in-progress row in progress', () => {
     const s = sheetRowStatus(t({ owedTo: 'FFG', startedAt: new Date() }))
     expect(s.status).toBe('started')
-    expect(s.note).toBe('For FFG')
+    expect(s.note).toBe('Started · For FFG')
   })
   it('writes the name, trimmed, with the old one to undo to', () => {
     const w = owedWrite(t({ owedTo: 'Iris' }), ' Ms. Kroger ')
@@ -111,5 +111,15 @@ describe('owed to someone (the wall’s Waiting on us)', () => {
     const w = owedWrite(t({ owedTo: 'Iris' }), null)
     expect(w.patch).toEqual({ owedTo: null })
     expect(w.label).toMatch(/^No one waiting: /)
+  })
+})
+
+describe('a wait with a check-back day', () => {
+  it('moves the task to that day, and Undo puts its old date back', () => {
+    const day = new Date(2026, 10, 12, 15)
+    const { patch, prev } = statusWrite(t({ isWaiting: true, waitingFor: 'KKI', waitingSince: now, bucket: 'week' }), { to: 'waiting', on: 'KKI', checkBack: day }, now)
+    expect(patch).toMatchObject({ isWaiting: true, waitingFor: 'KKI', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 10, 12) })
+    expect(prev).toMatchObject({ bucket: 'week', scheduledFor: undefined })
+    expect('scheduledFor' in prev).toBe(true)
   })
 })

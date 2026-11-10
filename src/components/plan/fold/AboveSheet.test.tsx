@@ -1,6 +1,7 @@
 import { createEvent, fireEvent, render, screen, within } from '@testing-library/react'
+import { act } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { AboveSheet } from '@/components/plan/fold/AboveSheet'
+import { AboveSheet, JUST_DONE_MS, type RowStatusMenu } from '@/components/plan/fold/AboveSheet'
 
 const FOOT = 'For reading. Write November in its own words.'
 
@@ -71,6 +72,54 @@ describe('AboveSheet: the level above, for reading', () => {
       render(<AboveSheet kicker="Week" title="This week" rows={rows} doneCount={0} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} />)
       const check = screen.getByRole('button', { name: 'Mark Call KKI complete' })
       expect(check.compareDocumentPosition(screen.getByRole('button', { name: 'Call KKI' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    // Scott, 2026-11-10: "there's no undo" — the strip's Undo was far from the row.
+    it('keeps a ticked row in place, crossed out, with its own Undo', () => {
+      vi.useFakeTimers()
+      try {
+        const onReopen = vi.fn()
+        const { rerender } = render(<AboveSheet kicker="Week" title="This week" rows={rows} doneCount={0} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} onReopen={onReopen} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Mark Call KKI complete' }))
+        // The data catches up and the row leaves the open list; it still shows, done.
+        rerender(<AboveSheet kicker="Week" title="This week" rows={rows.slice(1)} doneCount={1} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} onReopen={onReopen} />)
+        const items = screen.getAllByRole('listitem')
+        expect(items[0]).toHaveTextContent('Call KKI')
+        expect(items[0]).toHaveTextContent('Done · Undo')
+        fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+        expect(onReopen).toHaveBeenCalledWith('a')
+        expect(screen.queryByText('Done ·', { exact: false })).toBeNull()
+      } finally { vi.useRealTimers() }
+    })
+
+    it('lets the ticked row go after a few seconds', () => {
+      vi.useFakeTimers()
+      try {
+        const { rerender } = render(<AboveSheet kicker="Week" title="This week" rows={rows} doneCount={0} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} onReopen={vi.fn()} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Mark Call KKI complete' }))
+        rerender(<AboveSheet kicker="Week" title="This week" rows={rows.slice(1)} doneCount={1} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} onReopen={vi.fn()} />)
+        act(() => { vi.advanceTimersByTime(JUST_DONE_MS) })
+        expect(screen.getAllByRole('listitem')).toHaveLength(1)
+        expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+      } finally { vi.useRealTimers() }
+    })
+
+    it('opens "N done" to the finished tasks, and a check puts one back', () => {
+      const onReopen = vi.fn()
+      render(<AboveSheet kicker="Week" title="This week" rows={rows} doneCount={1} doneRows={[{ id: 'z', title: 'Pay FFG' }]} foot={FOOT} onOpen={vi.fn()} onComplete={vi.fn()} onReopen={onReopen} />)
+      expect(screen.queryByText('Pay FFG')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: '1 done' }))
+      expect(screen.getByRole('list', { name: 'Done' })).toHaveTextContent('Pay FFG')
+      fireEvent.click(screen.getByRole('button', { name: 'Mark Pay FFG not done' }))
+      expect(onReopen).toHaveBeenCalledWith('z')
+    })
+
+    it('opens the row’s status menu from its status line', () => {
+      const seen: Record<string, RowStatusMenu> = {}
+      const rowTools = (id: string, menu: RowStatusMenu) => { seen[id] = menu; return menu.open ? <span>menu for {id}</span> : null }
+      render(<AboveSheet kicker="Week" title="This week" rows={[{ id: 'a', title: 'Call KKI', status: 'waiting', note: 'Waiting on KKI' }]} doneCount={0} foot={FOOT} onOpen={vi.fn()} rowTools={rowTools} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Waiting on KKI' }))
+      expect(screen.getByText('menu for a')).toBeInTheDocument()
     })
 
     it('is absent without onComplete', () => {

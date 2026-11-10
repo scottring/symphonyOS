@@ -411,7 +411,7 @@ describe('TapContextPanel', () => {
 
     it('offers none of them when the host wires none', () => {
       renderPanel()
-      for (const name of ['Bring up', 'Waiting for…', 'Need today']) {
+      for (const name of ['Bring up', 'Waiting on…', 'Need today']) {
         expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
       }
     })
@@ -431,10 +431,10 @@ describe('TapContextPanel', () => {
       expect(onUpdateDiscussion).toHaveBeenCalledWith({ needsDiscussion: true, discussionNote: 'Summer camp' })
     })
 
-    it('Waiting for… opens the sentence and saves it', async () => {
+    it('Waiting on… opens the sentence and saves it', async () => {
       const onSaveWaiting = vi.fn()
       const { user } = renderPanel({}, { onSaveWaiting, onClearWaiting: vi.fn() })
-      await user.click(await job(user, 'Waiting for…'))
+      await user.click(await job(user, 'Waiting on…'))
       await user.type(screen.getByPlaceholderText(/pizza Saturday/), 'Guy to call back')
       await user.click(screen.getByRole('button', { name: 'Save' }))
       expect(onSaveWaiting).toHaveBeenCalledWith('Guy to call back', undefined)

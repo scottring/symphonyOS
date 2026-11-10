@@ -292,7 +292,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
     ...(props.onSaveWaiting
       ? [{
           id: 'waiting',
-          label: task.isWaiting ? 'Waiting' : 'Waiting for…',
+          label: task.isWaiting ? 'Waiting' : 'Waiting on…',
           kind: (task.isWaiting ? 'flagged' : 'default') as PanelAction['kind'],
           pressed: !!task.isWaiting,
           title: task.isWaiting && task.waitingFor

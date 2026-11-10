@@ -7,9 +7,11 @@ import { waitingUpdates } from '@/lib/today/waiting'
 import type { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 
 export type SheetStatus = 'started' | 'waiting'
-export type SheetStatusChange = { to: 'started' } | { to: 'waiting'; on: string } | { to: 'none' }
+/** A wait may carry a check-back day: the task moves to that day, all-day,
+ *  and comes back then (lib/today/waiting). */
+export type SheetStatusChange = { to: 'started' } | { to: 'waiting'; on: string; checkBack?: Date } | { to: 'none' }
 
-type StatusFields = Pick<Task, 'title' | 'startedAt' | 'isWaiting' | 'waitingFor' | 'waitingSince'>
+type StatusFields = Pick<Task, 'title' | 'startedAt' | 'isWaiting' | 'waitingFor' | 'waitingSince'> & Partial<Pick<Task, 'bucket' | 'scheduledFor' | 'isAllDay'>>
 
 type RowFields = Pick<Task, 'startedAt' | 'isWaiting' | 'waitingFor' | 'subtasks' | 'owedTo'>
 
@@ -30,7 +32,8 @@ export function sheetRowStatus(t: RowFields): { status?: SheetStatus; note?: str
   const owed = t.owedTo ? { note: `For ${t.owedTo}` } : {}
   if (!t.startedAt) return owed
   const steps = stepsOf(t)
-  if (steps.length === 0) return { status: 'started', ...owed }
+  // Started with no steps: say so in words, not only on the circle (2026-11-10).
+  if (steps.length === 0) return { status: 'started', note: t.owedTo ? `Started · For ${t.owedTo}` : 'Started' }
   const open = openSteps(t)
   const fill = Math.round(((steps.length - open.length) / steps.length) * 100)
   return { status: 'started', ...owed, fill: open.length ? Math.max(LEAST_FILL, fill) : 100, ...(open[0] ? { nextStep: open[0].title } : {}) }
@@ -73,12 +76,14 @@ export function stepWrites(run: ReturnType<typeof useCanvasActivity>['run'], s: 
 export type StepWrites = ReturnType<typeof stepWrites>
 
 export function statusWrite(t: StatusFields, change: SheetStatusChange, now: Date = new Date()): { label: string; patch: Partial<Task>; prev: Partial<Task> } {
-  const prev: Partial<Task> = { startedAt: t.startedAt ?? null, isWaiting: !!t.isWaiting, waitingFor: t.waitingFor, waitingSince: t.waitingSince }
+  const prev: Partial<Task> = { startedAt: t.startedAt ?? null, isWaiting: !!t.isWaiting, waitingFor: t.waitingFor, waitingSince: t.waitingSince,
+    // A check-back day moves the task; Undo puts its date back too.
+    ...(change.to === 'waiting' && change.checkBack ? { bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay } : {}) } as Partial<Task>
   const notWaiting: Partial<Task> = { isWaiting: false, waitingFor: undefined, waitingSince: undefined }
   if (change.to === 'started') return { label: `In progress: “${t.title}”`, patch: { startedAt: now, ...notWaiting }, prev }
   if (change.to === 'waiting') {
     const on = change.on.trim()
-    return { label: `Waiting on ${on}: “${t.title}”`, patch: { ...waitingUpdates(t, on), startedAt: null }, prev }
+    return { label: `Waiting on ${on}: “${t.title}”`, patch: { ...waitingUpdates(t, on, change.checkBack), startedAt: null }, prev }
   }
   return { label: `Clear status: “${t.title}”`, patch: { startedAt: null, ...notWaiting }, prev }
 }

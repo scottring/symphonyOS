@@ -39,11 +39,11 @@ import { dayWordFor } from '@/components/canvas/week/compactWeek'
 import { earlierDayMark } from '@/lib/planning/weekList'
 import { compareSortOrder, reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
-import { AboveSheet, SheetRows, type SheetRow } from '@/components/plan/fold/AboveSheet'
+import { AboveSheet, SheetRows, type RowStatusMenu, type SheetRow } from '@/components/plan/fold/AboveSheet'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 import { assigneesOf, assignmentWrite } from '@/lib/planning/v2/planV2'
 import { openSteps, owedWrite, sheetRowStatus, statusWrite, stepWrites, type StepSavers, type StepWrites } from '@/lib/planning/sheetStatus'
-import { SheetStatusMenu } from '@/components/plan/fold/SheetStatusMenu'
+import { SheetStatusButton, SheetStatusMenu } from '@/components/plan/fold/SheetStatusMenu'
 import type { FamilyMember } from '@/types/family'
 
 export interface TodayNextWeek { weekStart: Date; entries: DayPlanEntry[] }
@@ -53,30 +53,40 @@ export const TODAY_WEEK_FOOT = 'Pick three to five for today.'
 /** The week sheet shows this many tasks, in the shared order; the rest fold (Scott, 2026-11-09). */
 export const TODAY_WEEK_SHORT_LIST = 5
 
-/** A week task's one control on its sheet row (Scott, 2026-11-09): its faces,
- *  opening who is on it and where it stands. `write` saves with an Undo. */
-export function SheetTaskTools({ task, members, write, steps }: {
+/** A week task's tools on its sheet row (Scott, 2026-11-10): a Status
+ *  button for where it stands, and its faces for who is doing it — two doors,
+ *  one question each. `write` saves with an Undo. `status` is the row's
+ *  open state (SheetRows owns it, so the row's status line opens it too). */
+export function SheetTaskTools({ task, members, write, steps, status: menu }: {
   task: Task
   members: readonly FamilyMember[]
   write: (change: { label: string; patch: Partial<Task>; prev: Partial<Task> }) => void
   steps?: StepWrites
+  status?: RowStatusMenu
 }) {
-  if (members.length === 0) return null
   const selected = assigneesOf(task)
   const status = sheetRowStatus(task).status
   // One level of steps: a step in progress has none of its own.
   const open = status === 'started' && steps?.canAdd && !task.parentTaskId ? openSteps(task) : undefined
   return (
-    <span className={`above-sheet-people${selected.length ? '' : ' is-empty'}`}>
-      <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={selected} size="sm" bare label="Who’s on it"
-        triggerLabel={`Status and people for ${task.title}`}
-        onSelect={(ids) => write(assignmentWrite(task, ids, members))}
-        menuTop={<SheetStatusMenu status={status} waitingFor={task.waitingFor}
-          owedTo={task.owedTo} onOwed={(who) => write(owedWrite(task, who))}
-          people={members.map((m) => m.name.split(' ')[0])} onChange={(change) => write(statusWrite(task, change))}
-          steps={open} onAddStep={(title) => steps?.add(task, title)}
-          onDoneStep={(id) => { const step = open?.find((s) => s.id === id); if (step) steps?.done(step) }} />} />
-    </span>
+    <>
+      {menu && (
+        <SheetStatusButton open={menu.open} onOpenChange={menu.setOpen} title={task.title}>
+          <SheetStatusMenu status={status} waitingFor={task.waitingFor}
+            owedTo={task.owedTo} onOwed={(who) => write(owedWrite(task, who))}
+            people={members.map((m) => m.name.split(' ')[0])} onChange={(change) => write(statusWrite(task, change))}
+            steps={open} onAddStep={(title) => steps?.add(task, title)}
+            onDoneStep={(id) => { const step = open?.find((s) => s.id === id); if (step) steps?.done(step) }} />
+        </SheetStatusButton>
+      )}
+      {members.length > 0 && (
+        <span className={`above-sheet-people${selected.length ? '' : ' is-empty'}`}>
+          <MultiAssigneeDropdown members={members as FamilyMember[]} selectedIds={selected} size="sm" bare label="Who’s doing it"
+            triggerLabel={`Who’s doing ${task.title}`}
+            onSelect={(ids) => write(assignmentWrite(task, ids, members))} />
+        </span>
+      )}
+    </>
   )
 }
 
@@ -229,26 +239,36 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
       ids: writes.map((w) => w.id), undo: async () => { await reorderTasks(writes.map((w) => ({ id: w.id, sortOrder: was.get(w.id) ?? null }))) },
     })
   } : undefined
-  const doneCount = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed).length
+  const doneEntries = plan.chooserTasks.filter((e) => e.kind === 'task' && e.completed)
+  const doneCount = doneEntries.length
   const steps = stepWrites(activity.run, { add: addStep, remove: removeStep, toggle: toggleStep })
   const tickNext = (key: string) => {
     const task = open.find((e) => e.key === key)?.task
     const next = task && openSteps(task)[0]
     if (next) steps.done(next)
   }
-  const peopleTools = restoreTask ? (key: string) => {
+  const peopleTools = restoreTask ? (key: string, menu: RowStatusMenu) => {
     const entry = open.find((e) => e.key === key)
     const task = entry?.task
     if (!task) return null
     return <SheetTaskTools task={task} members={members} write={({ label, patch, prev }) => {
       void activity.run(label, async () => { await restoreTask(task.id, patch) }, { ids: [task.id], undo: async () => { await restoreTask(task.id, prev) } })
-    }} steps={steps} />
+    }} steps={steps} status={menu} />
   } : undefined
   const completeRow = (key: string) => {
     const entry = open.find((e) => e.key === key)
     if (!entry) return
     void activity.run(`Done: “${entry.title}”`, async () => actions.complete(entry), {
       ids: [entry.id], undo: async () => actions.complete({ ...entry, completed: true }),
+    })
+  }
+  // Back to open: the Undo under a row just ticked, or a check in the done list.
+  const reopenRow = (key: string) => {
+    const entry = doneEntries.find((e) => e.key === key) ?? open.find((e) => e.key === key)
+    if (!entry) return
+    const done = { ...entry, completed: true }
+    void activity.run(`Not done: “${entry.title}”`, async () => actions.complete(done), {
+      ids: [entry.id], undo: async () => actions.complete({ ...entry, completed: false }),
     })
   }
   const firstLeft = left[0]?.key
@@ -266,7 +286,8 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
       frontLabel={`${range}, to pick from`}
       above={<>
         <AboveSheet kicker="Week" title={range} rows={rows}
-          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps} onReorder={reorder} shortList={TODAY_WEEK_SHORT_LIST} onComplete={completeRow} rowTools={peopleTools} onNextStep={tickNext}>
+          doneCount={doneCount} foot={TODAY_WEEK_FOOT} empty="Nothing still to place this week." {...rowProps} onReorder={reorder} shortList={TODAY_WEEK_SHORT_LIST} onComplete={completeRow} rowTools={peopleTools} onNextStep={tickNext}
+          onReopen={reopenRow} doneRows={doneEntries.map((e) => ({ id: e.key, title: e.title }))}>
           <SheetRoutines plan={plan} day={day} actions={actions} />
         </AboveSheet>
         {nextWeek && (

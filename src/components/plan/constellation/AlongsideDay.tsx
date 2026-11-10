@@ -36,7 +36,7 @@ import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { dayWordFor } from '@/components/canvas/week/compactWeek'
 import { placedInWeek } from '@/components/canvas/week/weekShelf'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
-import { AboveSheet, SheetRows } from '@/components/plan/fold/AboveSheet'
+import { AboveSheet, SheetRows, type RowStatusMenu } from '@/components/plan/fold/AboveSheet'
 import { TODAY_WEEK_FOOT, TODAY_WEEK_SHORT_LIST, SheetTaskTools } from '@/components/schedule/TodayWeekColumn'
 import { AlongsideContext, type AlongsideWorkspace } from './AlongsideContext'
 import './alongside.css'
@@ -105,7 +105,8 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
   const open = [...[...earlier].sort(byOrder), ...weekTasks.filter((t) => !t.completed && !earlierIds.has(t.id)
     && !(t.scheduledFor && localYmd(t.scheduledFor) === ymd)
     && !placedInWeek(t, week, now)).sort(byOrder)]
-  const doneCount = weekTasks.filter((t) => t.completed).length
+  const doneTasks = weekTasks.filter((t) => t.completed)
+  const doneCount = doneTasks.length
   // What is placed on a later day of this week, by day (Scott, 2026-11-07:
   // the sheet beside the day is the Week's own list, Sometime this week and
   // then the days). Its + brings it to this day.
@@ -154,17 +155,23 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
     const next = task && openSteps(task)[0]
     if (next) steps.done(next)
   }
-  const peopleTools = (id: string) => {
+  const peopleTools = (id: string, menu: RowStatusMenu) => {
     const task = [...open, ...later].find((t) => t.id === id)
     if (!task) return null
     return <SheetTaskTools task={task} members={members} write={({ label, patch, prev }) => {
       void activity.run(label, () => update(id, patch), { ids: [id], undo: async () => { await update(id, prev) } })
-    }} steps={steps} />
+    }} steps={steps} status={menu} />
   }
   const completeTask = complete ? (id: string) => {
     const task = [...open, ...later].find((t) => t.id === id)
     if (!task) return
     void activity.run(`Done: “${task.title}”`, () => complete(id), { ids: [id], undo: async () => { await complete(id) } })
+  } : undefined
+  // Back to open: the Undo under a row just ticked, or a check in the done list.
+  const reopenTask = complete ? (id: string) => {
+    const task = weekTasks.find((t) => t.id === id) ?? [...open, ...later].find((t) => t.id === id)
+    if (!task) return
+    void activity.run(`Not done: “${task.title}”`, () => complete(id), { ids: [id], undo: async () => { await complete(id) } })
   } : undefined
 
   const range = formatWeekRangeShort(week)
@@ -196,7 +203,8 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
                 : { id: t.id, title: t.title, ...sheetRowStatus(t) })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
               empty={loading ? 'Loading this week’s tasks…' : error ? 'This week didn’t load.' : 'Nothing still to place this week.'}
               onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-              onComplete={completeTask} rowTools={peopleTools} onNextStep={tickNext} onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
+              onComplete={completeTask} onReopen={reopenTask} doneRows={doneTasks.map((t) => ({ id: t.id, title: t.title }))}
+              rowTools={peopleTools} onNextStep={tickNext} onOpen={onSelect} onReorder={reorder} onDragRow={(id, ev) => {
                 // Dropped anywhere on the day, the hours included, it is
                 // planned for the day with no time (Scott, 2026-11-07: tasks
                 // get a time only when it is certain; set one on the task).
@@ -206,7 +214,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
                 <h3 className="above-sheet-sub above-sheet-rows-h">Later this week</h3>
                 <SheetRows rows={later.map((t) => ({ id: t.id, title: t.title, ...sheetRowStatus(t), mark: t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) }))}
                   label="Later this week" onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
-                  onComplete={completeTask} rowTools={peopleTools} onNextStep={tickNext} onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
+                  onComplete={completeTask} onReopen={reopenTask} rowTools={peopleTools} onNextStep={tickNext} onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
               </>}
               <div ref={setRoutinesSlot} className="ad-routines" />
             </AboveSheet>}>

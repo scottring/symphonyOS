@@ -88,6 +88,13 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 .above-sheet-check:hover { border-color: var(--paper-fold-accent, var(--color-primary-600)); background: var(--color-primary-50); }
 .above-sheet-check:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
 @media (pointer: coarse) { .above-sheet-check::before { content: ''; position: absolute; inset: -14px; } }
+/* One click finishes it (2026-11-10): a 28px press with a mouse too, and the
+   check shows on the circle you're pointing at. */
+@media (pointer: fine) { .above-sheet-check::before { content: ''; position: absolute; inset: -6px; border-radius: 999px; } }
+.above-sheet-tick { position: absolute; inset: 1px; width: auto; height: auto; color: var(--paper-fold-accent, var(--color-primary-700)); opacity: 0; transition: opacity .12s; pointer-events: none; }
+.above-sheet-check:hover .above-sheet-tick, .above-sheet-check:focus-visible .above-sheet-tick { opacity: 1; }
+.above-sheet-check.is-done, .above-sheet-check.is-done:hover { border-color: var(--color-success-600, #3b7650); background: var(--color-success-600, #3b7650); }
+.above-sheet-check.is-done .above-sheet-tick { opacity: 1; color: #fff; }
 /* Who a week task is for (Scott, 2026-11-09): faces always; the empty chooser on hover. */
 .above-sheet-people { flex: none; align-self: flex-start; display: inline-flex; }
 /* Where a task stands, on its circle: half filled is in progress, an amber ring is waiting. */
@@ -105,18 +112,52 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
 @media (prefers-reduced-motion: reduce) { .above-sheet-step { animation: none; } }
 .above-sheet-check.is-waiting { border-color: var(--color-amber-500, #f59e0b); border-style: dashed; }
 .above-sheet-check.is-waiting:hover { border-color: var(--color-amber-600, #d97706); background: var(--color-amber-50, #fffbeb); }
-/* The same row's menu, above who is on it. */
-.sheet-status { box-sizing: border-box; width: 232px; max-width: 100%; padding: 8px 12px 10px; border-bottom: 1px solid var(--color-neutral-100); }
-.sheet-status-toggles, .sheet-status-who { display: flex; flex-wrap: wrap; gap: 6px; }
-.sheet-status-who { margin-top: 8px; }
-.sheet-status-toggle, .sheet-status-person { padding: 5px 10px; border: 1px solid var(--color-neutral-200); border-radius: 999px; background: none; font: 500 13px/1.2 var(--font-family-sans); color: var(--color-neutral-700); cursor: pointer; }
-.sheet-status-toggle:hover, .sheet-status-person:hover { border-color: var(--color-primary-400); }
-.sheet-status-toggle[aria-checked='true'], .sheet-status-person[aria-pressed='true'] { background: var(--color-primary-50); border-color: var(--color-primary-500); color: var(--color-primary-700); }
-.sheet-steps { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--color-neutral-100); }
-.sheet-steps-list { list-style: none; max-height: 132px; overflow-y: auto; margin: 0 0 8px; padding: 0; }
-.sheet-steps-list li { display: flex; align-items: center; gap: 8px; padding: 3px 0; font: 400 13px/1.3 var(--font-family-sans); color: var(--color-neutral-700); }
-.sheet-status-input { box-sizing: border-box; width: 100%; min-width: 0; padding: 5px 8px; border: 1px solid var(--color-neutral-200); border-radius: 8px; font: 400 13px/1.3 var(--font-family-sans); }
+/* Where a task stands: its own menu, opened by the row's Status button or its
+   status line (Scott, 2026-11-10). One choice, then only what goes with it. */
+.sheet-status-pop {
+  position: fixed; z-index: 60; box-sizing: border-box; max-width: calc(100vw - 16px);
+  background: var(--color-bg-elevated, #fff); border-radius: 12px; padding: 14px 14px 12px;
+  box-shadow: 0 12px 36px rgba(30, 38, 40, .18), 0 0 0 1px rgba(30, 38, 40, .06);
+}
+.sheet-status { display: flex; flex-direction: column; gap: 14px; }
+.sheet-status-section { display: flex; flex-direction: column; gap: 7px; }
+.sheet-status-owed { padding-top: 12px; border-top: 1px solid var(--color-neutral-100); }
+.sheet-status-h { font: 600 10.5px/1.2 var(--font-family-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
+.sheet-status-h-note { font-weight: 400; letter-spacing: 0; text-transform: none; }
+.sheet-status-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 3px; border-radius: 9px; background: var(--color-neutral-100); }
+.sheet-status-seg-btn { min-height: 32px; padding: 6px 4px; border: 0; border-radius: 7px; background: none; font: 500 13px/1.2 var(--font-family-sans); color: var(--color-neutral-600); cursor: pointer; }
+.sheet-status-seg-btn:hover { color: var(--color-neutral-900); }
+.sheet-status-seg-btn[aria-checked='true'] { background: var(--color-bg-elevated, #fff); color: var(--color-primary-700); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.sheet-status-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sheet-status-chip { padding: 5px 11px; border: 1px solid var(--color-neutral-200); border-radius: 999px; background: none; font: 500 13px/1.2 var(--font-family-sans); color: var(--color-neutral-700); cursor: pointer; }
+.sheet-status-chip:hover { border-color: var(--color-primary-400); }
+.sheet-status-chip[aria-pressed='true'] { background: var(--color-primary-50); border-color: var(--color-primary-500); color: var(--color-primary-700); font-weight: 600; }
+.sheet-status-link { align-self: flex-start; padding: 2px 0; border: 0; background: none; font: 400 13px/1.3 var(--font-family-sans); color: var(--color-primary-700); cursor: pointer; }
+.sheet-status-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.sheet-status-seg-btn:focus-visible, .sheet-status-chip:focus-visible, .sheet-status-link:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+.sheet-steps-list { list-style: none; max-height: 132px; overflow-y: auto; margin: 0; padding: 0; }
+.sheet-steps-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; font: 400 14px/1.3 var(--font-family-sans); color: var(--color-neutral-700); }
+.sheet-status-input { box-sizing: border-box; width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--color-neutral-200); border-radius: 8px; font: 400 13px/1.3 var(--font-family-sans); }
 .sheet-status-input:focus { outline: none; border-color: var(--color-primary-500); }
+.sheet-status-other { width: 120px; padding: 5px 10px; border-style: dashed; border-radius: 999px; background: none; }
+/* The row's Status button: quiet until you point at the row; a finger always sees it. */
+.above-sheet-status-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 26px; min-height: 0; min-width: 0; padding: 0 8px;
+  border: 0; border-radius: 999px; background: none; font: 500 12px/1 var(--font-family-sans);
+  color: var(--paper-fold-ink-soft, var(--color-neutral-600)); cursor: pointer;
+}
+.above-sheet-status-btn:hover, .above-sheet-status-btn[aria-expanded='true'] { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.above-sheet-status-btn:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .above-sheet-status-btn { opacity: .5; transition: opacity .12s; }
+  .above-sheet-row:hover .above-sheet-status-btn, .above-sheet-row:focus-within .above-sheet-status-btn, .above-sheet-status-btn[aria-expanded='true'] { opacity: 1; }
+}
+/* The status line under a title opens the same menu. */
+button.above-sheet-row-note.is-opener, button.above-sheet-step-title.is-opener {
+  min-height: 0; min-width: 0; padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer;
+}
+button.above-sheet-row-note.is-opener:hover, button.above-sheet-step-title.is-opener:hover { text-decoration: underline; text-underline-offset: 3px; }
+button.above-sheet-row-note.is-opener:focus-visible, button.above-sheet-step-title.is-opener:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
 /* A long week sheet's "14 more" (Scott, 2026-11-09). */
 .above-sheet-more { display: block; margin: 12px 0 0; padding: 0; background: none; border: 0; font-size: 13px; color: var(--paper-fold-accent, var(--color-primary-600)); cursor: pointer; }
 .above-sheet-more:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -136,6 +177,18 @@ button.above-sheet-row-title:hover { color: var(--paper-fold-ink, var(--color-ne
   .above-sheet-row:hover .above-sheet-people.is-empty, .above-sheet-row:focus-within .above-sheet-people.is-empty, .above-sheet-people:has([aria-expanded='true']) { opacity: 1; }
 }
 .above-sheet-done { margin: 14px 0 0; font-size: 13px; color: var(--paper-fold-ink-faint, var(--color-neutral-400)); }
+/* "N done" opens to them (Scott, 2026-11-10). */
+.above-sheet-done-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0; border: 0; background: none; cursor: pointer; }
+.above-sheet-done-btn:hover { color: var(--paper-fold-ink-soft, var(--color-neutral-600)); }
+.above-sheet-done-btn svg { transition: transform .15s; }
+.above-sheet-done-btn[aria-expanded='true'] svg { transform: rotate(90deg); }
+.above-sheet-done-btn:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
+.above-sheet-done-list { margin-top: 2px; }
+.above-sheet-row-title.is-done { color: var(--paper-fold-ink-faint, var(--color-neutral-400)); text-decoration: line-through; }
+.above-sheet-row-note.is-done { color: var(--color-success-700, #3b7650); }
+.above-sheet-undo { min-height: 0; min-width: 0; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--paper-fold-accent, var(--color-primary-700)); cursor: pointer; }
+.above-sheet-undo:hover { text-decoration: underline; text-underline-offset: 3px; }
+.above-sheet-undo:focus-visible { outline: 2px solid var(--paper-fold-accent, var(--color-primary-500)); outline-offset: 2px; }
 .above-sheet-foot {
   display: flex; align-items: center; gap: 6px; margin: 16px 0 0; font-size: 12px;
   color: var(--paper-fold-ink-faint, var(--color-neutral-400));

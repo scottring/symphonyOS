@@ -254,7 +254,7 @@ it('shows who a week task is for, and assigns from the sheet with Undo data',asy
  const assigned={...task,assignedToAll:['iris'],assignedTo:'iris'} as Task
  render(<MemoryRouter><AlongsideDay tasks={[assigned]} date={date} update={update} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
  unfold()
- const row=screen.getByRole('button',{name:/^Status and people for Choose picnic spot/})
+ const row=screen.getByRole('button',{name:/^Who’s doing Choose picnic spot/})
  expect(row).toHaveTextContent('IR')
  fireEvent.click(row)
  fireEvent.click(screen.getByRole('menuitemcheckbox',{name:/Scott/}))
@@ -265,8 +265,8 @@ it('marks a week task in progress from the sheet',async()=>{
  const update=vi.fn(async()=>true)
  render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={update} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
  unfold()
- fireEvent.click(screen.getByRole('button',{name:/^Status and people for Choose picnic spot/}))
- fireEvent.click(screen.getByRole('menuitemcheckbox',{name:'In progress'}))
+ fireEvent.click(screen.getByRole('button',{name:/^Where Choose picnic spot stands/}))
+ fireEvent.click(screen.getByRole('radio',{name:'Started'}))
  await waitFor(()=>expect(update).toHaveBeenCalledWith('same-id',expect.objectContaining({startedAt:expect.any(Date),isWaiting:false})))
 })
 
