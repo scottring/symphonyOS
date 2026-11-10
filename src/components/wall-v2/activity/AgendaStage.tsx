@@ -8,7 +8,8 @@
 // leads with a check that ticks it off or back on; an event keeps a blank of
 // the same width so the times line up. Less scrolling ("as little as
 // possible"): one line a row, and done things fold to one line at the foot.
-// A day that still overflows scrolls inside its column.
+// A day that still overflows turns pages inside its column (Scott,
+// 2026-11-10: no scrolling on the wall).
 //
 // Presentation only: the Shell owns the data and the writes.
 
@@ -16,6 +17,7 @@ import { useState, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import { datesLabel, type AgendaDay, type AgendaRow, type AgendaView } from '@/lib/wall/wallAgenda'
+import { KioskPaged } from './KioskPaged'
 
 export interface AgendaStageProps {
   view: AgendaView
@@ -104,7 +106,7 @@ export function AgendaStage(p: AgendaStageProps) {
   const col = (lab: string, body: ReactNode, key: string) => (
     <section key={key} className="ka-col" aria-label={lab}>
       <p className="kw-eyebrow ka-lab">{lab}</p>
-      <div className="ka-list">{body}</div>
+      <KioskPaged outerClassName="ka-list" className="ka-list-box" resetKey={p.view} label={`${lab}: pages`}>{body}</KioskPaged>
     </section>
   )
   const empty = (text: string) => <p className="kw-quiet ka-empty">{text}</p>

@@ -738,3 +738,37 @@ button.kh-line:active { background: var(--kw-sym-tint); }
    at the right, so eight places never slide under it. */
 .is-v1 .kw-dock.has-places, .is-v1 .kw-dock.has-places.is-calm { grid-template-columns: auto minmax(0, 1fr); }
 .is-v1 .kw-dock.has-places .kw-talk.is-collapsed { justify-self: end; }
+
+/* ===== Pages, not scrolling (KioskPaged, 2026-11-10) ========================
+   Unscoped: the wall's sheets draw outside the canvas, where --p may be
+   unset, so every size falls back to one design pixel of a 1920 screen. */
+.kp { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.kp-box { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.kp-pager { flex: none; display: flex; align-items: center; gap: calc(16 * var(--p, .0521vw)); padding-top: calc(12 * var(--p, .0521vw)); }
+.kp-where { flex: 1; text-align: center; font-size: max(16px, calc(23 * var(--p, .0521vw))); color: var(--kw-muted, #58625f); }
+.kp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: calc(10 * var(--p, .0521vw));
+  min-height: max(56px, calc(88 * var(--p, .0521vw))); min-width: max(120px, calc(200 * var(--p, .0521vw))); padding: 0 calc(28 * var(--p, .0521vw));
+  border: 1px solid var(--kw-line-strong, #857d72); border-radius: calc(18 * var(--p, .0521vw)); background: var(--kw-surface, #fffdf9); color: var(--kw-ink, #1e2628);
+  font: 600 max(16px, calc(25 * var(--p, .0521vw))) var(--kw-sans, inherit);
+}
+.kp-btn svg { width: max(20px, calc(30 * var(--p, .0521vw))); height: max(20px, calc(30 * var(--p, .0521vw))); }
+.kp-btn[disabled] { opacity: .35; }
+.kp-btn:not([disabled]):active { transform: scale(.97); background: var(--kw-sym-tint, #ddece8); }
+.dark .kp-btn { background: transparent; color: inherit; }
+/* The wall's stage, its agenda and the like: the box holds what scrolled. */
+.kiosk-canvas.is-v1 .kc-main-inner { overflow: hidden; }
+.kiosk-canvas.is-v1 .kc-main-inner > .kp-box > * { min-height: 0; }
+.kiosk-canvas.is-v1 .kc-ingredients, .kiosk-canvas.is-v1 .kc-prop, .kiosk-canvas.is-v1 .kc-glist, .kiosk-canvas.is-v1 .kc-cook-ings { display: flex; flex-direction: column; overflow: hidden; }
+.kiosk-canvas.is-v1 .kc-ingredients > *, .kiosk-canvas.is-v1 .kc-prop > *, .kiosk-canvas.is-v1 .kc-glist > *, .kiosk-canvas.is-v1 .kc-cook-ings > * { flex: none; }
+.kiosk-canvas.is-v1 .kc-pages { flex: 1 1 auto !important; min-height: 0; }
+.kiosk-canvas.is-v1 .kc-dinner-mid, .kiosk-canvas.is-v1 .kc-cook-timers { overflow: hidden; }
+.kiosk-canvas.is-v1 .kc-cook-timers > .kc-pages { flex: 1 1 auto; }
+.kiosk-canvas.is-v1 .kc-cook-timers-box { display: flex; flex-direction: column; gap: calc(var(--kc-u) * .9); }
+.kiosk-canvas.is-v1 .kc-step-text { overflow: hidden; }
+.kiosk-canvas.is-v1 .kc-step-text.is-long { font-size: calc(var(--kc-u) * 2.2); }
+.kiosk-canvas.is-v1 .kc-step-text.is-longer { font-size: calc(var(--kc-u) * 1.8); }
+.kc-call-pages { flex: 1 1 auto; min-height: 0; }
+.kp-box.kc-call-grid { overflow: hidden; height: 100%; }
+/* More on the next page: the cut row fades out rather than stopping mid-line. */
+.kp.has-more > .kp-box { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent); }

@@ -1,9 +1,9 @@
 import { Redo2, Check, X, Phone, MapPin, FileText, Video, Link as LinkIcon } from 'lucide-react'
-import { useDragScroll } from '@/hooks/useDragScroll'
 import { pushTargets as targetsFor, type PushTarget } from '@/lib/wall/wallDates'
 import { readCadenceConfig } from '@/lib/cadence/config'
 import { WALL } from './wallTheme'
 import type { WallV2TimelineEvent } from './types'
+import { KioskPaged } from './activity/KioskPaged'
 
 /**
  * Push reschedules a task from the wall: into a named week or month, onto a
@@ -63,7 +63,6 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, p
 
   // The Pi delivers touch as mouse events, so the touch-action CSS below never
   // scrolls on the wall. Drive scroll by pointer-drag like the other surfaces.
-  const ctxScrollRef = useDragScroll<HTMLDivElement>()
 
   const hasContext = Boolean(
     event.phoneNumber ||
@@ -86,13 +85,9 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, p
         </div>
 
         {/* Context — the rich detail that was planned earlier, surfaced now.
-            Scrollable so long notes never push the actions off-screen. */}
+            Paged so long notes never push the actions off-screen. */}
         {hasContext && (
-          <div
-            ref={ctxScrollRef}
-            className="px-6 flex-1 min-h-0 overflow-y-auto"
-            style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
-          >
+          <KioskPaged outerClassName="px-6 flex-1 min-h-0">
             <div className="flex flex-col gap-2.5 pb-1">
               {event.phoneNumber && (
                 <a href={`tel:${event.phoneNumber}`} className={ctxRow}>
@@ -146,7 +141,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, p
                 </div>
               )}
             </div>
-          </div>
+          </KioskPaged>
         )}
 
         {/* Actions */}

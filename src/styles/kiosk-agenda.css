@@ -17,7 +17,8 @@
 .kiosk-canvas .ka-rule { flex: none; width: 1px; background: var(--kw-line); }
 .kiosk-canvas .ka-lab { flex: none; margin-bottom: calc(10 * var(--p)); }
 .kiosk-canvas .ka-lab.is-gap { margin-top: calc(28 * var(--p)); }
-.kiosk-canvas .ka-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding-bottom: calc(24 * var(--p)); }
+.kiosk-canvas .ka-list { flex: 1; min-height: 0; overflow: hidden; padding-bottom: calc(24 * var(--p)); }
+.kiosk-canvas .ka-list-box { display: flex; flex-direction: column; }
 .kiosk-canvas .ka-row.is-anytime .kw-tl { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
 .kiosk-canvas .ka-row.is-anytime .kw-tl-t { display: none; }
 .kiosk-canvas .ka-row.is-done .kw-tl-w > span:first-child { text-decoration: line-through; text-decoration-thickness: calc(2 * var(--p)); color: var(--kw-muted); }

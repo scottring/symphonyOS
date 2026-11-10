@@ -16,6 +16,7 @@ import { countdownLabel, type BedtimeGrid, type DepartureModel } from '@/lib/wal
 import type { CookingRecipe } from './useCookingRecipe'
 import type { CookingSource } from '@/lib/wall/activity/kioskActivity'
 import type { KidRow } from '@/lib/wall/kidDayModel'
+import { KioskPaged } from './KioskPaged'
 
 export interface KioskDinner {
   /** Recipe identity for cooking (recipe id, else url); null = nothing to cook from. */
@@ -95,7 +96,7 @@ export function DinnerStage({ d, state, nowMs, dispatch, onStartCooking, onAddMi
         <p className="kc-lab">Ingredients · for {serves}</p>
         {d.ingredients.length === 0 && <p className="kc-quiet-line">No ingredient list saved.</p>}
         <p className="kc-muted kc-small">Tap what you already have.</p>
-        <ul>
+        <KioskPaged outerClassName="kc-pages"><ul>
           {d.ingredients.map((line, i) => {
             const have = state.have.includes(i)
             const p = ingredientParts(line, factor)
@@ -109,7 +110,7 @@ export function DinnerStage({ d, state, nowMs, dispatch, onStartCooking, onAddMi
               </li>
             )
           })}
-        </ul>
+        </ul></KioskPaged>
       </section>
     </div>
   )
@@ -153,7 +154,7 @@ export function GroceriesStage({ proposal, listTitle, listItems, context, compac
       <section className="kc-card kc-prop" aria-label="Proposal">
         <h2 className="kc-h2">Add these to {list}?</h2>
         <p className="kc-muted kc-sub">{proposal.origin === 'cooking' ? 'Out of something? Tap what to add.' : 'Missing for tonight. Tap any to leave it off.'}</p>
-        <ul>
+        <KioskPaged outerClassName="kc-pages"><ul>
           {proposal.lines.map((l) => {
             const locked = l.state === 'saving' || l.state === 'added' || l.state === 'failed'
             const p = ingredientParts(l.text, 1)
@@ -170,7 +171,7 @@ export function GroceriesStage({ proposal, listTitle, listItems, context, compac
               </li>
             )
           })}
-        </ul>
+        </ul></KioskPaged>
         <p className="kc-muted" role="status" aria-live="polite">
           {[sum.added && `${sum.added} added`, sum.saving && `${sum.saving} saving`, sum.failed && `${sum.failed} didn’t save`].filter(Boolean).join(' · ')}
         </p>
@@ -186,10 +187,10 @@ export function GroceriesStage({ proposal, listTitle, listItems, context, compac
       <section className="kc-card kc-glist" aria-label={`${list} list`}>
         <p className="kc-lab">{list} · where they’ll go</p>
         {incoming.length === 0 && existing.length === 0 && <p className="kc-quiet-line">Nothing on the list yet.</p>}
-        <ul>
+        <KioskPaged outerClassName="kc-pages"><ul>
           {incoming.map((l) => <li key={l.key} className={`kc-li is-new is-${l.state}`}><span className="kc-dot" aria-hidden="true" />{ingredientParts(l.text, 1).name}</li>)}
           {existing.map((t, i) => <li key={`e${i}`} className="kc-li"><span className="kc-dot" aria-hidden="true" />{t}</li>)}
-        </ul>
+        </ul></KioskPaged>
       </section>
     </div>
   )
@@ -271,9 +272,11 @@ export function CookingStage({ session, recipe, loading, error, timers, nowMs, d
   return (
     <div className="kc-cooking">
       <section className="kc-card kc-cook-ings" aria-label="Ingredients">
-        <p className="kc-lab">For this step</p>
-        <IngList indices={usesNow} recipe={recipe} factor={factor} now />
-        {!last && <><p className="kc-lab kc-gap">Next step</p><IngList indices={usesNext} recipe={recipe} factor={factor} now={false} /></>}
+        <KioskPaged outerClassName="kc-pages" resetKey={i}>
+          <p className="kc-lab">For this step</p>
+          <IngList indices={usesNow} recipe={recipe} factor={factor} now />
+          {!last && <><p className="kc-lab kc-gap">Next step</p><IngList indices={usesNext} recipe={recipe} factor={factor} now={false} /></>}
+        </KioskPaged>
         <button type="button" className="kc-btn kc-wide-btn" onClick={onOutOfSomething}><ShoppingCart aria-hidden="true" />Out of something?</button>
       </section>
       <section className="kc-card kc-step" aria-label={`Step ${i + 1} of ${steps.length}`}>
@@ -284,7 +287,10 @@ export function CookingStage({ session, recipe, loading, error, timers, nowMs, d
           ))}
         </nav>
         <p className="kc-sn">Step {i + 1} of {steps.length}</p>
-        <p className="kc-step-text" aria-live="polite">{step}</p>
+        {/* A long step reads smaller, then turns pages; it never scrolls. */}
+        <KioskPaged outerClassName="kc-pages" resetKey={i}>
+          <p className={`kc-step-text ${step.length > 320 ? 'is-longer' : step.length > 180 ? 'is-long' : ''}`} aria-live="polite">{step}</p>
+        </KioskPaged>
         <div className="kc-nav2">
           <button type="button" className="kc-btn" disabled={i === 0} onClick={() => dispatch({ type: 'PREV_STEP' })}><ChevronLeft aria-hidden="true" />{i > 0 ? `Step ${i}` : 'Back a step'}</button>
           {last
@@ -293,6 +299,7 @@ export function CookingStage({ session, recipe, loading, error, timers, nowMs, d
         </div>
       </section>
       <section className="kc-cook-timers" aria-label="Kitchen timers">
+        <KioskPaged outerClassName="kc-pages" className="kc-cook-timers-box">
         <TimerList timers={timers} nowMs={nowMs} dispatch={dispatch} />
         {suggested.slice(0, 1).map((m) => (
           <button key={m} type="button" className="kc-btn kc-wide-btn is-accent" onClick={() => start(m)}><Timer aria-hidden="true" />{m} min timer · this step</button>
@@ -303,6 +310,7 @@ export function CookingStage({ session, recipe, loading, error, timers, nowMs, d
             {[1, 5, 10, 15, 20, 30].map((m) => <button key={m} type="button" className="kc-btn" onClick={() => start(m)}>{m} min</button>)}
           </div>
         )}
+        </KioskPaged>
       </section>
     </div>
   )

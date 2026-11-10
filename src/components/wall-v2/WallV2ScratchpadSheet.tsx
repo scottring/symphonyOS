@@ -13,10 +13,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown, ChevronRight, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
-import { useDragScroll } from '@/hooks/useDragScroll'
 import { rowByline, type ScratchpadKind, type ScratchpadNote, type ScratchpadRow } from '@/lib/wall/scratchpad'
 import { useTint, Chip } from './moments/tint'
 import { NOTE_ICON } from './moments/ScratchpadCard'
+import { KioskPaged } from './activity/KioskPaged'
 
 interface Props {
   rows: ScratchpadRow[]
@@ -61,15 +61,11 @@ export function WallV2ScratchpadSheet(p: Props) {
   const [trayText, setTrayText] = useState('')
   const [showSorted, setShowSorted] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const listRef = useDragScroll<HTMLDivElement>()
   const nameOf = (id: string) => p.members.find((m) => m.id === id)?.name
 
   useEffect(() => {
-    if (p.focusKey) {
-      listRef.current?.querySelector(`[data-key="${CSS.escape(p.focusKey)}"]`)?.scrollIntoView({ block: 'nearest' })
-    } else {
-      inputRef.current?.focus()
-    }
+    // A focused note keeps its ring; the list turns pages, it doesn't scroll to it.
+    if (!p.focusKey) inputRef.current?.focus()
     // Only on open: later renders must not steal focus from a tray input.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -162,7 +158,7 @@ export function WallV2ScratchpadSheet(p: Props) {
             <h3 className="m-0 font-display text-[2rem] font-medium text-[#f3f5f8]">Open</h3>
             <span className="text-[1rem] text-[#93a3b5]">{p.rows.length === 0 ? 'Nothing open' : `${p.rows.length} open`}</span>
           </div>
-          <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
+          <KioskPaged outerClassName="min-h-0 flex-1" className="flex flex-col gap-2.5">
             {p.rows.length === 0 && <p className="font-display text-[1.6rem] italic text-[#8d9cad]">The scratchpad is clear.</p>}
             {p.rows.map((r) => {
               const Icon = NOTE_ICON[r.source === 'note' ? r.kind : r.source]
@@ -234,7 +230,7 @@ export function WallV2ScratchpadSheet(p: Props) {
                 </div>
               )
             })}
-          </div>
+          </KioskPaged>
 
           {p.sorted.length > 0 && (
             <div className="shrink-0 border-t border-[#223041] pt-3">

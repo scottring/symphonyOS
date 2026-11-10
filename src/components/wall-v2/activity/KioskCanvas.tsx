@@ -58,6 +58,7 @@ import { KioskHome } from './KioskHome'
 import type { KioskHomeV1Props } from './KioskHomeV1'
 import { KioskWallHome } from './KioskWallHome'
 import { useDragScroll } from './useDragScroll'
+import { KioskPaged } from './KioskPaged'
 import {
   BedtimeStage, CookingStage, DepartureStage, DinnerStage, GroceriesStage, HeldColumn, type KioskDinner,
 } from './KioskStages'
@@ -597,7 +598,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
         <div className={`kc-stage ${showHeld ? 'is-held' : ''}`}>
           {showHeld && <HeldColumn session={state.cooking} recipe={recipe} timers={state.timers} nowMs={nowMs} dispatch={dispatch} />}
           <main className={`kc-main is-${stage.kind} ${stage.kind === 'home' ? `v1-${v1.pick.screen}` : ''}`}>
-            <div className="kc-main-inner">{content}</div>
+            <KioskPaged outerClassName="kc-main-inner" resetKey={stage.kind}>{content}</KioskPaged>
           </main>
           {moreOpen && (stage.kind !== 'home' || takeover) && <div className="kw-more-over">{morePanel}</div>}
         </div>

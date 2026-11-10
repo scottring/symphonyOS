@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { WALL } from './wallTheme';
 import type { ListItem } from '@/types/list';
+import { KioskPaged } from './activity/KioskPaged'
 
 export interface WallListSummary {
   id: string;
@@ -111,7 +112,7 @@ export function WallV2ListSheet({
 
       <div className="flex-1 min-h-0 flex gap-4">
         {/* Left rail — which list, and whether it lives on the wall face */}
-        <div className={`${WALL.rail} rounded-2xl w-[280px] shrink-0 p-2 flex flex-col gap-2 overflow-y-auto`}>
+        <KioskPaged outerClassName={`${WALL.rail} rounded-2xl w-[280px] shrink-0 p-2`} className="flex flex-col gap-2">
           {lists.map((list) => {
             const isPinned = pinnedIds.includes(list.id);
             return (
@@ -144,7 +145,7 @@ export function WallV2ListSheet({
               </div>
             );
           })}
-        </div>
+        </KioskPaged>
 
         {/* Right pane — add field, open items, done drawer */}
         <div className="flex-1 min-w-0 flex flex-col gap-3">
@@ -168,7 +169,7 @@ export function WallV2ListSheet({
             </button>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
+          <KioskPaged outerClassName="flex-1 min-h-0" className="flex flex-col gap-2">
             {open.length === 0 && !stillLoading && (
               <div className={`px-1 py-3 text-[1rem] ${WALL.muted}`}>Nothing open on this list</div>
             )}
@@ -289,7 +290,7 @@ export function WallV2ListSheet({
                 )}
               </div>
             )}
-          </div>
+          </KioskPaged>
         </div>
       </div>
     </div>

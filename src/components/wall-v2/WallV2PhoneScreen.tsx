@@ -28,6 +28,7 @@ import { useKidPhoneContacts, callableContacts, partitionContacts } from '@/hook
 import { useHandsetState } from '@/hooks/useHandsetState'
 import { placeCall } from '@/lib/telephony/placeCall'
 import type { KidPhoneContact } from '@/lib/telephony/listContacts'
+import { KioskPaged } from './activity/KioskPaged'
 
 type Pending = { state: 'confirm' | 'dialing' | 'dialed' | 'error'; contact: KidPhoneContact; message?: string }
 
@@ -111,7 +112,7 @@ export function WallV2PhoneScreen({ onClose, embedded = false, fixture }: { onCl
         {loading && all.length === 0 && <p className="kc-muted kc-quiet-line">Loading the phone book…</p>}
         {!loading && all.length === 0 && <p className="kc-muted kc-quiet-line">No one to call yet.</p>}
         {error && all.length > 0 && <p className="kc-muted kc-small">Showing the last saved list.</p>}
-        <div className="kc-call-grid">
+        <KioskPaged outerClassName="kc-pages kc-call-pages" className="kc-call-grid">
           {all.map((c) => (
             <button key={c.contactId} type="button" aria-label={c.name} aria-pressed={pending?.contact.contactId === c.contactId}
               className={`kc-call-card ${pending?.contact.contactId === c.contactId ? 'is-selected' : ''}`} onClick={() => pick(c)} disabled={dialed && pending?.contact.contactId !== c.contactId}>
@@ -120,7 +121,7 @@ export function WallV2PhoneScreen({ onClose, embedded = false, fixture }: { onCl
               {c.favorite && <small>Favorite</small>}
             </button>
           ))}
-        </div>
+        </KioskPaged>
       </section>
 
       <section className="kc-call-confirm" aria-label="Confirm call">
