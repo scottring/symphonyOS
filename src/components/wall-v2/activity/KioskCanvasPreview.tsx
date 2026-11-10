@@ -329,7 +329,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
     pick: { screen: v1Screen, title: V1_TITLE[v1Screen], dark: v1Screen === 'night' || v1Screen === 'bedtime' || isDark },
     anchors: { morning: { start: 405, end: 440 }, home: { start: 1035 }, dinner: 1080, bedtime: { start: 1170, end: 1230 } },
     kids: KIDS.map((k, i) => ({
-      member: k, special: v1Screen === 'out-the-door' ? (i ? 'Library' : 'Music') : i ? 'Art' : 'Library', tomorrowSpecial: i ? 'Library' : 'Music', bag: v1Screen === 'out-the-door' && i ? ['Library book'] : [],
+      member: k, special: v1Screen === 'out-the-door' ? (i ? 'Library' : 'Music') : i ? 'Art' : 'Library', tomorrowSpecial: i ? 'Library' : 'Music', bag: v1Screen === 'out-the-door' && i ? ['Library book'] : [], tomorrowBag: i ? ['Library book'] : [],
       after: [
         { entityType: 'routine' as const, id: `folder-${i}`, title: 'Take-home folder', done: i === 0, timeOfDay: '17:45', target: null },
         { entityType: 'routine' as const, id: `math-${i}`, title: i ? 'Reading, 20 minutes' : 'Math sheet', done: false, timeOfDay: '17:45', target: null },

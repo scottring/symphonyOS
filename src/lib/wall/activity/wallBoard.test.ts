@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type { Task } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
-import { boardWaits, boardNews } from './wallBoard'
+import { boardWaits, boardNews, digestCards, pageOf, wallHome } from './wallBoard'
+import type { KioskScreen } from './kioskScreen'
 import type { SchoolDigest } from '@/lib/schoolDigest/schoolDigests'
 
 const now = new Date(2026, 10, 10, 14, 15) // Tue Nov 10
@@ -73,5 +74,44 @@ describe('boardNews: the newest school digest, as announcements', () => {
 
   it('a digest more than a week old is not news', () => {
     expect(boardNews([digest('2026-11-01', 'Sun, Nov 1')], now)).toBeNull()
+  })
+})
+
+describe('wallHome: which of the three screens leads', () => {
+  const anchors = { morning: { start: 405, end: 440 }, home: { start: 1035 }, dinner: 1080, bedtime: { start: 1170, end: 1230 } }
+  const at = (h: number, m = 0) => new Date(2026, 10, 10, h, m)
+  const pick = (screen: KioskScreen) => ({ screen, title: '', dark: false })
+  it('the day, from the morning through after school', () => {
+    for (const s of ['out-the-door', 'home', 'rest', 'weekend'] as KioskScreen[]) expect(wallHome(pick(s), anchors, at(10))).toBe('day')
+  })
+  it('dinner at dinner time', () => {
+    expect(wallHome(pick('dinner'), anchors, at(18))).toBe('dinner')
+  })
+  it('tomorrow once dinner is over, and through the night', () => {
+    expect(wallHome(pick('rest'), anchors, at(19, 5))).toBe('night')
+    expect(wallHome(pick('bedtime'), anchors, at(19, 40))).toBe('night')
+    expect(wallHome(pick('night'), anchors, at(23))).toBe('night')
+  })
+})
+
+describe('digestCards: a digest as cards, one thing each', () => {
+  it('each to-do, then each thing to know, with where it came from', () => {
+    const cards = digestCards({ id: 'd', date: '2026-11-06', label: 'Fri, Nov 6', toDoCount: 1, createdAt: now, sections: [
+      { source: 'PTO', toDo: [{ title: 'Craft fair', when: 'Dec 10', details: 'Help wanted' }], goodToKnow: ['No school Friday'], chatter: 'Nothing else.' },
+    ] })
+    expect(cards).toEqual([
+      { source: 'PTO', title: 'Craft fair', when: 'Dec 10', details: 'Help wanted' },
+      { source: 'PTO', title: 'No school Friday', when: null, details: null },
+    ])
+  })
+})
+
+describe('pageOf', () => {
+  it('cuts a list into pages and keeps the page in range', () => {
+    const items = [1, 2, 3, 4, 5]
+    expect(pageOf(items, 4, 0)).toEqual({ items: [1, 2, 3, 4], page: 0, pages: 2 })
+    expect(pageOf(items, 4, 1)).toEqual({ items: [5], page: 1, pages: 2 })
+    expect(pageOf(items, 4, 9)).toEqual({ items: [5], page: 1, pages: 2 })
+    expect(pageOf([], 4, 0)).toEqual({ items: [], page: 0, pages: 1 })
   })
 })

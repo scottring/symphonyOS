@@ -38,16 +38,17 @@ describe('KioskCanvasPreview (dev fixture)', () => {
   // Scott, 2026-10-18: "an option on the main screen".
   it('the dock’s Today opens all of today from Home, with the weekend a tap away', () => {
     render(<KioskCanvasPreview scene="quiet" v1Screen="rest" />)
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wall' })).getByRole('button', { name: 'All of today and this weekend' }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wall' })).getByRole('button', { name: 'Today' }))
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('All of today')
     fireEvent.click(screen.getByRole('button', { name: 'This weekend' }))
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^This weekend · [A-Z][a-z]{2} \d/)
   })
 
-  it('stickies sit in the band on Home, and the dock’s Sticky opens one to write', () => {
+  it('a sticky is written from More (the calm wall keeps the band to the clock)', () => {
     render(<KioskCanvasPreview scene="quiet" v1Screen="home" />)
-    expect(within(screen.getByRole('list', { name: 'Notes for the house' })).getAllByRole('button')).toHaveLength(2)
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wall' })).getByRole('button', { name: 'Add a sticky' }))
+    expect(screen.queryByRole('list', { name: 'Notes for the house' })).toBeNull()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wall' })).getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: /Add a sticky/ }))
     expect(screen.getByRole('dialog', { name: 'New sticky' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('dialog', { name: 'New sticky' })).toBeNull()

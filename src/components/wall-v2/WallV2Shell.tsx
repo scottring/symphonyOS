@@ -880,6 +880,7 @@ export function WallV2Shell() {
         tomorrowSpecial: model.school?.tomorrowSpecial ?? null,
         // A paper a parent has, due today, rides in the bag line (spec 2026-10-20).
         bag: bagWithPapers(model.needed.filter((n) => !n.tomorrow).map((n) => n.title), model.papers),
+        tomorrowBag: model.needed.filter((n) => n.tomorrow).map((n) => n.title),
         papers: model.papers.map((pp) => ({ id: pp.id, title: pp.title, due: pp.due, late: pp.late, heldByName: pp.heldBy ? memberName(pp.heldBy) ?? null : null, done: pp.done })),
         morning: model.collections.find((c) => (minutesOf(c.timeOfDay) ?? 24 * 60) < 11 * 60)?.rows ?? [],
         // After school is the home-from-school routine itself (its steps for

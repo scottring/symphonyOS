@@ -259,18 +259,18 @@ describe('Kitchen wall v2: the frame', () => {
   it('the top band has no Settings button; More opens in place of the side column, not as a sheet', () => {
     render(<Harness v1={v1Rest} />)
     expect(topBand().queryByRole('button', { name: 'Settings' })).toBeNull()
-    expect(topBand().getByRole('heading', { level: 1 })).toHaveTextContent('A quiet afternoon')
+    // The calm wall (2026-11-10): Home names no moment; the clock says it.
+    expect(topBand().getByRole('heading', { level: 1 })).toHaveTextContent('')
     fireEvent.click(dock().getByRole('button', { name: 'More' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     const more = screen.getByRole('region', { name: 'More' })
     expect(within(more).getAllByRole('button').map((b) => b.querySelector('b')?.textContent ?? b.textContent))
       .toEqual(['Done', 'Recipes', 'Call', 'Dark view', 'Voice is off'])
-    // The lead stays, the side column gives way.
+    // The lead stays, dimmed beside More.
     expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
-    expect(screen.queryByRole('complementary', { name: 'The rest of today' })).toBeNull()
     fireEvent.click(within(more).getByRole('button', { name: 'Done' }))
     expect(screen.queryByRole('region', { name: 'More' })).toBeNull()
-    expect(screen.getByRole('complementary', { name: 'The rest of today' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
   })
 
   it('More has a Recipes tile (the places moved off the moments); Type instead is gone', () => {
@@ -287,14 +287,15 @@ describe('Kitchen wall v2: the frame', () => {
   it('Home shows only away from Home: not on a home moment; in More and inside an activity', () => {
     render(<Harness v1={v1Rest} />)
     const navNames = () => within(dock().getByRole('navigation', { name: 'Wall' })).getAllByRole('button').map((b) => b.textContent)
-    expect(navNames()).toEqual(['More'])
+    // The calm wall's places (2026-11-10) ride the bar on every screen.
+    expect(navNames()).toEqual(['Dinner', 'More'])
     fireEvent.click(dock().getByRole('button', { name: 'More' }))
-    expect(navNames()).toEqual(['Home', 'More'])
+    expect(navNames()).toEqual(['Home', 'Dinner', 'More'])
     fireEvent.click(dock().getByRole('button', { name: 'Home' }))
-    expect(navNames()).toEqual(['More'])
+    expect(navNames()).toEqual(['Dinner', 'More'])
     fireEvent.click(dock().getByRole('button', { name: 'More' }))
     fireEvent.click(screen.getByRole('button', { name: /^Call/ }))
-    expect(navNames()).toEqual(['Home', 'Back', 'More'])
+    expect(navNames()).toEqual(['Home', 'Back', 'Dinner', 'More'])
   })
 
   it('without a listener, a tap on the mic opens the strip with the field focused; what is typed runs like speech', () => {
@@ -353,32 +354,16 @@ function ThemedWall({ auto }: { auto: boolean }) {
   return <Harness isDark={dark} tools={themed} v1={{ ...v1Rest, pick: { ...v1Rest.pick, dark } }} />
 }
 
-// Scott, 2026-10-20: a late dinner needs the dinner scene back. The scene's
-// name in the top band opens the day's scenes; a pick holds for a while.
-describe('Kitchen wall v2: picking a scene by hand', () => {
+// Scott, 2026-10-20: a late dinner needs the dinner scene back. The calm
+// wall (2026-11-10) has no scene picker: Dinner is a place in the bar.
+describe('Kitchen wall v2: dinner by hand', () => {
   beforeEach(() => { localStorage.clear() })
 
-  it('the scene name opens the day’s scenes, and a pick goes to the Shell', () => {
-    const onPick = vi.fn()
-    render(<Harness v1={{ ...v1Rest, pick: { screen: 'rest', title: 'This evening', dark: true }, scenes: { choices: ['out-the-door', 'home', 'dinner', 'bedtime'], clock: 'rest', held: false, onPick } }} />)
-    fireEvent.click(topBand().getByRole('button', { name: /This evening/ }))
-    const picker = screen.getByRole('group', { name: 'Scenes' })
-    expect(within(picker).getAllByRole('button').map((b) => b.textContent)).toEqual(['Out the door', 'Home from school', 'Dinner', 'Bedtime'])
-    fireEvent.click(within(picker).getByRole('button', { name: 'Dinner' }))
-    expect(onPick).toHaveBeenCalledWith('dinner')
-    expect(screen.queryByRole('group', { name: 'Scenes' })).toBeNull()
-  })
-
-  it('a held scene says so, and offers the clock’s scene back', () => {
-    const onPick = vi.fn()
-    render(<Harness v1={{ ...v1Rest, pick: { screen: 'dinner', title: 'Dinner', dark: false }, scenes: { choices: ['out-the-door', 'home', 'dinner', 'bedtime'], clock: 'rest', held: true, onPick } }} />)
-    const title = topBand().getByRole('button', { name: /Dinner/ })
-    expect(title).toHaveTextContent('Dinner · held')
-    fireEvent.click(title)
-    const picker = screen.getByRole('group', { name: 'Scenes' })
-    expect(within(picker).getByRole('button', { name: 'Dinner' })).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(within(picker).getByRole('button', { name: 'Back to the clock' }))
-    expect(onPick).toHaveBeenCalledWith('rest')
+  it('Home names no moment to pick from; the bar’s Dinner opens dinner at any hour', () => {
+    render(<Harness v1={{ ...v1Rest, pick: { screen: 'rest', title: 'This evening', dark: true } }} />)
+    expect(topBand().queryByRole('button', { name: /This evening/ })).toBeNull()
+    fireEvent.click(within(dock().getByRole('navigation', { name: 'Wall' })).getByRole('button', { name: 'Dinner' }))
+    expect(within(dock().getByRole('navigation', { name: 'Wall' })).getByRole('button', { name: 'Dinner' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
 

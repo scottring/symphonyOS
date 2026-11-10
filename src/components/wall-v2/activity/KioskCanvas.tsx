@@ -22,13 +22,13 @@
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen, Calculator, Zap, GraduationCap } from 'lucide-react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen, Calculator, Zap, GraduationCap, Utensils, StickyNote, Plus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
 import type { WallTodayRow, WallChecklist } from '@/lib/wall/wallMomentsModel'
 import type { KidRow } from '@/lib/wall/kidDayModel'
-import { sceneTitle, type KioskScreen } from '@/lib/wall/activity/kioskScreen'
+import type { KioskScreen } from '@/lib/wall/activity/kioskScreen'
 import type { ComingUpRow } from '../wallStrip'
 import type { MomentKid, MomentHandoff } from '../moments/WallMoments'
 import { usePlaceOrDefault } from '@/hooks/usePlace'
@@ -49,13 +49,15 @@ import type { KioskActivity } from './useKioskActivity'
 import { useCookingRecipe } from './useCookingRecipe'
 import { TellSymphonyPill, type WallVoice } from './KioskTellSymphony'
 import { useTellSymphony, type ListenerPreview } from './useTellSymphony'
-import { KioskDock, KioskMorePanel, type MoreTile } from './KioskDock'
+import { KioskDock, KioskMorePanel, type DockPlace, type MoreTile } from './KioskDock'
 import { dockCopy } from '@/lib/wall/activity/dockCopy'
 import { talkUsesBand } from '@/lib/wall/wallTalk'
 import { localYmd } from '@/lib/cadence/config'
 import { WallConversation, WallTalkLead, WallTalkStage, type WallTalkWeek } from './WallTalk'
 import { KioskHome } from './KioskHome'
-import { KioskHomeV1, hasSchoolWork, type KioskHomeV1Props } from './KioskHomeV1'
+import type { KioskHomeV1Props } from './KioskHomeV1'
+import { KioskWallHome } from './KioskWallHome'
+import { useDragScroll } from './useDragScroll'
 import {
   BedtimeStage, CookingStage, DepartureStage, DinnerStage, GroceriesStage, HeldColumn, type KioskDinner,
 } from './KioskStages'
@@ -67,7 +69,7 @@ import { DigestStage } from './DigestStage'
 import { dayLabel, toDoLabel, type SchoolDigest } from '@/lib/schoolDigest/schoolDigests'
 import { WebAppStage } from './WebAppStage'
 import { AgendaStage, AgendaViews } from './AgendaStage'
-import { StickySheet, StickyStrip } from './KioskStickies'
+import { StickySheet } from './KioskStickies'
 import { datesLabel, weekendDates, type AgendaDay, type AgendaRow, type AgendaView } from '@/lib/wall/wallAgenda'
 import { formatWatts, hasReading, type EnergyLive, type EnergyPeriod } from '@/lib/wall/energy/homeEnergy'
 import { planWeek } from '@/lib/wall/wallDates'
@@ -220,7 +222,6 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const next = nextCommitment(p.rows, p.now)
   const showHeld = showsHeldColumn(state)
   const [moreOpen, setMoreOpen] = useState(false)
-  const [scenesOpen, setScenesOpen] = useState(false)
   const [stickyOpen, setStickyOpen] = useState(false)
 
   // ─── Commands: buttons, typing and speech all land here ───
@@ -387,6 +388,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
           onSelect: () => { setMoreOpen(false); p.onRefreshDigests?.(); dispatch({ type: 'OPEN', stage: { kind: 'digest' } }) },
         }
       : null,
+    p.onAddSticky ? { id: 'sticky', label: 'Add a sticky', sub: 'A note for the house', icon: Plus, onSelect: () => { setMoreOpen(false); setStickyOpen(true) } } : null,
     shellTile('list'),
     { id: 'recipes', label: 'Recipes', sub: 'The family’s recipes', icon: BookOpen, onSelect: () => { setMoreOpen(false); p.tools.onRecipes() } },
     shellTile('notes'),
@@ -416,7 +418,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
   switch (stage.kind) {
     case 'home':
       content = p.v1 ? (
-        <KioskHomeV1
+        <KioskWallHome
           {...p.v1} now={p.v1.at ?? p.now} members={p.members} dinner={p.dinner} bedtime={p.bedtime}
           have={state.have} scale={p.dinner ? Math.max(1, Math.round((state.serves ?? p.dinner.baseServes) / p.dinner.baseServes)) : 1}
           onTick={p.onTick} onTapRow={p.onTapRow} onOpenWork={p.onOpenWork} onCompleteRow={p.onCompleteRow}
@@ -523,13 +525,14 @@ export function KioskCanvas(p: KioskCanvasProps) {
   // v1: light by day, warm dark after dinner, on its own; the old manual
   // "Dark view" forced dark all day (Scott, 2026-10-13: "patchwork").
   const dark = v1 ? v1.pick.dark : p.isDark
-  const title = v1 && stage.kind === 'home' ? v1.pick.title : place
-  // v1 (mockup 2026-10-14): the place's scenery is a faint wash behind the
-  // whole wall, band and bar included; fuller when nothing is pressing.
-  const quietScreen = v1 && ['rest', 'night', 'weekend'].includes(v1.pick.screen)
-  const wash = v1 && stage.kind === 'home' && scenery.showScenery
-    ? sceneryArt(scenery.sceneryStyle, placeId, v1.pick.screen === 'night' ? 'nighttime' : dark ? 'dusk-dawn' : 'daytime').src
-    : null
+  // The calm wall (2026-11-10): Home names no moment; the clock and the day say it.
+  const title = v1 && stage.kind === 'home' ? '' : place
+  // Behind Home, the woodblock mountain overlook (Scott, 2026-11-10: "the
+  // most recent woodblock style background"), whatever the app's own
+  // scenery is set to; faint while More is open.
+  const wash = v1 && stage.kind === 'home' ? sceneryArt('woodblock', 'mountain-town', 'daytime').src : null
+  const wallRef = useRef<HTMLDivElement>(null)
+  useDragScroll(wallRef)
   // Settings live behind a long press on the clock, away from small fingers.
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pressClock = {
@@ -550,16 +553,33 @@ export function KioskCanvas(p: KioskCanvasProps) {
 
   // ─── Kitchen wall v2: top band · stage · the conversation dock ───
   if (v1) {
+    // The calm wall's places (Scott, 2026-11-10: "allows you to navigate to
+    // where you need to navigate"): one tap each, from any screen.
+    const go = (kind: 'dinner' | 'digest') => () => {
+      setMoreOpen(false)
+      if (kind === 'digest') p.onRefreshDigests?.()
+      dispatch({ type: 'OPEN', stage: { kind } })
+    }
+    const lists = shellTile('list')
+    const notes = shellTile('notes')
+    const places: DockPlace[] = [
+      ...(p.agenda && p.onSetDone ? [{
+        id: 'today', label: 'Today', icon: CalendarDays, current: stage.kind === 'agenda' && !moreOpen,
+        onSelect: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'agenda', view: p.now.getDay() === 0 || p.now.getDay() === 6 ? 'weekend' : 'today' } }) },
+      }] : []),
+      { id: 'dinner', label: 'Dinner', icon: Utensils, onSelect: go('dinner'), current: stage.kind === 'dinner' && !moreOpen },
+      ...(lists ? [{ id: 'lists', label: 'Lists', icon: ShoppingCart, onSelect: lists.onSelect }] : []),
+      ...(p.schoolDigests ? [{ id: 'school', label: 'School', icon: GraduationCap, onSelect: go('digest'), current: stage.kind === 'digest' && !moreOpen }] : []),
+      ...(notes ? [{ id: 'notes', label: 'Notes', icon: StickyNote, onSelect: notes.onSelect }] : []),
+    ]
     const screen = stage.kind === 'home' ? v1.pick.screen : stage.kind === 'cooking' ? 'cooking' : 'activity'
     const copy = dockCopy(moreOpen ? 'more' : screen)
     // Home only away from Home: an activity, an answer, More, the week.
     const away = stage.kind !== 'home' || moreOpen || takeover || talk.active || !!tell.answer
     const ampm = /PM$/i.test(p.clock) ? 'pm' : /AM$/i.test(p.clock) ? 'am' : ''
-    // Scenes are picked from Home only; an activity keeps its own title.
-    const scenes = stage.kind === 'home' && !moreOpen ? v1.scenes ?? null : null
     return (
-      <div className={`kiosk-canvas is-v1 ${dark ? 'is-dark dark' : ''} sky-${stage.kind === 'home' ? v1.pick.screen : 'activity'} ${moreOpen ? 'is-more' : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
-        {wash && <div className={`kv-wash ${quietScreen && !moreOpen ? '' : 'is-faint'}`} aria-hidden="true"><img src={wash} alt="" /></div>}
+      <div ref={wallRef} className={`kiosk-canvas is-v1 ${dark ? 'is-dark dark' : ''} sky-${stage.kind === 'home' ? v1.pick.screen : 'activity'} ${moreOpen ? 'is-more' : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
+        {wash && <div className={`kv-wash is-woodblock ${moreOpen ? 'is-faint' : ''}`} aria-hidden="true"><img src={wash} alt="" /></div>}
         <header className="kw-top">
           <span className="kw-clock" {...pressClock}>{p.clock.replace(/\s?[AP]M$/i, '')}<small>{ampm}</small></span>
           <span className="kw-date">{p.dateLabel}</span>
@@ -569,24 +589,10 @@ export function KioskCanvas(p: KioskCanvasProps) {
             // Stickies ride the band on every Home moment but the quiet one,
             // which lays them out large in its lead, unless the kids' school
             // work takes that room.
-            : stage.kind === 'home' && (v1.pick.screen !== 'rest' || hasSchoolWork(v1.kids)) && !moreOpen
-              ? <span className="kw-grow kw-band-stickies"><StickyStrip notes={v1.notes} onOpen={v1.onNotes} /></span>
-              : <span className="kw-grow" />}
+            : <span className="kw-grow" />}
           {W && <span className="kw-wx" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
-          <h1 className="kw-moment" ref={placeRef} tabIndex={-1} aria-live="polite">
-            {scenes
-              ? <button type="button" className="kw-scene-name" aria-expanded={scenesOpen} onClick={() => setScenesOpen((o) => !o)}>{title}{scenes.held && <small> · held</small>}</button>
-              : title}
-          </h1>
+          <h1 className="kw-moment" ref={placeRef} tabIndex={-1} aria-live="polite">{title}</h1>
         </header>
-        {scenes && scenesOpen && (
-          <div className="kw-scenes" role="group" aria-label="Scenes">
-            {scenes.choices.map((s) => (
-              <button key={s} type="button" aria-pressed={s === v1.pick.screen} onClick={() => { scenes.onPick(s); setScenesOpen(false) }}>{sceneTitle(s, p.now)}</button>
-            ))}
-            {scenes.held && <button type="button" className="is-quiet" onClick={() => { scenes.onPick(scenes.clock); setScenesOpen(false) }}>Back to the clock</button>}
-          </div>
-        )}
 
         <div className={`kc-stage ${showHeld ? 'is-held' : ''}`}>
           {showHeld && <HeldColumn session={state.cooking} recipe={recipe} timers={state.timers} nowMs={nowMs} dispatch={dispatch} />}
@@ -604,12 +610,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
           held={heldEls.length ? <div className="kw-held" aria-label="Held activities">{heldEls}</div> : null}
           next={v1.next}
           replyInSide={talkInSide}
-          math={math && math.kids.length > 0 ? { onOpen: () => { setMoreOpen(false); openMath() }, open: mathLeft > 0, current: stage.kind === 'math' && !moreOpen } : undefined}
-          onSticky={p.onAddSticky ? () => { setMoreOpen(false); setStickyOpen(true) } : undefined}
-          agenda={p.agenda && p.onSetDone ? {
-            onOpen: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'agenda', view: p.now.getDay() === 0 || p.now.getDay() === 6 ? 'weekend' : 'today' } }) },
-            current: stage.kind === 'agenda' && !moreOpen,
-          } : undefined}
+          places={places}
         />
         {stickyOpen && p.onAddSticky && <StickySheet members={p.members} onSave={p.onAddSticky} onClose={() => setStickyOpen(false)} />}
       </div>

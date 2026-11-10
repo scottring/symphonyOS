@@ -49,7 +49,12 @@ export interface KioskDockProps {
   agenda?: { onOpen: () => void; current: boolean }
   /** A sticky for Home, written here (Scott, 2026-10-18). */
   onSticky?: () => void
+  /** The calm wall's places (Scott, 2026-11-10): one tap to each, in place
+   *  of Today · Sticky · Math, and no Next (Home leads with the day). */
+  places?: DockPlace[]
 }
+
+export interface DockPlace { id: string; label: string; icon: LucideIcon; onSelect: () => void; current?: boolean }
 
 function NavButton({ icon: Icon, label, onClick, current, dot, aria }: { icon: LucideIcon; label: string; onClick: () => void; current?: boolean; dot?: boolean; aria?: string }) {
   return (
@@ -195,14 +200,18 @@ export function KioskDock(p: KioskDockProps) {
           <button type="button" className="kw-btn kw-undo" onClick={() => void t.undoCard()}><Undo2 aria-hidden="true" />Undo</button>
         </section>
       )}
-      <footer className={`kw-dock ${open ? '' : 'is-calm'}`} aria-label="Kiosk">
+      <footer className={`kw-dock ${open ? '' : 'is-calm'} ${p.places ? 'has-places' : ''}`} aria-label="Kiosk">
         <nav className="kw-nav" aria-label="Wall">
           {p.onHome && <NavButton icon={Home} label="Home" onClick={p.onHome} />}
           {p.onBack && <NavButton icon={ArrowLeft} label="Back" onClick={p.onBack} />}
-          {p.agenda && <NavButton icon={ListChecks} label="Today" onClick={p.agenda.onOpen} current={p.agenda.current} aria="All of today and this weekend" />}
-          {p.onSticky && <NavButton icon={StickyNote} label="Sticky" onClick={p.onSticky} aria="Add a sticky" />}
+          {p.places ? p.places.map((x) => <NavButton key={x.id} icon={x.icon} label={x.label} onClick={x.onSelect} current={x.current} />) : (
+            <>
+              {p.agenda && <NavButton icon={ListChecks} label="Today" onClick={p.agenda.onOpen} current={p.agenda.current} aria="All of today and this weekend" />}
+              {p.onSticky && <NavButton icon={StickyNote} label="Sticky" onClick={p.onSticky} aria="Add a sticky" />}
+            </>
+          )}
           <NavButton icon={LayoutGrid} label="More" onClick={p.onMore} current={p.moreOpen} />
-          {p.math && (
+          {p.math && !p.places && (
             <NavButton icon={Calculator} label="Math" onClick={p.math.onOpen} current={p.math.current} dot={p.math.open}
               aria={`Math of the day${p.math.open ? ' · still to solve' : ''}`} />
           )}
@@ -212,10 +221,12 @@ export function KioskDock(p: KioskDockProps) {
           data-strip={open ? 'open' : 'collapsed'}>
           <div className="kw-strip-body" key={!open ? 'mic' : entry ? 'field' : 'hint'}>{strip}</div>
         </div>
-        <div className="kw-next" aria-label="Next">
-          <span className="kw-eyebrow">Next</span>
-          {p.next ? <b>{p.next.time} · {p.next.title}</b> : <b className="is-quiet">Nothing else today</b>}
-        </div>
+        {!p.places && (
+          <div className="kw-next" aria-label="Next">
+            <span className="kw-eyebrow">Next</span>
+            {p.next ? <b>{p.next.time} · {p.next.title}</b> : <b className="is-quiet">Nothing else today</b>}
+          </div>
+        )}
       </footer>
     </>
   )

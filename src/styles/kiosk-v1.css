@@ -102,6 +102,11 @@
 .kv-wash.is-faint img { opacity: .13; height: 34%; }
 .is-dark .kv-wash img { opacity: .38; filter: saturate(.5) brightness(.85); }
 .is-dark .kv-wash.is-faint img { opacity: .16; }
+/* The calm wall's woodblock print (2026-11-10): the picture itself, not a
+   tint — it has the foot of the screen to itself. */
+.kv-wash.is-woodblock img { height: 46%; opacity: .5; filter: saturate(.85); }
+.kv-wash.is-woodblock.is-faint img { opacity: .18; height: 34%; }
+.is-dark .kv-wash.is-woodblock img { opacity: .34; filter: brightness(.75) saturate(.7); }
 
 /* ---- Top band: passive, never moves ----------------------------------- */
 .is-v1 .kw-top { position: relative; z-index: 2; display: flex; align-items: center; gap: calc(28 * var(--p)); height: calc(96 * var(--p)); margin: calc(36 * var(--p)) calc(64 * var(--p)) calc(38 * var(--p)); min-width: 0; }
@@ -658,41 +663,78 @@
 .is-v1 .kw-kid-week-open:active { background: var(--kw-sym-tint); }
 .is-v1 .kw-kid-week b { margin-right: calc(8 * var(--p)); font-weight: 600; color: var(--kw-ink); }
 
-/* ===== The board (Scott approved the mockup 2026-11-10) =====================
-   The quiet daytime screen: dinner tonight across the top, then Calendar ·
-   Waiting for · School in three equal columns split by hairlines. */
-.is-v1 .kb-board { height: 100%; display: flex; flex-direction: column; min-height: 0; }
-.is-v1 .kb-dinner { flex: none; display: flex; align-items: center; gap: calc(24 * var(--p)); padding: 0 0 calc(22 * var(--p)); border-bottom: 1px solid var(--kw-line); }
-.is-v1 .kb-dinner-text { flex: 1; min-width: 0; }
-.is-v1 .kb-dinner-title { margin: calc(4 * var(--p)) 0 0; font: 400 calc(40 * var(--p))/1.14 var(--kw-serif); color: var(--kw-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.is-v1 .kb-dinner-cue { margin: calc(6 * var(--p)) 0 0; font-size: calc(24 * var(--p)); color: var(--kw-muted); }
-.is-v1 .kb-dinner .kw-btn { flex: none; }
-.is-v1 .kb-cols { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-top: calc(20 * var(--p)); }
-.is-v1 .kb-col { min-width: 0; min-height: 0; overflow: hidden; padding: 0 calc(44 * var(--p)); border-left: 1px solid var(--kw-line); }
-.is-v1 .kb-col:first-child { padding-left: 0; border-left: 0; }
-.is-v1 .kb-col:last-child { padding-right: 0; }
-.is-v1 .kb-h { margin: 0 0 calc(10 * var(--p)); font: 400 calc(36 * var(--p))/1.2 var(--kw-serif); color: var(--kw-ink); }
-.is-v1 .kb-lab { display: flex; align-items: baseline; gap: calc(12 * var(--p)); margin: 0 0 calc(2 * var(--p)); font-size: calc(22 * var(--p)); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--kw-muted); }
-.is-v1 .kb-lab.is-now { color: var(--kw-now); }
-.is-v1 .kb-lab.is-sym { color: var(--kw-sym); letter-spacing: .1em; }
-.is-v1 .kb-lab.is-gap { margin-top: calc(18 * var(--p)); }
-.is-v1 .kb-specials { margin: calc(4 * var(--p)) 0 calc(8 * var(--p)); font-size: calc(24 * var(--p)); color: var(--kw-muted); }
-.is-v1 .kb-quiet { margin: calc(8 * var(--p)) 0 0; font-size: calc(24 * var(--p)); font-style: italic; color: var(--kw-muted); }
-.is-v1 .kb-more { margin-left: auto; font-size: calc(21 * var(--p)); font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--kw-muted); }
-.is-v1 .kb-events, .is-v1 .kb-rows { list-style: none; margin: 0; padding: 0; }
-.is-v1 .kb-event { width: 100%; min-height: calc(88 * var(--p)); display: grid; grid-template-columns: calc(84 * var(--p)) minmax(0, 1fr) auto; align-items: center; column-gap: calc(12 * var(--p)); padding: calc(4 * var(--p)) 0; border: 0; background: none; text-align: left; font: inherit; color: var(--kw-ink); font-size: calc(27 * var(--p)); }
-.is-v1 .kb-event-t { font-weight: 600; }
-.is-v1 .kb-event-w { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.is-v1 .kb-event-w small { display: block; font-size: calc(23 * var(--p)); color: var(--kw-muted); }
-.is-v1 .kb-faces { display: inline-flex; gap: calc(4 * var(--p)); }
-.is-v1 .kb-row { display: block; width: 100%; min-height: calc(96 * var(--p)); padding: calc(8 * var(--p)) 0; border: 0; border-bottom: 1px solid var(--kw-line); background: none; text-align: left; font: inherit; color: var(--kw-ink); }
-.is-v1 .kb-row-t { display: block; font-size: calc(28 * var(--p)); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.is-v1 .kb-row.is-news .kb-row-t { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.is-v1 .kb-row-sub { display: flex; align-items: center; gap: calc(8 * var(--p)); margin-top: calc(4 * var(--p)); font-size: calc(23 * var(--p)); color: var(--kw-muted); min-width: 0; }
-.is-v1 .kb-row.is-news .kb-row-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.is-v1 .kb-who { display: inline-flex; align-items: center; gap: calc(8 * var(--p)); white-space: nowrap; }
-.is-v1 .kb-who.is-out { font-weight: 600; color: var(--kw-ink); }
-.is-v1 .kb-arrow { padding: 0 calc(4 * var(--p)); }
-.is-v1 .kb-when { margin-left: auto; white-space: nowrap; }
-.is-v1 .kb-when.is-now { color: var(--kw-now); font-weight: 600; }
-.is-v1 .kb-event:active, .is-v1 button.kb-row:active { background: var(--kw-sym-tint); }
+/* ===== The calm wall (Scott approved the mockups 2026-11-10) ================
+   Three screens — the day, dinner, tomorrow — with room around everything:
+   a large lead, a hairline, a quiet side column. Nothing scrolls. */
+.is-v1 .kh-stage { height: 100%; display: grid; grid-template-columns: minmax(0, 1.4fr) 1px minmax(0, 1fr); column-gap: calc(96 * var(--p)); }
+.is-v1 .kh-stage.is-full { grid-template-columns: minmax(0, 1fr); }
+.is-v1 .kh-vr { background: var(--kw-line); }
+.is-v1 .kh-lead, .is-v1 .kh-side { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.is-v1 .kh-lead.is-dim { opacity: .5; }
+.is-v1 .kh-side { justify-content: safe center; }
+.is-v1 .kh-centre { margin: auto 0; }
+.is-v1 .kh-eb { display: flex; align-items: baseline; gap: calc(12 * var(--p)); margin: 0 0 calc(14 * var(--p)); font-size: calc(22 * var(--p)); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--kw-muted); }
+.is-v1 .kh-eb.is-sym { color: var(--kw-sym); }
+.is-v1 .kh-eb.is-now { color: var(--kw-now); }
+.is-v1 .kh-more { margin-left: auto; font-size: calc(21 * var(--p)); font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--kw-muted); }
+.is-v1 .kh-ev { display: grid; grid-template-columns: calc(150 * var(--p)) minmax(0, 1fr) auto; align-items: center; column-gap: calc(24 * var(--p)); width: 100%; min-height: calc(112 * var(--p)); padding: 0; border: 0; border-radius: calc(16 * var(--p)); background: none; text-align: left; font: inherit; color: var(--kw-ink); }
+.is-v1 .kh-ev:active { background: var(--kw-sym-tint); }
+.is-v1 .kh-ev-t { font: 400 calc(52 * var(--p))/1 var(--kw-serif); }
+.is-v1 .kh-ev-w { min-width: 0; font-size: calc(42 * var(--p)); font-weight: 500; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.is-v1 .kh-ev-w small { display: block; margin-top: calc(4 * var(--p)); font-size: calc(26 * var(--p)); font-weight: 500; color: var(--kw-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.is-v1 .kh-faces { display: inline-flex; gap: calc(6 * var(--p)); }
+.is-v1 .kh-face { display: inline-grid; place-items: center; flex: none; width: calc(52 * var(--p)); height: calc(52 * var(--p)); border-radius: 999px; background: var(--kw-muted); color: #fff; font-size: calc(23 * var(--p)); font-weight: 700; }
+.is-v1 .kh-face.is-sm { width: calc(38 * var(--p)); height: calc(38 * var(--p)); font-size: calc(19 * var(--p)); }
+.is-v1 .kh-free { margin: calc(8 * var(--p)) 0 0; font: 400 calc(64 * var(--p))/1.1 var(--kw-serif); color: var(--kw-ink); }
+.is-v1 .kh-specials { margin: calc(28 * var(--p)) 0 0; font-size: calc(29 * var(--p)); color: var(--kw-muted); }
+.is-v1 .kh-specials b { font-weight: 600; color: var(--kw-ink); }
+.is-v1 .kh-specials.is-side { margin-top: calc(12 * var(--p)); font-size: calc(27 * var(--p)); }
+.is-v1 .kh-specials.is-night { font-size: calc(36 * var(--p)); }
+.is-v1 .kh-flag { align-self: flex-start; display: inline-flex; gap: calc(14 * var(--p)); margin: calc(28 * var(--p)) 0 0; padding: calc(16 * var(--p)) calc(26 * var(--p)); border-radius: calc(18 * var(--p)); background: var(--kw-now-tint); font-size: calc(28 * var(--p)); color: var(--kw-ink); }
+.is-v1 .kh-flag i { font-style: normal; font-weight: 600; color: var(--kw-now); }
+.is-v1 .kh-later { margin-top: calc(40 * var(--p)); }
+.is-v1 .kh-sec + .kh-sec { margin-top: calc(52 * var(--p)); }
+.is-v1 .kh-side-title { margin: 0; font: 400 calc(38 * var(--p))/1.2 var(--kw-serif); color: var(--kw-ink); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.is-v1 .kh-acts { display: flex; gap: calc(16 * var(--p)); margin-top: calc(22 * var(--p)); }
+.is-v1 .kh-acts.is-lead { margin-top: calc(44 * var(--p)); }
+.is-v1 .kh-line { display: flex; align-items: center; gap: calc(10 * var(--p)); width: 100%; min-height: calc(88 * var(--p)); padding: 0; border: 0; border-radius: calc(12 * var(--p)); background: none; text-align: left; font: inherit; font-size: calc(29 * var(--p)); color: var(--kw-ink); }
+button.kh-line:active { background: var(--kw-sym-tint); }
+.is-v1 .kh-line-t { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-v1 .kh-line-time { flex: none; width: calc(90 * var(--p)); font-weight: 600; }
+.is-v1 .kh-line-who { display: inline-flex; align-items: center; gap: calc(8 * var(--p)); flex: none; font-size: calc(24 * var(--p)); color: var(--kw-muted); white-space: nowrap; }
+.is-v1 .kh-when { margin-left: auto; flex: none; padding-left: calc(12 * var(--p)); font-size: calc(25 * var(--p)); color: var(--kw-muted); white-space: nowrap; }
+.is-v1 .kh-when.is-now { color: var(--kw-now); font-weight: 600; }
+.is-v1 .kh-dish { margin: 0; font: 400 calc(72 * var(--p))/1.1 var(--kw-serif); letter-spacing: -.01em; color: var(--kw-ink); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.is-v1 .kh-cue { margin: calc(22 * var(--p)) 0 0; font-size: calc(32 * var(--p)); color: var(--kw-muted); }
+.is-v1 .kh-night { margin: 0 0 calc(12 * var(--p)); font: 300 calc(104 * var(--p))/1.05 var(--kw-serif); letter-spacing: -.015em; color: var(--kw-ink); }
+
+/* Pages, not scrolling: the School digest's cards, four to a page. */
+.kiosk-canvas .kd-cards { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: calc(28 * var(--p)); }
+.kiosk-canvas .kd-card { display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: calc(30 * var(--p)) calc(34 * var(--p)); border: 1px solid var(--kw-line); border-radius: calc(22 * var(--p)); background: var(--kw-surface); color: var(--kw-ink); }
+.kiosk-canvas .kd-card-src { margin: 0 0 calc(8 * var(--p)); font-size: calc(21 * var(--p)); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--kw-sym); }
+.kiosk-canvas .kd-card h3 { flex: none; margin: 0; font: 400 calc(34 * var(--p))/1.18 var(--kw-serif); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.kiosk-canvas .kd-card p.kd-card-d { flex: none; margin: calc(10 * var(--p)) 0 0; font-size: calc(24 * var(--p)); line-height: 1.35; color: var(--kw-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.kiosk-canvas .kd-card-when { flex: none; margin: 0 0 calc(6 * var(--p)); font-size: calc(24 * var(--p)); font-weight: 600; color: var(--kw-now); }
+.kiosk-canvas .kd-pager { flex: none; display: flex; align-items: center; gap: calc(20 * var(--p)); }
+.kiosk-canvas .kd-pager .kw-btn[disabled] { opacity: .35; }
+.kiosk-canvas .kd-page { flex: 1; text-align: center; font-size: calc(26 * var(--p)); color: var(--kw-muted); }
+
+/* Anything that still holds more than fits: a fat bar that a finger can
+   take, and dragging the content itself (useDragScroll). */
+.kiosk-canvas.is-v1 * { scrollbar-width: auto; scrollbar-color: var(--kw-line-strong) transparent; }
+.kiosk-canvas.is-v1 *::-webkit-scrollbar { width: calc(28 * var(--p)); height: calc(28 * var(--p)); }
+.kiosk-canvas.is-v1 *::-webkit-scrollbar-thumb { border: calc(7 * var(--p)) solid transparent; border-radius: 999px; background: var(--kw-line-strong); background-clip: padding-box; }
+.kiosk-canvas.is-v1 *::-webkit-scrollbar-track { background: transparent; }
+
+/* Over the woodblock print, the bar keeps a frosted ground so its labels read. */
+.kiosk-canvas.is-v1 .kw-nav { background: var(--kw-glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-radius: calc(28 * var(--p)); padding: 0 calc(10 * var(--p)); }
+.kiosk-canvas.is-v1.is-dark .kw-nav { background: rgba(28, 35, 38, .72); }
+/* A wait or a piece of school work: the title, then who and when under it. */
+.is-v1 .kh-line.is-two { flex-direction: column; align-items: stretch; justify-content: center; gap: calc(4 * var(--p)); padding: calc(8 * var(--p)) 0; }
+.is-v1 .kh-line.is-two .kh-line-t { flex: none; }
+.is-v1 .kh-line-sub { display: flex; align-items: center; gap: calc(8 * var(--p)); min-width: 0; font-size: calc(24 * var(--p)); color: var(--kw-muted); }
+
+/* With the calm wall's places, the bar runs from the left and the mic sits
+   at the right, so eight places never slide under it. */
+.is-v1 .kw-dock.has-places, .is-v1 .kw-dock.has-places.is-calm { grid-template-columns: auto minmax(0, 1fr); }
+.is-v1 .kw-dock.has-places .kw-talk.is-collapsed { justify-self: end; }

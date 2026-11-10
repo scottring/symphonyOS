@@ -11,6 +11,7 @@ import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { dayLabel, type SchoolDigest } from '@/lib/schoolDigest/schoolDigests'
 import { localYmd } from '@/lib/cadence/config'
 import type { V1Kid } from '@/components/wall-v2/activity/KioskHomeV1'
+import type { DayAnchors, KioskScreenPick } from './kioskScreen'
 
 export interface BoardPerson { name: string; member?: FamilyMember }
 export interface BoardWait { id: string; title: string; from: BoardPerson; to: BoardPerson; when: string | null; late: boolean }
@@ -98,4 +99,41 @@ export function boardAssignments(kids: V1Kid[]): Assignment[] {
   }
   for (const k of kids) for (const w of k.work?.week ?? []) add({ key: w.id, taskId: w.id, title: w.title, when: `Due ${w.due}`, late: false }, k.member)
   return out
+}
+
+/** What the Shell hands the wall's Home besides the day: the waits both ways
+ *  and the newest digest's news. */
+export interface WallBoardData {
+  waits: { theirs: BoardWait[]; ours: BoardWait[] }
+  news: BoardNews | null
+}
+
+// ─── The calm wall (Scott, 2026-11-10) ───────────────────────────────────
+// Three screens, no kids' checklists: the day (morning through after
+// school), dinner at dinner time, and tomorrow once dinner is over.
+export type WallHome = 'day' | 'dinner' | 'night'
+
+export function wallHome(pick: Pick<KioskScreenPick, 'screen'>, anchors: Pick<DayAnchors, 'dinner'>, now: Date): WallHome {
+  if (pick.screen === 'dinner') return 'dinner'
+  if (pick.screen === 'bedtime' || pick.screen === 'night') return 'night'
+  const dinner = typeof anchors?.dinner === 'number' ? anchors.dinner : 18 * 60
+  return now.getHours() * 60 + now.getMinutes() >= dinner + 60 ? 'night' : 'day'
+}
+
+export interface DigestCard { source: string; title: string; when: string | null; details: string | null }
+
+/** A digest as cards: each to-do, then each thing to know. The chatter stays
+ *  in the email. */
+export function digestCards(d: SchoolDigest): DigestCard[] {
+  return [
+    ...d.sections.flatMap((s) => s.toDo.map((i) => ({ source: s.source, title: i.title, when: i.when || null, details: i.details || null }))),
+    ...d.sections.flatMap((s) => s.goodToKnow.map((g) => ({ source: s.source, title: g, when: null, details: null }))),
+  ]
+}
+
+/** One page of a list (pages instead of scrolling); the page kept in range. */
+export function pageOf<T>(items: readonly T[], size: number, page: number): { items: T[]; page: number; pages: number } {
+  const pages = Math.max(1, Math.ceil(items.length / size))
+  const p = Math.min(Math.max(0, page), pages - 1)
+  return { items: items.slice(p * size, p * size + size), page: p, pages }
 }

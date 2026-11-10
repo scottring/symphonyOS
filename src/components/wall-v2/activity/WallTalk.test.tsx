@@ -154,7 +154,7 @@ describe('talking to the wall: the conversation surface', () => {
 
   it('on a two-column moment the side column becomes the conversation: You, then Symphony; Back to today returns', async () => {
     setup(async (t, h) => reply(t, h, 'Swim at 10 and a birthday party at 2.'))
-    expect(screen.getByRole('complementary', { name: 'The rest of today' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Talking with Symphony' })).toBeNull()
     await type('What do we have tomorrow?')
     const convo = side()
     expect(convo.getByText('What do we have tomorrow?')).toBeInTheDocument()
@@ -164,7 +164,7 @@ describe('talking to the wall: the conversation surface', () => {
     expect(screen.queryByRole('status', { name: 'Symphony says' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Back to today/ }))
     expect(screen.queryByRole('region', { name: 'Talking with Symphony' })).toBeNull()
-    expect(screen.getByRole('complementary', { name: 'The rest of today' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
   })
 
   it('on a full-stage moment (out the door) the exchange shows in the reply band', async () => {
