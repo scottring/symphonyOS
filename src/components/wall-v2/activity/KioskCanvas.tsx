@@ -171,7 +171,7 @@ function useWallFonts(on: boolean) {
 }
 
 /** What the Shell hands the v1 Home; the canvas adds the handlers. */
-export type KioskV1Data = Pick<KioskHomeV1Props, 'pick' | 'anchors' | 'kids' | 'restLine' | 'restSub' | 'notes' | 'talks' | 'question' | 'tomorrow' | 'weekend' | 'onAnotherQuestion'> & {
+export type KioskV1Data = Pick<KioskHomeV1Props, 'pick' | 'anchors' | 'kids' | 'restLine' | 'restSub' | 'notes' | 'talks' | 'question' | 'tomorrow' | 'weekend' | 'onAnotherQuestion' | 'board'> & {
   onNotes: () => void
   /** The day's scenes, for picking one by hand (Scott, 2026-10-20). `clock`
    *  is the scene the clock would show; `held` when a pick is leading. */

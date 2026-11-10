@@ -173,6 +173,31 @@ describe('TodayWeekFold: the week folded beside the day', () => {
       await waitFor(() => expect(restoreTask).toHaveBeenCalledWith('a', expect.objectContaining({ isWaiting: true, waitingFor: 'Guy’s reply' })))
     })
 
+    it('says someone is waiting on us for it, alongside its status', async () => {
+      const restoreTask = vi.fn()
+      view({ members: [{ id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' }] as never, restoreTask })
+      unfold()
+      fireEvent.click(screen.getByRole('button', { name: /^Status and people for Book the cabin/ }))
+      fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Owed to…' }))
+      const input = screen.getByRole('textbox', { name: 'Owed to someone else' })
+      fireEvent.change(input, { target: { value: 'Ms. Kroger' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await waitFor(() => expect(restoreTask).toHaveBeenCalledWith('a', { owedTo: 'Ms. Kroger' }))
+    })
+
+    it('clears who it is owed to', async () => {
+      const restoreTask = vi.fn()
+      const owed = e(t('o', 'Write the letter', { owedTo: 'Ms. Kroger' }))
+      view({ members: [{ id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' }] as never, restoreTask, plan: { chooserTasks: [owed], chooserRoutines: [] } as never })
+      unfold()
+      expect(screen.getByText('For Ms. Kroger')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: /^Status and people for Write the letter/ }))
+      const toggle = screen.getByRole('menuitemcheckbox', { name: 'Owed to…' })
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
+      fireEvent.click(toggle)
+      await waitFor(() => expect(restoreTask).toHaveBeenCalledWith('o', { owedTo: null }))
+    })
+
     it('adds a step from the row’s menu once the task is in progress', async () => {
       const addStep = vi.fn(async () => 'new')
       const started = e(t('s', 'Book lodging', { startedAt: now }))

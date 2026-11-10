@@ -8,7 +8,10 @@
 //   out-the-door   full stage: the time and what's left · the grown-ups'
 //                  line · each kid's checklist (done steps fold to one line;
 //                  the step's icon is its check)
-//   rest           the next landmark, large · the kids' school work · dinner ·
+//   rest           the board (2026-11-10): dinner tonight across the top;
+//                  calendar · waiting for · school. With More or a talk open,
+//                  the older screen:
+//                  the next landmark, large · the kids' school work · dinner ·
 //                  notes for the house · the rest of today and tomorrow beside it
 //   home           each kid's after-school steps and the week's homework ·
 //                  dinner and what's next
@@ -40,6 +43,7 @@ import type { BedtimeGrid } from '@/lib/wall/activity/kioskRoutines'
 import { minutesOf, type DayAnchors, type KioskScreenPick } from '@/lib/wall/activity/kioskScreen'
 import { Photo, type KioskDinner } from './KioskStages'
 import type { KidMath } from '@/hooks/useKidMath'
+import { KioskBoard, type KioskBoardData } from './KioskBoard'
 
 export interface V1Kid {
   member: FamilyMember
@@ -125,6 +129,9 @@ export interface KioskHomeV1Props {
   /** Math of the day: each kid's problem and streak, and opening it. */
   math?: KidMath
   onOpenMath?: (member: FamilyMember) => void
+  /** The board (Scott, 2026-11-10): the quiet screen's dinner · calendar ·
+   *  waiting for · school. Without it the quiet screen is the older Rest. */
+  board?: KioskBoardData
 }
 
 const SHARED = '__shared'
@@ -988,7 +995,9 @@ export function KioskHomeV1(p: KioskHomeV1Props) {
     case 'bedtime': return <Bedtime {...p} />
     case 'night': return <Night {...p} />
     case 'weekend': return <Weekend {...p} />
-    default: return <Rest {...p} />
+    // More and the conversation take a side column, which the board has no
+    // room for: the older quiet screen has one.
+    default: return p.board && !p.aside && !p.talk ? <KioskBoard p={p} data={p.board} /> : <Rest {...p} />
   }
 }
 

@@ -85,6 +85,7 @@ import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useKidMath } from '@/hooks/useKidMath';
 import { fetchEnergyPeriod, useHomeEnergy } from '@/hooks/useHomeEnergy';
 import { useSchoolDigests } from '@/hooks/useSchoolDigests';
+import { boardNews, boardWaits } from '@/lib/wall/activity/wallBoard';
 import { noSchoolReason } from '@/lib/today/noSchool';
 import { openScratchpadRows, recentlySorted, type ScratchpadRow } from '@/lib/wall/scratchpad';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
@@ -1071,7 +1072,9 @@ export function WallV2Shell() {
   const handleOpenWork = useCallback((taskId: string) => {
     const tapped = timeline.flatMap((s) => s.events).find((e) => e.id === taskId || e.id === `task-${taskId}`);
     if (tapped) { setActionSheetItem(tapped); return; }
-    const t = [...wallData.homeworkTasks, ...wallData.paperTasks, ...wallData.tasks].find((x) => x.id === taskId);
+    // The board's waits come from the app's own tasks (family only), which
+    // the wall's day lists may not hold.
+    const t = [...wallData.homeworkTasks, ...wallData.paperTasks, ...wallData.tasks, ...withSteps(storeTasks).filter((x) => x.context === 'family')].find((x) => x.id === taskId);
     if (!t) return;
     const due = t.neededOn ?? t.scheduledFor;
     setActionSheetItem({
@@ -1080,7 +1083,7 @@ export function WallV2Shell() {
       subtitle: due ? `Due ${due.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}` : undefined,
       notes: t.notes || undefined,
     });
-  }, [timeline, wallData.homeworkTasks, wallData.paperTasks, wallData.tasks]);
+  }, [timeline, wallData.homeworkTasks, wallData.paperTasks, wallData.tasks, storeTasks]);
 
   // A check on the day's lists (Scott, 2026-10-17): the same writer the
   // action sheet's Done uses, and the flash says it took.
@@ -1183,7 +1186,13 @@ export function WallV2Shell() {
       { id: 'settings', label: 'Settings', sub: 'Refresh and daily routines', icon: Settings, onSelect: () => handleDockAction('utilities') },
     ],
   }), [groceryList, showFlash, handleDockAction, scratchRows.length, isDark, toggleTheme]);
-  const kioskV1Shown = useMemo(() => ({ ...kioskV1, pick: { ...kioskV1.pick, dark: isDark } }), [kioskV1, isDark]);
+  // The board (2026-11-10): what we wait for and who waits on us, from the
+  // app's own tasks, and the newest school digest's announcements.
+  const board = useMemo(() => ({
+    waits: boardWaits(withSteps(storeTasks), wallData.familyMembers, now),
+    news: schoolDigests.loading ? null : boardNews(schoolDigests.digests, now),
+  }), [storeTasks, wallData.familyMembers, now, schoolDigests.loading, schoolDigests.digests]);
+  const kioskV1Shown = useMemo(() => ({ ...kioskV1, pick: { ...kioskV1.pick, dark: isDark }, board }), [kioskV1, isDark, board]);
   // What's already on the grocery list, beside a proposal ("where they'll go").
   const { items: groceryItems } = useListItems(stage.kind === 'groceries' ? groceryList?.id ?? null : null);
   const groceryOpenItems = useMemo(

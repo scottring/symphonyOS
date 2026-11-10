@@ -3,9 +3,33 @@
 import { useState } from 'react'
 import type { SheetStatus, SheetStatusChange } from '@/lib/planning/sheetStatus'
 
-export function SheetStatusMenu({ status, waitingFor, people, onChange, steps, onAddStep, onDoneStep }: {
+/** The household's names, then anyone else typed in. */
+function WhoPicker({ people, picked, inputLabel, onPick }: {
+  people: readonly string[]; picked?: string | null; inputLabel: string; onPick: (name: string) => void
+}) {
+  const [text, setText] = useState('')
+  return (
+    <div className="sheet-status-who">
+      {people.map((name) => (
+        <button key={name} type="button" className="sheet-status-person" aria-pressed={picked === name} onClick={() => onPick(name)}>{name}</button>
+      ))}
+      <input className="sheet-status-input" aria-label={inputLabel} placeholder="Someone else…" value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || !text.trim()) return
+          e.preventDefault(); onPick(text); setText('')
+        }} />
+    </div>
+  )
+}
+
+export function SheetStatusMenu({ status, waitingFor, owedTo, onOwed, people, onChange, steps, onAddStep, onDoneStep }: {
   status?: SheetStatus
   waitingFor?: string
+  /** Someone outside waits on us for it (the wall's "Waiting on us"). */
+  owedTo?: string | null
+  /** Undefined: the menu offers no Owed to. */
+  onOwed?: (who: string | null) => void
   /** The household's first names, offered first for a wait. */
   people: readonly string[]
   onChange: (change: SheetStatusChange) => void
@@ -15,7 +39,7 @@ export function SheetStatusMenu({ status, waitingFor, people, onChange, steps, o
   onDoneStep?: (id: string) => void
 }) {
   const [asking, setAsking] = useState(false)
-  const [text, setText] = useState('')
+  const [askingOwed, setAskingOwed] = useState(false)
   const [stepText, setStepText] = useState('')
   const waiting = status === 'waiting'
   const toggleWaiting = () => {
@@ -27,20 +51,18 @@ export function SheetStatusMenu({ status, waitingFor, people, onChange, steps, o
         <button type="button" role="menuitemcheckbox" aria-checked={status === 'started'} className="sheet-status-toggle"
           onClick={() => { setAsking(false); onChange({ to: status === 'started' ? 'none' : 'started' }) }}>In progress</button>
         <button type="button" role="menuitemcheckbox" aria-checked={waiting} className="sheet-status-toggle" onClick={toggleWaiting}>Waiting on…</button>
+        {onOwed && (
+          <button type="button" role="menuitemcheckbox" aria-checked={!!owedTo} className="sheet-status-toggle"
+            onClick={() => { if (owedTo) { setAskingOwed(false); onOwed(null) } else setAskingOwed(!askingOwed) }}>Owed to…</button>
+        )}
       </div>
       {(asking || waiting) && (
-        <div className="sheet-status-who">
-          {people.map((name) => (
-            <button key={name} type="button" className="sheet-status-person" aria-pressed={waitingFor === name}
-              onClick={() => { setAsking(false); onChange({ to: 'waiting', on: name }) }}>{name}</button>
-          ))}
-          <input className="sheet-status-input" aria-label="Waiting on someone else" placeholder="Someone else…" value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' || !text.trim()) return
-              e.preventDefault(); setAsking(false); onChange({ to: 'waiting', on: text }); setText('')
-            }} />
-        </div>
+        <WhoPicker people={people} picked={waitingFor} inputLabel="Waiting on someone else"
+          onPick={(name) => { setAsking(false); onChange({ to: 'waiting', on: name }) }} />
+      )}
+      {onOwed && (askingOwed || !!owedTo) && (
+        <WhoPicker people={people} picked={owedTo} inputLabel="Owed to someone else"
+          onPick={(name) => { setAskingOwed(false); onOwed(name) }} />
       )}
       {steps && (
         <div className="sheet-steps">

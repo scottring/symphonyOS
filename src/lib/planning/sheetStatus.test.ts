@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { Task } from '@/types/task'
 import { dbTaskToTask } from '@/hooks/useSupabaseTasks'
-import { sheetRowStatus, statusWrite } from './sheetStatus'
+import { owedWrite, sheetRowStatus, statusWrite } from './sheetStatus'
 
 const now = new Date(2026, 10, 9, 9)
 const t = (x: Partial<Task> = {}) => ({ id: 'a', title: 'Book the cabin', completed: false, createdAt: now, ...x }) as Task
@@ -86,5 +86,30 @@ describe('reading started_at', () => {
   it('becomes startedAt', () => {
     const at = '2026-11-09T14:00:00.000Z'
     expect(dbTaskToTask({ id: 'a', title: 'x', completed: false, created_at: at, updated_at: at, started_at: at } as never).startedAt).toEqual(new Date(at))
+  })
+})
+
+describe('owed to someone (the wall’s Waiting on us)', () => {
+  it('says who it is for under the title', () => {
+    expect(sheetRowStatus(t({ owedTo: 'Ms. Kroger' })).note).toBe('For Ms. Kroger')
+  })
+  it('a wait on someone says that instead', () => {
+    expect(sheetRowStatus(t({ owedTo: 'Ms. Kroger', isWaiting: true, waitingFor: 'Iris' })).note).toBe('Waiting on Iris')
+  })
+  it('keeps an in-progress row in progress', () => {
+    const s = sheetRowStatus(t({ owedTo: 'FFG', startedAt: new Date() }))
+    expect(s.status).toBe('started')
+    expect(s.note).toBe('For FFG')
+  })
+  it('writes the name, trimmed, with the old one to undo to', () => {
+    const w = owedWrite(t({ owedTo: 'Iris' }), ' Ms. Kroger ')
+    expect(w.patch).toEqual({ owedTo: 'Ms. Kroger' })
+    expect(w.prev).toEqual({ owedTo: 'Iris' })
+    expect(w.label).toMatch(/^For Ms\. Kroger: /)
+  })
+  it('clears it', () => {
+    const w = owedWrite(t({ owedTo: 'Iris' }), null)
+    expect(w.patch).toEqual({ owedTo: null })
+    expect(w.label).toMatch(/^No one waiting: /)
   })
 })

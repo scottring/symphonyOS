@@ -42,7 +42,7 @@ import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows, type SheetRow } from '@/components/plan/fold/AboveSheet'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 import { assigneesOf, assignmentWrite } from '@/lib/planning/v2/planV2'
-import { openSteps, sheetRowStatus, statusWrite, stepWrites, type StepSavers, type StepWrites } from '@/lib/planning/sheetStatus'
+import { openSteps, owedWrite, sheetRowStatus, statusWrite, stepWrites, type StepSavers, type StepWrites } from '@/lib/planning/sheetStatus'
 import { SheetStatusMenu } from '@/components/plan/fold/SheetStatusMenu'
 import type { FamilyMember } from '@/types/family'
 
@@ -72,6 +72,7 @@ export function SheetTaskTools({ task, members, write, steps }: {
         triggerLabel={`Status and people for ${task.title}`}
         onSelect={(ids) => write(assignmentWrite(task, ids, members))}
         menuTop={<SheetStatusMenu status={status} waitingFor={task.waitingFor}
+          owedTo={task.owedTo} onOwed={(who) => write(owedWrite(task, who))}
           people={members.map((m) => m.name.split(' ')[0])} onChange={(change) => write(statusWrite(task, change))}
           steps={open} onAddStep={(title) => steps?.add(task, title)}
           onDoneStep={(id) => { const step = open?.find((s) => s.id === id); if (step) steps?.done(step) }} />} />

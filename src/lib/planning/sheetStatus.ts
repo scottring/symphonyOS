@@ -11,7 +11,7 @@ export type SheetStatusChange = { to: 'started' } | { to: 'waiting'; on: string 
 
 type StatusFields = Pick<Task, 'title' | 'startedAt' | 'isWaiting' | 'waitingFor' | 'waitingSince'>
 
-type RowFields = Pick<Task, 'startedAt' | 'isWaiting' | 'waitingFor' | 'subtasks'>
+type RowFields = Pick<Task, 'startedAt' | 'isWaiting' | 'waitingFor' | 'subtasks' | 'owedTo'>
 
 /** The steps that count: a step let go is gone. Oldest first, as fetched. */
 const stepsOf = (t: Pick<Task, 'subtasks'>) => (t.subtasks ?? []).filter((s) => !s.dismissedAt)
@@ -26,12 +26,24 @@ const LEAST_FILL = 12
  *  that shows (Scott, 2026-11-09: the row never lists them). */
 export function sheetRowStatus(t: RowFields): { status?: SheetStatus; note?: string; fill?: number; nextStep?: string } {
   if (t.isWaiting) return { status: 'waiting', ...(t.waitingFor ? { note: `Waiting on ${t.waitingFor}` } : {}) }
-  if (!t.startedAt) return {}
+  // Someone waits on us for it: who, under the title (the wall's "Waiting on us").
+  const owed = t.owedTo ? { note: `For ${t.owedTo}` } : {}
+  if (!t.startedAt) return owed
   const steps = stepsOf(t)
-  if (steps.length === 0) return { status: 'started' }
+  if (steps.length === 0) return { status: 'started', ...owed }
   const open = openSteps(t)
   const fill = Math.round(((steps.length - open.length) / steps.length) * 100)
-  return { status: 'started', fill: open.length ? Math.max(LEAST_FILL, fill) : 100, ...(open[0] ? { nextStep: open[0].title } : {}) }
+  return { status: 'started', ...owed, fill: open.length ? Math.max(LEAST_FILL, fill) : 100, ...(open[0] ? { nextStep: open[0].title } : {}) }
+}
+
+/** Who waits on us for it, or no one: beside the status, never instead of it. */
+export function owedWrite(t: Pick<Task, 'title' | 'owedTo'>, who: string | null): { label: string; patch: Partial<Task>; prev: Partial<Task> } {
+  const name = who?.trim() || null
+  return {
+    label: name ? `For ${name}: “${t.title}”` : `No one waiting: “${t.title}”`,
+    patch: { owedTo: name },
+    prev: { owedTo: t.owedTo ?? null },
+  }
 }
 
 export interface StepSavers {

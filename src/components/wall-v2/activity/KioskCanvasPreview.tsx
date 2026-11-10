@@ -358,6 +358,23 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
     weekend: { rows, anytime: [{ title: 'Kids’ laundry', owners: ['sk', 'ir'] }, { title: 'Food planning', owners: ['ir'] }, { title: 'Paper mail', owners: [] }], tomorrow: [row('soccer', 16, 0, 'Soccer', ['mi']), row('math', 18, 30, 'Math night', ['li'])], tomorrowLabel: 'Thursday' },
     onNotes: noop, next: V1_NEXT[v1Screen],
     scenes: { choices: ['out-the-door', 'home', 'dinner', 'bedtime'], clock: v1Screen, held: false, onPick: noop },
+    // The board (rest): sample waits both ways, and a digest's announcements.
+    board: {
+      waits: {
+        theirs: [
+          { id: 'w1', title: 'Winter trip dates', from: { name: 'Iris', member: MEMBERS[1] }, to: { name: 'Scott', member: MEMBERS[0] }, when: '2 days', late: false },
+          { id: 'w2', title: 'Countersigned bathroom agreement', from: { name: 'Scherr' }, to: { name: 'Scott', member: MEMBERS[0] }, when: 'Today', late: false },
+        ],
+        ours: [
+          { id: 'w3', title: 'Letter for Ms. Kroger', from: { name: 'Scott', member: MEMBERS[0] }, to: { name: 'Ms. Kroger' }, when: 'Was due Thu', late: true },
+          { id: 'w4', title: 'FFG tuition', from: { name: 'Iris', member: MEMBERS[1] }, to: { name: 'FFG' }, when: 'Due tomorrow', late: false },
+        ],
+      },
+      news: { label: 'Fri, Nov 6', items: [
+        { title: 'Holiday Festival & Craft Fair', sub: 'Thu Dec 10 – Fri Dec 11 · PTO wants planning help' },
+        { title: 'Recess supplies for Ms. Jones', sub: 'Optional · indoor and outdoor' },
+      ] },
+    },
   }
   return (
     <div className={`${(v1 ? v1.pick.dark : isDark) ? 'dark ' : ''}h-screen w-screen overflow-hidden`} data-kiosk-scene={scene}>
