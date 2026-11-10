@@ -1,6 +1,7 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
 import qrcode from 'qrcode-terminal'
 import { join } from 'node:path'
+import { rename } from 'node:fs/promises'
 import type { ConnectorMessage, WatchedSource } from '../types.ts'
 import type { MessageBuffer } from '../buffer.ts'
 import { isWatched } from '../watchlist.ts'
@@ -96,6 +97,77 @@ async function listGroups(sock: { groupFetchAllParticipating: () => Promise<Reco
   }
 }
 
+/** What the supervisor does about a dropped connection. */
+export type DownReason = { unlinked: boolean; status?: number }
+
+/** Wait before the nth reconnect: 5s doubling to a 5-minute ceiling. */
+export function backoffMs(attempt: number): number {
+  return Math.min(5_000 * 2 ** attempt, 5 * 60_000)
+}
+
+/** Keep a WhatsApp connection alive IN this process.
+ *
+ * It used to exit on every close and lean on Fly to restart the machine. Fly
+ * gives up after ten failed restarts, and on 2026-11-08 a burst of ten closes
+ * in two minutes left the machine stopped — no digest email, no homework on
+ * the wall — for days, the ClassDojo half dead with it. Now a close only
+ * reconnects this socket, with backoff, and the process (and the 5pm digest)
+ * keeps running whatever WhatsApp does.
+ *
+ * `connect` builds a fresh socket; `onSocket` wires each one up (the receiver
+ * must be re-attached, a new socket has new events). An unlinked device
+ * (loggedOut) cannot reconnect on its old credentials: `onUnlinked` clears
+ * them so the next connect prints a fresh pairing QR for a human to scan. */
+export async function superviseSocket(opts: {
+  connect: () => Promise<SocketLike>
+  onSocket: (sock: SocketLike) => void
+  onUp?: () => void
+  onDown?: (why: DownReason) => void
+  onUnlinked?: () => Promise<void>
+  wait?: (ms: number) => Promise<void>
+}): Promise<void> {
+  const wait = opts.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+  let attempt = 0
+
+  const reconnect = async (): Promise<void> => {
+    for (;;) {
+      await wait(backoffMs(attempt++))
+      try {
+        await open()
+        return
+      } catch (e) {
+        console.error('whatsapp: reconnect failed, trying again:', e)
+      }
+    }
+  }
+
+  const open = async (): Promise<void> => {
+    const sock = await opts.connect()
+    let down = false
+    sock.ev.on('connection.update', (arg: unknown) => {
+      const u = arg as { connection?: string; lastDisconnect?: { error?: unknown } }
+      if (u.connection === 'open') { attempt = 0; opts.onUp?.(); return }
+      if (u.connection !== 'close' || down) return
+      down = true
+      const status = (u.lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode
+      const unlinked = status === DisconnectReason.loggedOut
+      console.error(
+        unlinked
+          ? 'whatsapp: device unlinked — scan the new QR in `fly logs` (see connectors/README.md)'
+          : `whatsapp: connection closed (${status}) — reconnecting`,
+      )
+      opts.onDown?.({ unlinked, status })
+      void (async () => {
+        if (unlinked) await opts.onUnlinked?.().catch((e) => console.error('whatsapp: clearing the old link failed:', e))
+        await reconnect()
+      })()
+    })
+    opts.onSocket(sock)
+  }
+
+  await open()
+}
+
 /** Build the companion-device socket.
  *
  * markOnlineOnConnect: false is load-bearing — a linked device that marks
@@ -132,17 +204,13 @@ export async function makeReceiveOnlySocket(stateDir: string): Promise<SocketLik
       // groups only — 1:1 conversations are never enumerated.
       void listGroups(sock)
     }
-    if (u.connection === 'close') {
-      const status = (u.lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode
-      // loggedOut means the phone unlinked this device — a human must re-scan
-      // the QR. Anything else is transient; the supervisor restarts us.
-      console.error(
-        status === DisconnectReason.loggedOut
-          ? 'whatsapp: device unlinked — re-run the QR link (see connectors/README.md)'
-          : `whatsapp: connection closed (${status}) — restarting`,
-      )
-      process.exit(1)
-    }
+    // A close is handled by superviseSocket, which reconnects in place.
   })
   return sock as unknown as SocketLike
+}
+
+/** The phone unlinked this device: set its dead credentials aside (never
+ * deleted) so the next connect starts a fresh pairing and prints a QR. */
+export async function setAsideUnlinkedAuth(stateDir: string): Promise<void> {
+  await rename(join(stateDir, 'wa-auth'), join(stateDir, `wa-auth.unlinked-${Date.now()}`))
 }

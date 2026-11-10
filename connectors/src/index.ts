@@ -2,7 +2,7 @@ import { loadConfig } from './config.ts'
 import { MessageBuffer } from './buffer.ts'
 import { HighWaterStore } from './highWater.ts'
 import { loadWatchlist, registerDiscovered } from './watchlist.ts'
-import { attachReceiver, makeReceiveOnlySocket } from './whatsapp/adapter.ts'
+import { attachReceiver, makeReceiveOnlySocket, setAsideUnlinkedAuth, superviseSocket } from './whatsapp/adapter.ts'
 import { dueNow, flushAll, localHour } from './scheduler.ts'
 import { recordHealth } from './health.ts'
 import { makeClassDojoClient } from './classdojo/client.ts'
@@ -33,12 +33,26 @@ async function main(): Promise<void> {
   console.log(`watching ${sources.length} source(s): ${sources.map((s) => s.sourceLabel).join(', ') || 'none'}`)
   console.log(`digest at local hour(s) ${config.flushHoursLocal.join(',')} → ${config.digestTo.join(', ') || 'the sending account'}`)
 
-  const sock = await makeReceiveOnlySocket(config.stateDir)
-  attachReceiver(sock, { buffer, sources: () => sources })
+  // WhatsApp reconnects in place; a dropped link never takes the process,
+  // and with it the ClassDojo half and the 5pm email, down (see superviseSocket).
+  await superviseSocket({
+    connect: () => makeReceiveOnlySocket(config.stateDir),
+    onSocket: (sock) => attachReceiver(sock, { buffer, sources: () => sources }),
+    onUp: () => { void recordHealth(config, 'whatsapp', { ok: true }) },
+    onDown: ({ unlinked, status }) => {
+      void recordHealth(config, 'whatsapp', {
+        ok: false,
+        error: unlinked ? 'device unlinked — scan the QR in fly logs' : `connection closed (${status}) — reconnecting`,
+      })
+    },
+    onUnlinked: () => setAsideUnlinkedAuth(config.stateDir),
+  })
   await recordHealth(config, 'whatsapp', { ok: true })
 
   let lastFiredHour: number | null = null
   setInterval(() => {
+    // Caught whole: an unhandled rejection here (a network blip reading the
+    // watchlist) would crash the process, which is how the digest died before.
     void (async () => {
       const now = new Date()
       if (!dueNow(now, config.timezone, config.flushHoursLocal, lastFiredHour)) return
@@ -113,7 +127,7 @@ async function main(): Promise<void> {
       lastFiredHour = localHour(now, config.timezone)
       await recordHealth(config, 'whatsapp', { ok: true })
       if (dojoOk && dojoSources.length > 0) await recordHealth(config, 'classdojo', { ok: true })
-    })()
+    })().catch((e) => console.error('flush tick failed; the next tick retries:', e))
   }, TICK_MS)
 }
 

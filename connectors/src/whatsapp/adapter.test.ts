@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { attachReceiver, toConnectorMessage, type RawMessage, type SocketLike } from './adapter'
+import { attachReceiver, backoffMs, superviseSocket, toConnectorMessage, type RawMessage, type SocketLike } from './adapter'
 import { MessageBuffer } from '../buffer'
 import type { WatchedSource } from '../types'
 
@@ -104,6 +104,83 @@ describe('attachReceiver', () => {
     attachReceiver(sock, { buffer, sources: () => WATCHED })
 
     expect(() => sock.handlers.get('messages.upsert')!({ messages: [raw()], type: 'notify' })).not.toThrow()
+  })
+})
+
+/** A socket whose connection events the test fires by hand. */
+function fakeSocket() {
+  const handlers = new Map<string, ((a: unknown) => void)[]>()
+  return {
+    ev: { on: (e: string, h: (a: unknown) => void) => { handlers.set(e, [...(handlers.get(e) ?? []), h]) } },
+    fire: (e: string, a: unknown) => { for (const h of handlers.get(e) ?? []) h(a) },
+  }
+}
+const closed = (statusCode: number) => ({ connection: 'close', lastDisconnect: { error: { output: { statusCode } } } })
+const settle = () => new Promise((r) => setTimeout(r, 0))
+
+// 2026-11-08: the worker exited on every close and Fly stopped restarting it
+// after ten, so the 5pm school digest (and the wall's homework) went silent.
+describe('superviseSocket — a dropped link reconnects in place', () => {
+  it('reconnects after a close, re-wires the new socket, and never exits', async () => {
+    const socks = [fakeSocket(), fakeSocket()]
+    const wired: unknown[] = []
+    const waits: number[] = []
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw new Error('exited') }) as never)
+    await superviseSocket({
+      connect: async () => socks[wired.length]!,
+      onSocket: (s) => { wired.push(s) },
+      wait: async (ms) => { waits.push(ms) },
+    })
+    socks[0]!.fire('connection.update', closed(503))
+    await settle()
+    expect(wired).toEqual([socks[0], socks[1]])
+    expect(waits).toEqual([backoffMs(0)])
+    expect(exit).not.toHaveBeenCalled()
+    exit.mockRestore()
+  })
+
+  it('an unlinked device sets its old link aside so the next connect pairs afresh', async () => {
+    const socks = [fakeSocket(), fakeSocket()]
+    let n = 0
+    const down: unknown[] = []
+    const onUnlinked = vi.fn(async () => {})
+    await superviseSocket({
+      connect: async () => socks[n++]!,
+      onSocket: () => {},
+      onDown: (why) => { down.push(why) },
+      onUnlinked,
+      wait: async () => {},
+    })
+    socks[0]!.fire('connection.update', closed(401))
+    await settle()
+    expect(down).toEqual([{ unlinked: true, status: 401 }])
+    expect(onUnlinked).toHaveBeenCalledOnce()
+    expect(n).toBe(2)
+  })
+
+  it('keeps trying when a reconnect itself fails, and backs off', async () => {
+    const socks = [fakeSocket(), fakeSocket()]
+    let calls = 0
+    const waits: number[] = []
+    await superviseSocket({
+      connect: async () => {
+        calls++
+        if (calls === 2) throw new Error('offline')
+        return calls === 1 ? socks[0]! : socks[1]!
+      },
+      onSocket: () => {},
+      wait: async (ms) => { waits.push(ms) },
+    })
+    socks[0]!.fire('connection.update', closed(428))
+    await settle(); await settle()
+    expect(calls).toBe(3)
+    expect(waits).toEqual([backoffMs(0), backoffMs(1)])
+  })
+
+  it('backs off from 5 seconds to a 5-minute ceiling', () => {
+    expect(backoffMs(0)).toBe(5_000)
+    expect(backoffMs(1)).toBe(10_000)
+    expect(backoffMs(20)).toBe(300_000)
   })
 })
 

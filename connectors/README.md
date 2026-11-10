@@ -64,8 +64,16 @@ On the phone: WhatsApp -> Settings -> Linked Devices -> Link a Device, and
 scan the QR from the log output. The session persists on the volume across
 deploys and restarts.
 
-If the log says `device unlinked`, the phone dropped the link — repeat the
-scan. Nothing is lost; the high-water marks stay on the volume.
+If the log says `device unlinked`, the phone dropped the link. The worker
+sets the old link aside (`/data/wa-auth.unlinked-<time>`) and prints a fresh
+QR in `fly logs` — scan it. It keeps running meanwhile, so the ClassDojo half
+of the 5pm digest still goes out. Nothing is lost; the high-water marks stay
+on the volume.
+
+A dropped WhatsApp connection reconnects in place with backoff; the process
+no longer exits on it. `fly.toml` restarts the machine on any exit with no
+retry limit (the default gave up after ten, which silenced the digest for
+days in November 2026).
 
 ## Why the phone still gets notifications
 

@@ -19,3 +19,9 @@ primary_region = "ewr"
 
 [deploy]
   strategy = "immediate"
+
+# Restart whenever the process exits, without the on-failure policy's limit
+# of ten tries: on 2026-11-08 ten quick crashes left the machine stopped and
+# the 5pm digest silent for days.
+[[restart]]
+  policy = "always"
