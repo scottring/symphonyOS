@@ -119,8 +119,10 @@ describe('TapRoutinePanel', () => {
   })
 
   it('a Background routine offers no Kiosk or day-grid switch', () => {
+    // A fixed day the routine doesn't run: on its own day (any real Tuesday)
+    // the "Where it shows" line repeats the hint's wording.
     render(<TapRoutinePanel routine={{ ...routine, background: true }} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
-      onBackgroundChange={vi.fn()} onShowOnDayGridChange={vi.fn()} onShowOnKioskChange={vi.fn()} />)
+      onBackgroundChange={vi.fn()} onShowOnDayGridChange={vi.fn()} onShowOnKioskChange={vi.fn()} viewedDate={WED} />)
     expect(screen.getByRole('switch', { name: 'Background' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText(/time still counts against the hours open/)).toBeInTheDocument()
     expect(screen.queryByRole('switch', { name: 'Kiosk' })).toBeNull()
