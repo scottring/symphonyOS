@@ -20,7 +20,7 @@
    sheets of paper to carry the contrast). */
 @media (min-width: 768px) {
   :is([data-scenery-lighting='daytime'], [data-scenery-lighting='dusk-dawn']):has(.today-page) {
-    --scenery-reading: rgb(255 255 255 / 0.22);
+    --scenery-reading: transparent;
   }
 }
 
@@ -149,3 +149,107 @@
 .today-page .today-scale-now { border-top-color: var(--today-now); }
 .today-page .today-scale-now::before { background: var(--today-now); }
 .today-page .today-scale-now > span { color: var(--today-now); }
+
+/* ---- The day as a short list (TodayAgenda, board A) ------------------- */
+.today-agenda { --ag-gutter: 72px; list-style: none; margin: 12px 0 0; padding: 0; }
+.today-agenda.is-over { outline: 2px dashed var(--color-primary-300); outline-offset: 6px; border-radius: 8px; }
+.today-agenda > li {
+  position: relative; display: grid; grid-template-columns: var(--ag-gutter) 22px minmax(0, 1fr);
+  column-gap: 10px; align-items: start;
+}
+/* The margin: times in light Jost, right-aligned against the spine. */
+.ag-time {
+  padding-top: 9px; text-align: right; white-space: nowrap;
+  font: 300 14px/1.2 'Jost', var(--font-family-sans); color: var(--color-neutral-500);
+}
+.ag-row.is-event .ag-time { color: var(--color-neutral-800); font-weight: 400; }
+/* The spine: one thin line down the day, a dot or a check on it. */
+.ag-spine { position: relative; align-self: stretch; display: flex; justify-content: center; }
+.ag-spine::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px;
+  background: var(--color-neutral-200);
+}
+.today-agenda > li:first-child .ag-spine::before { top: 14px; }
+.today-agenda > li:last-child .ag-spine::before { bottom: auto; height: 14px; }
+.ag-dot {
+  position: relative; z-index: 1; box-sizing: border-box; width: 11px; height: 11px; margin-top: 12px;
+  border-radius: 50%; border: 2px solid var(--color-neutral-400); background: var(--paper-fold-paper, var(--color-bg-elevated));
+}
+.ag-row.is-event .ag-dot { width: 13px; height: 13px; margin-top: 11px; border-color: var(--color-primary-600); background: var(--color-primary-600); }
+.ag-check {
+  position: relative; z-index: 1; display: flex; margin-top: 7px; border-radius: 50%;
+  background: var(--paper-fold-paper, var(--color-bg-elevated));
+}
+.ag-check > button { min-width: 0; min-height: 0; margin: -4px; padding: 4px; }
+.ag-check > button > span { width: 18px; height: 18px; }
+.ag-check > button > span:not(.bg-primary-500) { border-color: var(--color-neutral-400); }
+.ag-body { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding: 6px 0 14px; }
+.ag-open {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+  padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer;
+}
+.ag-title { font-size: 15px; line-height: 1.35; color: var(--color-neutral-800); overflow-wrap: anywhere; }
+.ag-row.is-event .ag-title {
+  font-family: var(--font-family-display); font-size: 21px; line-height: 1.25; font-weight: 500; color: var(--color-neutral-900);
+}
+.ag-row.is-background .ag-title { font-size: 14px; color: var(--color-neutral-600); }
+.ag-open:hover .ag-title { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.ag-open:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 3px; border-radius: 4px; }
+.ag-sub { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 13px; color: var(--color-neutral-500); }
+.ag-travel { display: inline-flex; align-items: center; gap: 5px; }
+.ag-people { flex: none; display: inline-flex; margin-top: 4px; }
+.ag-row.is-done .ag-title { color: var(--color-neutral-400); text-decoration: line-through; }
+.ag-row.is-past:not(.is-done) .ag-title { color: var(--color-neutral-500); }
+.ag-row.is-past.is-event { opacity: .7; }
+.ag-row.is-selected .ag-title { color: var(--color-primary-700); }
+.ag-row[data-kind] { cursor: grab; }
+.ag-row.is-dragging { opacity: .35; }
+/* Dropped on a thing: it lands right after it. */
+.ag-row.is-landing .ag-body { box-shadow: inset 0 -2px 0 var(--color-primary-500); }
+/* Open time: one plain line, no box. */
+.ag-free { margin: 0; padding: 8px 0 18px; font-size: 13px; color: var(--color-neutral-500); }
+.ag-open-row.is-landing .ag-free { color: var(--color-primary-700); font-weight: 600; }
+/* Now. */
+.ag-now .ag-time { color: var(--today-now); font-weight: 400; }
+.ag-now .ag-dot { border-color: var(--today-now); background: var(--today-now); }
+.ag-nowline {
+  display: flex; align-items: center; gap: 10px; padding: 8px 0 8px;
+  font-size: 12.5px; font-weight: 600; color: var(--today-now);
+}
+.ag-nowline i { flex: 1; height: 1.5px; background: var(--today-now); }
+/* A change card's timed arrival: dashed, inert, at its time. */
+.ag-row.is-proposed .ag-body {
+  margin: 2px 0 10px; padding: 6px 10px; border: 1.5px dashed hsl(176 45% 36%); border-radius: 8px;
+  background: hsl(176 40% 96%);
+}
+.dark .ag-row.is-proposed .ag-body, [data-scenery-lighting='nighttime'] .ag-row.is-proposed .ag-body { background: transparent; }
+
+/* ---- Masthead, as on the board ---------------------------------------- */
+/* Where the day sits, in plain small words (not tracked capitals). */
+.today-page .daybook-masthead [data-testid="masthead-eyebrow"] .uppercase {
+  text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500; color: var(--color-neutral-600);
+}
+/* "What is this page?" and its video stay one hover away from the title. */
+@media (hover: hover) and (pointer: fine) {
+  .today-page .daybook-masthead .daybook-title > :not(span) { opacity: 0; transition: opacity .15s; }
+  .today-page .daybook-masthead:is(:hover, :focus-within) .daybook-title > :not(span) { opacity: 1; }
+}
+/* The specials and the day's other all-day things, under its sentence. */
+.today-page .daybook-masthead .daybook-journal-allday {
+  flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 12px 0 0;
+}
+.today-page .daybook-masthead .daybook-journal-allday button { font-size: 13.5px; }
+
+/* ---- For today's column: what is moving, and what is coming ----------- */
+.today-page .today-cols .today-talk { display: block; margin-top: 22px; }
+.today-page .today-cols .today-talk-label {
+  display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--color-neutral-600);
+}
+.today-page .today-cols .today-talk-chip {
+  display: flex; width: 100%; margin: 0 0 6px; padding: 10px 14px; border-radius: 10px; text-align: left;
+  border: 1px solid var(--color-neutral-200); background: var(--color-bg-elevated);
+  font-family: var(--font-family-display); font-size: 17px; line-height: 1.3; color: var(--color-neutral-900);
+}
+.today-page .today-cols .today-talk-chip:hover { border-color: var(--color-neutral-300); }
+.today-page .today-focus-card .today-coming-up { margin-top: 30px; }
+.today-page .today-focus-card .today-coming-up .daybook-journal-heading h2 { font-size: 20px; }

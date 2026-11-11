@@ -80,6 +80,7 @@ import { DailyEditionPreview, useEditionPreview } from './DailyEditionPreview'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
 import { TodayDayScale, type DayScaleHandle } from './TodayDayScale'
+import { TodayAgenda } from './TodayAgenda'
 import { TodayRoutineChecklist } from './TodayRoutineChecklist'
 import { splitDayRoutines, quietBands } from '@/lib/today/dayRoutines'
 import { deferredInRoutineIds } from '@/lib/today/deferredRoutines'
@@ -207,6 +208,14 @@ function readHideEarlier(): boolean {
 }
 function writeHideEarlier(v: boolean) {
   try { if (v) localStorage.setItem(HIDE_EARLIER_KEY, '1'); else localStorage.removeItem(HIDE_EARLIER_KEY) } catch { /* private window */ }
+}
+// The day as hours rather than the short list, remembered on this device.
+const SHOW_HOURS_KEY = 'symphony-today-show-hours'
+function readShowHours(): boolean {
+  try { return localStorage.getItem(SHOW_HOURS_KEY) === '1' } catch { return false }
+}
+function writeShowHours(v: boolean) {
+  try { if (v) localStorage.setItem(SHOW_HOURS_KEY, '1'); else localStorage.removeItem(SHOW_HOURS_KEY) } catch { /* private window */ }
 }
 
 export function TodayView({
@@ -633,6 +642,11 @@ export function TodayView({
   const canHideEarlier = data.isToday && earlierCutoff >= DEFAULT_START + 2
   const [hideEarlier, setHideEarlierState] = useState(readHideEarlier)
   const setHideEarlier = (v: boolean) => { setHideEarlierState(v); writeHideEarlier(v) }
+  // The open journal's day is a short list (Scott, 2026-11-11, board A);
+  // "Show hours" draws the same day to scale. Phones keep the hours.
+  const [showHours, setShowHoursState] = useState(readShowHours)
+  const setShowHours = (v: boolean) => { setShowHoursState(v); writeShowHours(v) }
+  const listDay = foldedControls && !showHours
   const dayName = useMemo(
     () => viewedDate.toLocaleDateString('en-US', { weekday: 'long' }),
     [viewedDate],
@@ -1258,6 +1272,7 @@ export function TodayView({
   }), [timedItems, dateInstances, viewedDate, preview])
   const dayBands = useMemo(() => quietBands(routineSplit.quiet), [routineSplit.quiet])
   const shownTimedItems = useMemo(() => routineSplit.grid.filter(notHidden), [routineSplit.grid, notHidden])
+  const agendaItems = useMemo(() => [...routineSplit.grid, ...routineSplit.quiet].filter(notHidden), [routineSplit.grid, routineSplit.quiet, notHidden])
   const toggleDayItem = (item: TimelineItem) => {
     if (item.type === 'task') onToggleTask(item.id.replace('task-', ''))
     else if (item.type === 'routine' && onCompleteRoutine) {
@@ -1344,6 +1359,29 @@ export function TodayView({
     </TodayWeekFold>
   )
 
+  // The day's all-day things: the kids' specials as chips, the rest by name.
+  // On a wide page they stand under the day's sentence in the masthead
+  // (board A); otherwise at the head of The day.
+  const allDayBlock = journal.allDayEvents.length > 0 && (
+              <ul className="daybook-journal-allday" aria-label="All day">
+                {journal.allDayEvents.map((ev) => {
+                  // The kids' specials as chips, one per kid (2026-10-06).
+                  const specials = parseSpecials(ev.title)
+                  return (
+                    <li key={ev.id}>
+                      {specials ? (
+                        <button type="button" className="today-specials" aria-label={ev.title} onClick={() => handleSelectItem(ev.id)}>
+                          {specials.map((sp) => <span key={sp.who} className="today-special-chip"><span>{sp.who}</span>{sp.special}</span>)}
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => handleSelectItem(ev.id)}>{ev.title}</button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )
+
   return (
     // @container: the day's own layout reads the page's width.
     // Width: the reading column (PAGE_COLUMN, 1040px of content), the week's
@@ -1424,7 +1462,7 @@ export function TodayView({
         // dinner stand at the right under the controls (board A, 2026-11-11).
         // The week's dates are on the week's own page beside it.
         subline={foldedControls
-          ? headerLine ?? undefined
+          ? (headerLine || journal.allDayEvents.length > 0) ? <>{headerLine}{allDayBlock}</> : undefined
           : dinnerLink ? <>{headerLine}{headerLine && ' '}<span className="today-sentence-meta">{dinnerLink}</span></> : headerLine ?? undefined}
         // Domain chooser + assistant toggle, in the card's corner.
         // Desktop: the page's controls sit in the control row below, as on
@@ -1657,14 +1695,17 @@ export function TodayView({
               </div>
             )}
           </ForTodayDropZone>
-          <TodayRoutineChecklist
+          {!listDay && <TodayRoutineChecklist
             items={routineSplit.checklist}
             heading={data.isToday ? 'Routines today' : 'Routines this day'}
             peopleOf={peopleOf}
             onSelect={handleSelectItem}
             onToggleDone={toggleDayItem}
             onPin={ctx.onUpdateRoutine ? (item) => setDayGridPin(item, true) : undefined}
-          />
+          />}
+          {/* On the open journal what is coming sits at the foot of this
+              column, as the mockup's "Tomorrow" did. */}
+          {foldedControls && <TodayComingUp items={comingUpItems} onOpen={(id) => handleSelectItem(`task-${id}`)} />}
           </section>
 
           <section aria-labelledby="today-day-heading" className="daybook-journal-section today-day-section" data-guide-anchor="day">
@@ -1673,33 +1714,24 @@ export function TodayView({
               {/* Late in the day the spent morning took most of the column
                   (review, 2026-10-07): the rest of the day can take it, the
                   whole day one click back. Remembered on this device. */}
-              {canHideEarlier && (
+              {(foldedControls || (canHideEarlier && !listDay)) && (
                 <div className="daybook-heading-actions">
-                  <button type="button" className="today-scale-toggle" aria-pressed={hideEarlier} onClick={() => setHideEarlier(!hideEarlier)}>
-                    {hideEarlier ? 'Show the whole day' : 'Hide earlier hours'}
-                  </button>
+                  {canHideEarlier && !listDay && (
+                    <button type="button" className="today-scale-toggle" aria-pressed={hideEarlier} onClick={() => setHideEarlier(!hideEarlier)}>
+                      {hideEarlier ? 'Show the whole day' : 'Hide earlier hours'}
+                    </button>
+                  )}
+                  {/* The short list, or the same day drawn to scale (board
+                      A, 2026-11-11). Remembered on this device. */}
+                  {foldedControls && (
+                    <button type="button" className="today-scale-toggle" aria-pressed={showHours} onClick={() => setShowHours(!showHours)}>
+                      {showHours ? 'Show list' : 'Show hours'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
-            {journal.allDayEvents.length > 0 && (
-              <ul className="daybook-journal-allday" aria-label="All day">
-                {journal.allDayEvents.map((ev) => {
-                  // The kids' specials as chips, one per kid (2026-10-06).
-                  const specials = parseSpecials(ev.title)
-                  return (
-                    <li key={ev.id}>
-                      {specials ? (
-                        <button type="button" className="today-specials" aria-label={ev.title} onClick={() => handleSelectItem(ev.id)}>
-                          {specials.map((sp) => <span key={sp.who} className="today-special-chip"><span>{sp.who}</span>{sp.special}</span>)}
-                        </button>
-                      ) : (
-                        <button type="button" onClick={() => handleSelectItem(ev.id)}>{ev.title}</button>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
+            {!foldedControls && allDayBlock}
             {/* No school on the calendar: the school routines are off, and
                 the page says so — a fact, with the way back (noSchool.ts). */}
             {data.schoolOff && (
@@ -1715,7 +1747,24 @@ export function TodayView({
                 )}
               </p>
             )}
-            <TodayDayScale
+            {listDay ? (
+              <TodayAgenda
+                items={agendaItems}
+                viewedDate={viewedDate}
+                now={data.isToday ? nowForDisplay : null}
+                selectedItemId={selectedItemId}
+                upNextId={upNextId}
+                peopleOf={peopleOf}
+                isReadOnlyEvent={isReadOnlyEvent}
+                onSelect={handleSelectItem}
+                onToggleDone={toggleDayItem}
+                markOf={previewOf}
+                proposed={proposedTimed}
+                showOpenTime={calendarReady}
+                onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }).then((ok) => { if (ok === true && payload.kind === 'task') notePlaced() }) }}
+                handleRef={scaleRef}
+              />
+            ) : <TodayDayScale
               showOpenTime={calendarReady}
               items={shownTimedItems}
               markOf={previewOf}
@@ -1763,7 +1812,7 @@ export function TodayView({
                 onCreateEvent: ctx.onCreateEventAt,
               } : undefined}
               handleRef={scaleRef}
-            />
+            />}
             {timedItems.length === 0 && (
               <p className="today-scale-note">
                 {/* "Clear" is a claim: connected, synced, and no layer filtered
@@ -1783,7 +1832,7 @@ export function TodayView({
           </div>
           {/* What is dated in the days after this one — quiet, and silent
               when there is nothing (walkthrough 2026-10-02, #28). */}
-          <TodayComingUp items={comingUpItems} onOpen={(id) => handleSelectItem(`task-${id}`)} />
+          {!foldedControls && <TodayComingUp items={comingUpItems} onOpen={(id) => handleSelectItem(`task-${id}`)} />}
           {/* Below the schedule, not above the date: the one planning
               reminder Today carries (2026-09-22). */}
           {data.isToday && afterSchedule}

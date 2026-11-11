@@ -67,6 +67,7 @@ import { useSelection } from './providers/SelectionProvider';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
 import { TellSymphonyBar } from './TellSymphonyBar';
+import { SceneryDial } from './SceneryDial';
 import { PhonePaneSwitch } from './PhonePaneSwitch';
 import { NoteViewer } from '@/components/chat/NoteViewer';
 import { useSceneryPreferences } from '@/hooks/useSceneryPreferences';
@@ -661,6 +662,8 @@ function ShellLayoutInner({ children }: Props) {
           </>
         )}
         {showScenery && isMobile && <div className="scenery-end-clearance" aria-hidden="true" />}
+        {/* The landscape's switch and strength, at the foot on the right (2026-11-11). */}
+        {!isMobile && <SceneryDial right={paneWidth} />}
         <PlaceScenery scroller={pageScroller} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} vivid={location.pathname === HOME_ROUTE} />
       </div>
 

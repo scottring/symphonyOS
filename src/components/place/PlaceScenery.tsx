@@ -38,7 +38,7 @@ export function PlaceScenery({ scroller, right = 0, floor, vivid = false }: {
   vivid?: boolean
 }) {
   const place = usePlaceOrDefault()
-  const { showScenery, sceneryLighting, sceneryStyle, sceneryScene } = useSceneryPreferences()
+  const { showScenery, sceneryLighting, sceneryStyle, sceneryScene, sceneryStrength } = useSceneryPreferences()
   const art = sceneryArt(sceneryStyle, place, sceneryLighting)
   const box = useRef<HTMLDivElement>(null)
   const catcher = useRef<HTMLDivElement>(null)
@@ -117,6 +117,7 @@ export function PlaceScenery({ scroller, right = 0, floor, vivid = false }: {
     right,
     '--scenery-veil': `url(${art.veil})`,
     '--scenery-art': `url(${art.src})`,
+    '--scenery-strength': sceneryStrength / 100,
     ...(floor ? { '--scenery-floor': floor } : {}),
   } as CSSProperties
   return (

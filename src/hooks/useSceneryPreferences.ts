@@ -16,6 +16,10 @@ const SHOW_KEY = 'symphony-show-scenery'
 const LIGHTING_KEY = 'symphony-scenery-lighting'
 const STYLE_KEY = 'symphony-scenery-style'
 const SCENE_KEY = 'symphony-scenery-scene'
+const STRENGTH_KEY = 'symphony-scenery-strength'
+/** How strongly the faint landscape shows, 0–100 (Scott, 2026-11-11: a
+ *  slider at the foot of the page). 45 is the faint look it always had. */
+export const DEFAULT_SCENERY_STRENGTH = 45
 /** Automatic lighting is re-read this often (and when the tab returns). */
 const CLOCK_MS = 60_000
 const fallback = new Map<string, string>()
@@ -65,6 +69,11 @@ const getLighting = (): SceneryLighting => {
 const getStyle = (): SceneryStyle => read(STYLE_KEY) === 'woodblock' ? 'woodblock' : 'painted'
 const getScene = (): SceneryScene => read(SCENE_KEY) === 'full' ? 'full' : 'faint'
 const setSceneryScene = (scene: SceneryScene) => write(SCENE_KEY, scene)
+const getStrength = (): number => {
+  const n = Number(read(STRENGTH_KEY))
+  return read(STRENGTH_KEY) !== null && Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : DEFAULT_SCENERY_STRENGTH
+}
+const setSceneryStrength = (strength: number) => write(STRENGTH_KEY, String(Math.min(100, Math.max(0, Math.round(strength)))))
 const setShowScenery = (show: boolean) => write(SHOW_KEY, String(show))
 const setSceneryStyle = (style: SceneryStyle) => write(STYLE_KEY, style)
 const setSceneryLighting = (choice: SceneryLightingChoice) => write(LIGHTING_KEY, choice)
@@ -78,7 +87,8 @@ export function useSceneryPreferences() {
   const sceneryLighting = useSyncExternalStore(subscribe, getLighting, () => 'daytime' as const)
   const sceneryStyle = useSyncExternalStore(subscribe, getStyle, () => 'painted' as const)
   const sceneryScene = useSyncExternalStore(subscribe, getScene, () => 'faint' as const)
-  return { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene }
+  const sceneryStrength = useSyncExternalStore(subscribe, getStrength, () => DEFAULT_SCENERY_STRENGTH)
+  return { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene, sceneryStrength, setSceneryStrength }
 }
 
 /** When Automatic lighting next changes, for the chooser's hint. */
