@@ -93,9 +93,12 @@ export function foldSizes(
   // Three pages (the prototype's layout()): each companion about a quarter
   // of the spread (220–320). With room for all three, this sheet keeps at
   // least 420; otherwise one companion is open and the other folded at its edge.
+  // Week as an open journal (2026-11-11): the three pages fill a wide
+  // window — the companions up to 340, this sheet up to 760 (it holds the
+  // masthead now) — rather than leaving wide margins of sky.
   const { both } = spreadFits(mode, spreadWidth)
-  let comp = Math.round(Math.min(320, Math.max(MIN_COMPANION, 0.26 * spreadWidth)))
+  let comp = Math.round(Math.min(340, Math.max(MIN_COMPANION, 0.24 * spreadWidth)))
   if (both) comp = Math.max(MIN_COMPANION, Math.min(comp, Math.floor((spreadWidth - MIN_CURRENT) / 2)))
-  const current = Math.min(560, both ? spreadWidth - 2 * comp : spreadWidth - comp - 34)
+  const current = Math.min(760, both ? spreadWidth - 2 * comp : spreadWidth - comp - 34)
   return { above: comp, calendar: comp, current, edge: 34, maxAboveHeight: viewportHeight, both }
 }

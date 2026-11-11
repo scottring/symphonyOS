@@ -69,7 +69,8 @@ import { markLevelStep } from '@/lib/fold/levelStep'
 import './weekList.css'
 import { isPlanDrag, readPlanDrag, writePlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { PlanMastheadSlotsContext } from '@/components/plan/v2/planMastheadSlots'
+import { PlanMastheadSlotsContext, WeekMastheadHostContext } from '@/components/plan/v2/planMastheadSlots'
+import { likelyDuplicates, weekSentence } from '@/lib/planning/weekJournal'
 import { CompactWeekRow, type CompactRow, type CompactWeekRowProps } from './CompactWeekList'
 import { GiveItADay } from './GiveItADay'
 import { dayChipLabel } from './compactWeek'
@@ -308,6 +309,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     useSensor(TouchSensor, { activationConstraint: TOUCH_HOLD }),
   )
   const slots = useContext(PlanMastheadSlotsContext)
+  // The week's page holds the masthead (open journal, 2026-11-11).
+  const mastheadHost = useContext(WeekMastheadHostContext)
+  const [calPastOpen, setCalPastOpen] = useState(false)
   // The page's view choices, remembered on this device (calm pass 2).
   const prefs = useWeekViewPrefs()
   const showDone = prefs.done
@@ -955,6 +959,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const mainList = [...ownList, ...dayed].sort(byOrder)
     olderList.sort(byOrder)
     const openMain = mainList.filter((r) => !r.task.completed).map((r) => r.task)
+    // The same thing written twice reads as such (board W): the later row says so.
+    const dupOf = likelyDuplicates(openMain)
     // Move up / Move down (the When ▾ panel): the same write a drag makes.
     const moveBy = (t: Task, by: -1 | 1) => {
       const from = openMain.findIndex((x) => x.id === t.id)
@@ -975,7 +981,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       )
       return (
         <CompactWeekRow key={key}
-          row={{ key, id: t.id, title: t.title, item: t, completed: t.completed, meta: day ? dayMark(day) : shelfMeta.get(t.id) ?? undefined }}
+          row={{ key, id: t.id, title: t.title, item: t, completed: t.completed, meta: [day ? dayMark(day) : shelfMeta.get(t.id), dupOf.has(t.id) ? `Looks like “${dupOf.get(t.id)}”` : null].filter(Boolean).join(' · ') || undefined }}
           className={`wc-dayrow wc-weekrow wl-row${day ? ' has-day' : ''}${day?.key === todayKey ? ' is-today' : ''}${pointedTask(t.id) ? ' is-pointed' : ''}${whenOpen === key || picker?.key === key ? ' is-when-open' : ''}${fresh.has(t.id) || dayFresh.has(`${day?.key}:task-${t.id}`) ? ' is-new' : ''}${order?.liProps.className ? ` ${order.liProps.className}` : ''}`}
           liProps={{ ...order?.liProps, className: undefined, 'data-testid': `week-row-${t.id}` }}
           onDragStart={order?.onDragStart ? (_, ev) => order.onDragStart!(ev) : undefined}
@@ -1023,31 +1029,69 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     }
     const timeOf = (it: CanvasDayItem) => (it.time ? formatTimeCompact(it.time) : 'All day')
     const calendar = (
-      <CalendarSheet kicker="Calendar" title={range}>
+      <CalendarSheet kicker="Calendar" title="The days">
         {spans.length > 0 && (
           <ul className="wl-cal-spans" aria-label="Across these days">
             {spans.map((sp) => <li key={sp.id}><span className="gw-row-note">{sp.when}</span> {sp.title}{sp.tail && <span className="gw-row-note">{sp.tail}</span>}</li>)}
           </ul>
         )}
-        <ul className="gw-rows wl-cal" aria-label="This week's days">
-          {days.map((d) => {
-            const dinners = d.dinners ?? []
-            const specials = d.specials ?? []
-            const empty = d.events.length === 0 && dinners.length === 0 && specials.length === 0
-            return (
-              <li key={d.key} className="gw-row gw-day" data-now={d.key === todayKey ? '' : undefined}>
-                <span className="gw-day-label">{d.date.toLocaleDateString('en-US', { weekday: 'short' })} {d.date.getDate()}{prefs.weather && d.weather && <span className="gw-row-note">{d.weather}</span>}</span>
-                {empty ? <span className="gw-row-note">Nothing fixed</span> : (
-                  <ul className="gw-days">
-                    {d.events.map((ev) => <li key={ev.id}><b>{timeOf(ev)}</b><span>{ev.title}</span></li>)}
-                    {specials.map((sp) => <li key={`sp:${sp.who}`}><b>{sp.who}</b><span>{sp.special}</span></li>)}
-                    {dinners.map((x) => <li key={x.id}><b>Dinner</b><span>{x.label}</span></li>)}
-                  </ul>
-                )}
-              </li>
-            )
-          })}
-        </ul>
+        {(() => {
+          // The days as Today's list reads (board W): the days gone fold to
+          // one line; each other day a heading, its things at their times
+          // down a margin, a now line on today.
+          const gone = isCurrent ? days.filter((d) => d.key < todayKey) : []
+          const goneCount = gone.reduce((n, d) => n + d.events.length + (d.dinners ?? []).length + (d.specials ?? []).length, 0)
+          const shown = isCurrent && !calPastOpen ? days.filter((d) => d.key >= todayKey) : days
+          const nowMs = Date.now()
+          const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' })
+          return <>
+            {gone.length > 0 && (
+              <button type="button" className="jc-gone" aria-expanded={calPastOpen} onClick={() => setCalPastOpen((o) => !o)}>
+                <span>{gone.length === 1 ? short(gone[0].date) : `${short(gone[0].date)} – ${short(gone[gone.length - 1].date)}`} · {goneCount} {goneCount === 1 ? 'thing' : 'things'}</span>
+                <span className="canvas-link">{calPastOpen ? 'Hide' : 'Show'}</span>
+              </button>
+            )}
+            <ul className="jc-days wl-cal" aria-label="This week's days">
+              {shown.map((d) => {
+                const dinners = d.dinners ?? []
+                const specials = d.specials ?? []
+                const isToday = d.key === todayKey
+                const empty = d.events.length === 0 && dinners.length === 0 && specials.length === 0
+                const before = isToday ? d.events.filter((ev) => !ev.time || ev.time.getTime() <= nowMs) : d.events
+                const after = isToday ? d.events.filter((ev) => ev.time && ev.time.getTime() > nowMs) : []
+                const evRow = (ev: CanvasDayItem) => (
+                  <li key={ev.id} className={`jc-row${ev.time ? ' is-timed' : ''}`}>
+                    <span className="jc-time">{timeOf(ev)}</span><span className="jc-dot" aria-hidden="true" />
+                    <button type="button" className="jc-what" onClick={() => writers.open(ev.id)}>{ev.title}</button>
+                  </li>
+                )
+                return (
+                  <li key={d.key} className={`jc-day${isToday ? ' is-today' : ''}`} data-now={isToday ? '' : undefined}>
+                    <p className="jc-head">
+                      <span className="jc-name">{d.date.toLocaleDateString('en-US', { weekday: 'long' })} {d.date.getDate()}</span>
+                      <span className="jc-tag">{isToday ? 'Today' : ''}{prefs.weather && d.weather ? <span className="gw-row-note"> {d.weather}</span> : null}</span>
+                    </p>
+                    {empty ? <p className="jc-empty">Nothing on the calendar yet</p> : (
+                      <ul className="jc-rows">
+                        {specials.length > 0 && (
+                          <li className="jc-row"><span className="jc-time">All day</span><span className="jc-dot" aria-hidden="true" />
+                            <span className="jc-what is-plain jc-specials">{specials.map((sp) => <span key={sp.who}>{sp.who} · {sp.special}</span>)}</span></li>
+                        )}
+                        {before.map(evRow)}
+                        {isToday && <li className="jc-now" aria-label="Now"><span className="jc-time" /><span className="jc-dot" aria-hidden="true" /><i aria-hidden="true" /></li>}
+                        {after.map(evRow)}
+                        {dinners.map((x) => (
+                          <li key={x.id} className="jc-row is-dinner"><span className="jc-time">Dinner</span><span className="jc-dot" aria-hidden="true" />
+                            <span className="jc-what is-plain">{x.label}</span></li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </>
+        })()}
       </CalendarSheet>
     )
     const listRoutineRow = (r: ShelfRoutine) => {
@@ -1067,7 +1111,11 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     }
     const sheet = (
       <section className="wl-sheet vt-sheet-week" aria-label={sheetTitle} data-guide-anchor="day">
-        <p className="above-sheet-kicker">Week · {range}</p>
+        {mastheadHost ? <>
+          {/* The masthead (HomeHeader) is drawn here, then the week in one sentence. */}
+          <div className="wl-masthead" ref={mastheadHost} />
+          {isCurrent && <p className="wl-lede">{weekSentence({ days, spans, now: new Date(), todayKey, open: openMain.length })}</p>}
+        </> : <p className="above-sheet-kicker">Week · {range}</p>}
         <h2 className="above-sheet-title wl-title">{sheetTitle}</h2>
         <section className="wl-some" aria-label="The week’s list" data-testid="week-sometime" data-explain="still-to-place" data-explain-label="This week’s list">
           {mainList.length > 0 && (

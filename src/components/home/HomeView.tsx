@@ -3,6 +3,7 @@ import { currentWeekCleanup, weekRangeFromParams, weekStartParam } from '@/lib/w
 import { useWeekRollover } from '@/hooks/useWeekRollover'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useCadenceConfig, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { HomeChromeControls } from './HomeChromeControls'
 import type { HomeViewType } from '@/types/homeView'
@@ -42,7 +43,7 @@ import { TodayView } from '@/components/schedule/TodayView'
 import { PAGE_GUTTER_X } from '@/components/layout/pageLayout'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { HomeHeader } from '@/components/home/HomeHeader'
-import { PlanMastheadSlotsContext } from '@/components/plan/v2/planMastheadSlots'
+import { PlanMastheadSlotsContext, WeekMastheadHostContext } from '@/components/plan/v2/planMastheadSlots'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 import { PLANNING_PAGE_CLASS } from '@/components/layout/pageLayout'
 
@@ -256,6 +257,8 @@ export function HomeView({
   // status and controls into them. Phones keep the row.
   const [planSublineHost, setPlanSublineHost] = useState<HTMLElement | null>(null)
   const [planControlsHost, setPlanControlsHost] = useState<HTMLElement | null>(null)
+  // The week's page, when it offers to hold the masthead (open journal).
+  const [weekMastheadHost, setWeekMastheadHost] = useState<HTMLElement | null>(null)
   const planSlotsOn = currentView === 'week' && !isMobile
   const planSlots = useMemo(
     () => (planSlotsOn && planSublineHost && planControlsHost ? { subline: planSublineHost, controls: planControlsHost } : null),
@@ -608,20 +611,8 @@ export function HomeView({
     )
   }
 
-  // Subtle domain background tint — only when exactly one real domain is checked.
-  const tint = soleDomain ? domainById(soleDomain).bgClass : ''
-
-  return (
-    <div className={`relative flex flex-col h-full transition-colors duration-500 ${tint}`}>
-      {/* Today header is rendered INSIDE the scroll container so it shares
-          the exact same max-w/px column as TodayView's content, keeping the
-          date label and controls left/right-aligned with the task rows.
-          Week/Month headers stay outside the scroll container (full-width). */}
-      {/* Week keeps its masthead on a phone too: it is the only way to step
-          to another week or pick a shorter run there. */}
-      {(!isMobile || currentView === 'week') && currentView !== 'today' && (
-        <div className={`${PAGE_GUTTER_X} pt-2${weekColumn}`}>
-          <HomeHeader
+  const homeHeader = (
+    <HomeHeader
             currentView={currentView}
             onViewChange={handleViewChange}
             viewedDate={viewedDate}
@@ -641,8 +632,26 @@ export function HomeView({
             onMonthChange={setMonthStart}
             planSlots={planSlotsOn ? { subline: setPlanSublineHost, controls: setPlanControlsHost } : undefined}
           />
+  )
+
+  // Subtle domain background tint — only when exactly one real domain is checked.
+  const tint = soleDomain ? domainById(soleDomain).bgClass : ''
+
+  return (
+    <div className={`relative flex flex-col h-full transition-colors duration-500 ${tint}`}>
+      {/* Today header is rendered INSIDE the scroll container so it shares
+          the exact same max-w/px column as TodayView's content, keeping the
+          date label and controls left/right-aligned with the task rows.
+          Week/Month headers stay outside the scroll container (full-width). */}
+      {/* Week keeps its masthead on a phone too: it is the only way to step
+          to another week or pick a shorter run there. */}
+      {(!isMobile || currentView === 'week') && currentView !== 'today' && !(weekMastheadHost && currentView === 'week' && !isMobile) && (
+        <div className={`${PAGE_GUTTER_X} pt-2${weekColumn}`}>
+{homeHeader}
         </div>
       )}
+      {/* Week as an open journal: the masthead on the week's own page. */}
+      {weekMastheadHost && currentView === 'week' && !isMobile && createPortal(homeHeader, weekMastheadHost)}
 
       {/* On desktop the shell scrolls the page; an inner scroller here (one that
           never scrolls — it grows with its content) made every sticky column
@@ -669,7 +678,7 @@ export function HomeView({
             // start flush against the content edge, 56px left of their own
             // masthead card. One gutter, one left edge (Scott, 2026-09-07).
             <div className={`${PAGE_GUTTER_X}${weekColumn}`}>
-              <PlanMastheadSlotsContext.Provider value={planSlots}>{renderContent()}</PlanMastheadSlotsContext.Provider>
+              <PlanMastheadSlotsContext.Provider value={planSlots}><WeekMastheadHostContext.Provider value={!isMobile && currentView === 'week' ? setWeekMastheadHost : null}>{renderContent()}</WeekMastheadHostContext.Provider></PlanMastheadSlotsContext.Provider>
             </div>
           )}
       </div>

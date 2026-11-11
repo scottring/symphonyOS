@@ -47,8 +47,12 @@ describe('spreadFits', () => {
 })
 
 describe('foldSizes with a calendar', () => {
-  it('h, wide: two companions and this sheet, at most 560', () => {
-    expect(foldSizes('h', 1284, 900, { calendar: true })).toMatchObject({ above: 320, calendar: 320, current: 560, edge: 34, both: true })
+  // Week as an open journal (2026-11-11): the three pages fill the window.
+  it('h, wide: two companions and this sheet filling the spread', () => {
+    expect(foldSizes('h', 1284, 900, { calendar: true })).toMatchObject({ above: 308, calendar: 308, current: 668, edge: 34, both: true })
+  })
+  it('h, very wide: companions at most 340, this sheet at most 760', () => {
+    expect(foldSizes('h', 1700, 900, { calendar: true })).toMatchObject({ above: 340, calendar: 340, current: 760, both: true })
   })
   it('h, at the threshold: this sheet keeps 420', () => {
     expect(foldSizes('h', 860, 900, { calendar: true })).toMatchObject({ above: 220, calendar: 220, current: 420, both: true })
