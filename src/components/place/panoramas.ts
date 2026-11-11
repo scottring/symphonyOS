@@ -1,5 +1,8 @@
 import type { PlaceId } from '@/config/places'
-import type { SceneryLighting, SceneryStyle } from '@/hooks/useSceneryPreferences'
+import type { SceneryBackground, SceneryLighting, SceneryStyle } from '@/hooks/useSceneryPreferences'
+import type { SceneryPrintId } from '@/config/sceneryPrints'
+import train_yard from '@/assets/scenery/prints/train-yard.webp'
+import train_yard_veil from '@/assets/scenery/prints/train-yard-veil.webp'
 import urban_daytime from '@/assets/scenery/painted/urban-daytime.webp'
 import urban_daytime_veil from '@/assets/scenery/painted/urban-daytime-veil.webp'
 import urban_dusk_dawn from '@/assets/scenery/painted/urban-dusk-dawn.webp'
@@ -141,4 +144,20 @@ export const WOODBLOCK: Record<PlaceId, Record<SceneryLighting, Panorama>> = {
  *  and the Settings chooser both draw from here. */
 export function sceneryArt(style: SceneryStyle, place: PlaceId, lighting: SceneryLighting): Panorama {
   return (style === 'woodblock' ? WOODBLOCK : PANORAMAS)[place][lighting]
+}
+
+// Prints that belong to no place (config/sceneryPrints.ts): one picture for
+// every light and style, in the woodblock band (2172x724).
+// Train yard (Scott, 2026-11-11): the bottom of his print, the four train
+// faces, its top fading into the sky (scripts/scenery/train_yard.py).
+export const PRINTS: Record<SceneryPrintId, Panorama> = {
+  'train-yard': { src: train_yard, veil: train_yard_veil, skyline: 0.12 },
+}
+
+/** The art for the chosen background: your place's own scene ('place'),
+ *  another place's in the same style and light, or a print. */
+export function backgroundArt(background: SceneryBackground, style: SceneryStyle, place: PlaceId, lighting: SceneryLighting): Panorama {
+  if (background === 'place') return sceneryArt(style, place, lighting)
+  if (background in PRINTS) return PRINTS[background as SceneryPrintId]
+  return sceneryArt(style, background as PlaceId, lighting)
 }

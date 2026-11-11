@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { PLACES } from '@/config/places'
-import { PANORAMAS, WOODBLOCK, sceneryArt } from './panoramas'
+import { PANORAMAS, PRINTS, WOODBLOCK, backgroundArt, sceneryArt } from './panoramas'
 
 const LIGHTS = ['daytime', 'dusk-dawn', 'nighttime'] as const
 
@@ -30,5 +30,23 @@ describe('scenery style resolution', () => {
     for (const { id } of PLACES) {
       for (const light of LIGHTS) expect(sceneryArt('painted', id, light)).toBe(PANORAMAS[id][light])
     }
+  })
+})
+
+describe('chosen background', () => {
+  it('follows your place by default, in the chosen style and light', () => {
+    expect(backgroundArt('place', 'woodblock', 'farm', 'nighttime')).toBe(WOODBLOCK.farm.nighttime)
+    expect(backgroundArt('place', 'painted', 'cabin', 'daytime')).toBe(PANORAMAS.cabin.daytime)
+  })
+
+  it("draws another place's scene without changing the place", () => {
+    expect(backgroundArt('urban', 'painted', 'cabin', 'dusk-dawn')).toBe(PANORAMAS.urban['dusk-dawn'])
+  })
+
+  it('shows a print the same in every style and light', () => {
+    for (const style of ['painted', 'woodblock'] as const) {
+      for (const light of LIGHTS) expect(backgroundArt('train-yard', style, 'farm', light)).toBe(PRINTS['train-yard'])
+    }
+    expect(PRINTS['train-yard'].veil).not.toBe(PRINTS['train-yard'].src)
   })
 })

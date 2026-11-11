@@ -5,14 +5,28 @@
 // allows user to increase, decrease the … opacity of the background image
 // and/or turn it off/on"). A small mountain opens a card with a switch and a
 // strength slider; both are this device's, like the rest of the scenery
-// settings (useSceneryPreferences).
+// settings (useSceneryPreferences). Below them, the background: the five
+// places' scenes and the prints (Scott, 2026-11-11: "give the user the
+// option to choose the background they want"), this device's too — the
+// place itself, and with it the app's accent, stays in Settings.
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { MountainSnow } from 'lucide-react'
-import { useSceneryPreferences } from '@/hooks/useSceneryPreferences'
+import { useSceneryPreferences, type SceneryBackground } from '@/hooks/useSceneryPreferences'
+import { usePlaceOrDefault } from '@/hooks/usePlace'
+import { PLACES } from '@/config/places'
+import { SCENERY_PRINTS, isSceneryPrintId } from '@/config/sceneryPrints'
+import { backgroundArt } from '@/components/place/panoramas'
 
 export function SceneryDial({ right = 0 }: { right?: number }) {
-  const { showScenery, setShowScenery, sceneryStrength, setSceneryStrength } = useSceneryPreferences()
+  const { showScenery, setShowScenery, sceneryStrength, setSceneryStrength, sceneryBackground, setSceneryBackground, sceneryStyle, sceneryLighting } = useSceneryPreferences()
+  const place = usePlaceOrDefault()
+  // Your own place reads as 'place', so it keeps following a later change of place.
+  const shown = sceneryBackground === 'place' ? place : sceneryBackground
+  const choices: { id: Exclude<SceneryBackground, 'place'>; name: string }[] = [
+    ...PLACES.map((p) => ({ id: p.id, name: p.id === place ? `${p.name} (your place)` : p.name })),
+    ...SCENERY_PRINTS,
+  ]
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement | null>(null)
   const sliderId = useId()
@@ -43,6 +57,23 @@ export function SceneryDial({ right = 0 }: { right?: number }) {
               disabled={!showScenery} onChange={(e) => setSceneryStrength(Number(e.target.value))}
               aria-valuetext={`${sceneryStrength}%`} />
             <span className="tabular-nums" aria-hidden="true">{sceneryStrength}%</span>
+          </div>
+          <span className="scenery-dial-label" id={`${panelId}-bg`}>Background</span>
+          <div className="scenery-dial-backgrounds" role="radiogroup" aria-labelledby={`${panelId}-bg`}>
+            {choices.map((c) => {
+              const art = backgroundArt(c.id, sceneryStyle, place, sceneryLighting)
+              const checked = c.id === shown
+              return (
+                <button key={c.id} type="button" role="radio" aria-checked={checked} title={c.name} aria-label={c.name}
+                  className="scenery-dial-background" disabled={!showScenery}
+                  onClick={() => setSceneryBackground(c.id === place ? 'place' : c.id)}>
+                  <span className="place-theme-preview" data-sky-place={isSceneryPrintId(c.id) ? place : c.id}
+                    data-scenery-lighting={sceneryLighting} aria-hidden="true">
+                    <img src={art.src} alt="" loading="lazy" />
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
