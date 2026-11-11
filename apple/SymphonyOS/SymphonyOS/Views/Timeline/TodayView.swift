@@ -229,13 +229,7 @@ struct TodayView: View {
                 pageHead
                     .padding(.horizontal, 22)
                     .padding(.top, 12)
-                HStack(alignment: .top, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 0) { dayList }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 0) { lists }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(.leading, 6)
+                dayAndToDo(pageWidth: size.width)
             }
             .padding(.bottom, 12)
         }
@@ -264,13 +258,7 @@ struct TodayView: View {
                         .padding(.horizontal, 24)
                         .padding(.top, 8)
                     if isSearching { searchResultsContent } else {
-                        HStack(alignment: .top, spacing: 18) {
-                            VStack(alignment: .leading, spacing: 0) { dayList }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            VStack(alignment: .leading, spacing: 0) { lists }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.leading, 8)
+                        dayAndToDo(pageWidth: size.width - weekPageWidth)
                     }
                 }
                 .padding(.bottom, 12)
@@ -280,18 +268,45 @@ struct TodayView: View {
         }
     }
 
-    /// The week page's width: at the fold when the screen has one running
-    /// top to bottom, else about a third (the web's 0.24–0.38 of a spread).
+    /// The week page's width: about a third of the screen. The Duo reports
+    /// its hinge even when it lies flat, and the screen has no crease, so the
+    /// split follows the content, not the hinge (paper-style horizons spec).
     private var weekPageWidth: CGFloat {
-        #if os(iOS)
-        let layout = appState.dockLayout
-        if let fold = layout.fold, fold.height > fold.width {
-            let leadingInset = layout.edge == .leading ? layout.contentInset : 0
-            let x = fold.midX - leadingInset
-            if x > 240 && x < size.width - 360 { return x }
+        min(360, max(280, (size.width * 0.34).rounded()))
+    }
+
+    /// How much wider text makes everything (Dynamic Type), for deciding
+    /// whether two columns still fit.
+    private var textScale: CGFloat {
+        switch typeSize {
+        case .xSmall, .small, .medium, .large: 1.0
+        case .xLarge: 1.1
+        case .xxLarge: 1.2
+        case .xxxLarge: 1.3
+        default: 1.7
         }
-        #endif
-        return min(340, max(260, (size.width * 0.34).rounded()))
+    }
+
+    /// The day and To do side by side only when each gets a real column at
+    /// this text size (Scott, 2026-11-11: on the Duo they were squeezed to a
+    /// letter a line); otherwise one under the other.
+    @ViewBuilder
+    private func dayAndToDo(pageWidth: CGFloat) -> some View {
+        if pageWidth >= 640 * textScale {
+            HStack(alignment: .top, spacing: 18) {
+                VStack(alignment: .leading, spacing: 0) { dayList }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 0) { lists }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.leading, 8)
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                dayList
+                lists
+            }
+            .padding(.leading, 8)
+        }
     }
 
     /// The day page's heading: the one-line date and the day in a sentence.
