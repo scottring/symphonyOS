@@ -45,6 +45,7 @@ import { assigneesOf, assignmentWrite } from '@/lib/planning/v2/planV2'
 import { openSteps, owedWrite, sheetRowStatus, statusWrite, stepWrites, type StepSavers, type StepWrites } from '@/lib/planning/sheetStatus'
 import { SheetStatusButton, SheetStatusMenu } from '@/components/plan/fold/SheetStatusMenu'
 import type { FamilyMember } from '@/types/family'
+import { useSideColumnSlot } from '@/shell/SideColumn'
 
 export interface TodayNextWeek { weekStart: Date; entries: DayPlanEntry[] }
 
@@ -277,12 +278,15 @@ export function TodayWeekFold({ plan, day, weekStart, actions, earlier = [], nex
     ...(earlierIds.has(e.id) && e.task ? { mark: earlierDayMark(e.task), anchor: e.key === firstLeft ? 'leftovers' : undefined } : {}),
   }))
 
+  // The Details / Chat card beside the day folds the week (Scott, 2026-11-11).
+  const { open: paneOpen } = useSideColumnSlot()
+  const foldDrive = drive ?? (paneOpen ? false : undefined)
   const range = formatWeekRangeShort(weekStart)
   const nextById = new Map((nextWeek?.entries ?? []).map((e) => [e.id, e]))
 
   return (
     <PaperFold horizon="day" wide stowed={stowed} className={['today-fold', className].filter(Boolean).join(' ')} edgeLabel={range} edgeCount={open.length}
-      drive={drive === undefined ? undefined : { above: drive }}
+      drive={foldDrive === undefined ? undefined : { above: foldDrive }}
       frontLabel={`${range}, to pick from`}
       above={<>
         <AboveSheet kicker="Week" title={range} rows={rows}

@@ -66,6 +66,7 @@ import { localYmd } from '@/lib/cadence/config';
 import { useSelection } from './providers/SelectionProvider';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
+import { TellSymphonyBar } from './TellSymphonyBar';
 import { PhonePaneSwitch } from './PhonePaneSwitch';
 import { NoteViewer } from '@/components/chat/NoteViewer';
 import { useSceneryPreferences } from '@/hooks/useSceneryPreferences';
@@ -641,7 +642,13 @@ function ShellLayoutInner({ children }: Props) {
                 <div className={`scenery-page scenery-page-contents`}>
                   {children}
                   {dockedBar
-                    ? !aiOpen && <button type="button" className="conversation-launcher" style={{ right: paneWidth + 24 }} onClick={openConversation}><Sparkles size={18} aria-hidden="true" />Chat with Symphony</button>
+                    // One bar for telling Symphony and adding (boards D/E,
+                    // 2026-11-11): it replaces the Chat pill and the round +.
+                    // With the Chat card in front, the card's composer is the bar.
+                    ? !(aiOpen && (!selection || pane === 'ai')) && <TellSymphonyBar right={paneWidth} busy={assistant.loading}
+                        onSend={(text) => { stayInSymphony(); sendConversation(text); }}
+                        onAdd={() => setQuickAddOpen(true)}
+                        onTalk={voiceEnabled ? startTalking : undefined} />
                     : showStrip && <ConversationStrip chatOnly onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
                 </div>
               </SideColumn>
@@ -665,7 +672,8 @@ function ShellLayoutInner({ children }: Props) {
           // the 2026-09-18 top-navigation redesign hid it). It opens the same
           // ⌘K add box as the shortcut. Phones add
           // through the dock's + (and the capture bar) instead.
-          showFab={!isMobile}
+          // The Tell Symphony bar carries the + where it shows (2026-11-11).
+          showFab={!isMobile && !dockedBar}
           rightInset={isMobile ? 0 : paneWidth}
           onAdd={tracked(chrome.onQuickAdd)}
           onAddRich={tracked(chrome.onQuickAddRich)}

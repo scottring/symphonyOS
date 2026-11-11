@@ -76,6 +76,8 @@ await import('./styles/canvas.css')
 await import('./styles/canvas-today.css')
 // Today as an open journal (board A, 2026-11-11), over canvas-today.css.
 await import('./styles/today-journal.css')
+// The shell in the same look: the pane as a card, the Tell Symphony bar.
+await import('./styles/journal-chrome.css')
 await import('./styles/canvas-plan.css')
 // The deck: one card at a time (Friday session).
 await import('./styles/deck.css')

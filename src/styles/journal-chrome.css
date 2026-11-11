@@ -1,0 +1,110 @@
+/* src/styles/journal-chrome.css — the shell in the open-journal look.
+ *
+ * Scott, 2026-11-11 (boards D and E of the Today look-and-feel canvas):
+ * the Details / Chat pane is a card of paper on the sky beside the page, not
+ * a white strip on the window's edge; one "Tell Symphony" bar at the page's
+ * foot replaces the Chat pill and the round +; while the Chat card is open
+ * its composer is that bar. Loaded after today-journal.css. */
+
+/* ---- The Tell Symphony bar ------------------------------------------- */
+.tell-bar-dock {
+  position: fixed; left: 0; bottom: 20px; z-index: 25;
+  display: flex; justify-content: center; padding: 0 24px;
+  pointer-events: none;
+}
+.tell-bar {
+  pointer-events: auto; box-sizing: border-box; width: min(640px, 100%);
+  display: flex; align-items: center; gap: 4px; padding: 6px;
+  border-radius: 999px; background: var(--color-bg-elevated);
+  border: 1px solid color-mix(in srgb, var(--color-neutral-300) 70%, transparent);
+  box-shadow: 0 1px 2px hsl(215 32% 14% / .06), 0 12px 32px -10px hsl(215 32% 14% / .28);
+}
+.tell-bar:focus-within { border-color: var(--color-primary-300); }
+.tell-bar-icon {
+  flex: none; display: grid; place-items: center; width: 38px; height: 38px; min-width: 0; min-height: 0;
+  padding: 0; border: 0; border-radius: 999px; background: none; color: var(--color-neutral-600); cursor: pointer;
+}
+.tell-bar-icon:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.tell-bar-add { color: var(--color-primary-700); }
+.tell-bar-mark { flex: none; margin: 0 2px 0 4px; color: var(--color-primary-600); }
+.tell-bar-field {
+  flex: 1; min-width: 0; padding: 8px 4px; border: 0; outline: 0; background: transparent;
+  font: 400 15px/1.3 var(--font-family-sans); color: var(--color-neutral-900);
+}
+.tell-bar-field::placeholder { color: var(--color-neutral-500); }
+.tell-bar-send {
+  flex: none; display: grid; place-items: center; width: 40px; height: 40px; min-width: 0; min-height: 0;
+  padding: 0; border: 0; border-radius: 999px; background: var(--color-primary-600); color: #fff; cursor: pointer;
+}
+.tell-bar-send:disabled { background: var(--color-neutral-200); color: var(--color-neutral-500); cursor: default; }
+.tell-bar :is(.tell-bar-icon, .tell-bar-send):focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+
+/* ---- The Details / Chat pane as a card of paper ----------------------- */
+@media (min-width: 768px) {
+  .side-column, .connected-workspace .side-column {
+    top: 10px; bottom: 10px; right: 10px;
+    /* The page keeps the column's 420px; the card sits inside it. */
+    width: 400px !important;
+    border: 0; border-radius: 14px; overflow: hidden;
+    box-shadow:
+      0 1px 1px hsl(215 32% 14% / .06),
+      0 16px 40px -14px hsl(215 32% 14% / .3);
+  }
+  /* Details | Chat: two words with a rule under the one in front. */
+  .side-column-bar, .connected-workspace .side-column-bar {
+    padding: 4px 10px 0 22px; border-bottom: 1px solid var(--color-neutral-200);
+  }
+  .side-column-switch, .connected-workspace .side-column-switch {
+    gap: 22px; padding: 0; border-radius: 0; background: none;
+  }
+  .side-column-switch > button, .connected-workspace .side-column-switch > button {
+    padding: 14px 0 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+    background: none; box-shadow: none;
+    font: 500 14px/1 var(--font-family-sans); color: var(--color-neutral-600);
+  }
+  .side-column-switch > button[aria-selected="true"], .connected-workspace .side-column-switch > button[aria-selected="true"] {
+    background: none; box-shadow: none; font-weight: 600;
+    color: var(--color-neutral-900); border-bottom-color: var(--color-neutral-900);
+  }
+  .side-column-close { background: none; border: 0; }
+  .side-column-close:hover { background: var(--color-neutral-100); }
+}
+
+/* ---- Inside the card: journal type, quiet controls -------------------- */
+/* Small spaced capitals ("EVENT", "LOCATION") read as a form; plain small
+   labels read as a note. */
+.side-column .uppercase { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.side-column .panel-kind { font-weight: 500; color: var(--color-neutral-600); }
+/* The item's name, in the journal's serif. */
+.side-column .panel-shell .font-display.text-\[24px\] { font-size: 28px; font-weight: 500; letter-spacing: 0; }
+/* One strong action; the rest are quiet words with their icons. */
+.side-column .panel-shell button.h-9.border { border-radius: 999px; }
+.side-column .panel-shell button.h-9.border:not([class*="bg-primary"]) {
+  border-color: transparent; background: transparent; padding-inline: 8px;
+}
+.side-column .panel-shell button.h-9.border:not([class*="bg-primary"]):hover { background: var(--color-neutral-100); }
+
+/* ---- The Chat card's composer is the Tell Symphony bar ---------------- */
+.side-column .is-panel .canvas-composer {
+  flex-wrap: nowrap; align-items: center; gap: 4px; margin: 0 12px 12px;
+  padding: 6px 6px 6px 16px; border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--color-neutral-300) 70%, transparent);
+  background: #fff;
+  box-shadow: 0 1px 2px hsl(215 32% 14% / .05), 0 8px 22px -12px hsl(215 32% 14% / .25);
+}
+.side-column .is-panel .canvas-composer:focus-within { border-color: var(--color-primary-300); outline: 0; box-shadow: 0 8px 22px -12px hsl(215 32% 14% / .25); }
+.side-column .is-panel .canvas-composer-label {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.side-column .is-panel .canvas-composer-field {
+  flex: 1 1 auto; width: auto; min-height: 24px; max-height: 140px; padding: 8px 2px;
+  field-sizing: content; resize: none; font-size: 15px; line-height: 1.4;
+}
+.side-column .is-panel .canvas-send {
+  flex: none; width: 40px; height: 40px; min-width: 0; min-height: 0; margin: 0; padding: 0;
+  border-radius: 999px; justify-content: center;
+}
+.side-column .is-panel .canvas-send > span {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.side-column .is-panel .canvas-attach { min-width: 38px; min-height: 38px; border-radius: 999px; }

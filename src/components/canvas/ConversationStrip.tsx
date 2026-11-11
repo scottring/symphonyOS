@@ -281,7 +281,7 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
           className="canvas-composer-field"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={chatOnly ? (editing ? 'What would you like to change?' : '') : voice.active ? (voice.turn === 'listening' ? 'Listening — take your time' : 'Tap Talk, or type') : placeholder}
+          placeholder={chatOnly ? (editing ? 'What would you like to change?' : panel ? 'Tell Symphony, or ask…' : '') : voice.active ? (voice.turn === 'listening' ? 'Listening — take your time' : 'Tap Talk, or type') : placeholder}
           autoComplete="off"
           rows={panel ? 2 : 1}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(e) } }}

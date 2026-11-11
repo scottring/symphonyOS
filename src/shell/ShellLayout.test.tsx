@@ -409,11 +409,15 @@ describe('Grouped More menu and desktop capture', () => {
     expect(plan).not.toContainElement(screen.getByRole('button', { name: 'Plan from paper' }))
   })
 
-  // Desktop keeps its round + (Scott, 2026-09-26); phones add from the dock's +.
-  it('desktop has its round + button; phones add from the dock + with no floating button', () => {
+  // Desktop adds from the Tell Symphony bar's + on the planning pages
+  // (Scott, 2026-11-11: one bar replaces the pill and the round +); phones
+  // add from the dock's +.
+  it('desktop adds from the Tell Symphony bar; phones add from the dock + with no floating button', () => {
     const desktop = renderAt('/today')
-    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'true')
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'false')
     expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('form', { name: 'Tell Symphony' })).getByRole('button', { name: 'Add something' }))
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'true')
     desktop.unmount()
     mobileState.isMobile = true
     renderAt('/today')
@@ -455,11 +459,13 @@ describe('Pinned lists on the left', () => {
 describe('Capture and the Today pin from every desktop page', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
 
-  // Scott, 2026-09-29: no "+ Add ⌘K" in the top bar — the round + and ⌘K add.
-  it.each(['/today', '/week', '/month', '/notes', '/inbox'])('%s has no Add button in the top bar; the round + stays', (path) => {
+  // Scott, 2026-09-29: no "+ Add ⌘K" in the top bar. The planning pages add
+  // from the Tell Symphony bar's + (2026-11-11); the others keep the round +.
+  it.each([['/today', false], ['/week', false], ['/month', false], ['/notes', true], ['/inbox', true]] as const)('%s has no Add button in the top bar (round + shown: %s)', (path, fab) => {
     renderAt(path)
     expect(screen.queryByRole('button', { name: 'Add — ⌘K' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'true')
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', String(fab))
+    expect(!!screen.queryByRole('form', { name: 'Tell Symphony' })).toBe(!fab)
   })
 
   it('⌘K still toggles the same capture', () => {
@@ -498,12 +504,18 @@ describe('Conversation beside the plan', () => {
     expect(screen.getByRole('tab', { name: 'Chat' })).toBeInTheDocument()
     expect(screen.getAllByLabelText('Message Symphony')).toHaveLength(1)
   })
-  it('keeps the page clear and provides a launcher when the panel is closed', () => {
+  it('keeps the page clear and offers the Tell Symphony bar when the panel is closed', () => {
     aiState.hidden = true
     renderAt('/week?view=alongside')
     expect(screen.queryByRole('region', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Chat with Symphony' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Chat with Symphony' })).not.toBeInTheDocument()
+    expect(screen.getByRole('form', { name: 'Tell Symphony' })).toBeInTheDocument()
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-right-inset', '0')
+  })
+  it('steps the bar aside while the Chat card is in front: its composer is the bar', () => {
+    renderAt('/week?view=alongside')
+    expect(screen.getByRole('region', { name: 'Chat with Symphony' })).toBeInTheDocument()
+    expect(screen.queryByRole('form', { name: 'Tell Symphony' })).not.toBeInTheDocument()
   })
 })
 

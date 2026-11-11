@@ -38,6 +38,7 @@ import { placedInWeek } from '@/components/canvas/week/weekShelf'
 import { PaperFold } from '@/components/plan/fold/PaperFold'
 import { AboveSheet, SheetRows, type RowStatusMenu } from '@/components/plan/fold/AboveSheet'
 import { TODAY_WEEK_FOOT, TODAY_WEEK_SHORT_LIST, SheetTaskTools } from '@/components/schedule/TodayWeekColumn'
+import { useSideColumnSlot } from '@/shell/SideColumn'
 import { AlongsideContext, type AlongsideWorkspace } from './AlongsideContext'
 import './alongside.css'
 
@@ -73,6 +74,12 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
   const [routinesSlot, setRoutinesSlot] = useState<HTMLElement | null>(null)
   // Today drives the week open for the guide's Today step (PaperFold `drive`).
   const [weekDrive, setWeekDrive] = useState<boolean | undefined>(undefined)
+  // The Details / Chat card open beside the day folds the week to its edge,
+  // so the day keeps its width (Scott, 2026-11-11: "the fold works"); closing
+  // the card gives the week back as the reader left it. A session's own drive
+  // still wins.
+  const { open: paneOpen } = useSideColumnSlot()
+  const foldDrive = weekDrive ?? (paneOpen ? false : undefined)
   // Today hears each placement that saved (the Day session's Pick step).
   const placedListeners = useRef(new Set<() => void>())
   const listenPlaced = useCallback((listener: () => void) => {
@@ -194,7 +201,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
           // A session stows the fold rather than unmounting it, so the day
           // under it keeps its state.
           <PaperFold horizon="day" wide className="today-fold ad-fold" stowed={stepAside} edgeLabel={range} edgeCount={open.length}
-            drive={weekDrive === undefined ? undefined : { above: weekDrive }}
+            drive={foldDrive === undefined ? undefined : { above: foldDrive }}
             frontLabel={`${range}, to pick from`}
             above={<AboveSheet kicker={`Week · ${range}`} title={isThisWeek ? 'This week' : range} className="vt-sheet-week"
               rowsHeading={open.length > 0 ? 'Sometime this week' : undefined} shortList={TODAY_WEEK_SHORT_LIST}
