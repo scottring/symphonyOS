@@ -1068,7 +1068,9 @@ function Inner() {
         <div className="plan-period is-journal" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
           <JournalHeading title={periodTitle}
             onPrev={() => setStart(bounds.prev)} onNext={() => setStart(bounds.next)}
-            prevLabel={`Previous ${PERIODS[level]}`} nextLabel={`Next ${PERIODS[level]}`} />
+            prevLabel={`Previous ${PERIODS[level]}`} nextLabel={`Next ${PERIODS[level]}`}
+            // Another period on screen: the way back (Scott, 2026-11-11).
+            current={current ? undefined : { label: `This ${PERIODS[level]}`, ariaLabel: `Go to this ${PERIODS[level]}`, onGo: () => setStart(null) }} />
         </div>
         {/* The review and the plan say where the period stands in their own
             words: the fact line steps aside while one is open. */}

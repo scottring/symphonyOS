@@ -114,6 +114,9 @@ export interface Routine {
   /** Background: no row on Today, the kitchen kiosk or the kids' tablets. Its
    *  time still counts against the hours open (Scott, 2026-11-09). */
   background?: boolean
+  /** "Keep it until it's done" (Scott, 2026-11-11): a missed occurrence
+   *  carries onto Today ("from Tue") until ticked off or skipped. Default false. */
+  keep_until_done?: boolean
   pin_to_timeline?: boolean // Always show on Today even when "hide daily routines" is on (tracked obligations, e.g. PT exercises)
   /** Daily quantity goal — "read 20 minutes" = 20/'minutes'. Both null = plain checkbox step. */
   target_amount?: number | null

@@ -345,10 +345,13 @@
   font: inherit; color: inherit; letter-spacing: inherit; cursor: pointer;
 }
 .journal-tag-button:hover { background: var(--color-neutral-100); }
-.journal-today {
-  align-self: center; margin-left: 8px; padding: 2px 9px; border: 1px solid var(--color-primary-100); border-radius: 999px;
-  background: var(--color-primary-50); font: 600 11.5px/1.4 var(--font-family-sans); letter-spacing: 0; color: var(--color-primary-700); cursor: pointer;
+.journal-current {
+  align-self: center; margin-left: 6px; padding: 3px 11px; border: 1px solid var(--color-primary-200); border-radius: 999px;
+  background: var(--color-primary-50); font: 600 12px/1.4 var(--font-family-sans); letter-spacing: 0;
+  color: var(--color-primary-700); cursor: pointer; white-space: nowrap;
 }
+.journal-current:hover { background: var(--color-primary-100); }
+.journal-current:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .journal-extras { display: inline-flex; gap: 4px; margin-left: 4px; }
 .journal-subline { margin-top: 10px; max-width: 42rem; }
 .journal-subline:empty { display: none; }
@@ -388,3 +391,12 @@
 @media (min-width: 768px) {
   .journal-step:first-child { margin-left: -40px; }
 }
+
+/* "Still to do": a routine kept until it's done, carried from its day. */
+.today-carried-from { flex: none; font: 500 12.5px/1.2 var(--font-family-sans); color: var(--today-now, hsl(16 62% 42%)); }
+.today-carried-skip {
+  flex: none; padding: 2px 8px; border: 0; border-radius: 999px; background: none; cursor: pointer;
+  font: 500 12.5px/1.4 var(--font-family-sans); color: var(--color-neutral-600);
+}
+.today-carried-skip:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.today-carried { margin-top: 18px; }

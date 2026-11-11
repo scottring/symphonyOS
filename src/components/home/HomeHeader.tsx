@@ -272,6 +272,9 @@ export function HomeHeader(props: HomeHeaderProps) {
       // the title opens the range menu; the dates
       // stay the heading's (and the range menu's) name for a screen reader.
       const months = monthsTitle(weekStart, rangeEnd)
+      const thisWeek = weekRange(new Date(), readCadenceConfig().weekStartsOn)
+      const isThisWeek = thisWeek[0].toDateString() === weekStart.toDateString()
+      const goThisWeek = () => (onRangeChange ? onRangeChange(thisWeek) : onWeekChange(thisWeek[0]))
       const named = <><span aria-hidden="true">{months}</span><span className="sr-only">{label.long}</span></>
       return (
         <MastheadCard
@@ -280,6 +283,8 @@ export function HomeHeader(props: HomeHeaderProps) {
             numeral: `${weekStart.getDate()}–${rangeEnd.getDate()}`,
             onPrev, onNext, prevLabel, nextLabel,
             trailing: menu,
+            // Another week on screen: the way back (Scott, 2026-11-11).
+            current: isThisWeek ? undefined : { label: 'This week', ariaLabel: 'Go to this week', onGo: goThisWeek },
           }}
           title={onRangeChange ? (
             <button ref={menuButtonRef} type="button" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="week-range-menu"

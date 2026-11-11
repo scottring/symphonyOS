@@ -179,6 +179,11 @@ describe('where you are',()=>{
   expect(screen.queryByRole('button',{name:'Back to this season'})).toBeNull()
   choose('Back to this season')
   expect(screen.getByTestId('where').textContent).not.toContain('start=')
+  // Away from now, the heading offers the way back too (2026-11-11).
+  expect(screen.queryByRole('button',{name:'Go to this season'})).toBeNull()
+  fireEvent.click(screen.getByRole('button',{name:'Next season'}))
+  fireEvent.click(screen.getByRole('button',{name:'Go to this season'}))
+  expect(screen.getByTestId('where').textContent).not.toContain('start=')
  })
  it('hands the week horizon over to the Week page',()=>{
   open('/year?view=constellation&start=2026-10-09&horizon=3&focus=3:w')

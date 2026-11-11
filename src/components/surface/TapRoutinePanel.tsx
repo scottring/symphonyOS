@@ -77,6 +77,8 @@ interface TapRoutinePanelProps {
   onShowOnDayGridChange?: (next: boolean) => unknown
   /** Background: no row on Today or the kiosk; its time still counts (writes background). */
   onBackgroundChange?: (next: boolean) => unknown
+  /** "Keep it until it's done": a missed occurrence carries onto Today (writes keep_until_done). */
+  onKeepUntilDoneChange?: (next: boolean) => unknown
   /** The day "Where it shows" and "Hide for today" are about. Defaults to today. */
   viewedDate?: Date
   /** The occurrence the panel was opened from (a day on Week or Routines).
@@ -201,15 +203,6 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
       () => write(() => props.onRestUntilChange!(iso)),
       { ids: [routine.id], undo: () => write(() => props.onRestUntilChange!(prior.pausedUntil)) })
   }
-  const setOff = async (next: boolean) => {
-    const fn = props.onShowOnTodayChange
-    if (!fn) return
-    if (props.unsaved) { fn(!next); return }
-    await run(next ? `Turn "${routine.name}" off` : `Show "${routine.name}" in Today and planning`,
-      () => write(() => fn(!next)),
-      { ids: [routine.id], undo: () => write(() => fn(next)) })
-  }
-
   const setKioskOff = async (next: boolean) => {
     const fn = props.onShowOnKioskChange
     if (!fn) return
@@ -235,6 +228,48 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
     if (!fn) return
     if (props.unsaved) { fn(next); return }
     await run(label, () => write(() => fn(next)), { ids: [routine.id], undo: () => write(() => fn(!next)) })
+  }
+
+  const keepUntilDone = !!routine.keep_until_done
+  // How it shows on Today, as one choice (2026-11-11). Hidden is Off
+  // (show_on_timeline false: still runs, still on the kiosk); Background has
+  // no row but its time counts; At its time pins it to the grid; Checklist
+  // is the default.
+  type TodayMode = 'checklist' | 'grid' | 'background' | 'hidden'
+  const todayMode: TodayMode = off ? 'hidden' : background ? 'background' : onDayGrid ? 'grid' : 'checklist'
+  const todayModes: { id: TodayMode; label: string; hint: string; disabled?: boolean; disabledWhy?: string }[] = [
+    // Said as it behaves (dayPlan.ts): a time puts it at that time; a rule
+    // naming its days puts it on each of them, untimed; a rule that leaves
+    // the day open is offered on Today to choose.
+    { id: 'checklist', label: 'Checklist', hint: routine.time_of_day
+      ? 'On Today’s checklist at its time, on its days.'
+      : namesDueDays(routine.recurrence_pattern)
+        ? 'On Today on each day it’s due — no time needed.'
+        : 'Offered on Today to choose — it has no set day.' },
+    ...(props.onShowOnDayGridChange ? [{ id: 'grid' as const, label: 'At its time', hint: 'On Today’s grid at its time.',
+      disabled: !routine.time_of_day && todayMode !== 'grid', disabledWhy: 'Give it a time first' }] : []),
+    ...(props.onBackgroundChange ? [{ id: 'background' as const, label: 'Background', hint: 'No row on Today or the kiosk. Its time still counts against the hours open.' }] : []),
+    ...(props.onShowOnTodayChange ? [{ id: 'hidden' as const, label: 'Hidden', hint: 'Off Today and planning. Still runs, and still on the kitchen kiosk.' }] : []),
+  ]
+  // The writes a mode needs: each of the three flags set to what the mode
+  // says — only where it differs, or (Undo, which runs after the change has
+  // landed) all of them, so it never reads a stale closure.
+  const applyTodayMode = async (to: TodayMode, all = false): Promise<boolean> => {
+    const want = { show: to !== 'hidden', grid: to === 'grid', bg: to === 'background' }
+    const steps: (() => unknown)[] = []
+    if (props.onShowOnTodayChange && (all || want.show === off)) steps.push(() => props.onShowOnTodayChange!(want.show))
+    if (props.onBackgroundChange && (all || want.bg !== background)) steps.push(() => props.onBackgroundChange!(want.bg))
+    if (props.onShowOnDayGridChange && (all || want.grid !== onDayGrid)) steps.push(() => props.onShowOnDayGridChange!(want.grid))
+    for (const step of steps) if (!(await write(step))) return false
+    return true
+  }
+  const setTodayMode = async (to: TodayMode) => {
+    if (to === todayMode) return
+    const from = todayMode
+    const label = { checklist: `“${routine.name}” on Today’s checklist`, grid: `“${routine.name}” on Today’s grid at its time`,
+      background: `Put “${routine.name}” in the background`, hidden: `Hide “${routine.name}” from Today and planning` }[to]
+    if (props.unsaved) { await applyTodayMode(to); return }
+    await run(label, () => applyTodayMode(to), { ids: [routine.id], undo: () => applyTodayMode(from, true) })
   }
 
   // "<day> only": one occurrence changes, the routine does not. Each write
@@ -416,234 +451,96 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           </section>
         )}
 
-        {/* Three strengths of "not showing", kept apart so the difference
-            is visible: Hide for today (this occurrence), Rest until… (the
-            whole routine, everywhere, wakes on a date), Off (keeps running
-            and stays on the kiosk; hidden from Today and planning). */}
-        <section aria-label="Hide it" className="routine-hide-controls">
-          {onTimeline && !props.unsaved && (
-            <div className="routine-hide-control">
-              <div className="routine-hide-control-text">
-                <span className="routine-hide-control-title">{ROUTINE_HIDE_LABELS.today}</span>
-                <span className="routine-hide-control-hint">
-                  {skipped
-                    ? 'Skipped for today only — the routine itself is unchanged.'
-                    : canHideToday
-                      ? 'Skips today’s occurrence only. Back next time it’s due.'
-                      : 'Not on Today today — nothing to hide.'}
-                </span>
-              </div>
+        {/* Streamlined (Scott, 2026-11-11: "finish the work of streamlining
+            the routines parameters"): how it shows on Today is ONE choice
+            (Checklist · At its time · Background · Hidden) instead of three
+            switches; where else it shows is two small switches; pausing is
+            one row. Same writes as before, each with Undo. */}
+        {onTimeline && (props.onShowOnTodayChange || props.onShowOnDayGridChange || props.onBackgroundChange) && (
+          <section aria-label="On Today" className="routine-params">
+            <p className="routine-params-label" id={`routine-today-${routine.id}`}>On Today</p>
+            <div className="routine-params-seg" role="radiogroup" aria-labelledby={`routine-today-${routine.id}`}>
+              {todayModes.map((m) => (
+                <button key={m.id} type="button" role="radio" aria-checked={todayMode === m.id}
+                  disabled={m.disabled} title={m.disabled ? m.disabledWhy : undefined}
+                  className={`routine-params-opt${todayMode === m.id ? ' is-on' : ''}`}
+                  onClick={() => { void setTodayMode(m.id) }}>{m.label}</button>
+              ))}
+            </div>
+            <p className="routine-params-hint">{todayModes.find((m) => m.id === todayMode)?.hint}</p>
+          </section>
+        )}
+
+        {onTimeline && (props.onShowOnWeekChange || (props.onShowOnKioskChange && !background) || props.onKeepUntilDoneChange) && (
+          <section aria-label="Also" className="routine-params">
+            {props.onShowOnWeekChange && (
+              <ParamSwitch label="Show on the week" on={onWeek}
+                hint={onWeek ? 'On the week’s grid on its days too.' : 'Only on Today, on its days.'}
+                onToggle={() => { void setOnWeek(!onWeek) }} />
+            )}
+            {props.onShowOnKioskChange && !background && (
+              <ParamSwitch label="Kiosk" on={!kioskOff}
+                hint={kioskOff ? 'Off the kitchen kiosk and the kids’ tablets.' : 'On the kitchen kiosk and the kids’ tablets when due.'}
+                onToggle={() => { void setKioskOff(!kioskOff) }} />
+            )}
+            {props.onKeepUntilDoneChange && namesDueDays(routine.recurrence_pattern) && (
+              <ParamSwitch label="Keep it until it’s done" on={keepUntilDone}
+                hint={keepUntilDone ? 'Missed, it stays on Today (“from Tue”) until you tick it off or skip it.' : 'Missed, it stays on its own day.'}
+                onToggle={() => { void setSwitch(props.onKeepUntilDoneChange, !keepUntilDone, keepUntilDone ? `“${routine.name}” stays on its own day` : `Keep “${routine.name}” until it’s done`) }} />
+            )}
+          </section>
+        )}
+
+        {/* Pause: Hide for today (this occurrence) and Rest until… (the whole
+            routine, everywhere, wakes on a date), on one row. */}
+        <section aria-label="Hide it" className="routine-hide-controls routine-params">
+          <p className="routine-params-label">{onTimeline ? 'Pause' : 'Resting'}</p>
+          {!onTimeline && (
+            <p className="routine-params-hint">
+              {explanation.wakesOn
+                ? `Asleep everywhere until ${formatWake(explanation.wakesOn)} — it wakes on its own.`
+                : 'Asleep everywhere, with no wake date — parked on the Resting shelf.'}
+            </p>
+          )}
+          <div className="routine-hide-control-act">
+            {onTimeline && !props.unsaved && (skipped || canHideToday) && (
               <button
                 type="button"
                 className="canvas-chip"
-                disabled={!skipped && !canHideToday}
                 onClick={() => { void (skipped ? showToday(routine.id, routine.name, viewedDate) : hideForToday(routine.id, routine.name, viewedDate)) }}
               >
                 {skipped ? 'Show today again' : ROUTINE_HIDE_LABELS.today}
               </button>
-            </div>
-          )}
-
-          <div className="routine-hide-control">
-            <div className="routine-hide-control-text">
-              <span className="routine-hide-control-title">{onTimeline ? ROUTINE_HIDE_LABELS.rest : 'Resting'}</span>
-              <span className="routine-hide-control-hint">
-                {onTimeline
-                  ? 'Pauses it everywhere — Today, the week and the kiosk — and wakes it on the date.'
-                  : explanation.wakesOn
-                    ? `Asleep everywhere until ${formatWake(explanation.wakesOn)} — it wakes on its own.`
-                    : 'Asleep everywhere, with no wake date — parked on the Resting shelf.'}
-              </span>
-            </div>
-            <div className="routine-hide-control-act">
-              {(onTimeline || props.onRestUntilChange) && (
-                <input
-                  type="date"
-                  aria-label={onTimeline ? 'Rest until' : 'Wake automatically on'}
-                  value={onTimeline ? restDate : (routine.paused_until ? routine.paused_until.slice(0, 10) : '')}
-                  onChange={e => {
-                    if (onTimeline) { setRestDate(e.target.value); return }
-                    void changeWake(e.target.value)
-                  }}
-                  className="rounded-lg border border-neutral-200 px-2 py-1 text-xs text-neutral-600"
-                />
-              )}
-              {onTimeline ? (
-                <button
-                  type="button"
-                  className="canvas-chip"
-                  onClick={() => { void restUntil(restDate || null) }}
-                  aria-label={restDate ? `Rest until ${formatWake(wakeDate(restDate)!)}` : 'Rest with no wake date'}
-                >
-                  {restDate ? 'Rest' : 'Rest, no date'}
-                </button>
-              ) : (
-                <button type="button" className="canvas-chip" onClick={() => { void wakeNow() }}>
-                  Wake now
-                </button>
-              )}
-            </div>
+            )}
+            {onTimeline && <span className="routine-params-sub">{ROUTINE_HIDE_LABELS.rest}</span>}
+            {(onTimeline || props.onRestUntilChange) && (
+              <input
+                type="date"
+                aria-label={onTimeline ? 'Rest until' : 'Wake automatically on'}
+                value={onTimeline ? restDate : (routine.paused_until ? routine.paused_until.slice(0, 10) : '')}
+                onChange={e => {
+                  if (onTimeline) { setRestDate(e.target.value); return }
+                  void changeWake(e.target.value)
+                }}
+                className="rounded-lg border border-neutral-200 px-2 py-1 text-xs text-neutral-600"
+              />
+            )}
+            {onTimeline ? (
+              <button
+                type="button"
+                className="canvas-chip"
+                onClick={() => { void restUntil(restDate || null) }}
+                aria-label={restDate ? `Rest until ${formatWake(wakeDate(restDate)!)}` : 'Rest with no wake date'}
+              >
+                {restDate ? 'Rest' : 'Rest, no date'}
+              </button>
+            ) : (
+              <button type="button" className="canvas-chip" onClick={() => { void wakeNow() }}>
+                Wake now
+              </button>
+            )}
           </div>
-
-          {/* Off — a running routine that doesn't need a row read back to
-              you. One switch for Today and the planning pages (Scott,
-              2026-10-03); it keeps running and stays on the kitchen kiosk. */}
-          {onTimeline && props.onShowOnTodayChange && (
-            <div className="routine-hide-control">
-              <div className="routine-hide-control-text">
-                <span className="routine-hide-control-title">
-                  {ROUTINE_HIDE_LABELS.off}{off ? ' — hidden from Today and planning' : ''}
-                </span>
-                <span className="routine-hide-control-hint">
-                  {/* Said as it behaves (dayPlan.ts): a time puts it at that time;
-                      a rule naming its days puts it on each of them, untimed; a
-                      rule that leaves the day open (the weekend window, "since
-                      last") is offered on Today to choose. */}
-                  {off
-                    ? 'Still runs, and still on the kitchen kiosk. Turn Off back off to show it again.'
-                    : routine.time_of_day
-                      ? 'Takes a row on Today and the week grid at its time.'
-                      : namesDueDays(routine.recurrence_pattern)
-                        ? 'On Today and the week on each day it’s due — no time needed.'
-                        : 'Offered on Today to choose — it has no set day.'}
-                </span>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={off}
-                aria-label="Off"
-                onClick={() => { void setOff(!off) }}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                  off ? 'bg-primary-600' : 'bg-neutral-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                    off ? 'translate-x-[22px]' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          )}
-
-          {/* Kiosk — the one surface Off leaves alone (Scott, 2026-10-27: the
-              panel said where it shows but gave no way off the kiosk). */}
-          {onTimeline && !background && props.onShowOnKioskChange && (
-            <div className="routine-hide-control">
-              <div className="routine-hide-control-text">
-                <span className="routine-hide-control-title">
-                  {ROUTINE_HIDE_LABELS.kiosk}{kioskOff ? ' — hidden from the kitchen kiosk' : ''}
-                </span>
-                <span className="routine-hide-control-hint">
-                  {kioskOff
-                    ? 'Still runs, and still on Today. Turn Kiosk back on to show it there again.'
-                    : 'On the kitchen kiosk and the kids’ tablets when it’s due.'}
-                </span>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={!kioskOff}
-                aria-label="Kiosk"
-                onClick={() => { void setKioskOff(!kioskOff) }}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                  !kioskOff ? 'bg-primary-600' : 'bg-neutral-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                    !kioskOff ? 'translate-x-[22px]' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          )}
-
-          {/* Show on the week (Scott, 2026-11-08: routines stay off the
-              week's grid unless tagged). Off by default. */}
-          {onTimeline && props.onShowOnWeekChange && (
-            <div className="routine-hide-control">
-              <div className="routine-hide-control-text">
-                <span className="routine-hide-control-title">Show on the week</span>
-                <span className="routine-hide-control-hint">
-                  {onWeek
-                    ? 'On the week’s grid on its days, as well as on Today.'
-                    : 'On Today on its days. Turn on to plan around it on the week too.'}
-                </span>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={onWeek}
-                aria-label="Show on the week"
-                onClick={() => { void setOnWeek(!onWeek) }}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                  onWeek ? 'bg-primary-600' : 'bg-neutral-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                    onWeek ? 'translate-x-[22px]' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          )}
-
-          {onTimeline && !background && props.onShowOnDayGridChange && (
-            <div className="routine-hide-control">
-              <div className="routine-hide-control-text">
-                <span className="routine-hide-control-title">Keep on the day grid</span>
-                <span className="routine-hide-control-hint">
-                  {onDayGrid ? 'On Today’s grid at its time.' : 'On Today’s checklist. Turn on when the exact time matters.'}
-                </span>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={onDayGrid}
-                aria-label="Keep on the day grid"
-                onClick={() => { void setSwitch(props.onShowOnDayGridChange, !onDayGrid, onDayGrid ? `Take "${routine.name}" off the day grid` : `Keep "${routine.name}" on the day grid`) }}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                  onDayGrid ? 'bg-primary-600' : 'bg-neutral-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                    onDayGrid ? 'translate-x-[22px]' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          )}
-
-          {onTimeline && props.onBackgroundChange && (
-            <div className="routine-hide-control">
-              <div className="routine-hide-control-text">
-                <span className="routine-hide-control-title">Background</span>
-                <span className="routine-hide-control-hint">
-                  {background ? 'No row on Today or the kiosk. Its time still counts against the hours open.' : 'Turn on for something that happens the same way most days.'}
-                </span>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={background}
-                aria-label="Background"
-                onClick={() => { void setSwitch(props.onBackgroundChange, !background, background ? `Bring "${routine.name}" back` : `Put "${routine.name}" in the background`) }}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                  background ? 'bg-primary-600' : 'bg-neutral-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                    background ? 'translate-x-[22px]' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          )}
+          {onTimeline && skipped && <p className="routine-params-hint">Skipped for today only — the routine itself is unchanged.</p>}
         </section>
 
         {/* A zero-step routine IS the atom — even RhythmPage's always-visible
@@ -811,5 +708,21 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
       )}
     </PanelShell>
 
+  )
+}
+
+/** One small labelled switch for the routine's "Also" settings. */
+function ParamSwitch({ label, on, hint, onToggle }: { label: string; on: boolean; hint: string; onToggle: () => void }) {
+  return (
+    <div className="routine-param">
+      <div className="routine-param-text">
+        <span className="routine-param-title">{label}</span>
+        <span className="routine-params-hint">{hint}</span>
+      </div>
+      <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onToggle}
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${on ? 'bg-primary-600' : 'bg-neutral-300'}`}>
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+      </button>
+    </div>
   )
 }

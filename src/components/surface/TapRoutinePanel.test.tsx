@@ -104,17 +104,35 @@ describe('TapRoutinePanel', () => {
   })
 
   // Scott, 2026-11-08: routines stay off the week's grid unless tagged.
-  it('Keep on the day grid writes the pin', async () => {
+  // Streamlined (2026-11-11): how it shows on Today is one choice.
+  it('At its time pins it to the grid', async () => {
     const onShowOnDayGridChange = vi.fn()
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onShowOnDayGridChange={onShowOnDayGridChange} />)
-    fireEvent.click(screen.getByRole('switch', { name: 'Keep on the day grid' }))
+    const today = screen.getByRole('radiogroup', { name: 'On Today' })
+    expect(within(today).getByRole('radio', { name: 'Checklist' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(within(today).getByRole('radio', { name: 'At its time' }))
     await waitFor(() => expect(onShowOnDayGridChange).toHaveBeenCalledWith(true))
+  })
+
+  it('At its time needs a time first', () => {
+    render(<TapRoutinePanel routine={{ ...routine, time_of_day: null }} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onShowOnDayGridChange={vi.fn()} />)
+    expect(screen.getByRole('radio', { name: 'At its time' })).toBeDisabled()
+  })
+
+  it('one choice writes only what differs: Background from the grid turns the pin off too', async () => {
+    const onBackgroundChange = vi.fn(), onShowOnDayGridChange = vi.fn(), onShowOnTodayChange = vi.fn()
+    render(<TapRoutinePanel routine={{ ...routine, show_on_day_grid: true }} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+      onBackgroundChange={onBackgroundChange} onShowOnDayGridChange={onShowOnDayGridChange} onShowOnTodayChange={onShowOnTodayChange} />)
+    fireEvent.click(screen.getByRole('radio', { name: 'Background' }))
+    await waitFor(() => expect(onShowOnDayGridChange).toHaveBeenCalledWith(false))
+    expect(onBackgroundChange).toHaveBeenCalledWith(true)
+    expect(onShowOnTodayChange).not.toHaveBeenCalled()
   })
 
   it('Background writes the switch and says its time still counts', async () => {
     const onBackgroundChange = vi.fn()
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onBackgroundChange={onBackgroundChange} />)
-    fireEvent.click(screen.getByRole('switch', { name: 'Background' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Background' }))
     await waitFor(() => expect(onBackgroundChange).toHaveBeenCalledWith(true))
   })
 
@@ -123,10 +141,9 @@ describe('TapRoutinePanel', () => {
     // the "Where it shows" line repeats the hint's wording.
     render(<TapRoutinePanel routine={{ ...routine, background: true }} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
       onBackgroundChange={vi.fn()} onShowOnDayGridChange={vi.fn()} onShowOnKioskChange={vi.fn()} viewedDate={WED} />)
-    expect(screen.getByRole('switch', { name: 'Background' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'Background' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText(/time still counts against the hours open/)).toBeInTheDocument()
     expect(screen.queryByRole('switch', { name: 'Kiosk' })).toBeNull()
-    expect(screen.queryByRole('switch', { name: 'Keep on the day grid' })).toBeNull()
   })
 
   it('Show on the week puts it on the week, with Undo', async () => {
@@ -143,7 +160,7 @@ describe('TapRoutinePanel', () => {
     expect(within(screen.getByRole('region', { name: 'Where it shows' })).getByText('On the week on Tue at 8:00 PM')).toBeInTheDocument()
   })
 
-  it('offers three distinct controls: Hide for today, Rest until…, Off', () => {
+  it('offers three distinct strengths: Hide for today, Rest until…, Hidden', () => {
     render(
       <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
         onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} onRestUntilChange={vi.fn()} viewedDate={TUE} />,
@@ -152,10 +169,7 @@ describe('TapRoutinePanel', () => {
     expect(within(controls).getByRole('button', { name: 'Hide for today' })).toBeInTheDocument()
     expect(within(controls).getByText('Rest until…')).toBeInTheDocument()
     expect(within(controls).getByLabelText('Rest until')).toBeInTheDocument()
-    expect(within(controls).getByRole('switch', { name: 'Off' })).toHaveAttribute('aria-checked', 'false')
-    // Each says how strong it is.
-    expect(within(controls).getByText(/Skips today’s occurrence only/)).toBeInTheDocument()
-    expect(within(controls).getByText(/Pauses it everywhere/)).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Hidden' })).toHaveAttribute('aria-checked', 'false')
   })
 
   it('Hide for today skips the occurrence; it never rests the routine', async () => {
@@ -213,17 +227,17 @@ describe('TapRoutinePanel', () => {
   // Scott, 2026-09-07: "make it so you can choose not to show particular
   // routines on the Today page." Separate from Rest: Off keeps the routine
   // running (and on the kitchen wall), it just stops the row.
-  it('Off is a switch, and reports hiding from Today and planning', async () => {
+  it('Hidden (was Off) hides it from Today and planning', async () => {
     const onShowOnTodayChange = vi.fn()
     render(
       <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
         onVisibilityChange={vi.fn()} onShowOnTodayChange={onShowOnTodayChange} />,
     )
-    fireEvent.click(screen.getByRole('switch', { name: 'Off' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Hidden' }))
     await waitFor(() => expect(onShowOnTodayChange).toHaveBeenCalledWith(false))
   })
 
-  it('Kiosk is a switch beside Off, and takes the routine off the kitchen kiosk', async () => {
+  it('Kiosk is a switch, and takes the routine off the kitchen kiosk', async () => {
     const onShowOnKioskChange = vi.fn()
     render(
       <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
@@ -241,7 +255,7 @@ describe('TapRoutinePanel', () => {
         onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnKioskChange={vi.fn()} viewedDate={TUE} />,
     )
     expect(screen.getByRole('switch', { name: 'Kiosk' })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByText(/Still runs, and still on Today\./)).toBeInTheDocument()
+    expect(screen.getByText(/Off the kitchen kiosk and the kids’ tablets/)).toBeInTheDocument()
     expect(screen.getByText('Hidden from the kitchen kiosk (Kiosk off)')).toBeInTheDocument()
   })
 
@@ -250,10 +264,23 @@ describe('TapRoutinePanel', () => {
       <TapRoutinePanel routine={{ ...routine, show_on_timeline: false }} onClose={vi.fn()} onNotesChange={vi.fn()}
         onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} viewedDate={TUE} />,
     )
-    expect(screen.getByRole('switch', { name: 'Off' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'Hidden' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText(/Still runs, and still on the kitchen kiosk/)).toBeInTheDocument()
     expect(screen.getAllByText('Hidden from Today and planning (Off)')).toHaveLength(2) // Today and the week
     expect(screen.getByText('Still on the kitchen kiosk — Off only clears Today and planning')).toBeInTheDocument()
+  })
+
+  it('Keep it until it’s done is a switch, for a routine with days of its own', async () => {
+    const onKeepUntilDoneChange = vi.fn()
+    const { rerender } = render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+      onVisibilityChange={vi.fn()} onKeepUntilDoneChange={onKeepUntilDoneChange} viewedDate={TUE} />)
+    const sw = screen.getByRole('switch', { name: 'Keep it until it’s done' })
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(sw)
+    await waitFor(() => expect(onKeepUntilDoneChange).toHaveBeenCalledWith(true))
+    rerender(<TapRoutinePanel routine={{ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekend' } }} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+      onVisibilityChange={vi.fn()} onKeepUntilDoneChange={onKeepUntilDoneChange} viewedDate={TUE} />)
+    expect(screen.queryByRole('switch', { name: 'Keep it until it’s done' })).toBeNull()
   })
 
   it('a Personal routine is never on the shared kiosk', () => {
@@ -277,7 +304,7 @@ describe('TapRoutinePanel', () => {
       return text
     }
     expect(say(routine)).toMatch(/at its time/)
-    const onDays = /On Today and the week on each day it’s due — no time needed/
+    const onDays = /On Today on each day it’s due — no time needed/
     expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } })).toMatch(onDays)
     expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'daily' } })).toMatch(onDays)
     expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['tue', 'thu'] } })).toMatch(onDays)
@@ -286,12 +313,12 @@ describe('TapRoutinePanel', () => {
     expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'daily' } })).not.toMatch(/no set day/)
   })
 
-  it('offers no Off switch while the routine is resting off everything', () => {
+  it('offers no On Today choice while the routine is resting off everything', () => {
     render(
       <TapRoutinePanel routine={{ ...routine, visibility: 'reference' }} onClose={vi.fn()} onNotesChange={vi.fn()}
         onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} />,
     )
-    expect(screen.queryByRole('switch', { name: 'Off' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup', { name: 'On Today' })).not.toBeInTheDocument()
   })
 
   it('renders the assignee picker when members + onAssignChange are provided', () => {

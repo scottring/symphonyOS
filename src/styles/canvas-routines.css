@@ -50,3 +50,25 @@
 }
 
 /* The Routines page itself is a picture of the week: src/styles/routines-picture.css. */
+
+/* The routine's settings, streamlined (2026-11-11): one choice for how it
+   shows on Today, small switches for where else, one row to pause. */
+.routine-params { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--color-neutral-100); }
+.routine-params-label { margin: 0; font: 600 13px/1.2 var(--font-family-sans); color: var(--color-neutral-700); }
+.routine-params-hint { margin: 0; font: 400 12px/1.35 var(--font-family-sans); color: var(--color-neutral-600); }
+.routine-params-sub { font: 500 12.5px/1 var(--font-family-sans); color: var(--color-neutral-600); }
+.routine-params-seg {
+  display: inline-flex; flex-wrap: wrap; align-self: flex-start; gap: 2px; padding: 2px; border-radius: 999px;
+  background: var(--color-neutral-100);
+}
+.routine-params-opt {
+  min-height: 28px; padding: 0 11px; border: 0; border-radius: 999px; background: none; cursor: pointer;
+  font: 500 12.5px/1 var(--font-family-sans); color: var(--color-neutral-700);
+}
+.routine-params-opt.is-on { background: var(--color-bg-elevated); color: var(--color-neutral-900); box-shadow: 0 1px 3px hsl(215 32% 14% / .14); }
+.routine-params-opt:disabled { cursor: default; opacity: .45; }
+.routine-params-opt:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.routine-param { display: flex; align-items: center; gap: 12px; padding: 3px 0; }
+.routine-param-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.routine-param-title { font: 500 13.5px/1.25 var(--font-family-sans); color: var(--color-neutral-800); }
+.routine-params.routine-hide-controls { padding: 10px 0; border: 0; border-top: 1px solid var(--color-neutral-100); border-radius: 0; background: none; }

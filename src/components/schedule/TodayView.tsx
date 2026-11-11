@@ -82,6 +82,8 @@ import { TodayDragProvider } from './TodayDragProvider'
 import { TodayDayScale, type DayScaleHandle } from './TodayDayScale'
 import { TodayAgenda } from './TodayAgenda'
 import { TodayRoutineChecklist } from './TodayRoutineChecklist'
+import { TodayCarriedRoutines } from './TodayCarriedRoutines'
+import { useCarriedRoutines } from '@/hooks/useCarriedRoutines'
 import { splitDayRoutines, quietBands } from '@/lib/today/dayRoutines'
 import { deferredInRoutineIds } from '@/lib/today/deferredRoutines'
 import { ForTodayDropZone } from './TodayDropZones'
@@ -357,6 +359,9 @@ export function TodayView({
       currentWeekStart, weekInstances, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar, showSchoolRoutines])
 
   const data = useTodayData(todayInput)
+  // "Keep it until it's done" (Scott, 2026-11-11): a routine's missed
+  // occurrence carries onto Today until ticked off or skipped.
+  const carriedRoutines = useCarriedRoutines(allRoutines ?? routines, data.isToday)
 
   // ── The day's plan (dayPlan.ts) ────────────────────────────────────────
   // What the main list does not draw — dated-but-unchosen tasks, available
@@ -1464,6 +1469,8 @@ export function TodayView({
           onPrev: () => onDateChange(new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate() - 1)),
           onNext: () => onDateChange(new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate() + 1)),
           prevLabel: 'Previous day', nextLabel: 'Next day',
+          // Another day on screen: the way back (Scott, 2026-11-11).
+          current: data.isToday ? undefined : { label: 'Today', ariaLabel: 'Go to today', onGo: () => onDateChange(new Date()) },
         } : undefined}
         title={foldedControls
           ? journalEyebrow
@@ -1717,6 +1724,10 @@ export function TodayView({
               </div>
             )}
           </ForTodayDropZone>
+          <TodayCarriedRoutines carried={carriedRoutines.carried} today={nowForDisplay}
+            onDone={(c) => { void canvasActivity.run(`Done: “${c.routine.name}”`, () => carriedRoutines.done(c), { ids: [c.routine.id], undo: () => carriedRoutines.undo(c) }) }}
+            onSkip={(c) => { void canvasActivity.run(`Skip “${c.routine.name}” this time`, () => carriedRoutines.skip(c), { ids: [c.routine.id], undo: () => carriedRoutines.undo(c) }) }}
+            onOpen={(id) => handleSelectItem(`routine-${id}`)} />
           {!listDay && <TodayRoutineChecklist
             items={routineSplit.checklist}
             heading={data.isToday ? 'Routines today' : 'Routines this day'}

@@ -94,9 +94,6 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
         >
           {weekdayLong}
         </button>
-        {!isToday && (
-          <button type="button" aria-label="Go to today" onClick={() => onDateChange(new Date(today))} className="journal-today">Today</button>
-        )}
         {picker}
       </span>
     )

@@ -35,6 +35,7 @@ const NOT_FOR_AI: Record<string, string> = {
   raw_input: 'internal: the words a routine was typed from',
   target_amount: 'gap: a kid routine\'s target (minutes, pages)',
   target_unit: 'gap: same',
+  keep_until_done: 'gap: "Keep it until it\'s done" — a missed routine carries onto Today (2026-11-11)',
 }
 
 const read = (p: string) => readFileSync(p, 'utf8')
