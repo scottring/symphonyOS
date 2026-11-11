@@ -173,6 +173,15 @@ describe('routine ops: from now on', () => {
     expect(c).toMatchObject({ clearTime: true, assignees: [] })
     expect(c.time).toBeUndefined()
   })
+  it('carries the routine display switches on add and change (AI audit 2026-11-11)', () => {
+    const [c] = ok([{ op: 'routine_change', routine_id: R, show_on_week: true, show_on_kiosk: false }])
+    expect(c).toMatchObject({ op: 'routine_change', showOnWeek: true, showOnKiosk: false })
+    expect(c.showOnDayGrid).toBeUndefined()
+    const [a] = ok([{ op: 'routine_add', name: 'Sleep', days: ['mon'], background: true, show_on_day_grid: false }])
+    expect(a).toMatchObject({ op: 'routine_add', background: true, showOnDayGrid: false })
+    expect(err([{ op: 'routine_change', routine_id: R, background: 'yes' }])).toContain('background must be true or false')
+    expect(err([{ op: 'routine_skip', routine_id: R, date: '2026-10-15', show_on_week: true }])).toContain('show_on_week')
+  })
   it('refuses a change that changes nothing, or bad fields', () => {
     expect(err([{ op: 'routine_change', routine_id: R }])).toContain('at least one of')
     expect(err([{ op: 'routine_change', routine_id: R, days: [] }])).toContain('days')
@@ -332,7 +341,7 @@ describe('agent wiring', () => {
   })
   it("reads this week's routine exceptions for read_week", () => {
     expect(src).toContain("db.from('actionable_instances').select('entity_id, date, status, deferred_to, assigned_to_override')")
-    expect(src).toContain("assigned_to_all, visibility, paused_until')")
+    expect(src).toContain("assigned_to_all, visibility, paused_until, show_on_timeline, show_on_week, show_on_kiosk, show_on_day_grid, background')")
   })
   it('documents every op in the tool', () => {
     const schema = JSON.stringify(PROPOSE_CHANGES_TOOL.input_schema)

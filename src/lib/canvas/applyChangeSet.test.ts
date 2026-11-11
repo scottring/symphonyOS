@@ -279,6 +279,14 @@ describe('applyChangeSet: done, merge and routine ops (stage 3)', () => {
     })
   })
 
+  it('routine_change writes the display switches; Undo restores them', async () => {
+    const d = deps()
+    const r = await applyOk(one({ key: 'k:0', op: 'routine_change', routineId: 'r1', title: 'r1', seen, showOnWeek: true, background: true }), d)
+    expect(d.updateRoutine).toHaveBeenCalledWith('r1', { show_on_week: true, background: true })
+    await r.undo()
+    expect(d.updateRoutine).toHaveBeenLastCalledWith('r1', { show_on_week: false, background: false })
+  })
+
   it('routine_change turns a non-weekly rule weekly, and clears a time', async () => {
     const d = deps({ routines: [routine('r1', { recurrence_pattern: { type: 'daily', start_date: '2026-02-01' } })] })
     await applyOk(one({ key: 'k:0', op: 'routine_change', routineId: 'r1', title: 'r1', days: ['sat', 'sun'], clearTime: true }), d)

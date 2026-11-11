@@ -11,6 +11,11 @@ describe('opRow', () => {
     expect(opRow(op({op:'routine_add',showOnTimeline:false}),today).where).toContain('Hidden from Today and Week · Kept in Routines')
     expect(opRow(op({op:'routine_change',showOnTimeline:true}),today)).toMatchObject({kind:'CHANGE',where:'→ Show in Today and Week'})
   })
+
+  it('names the routine display switches the card sets',()=>{
+    expect(opRow(op({op:'routine_change',showOnWeek:true,showOnKiosk:false}),today)).toMatchObject({kind:'CHANGE',where:'→ On the week · Off the kiosk'})
+    expect(opRow(op({op:'routine_add',days:['mon'],background:true}),today).where).toContain('· In the background')
+  })
   it('says where each change lands, in the card’s words', () => {
     expect(opRow(op({ date: '2026-10-14', time: '09:00' }), today)).toEqual({ kind: 'MOVE', title: 'Reply to Christian', where: '→ Today 9:00' })
     expect(opRow(op({ date: '2026-10-15', time: '13:30' }), today).where).toBe('→ Thu 1:30')

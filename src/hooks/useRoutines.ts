@@ -166,6 +166,10 @@ export interface CreateRoutineInput {
   parent_routine_id?: string | null
   step_order?: number | null
   pin_to_timeline?: boolean // always show on Today, even when "hide daily" is on
+  show_on_kiosk?: boolean
+  show_on_week?: boolean
+  show_on_day_grid?: boolean
+  background?: boolean
   target_amount?: number | null
   target_unit?: TargetUnit | null
   // Fallback assignee if assigned_to is undefined (not null)
@@ -382,6 +386,10 @@ export function useRoutines(supabase = defaultSupabase) {
           image_url: input.image_url ?? null,
           visibility: input.visibility || 'active',
           ...(input.show_on_timeline !== undefined ? { show_on_timeline: input.show_on_timeline } : {}),
+          ...(input.show_on_kiosk !== undefined ? { show_on_kiosk: input.show_on_kiosk } : {}),
+          ...(input.show_on_week !== undefined ? { show_on_week: input.show_on_week } : {}),
+          ...(input.show_on_day_grid !== undefined ? { show_on_day_grid: input.show_on_day_grid } : {}),
+          ...(input.background !== undefined ? { background: input.background } : {}),
           default_assignee: input.default_assignee || null,
           assigned_to: effectiveAssignedTo,
           assigned_to_all: input.assigned_to_all ?? null,

@@ -118,3 +118,30 @@ describe('shapeWeek routines', () => {
     expect(read.routines.map((r) => r.id)).toEqual(['pick', 'bed', 'run', 'nap'])
   })
 })
+
+describe('shapeWeek: status marks, list order and routine display (AI audit 2026-11-11)', () => {
+  const read = shapeWeek({
+    start: '2026-11-07', today: '2026-11-11',
+    tasks: [
+      t({ id: 'x', title: 'Unordered', bucket: 'week', week_start: '2026-11-07' }),
+      t({ id: 'y', title: 'Second', bucket: 'week', week_start: '2026-11-07', sort_order: 1000, is_waiting: true, waiting_for: 'Iris' }),
+      t({ id: 'z', title: 'First', bucket: 'week', week_start: '2026-11-07', sort_order: 0, started_at: '2026-11-10T12:00:00Z', owed_to: 'Kaisa' }),
+    ],
+    events: [],
+    routines: [
+      { id: 'r1', name: 'Sleep', recurrence_pattern: { type: 'daily' }, time_of_day: null, parent_routine_id: null, background: true, show_on_kiosk: true },
+      { id: 'r2', name: 'Walk', recurrence_pattern: { type: 'daily' }, time_of_day: null, parent_routine_id: null },
+    ],
+    talks: [],
+  })
+  it('lists sometime-this-week in the Week list order, with status marks', () => {
+    expect(read.noDay.map((n) => n.id)).toEqual(['z', 'y', 'x'])
+    expect(read.noDay[0]).toMatchObject({ status: 'started', owedTo: 'Kaisa' })
+    expect(read.noDay[1]).toMatchObject({ status: 'waiting', waitingOn: 'Iris' })
+    expect(read.noDay[2]).toEqual({ id: 'x', title: 'Unordered', seen: 'u' })
+  })
+  it('shows a routine\'s display only where it differs from the defaults', () => {
+    expect(read.routines.find((r) => r.id === 'r1')!.display).toEqual({ background: true })
+    expect(read.routines.find((r) => r.id === 'r2')!.display).toBeUndefined()
+  })
+})

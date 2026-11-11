@@ -54,3 +54,16 @@ export function normalizeSchedule(
   }
   return { scheduled_for: sf, is_all_day: allDay, bucket: 'timed' }
 }
+
+/** The UTC instants bounding one local calendar day [start, end), for
+ *  filtering timestamps by the day a person means (not the UTC date). */
+export function localDayBounds(ymd: string): { start: string; end: string } {
+  const at = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) - etOffsetMinutes(d) * 60000).toISOString()
+  const next = new Date(Date.parse(`${ymd}T12:00:00Z`) + 86400000).toISOString().slice(0, 10)
+  return { start: at(ymd), end: at(next) }
+}
+
+/** Today's date (YYYY-MM-DD) where the person is, not in UTC. */
+export function localToday(now: Date = new Date(), timeZone: string = APP_TZ): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+}

@@ -8,9 +8,12 @@
 
 import { APP_TZ } from './schedule.ts'
 
-export type TaskRow = { id: string; title: string; scheduled_for: string | null; is_all_day: boolean | null; bucket: string | null; week_start: string | null; completed: boolean; assigned_to: string | null; updated_at: string }
+export type TaskRow = { id: string; title: string; scheduled_for: string | null; is_all_day: boolean | null; bucket: string | null; week_start: string | null; completed: boolean; assigned_to: string | null; updated_at: string
+  // Where it stands and its place on the Week list (2026-11-08 to 11-10).
+  sort_order?: number | null; started_at?: string | null; is_waiting?: boolean | null; waiting_for?: string | null; owed_to?: string | null; needed_on?: string | null }
 export type EventRow = { id: string; title: string; start_time: string; end_time: string; all_day: boolean | null }
-export type RoutineRow = { id: string; name: string; recurrence_pattern: unknown; time_of_day: string | null; parent_routine_id: string | null; assigned_to_all?: string[] | null; visibility?: string | null; paused_until?: string | null }
+export type RoutineRow = { id: string; name: string; recurrence_pattern: unknown; time_of_day: string | null; parent_routine_id: string | null; assigned_to_all?: string[] | null; visibility?: string | null; paused_until?: string | null
+  show_on_timeline?: boolean | null; show_on_week?: boolean | null; show_on_kiosk?: boolean | null; show_on_day_grid?: boolean | null; background?: boolean | null }
 /** One routine occurrence row (actionable_instances, entity_type 'routine'). */
 export type InstanceRow = { entity_id: string; date: string; status: string; deferred_to: string | null; assigned_to_override: string | null }
 
@@ -24,14 +27,48 @@ export type WeekRoutine = {
   /** Resting (the board's Rest): until a date, or null for no date. */
   resting?: { until: string | null }
   thisWeek?: RoutineException[]
+  /** Its display switches, only where they differ from the defaults. */
+  display?: { hidden?: true; onWeek?: true; offKiosk?: true; onDayGrid?: true; background?: true }
+}
+
+/** A task's status marks, as the week sheet shows them; absent when plain. */
+export type TaskMarks = { status?: 'started' | 'waiting'; waitingOn?: string; owedTo?: string; neededOn?: string }
+export function taskMarks(t: TaskRow): TaskMarks {
+  const m: TaskMarks = {}
+  if (t.is_waiting) { m.status = 'waiting'; if (t.waiting_for) m.waitingOn = t.waiting_for }
+  else if (t.started_at) m.status = 'started'
+  if (t.owed_to) m.owedTo = t.owed_to
+  if (t.needed_on) m.neededOn = t.needed_on
+  return m
+}
+
+function routineDisplay(r: RoutineRow): WeekRoutine['display'] | undefined {
+  const d: NonNullable<WeekRoutine['display']> = {}
+  if (r.show_on_timeline === false) d.hidden = true
+  if (r.show_on_week) d.onWeek = true
+  if (r.show_on_kiosk === false) d.offKiosk = true
+  if (r.show_on_day_grid) d.onDayGrid = true
+  if (r.background) d.background = true
+  return Object.keys(d).length ? d : undefined
+}
+
+/** The Week list's own order: ordered rows first by sort_order, the rest after
+ *  (stable), as src/lib/today/taskOrdering.ts compareSortOrder reads it. */
+function byListOrder(a: TaskRow, b: TaskRow): number {
+  const ao = a.sort_order ?? null, bo = b.sort_order ?? null
+  if (ao != null && bo != null) return ao - bo
+  if (ao != null) return -1
+  if (bo != null) return 1
+  return 0
 }
 
 export interface WeekRead {
   start: string
   today: string
   calendar: CalendarCoverage
-  days: { date: string; events: { id: string; title: string; time: string | null }[]; tasks: { id: string; title: string; time: string | null; done: boolean; seen: string }[] }[]
-  noDay: { id: string; title: string; seen: string }[]
+  days: { date: string; events: { id: string; title: string; time: string | null }[]; tasks: ({ id: string; title: string; time: string | null; done: boolean; seen: string } & TaskMarks)[] }[]
+  /** "Sometime this week", in the Week list's order (top first). */
+  noDay: ({ id: string; title: string; seen: string } & TaskMarks)[]
   lastWeekUnfinished: { id: string; title: string; was: string; seen: string }[]
   inbox: { id: string; title: string; seen: string }[]
   routines: WeekRoutine[]
@@ -130,12 +167,12 @@ export function shapeWeek(input: { start: string; today: string; calendar?: Cale
       events: input.events.filter((e) => { const s = eventDay(e.start_time, e.all_day), en = eventDay(e.end_time, e.all_day); return s <= date && (en > date || s === date) })
         .map((e) => ({ id: e.id, title: e.title, time: hhmm(e.start_time, e.all_day) })),
       tasks: input.tasks.filter((t) => ymd(t.scheduled_for) === date)
-        .map((t) => ({ id: t.id, title: t.title, time: t.scheduled_for ? hhmm(t.scheduled_for, t.is_all_day) : null, done: t.completed, seen: t.updated_at })),
+        .map((t) => ({ id: t.id, title: t.title, time: t.scheduled_for ? hhmm(t.scheduled_for, t.is_all_day) : null, done: t.completed, seen: t.updated_at, ...taskMarks(t) })),
     }
   })
   return {
     start, today, calendar: input.calendar ?? unknownCalendar(), days,
-    noDay: open.filter((t) => t.bucket === 'week' && !t.scheduled_for && (t.week_start ?? start) === start).map((t) => ({ id: t.id, title: t.title, seen: t.updated_at })),
+    noDay: open.filter((t) => t.bucket === 'week' && !t.scheduled_for && (t.week_start ?? start) === start).sort(byListOrder).map((t) => ({ id: t.id, title: t.title, seen: t.updated_at, ...taskMarks(t) })),
     lastWeekUnfinished: open.filter((t) => { const d = ymd(t.scheduled_for); return !!d && d >= lastStart && d < start })
       .map((t) => ({ id: t.id, title: t.title, was: ymd(t.scheduled_for)!, seen: t.updated_at })),
     inbox: open.filter((t) => t.bucket === 'inbox' && !t.scheduled_for).slice(0, 30).map((t) => ({ id: t.id, title: t.title, seen: t.updated_at })),
@@ -146,6 +183,7 @@ export function shapeWeek(input: { start: string; today: string; calendar?: Cale
         who: (r.assigned_to_all ?? []).map(nameOf),
         ...(r.visibility === 'reference' ? { resting: { until: r.paused_until ? local(r.paused_until).date : null } } : {}),
         ...(thisWeek ? { thisWeek } : {}),
+        ...(routineDisplay(r) ? { display: routineDisplay(r) } : {}),
       }
     }),
     talkAbouts: input.talks.map((s) => s.body),
@@ -154,6 +192,6 @@ export function shapeWeek(input: { start: string; today: string; calendar?: Cale
 
 export const READ_WEEK_TOOL = {
   name: 'symphony_read_week',
-  description: 'Read the whole week in one call before planning it: each day\'s calendar events and dated tasks, tasks chosen for the week with no day yet, last week\'s unfinished tasks, the inbox, routines (id, time, days, who, resting, and thisWeek: days skipped, moved or done by someone else), and open things-to-talk-about. Use it FIRST when asked to plan the week or the rest of the week, and before proposing a routine change. Task and routine ids here are the ids symphony_propose_changes takes.',
+  description: 'Read the whole week in one call before planning it: each day\'s calendar events and dated tasks, tasks chosen for the week with no day yet (noDay, in the Week list\'s own order, top first), last week\'s unfinished tasks, the inbox, routines (id, time, days, who, resting, and thisWeek: days skipped, moved or done by someone else), and open things-to-talk-about. Tasks carry status marks when set: status started or waiting (waitingOn), owedTo (someone waiting on us), neededOn. Routines carry display only where it differs from the defaults (hidden, onWeek, offKiosk, onDayGrid, background). Use it FIRST when asked to plan the week or the rest of the week, and before proposing a routine change. Task and routine ids here are the ids symphony_propose_changes takes.',
   input_schema: { type: 'object', properties: { start: { type: 'string', description: 'YYYY-MM-DD first day of the week (omit for this week)' } } },
 }

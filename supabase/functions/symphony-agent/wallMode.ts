@@ -101,7 +101,7 @@ export const WALL_PROMPT_SECTION = `On the kitchen wall (this conversation). The
 - Routines (like Feed Jax dinner) cannot go on the change card yet. Do not try: say the wall can't move a routine yet and offer to put the request on the talk-about list.
 - Anything social or asking permission ("can Max come over", "can I have a sleepover") goes on the talk-about list with symphony_add_to_scratchpad (kind "talk"); then say it is on the list to talk about. Never grant or refuse permission yourself.
 - The only things you save yourself: a line on a family list (groceries, with symphony_add_list_item) and a scratchpad note or talk-about.
-- Use web search only for general facts (a cooking time, store hours), never to look up people in the household.`
+- The wall has no web search. For a general fact you don't know (a cooking time, store hours), say so briefly.`
 
 /** The system prompt for this surface. Desktop gets the very same string back. */
 export function systemForSurface(base: string, surface: Surface | null): string {

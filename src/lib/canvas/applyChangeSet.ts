@@ -145,6 +145,10 @@ function routineChange(op: ChangeOp, r: Routine): { updates: UpdateRoutineInput;
   else if (op.time) { updates.time_of_day = dbTime(op.time); previous.time_of_day = r.time_of_day }
   if (op.days) { updates.recurrence_pattern = withDays(r.recurrence_pattern, op.days); previous.recurrence_pattern = r.recurrence_pattern }
   if (op.showOnTimeline !== undefined) { updates.show_on_timeline = op.showOnTimeline; previous.show_on_timeline = r.show_on_timeline }
+  if (op.showOnWeek !== undefined) { updates.show_on_week = op.showOnWeek; previous.show_on_week = r.show_on_week ?? false }
+  if (op.showOnKiosk !== undefined) { updates.show_on_kiosk = op.showOnKiosk; previous.show_on_kiosk = r.show_on_kiosk ?? true }
+  if (op.showOnDayGrid !== undefined) { updates.show_on_day_grid = op.showOnDayGrid; previous.show_on_day_grid = r.show_on_day_grid ?? false }
+  if (op.background !== undefined) { updates.background = op.background; previous.background = r.background ?? false }
   if (op.assignees) {
     updates.assigned_to_all = [...op.assignees]
     updates.assigned_to = op.assignees[0] ?? null
@@ -161,6 +165,10 @@ function routineAdd(op: ChangeOp): CreateRoutineInput {
     name: op.title,
     ...(op.note ? { description: op.note } : {}),
     ...(op.showOnTimeline !== undefined ? { show_on_timeline: op.showOnTimeline } : {}),
+    ...(op.showOnWeek !== undefined ? { show_on_week: op.showOnWeek } : {}),
+    ...(op.showOnKiosk !== undefined ? { show_on_kiosk: op.showOnKiosk } : {}),
+    ...(op.showOnDayGrid !== undefined ? { show_on_day_grid: op.showOnDayGrid } : {}),
+    ...(op.background !== undefined ? { background: op.background } : {}),
     recurrence_pattern,
     ...(op.time ? { time_of_day: dbTime(op.time) } : {}),
     assigned_to_all: op.assignees?.length ? [...op.assignees] : null,

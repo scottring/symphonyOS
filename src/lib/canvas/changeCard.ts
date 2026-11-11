@@ -75,6 +75,11 @@ export interface ChangeOp {
   assigneeNames?: string[]
   /** routine_add/change: shared Today and Week visibility. */
   showOnTimeline?: boolean
+  /** routine_add/change: the routine's own display switches. */
+  showOnWeek?: boolean
+  showOnKiosk?: boolean
+  showOnDayGrid?: boolean
+  background?: boolean
   /** routine_rest: YYYY-MM-DD it wakes; none = rest with no date. */
   until?: string
   /** routine_add, add, plan_add: the space (Work, Family or Personal). */
@@ -340,6 +345,8 @@ export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string
       if (op.clearTime) { parts.push('any time'); kinds.push('TIME') }
       if (op.assignees) { parts.push(names(op.assigneeNames)); kinds.push('WHO') }
       if (op.showOnTimeline !== undefined) { parts.push(op.showOnTimeline ? 'Show in Today and Week' : 'Hidden from Today and Week · Kept in Routines'); kinds.push('CHANGE') }
+      const shown = switchWords(op)
+      if (shown) { parts.push(shown); kinds.push('CHANGE') }
       if (op.name) kinds.push('NAME')
       const kind: RowKind = new Set(kinds).size === 1 ? kinds[0] : 'CHANGE'
       const title = op.name ? `${op.title} → ${op.name}` : op.title
@@ -377,7 +384,8 @@ export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string
     case 'event_plan': return { kind: 'PLAN', title: eventTitle(op, op.date ? datedWords(op) : ''), where: 'goes on your calendar' }
     case 'routine_add': {
       const when = [op.days ? daysWords(op.days) : null, op.time ? clock(op.time) : null,
-        op.showOnTimeline === undefined ? null : op.showOnTimeline ? '· Show in Today and Week' : '· Hidden from Today and Week · Kept in Routines'].filter(Boolean).join(' ')
+        op.showOnTimeline === undefined ? null : op.showOnTimeline ? '· Show in Today and Week' : '· Hidden from Today and Week · Kept in Routines',
+        switchWords(op) ? `· ${switchWords(op)}` : null].filter(Boolean).join(' ')
       return { kind: 'NEW', title: op.title, where: when ? `→ ${when}` : '' }
     }
   }
@@ -411,4 +419,14 @@ export function opWrite(op: ChangeOp, task: Task): { updates: Partial<Task>; pre
     }
     default: throw new Error(`${op.op} is not a plain task write`)
   }
+}
+
+/** The routine display switches a card sets, in the routine panel's words. */
+export function switchWords(op: Pick<ChangeOp, 'showOnWeek' | 'showOnKiosk' | 'showOnDayGrid' | 'background'>): string {
+  const words: string[] = []
+  if (op.showOnWeek !== undefined) words.push(op.showOnWeek ? 'On the week' : 'Off the week')
+  if (op.showOnKiosk !== undefined) words.push(op.showOnKiosk ? 'On the kiosk' : 'Off the kiosk')
+  if (op.showOnDayGrid !== undefined) words.push(op.showOnDayGrid ? 'Kept on the day grid' : 'On the day\u2019s checklist')
+  if (op.background !== undefined) words.push(op.background ? 'In the background' : 'Out of the background')
+  return words.join(' · ')
 }

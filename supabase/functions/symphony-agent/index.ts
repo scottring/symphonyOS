@@ -29,7 +29,9 @@ import {
   toolsForTurn,
 } from './webAccess.ts'
 import { EVERYDAY_TALK_RULES, HARD_RULES, MONTH_SEASON_YEAR_NOTE, SESSION_SPINE_PREAMBLE, WEEKLY_PLANNING_SCRIPT } from '../_shared/sessionScripts.ts'
-import { normalizeSchedule, etOffsetMinutes, APP_TZ } from './schedule.ts'
+import { normalizeSchedule, etOffsetMinutes, APP_TZ, localDayBounds, localToday } from './schedule.ts'
+import { TASK_STATUS_PROPERTIES, orderWrites, taskStatusPatch } from './taskStatus.ts'
+import { noteKeyword } from './notesQuery.ts'
 import { MEAL_SLOTS, type MealSlot, getMeals, resolveDate, setMeal } from './meals.ts'
 import { summarizeTurn, type TurnWrite } from './outcome.ts'
 import { fenceRetrieved } from './untrusted.ts'
@@ -134,13 +136,15 @@ Symphony domain model:
 - Tasks have a context: work, family, or personal. An unscheduled task (bucket "inbox") needs triage; a scheduled task has bucket "timed" and a scheduled_for date.
 - contact_id = who the task is ABOUT. assigned_to = who should DO it (a household member id). They are different.
 - To schedule a task, set scheduled_for; the system files it as "timed" automatically.
+- Where a task stands is its status on the week sheet: started (in progress), waiting (on someone: waiting_for, optionally a check_back day), or not started. Set it with symphony_update_task status; never with notes. owed_to is someone waiting on US for it; needed_on is the day it is needed (shown that day without a time). Report these from the read tools when asked what is in progress or what is waiting.
+- The Week list ("sometime this week"), Today's week sheet, and month and season lists have a manual order the person sets by dragging. When asked to prioritize or reorder one, say the order you suggest, and when they agree (or asked you to order it), write it with symphony_order_tasks, passing every task on that list, top first. Reordering is a direct write: it changes only the order and the person can drag to undo.
 - When unsure which context or date the user means, ask one short question rather than guessing.
 - Dates are ISO (YYYY-MM-DD). Today's date is provided in the first user message.
 
 Routines vs tasks:
 - Meals live in the family meal plan, not in tasks or the calendar. "What's for dinner" is symphony_get_meals; "dinner tonight is pizza" or "make Thursday tacos" is symphony_set_meal (it replaces that day's meal). Say what it was and what it is now.
 - A routine is a recurring item (e.g. "Feed Jax dinner", "Walk Jax", "Kids morning routine"). Routines are NOT tasks. To find a routine, use symphony_list_routines, never symphony_list_tasks.
-- Routine display is a choice the person can make in chat: propose routine_add or routine_change with show_on_timeline false to keep a routine in Routines but hide it from Today and Week, or true to show it when due. This is not stopping, deleting, skipping, or making it private. Today and Week share this setting; if asked to show in one and hide in the other, explain and clarify before changing both. Preserve the choice when revising a pending draft. Never claim it changed until the proposal is saved.
+- Routine display is a choice the person can make in chat, on the change card (routine_add or routine_change). show_on_timeline false keeps a routine in Routines but takes it off Today and Week; true shows it when due. Finer switches, matching the routine's panel: show_on_week (also on the Week page's grid of days; default off), show_on_kiosk (on the kitchen kiosk and kids' tablets; default on), show_on_day_grid (pinned to Today's hour grid instead of the day's checklist), background (no row on Today, the kiosk or tablets, while its time still counts, e.g. sleep or school hours). None of these stop, delete, skip or make it private. symphony_read_week shows a routine's display where it differs from the defaults. Preserve the choices when revising a pending draft. Never claim it changed until the proposal is saved.
 - Routines can be grouped into collections. A "step" is just a routine whose parent_routine_id points at a parent routine; step_order sets its order within the parent.
 - To GROUP existing routines into a collection (e.g. "group Feed Jax dinner and Walk Jax into Jax Evening Routine"): first confirm the grouping with the person in one sentence listing what goes under which collection; then (1) symphony_list_routines to find each one and get its id; (2) symphony_create_routine to make the parent collection; (3) symphony_update_routine on each existing routine, setting parent_routine_id to the parent's id and step_order (0, 1, 2...). Do NOT recreate routines that already exist; fold the existing ones in.
 - When folding a routine in, change ONLY parent_routine_id and step_order. Do NOT modify its recurrence_pattern, time_of_day, name, context, or any other field. Preserve each routine's existing schedule exactly. Never assert or "restore" a schedule the data does not show, and never invent one. Report only the changes you actually made.
@@ -196,8 +200,7 @@ When the user attaches a document describing a recurring program (e.g. a physica
 - Read it. Extract each distinct item, its instructions, and how many times per day it is done.
 - Before creating anything, list what you found (item -> frequency) and ask the user to confirm. Only write after they confirm.
 - If a frequency is unclear, ask rather than guessing. Never invent a cadence the document does not state.
-- After the user confirms, create one routine per item with symphony_create_routine, setting times_per_day when an item is done more than once a day, and put the document's instructions for that item in its notes.
-${WEB_PROMPT_SECTION}`
+- After the user confirms, create one routine per item with symphony_create_routine, setting times_per_day when an item is done more than once a day, and put the document's instructions for that item in its notes.`
 
 // ── Tool schemas (Anthropic tool-use format) ───────────────────────
 const CONTEXT_ENUM = ['work', 'family', 'personal']
@@ -219,7 +222,7 @@ const TOOLS = [
   { name: 'symphony_update_intention', description: 'Edit the wording or completion state of an existing year goal. Does not change its year, sharing or links.', input_schema:{type:'object',properties:{id:{type:'string'},name:{type:'string'},status:{type:'string',enum:['active','completed']}},required:['id']}},
   {
     name: 'symphony_list_tasks',
-    description: 'List tasks (max 50). Filter by bucket, context, completed, is_waiting, scheduled_for (YYYY-MM-DD), or search (title substring). Items the user let go are left out unless you search.',
+    description: 'List tasks (max 50). Filter by bucket, context, completed, is_waiting, scheduled_for (YYYY-MM-DD, the person\'s day), or search (title substring). order_by "list" returns them in the order the Week list and Today\'s sheet show (sort_order). Rows include started_at, is_waiting/waiting_for, owed_to and needed_on. Items the user let go are left out unless you search.',
     input_schema: {
       type: 'object',
       properties: {
@@ -230,6 +233,7 @@ const TOOLS = [
         scheduled_for: { type: 'string', description: 'YYYY-MM-DD' },
         search: { type: 'string' },
         limit: { type: 'number' },
+        order_by: { type: 'string', enum: ['schedule', 'list'] },
       },
     },
   },
@@ -250,6 +254,8 @@ const TOOLS = [
         phone_number: { type: 'string' },
         location: { type: 'string' },
         estimated_duration: { type: 'number', description: 'minutes' },
+        owed_to: TASK_STATUS_PROPERTIES.owed_to,
+        needed_on: TASK_STATUS_PROPERTIES.needed_on,
         parent_task_id: {
           type: 'string',
           description:
@@ -261,7 +267,7 @@ const TOOLS = [
   },
   {
     name: 'symphony_update_task',
-    description: 'Update a task by id. Set scheduled_for to reschedule (or null to move to inbox), change context, notes, etc.',
+    description: 'Update a task by id. Set scheduled_for to reschedule (or null to move to inbox), change context, notes, duration, etc. status sets where it stands (started, waiting on someone, or not started) exactly as the week sheet does; owed_to and needed_on sit beside it.',
     input_schema: {
       type: 'object',
       properties: {
@@ -275,7 +281,9 @@ const TOOLS = [
         notes: { type: ['string', 'null'] },
         contact_id: { type: ['string', 'null'] },
         assigned_to: { type: ['string', 'null'] },
-        is_waiting: { type: 'boolean' },
+        is_waiting: { type: 'boolean', description: 'Legacy: false clears a wait. To mark it waiting, use status "waiting" with waiting_for.' },
+        ...TASK_STATUS_PROPERTIES,
+        estimated_duration: { type: ['number', 'null'], description: 'minutes; the length of its block on Today' },
         needs_discussion: { type: 'boolean', description: 'Flag that the real next step is a conversation with someone, not solo work' },
         discussion_note: { type: ['string', 'null'], description: 'Who to talk to and what to decide, e.g. "Ask Iris which clothes and where to donate"' },
         location: { type: ['string', 'null'], description: 'Where this happens (address or place name), for directions when doing it' },
@@ -284,6 +292,15 @@ const TOOLS = [
         add_links: { type: 'array', items: { type: 'object', properties: { url: { type: 'string' }, title: { type: 'string' } }, required: ['url'] }, description: 'Websites or documents needed to do this; appended to existing links' },
       },
       required: ['id'],
+    },
+  },
+  {
+    name: 'symphony_order_tasks',
+    description: 'Put tasks in the order the person wants on their list: the Week list ("sometime this week") and Today\'s week sheet share this order (sort_order), as do a month or season list. Pass every task on that list, top first; read it first (symphony_read_week noDay is in the current order, or symphony_list_tasks with order_by "list"). Only the order changes. Say the new order back in a short list.',
+    input_schema: {
+      type: 'object',
+      properties: { ids: { type: 'array', items: { type: 'string' }, description: 'task ids, top of the list first' } },
+      required: ['ids'],
     },
   },
   {
@@ -738,14 +755,14 @@ async function runTool(
           : (() => { const d = new Date(`${today}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 1) % 7)); return d.toISOString().slice(0, 10) })()
         const { end, lastStart } = weekWindow(start)
         const shift = (ymd: string, n: number) => { const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
-        const cols = 'id, title, scheduled_for, is_all_day, bucket, week_start, completed, assigned_to, updated_at'
+        const cols = 'id, title, scheduled_for, is_all_day, bucket, week_start, completed, assigned_to, updated_at, sort_order, started_at, is_waiting, waiting_for, owed_to, needed_on'
         const [dated, week, inbox, events, routines, talks, members] = await Promise.all([
           // A day wider each side: stored times are UTC; shapeWeek files them by local day.
           db.from('tasks').select(cols).gte('scheduled_for', `${shift(lastStart, -1)}T00:00:00Z`).lt('scheduled_for', `${shift(end, 1)}T00:00:00Z`).limit(300),
           db.from('tasks').select(cols).eq('bucket', 'week').eq('completed', false).is('scheduled_for', null).limit(100),
           db.from('tasks').select(cols).eq('bucket', 'inbox').eq('completed', false).is('scheduled_for', null).order('created_at', { ascending: false }).limit(30),
           db.from('calendar_events').select('id, title, start_time, end_time, all_day').lt('start_time', `${shift(end, 1)}T00:00:00Z`).gte('end_time', `${shift(start, -1)}T00:00:00Z`).order('start_time').limit(200),
-          db.from('routines').select('id, name, recurrence_pattern, time_of_day, parent_routine_id, assigned_to_all, visibility, paused_until').limit(200),
+          db.from('routines').select('id, name, recurrence_pattern, time_of_day, parent_routine_id, assigned_to_all, visibility, paused_until, show_on_timeline, show_on_week, show_on_kiosk, show_on_day_grid, background').limit(200),
           db.from('scratchpad_notes').select('id, body').eq('kind', 'talk').eq('status', 'open').limit(20),
           db.from('family_members').select('id, name').limit(50),
         ])
@@ -783,6 +800,9 @@ async function runTool(
       }
       case 'symphony_create_task': {
         const { id: _id, scheduled_for, is_all_day, bucket: rawBucket, ...rest } = input as Record<string, unknown>
+        const marks = taskStatusPatch(rest, null, new Date(), (d) => normalizeSchedule(d, true).scheduled_for!)
+        if ('error' in marks) return `Error: ${marks.error}`
+        Object.assign(rest, marks.patch)
         // A subtask is a STEP, not a day commitment, so it is born undated —
         // matching the in-app addSubtask. Passing the parent's scheduled_for
         // down to every child is what produced five permanent Today rows from
@@ -851,6 +871,14 @@ async function runTool(
             )
           }
         }
+        // Where it stands (started / waiting on / not started), owed to and
+        // needed on: the week sheet's own write (taskStatus.ts).
+        if (['status', 'waiting_for', 'check_back', 'owed_to', 'needed_on', 'is_waiting'].some((k) => k in updates)) {
+          const { data: was } = await db.from('tasks').select('is_waiting, waiting_since').eq('id', id).maybeSingle()
+          const marks = taskStatusPatch(updates, was ?? null, new Date(), (d) => normalizeSchedule(d, true).scheduled_for!)
+          if ('error' in marks) return `Error: ${marks.error}`
+          Object.assign(updates, marks.patch)
+        }
         // Normalize a (re)schedule the same way create does.
         if ('scheduled_for' in updates) {
           const sched = normalizeSchedule(updates.scheduled_for, updates.is_all_day)
@@ -880,6 +908,22 @@ async function runTool(
           .update({ ...updates, ...('completed' in updates ? { completed_at: updates.completed ? now() : null } : {}), updated_at: now() }).eq('id', id).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_order_tasks': {
+        const order = orderWrites(input.ids)
+        if ('error' in order) return `Error: ${order.error}`
+        const ids = order.writes.map((w) => w.id)
+        const { data: rows, error: readError } = await db.from('tasks').select('id, title, sort_order').in('id', ids)
+        if (readError) throw readError
+        const found = new Set((rows ?? []).map((r) => r.id))
+        const missing = ids.filter((i) => !found.has(i))
+        if (missing.length) return `Error: these ids are not tasks you can see: ${missing.join(', ')}`
+        // One narrow UPDATE per row (never an upsert: see useSupabaseTasks updateTaskOrders).
+        const results = await Promise.all(order.writes.map((w) =>
+          db.from('tasks').update({ sort_order: w.sort_order, updated_at: now() }).eq('id', w.id).select('id, title, sort_order').single()))
+        const failed = results.find((r) => r.error)
+        if (failed?.error) throw failed.error
+        return JSON.stringify(results.map((r) => r.data))
       }
       case 'symphony_complete_task': {
         const completed = input.completed === undefined ? true : !!input.completed
@@ -954,21 +998,24 @@ async function runTool(
         return JSON.stringify(dedupeMembersByName(data ?? []), null, 2)
       }
       case 'symphony_daily_summary': {
-        const today = new Date().toISOString().split('T')[0]
-        const start = `${today}T00:00:00`, end = `${today}T23:59:59`
-        const [todayT, inboxT, waitingT, overdueT, eventsT] = await Promise.all([
-          db.from('tasks').select('id, title, completed, scheduled_for, context, category, is_waiting')
-            .eq('bucket', 'timed').gte('scheduled_for', start).lte('scheduled_for', end).order('scheduled_for'),
+        // The person's day, not the UTC date (after 8pm Eastern the UTC date is tomorrow).
+        const day = today ?? localToday()
+        const { start, end } = localDayBounds(day)
+        const [todayT, inboxT, waitingT, overdueT, eventsT, neededT] = await Promise.all([
+          db.from('tasks').select('id, title, completed, scheduled_for, context, category, is_waiting, waiting_for, started_at, owed_to')
+            .eq('bucket', 'timed').gte('scheduled_for', start).lt('scheduled_for', end).order('scheduled_for'),
           db.from('tasks').select('id, title, context, created_at').eq('bucket', 'inbox').eq('completed', false),
-          db.from('tasks').select('id, title, context').eq('is_waiting', true).eq('completed', false),
+          db.from('tasks').select('id, title, context, waiting_for, waiting_since').eq('is_waiting', true).eq('completed', false),
           db.from('tasks').select('id, title, scheduled_for, context')
             .eq('bucket', 'timed').eq('completed', false).lt('scheduled_for', start),
           db.from('calendar_events').select('id, title, start_time, end_time, all_day, location, meeting_url')
-            .gte('start_time', start).lte('start_time', end).order('start_time'),
+            .gte('start_time', start).lt('start_time', end).order('start_time'),
+          db.from('tasks').select('id, title, context').eq('needed_on', day).eq('completed', false).is('dismissed_at', null),
         ])
         return JSON.stringify({
-          date: today,
+          date: day,
           calendar: await calendarCoverage(!eventsT.error),
+          neededToday: { count: neededT.data?.length ?? 0, tasks: neededT.data ?? [] },
           today: { total: todayT.data?.length ?? 0, remaining: todayT.data?.filter((t) => !t.completed).length ?? 0, tasks: todayT.data ?? [] },
           events: { count: eventsT.data?.length ?? 0, events: eventsT.data ?? [] },
           inbox: { count: inboxT.data?.length ?? 0, tasks: inboxT.data ?? [] },
@@ -1017,7 +1064,7 @@ async function runTool(
       }
       case 'symphony_list_routines': {
         let q = db.from('routines')
-          .select('id, name, description, context, parent_routine_id, step_order, recurrence_pattern, time_of_day, times_per_day, visibility, show_on_timeline')
+          .select('id, name, description, context, parent_routine_id, step_order, recurrence_pattern, time_of_day, times_per_day, visibility, paused_until, show_on_timeline, show_on_week, show_on_kiosk, show_on_day_grid, background')
           .order('name')
         if (input.context) q = q.eq('context', input.context)
         if (input.search) q = q.ilike('name', `%${input.search}%`)
@@ -1193,7 +1240,7 @@ async function runTool(
         if (hits.length === 0) {
           const { data, error } = await db.from('notes')
             .select('id, title, content, vault_path, context')
-            .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+            .or(`title.ilike.%${noteKeyword(query)}%,content.ilike.%${noteKeyword(query)}%`)
             .limit(limit)
           if (error) throw error
           hits = (data as NoteHit[]) ?? []
@@ -1224,20 +1271,21 @@ async function runTool(
           d.setUTCDate(d.getUTCDate() + days)
           return d.toISOString().split('T')[0]
         }
-        const today = new Date().toISOString().split('T')[0]
+        const day = today ?? localToday()
         const search = typeof input.query === 'string' && input.query.trim() ? input.query.trim() : null
         let start = typeof input.start_date === 'string' ? input.start_date : null
         let end = typeof input.end_date === 'string' ? input.end_date : start
         if (!start) {
           // Bare title search sweeps a year in each direction; a plain listing means today.
-          start = search ? shiftDate(today, -365) : today
-          end = search ? shiftDate(today, 365) : today
+          start = search ? shiftDate(day, -365) : day
+          end = search ? shiftDate(day, 365) : day
         }
         // Overlap semantics so multi-day events mid-range still match.
         let q = db.from('calendar_events')
           .select('id, title, start_time, end_time, all_day, location, meeting_url, calendar_name')
-          .lte('start_time', `${end}T23:59:59`)
-          .gte('end_time', `${start}T00:00:00`)
+          // The person's days, not UTC dates.
+          .lt('start_time', localDayBounds(end!).end)
+          .gte('end_time', localDayBounds(start).start)
         if (search) q = q.ilike('title', `%${search}%`)
         const { data, error } = await q.order('start_time').limit(100)
         if (error) throw error
@@ -1355,7 +1403,7 @@ async function callAnthropic(
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 2048,
-      system: [{ type: 'text', text: systemForSurface(SYSTEM_PROMPT, surface) + (web.length ? '' : '\nThis beta supports text planning using Symphony data. Hosted web search and page/PDF analysis are unavailable. If a request needs current web information, say that plainly; never claim you searched or verified it.'), cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: systemForSurface(SYSTEM_PROMPT, surface) + (web.length ? WEB_PROMPT_SECTION : '\nWeb search is not available here. If a request needs current web information (stock, hours, prices), say that plainly and offer what Symphony can do instead (a task to check it, a link the person can open); never claim you searched or verified it.'), cache_control: { type: 'ephemeral' } }],
       tools: tools.map((t, i) =>
         i === tools.length - 1
           ? { ...(t as Record<string, unknown>), cache_control: { type: 'ephemeral' } }

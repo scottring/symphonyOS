@@ -77,6 +77,14 @@ export interface ChangeOp {
   assigneeNames?: string[]
   /** routine_add/change: one shared switch for Today and Week; false keeps it in Routines. */
   showOnTimeline?: boolean
+  /** routine_add/change: the routine's own display switches (2026-10-27 to
+   *  11-09): on the Week's grid, on the kitchen kiosk and kids' tablets,
+   *  pinned to Today's grid, or in the background (no row anywhere, its time
+   *  still counts). Omitted = unchanged (or the default on a new routine). */
+  showOnWeek?: boolean
+  showOnKiosk?: boolean
+  showOnDayGrid?: boolean
+  background?: boolean
   /** routine_rest: YYYY-MM-DD it wakes; none = rest with no date. */
   until?: string
   /** routine_add, add, plan_add: the space (Work, Family or Personal). */
@@ -296,6 +304,12 @@ export function changeSetFromInput(input: Record<string, unknown>, key: string, 
   return { set: { key, title, ops, ...(weekStart ? { weekStart } : {}) } }
 }
 
+/** The routine display switches a card may set, and their ChangeOp keys. */
+const ROUTINE_SWITCHES = [
+  ['show_on_week', 'showOnWeek'], ['show_on_kiosk', 'showOnKiosk'],
+  ['show_on_day_grid', 'showOnDayGrid'], ['background', 'background'],
+] as const
+
 /** One routine op. A routine may hold one lasting op (change or rest) AND
  *  this-week ops, but only one this-week op per day. */
 function routineOp(
@@ -307,6 +321,13 @@ function routineOp(
       return { error: `${at}: show_on_timeline must be true or false on routine_add or routine_change` }
     }
     base.showOnTimeline = o.show_on_timeline
+  }
+  for (const [field, key] of ROUTINE_SWITCHES) {
+    if (o[field] === undefined) continue
+    if (!['routine_add', 'routine_change'].includes(op) || typeof o[field] !== 'boolean') {
+      return { error: `${at}: ${field} must be true or false on routine_add or routine_change` }
+    }
+    base[key] = o[field] as boolean
   }
   if (op === 'routine_add') {
     const name = routineName(o.name)
@@ -376,7 +397,7 @@ function routineOp(
     }
     return { op: base }
   }
-  let changed = base.showOnTimeline !== undefined
+  let changed = base.showOnTimeline !== undefined || ROUTINE_SWITCHES.some(([, key]) => base[key] !== undefined)
   if (o.name !== undefined) {
     const name = routineName(o.name)
     if (!name) return { error: `${at}: name must not be empty` }
@@ -404,7 +425,7 @@ function routineOp(
     base.assignees = who
     changed = true
   }
-  if (!changed) return { error: `${at}: routine_change needs at least one of name, time, days, assignees or show_on_timeline` }
+  if (!changed) return { error: `${at}: routine_change needs at least one of name, time, days, assignees, show_on_timeline, show_on_week, show_on_kiosk, show_on_day_grid or background` }
   return { op: base }
 }
 
@@ -721,7 +742,11 @@ export const PROPOSE_CHANGES_TOOL = {
             days: { type: 'array', items: { type: 'string', enum: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] }, description: 'routine_change/routine_add: the weekly days' },
             assignee: { type: 'string', description: 'Household member id (assign, routine_who; optional for add)' },
             assignees: { type: 'array', items: { type: 'string' }, description: 'routine_change/routine_add: household member ids who do it every week (empty = no one)' },
-            show_on_timeline: { type: 'boolean', description: 'routine_add/routine_change: shared Today AND Week visibility. false = keep in Routines but hide from both views; true = show when due, subject to the person’s view filters. Omit to keep the default (new routines show) or existing choice. This does not stop the routine or change who can see it. Separate Today-only/Week-only settings are not supported; clarify before changing both if asked for different settings.' },
+            show_on_timeline: { type: 'boolean', description: 'routine_add/routine_change: shared Today AND Week visibility. false = keep in Routines but hide from both views; true = show when due, subject to the person’s view filters. Omit to keep the default (new routines show) or existing choice. This does not stop the routine or change who can see it. To hide it from only one place, use the switches below instead.' },
+            show_on_week: { type: 'boolean', description: 'routine_add/routine_change: also show it on the Week page\'s grid of days (default off; an occurrence someone placed on a day shows regardless).' },
+            show_on_kiosk: { type: 'boolean', description: 'routine_add/routine_change: show it on the kitchen kiosk and the kids\' tablets (default on).' },
+            show_on_day_grid: { type: 'boolean', description: 'routine_add/routine_change: pin it to Today\'s hour grid (default off: it sits on the day\'s checklist).' },
+            background: { type: 'boolean', description: 'routine_add/routine_change: true = no row on Today, the kiosk or the tablets, while its time still counts against the hours open (e.g. sleep, school hours).' },
             until: { type: 'string', description: 'routine_rest: YYYY-MM-DD it wakes (omit to rest with no date)' },
             context: { type: 'string', enum: ['family', 'personal', 'work'], description: 'The space. routine_add: default family; add: optional; plan_add: optional (defaults to its parent\'s, or its life area\'s)' },
             area_id: { type: 'string', description: 'add, plan_add, optional: the id of the life area it is filed under (one of the life areas you were given; never invent one)' },
