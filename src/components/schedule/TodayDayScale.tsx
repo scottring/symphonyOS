@@ -159,6 +159,7 @@ function ScaleItem({ item, start, end: savedEnd, hasEnd: savedHasEnd, block, pxP
         tabIndex={-1}
         role={undefined}
         data-item-id={item.id}
+        data-kind={item.type}
         className={[
           'today-scale-item',
           done ? 'is-done' : '',

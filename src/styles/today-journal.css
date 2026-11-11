@@ -1,0 +1,143 @@
+/* src/styles/today-journal.css — Today as an open journal.
+ *
+ * Scott, 2026-11-11 (board A of the Today look-and-feel canvas): the week and
+ * the day are two facing pages of paper over the place's sky, the landscape a
+ * short band at the foot that never competes with the planner. The day keeps
+ * its scale (drag, resize, type on an hour) but reads as ink on paper: times
+ * in the margin, open time left blank with a small note, no grey bars, no
+ * coloured edge on a block. Italic is kept for one thing, the day's sentence.
+ *
+ * Loaded after canvas-today.css; every rule is scoped to Today. */
+
+:root {
+  --today-now: hsl(16 62% 42%);
+}
+[data-scenery-lighting='nighttime'], .dark { --today-now: hsl(18 72% 64%); }
+
+/* ---- The sky shows around the pages ----------------------------------- */
+/* The paper is the reading surface now, so the near-white reading layer the
+   sky wears elsewhere thins on Today (wide pages only: a phone has no
+   sheets of paper to carry the contrast). */
+@media (min-width: 768px) {
+  :is([data-scenery-lighting='daytime'], [data-scenery-lighting='dusk-dawn']):has(.today-page) {
+    --scenery-reading: rgb(255 255 255 / 0.22);
+  }
+}
+
+/* ---- The landscape: a short band at the foot --------------------------- */
+/* Less of it shows, and its top fades into the sky (review, 2026-11-11: the
+   illustration pulled attention from the planner). */
+.scenery-scroll:has(.today-page) > .place-scenery.is-faint {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 32%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 32%);
+}
+.scenery-scroll:has(.today-page) > .place-scenery.is-faint .place-scenery-panorama {
+  height: clamp(150px, 15vw, 240px);
+  object-fit: cover;
+  object-position: center 62%;
+}
+
+/* ---- Two facing pages --------------------------------------------------- */
+/* The day is a sheet of paper too, meeting the week's sheet at the crease
+   PaperFold already draws (::before, by how open the week is). */
+@media (min-width: 768px) {
+  .paper-fold.today-fold:not([data-fold-mode='v']) > article.paper-fold-current {
+    padding: 34px 44px 40px 48px;
+    background-color: var(--paper-fold-paper);
+    background-image: var(--paper-fold-grain, none);
+    border-radius: 3px 10px 10px 3px;
+    box-shadow:
+      0 1px 1px hsl(var(--paper-fold-shadow) / .06),
+      0 10px 30px -8px hsl(var(--paper-fold-shadow) / .18),
+      0 30px 60px -30px hsl(var(--paper-fold-shadow) / .22);
+  }
+  /* In the workspace the pair of pages sits in from both edges, as the
+     week's sheet already does on the left (alongside.css). */
+  .paper-fold.today-fold.ad-fold:not([data-fold-mode='v']) > article.paper-fold-current {
+    margin-right: 2.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .paper-fold.today-fold.ad-fold:not([data-fold-mode='v']) > article.paper-fold-current { margin-right: 3.5rem; }
+}
+
+/* The week's page: plain small labels, not tracked capitals. */
+.today-fold :is(.above-sheet-kicker, .above-sheet-sub) {
+  font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none;
+  color: var(--color-neutral-600);
+}
+.today-fold .above-sheet-row-title { font-size: 17px; line-height: 1.3; }
+.today-fold .above-sheet-row-note {
+  font-family: var(--font-family-sans); font-size: 12.5px; color: var(--color-neutral-500);
+}
+
+/* ---- The masthead: the number in the margin, the weekday, one sentence -- */
+.today-page .daybook-masthead .masthead-numeral {
+  font-size: 92px; line-height: .8; margin-right: 4px; color: var(--color-neutral-900);
+}
+.today-page .daybook-masthead .daybook-title { font-size: 40px; font-weight: 500; line-height: 1.05; }
+/* The one italic on the page: the day in a sentence. */
+.today-page .today-sentence {
+  font-style: italic; font-size: 21px; line-height: 1.35; color: var(--color-neutral-700);
+}
+.today-page .today-sentence-link { font-style: italic; }
+.today-mast-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.today-mast-facts {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  font-family: var(--font-family-sans); font-size: 13.5px; line-height: 1.3; color: var(--color-neutral-700);
+  text-align: right;
+}
+.today-mast-facts .today-dinner { color: inherit; text-decoration: none; max-width: 22rem; }
+.today-mast-facts .today-dinner:hover { color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---- Section headings and labels: no italic ----------------------------- */
+.today-page .daybook-journal-heading h2 { font-size: 24px; }
+.today-page .daybook-journal-allday button { font-style: normal; color: var(--color-neutral-600); }
+.today-page .today-talk-label { font-style: normal; }
+
+/* For today: the chosen work reads as the journal's lines. */
+.today-page .today-focus-card .row-title {
+  font-family: var(--font-family-display); font-size: 19px; line-height: 1.3;
+}
+
+/* ---- The day, to scale, as ink on paper ------------------------------- */
+.today-page .today-scale { --scale-gutter: 52px; }
+.today-page .today-scale-hour {
+  left: var(--scale-gutter);
+  border-top-color: color-mix(in srgb, var(--color-neutral-200) 65%, transparent);
+}
+.today-page .today-scale-hour > span {
+  left: calc(-1 * var(--scale-gutter)); width: calc(var(--scale-gutter) - 12px);
+  top: -9px; padding: 0; background: none; text-align: right;
+  font: 300 13px/1.2 'Jost', var(--font-family-sans); color: var(--color-neutral-500);
+}
+/* Open time is blank paper with a small note, not a block. */
+.today-page .today-scale-free {
+  background: none; place-items: center start; padding: 0 12px;
+  font-size: 13px; font-weight: 400; color: var(--color-neutral-500);
+}
+/* What's on the day: no coloured edge. Events a light wash of the place's
+   blue; tasks and pinned routines white paper with a hairline. */
+.today-page .today-scale-item {
+  box-shadow: none; background: var(--event-tint); color: var(--color-neutral-900);
+  font-size: 14px; border-radius: 8px;
+}
+.today-page .today-scale-item[data-kind='event'] .today-scale-line { font-weight: 500; }
+.today-page .today-scale-item:is([data-kind='task'], [data-kind='routine']) {
+  background: var(--color-bg-elevated);
+  box-shadow: inset 0 0 0 1px var(--color-neutral-200);
+}
+.today-page .today-scale-item:hover { filter: none; background: var(--event-tint-hover); }
+.today-page .today-scale-item:is([data-kind='task'], [data-kind='routine']):hover {
+  background: color-mix(in srgb, var(--color-bg-elevated) 92%, var(--color-neutral-300));
+}
+/* Routines off the grid: a hollow dot and their names, no grey bar. */
+.today-page .today-scale-quiet { background: none; padding: 0 12px; font-size: 12.5px; color: var(--color-neutral-600); }
+.today-page .today-scale-quiet::before {
+  content: ''; flex: none; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%;
+  border: 1.5px solid var(--color-neutral-400);
+}
+/* Now: one warm line, the only colour on the scale that moves. */
+.today-page .today-scale-now { border-top-color: var(--today-now); }
+.today-page .today-scale-now::before { background: var(--today-now); }
+.today-page .today-scale-now > span { color: var(--today-now); }

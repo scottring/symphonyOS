@@ -834,6 +834,11 @@ export function TodayView({
     if (days === -1) return 'Yesterday'
     return dayName
   }, [viewedDate, nowForDisplay, dayName])
+  // The open journal's eyebrow: where the day sits and its month — the
+  // weekday is the title and the number stands in the margin.
+  const journalMonth = viewedDate.toLocaleDateString('en-US', { month: 'long' })
+  const journalEyebrow = data.isToday ? `Today · ${journalMonth}`
+    : relativeDayLabel === dayName ? journalMonth : `${relativeDayLabel} · ${journalMonth}`
 
   // ── Drag: the pure resolver's inputs ─────────────────────────────────────────
   const { isReadOnlyCalendar } = useCalendarPermissions()
@@ -1399,8 +1404,15 @@ export function TodayView({
         // The date gives the page its identity; the chosen work gives it its
         // purpose (2026-09-19). The eyebrow says where the day sits — Today,
         // Tomorrow, a weekday — and still opens the date picker.
-        eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} />}
-        title={viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline"
+          label={foldedControls ? journalEyebrow : data.isToday ? 'Today' : relativeDayLabel} />}
+        // The open journal (Scott, 2026-11-11, board A): on a wide page the
+        // day's number stands in the margin and the weekday is the title; the
+        // heading still reads the whole date.
+        numeral={foldedControls ? String(viewedDate.getDate()) : undefined}
+        title={foldedControls
+          ? <><span aria-hidden="true">{viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}</span><span className="sr-only">{viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span></>
+          : viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         // No big numeral (approved Today board, 2026-10-10): the date is the title.
         // Adding moved to the "For today" heading with Choose (2026-09-22):
         // the date is the page's identity, the heading holds its two verbs.
@@ -1408,15 +1420,26 @@ export function TodayView({
         // trimmed" 2026-10-14), with the week and weather small after it.
         // Desktop folds the control row into the masthead (layout system,
         // 2026-10-01): the view controls sit at the title's right.
+        // Wide page: the subline is the day's one sentence alone; weather and
+        // dinner stand at the right under the controls (board A, 2026-11-11).
+        // The week's dates are on the week's own page beside it.
         subline={foldedControls
-          ? <>{headerLine}{headerLine && ' '}<span className="today-sentence-meta">{weekLine}{dinnerLink && <> · {dinnerLink}</>}{data.isToday && <> · <WeatherChip now={nowForDisplay} /></>}</span></>
+          ? headerLine ?? undefined
           : dinnerLink ? <>{headerLine}{headerLine && ' '}<span className="today-sentence-meta">{dinnerLink}</span></> : headerLine ?? undefined}
         // Domain chooser + assistant toggle, in the card's corner.
         // Desktop: the page's controls sit in the control row below, as on
         // every horizon (Scott, 2026-09-30). The masthead keeps them only where
         // there is no control row to hold them.
         controls={foldedControls
-          ? <div className="flex items-center gap-1">{dayFlowButton}{desktopToolbar}</div>
+          ? <div className="today-mast-right">
+              <div className="flex items-center justify-end gap-1">{dayFlowButton}{desktopToolbar}</div>
+              {(data.isToday || dinnerLink) && (
+                <div className="today-mast-facts">
+                  {data.isToday && <WeatherChip now={nowForDisplay} />}
+                  {dinnerLink}
+                </div>
+              )}
+            </div>
           : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than

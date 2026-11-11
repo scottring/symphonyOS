@@ -74,6 +74,8 @@ await import('./styles/layout-system.css')
 // The conversational canvas's shared forms, drawn on the same tokens.
 await import('./styles/canvas.css')
 await import('./styles/canvas-today.css')
+// Today as an open journal (board A, 2026-11-11), over canvas-today.css.
+await import('./styles/today-journal.css')
 await import('./styles/canvas-plan.css')
 // The deck: one card at a time (Friday session).
 await import('./styles/deck.css')
