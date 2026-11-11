@@ -750,7 +750,7 @@ function TodayChooser({ plan, day, actions, draggable, wide }: {
         <ChooserSection
           id="routines"
           title="Routines"
-          note={day.toDateString() === new Date().toDateString() ? "For today" : "For this day"}
+          note={day.toDateString() === new Date().toDateString() ? "To do today" : "To do this day"}
           empty={<><span>{query ? "No matching routines." : "No routine occurrences in this view for this day. Check your filters or add a repeating routine."}</span><a href="/routines">Manage routines →</a></>}
           icon={<Repeat aria-hidden="true" className="h-3.5 w-3.5" />}
           entries={routines.filter(matches)}

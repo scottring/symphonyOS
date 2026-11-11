@@ -86,7 +86,7 @@ afterEach(() => { vi.useRealTimers() })
 describe('Today rows carry no serves line', () => {
   it('a step of a goal and a copied-down line are plain rows', () => {
     renderView()
-    const focus = screen.getByRole('region', { name: 'For today' })
+    const focus = screen.getByRole('region', { name: 'To do' })
     expect(within(focus).getByText('Buy running shoes')).toBeInTheDocument()
     expect(within(focus).getByText('Order seeds')).toBeInTheDocument()
     expect(screen.queryByText(/Step toward/)).toBeNull()

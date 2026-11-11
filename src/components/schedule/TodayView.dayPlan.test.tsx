@@ -81,7 +81,7 @@ describe('Today — routines off the grid (Scott, 2026-11-09)', () => {
   const timed = (over: Parameters<typeof createMockRoutine>[0]) =>
     createMockRoutine({ time_of_day: '12:00', recurrence_pattern: { type: 'daily' }, show_on_timeline: true, ...over })
   const dayRegion = () => within(screen.getByRole('region', { name: 'The day' }))
-  const forToday = () => within(screen.getByRole('region', { name: 'For today' }))
+  const forToday = () => within(screen.getByRole('region', { name: 'To do' }))
 
   it('a timed routine is on the checklist, with a quiet band on the grid', () => {
     renderView({ routines: [timed({ id: 'a', name: 'School morning' })] })
@@ -135,7 +135,7 @@ describe('Today — the way to Planning', () => {
     expect(screen.getByText('Call the bank')).toBeInTheDocument()
     expect(screen.getByText('Pick up foot meds')).toBeInTheDocument()
     // (Off the day's list; it waits on the week sheet beside it.)
-    expect(within(screen.getByRole('region', { name: 'For today' })).queryByText('Kids clean rooms')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'To do' })).queryByText('Kids clean rooms')).not.toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'The day' })).queryByText('Kids clean rooms')).not.toBeInTheDocument()
     // No instruction beside the heading, and no count — Today keeps no
     // scoreboard and explains nothing (2026-09-21).

@@ -134,7 +134,7 @@ describe('Today as a daily journal', () => {
 
   it('For today holds what was chosen; The day draws the timed day', () => {
     renderView()
-    const focus = screen.getByRole('region', { name: 'For today' })
+    const focus = screen.getByRole('region', { name: 'To do' })
     const ahead = screen.getByRole('region', { name: 'The day' })
     expect(within(focus).getByText('Check dryer duct')).toBeInTheDocument()
     expect(within(ahead).getByText('Food planning')).toBeInTheDocument()

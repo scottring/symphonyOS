@@ -45,7 +45,7 @@ export const PAGE_GUIDES: Record<string, string> = {
   today:
     'Today is for doing: what you are doing today, with what you need to do it. ' +
     '"The day" shows the day\'s hours with timed things on them and how many hours are still open. ' +
-    '"For today" lists things for today without a time; Add task adds one. ' +
+    '"To do" lists things for today without a time; Add task adds one. ' +
     '"This week" holds this week\'s tasks that have no day yet; drag one onto the day, or press +, to plan it for today. ' +
     '"Coming up" shows the next few dated things after today. ' +
     'Open any item to see its notes, people, links and places, or to move it to another day.',

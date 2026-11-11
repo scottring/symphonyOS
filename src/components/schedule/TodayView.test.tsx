@@ -783,7 +783,7 @@ describe('TodayView — the Day session', () => {
     expect(screen.getByRole('button', { name: 'Stop planning' }).closest('.plan-chip')).toHaveClass('is-on')
     expect(within(screen.getByTestId('guide-panel')).getByText('Look back at yesterday')).toBeInTheDocument()
     // One page: the day is still there, as every day.
-    expect(within(session).getByRole('heading', { name: 'For today' })).toBeInTheDocument()
+    expect(within(session).getByRole('heading', { name: 'To do' })).toBeInTheDocument()
     expect(within(session).getByRole('heading', { name: 'The day' })).toBeInTheDocument()
     // The chip says where the session is.
     expect(screen.getByRole('button', { name: 'Planning today · 1 of 5' })).toBeInTheDocument()

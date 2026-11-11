@@ -259,7 +259,7 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
   if (ctx.overId === FOR_TODAY_DROP_ID || (fromTheDay && onForTodayRow)) {
     if (!fromTheDay) return []
     if (active.type !== 'task') {
-      return [{ kind: 'refuse', reason: 'Only a task goes back to For today — open it to change its time.' }]
+      return [{ kind: 'refuse', reason: 'Only a task goes back to To do — open it to change its time.' }]
     }
     return [...leavingGroup, { kind: 'make-all-day', itemId: active.id }]
   }

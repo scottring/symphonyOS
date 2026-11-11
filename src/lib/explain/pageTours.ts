@@ -55,7 +55,7 @@ export const PAGE_TOURS: Record<string, TourPart[]> = {
   today: [
     { target: 'page-title', title: 'Today', text: 'Today is for doing: what you are doing today, with what you need to do it.' },
     { target: 'region:The day', title: 'The day', text: 'The day’s hours to scale, with timed things on them and how many hours are still open.' },
-    { target: /^region:For (today|this day)$/, title: 'For today', text: 'Things for today without a time. Add task adds one; drag one onto the day to give it a time.' },
+    { target: /^region:To do$/, title: 'To do', text: 'Things for today without a time. Add task adds one; drag one onto the day to give it a time.' },
     { target: 'this-week', title: 'This week', text: 'This week’s tasks with no day yet. Drag one onto the day, or press +, to plan it for today.' },
     { target: 'region:Coming up', title: 'Coming up', text: 'The next few dated things after today.' },
   ],

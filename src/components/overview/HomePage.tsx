@@ -236,7 +236,7 @@ function HomeInner() {
           )}
           {b.chosen.length > 0 && (
             <section className="home-chosen home-card" aria-labelledby="home-chosen-title">
-              <h2 id="home-chosen-title">For today <span className="home-count" aria-hidden="true">{b.chosen.length}</span></h2>
+              <h2 id="home-chosen-title">To do today <span className="home-count" aria-hidden="true">{b.chosen.length}</span></h2>
               <ul>
                 {b.chosen.map((t) => (
                   <li key={t.id}>

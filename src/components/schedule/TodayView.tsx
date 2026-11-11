@@ -992,7 +992,7 @@ export function TodayView({
             allDayId,
             { bucket: 'timed', scheduledFor: midnight, isAllDay: true },
             wasTimed && { bucket: wasTimed.bucket, scheduledFor: wasTimed.scheduledFor, isAllDay: wasTimed.isAllDay },
-            `Moved "${wasTimed?.title}" to For today`,
+            `Moved "${wasTimed?.title}" to To do`,
             ctx.onRegisterUndo,
           )
           if (madeAllDay) notePlaced()
@@ -1575,7 +1575,8 @@ export function TodayView({
               {/* "For today" holds the page's verb (approved white journal,
                   2026-09-22): Add task opens the add box at the head of
                   this list. */}
-              <h2 id="today-focus-heading">{data.isToday ? 'For today' : 'For this day'}</h2>
+              {/* "To do", not "For today" (Scott, 2026-11-11: too close to "The day"). */}
+              <h2 id="today-focus-heading">To do</h2>
               <div className="daybook-heading-actions">
                 {addTaskButton}
               </div>
