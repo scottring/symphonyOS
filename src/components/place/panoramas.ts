@@ -148,10 +148,12 @@ export function sceneryArt(style: SceneryStyle, place: PlaceId, lighting: Scener
 
 // Prints that belong to no place (config/sceneryPrints.ts): one picture for
 // every light and style, in the woodblock band (2172x724).
-// Train yard (Scott, 2026-11-11): the bottom of his print, the four train
-// faces, its top fading into the sky (scripts/scenery/train_yard.py).
+// Train yard (Scott, 2026-11-11): the top of his print — poles, wires and
+// gantries against the sky, the hazy city, the first curving trains — its
+// painted sky keyed out (scripts/scenery/train_yard.py). The skyline is the
+// city's: the wires and gantries draw over the page, they do not conceal it.
 export const PRINTS: Record<SceneryPrintId, Panorama> = {
-  'train-yard': { src: train_yard, veil: train_yard_veil, skyline: 0.12 },
+  'train-yard': { src: train_yard, veil: train_yard_veil, skyline: 0.49 },
 }
 
 /** The art for the chosen background: your place's own scene ('place'),
