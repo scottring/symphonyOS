@@ -65,6 +65,43 @@ struct PlannerHeader<Trailing: View>: View {
 }
 
 /// A 32pt circle button (search, ‹, ›) with a 44pt hit area.
+/// Away from the current period, the way back to it: "Today", "This week",
+/// "This month"… (Scott, 2026-11-11: a today button on every horizon).
+struct BackToNowPill: View {
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(label) { withAnimation(.easeInOut(duration: 0.2)) { action() } }
+            .font(.captionBold)
+            .foregroundStyle(Color.ink)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 10)
+            .frame(minHeight: 32)
+            .background(Color.bgWarm, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.cardBorder, lineWidth: 1))
+            .frame(minHeight: 44)
+            .buttonStyle(.plain)
+    }
+}
+
+extension AppState {
+    /// Whether the period on screen (at this horizon) is the one containing today.
+    func showsCurrentPeriod(seasons: [SeasonBoundary]? = nil) -> Bool {
+        let now = Date()
+        switch horizon {
+        case .today: return isToday
+        case .week: return PlanCalendar.weekStart(selectedDate) == PlanCalendar.weekStart(now)
+        case .month: return PlanCalendar.monthStart(selectedDate) == PlanCalendar.monthStart(now)
+        case .season:
+            return PlanCalendar.season(containing: selectedDate, boundaries: seasons).start
+                == PlanCalendar.season(containing: now, boundaries: seasons).start
+        case .year: return PlanCalendar.year(of: selectedDate) == PlanCalendar.year(of: now)
+        }
+    }
+}
+
 struct CircleIconButton: View {
     let systemImage: String
     let label: String

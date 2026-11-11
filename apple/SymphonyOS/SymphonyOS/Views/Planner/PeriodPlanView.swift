@@ -116,6 +116,9 @@ struct PeriodPlanView: View {
                     DomainMenu()
                     CircleIconButton(systemImage: "chevron.left", label: "Previous \(unit)") { appState.step(-1, seasons: seasons) }
                     CircleIconButton(systemImage: "chevron.right", label: "Next \(unit)") { appState.step(1, seasons: seasons) }
+                    if !appState.showsCurrentPeriod(seasons: seasons) {
+                        BackToNowPill(label: "This \(unit)") { appState.goToCurrentPeriod() }
+                    }
                     PlannerOptionsMenu()
                 }
             }

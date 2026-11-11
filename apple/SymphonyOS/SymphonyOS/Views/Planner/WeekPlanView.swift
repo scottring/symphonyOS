@@ -108,6 +108,9 @@ struct WeekPlanView: View {
                         DomainMenu()
                         CircleIconButton(systemImage: "chevron.left", label: "Previous week") { appState.step(-1) }
                         CircleIconButton(systemImage: "chevron.right", label: "Next week") { appState.step(1) }
+                        if !appState.showsCurrentPeriod() {
+                            BackToNowPill(label: "This week") { appState.goToCurrentPeriod() }
+                        }
                         PlannerOptionsMenu {
                             Button {
                                 layout = layout == "list" ? "days" : "list"
