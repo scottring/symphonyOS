@@ -33,7 +33,8 @@ import { normalizeSchedule, etOffsetMinutes, APP_TZ, localDayBounds, localToday 
 import { TASK_STATUS_PROPERTIES, orderWrites, taskStatusPatch } from './taskStatus.ts'
 import { noteKeyword } from './notesQuery.ts'
 import { DELETE_CALENDAR_EVENT_TOOL, MOVE_CALENDAR_EVENT_TOOL, RECURRENCE_DESCRIPTION_NOTE, RECURRENCE_SCHEMA_PROPERTIES, UPDATE_CALENDAR_EVENT_TOOL, deleteCalendarEvent, moveCalendarEvent, recurrenceLines, updateCalendarEvent } from './calendarTools.ts'
-import { MEAL_SLOTS, type MealSlot, getMeals, resolveDate, setMeal } from './meals.ts'
+import { STORED_MEAL_SLOTS, type MealSlot, getMeals, resolveDate, setMeal } from './meals.ts'
+import { HOUSEHOLD_TOOLS, runHouseholdTool, syncGroceriesForDate } from './householdTools.ts'
 import { summarizeTurn, type TurnWrite } from './outcome.ts'
 import { fenceRetrieved } from './untrusted.ts'
 import { type Surface, SCRATCHPAD_TOOL, WALL_WRITE_TOOLS, addToScratchpad, callerSurface, fenceDb, loadWallFence, parseSurface, systemForSurface, toolAllowed, toolsForSurface, wallClockLine, wallPlanLine } from './wallMode.ts'
@@ -120,9 +121,10 @@ Grounding and verification (important):
 - Only state facts you have actually read from a tool result. Never assert a prior value, schedule, date, or history you have not looked up. If you are not sure, look it up or say you don't know. Do not invent.
 - When the person asks about their notes or wants background or preparation from saved material, use symphony_search_notes if it is available on this surface before concluding there is nothing. Notes may be absent; do not assume a vault or knowledge base was imported. Name the titles of notes you actually find so the person can open their in-app chips; do not print file paths or ".md" filenames. A failed search means you could not check, not that no notes exist.
 - The user's data spans tasks, routines, goals, contacts, lists, notes, meals and calendar events. Before acting on "X", check the right entity type: a recurring item like "Feed Jax dinner" is a routine (symphony_list_routines), not a task. Look it up before assuming it doesn't exist.
+- Calendar events: read with symphony_list_events, then change one with symphony_update_calendar_event (title, time, length, location), symphony_move_calendar_event (to another calendar) or symphony_delete_calendar_event. A repeating event is created with the recurrence field. Deleting is permanent on the real calendar: confirm in one sentence first unless the person plainly asked to delete that event.
 - A dated occasion someone ATTENDS (a show, appointment, party, pickup, reservation) normally belongs on the calendar. However, when the user explicitly asks for a timed task, honor that using a task with scheduled_for and is_all_day=false; do not require a calendar connection. Tasks are to-dos someone DOES. Family occasions go on the family calendar (domain "family").
 - Keep the IDs returned by writes and reuse them in this conversation instead of repeatedly searching. For ONE week task the person states, create it with symphony_create_plan_item and parent_id, then schedule that same ID. For several week tasks, or anything during week planning, use symphony_propose_changes add with goal_id instead. If linking fails, repair the existing item; never create a replacement that leaves a duplicate. After a connection failure, check existing items before retrying a creation.
-- After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified. There is no delete: a task the person no longer wants is set aside (someday) or marked done; a routine they stop is rested (routine_rest on the change card).
+- After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified. Tasks, routines and goals have no delete: a task the person no longer wants is set aside (someday) or marked done; a routine they stop is rested (routine_rest on the change card). Only list items and calendar events can be deleted.
 - When updating an item, change only the fields the user asked about. Do not modify unrelated fields (schedule, time, name, context) as a side effect.
 
 Email:
@@ -143,6 +145,9 @@ Symphony domain model:
 - Dates are ISO (YYYY-MM-DD). Today's date is provided in the first user message.
 
 Routines vs tasks:
+- Recipes: symphony_list_recipes / symphony_get_recipe read the household's recipes; symphony_create_recipe saves one the person dictates. Setting a meal also updates the to-buy list the way the Meals page does (the result says what changed); symphony_read_groceries shows what is on it and which recipe each line came from.
+- School: for questions about the kids' school (events, papers, homework, what came home), read symphony_read_school_digest first; search email only when the digest does not answer it.
+- Life areas: symphony_list_life_areas reads them; symphony_save_life_area adds or renames one when the person asks. Never invent one.
 - Meals live in the family meal plan, not in tasks or the calendar. "What's for dinner" is symphony_get_meals; "dinner tonight is pizza" or "make Thursday tacos" is symphony_set_meal (it replaces that day's meal). Say what it was and what it is now.
 - A routine is a recurring item (e.g. "Feed Jax dinner", "Walk Jax", "Kids morning routine"). Routines are NOT tasks. To find a routine, use symphony_list_routines, never symphony_list_tasks.
 - Routine display is a choice the person can make in chat, on the change card (routine_add or routine_change). show_on_timeline false keeps a routine in Routines but takes it off Today and Week; true shows it when due. Finer switches, matching the routine's panel: show_on_week (also on the Week page's grid of days; default off), show_on_kiosk (on the kitchen kiosk and kids' tablets; default on), show_on_day_grid (pinned to Today's hour grid instead of the day's checklist), background (no row on Today, the kiosk or tablets, while its time still counts, e.g. sleep or school hours). None of these stop, delete, skip or make it private. symphony_read_week shows a routine's display where it differs from the defaults. Preserve the choices when revising a pending draft. Never claim it changed until the proposal is saved.
@@ -440,7 +445,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         date: { type: 'string' },
-        slot: { type: 'string', enum: ['breakfast', 'lunch', 'snack', 'dinner', 'prep'], description: 'default dinner' },
+        slot: { type: 'string', enum: [...STORED_MEAL_SLOTS], description: 'default dinner' },
         title: { type: 'string' },
         recipe_id: { type: 'string', description: 'Optional: a recipe id, when known' },
       },
@@ -573,6 +578,7 @@ const TOOLS = [
       required: ['title', 'start_time', 'domain'],
     },
   },
+  ...HOUSEHOLD_TOOLS,
   UPDATE_CALENDAR_EVENT_TOOL,
   MOVE_CALENDAR_EVENT_TOOL,
   DELETE_CALENDAR_EVENT_TOOL,
@@ -692,6 +698,9 @@ async function runTool(
   }
   const now = () => new Date().toISOString()
   try {
+    // Recipes, groceries, school digest and life areas (householdTools.ts).
+    const household = runHouseholdTool(name, db, input, { userId, today: today ?? local(new Date().toISOString()).date, stableId })
+    if (household) return await household
     switch (name) {
       case 'symphony_list_intentions': {
         let q=db.from('goals').select('*').order('sort_order').limit(100)
@@ -1161,10 +1170,14 @@ async function runTool(
         const today = local(new Date().toISOString()).date
         const date = resolveDate(input.date, today)
         const title = typeof input.title === 'string' ? input.title.trim() : ''
-        const slot = (typeof input.slot === 'string' && (MEAL_SLOTS as readonly string[]).includes(input.slot) ? input.slot : 'dinner') as MealSlot
+        // An unknown slot is refused, never read as dinner ("snack" used to replace dinner).
+        if (input.slot !== undefined && !(STORED_MEAL_SLOTS as readonly string[]).includes(String(input.slot))) return `Error: slot must be one of ${STORED_MEAL_SLOTS.join(', ')}`
+        const slot = (typeof input.slot === 'string' ? input.slot : 'dinner') as MealSlot
         if (!date) return 'Error: date must be YYYY-MM-DD, "today" or "tomorrow"'
         if (!title) return 'Error: title is required'
-        return JSON.stringify(await setMeal(db, userId, { date, slot, title, recipe_id: typeof input.recipe_id === 'string' ? input.recipe_id : null }), null, 2)
+        const saved = await setMeal(db, userId, { date, slot, title, recipe_id: typeof input.recipe_id === 'string' ? input.recipe_id : null })
+        // The Meals page keeps the to-buy list in step with the plan; do the same here.
+        return JSON.stringify({ ...saved, groceries: await syncGroceriesForDate(db, userId, date) }, null, 2)
       }
       case 'symphony_list_lists': {
         let q = db.from('lists').select('id, title, category, visibility, icon')
