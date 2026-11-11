@@ -25,7 +25,7 @@ export interface SocketLike {
 }
 
 export interface RawMessage {
-  key: { remoteJid?: string | null; fromMe?: boolean | null }
+  key: { remoteJid?: string | null; fromMe?: boolean | null; id?: string | null }
   pushName?: string | null
   messageTimestamp?: number | Long | null
   message?: {
@@ -51,35 +51,64 @@ export function toConnectorMessage(rawMsg: RawMessage): ConnectorMessage | null 
   const ts = seconds(rawMsg.messageTimestamp)
   if (ts === null) return null
   return {
+    ...(rawMsg.key.id ? { id: rawMsg.key.id } : {}),
     timestamp: new Date(ts * 1000),
     sender: rawMsg.pushName?.trim() || rawMsg.key.remoteJid || 'unknown',
     text,
   }
 }
 
+/** How far back the history WhatsApp sends on a fresh link is read, at most. */
+export const BACKFILL_DAYS = 7
+
 /** Subscribe to incoming messages. `sources` is a getter, not a snapshot, so
- * a watchlist edit takes effect without a reconnect. */
+ * a watchlist edit takes effect without a reconnect.
+ *
+ * Live messages ('notify') are buffered as they come. History — what
+ * WhatsApp sends when the phone links this device again, as
+ * messaging-history.set or an 'append' upsert — fills the gap the link was
+ * down (2026-11-11: Nov 7–10 were lost): only watched groups, only messages
+ * newer than the source's last delivered message (`since`), and never more
+ * than BACKFILL_DAYS back, so a first link does not replay a group's whole
+ * backlog through extraction. */
 export function attachReceiver(
   sock: SocketLike,
-  { buffer, sources }: { buffer: MessageBuffer; sources: () => WatchedSource[] },
+  { buffer, sources, since = () => null, now = () => new Date() }: {
+    buffer: MessageBuffer
+    sources: () => WatchedSource[]
+    /** The newest message already delivered for a source. */
+    since?: (sourceKey: string) => Date | null
+    now?: () => Date
+  },
 ): void {
+  const take = (rawMsg: RawMessage, history: boolean): boolean => {
+    const jid = rawMsg.key.remoteJid
+    if (!jid || rawMsg.key.fromMe) return false
+    const sourceKey = `whatsapp:${jid}`
+    // The allowlist gate, applied at RECEIPT. An unlisted conversation
+    // never reaches the buffer, so it never reaches memory or the network.
+    if (!isWatched(sources(), 'whatsapp', sourceKey)) return false
+
+    const msg = toConnectorMessage(rawMsg)
+    if (!msg) return false
+    if (history) {
+      const floor = Math.max(since(sourceKey)?.getTime() ?? 0, now().getTime() - BACKFILL_DAYS * 86_400_000)
+      if (msg.timestamp.getTime() <= floor) return false
+    }
+    return buffer.add(sourceKey, msg)
+  }
+
   sock.ev.on('messages.upsert', (arg: unknown) => {
     const ev = arg as UpsertEvent
-    // 'notify' is a live message. 'append'/'prepend' are history sync, which
-    // would replay an entire group's backlog through extraction.
-    if (ev.type !== 'notify') return
+    if (ev.type !== 'notify' && ev.type !== 'append') return
+    for (const rawMsg of ev.messages) take(rawMsg, ev.type !== 'notify')
+  })
 
-    for (const rawMsg of ev.messages) {
-      const jid = rawMsg.key.remoteJid
-      if (!jid || rawMsg.key.fromMe) continue
-      const sourceKey = `whatsapp:${jid}`
-      // The allowlist gate, applied at RECEIPT. An unlisted conversation
-      // never reaches the buffer, so it never reaches memory or the network.
-      if (!isWatched(sources(), 'whatsapp', sourceKey)) continue
-
-      const msg = toConnectorMessage(rawMsg)
-      if (msg) buffer.add(sourceKey, msg)
-    }
+  sock.ev.on('messaging-history.set', (arg: unknown) => {
+    const messages = (arg as { messages?: RawMessage[] }).messages ?? []
+    let n = 0
+    for (const rawMsg of messages) if (take(rawMsg, true)) n++
+    if (n > 0) console.log(`whatsapp: ${n} message(s) from the gap recovered from history`)
   })
 }
 
@@ -105,6 +134,21 @@ export function backoffMs(attempt: number): number {
   return Math.min(5_000 * 2 ** attempt, 5 * 60_000)
 }
 
+/** Waiting to be paired: a fresh code a minute after the last one ran out,
+ * not five minutes, so someone at Settings is not left staring at nothing.
+ * Not faster: many pairing attempts in a row make WhatsApp refuse new links
+ * ("can't link new devices", 2026-11-11). */
+export const PAIRING_RETRY_MS = 60_000
+/** Right after a scan WhatsApp asks for a restart (515); do it at once. */
+const RESTART_MS = 1_000
+
+/** How long to wait before reconnecting after a close. */
+export function reconnectDelay(close: { status?: number; pairing: boolean; attempt: number }): number {
+  if (close.status === DisconnectReason.restartRequired) return RESTART_MS
+  if (close.pairing) return PAIRING_RETRY_MS
+  return backoffMs(close.attempt)
+}
+
 /** Keep a WhatsApp connection alive IN this process.
  *
  * It used to exit on every close and lean on Fly to restart the machine. Fly
@@ -124,14 +168,18 @@ export async function superviseSocket(opts: {
   onUp?: () => void
   onDown?: (why: DownReason) => void
   onUnlinked?: () => Promise<void>
+  /** A pairing code to show someone (Settings), or null once paired. */
+  onQr?: (qr: string | null) => void
   wait?: (ms: number) => Promise<void>
 }): Promise<void> {
   const wait = opts.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
   let attempt = 0
 
-  const reconnect = async (): Promise<void> => {
+  const reconnect = async (first: number): Promise<void> => {
+    let delay = first
     for (;;) {
-      await wait(backoffMs(attempt++))
+      await wait(delay)
+      delay = backoffMs(attempt++)
       try {
         await open()
         return
@@ -144,9 +192,13 @@ export async function superviseSocket(opts: {
   const open = async (): Promise<void> => {
     const sock = await opts.connect()
     let down = false
+    let pairing = false
     sock.ev.on('connection.update', (arg: unknown) => {
-      const u = arg as { connection?: string; lastDisconnect?: { error?: unknown } }
-      if (u.connection === 'open') { attempt = 0; opts.onUp?.(); return }
+      const u = arg as { connection?: string; qr?: string; lastDisconnect?: { error?: unknown } }
+      if (u.qr) { pairing = true; opts.onQr?.(u.qr) }
+      // Connected: any code still shown is spent (after a scan the code came
+      // from the socket before this one).
+      if (u.connection === 'open') { attempt = 0; opts.onQr?.(null); opts.onUp?.(); return }
       if (u.connection !== 'close' || down) return
       down = true
       const status = (u.lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode
@@ -159,7 +211,8 @@ export async function superviseSocket(opts: {
       opts.onDown?.({ unlinked, status })
       void (async () => {
         if (unlinked) await opts.onUnlinked?.().catch((e) => console.error('whatsapp: clearing the old link failed:', e))
-        await reconnect()
+        // Unlinked: the next connect pairs from scratch, so it is a pairing wait too.
+        await reconnect(reconnectDelay({ status, pairing: pairing || unlinked, attempt: attempt++ }))
       })()
     })
     opts.onSocket(sock)

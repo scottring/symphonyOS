@@ -16,6 +16,7 @@ import { PlanningRhythmSettings } from './PlanningRhythmSettings'
 import { SeasonsSettings } from './SeasonsSettings'
 import { DemoControls } from './DemoControls'
 import { SchoolMailCard } from './SchoolMailCard'
+import { SchoolFeedsCard } from './SchoolFeedsCard'
 import { DisplaysSection } from './DisplaysSection'
 import { SignOutSection } from './SignOutSection'
 import { TestAccountReset } from './TestAccountReset'
@@ -684,6 +685,9 @@ export function SettingsPage({
 
             {/* School mail — the household's forwarding address */}
             <SchoolMailCard />
+
+            {/* School feeds — the WhatsApp/ClassDojo worker behind the 5pm digest */}
+            <SchoolFeedsCard />
 
           </div>
         )}

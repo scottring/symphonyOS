@@ -1,5 +1,7 @@
 /** One message from a watched source, normalized across connectors. */
 export interface ConnectorMessage {
+  /** The source's own id, where it has one: a message is buffered once. */
+  id?: string
   timestamp: Date
   sender: string
   text: string

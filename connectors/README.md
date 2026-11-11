@@ -64,9 +64,13 @@ On the phone: WhatsApp -> Settings -> Linked Devices -> Link a Device, and
 scan the QR from the log output. The session persists on the volume across
 deploys and restarts.
 
-If the log says `device unlinked`, the phone dropped the link. The worker
-sets the old link aside (`/data/wa-auth.unlinked-<time>`) and prints a fresh
-QR in `fly logs` — scan it. It keeps running meanwhile, so the ClassDojo half
+If the phone drops the link, the worker sets the old link aside
+(`/data/wa-auth.unlinked-<time>`) and shows a fresh code in the app at
+Settings → School feeds (also as `QR_RAW:` in `fly logs`) — scan it. Codes
+come a minute apart; don't hurry them, since many pairing attempts in a row
+make WhatsApp refuse new links for a while. On the new link, WhatsApp's
+recent history fills the gap: messages from watched groups newer than the last
+delivered one, up to a week back. It keeps running meanwhile, so the ClassDojo half
 of the 5pm digest still goes out. Nothing is lost; the high-water marks stay
 on the volume.
 
@@ -125,3 +129,13 @@ the session cookie to `/data`. The connector reuses that across restarts and
 deploys, so it is genuinely one-time — until ClassDojo expires the session,
 at which point `connector_health.last_error` reads
 "awaiting one-time code" and you run it again.
+
+## When something goes wrong, you hear about it
+
+The worker stamps `connector_health.heartbeat_at` every 5 minutes and
+`last_flush_at` after each 5pm run. `school-feed-check` (pg_cron, every 15
+minutes) emails the account owner from their Gmail when the worker stops, a
+feed errors, or the 5pm run is missed — once per problem, again a day later
+if it's still wrong, and once when it's fixed. Quiet 10pm–7am. The buffer of
+not-yet-sent messages lives at `/data/buffer.json`, so a restart keeps it.
+

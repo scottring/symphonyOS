@@ -4,7 +4,7 @@ import { HighWaterStore } from './highWater.ts'
 import { loadWatchlist, registerDiscovered } from './watchlist.ts'
 import { attachReceiver, makeReceiveOnlySocket, setAsideUnlinkedAuth, superviseSocket } from './whatsapp/adapter.ts'
 import { dueNow, flushAll, localHour } from './scheduler.ts'
-import { recordHealth } from './health.ts'
+import { recordHealth, touchHealth } from './health.ts'
 import { makeClassDojoClient } from './classdojo/client.ts'
 import { toConnectorMessages, discoverTargets } from './classdojo/map.ts'
 import { SessionStore, OtcRequiredError } from './classdojo/session.ts'
@@ -15,7 +15,9 @@ const TICK_MS = 5 * 60 * 1000
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env)
-  const buffer = new MessageBuffer()
+  // On the volume, so a restart keeps what was collected since the last run.
+  const buffer = new MessageBuffer(join(config.stateDir, 'buffer.json'))
+  buffer.load()
   const highWater = new HighWaterStore(join(config.stateDir, 'high-water.json'))
   await highWater.load()
   // A stored ClassDojo session survives restarts, so the one-time-code dance
@@ -37,7 +39,10 @@ async function main(): Promise<void> {
   // and with it the ClassDojo half and the 5pm email, down (see superviseSocket).
   await superviseSocket({
     connect: () => makeReceiveOnlySocket(config.stateDir),
-    onSocket: (sock) => attachReceiver(sock, { buffer, sources: () => sources }),
+    onSocket: (sock) => attachReceiver(sock, { buffer, sources: () => sources, since: (key) => highWater.get(key) }),
+    // The pairing code goes to Settings → School feeds, where it can be
+    // scanned; the Fly log copy stays as the fallback.
+    onQr: (qr) => { void touchHealth(config, 'whatsapp', { pair_qr: qr, pair_qr_at: qr ? new Date().toISOString() : null }) },
     onUp: () => { void recordHealth(config, 'whatsapp', { ok: true }) },
     onDown: ({ unlinked, status }) => {
       void recordHealth(config, 'whatsapp', {
@@ -49,8 +54,13 @@ async function main(): Promise<void> {
   })
   await recordHealth(config, 'whatsapp', { ok: true })
 
+  // Alive: school-feed-check mails the household when this goes stale.
+  const beat = () => { void touchHealth(config, 'whatsapp', { heartbeat_at: new Date().toISOString() }) }
+  beat()
+
   let lastFiredHour: number | null = null
   setInterval(() => {
+    beat()
     // Caught whole: an unhandled rejection here (a network blip reading the
     // watchlist) would crash the process, which is how the digest died before.
     void (async () => {
@@ -125,6 +135,7 @@ async function main(): Promise<void> {
         return
       }
       lastFiredHour = localHour(now, config.timezone)
+      await touchHealth(config, 'whatsapp', { last_flush_at: new Date().toISOString() })
       await recordHealth(config, 'whatsapp', { ok: true })
       if (dojoOk && dojoSources.length > 0) await recordHealth(config, 'classdojo', { ok: true })
     })().catch((e) => console.error('flush tick failed; the next tick retries:', e))

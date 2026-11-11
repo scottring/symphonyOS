@@ -24,3 +24,23 @@ export async function recordHealth(
   )
   if (error) console.error('health upsert failed', error)
 }
+
+/** Stamp other fields on a connector's health row: the heartbeat, the 5pm
+ * run, the pairing code. Never fails the caller. */
+export async function touchHealth(
+  config: Config,
+  connector: 'whatsapp' | 'classdojo',
+  fields: Partial<Record<'heartbeat_at' | 'last_flush_at' | 'pair_qr' | 'pair_qr_at', string | null>>,
+  client?: UpsertClient,
+): Promise<void> {
+  try {
+    const db = client ?? (createClient(config.supabaseUrl, config.serviceRoleKey) as unknown as UpsertClient)
+    const { error } = await db.from('connector_health').upsert(
+      { user_id: config.userId, connector, ...fields },
+      { onConflict: 'user_id,connector' },
+    )
+    if (error) console.error('health touch failed', error)
+  } catch (e) {
+    console.error('health touch failed', e)
+  }
+}

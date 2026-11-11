@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { MessageBuffer } from './buffer'
 
 const msg = (iso: string, text: string) => ({ timestamp: new Date(iso), sender: 'A', text })
@@ -33,5 +36,34 @@ describe('MessageBuffer', () => {
     expect(b.keys()).toEqual(['s'])
     b.drain('s')
     expect(b.keys()).toEqual([])
+  })
+
+  // 2026-11-11: WhatsApp keeps no history the worker can re-read, so a restart
+  // used to lose the day's messages. The buffer now lives on the volume.
+  it('survives a restart: a new buffer on the same file has what the old one held', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'buf-')), 'buffer.json')
+    const a = new MessageBuffer(file)
+    a.add('whatsapp:one', msg('2026-11-11T12:00:00Z', 'kept'))
+    a.add('whatsapp:two', msg('2026-11-11T12:01:00Z', 'sent'))
+    a.drain('whatsapp:two')
+    const b = new MessageBuffer(file)
+    b.load()
+    expect(b.keys()).toEqual(['whatsapp:one'])
+    const [m] = b.drain('whatsapp:one')
+    expect(m!.text).toBe('kept')
+    expect(m!.timestamp).toBeInstanceOf(Date)
+  })
+
+  it('a missing file is an empty buffer', () => {
+    const b = new MessageBuffer(join(tmpdir(), 'no-such-dir-xyz', 'buffer.json'))
+    b.load()
+    expect(b.keys()).toEqual([])
+  })
+
+  it('keeps a message with an id once', () => {
+    const b = new MessageBuffer()
+    expect(b.add('s', { ...msg('2026-11-11T12:00:00Z', 'a'), id: 'X' })).toBe(true)
+    expect(b.add('s', { ...msg('2026-11-11T12:00:00Z', 'a'), id: 'X' })).toBe(false)
+    expect(b.drain('s')).toHaveLength(1)
   })
 })
