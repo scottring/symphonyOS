@@ -5,8 +5,9 @@
 // user from their own Gmail: once when something goes wrong, again if it is
 // still wrong a day later, and once when it is fixed. Quiet 10pm–7am.
 //
-// Auth: the service-role key as a bearer token (the cron job holds it).
+// Auth: the scheduler's service-role key as a bearer token (lib/auth.ts).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { isScheduler } from './lib/auth.ts'
 import { alertKey, awake, feedProblems, shouldMail, type HealthRow } from './lib/problems.ts'
 import { buildMime, gmailAccessToken, gmailAddress, sendGmail } from '../_shared/gmailSend.ts'
 
@@ -16,7 +17,7 @@ const escape = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '
 
 export async function handler(req: Request): Promise<Response> {
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  if (!key || req.headers.get('authorization') !== `Bearer ${key}`) return json({ error: 'unauthorized' }, 401)
+  if (!isScheduler(req.headers.get('authorization'), key)) return json({ error: 'unauthorized' }, 401)
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, key)
   const now = new Date()

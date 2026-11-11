@@ -263,6 +263,10 @@ inspector_port = 8083
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 # entrypoint = "./functions/MY_FUNCTION_NAME/index.ts"
 
+# The scheduler's JWT is checked by the gateway; lib/auth.ts relies on it.
+[functions.school-feed-check]
+verify_jwt = true
+
 [functions.capture-to-inbox]
 verify_jwt = false
 
