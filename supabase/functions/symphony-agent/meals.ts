@@ -8,35 +8,30 @@
 // (a main beside a side); setting a meal replaces that entry in place, so
 // Today, Week and the wall all show the change.
 
+//
+// Slots and dates come from _shared/mealDays.ts, the same rules the Meals
+// page's chat (meal-planner-chat) uses.
+
+import { STORED_MEAL_SLOTS, isStoredMealSlot, addDays, resolveDate, weekOf } from '../_shared/mealDays.ts'
+
+export { STORED_MEAL_SLOTS, addDays, resolveDate, weekOf }
+
+/** The slot words the symphony_set_meal schema in index.ts still offers.
+ *  Only STORED_MEAL_SLOTS can be written: the table's CHECK refuses snack and
+ *  prep, so setMeal turns them away with a plain reason. Kept here, not
+ *  narrowed, because index.ts defaults an unknown slot to dinner, and a
+ *  narrowed list would quietly turn "snack" into replacing dinner. */
 export const MEAL_SLOTS = ['breakfast', 'lunch', 'snack', 'dinner', 'prep'] as const
 export type MealSlot = typeof MEAL_SLOTS[number]
 
+/** Why a slot can't be written, or null when it can. */
+export function unstoredSlotReason(slot: string): string | null {
+  return isStoredMealSlot(slot) ? null
+    : `The meal plan holds ${STORED_MEAL_SLOTS.join(', ')} only; there is no ${slot} slot. Nothing was changed.`
+}
+
 // deno-lint-ignore no-explicit-any
 type Db = any
-
-const ISO = /^\d{4}-\d{2}-\d{2}$/
-
-/** "Today", "tomorrow" or a YYYY-MM-DD, against the user's today. */
-export function resolveDate(raw: unknown, today: string): string | null {
-  const s = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
-  if (!s || s === 'today' || s === 'tonight') return today
-  if (s === 'tomorrow') return addDays(today, 1)
-  if (!ISO.test(s)) return null
-  const d = new Date(`${s}T12:00:00Z`)
-  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s ? null : s
-}
-
-export function addDays(iso: string, n: number): string {
-  const d = new Date(`${iso}T12:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-
-/** The plan week (Sunday start) and weekday (0 = Sunday) a date falls in. */
-export function weekOf(iso: string): { weekStart: string; dayOfWeek: number } {
-  const dow = new Date(`${iso}T12:00:00Z`).getUTCDay()
-  return { weekStart: addDays(iso, -dow), dayOfWeek: dow }
-}
 
 export interface EntryRow {
   id: string
@@ -101,7 +96,7 @@ export async function getMeals(db: Db, start: string, days: number) {
   return dates.map((date) => {
     const { weekStart, dayOfWeek } = weekOf(date)
     const planId = plans.get(weekStart)
-    const meals = MEAL_SLOTS.flatMap((slot) => {
+    const meals = STORED_MEAL_SLOTS.flatMap((slot) => {
       const e = planId ? primaryEntry(entries.filter((x) => x.meal_plan_id === planId), dayOfWeek, slot) : undefined
       return e ? [{ slot, title: entryTitle(e, byId), entry_id: e.id, recipe_id: e.recipe_id }] : []
     })
@@ -111,6 +106,8 @@ export async function getMeals(db: Db, start: string, days: number) {
 
 /** Set a day's meal for a slot, replacing what was there. */
 export async function setMeal(db: Db, userId: string, input: { date: string; slot: MealSlot; title: string; recipe_id?: string | null }) {
+  const refused = unstoredSlotReason(input.slot)
+  if (refused) throw new Error(refused)
   const title = input.title.trim().slice(0, 200)
   const { weekStart, dayOfWeek } = weekOf(input.date)
 

@@ -1,7 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
-import { DAY_NAMES, addDaysIso, dateInWindow, dayInWindow, dayLabel, weekdayOf, windowWeeks } from './window.ts'
+import { DAY_NAMES, addDaysIso, dateInWindow, dayLabel, slotDay, weekdayOf, windowWeeks } from './window.ts'
+import { STORED_MEAL_SLOTS, isStoredMealSlot } from '../_shared/mealDays.ts'
 
 // ════════════════════════════════════════════════════════════════
 // MEAL-PLANNER CHAT — a Claude tool-calling loop that writes DIRECTLY to
@@ -55,8 +56,8 @@ function scopeFor(
 const MODEL = 'claude-sonnet-4-6'
 const MAX_TURNS = 12
 
-const SLOTS = ['breakfast', 'lunch', 'dinner'] as const
-type MealSlot = typeof SLOTS[number]
+// The table's slots, shared with Symphony's meal tools (_shared/mealDays.ts).
+const SLOT_ERROR = `Error: slot must be one of ${STORED_MEAL_SLOTS.join(', ')}.`
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -99,14 +100,15 @@ const TOOLS: any[] = [
     input_schema: {
       type: 'object',
       properties: {
-        day_of_week: { type: 'integer', minimum: 0, maximum: 6, description: '0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday — matches JS Date.getDay(). Each weekday is one date in the week being planned (listed in the system prompt).' },
-        slot: { type: 'string', enum: ['breakfast', 'lunch', 'dinner'] },
+        date: { type: 'string', description: 'The day, YYYY-MM-DD, inside the week being planned (each day and its date are listed in the system prompt).' },
+        day_of_week: { type: 'integer', minimum: 0, maximum: 6, description: 'Older form of the day: 0=Sunday .. 6=Saturday. Prefer date.' },
+        slot: { type: 'string', enum: [...STORED_MEAL_SLOTS] },
         recipe_id: { type: 'string' },
         title: { type: 'string' },
         leftover_from_entry_id: { type: 'string' },
         for_member: { type: 'string', description: 'A household member\'s name (see the list in the system prompt) to set this meal for just that person. Omit for the shared whole-family meal.' },
       },
-      required: ['day_of_week', 'slot'],
+      required: ['date', 'slot'],
     },
   },
   {
@@ -115,10 +117,11 @@ const TOOLS: any[] = [
     input_schema: {
       type: 'object',
       properties: {
-        day_of_week: { type: 'integer', minimum: 0, maximum: 6, description: '0=Sunday .. 6=Saturday' },
-        slot: { type: 'string', enum: ['breakfast', 'lunch', 'dinner'] },
+        date: { type: 'string', description: 'The day, YYYY-MM-DD, inside the week being planned.' },
+        day_of_week: { type: 'integer', minimum: 0, maximum: 6, description: 'Older form of the day: 0=Sunday .. 6=Saturday. Prefer date.' },
+        slot: { type: 'string', enum: [...STORED_MEAL_SLOTS] },
       },
-      required: ['day_of_week', 'slot'],
+      required: ['date', 'slot'],
     },
   },
   {
@@ -283,7 +286,7 @@ function buildSystemPrompt(weekStart: string, ctx: PlanContext): string {
   const weekEnd = addDaysIso(weekStart, 6)
   const dayLines = Array.from({ length: 7 }, (_, i) => {
     const date = addDaysIso(weekStart, i)
-    return `${dayLabel(date)} (${date}) = day_of_week ${weekdayOf(date)}`
+    return `${dayLabel(date)} = ${date}`
   }).join('; ')
   const rangeLine = (ctx.startsOn || ctx.endsOn)
     ? `ACTIVE RANGE: this week is PARTIAL. Only ${ctx.startsOn ?? weekStart} through ${ctx.endsOn ?? weekEnd} is being planned. Never propose meals, call set_slot, or suggest groceries for days outside this range.`
@@ -302,8 +305,8 @@ Rules:
 - You do not have calendar access. Never invent or assume events, activities, or plans for the week — only plan around schedule constraints the user actually tells you about in chat.
 
 Day/slot model:
-- Each day has three slots: breakfast, lunch, dinner.
-- day_of_week is 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday — this matches JS Date.getDay(). This week runs ${dayLabel(weekStart)} to ${dayLabel(weekEnd)}, so each weekday is exactly one date: ${dayLines}. Propose and list the nights in that order, starting with ${DAY_NAMES[weekdayOf(weekStart)]}.
+- Each day has three slots: ${STORED_MEAL_SLOTS.join(', ')}. There is no snack or prep slot; say so if asked rather than putting it in another slot.
+- Name a day by its date (YYYY-MM-DD) in set_slot and clear_slot. This week runs ${dayLabel(weekStart)} to ${dayLabel(weekEnd)}: ${dayLines}. Propose and list the nights in that order, starting with ${DAY_NAMES[weekdayOf(weekStart)]}.
 - Use set_slot to fill or replace a slot (it replaces whatever was there), clear_slot to empty one.
 - Meals can DIVERGE per person. A slot normally has one shared whole-family meal, but when the household eats differently that day (e.g. Scott and Iris have different lunches, or the kids eat separately on date night) call set_slot with for_member = a person's name to set just their meal. Omit for_member for the shared meal. Setting one person's meal leaves the shared meal and everyone else's untouched. Household members: ${ctx.members.map(m => m.name).join(', ') || '(none on record)'}.
 - The week can be PARTIAL. If the user says they are away or unavailable for part of the week ("we get back Tuesday", "we leave Friday morning"), call set_week_range with the first and/or last planned date, then plan only the days inside the range. Days outside the active range never get proposals, set_slot calls, or grocery items.
@@ -396,14 +399,6 @@ function asNonEmptyString(v: unknown): string | null {
   return typeof v === 'string' && v.trim().length > 0 ? v.trim() : null
 }
 
-/** Strict day_of_week guard: only an actual integer number 0-6 passes.
- *  `Number(...)` coercion would silently accept `null` (-> 0), `true`
- *  (-> 1), `""` (-> 0), etc — reject those instead of miscoercing them. */
-function strictDayOfWeek(v: unknown): number | null {
-  if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 6) return null
-  return v
-}
-
 async function runTool(
   db: SupabaseClient,
   userId: string,
@@ -417,12 +412,11 @@ async function runTool(
   try {
     switch (name) {
       case 'set_slot': {
-        const dayOfWeek = strictDayOfWeek(input.day_of_week)
-        const slot = String(input.slot ?? '') as MealSlot
-        if (dayOfWeek === null) {
-          return 'Error: day_of_week must be an integer 0-6 (0=Sunday..6=Saturday).'
-        }
-        if (!SLOTS.includes(slot)) return 'Error: slot must be one of breakfast, lunch, dinner.'
+        const day = slotDay(weekStart, input)
+        if ('error' in day) return day.error
+        const dayOfWeek = day.dayOfWeek
+        const slot = input.slot
+        if (!isStoredMealSlot(slot)) return SLOT_ERROR
         const recipeId = asNonEmptyString(input.recipe_id)
         const title = asNonEmptyString(input.title)
         const leftoverFrom = asNonEmptyString(input.leftover_from_entry_id)
@@ -439,8 +433,7 @@ async function runTool(
           forMemberId = match.id
         }
 
-        // The weekday's date in this week, stored under its own Sunday week.
-        const day = dayInWindow(weekStart, dayOfWeek)
+        // The day's date in this week, stored under its own Sunday week.
         const planId = await resolvePlanId(db, userId, day.week, planCache)
 
         // leftover_from must point at a REAL entry in THIS week's plans —
@@ -487,14 +480,12 @@ async function runTool(
         return `Set ${dayLabel(day.date)} ${slot}${who} -> ${title ?? recipeId}. Entry: ${JSON.stringify(data)}`
       }
       case 'clear_slot': {
-        const dayOfWeek = strictDayOfWeek(input.day_of_week)
-        const slot = String(input.slot ?? '') as MealSlot
-        if (dayOfWeek === null) {
-          return 'Error: day_of_week must be an integer 0-6 (0=Sunday..6=Saturday).'
-        }
-        if (!SLOTS.includes(slot)) return 'Error: slot must be one of breakfast, lunch, dinner.'
+        const day = slotDay(weekStart, input)
+        if ('error' in day) return day.error
+        const dayOfWeek = day.dayOfWeek
+        const slot = input.slot
+        if (!isStoredMealSlot(slot)) return SLOT_ERROR
 
-        const day = dayInWindow(weekStart, dayOfWeek)
         const planId = await resolvePlanId(db, userId, day.week, planCache)
         const { error, count } = await db.from('meal_plan_entries')
           .delete({ count: 'exact' })

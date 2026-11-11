@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { dateInWindow, dayInWindow, dayLabel, windowWeeks } from './window'
+import { dateInWindow, dayInWindow, dayLabel, slotDay, windowWeeks } from './window'
+import { resolveDate, weekOf } from '../_shared/mealDays'
 
 describe('meal chat window', () => {
   it('a Saturday week: each weekday names one date, stored under its Sunday week', () => {
@@ -22,5 +23,30 @@ describe('meal chat window', () => {
 
   it('names a day with its date', () => {
     expect(dayLabel('2026-10-24')).toBe('Saturday Oct 24')
+  })
+
+  it('addresses a day by its date, as Symphony\'s meal tools do, stored under its Sunday week', () => {
+    expect(slotDay('2026-10-24', { date: '2026-10-24' })).toEqual({ date: '2026-10-24', week: '2026-10-18', dayOfWeek: 6 })
+    expect(slotDay('2026-10-24', { date: '2026-10-30' })).toEqual({ date: '2026-10-30', week: '2026-10-25', dayOfWeek: 5 })
+  })
+
+  it('agrees with Symphony\'s meal tools on where a date is stored', () => {
+    for (const date of ['2026-10-24', '2026-10-25', '2026-10-30']) {
+      const day = slotDay('2026-10-24', { date })
+      const { weekStart, dayOfWeek } = weekOf(resolveDate(date, '2026-10-24')!)
+      expect(day).toMatchObject({ week: weekStart, dayOfWeek })
+    }
+  })
+
+  it('still takes a weekday from an older conversation', () => {
+    expect(slotDay('2026-10-24', { day_of_week: 0 })).toEqual({ date: '2026-10-25', week: '2026-10-25', dayOfWeek: 0 })
+  })
+
+  it('refuses a date outside the week, a bad date, a date that contradicts its weekday, and no day at all', () => {
+    expect(slotDay('2026-10-24', { date: '2026-10-31' })).toEqual({ error: expect.stringContaining('outside the week') })
+    expect(slotDay('2026-10-24', { date: '2026-02-30' })).toEqual({ error: 'Error: date must be YYYY-MM-DD.' })
+    expect(slotDay('2026-10-24', { date: '2026-10-24', day_of_week: 0 })).toEqual({ error: expect.stringContaining('is a Saturday') })
+    expect(slotDay('2026-10-24', { day_of_week: true })).toEqual({ error: expect.stringContaining('integer 0-6') })
+    expect(slotDay('2026-10-24', {})).toEqual({ error: expect.stringContaining('give the date') })
   })
 })

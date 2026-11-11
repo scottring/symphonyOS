@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, entryTitle, getMeals, primaryEntry, resolveDate, setMeal, weekOf, type EntryRow } from './meals'
+import { STORED_MEAL_SLOTS, addDays, entryTitle, getMeals, primaryEntry, resolveDate, setMeal, unstoredSlotReason, weekOf, type EntryRow } from './meals'
 
 // ── An in-memory stand-in for the three tables, enough for these queries ──
 type Row = Record<string, unknown>
@@ -125,5 +125,21 @@ describe('setMeal', () => {
     await setMeal(db, 'scott', { date: '2026-10-19', slot: 'dinner', title: 'Pasta' })
     expect(tables.meal_plans.at(-1)).toMatchObject({ user_id: 'scott', week_start: '2026-10-18' })
     expect((await getMeals(db, '2026-10-19', 1))[0].meals[0].title).toBe('Pasta')
+  })
+
+  it('turns away a snack or prep slot the table would refuse, writing nothing', async () => {
+    const { db, tables } = seed()
+    const before = tables.meal_plan_entries.length
+    await expect(setMeal(db, 'scott', { date: TODAY, slot: 'snack', title: 'Apples' })).rejects.toThrow('breakfast, lunch, dinner only')
+    await expect(setMeal(db, 'scott', { date: TODAY, slot: 'prep', title: 'Chop onions' })).rejects.toThrow('Nothing was changed')
+    expect(tables.meal_plan_entries).toHaveLength(before)
+  })
+})
+
+describe('slots', () => {
+  it('reads only the slots the table stores', () => {
+    expect(STORED_MEAL_SLOTS).toEqual(['breakfast', 'lunch', 'dinner'])
+    expect(unstoredSlotReason('lunch')).toBeNull()
+    expect(unstoredSlotReason('snack')).toMatch(/no snack slot/)
   })
 })
