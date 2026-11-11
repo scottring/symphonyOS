@@ -312,6 +312,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // The week's page holds the masthead (open journal, 2026-11-11).
   const mastheadHost = useContext(WeekMastheadHostContext)
   const [calPastOpen, setCalPastOpen] = useState(false)
+  // The calendar's now line and the week's sentence: a clock read once a minute.
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => { const id = setInterval(() => setNowMs(Date.now()), 60_000); return () => clearInterval(id) }, [])
   // The page's view choices, remembered on this device (calm pass 2).
   const prefs = useWeekViewPrefs()
   const showDone = prefs.done
@@ -1042,7 +1045,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           const gone = isCurrent ? days.filter((d) => d.key < todayKey) : []
           const goneCount = gone.reduce((n, d) => n + d.events.length + (d.dinners ?? []).length + (d.specials ?? []).length, 0)
           const shown = isCurrent && !calPastOpen ? days.filter((d) => d.key >= todayKey) : days
-          const nowMs = Date.now()
           const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' })
           return <>
             {gone.length > 0 && (
@@ -1114,7 +1116,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {mastheadHost ? <>
           {/* The masthead (HomeHeader) is drawn here, then the week in one sentence. */}
           <div className="wl-masthead" ref={mastheadHost} />
-          {isCurrent && <p className="wl-lede">{weekSentence({ days, spans, now: new Date(), todayKey, open: openMain.length })}</p>}
+          {isCurrent && <p className="wl-lede">{weekSentence({ days, spans, now: new Date(nowMs), todayKey, open: openMain.length })}</p>}
         </> : <p className="above-sheet-kicker">Week · {range}</p>}
         <h2 className="above-sheet-title wl-title">{sheetTitle}</h2>
         <section className="wl-some" aria-label="The week’s list" data-testid="week-sometime" data-explain="still-to-place" data-explain-label="This week’s list">
