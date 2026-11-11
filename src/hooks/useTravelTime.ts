@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getHomeLocation } from '@/lib/homeLocation'
-import { formatTravelEstimate, getTravelEstimate, isTravelDestination } from '@/lib/travelTime'
+import { formatTravelDuration, formatTravelEstimate, getTravelEstimate, isTravelDestination } from '@/lib/travelTime'
+import { routeMode, type TravelChoice } from '@/lib/travelChoice'
 import type { TravelMode } from '@/types/directions'
 
 interface TravelTimeTarget {
@@ -13,7 +14,8 @@ interface TravelTimeTarget {
 interface TravelTimeOptions {
   /** Skip the lookup entirely (row not visible, feature off). */
   enabled?: boolean
-  mode?: TravelMode
+  /** How you're getting there; Uber ('rideshare') is timed as a drive. */
+  mode?: TravelMode | TravelChoice
 }
 
 const sameAddress = (a: string, b: string) =>
@@ -58,10 +60,12 @@ export function useTravelTime(
         originPlaceId: home.placeId,
         destination,
         destinationPlaceId: locationPlaceId ?? undefined,
-        mode,
+        mode: routeMode(mode),
       })
       if (cancelled) return
-      setLabel(estimate ? formatTravelEstimate(estimate.durationSeconds, mode) : null)
+      setLabel(!estimate ? null
+        : mode === 'rideshare' ? `${formatTravelDuration(estimate.durationSeconds)} by Uber`
+          : formatTravelEstimate(estimate.durationSeconds, mode))
     })()
 
     return () => {

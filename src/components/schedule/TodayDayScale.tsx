@@ -15,6 +15,8 @@ import type { ProposedRow, RowMark } from './todayPreview'
 import { TaskCheckbox } from './TaskCheckbox'
 import { TodayQuietBand } from './TodayQuietBand'
 import { TimelineQuickInput, type TimelineCaptureResult } from './TimelineQuickInput'
+import { TravelChip } from './TravelChip'
+import { travelKey, useTravelChoice } from '@/lib/travelChoice'
 import type { ParserContext } from '@/lib/quickInputParser'
 
 /**
@@ -131,7 +133,8 @@ function ScaleItem({ item, start, end: savedEnd, hasEnd: savedHasEnd, block, pxP
   const hasEnd = resizeTo !== null || savedHasEnd
   const isEvent = item.type === 'event'
   // How far away it is, drawn above it as the time it takes to get there.
-  const travel = useTravelTime(item, { enabled: isEvent && !item.completed && !past })
+  const [travelChoice, chooseTravel] = useTravelChoice(travelKey(item))
+  const travel = useTravelTime(item, { enabled: isEvent && !item.completed && !past, mode: travelChoice })
   const driveH = travel ? Math.max(14, (driveMinutes(travel) / 60) * pxPerHour) : 0
   const time = hasEnd ? `${clock(start)}–${clock(end)}` : clock(start)
   const lanes = block.lanes
@@ -146,8 +149,8 @@ function ScaleItem({ item, start, end: savedEnd, hasEnd: savedHasEnd, block, pxP
   return (
     <>
       {travel && block.lane === 0 && block.top - driveH > 0 && (
-        <div className="today-scale-drive" style={{ top: block.top - driveH, height: driveH, left: pos.left }} aria-hidden="true">
-          {travel}
+        <div className="today-scale-drive" style={{ top: block.top - driveH, height: driveH, left: pos.left }}>
+          <TravelChip label={travel} choice={travelChoice} onChoose={chooseTravel} />
         </div>
       )}
       <div
@@ -395,7 +398,7 @@ export function TodayDayScale({
   }
   // Only the column itself, its hour lines and its free stretches open a box.
   const onEmpty = (target: EventTarget) =>
-    target instanceof Element && !target.closest('.today-scale-item, .today-scale-quiet, .today-scale-draft')
+    target instanceof Element && !target.closest('.today-scale-item, .today-scale-quiet, .today-scale-draft, .travel-chip')
   const createHandlers = create ? {
     onClick: (e: React.MouseEvent) => {
       if (!onEmpty(e.target) || draft) return

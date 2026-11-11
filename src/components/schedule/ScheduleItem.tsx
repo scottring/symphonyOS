@@ -21,6 +21,7 @@ import { rowSubtitle } from '@/lib/rowSubtitle'
 import { TimelineSpine } from './TimelineSpine'
 import { locationLink } from '@/lib/locationLink'
 import { useTravelTime } from '@/hooks/useTravelTime'
+import { travelKey, useTravelChoice } from '@/lib/travelChoice'
 
 
 interface ScheduleItemProps {
@@ -157,7 +158,9 @@ export const ScheduleItem = memo(function ScheduleItem({
   // "18 min drive" for a row with a real address — null for a video meeting,
   // an unset home address, or anything already done. Cached per address, so a
   // recurring destination is looked up once, not once per render.
-  const travelLabel = useTravelTime(item, { enabled: !item.completed && !item.skipped })
+  // How you're getting there, as chosen on the day (travelChoice.ts).
+  const [travelChoice] = useTravelChoice(travelKey(item))
+  const travelLabel = useTravelTime(item, { enabled: !item.completed && !item.skipped, mode: travelChoice })
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
@@ -417,8 +420,8 @@ export const ScheduleItem = memo(function ScheduleItem({
               {contextLabel && <span className="truncate">{contextLabel}</span>}
               {travelLabel && (
                 <span className="shrink-0 inline-flex items-center gap-1 text-neutral-500">
-                  <Car className="w-3 h-3 shrink-0" aria-hidden />
-                  {travelLabel.replace(/ drive$/, '')}
+                  {travelChoice === 'driving' && <Car className="w-3 h-3 shrink-0" aria-hidden />}
+                  {travelChoice === 'driving' ? travelLabel.replace(/ drive$/, '') : travelLabel}
                 </span>
               )}
             </div>

@@ -1,5 +1,4 @@
 import { useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
-import { Car } from 'lucide-react'
 import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember, FamilyMemberColor } from '@/types/family'
@@ -13,6 +12,8 @@ import { agendaEntries, buildAgenda, nextQuarter, shortClock, type AgendaEntry, 
 import type { DayScaleHandle } from './TodayDayScale'
 import type { ProposedRow, RowMark } from './todayPreview'
 import { TaskCheckbox } from './TaskCheckbox'
+import { TravelChip } from './TravelChip'
+import { travelKey, useTravelChoice } from '@/lib/travelChoice'
 
 /**
  * The day as a short list (Scott, 2026-11-11: board A, "switch to the short
@@ -58,7 +59,8 @@ function AgendaItemRow({ entry, people, selected, upNext, past, refused, landing
   const { item, start, end, hasEnd } = entry
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: refused })
   const isEvent = item.type === 'event'
-  const travel = useTravelTime(item, { enabled: isEvent && !item.completed && !past })
+  const [travelChoice, chooseTravel] = useTravelChoice(travelKey(item))
+  const travel = useTravelTime(item, { enabled: isEvent && !item.completed && !past, mode: travelChoice })
   const done = item.completed || !!item.skipped
   const background = !!item.originalRoutine?.background
   const label = `${item.title}, ${formatTimeLong(start)}${hasEnd ? ` to ${formatTimeLong(end)}` : ''}${done ? ', done' : ''}${upNext ? ', up next' : ''}`
@@ -102,16 +104,19 @@ function AgendaItemRow({ entry, people, selected, upNext, past, refused, landing
         ) : <span className="ag-dot" aria-hidden="true" />}
       </span>
       <div className="ag-body">
-        <button type="button" className="ag-open" aria-label={label} onClick={() => onSelect(item.id)}>
-          <span className="ag-title">{item.title}</span>
-          {(hasEnd || travel || mark?.note) && (
-            <span className="ag-sub">
-              {hasEnd && <span>Until {shortClock(end)}</span>}
-              {travel && <span className="ag-travel"><Car size={13} aria-hidden="true" />{travel}</span>}
-              {mark?.note && <span className="wc-proposed-note">{mark.note}</span>}
-            </span>
-          )}
-        </button>
+        <div className="ag-main">
+          <button type="button" className="ag-open" aria-label={label} onClick={() => onSelect(item.id)}>
+            <span className="ag-title">{item.title}</span>
+            {(hasEnd || mark?.note) && (
+              <span className="ag-sub">
+                {hasEnd && <span>Until {shortClock(end)}</span>}
+                {mark?.note && <span className="wc-proposed-note">{mark.note}</span>}
+              </span>
+            )}
+          </button>
+          {/* How you're getting there, one hover away (2026-11-11). */}
+          <TravelChip label={travel} choice={travelChoice} onChoose={chooseTravel} className="ag-travel" />
+        </div>
         {people.length > 0 && (
           <span className="ag-people">{people.slice(0, 3).map((m) => <MiniAvatar key={m.id} member={m} />)}</span>
         )}

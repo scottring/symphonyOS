@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
+import { EventTravel } from '@/components/schedule/TravelChip'
 import { useItemDiscussionLabel } from '@/hooks/useItemDiscussionLabel'
 
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -605,6 +606,8 @@ export function TapEventPanel(props: TapEventPanelProps) {
               onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
               onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
             />
+            {/* How you're getting there: the same choice as on the day. */}
+            {isPhysicalLocation && <EventTravel eventKey={eventId} location={event.location} meetingUrl={event.meeting_url ?? event.meetingUrl} />}
           </div>)}
 
           {show('notes') && (<div data-prep-field="notes">

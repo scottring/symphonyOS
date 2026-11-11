@@ -71,12 +71,16 @@ const VERB: Record<TravelMode, string> = {
 }
 
 /** 1080 → "18 min drive". Hours roll over; never reads "0 min". */
-export function formatTravelEstimate(durationSeconds: number, mode: TravelMode): string {
+/** "18 min", "1 hr 5 min". */
+export function formatTravelDuration(durationSeconds: number): string {
   const minutes = Math.max(1, Math.round(durationSeconds / 60))
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
-  const time = hours === 0 ? `${minutes} min` : rest === 0 ? `${hours} hr` : `${hours} hr ${rest} min`
-  return `${time} ${VERB[mode]}`
+  return hours === 0 ? `${minutes} min` : rest === 0 ? `${hours} hr` : `${hours} hr ${rest} min`
+}
+
+export function formatTravelEstimate(durationSeconds: number, mode: TravelMode): string {
+  return `${formatTravelDuration(durationSeconds)} ${VERB[mode]}`
 }
 
 function readCache(key: string): TravelEstimate | null {
