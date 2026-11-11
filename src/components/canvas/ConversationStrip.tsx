@@ -334,7 +334,7 @@ export function ConversationStrip({ chatOnly = false, onSend, busy, voice, onOpe
 }
 
 /** One truthful result after the draft has finished saving; keep failures explicit. */
-function ChatReceipt({ receipt, onUndo, onRetry, busy }: { receipt: CanvasReceipt; onUndo: () => void; onRetry: () => void; busy: boolean }) {
+export function ChatReceipt({ receipt, onUndo, onRetry, busy }: { receipt: CanvasReceipt; onUndo: () => void; onRetry: () => void; busy: boolean }) {
   const undone = receipt.summary === 'Undone'
   const undoing = receipt.summary === 'Undoing…'
   const count = receipt.changeCount

@@ -16,13 +16,15 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
-import type { AgentApiMessage, AgentSourceNote, AssistantTaskContext } from '@/lib/agentStream'
+import type { AgentApiMessage, AgentProposalItem, AgentSourceNote, AssistantTaskContext } from '@/lib/agentStream'
 import { runAgentTurn } from '@/lib/agentTurn'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
 import { emitThreadRead } from '@/lib/discussions/readSignal'
 import { memberForAuthUser, type Scope } from '@/lib/scope'
 import { sharedWithNames } from '@/lib/discussions/sharedWith'
+import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
+import type { ChangeSet } from '@/lib/canvas/changeCard'
 
 export interface DiscussEntity {
   type: 'task' | 'routine' | 'event'
@@ -134,6 +136,12 @@ export function buildDiscussApiMessages(thread: DiscussMessage[]): AgentApiMessa
   ]
 }
 
+/** The change card each thread last proposed, by thread id, so reopening the
+ *  drawer in this tab shows a card that is still waiting. The card itself is
+ *  the shell's one pending card (CanvasActivityContext); this only says which
+ *  thread it came from. */
+const threadCards = new Map<string, string>()
+
 export function useDiscussThread(
   entity: DiscussEntity | null,
   options: UseDiscussThreadOptions = {},
@@ -151,6 +159,13 @@ export function useDiscussThread(
   const [reads, setReads] = useState<Record<string, Date>>({})
 
   const { members, getCurrentUserMember } = useFamilyMembers()
+
+  // Change cards: a card Symphony proposes in a thread becomes the shell's one
+  // pending card, saved and undone through the same path as the chat pane.
+  const canvas = useCanvasActivity()
+  const canvasRef = useRef(canvas)
+  useEffect(() => { canvasRef.current = canvas })
+  const [cardKey, setCardKey] = useState<string | null>(null)
 
   // The viewer's AUTH id — what every author carries, and the only reliable way
   // to tell "mine" from "my partner's". Not the member row's auth_user_id: that
@@ -180,6 +195,7 @@ export function useDiscussThread(
   useEffect(() => {
     threadIdRef.current = null
     setThreadId(null)
+    setCardKey(null)
     setMessages([])
     setMeta(null)
     setReads({})
@@ -204,6 +220,7 @@ export function useDiscussThread(
         }
         threadIdRef.current = data
         setThreadId(data)
+        setCardKey(threadCards.get(data) ?? null)
       } catch {
         if (!cancelled) {
           setError(DISCUSS_UNAVAILABLE)
@@ -373,12 +390,26 @@ export function useDiscussThread(
       { id: assistantId, role: 'assistant', content: '', timestamp: new Date(), author: SYMPHONY_AUTHOR },
     ])
 
+    // Tell the turn about this thread's card (still waiting, or what became of
+    // it) so a revision re-sends the whole list. A card from somewhere else is
+    // left for the conversation it came from.
+    const ownCard = threadCards.get(id)
+    const pendingNow = canvasRef.current.changeSet
+    const changeCard = ownCard && (!pendingNow || pendingNow.key === ownCard)
+      ? canvasRef.current.takeChangeCard()
+      : undefined
+    let pendingCard: ChangeSet | undefined
+    let pendingProposals: AgentProposalItem[] | undefined
+
     const turn = await runAgentTurn(buildDiscussApiMessages(thread), {
       onText: (chunk) => {
         setMessages((prev) => prev.map((m) =>
           m.id === assistantId ? { ...m, content: m.content + chunk } : m))
       },
       onTool: (name) => setToolActivity((prev) => [...prev, name]),
+      onChangeSet: (set) => { pendingCard = set },
+      onProposal: (items) => { pendingProposals = items },
+      changeCard,
       onReplyFallback: (reply) => {
         setMessages((prev) => prev.map((m) =>
           m.id === assistantId && m.content.length === 0 ? { ...m, content: reply } : m))
@@ -410,6 +441,16 @@ export function useDiscussThread(
       replySaved = !rpcError
     } catch {
       replySaved = false
+    }
+
+    // As in the chat pane: a failed or unverified turn shows no card.
+    if (!turn.error && !['failed', 'unverified'].includes(turn.outcome.state)) {
+      if (pendingCard) {
+        threadCards.set(id, pendingCard.key)
+        canvasRef.current.setChangeSet(pendingCard)
+        if (threadIdRef.current === id) setCardKey(pendingCard.key)
+      }
+      if (pendingProposals) canvasRef.current.addProposals(pendingProposals)
     }
 
     if (turn.didWrite) onMutate?.()
@@ -482,7 +523,7 @@ export function useDiscussThread(
   const sharedWith = entityScope ? sharedWithNames(members, selfAuthId, entityScope) : []
 
   return {
-    threadId, messages, loading, sending, error, toolActivity,
+    threadId, messages, loading, sending, error, toolActivity, cardKey,
     post, ask, participants, sharedWith, reload, selfAuthId,
     meta, reads, members, setWith, settle,
   }

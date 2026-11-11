@@ -8,7 +8,7 @@
 // Symphony's, not a person's. "Mark settled" closes it with what was decided.
 // Rendered inside AssistDrawer in discuss mode; the drawer owns open/close.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { ChatMessage } from '@/components/chat/ChatMessage'
@@ -60,12 +60,15 @@ export interface DiscussionThreadProps {
   onPost: (text: string) => void | Promise<boolean | void>
   onAsk: (text: string) => void | Promise<boolean | void>
   onClose: () => void
+  /** Symphony's change card for this thread (DiscussChangeCard), under the
+   *  messages. */
+  card?: ReactNode
 }
 
 export function DiscussionThread({
   title, scope, peopleLabel, stateLabel, others, messages, loading, sending, error, toolActivity,
   currentUserId, familyMembers, suggestions, choices = [], chosen = [], onChoose, seen, settled,
-  onSettle, onReopen, onOpenItem, onPost, onAsk, onClose,
+  onSettle, onReopen, onOpenItem, onPost, onAsk, onClose, card,
 }: DiscussionThreadProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [settling, setSettling] = useState(false)
@@ -186,6 +189,8 @@ export function DiscussionThread({
             />
           ))
         )}
+
+        {!starting && card}
 
         {seen && !starting && <p className="-mt-1 mb-2 text-right text-[12px] text-neutral-500">{seen}</p>}
 

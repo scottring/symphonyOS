@@ -22,6 +22,7 @@ import type { ChatMessage } from '@/types/chat'
 import { discussionState, loginIds, memberOfAuth, othersIn, peopleLabel, stateLine } from '@/lib/discussions/waiting'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { DiscussionThread } from '@/components/discussion/DiscussionThread'
+import { DiscussChangeCard } from '@/components/discussion/DiscussChangeCard'
 
 const TASK_SUGGESTIONS = [
   'Break this into doable steps',
@@ -182,6 +183,7 @@ export function AssistDrawer({ item, onClose, onMutate, discuss, onOpenItem }: A
             onPost={async (text) => (await withFirst()) ? thread.post(text) : false}
             onAsk={async (text) => (await withFirst()) ? thread.ask(text) : false}
             onClose={onClose}
+            card={<DiscussChangeCard cardKey={thread.cardKey ?? null} busy={thread.sending} />}
           />
         ) : (
           <ChatPanel

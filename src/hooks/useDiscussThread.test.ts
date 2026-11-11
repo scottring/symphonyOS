@@ -93,6 +93,17 @@ vi.mock('@/lib/supabase', () => {
   }
 })
 
+// The shell's change-card state, faked: the thread hands its card over to it.
+const canvas = vi.hoisted(() => ({
+  changeSet: null as null | { key: string; title: string; ops: unknown[]; state: string },
+  setChangeSet: vi.fn(),
+  addProposals: vi.fn(),
+  takeChangeCard: vi.fn(() => undefined as unknown),
+}))
+vi.mock('@/contexts/CanvasActivityContext', () => ({
+  useCanvasActivity: () => canvas,
+}))
+
 import { streamSymphonyAgent } from '@/lib/agentStream'
 import { useDiscussThread, DISCUSS_UNAVAILABLE, type DiscussEntity } from '@/hooks/useDiscussThread'
 
@@ -120,6 +131,8 @@ describe('useDiscussThread', () => {
       member_type: 'core', created_at: '2026-01-01T00:00:00Z',
     }]
     seedRow()
+    canvas.changeSet = null
+    canvas.takeChangeCard.mockImplementation(() => undefined)
     vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
       h.onText?.('Try Tuesday.')
       h.onDone?.('Try Tuesday.', null)
@@ -362,5 +375,89 @@ describe('useDiscussThread', () => {
     await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
     unmount()
     expect(db.removed).toBeGreaterThan(0)
+  })
+  describe('change cards', () => {
+    const card = { key: 'cs-1', title: '2 changes to Book the dentist', ops: [
+      { key: 'cs-1:0', op: 'add', title: 'Call the office' },
+      { key: 'cs-1:1', op: 'add', title: 'Find the insurance card' },
+    ] }
+    const proposed = { state: 'proposed' as const, writes: [], say: 'On the card.' }
+
+    it('a card Symphony proposes in the thread becomes the pending card, with the thread knowing it is its own', async () => {
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h) => {
+        h.onText?.("I've put it on a card.")
+        h.onChangeSet?.(card as never)
+        h.onDone?.("I've put it on a card.", null, undefined, proposed)
+      })
+      const { result } = renderHook(() => useDiscussThread(familyTask))
+      await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
+      await act(async () => { await result.current.ask('break this into steps') })
+
+      expect(canvas.setChangeSet).toHaveBeenCalledWith(card)
+      expect(result.current.cardKey).toBe('cs-1')
+    })
+
+    it('a failed turn shows no card, as in the chat pane', async () => {
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h) => {
+        h.onChangeSet?.(card as never)
+        h.onError?.('Connection dropped')
+      })
+      const { result } = renderHook(() => useDiscussThread({ ...familyTask, id: 't-failed' }))
+      await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
+      await act(async () => { await result.current.ask('break this into steps') })
+      expect(canvas.setChangeSet).not.toHaveBeenCalled()
+    })
+
+    it('suggestions go to the shell the same way the chat pane sends them', async () => {
+      const items = [{ key: 'p1', title: 'Get the kids to the dentist twice a year' }]
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h) => {
+        h.onProposal?.(items as never)
+        h.onDone?.('Suggested one.', null)
+      })
+      const { result } = renderHook(() => useDiscussThread(familyTask))
+      await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
+      await act(async () => { await result.current.ask('anything else?') })
+      expect(canvas.addProposals).toHaveBeenCalledWith(items)
+    })
+
+    it("the next turn is told about the thread's own card, so a revision replaces it", async () => {
+      db.threadId = 'thr-card'
+      db.rows = { 'thr-card': { id: 'thr-card', messages: [], scope: 'compound', user_id: 'u1' } }
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h) => {
+        h.onChangeSet?.(card as never)
+        h.onDone?.('On the card.', null, undefined, proposed)
+      })
+      const { result } = renderHook(() => useDiscussThread({ ...familyTask, id: 't-card' }))
+      await waitFor(() => expect(result.current.threadId).toBe('thr-card'))
+      await act(async () => { await result.current.ask('break it down') })
+
+      canvas.changeSet = { ...card, state: 'proposed' }
+      const note = { state: 'pending', title: card.title }
+      canvas.takeChangeCard.mockImplementation(() => note)
+      let told: unknown
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h) => {
+        told = h.changeCard
+        h.onDone?.('Moved it.', null)
+      })
+      await act(async () => { await result.current.ask('make the call Friday') })
+      expect(told).toBe(note)
+    })
+
+    it("a card from another conversation is left alone: not shown here, not told to this turn", async () => {
+      db.threadId = 'thr-other'
+      db.rows = { 'thr-other': { id: 'thr-other', messages: [], scope: 'compound', user_id: 'u1' } }
+      canvas.changeSet = { key: 'week-card', title: '5 changes to your week', ops: [], state: 'proposed' }
+      let told: unknown = 'unset'
+      vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h) => {
+        told = h.changeCard
+        h.onDone?.('Sure.', null)
+      })
+      const { result } = renderHook(() => useDiscussThread({ ...familyTask, id: 't-other' }))
+      await waitFor(() => expect(result.current.threadId).toBe('thr-other'))
+      await act(async () => { await result.current.ask('what next?') })
+      expect(canvas.takeChangeCard).not.toHaveBeenCalled()
+      expect(told).toBeUndefined()
+      expect(result.current.cardKey).toBeNull()
+    })
   })
 })
