@@ -269,17 +269,6 @@
 .wl-sheet .wl-masthead .daybook-title { font-size: 40px; overflow: visible; }
 /* The heading as Today's (2026-11-11): "7–13" in the margin, "‹ This week ›"
    over "November", and both share the numeral's bottom edge. */
-.wl-sheet .wl-masthead .masthead-numeral {
-  width: auto !important; font-size: 72px !important; font-weight: 300; line-height: .8; letter-spacing: -0.03em;
-  margin-right: 4px; color: var(--color-neutral-900);
-}
-.wl-sheet .wl-masthead .daybook-masthead-row:has(> .masthead-numeral) { align-items: flex-end; flex-wrap: wrap; row-gap: 12px; }
-.wl-sheet .wl-masthead .daybook-masthead-row:has(> .masthead-numeral) > .daybook-masthead-text { flex: 1 1 12rem; }
-.wl-sheet .wl-masthead .daybook-masthead-row:has(> .masthead-numeral) > .daybook-masthead-controls { align-self: flex-start; margin-left: auto; }
-.wl-sheet .wl-masthead [data-testid="masthead-eyebrow"] { margin: 0 0 2px -6px; }
-.wl-sheet .wl-masthead [data-testid="masthead-eyebrow"] .uppercase { text-transform: none; letter-spacing: 0; padding-inline: 2px; }
-.wl-mast-eyebrow { font: 600 13px/1.2 var(--font-family-sans); color: var(--color-neutral-600); }
-.wl-mast-title { position: relative; display: inline-block; }
 .wl-sheet .wl-masthead + .wl-lede, .wl-sheet .wl-lede {
   margin: 12px 0 0; font-family: var(--font-family-display); font-style: italic; font-size: 20px; line-height: 1.35;
   color: var(--color-neutral-700);
@@ -327,27 +316,45 @@
 .jc-now .jc-dot::after { border-color: var(--today-now); background: var(--today-now); top: 2px; }
 .jc-specials { display: flex; flex-wrap: wrap; gap: 2px 14px; }
 
-/* ---- One heading on every horizon (Scott's sketch, 2026-11-11) ---------
-   The span as a big number in the margin; "‹ This month ›" small over the
-   period's name, "November, 2026". Today and Week draw it through
-   MastheadCard; Month, Season and Year through .plan-period.is-journal. */
-.today-mast-eyebrow { display: inline-flex; margin-left: -6px; }
-.today-mast-eyebrow .uppercase { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; color: var(--color-neutral-600); }
-.plan-period.is-journal { align-items: flex-end; flex-wrap: nowrap; gap: 16px; }
-.plan-numeral {
-  flex: none; font: 200 72px/.8 'Jost', var(--font-family-sans); letter-spacing: -0.03em; color: var(--color-neutral-900); white-space: nowrap;
+/* ---- One heading on every horizon, one plain line (Scott's sketch,
+   2026-11-11): "‹ 11 November 2026, Wednesday ›" — the arrows around the
+   whole line, the words in one face and size (JournalHeading). */
+.journal-heading { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; min-width: 0; }
+.journal-step {
+  flex: none; display: grid; place-items: center; width: 36px; height: 36px;
+  border: 0; border-radius: 999px; background: none; color: var(--color-neutral-500); cursor: pointer;
 }
-.plan-numeral[data-len="6"], .plan-numeral[data-len="7"] { font-size: 58px; }
-.plan-period-text { min-width: 0; }
-.plan-period-name {
-  display: flex; align-items: center; gap: 2px; margin: 0 0 4px -6px;
-  font: 600 13px/1.2 var(--font-family-sans); color: var(--color-neutral-600);
+.journal-step:first-child { margin-left: -10px; }
+.journal-step:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.journal-step:focus-visible, .journal-tag-button:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.journal-num {
+  flex: none; margin: 0 10px 0 -3px; font: 200 72px/.85 'Jost', var(--font-family-sans); letter-spacing: -0.03em;
+  color: var(--color-neutral-900); white-space: nowrap;
 }
-.plan-horizon .plan-period-name .plan-step {
-  width: 26px; height: 26px; border: 0; background: none; color: var(--color-neutral-500);
+/* With the number the line sits on its foot. */
+.journal-heading:has(> .journal-num) { align-items: last baseline; }
+.journal-heading:has(> .journal-num) > .journal-step { align-self: center; }
+.journal-title, .journal-tag {
+  margin: 0; min-width: 0; font: 500 40px/1.1 var(--font-family-display); letter-spacing: -0.01em; color: var(--color-neutral-900);
 }
-.plan-horizon .plan-period-name .plan-step:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
-.plan-horizon .plan-period.is-journal h1 { margin: 0; font-size: 40px; font-weight: 500; line-height: 1.05; }
+.journal-title { display: inline-flex; align-items: baseline; }
+.journal-title .daybook-title-trigger { font: inherit; color: inherit; }
+.journal-tag { display: inline-flex; align-items: baseline; gap: .25em; margin-left: -4px; }
+.journal-tag-button {
+  margin: 0 -4px; padding: 0 4px; border: 0; border-radius: 8px; background: none;
+  font: inherit; color: inherit; letter-spacing: inherit; cursor: pointer;
+}
+.journal-tag-button:hover { background: var(--color-neutral-100); }
+.journal-today {
+  align-self: center; margin-left: 8px; padding: 2px 9px; border: 1px solid var(--color-primary-100); border-radius: 999px;
+  background: var(--color-primary-50); font: 600 11.5px/1.4 var(--font-family-sans); letter-spacing: 0; color: var(--color-primary-700); cursor: pointer;
+}
+.journal-extras { display: inline-flex; gap: 4px; margin-left: 4px; }
+.journal-subline { margin-top: 10px; max-width: 42rem; }
+.journal-subline:empty { display: none; }
+.today-page .journal-subline .today-sentence { margin: 0; }
+.plan-period.is-journal { display: block; }
+.plan-head-main:has(> .plan-period.is-journal) { gap: 10px; }
 /* On the desk the heading stands on the sheet itself. */
 .plan-sheet-mast:empty { display: none; }
 .plan-sheet-mast .plan-head { margin: 0; align-items: flex-start; }
@@ -357,9 +364,27 @@
   font: 600 13px/1.2 var(--font-family-sans); color: var(--color-neutral-600);
 }
 @media (max-width: 767px) {
-  .plan-numeral { font-size: 52px; }
-  .plan-numeral[data-len="6"], .plan-numeral[data-len="7"] { font-size: 40px; }
-  .plan-horizon .plan-period.is-journal h1 { font-size: 30px; }
-  .plan-horizon .plan-period-name .plan-step { width: 40px; height: 40px; }
+  .journal-num {
+  flex: none; margin: 0 10px 0 -3px; font: 200 72px/.85 'Jost', var(--font-family-sans); letter-spacing: -0.03em;
+  color: var(--color-neutral-900); white-space: nowrap;
 }
-.plan-head-main:has(> .plan-period.is-journal) { gap: 12px; }
+/* With the number the line sits on its foot. */
+.journal-heading:has(> .journal-num) { align-items: last baseline; }
+.journal-heading:has(> .journal-num) > .journal-step { align-self: center; }
+.journal-title, .journal-tag { font-size: 28px; }
+  .journal-step { width: 44px; height: 44px; }
+}
+.journal-extras { align-self: center; display: inline-flex; gap: 4px; margin-left: 4px; }
+/* Week's page is narrower than Today's: the line a size smaller so it stays
+   one line beside Plan the week and ⋯. */
+.wl-sheet .wl-masthead .daybook-masthead-row { flex-wrap: nowrap; align-items: flex-start; }
+.wl-sheet .wl-masthead .daybook-masthead-controls { align-self: flex-start; padding-top: 10px; }
+.wl-sheet .wl-masthead .journal-title { font-size: 34px; }
+.wl-sheet .wl-masthead .journal-num { font-size: 60px; }
+.today-page .daybook-masthead-row:has(.journal-heading) { align-items: flex-start; flex-wrap: nowrap; }
+.today-page .daybook-masthead-row:has(.journal-heading) > .daybook-masthead-controls { align-self: flex-start; margin-top: 22px; margin-left: auto; }
+/* The left caret hangs in the margin (Scott, 2026-11-11): the number, or
+   the title, starts at the page's own left edge, with the content under it. */
+@media (min-width: 768px) {
+  .journal-step:first-child { margin-left: -40px; }
+}

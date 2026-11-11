@@ -12,7 +12,7 @@ interface DayNavClusterProps {
    * title). 'inline' — an eyebrow-sized date line that sits inside another
    * card's header, so the page has one masthead instead of two stacked ones.
    */
-  variant?: 'masthead' | 'inline'
+  variant?: 'masthead' | 'inline' | 'tag'
   /** Inline only: what the eyebrow says instead of the full date — "Today",
    *  "Tomorrow" — when the page title already carries the date. */
   label?: string
@@ -78,6 +78,29 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
       <MiniMonthPicker selected={viewedDate} today={today} onSelect={handlePick} />
     </div>
   ) : null
+
+  // The journal heading's small word (2026-11-11): the weekday, which opens
+  // the picker; the heading's own arrows step the day.
+  if (variant === 'tag') {
+    return (
+      <span ref={ref} className="relative inline-flex min-w-0 items-center gap-1">
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={pickerOpen}
+          aria-label={`${label ? `${label}, ` : ''}${weekdayLong} ${dateMedium} — choose a date`}
+          onClick={() => setPickerOpen((o) => !o)}
+          className="journal-tag-button"
+        >
+          {weekdayLong}
+        </button>
+        {!isToday && (
+          <button type="button" aria-label="Go to today" onClick={() => onDateChange(new Date(today))} className="journal-today">Today</button>
+        )}
+        {picker}
+      </span>
+    )
+  }
 
   if (variant === 'inline') {
     return (

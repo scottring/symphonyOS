@@ -49,13 +49,6 @@ interface HomeHeaderProps {
   journal?: boolean
 }
 
-/** "This week", "Last week", "Next week"; further off, just "Week". */
-function weekName(start: Date): string {
-  const now = weekRange(new Date(), readCadenceConfig().weekStartsOn)[0]
-  const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
-  const weeks = Math.round((day(start) - day(now)) / (7 * 86400000))
-  return weeks === 0 ? 'This week' : weeks === -1 ? 'Last week' : weeks === 1 ? 'Next week' : 'Week'
-}
 
 /** An empty element whose node goes to `onHost` — where WeekV2 portals the
  *  week's folded status and controls. */
@@ -275,22 +268,26 @@ export function HomeHeader(props: HomeHeaderProps) {
     // week's own controls (Plan this week, ⋯) at the right.
     const slots = planV2Enabled() ? props.planSlots : undefined
     if (props.journal && rangeDays === 7) {
-      // "7–13" in the margin; "‹ This week ›" above "November, 2026"; the dates
+      // One plain line (Scott's sketch, 2026-11-11): "‹ 7–13 November 2026 ›";
+      // the title opens the range menu; the dates
       // stay the heading's (and the range menu's) name for a screen reader.
       const months = monthsTitle(weekStart, rangeEnd)
       const named = <><span aria-hidden="true">{months}</span><span className="sr-only">{label.long}</span></>
       return (
         <MastheadCard
           variant="page"
-          numeral={`${weekStart.getDate()}–${rangeEnd.getDate()}`}
-          eyebrow={<PeriodNavEyebrow label={<span className="wl-mast-eyebrow">{weekName(weekStart)}</span>} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} />}
-          title={onRangeChange ? (<span className="wl-mast-title">
+          journal={{
+            numeral: `${weekStart.getDate()}–${rangeEnd.getDate()}`,
+            onPrev, onNext, prevLabel, nextLabel,
+            trailing: menu,
+          }}
+          title={onRangeChange ? (
             <button ref={menuButtonRef} type="button" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="week-range-menu"
               onClick={() => setMenuOpen((v) => !v)}
               onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setMenuOpen(true) } }}
               className="daybook-title-trigger">
               {named}<ChevronDown className="daybook-title-caret" aria-hidden="true" />
-            </button>{menu}</span>
+            </button>
           ) : named}
           help={!planV2Enabled()}
           subline={slots ? <>{customInputs}<SlotHost onHost={slots.subline} className="pv2-mslot" /></> : customInputs}

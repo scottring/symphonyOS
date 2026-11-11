@@ -85,10 +85,9 @@ import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { restoreDeleted } from '@/lib/planning/restoreDeleted'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useMobile } from '@/hooks/useMobile'
-import { periodHeading } from '@/lib/planning/journalHeading'
+import { JournalHeading } from '@/components/layout/JournalHeading'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { describeTriageWhen } from '@/lib/triage/applyWhen'
 import { compareSortOrder, nextTaskSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
@@ -1060,24 +1059,16 @@ function Inner() {
     </div>
   )
 
-  // One heading on every horizon (Scott's sketch, 2026-11-11): "1–30" in
-  // the margin, "‹ This month ›" over "November, 2026"; the heading still
-  // reads "November 2026". On the desk it stands on the sheet itself, as
+  // One heading on every horizon, one plain line (Scott's sketch,
+  // 2026-11-11): "‹ November 2026 ›". On the desk it stands on the sheet itself, as
   // Today's and Week's do; on a phone, above it.
-  const journal = periodHeading(bounds, now, seasons)
   const head = (
     <header className="plan-head">
       <div className="plan-head-main">
         <div className="plan-period is-journal" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
-          <span className="plan-numeral" aria-hidden="true" data-len={journal.numeral.length}>{journal.numeral}</span>
-          <div className="plan-period-text">
-            <p className="plan-period-name">
-              <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={16} aria-hidden="true" /></button>
-              <span>{journal.name}</span>
-              <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={16} aria-hidden="true" /></button>
-            </p>
-            <h1 data-guide-anchor="title"><span aria-hidden="true">{journal.title}</span><span className="sr-only">{periodTitle}</span></h1>
-          </div>
+          <JournalHeading title={periodTitle}
+            onPrev={() => setStart(bounds.prev)} onNext={() => setStart(bounds.next)}
+            prevLabel={`Previous ${PERIODS[level]}`} nextLabel={`Next ${PERIODS[level]}`} />
         </div>
         {/* The review and the plan say where the period stands in their own
             words: the fact line steps aside while one is open. */}

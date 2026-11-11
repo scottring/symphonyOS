@@ -164,9 +164,9 @@ describe('where you are',()=>{
   const sheet=document.querySelector('.plan-sheet.vt-sheet-month') as HTMLElement
   expect(within(sheet).getByRole('heading',{level:2,name:'October goals'})).toBeInTheDocument()
   // On the desk the sheet carries the heading (2026-11-11): "1–31",
-  // "‹ Last month ›", "October, 2026", then its list's name.
+  // "‹ October 2026 ›", then its list's name.
   expect(within(sheet).getByRole('heading',{level:1})).toHaveTextContent('October 2026')
-  expect(sheet.querySelector('.plan-numeral')).toHaveTextContent('1–31')
+  expect(sheet.querySelector('.journal-heading')).not.toBeNull()
   expect(document.querySelector('.vt-sheet-season .above-sheet-title')).toHaveTextContent('Fall goals')
  })
 

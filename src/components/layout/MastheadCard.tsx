@@ -22,12 +22,13 @@
 //   'card'     the older illustrated card, kept for anything still on it
 import { PageHelpButton } from '@/components/explain/PageHelp'
 import { LearnVideoChip } from '@/components/learn/LearnVideoChip'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
+import { JournalHeading } from './JournalHeading'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { PageMotif, type MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral, titleNav, help = true }: {
+export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral, titleNav, help = true, journal }: {
   eyebrow?: ReactNode
   title: ReactNode
   /** Prev/next arrows either side of the title — "‹ Oct 17 – 23 ›" (Week,
@@ -55,6 +56,10 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
   /** The horizon's big thin number in the margin — "40" on Week (planning
    *  v2, 2026-09-28). Absent, nothing changes. */
   numeral?: string
+  /** The one-line journal heading (JournalHeading) in place of the eyebrow,
+   *  numeral and title: "‹ 11 November, 2026 Wednesday ›". `title` is what
+   *  it shows; this carries the rest. */
+  journal?: Omit<ComponentProps<typeof JournalHeading>, 'title' | 'titleExtras'>
 }) {
   const open = variant !== 'card'
   const heading = (
@@ -91,7 +96,13 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
                motif's own label would just be read out twice. */
             <span aria-hidden="true" className="contents"><PageMotif motif={motif} className="daybook-stamp" /></span>
           )}
-          {numeral && <div aria-hidden="true" className="masthead-numeral" data-len={numeral.length}>{numeral}</div>}
+          {numeral && !journal && <div aria-hidden="true" className="masthead-numeral" data-len={numeral.length}>{numeral}</div>}
+          {journal ? (
+            <div className="daybook-masthead-text min-w-0 flex-1">
+              <JournalHeading {...journal} title={title} titleExtras={help ? <><PageHelpButton /><LearnVideoChip /></> : undefined} />
+              {subline && <div className="journal-subline">{subline}</div>}
+            </div>
+          ) : (
           <div className="daybook-masthead-text min-w-0 flex-1">
             {eyebrow && <div data-testid="masthead-eyebrow" className="mb-1 -ml-1.5">{eyebrow}</div>}
             <div className={action ? 'daybook-title-row' : undefined}>
@@ -111,6 +122,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
             </div>
             {subline && <div className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{subline}</div>}
           </div>
+          )}
           {controls && <div className="daybook-masthead-controls hidden shrink-0 md:block">{controls}</div>}
           {aside && <div data-testid="masthead-aside" className="daybook-masthead-aside">{aside}</div>}
         </div>

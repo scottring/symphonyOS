@@ -853,7 +853,7 @@ export function TodayView({
   const journalMonth = viewedDate.toLocaleDateString('en-US', { month: 'long' })
   // The month and year; where the day sits (Today, Tomorrow) is on the
   // arrows at the right.
-  const journalEyebrow = `${journalMonth}, ${viewedDate.getFullYear()}`
+  const journalEyebrow = `${journalMonth} ${viewedDate.getFullYear()}`
 
   // ── Drag: the pure resolver's inputs ─────────────────────────────────────────
   const { isReadOnlyCalendar } = useCalendarPermissions()
@@ -1450,14 +1450,23 @@ export function TodayView({
         // the margin, "‹ Today ›" (the day's arrows, its picker) over
         // "November, 2026".
         eyebrow={foldedControls
-          ? <span className="today-mast-eyebrow"><DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} /></span>
+          ? undefined
           : <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} />}
         // The open journal (Scott, 2026-11-11, board A): on a wide page the
         // day's number stands in the margin and the weekday is the title; the
         // heading still reads the whole date.
-        numeral={foldedControls ? String(viewedDate.getDate()) : undefined}
+        // One plain line (Scott's sketch, 2026-11-11): "‹ 11 November 2026,
+        // Wednesday ›"; the weekday opens the date picker.
+        journal={foldedControls ? {
+          numeral: String(viewedDate.getDate()),
+          srTitle: viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+          tag: <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="tag" label={data.isToday ? 'Today' : relativeDayLabel} />,
+          onPrev: () => onDateChange(new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate() - 1)),
+          onNext: () => onDateChange(new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate() + 1)),
+          prevLabel: 'Previous day', nextLabel: 'Next day',
+        } : undefined}
         title={foldedControls
-          ? <><span aria-hidden="true">{journalEyebrow}</span><span className="sr-only">{viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span></>
+          ? journalEyebrow
           : viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         // No big numeral (approved Today board, 2026-10-10): the date is the title.
         // Adding moved to the "For today" heading with Choose (2026-09-22):
