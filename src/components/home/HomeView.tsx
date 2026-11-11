@@ -631,6 +631,7 @@ export function HomeView({
             monthStart={monthStart}
             onMonthChange={setMonthStart}
             planSlots={planSlotsOn ? { subline: setPlanSublineHost, controls: setPlanControlsHost } : undefined}
+            journal={!!weekMastheadHost && currentView === 'week' && !isMobile}
           />
   )
 

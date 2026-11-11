@@ -266,6 +266,20 @@
 .wl-sheet .wl-masthead .daybook-masthead { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
 .wl-sheet .wl-masthead .daybook-masthead-inner { padding: 0; }
 .wl-sheet .wl-masthead .daybook-title { font-size: 38px; font-weight: 500; line-height: 1.05; }
+.wl-sheet .wl-masthead .daybook-title { font-size: 40px; overflow: visible; }
+/* The heading as Today's (2026-11-11): "7–13" in the margin, "‹ This week ›"
+   over "November", and both share the numeral's bottom edge. */
+.wl-sheet .wl-masthead .masthead-numeral {
+  width: auto !important; font-size: 72px !important; font-weight: 300; line-height: .8; letter-spacing: -0.03em;
+  margin-right: 4px; color: var(--color-neutral-900);
+}
+.wl-sheet .wl-masthead .daybook-masthead-row:has(> .masthead-numeral) { align-items: flex-end; flex-wrap: wrap; row-gap: 12px; }
+.wl-sheet .wl-masthead .daybook-masthead-row:has(> .masthead-numeral) > .daybook-masthead-text { flex: 1 1 12rem; }
+.wl-sheet .wl-masthead .daybook-masthead-row:has(> .masthead-numeral) > .daybook-masthead-controls { align-self: flex-start; margin-left: auto; }
+.wl-sheet .wl-masthead [data-testid="masthead-eyebrow"] { margin: 0 0 2px -6px; }
+.wl-sheet .wl-masthead [data-testid="masthead-eyebrow"] .uppercase { text-transform: none; letter-spacing: 0; padding-inline: 2px; }
+.wl-mast-eyebrow { font: 600 13px/1.2 var(--font-family-sans); color: var(--color-neutral-600); }
+.wl-mast-title { position: relative; display: inline-block; }
 .wl-sheet .wl-masthead + .wl-lede, .wl-sheet .wl-lede {
   margin: 12px 0 0; font-family: var(--font-family-display); font-style: italic; font-size: 20px; line-height: 1.35;
   color: var(--color-neutral-700);

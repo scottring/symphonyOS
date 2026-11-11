@@ -7,7 +7,7 @@
 // bar, a page passes `talk` to offer "Talk it through". "Paper sounds" (the
 // one mute control) ends every page's choices.
 
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { usePageHelp } from '@/components/explain/PageHelp'
 import { LearnPageContext, LearnVideoDialog } from '@/components/learn/LearnVideoChip'
@@ -23,8 +23,10 @@ export type PageMenuChoice = {
   onSelect: () => void
 }
 
-export function PageMenu({ label, choices, talk, anchor }: {
+export function PageMenu({ label, choices, talk, anchor, note }: {
   label: string
+  /** A quiet line at the menu's foot (Week: "Planned Wed · Last week's review"). */
+  note?: ReactNode
   choices: PageMenuChoice[]
   talk?: () => void
   /** A planning step's anchor (steps.ts `at`): Month's Fresh start lives here. */
@@ -108,6 +110,7 @@ export function PageMenu({ label, choices, talk, anchor }: {
               <span className="wk-menu-check" aria-hidden="true" /><span>Watch the guide</span>
             </button>
           )}
+          {note && <p className="wk-menu-note">{note}</p>}
         </div>
       )}
       {playing && <LearnVideoDialog video={playing} onClose={() => setPlaying(null)} />}

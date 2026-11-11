@@ -72,9 +72,11 @@ describe('WeekV2 header — the plan chip, at most one button, and the ⋯ menu'
     expect(slots.controls.querySelectorAll('.pv2-btn')).toHaveLength(0)
     expect(controls.getByRole('button', { name: 'Plan the week' })).toHaveClass('plan-chip')
     expect(controls.getByRole('button', { name: 'Week options' })).toHaveAttribute('aria-haspopup', 'menu')
-    // List | Grid (2026-11-07), the plan chip and ⋯.
-    expect(within(controls.getByRole('group', { name: 'Show the week as' })).getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true')
-    expect(controls.getAllByRole('button')).toHaveLength(4)
+    // The plan chip and ⋯; List | Grid is a tick inside ⋯ (2026-11-11),
+    // with "Planned …" at the menu's foot.
+    expect(controls.getAllByRole('button')).toHaveLength(2)
+    fireEvent.click(controls.getByRole('button', { name: 'Week options' }))
+    expect(controls.getByRole('menuitemcheckbox', { name: 'Show the days as a grid' })).toHaveAttribute('aria-checked', 'false')
     slots.done()
   })
 
@@ -458,7 +460,7 @@ describe('WeekV2 — the planning summary line', () => {
     expect(document.querySelector('.wk-facts')?.textContent).toContain('1 of 4 done')
   })
 
-  it('on the desk it sits in the masthead beside the facts', () => {
+  it('on the desk it sits at the foot of ⋯, not under the dates (2026-11-11)', () => {
     seed.notes = { guide: { current: 'family', done: [], skipped: [], plannedAt: new Date(2026, 8, 27, 18).toISOString() } }
     const slots = slotsFor()
     render(
@@ -468,7 +470,9 @@ describe('WeekV2 — the planning summary line', () => {
         </PlanMastheadSlotsContext.Provider>
       </MemoryRouter>,
     )
-    expect(slots.subline.querySelector('.guide-summary-line')?.textContent).toBe('Planned Sun, Sep 27')
+    expect(slots.subline.querySelector('.guide-summary-line')).toBeNull()
+    fireEvent.click(within(slots.controls).getByRole('button', { name: 'Week options' }))
+    expect(slots.controls.querySelector('.wk-menu-note')?.textContent).toBe('Planned Sun, Sep 27')
     slots.done()
   })
 })

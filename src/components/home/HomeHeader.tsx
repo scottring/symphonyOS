@@ -42,6 +42,18 @@ interface HomeHeaderProps {
    *  this masthead (layout system, 2026-10-01). WeekV2 owns the plan's
    *  status and controls and portals them into these two hosts. */
   planSlots?: { subline: (el: HTMLElement | null) => void; controls: (el: HTMLElement | null) => void }
+  /** Desktop /week, drawn on the week's own page (Week as an open journal,
+   *  2026-11-11): Today's heading grammar — the dates as a big numeral, the
+   *  week's name with its arrows above, the month as the title. */
+  journal?: boolean
+}
+
+/** "This week", "Last week", "Next week"; further off, the year. */
+function weekName(start: Date): string {
+  const now = weekRange(new Date(), readCadenceConfig().weekStartsOn)[0]
+  const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
+  const weeks = Math.round((day(start) - day(now)) / (7 * 86400000))
+  return weeks === 0 ? 'This week' : weeks === -1 ? 'Last week' : weeks === 1 ? 'Next week' : String(start.getFullYear())
 }
 
 /** An empty element whose node goes to `onHost` — where WeekV2 portals the
@@ -261,6 +273,32 @@ export function HomeHeader(props: HomeHeaderProps) {
     // Folded (desktop, v2): the week's fact line under the dates, and the
     // week's own controls (Plan this week, ⋯) at the right.
     const slots = planV2Enabled() ? props.planSlots : undefined
+    if (props.journal && rangeDays === 7) {
+      // "7–13" in the margin; "‹ This week ›" above "November"; the dates
+      // stay the heading's (and the range menu's) name for a screen reader.
+      const months = rangeEnd.getMonth() === weekStart.getMonth()
+        ? weekStart.toLocaleDateString('en-US', { month: 'long' })
+        : `${weekStart.toLocaleDateString('en-US', { month: 'short' })} – ${rangeEnd.toLocaleDateString('en-US', { month: 'short' })}`
+      const named = <><span aria-hidden="true">{months}</span><span className="sr-only">{label.long}</span></>
+      return (
+        <MastheadCard
+          variant="page"
+          numeral={`${weekStart.getDate()}–${rangeEnd.getDate()}`}
+          eyebrow={<PeriodNavEyebrow label={<span className="wl-mast-eyebrow">{weekName(weekStart)}</span>} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} />}
+          title={onRangeChange ? (<span className="wl-mast-title">
+            <button ref={menuButtonRef} type="button" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="week-range-menu"
+              onClick={() => setMenuOpen((v) => !v)}
+              onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setMenuOpen(true) } }}
+              className="daybook-title-trigger">
+              {named}<ChevronDown className="daybook-title-caret" aria-hidden="true" />
+            </button>{menu}</span>
+          ) : named}
+          help={!planV2Enabled()}
+          subline={slots ? <>{customInputs}<SlotHost onHost={slots.subline} className="pv2-mslot" /></> : customInputs}
+          controls={slots ? <div className="pv2-mcontrols"><SlotHost onHost={slots.controls} className="contents" /></div> : undefined}
+        />
+      )
+    }
     return (
       <MastheadCard
         variant="page"

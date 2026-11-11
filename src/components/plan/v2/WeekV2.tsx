@@ -33,7 +33,6 @@ import { GuidedWeek } from '@/components/plan/guided/GuidedWeek'
 import { useGuidedWeek } from '@/components/plan/guided/useGuidedWeek'
 import { WeekLookBack } from '@/components/plan/guided/week/WeekLookBack'
 import { PlanChip, usePlanSessionLoading } from '@/components/guide/GuideCoach'
-import { WeekLayoutSwitch } from '@/components/canvas/week/WeekLayoutSwitch'
 import type { SessionFold } from '@/components/plan/guided/GuidedPeriod'
 import type { StripDay } from '@/components/plan/deck/WeekStrip'
 import type { DeckCard, DeckMode } from '@/lib/planning/deck'
@@ -193,28 +192,36 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
     </p>
   ) : null
   const guide = planNotes.notes.guide
-  const line = deckMode !== 'place' && !planNotes.error ? (
-    <PeriodSummaryLine plannedAt={guide?.plannedAt ?? (!session.loading && !session.error ? session.saved?.at.toISOString() : undefined)} energy={planNotes.notes.energy}
-      reviewed={!!guide?.done?.includes('look-back') || !!lastReview.reviewed} level="week" />
+  // HomeHeader's masthead, when it offers a place for the header (desktop
+  // only; HomeView decides).
+  const slots = useContext(PlanMastheadSlotsContext)
+  const desk = !!(slots?.subline && slots.controls)
+  const summary = deckMode !== 'place' && !planNotes.error
+  const plannedAt = guide?.plannedAt ?? (!session.loading && !session.error ? session.saved?.at.toISOString() : undefined)
+  const reviewed = !!guide?.done?.includes('look-back') || !!lastReview.reviewed
+  // On the desk "Planned Wed · Last week's review" sits at the foot of ⋯
+  // (Week as an open journal, 2026-11-11); the energy, once said, stays
+  // under the dates, where its planning step points.
+  const line = summary ? (
+    desk
+      ? <PeriodSummaryLine energy={planNotes.notes.energy} level="week" />
+      : <PeriodSummaryLine plannedAt={plannedAt} energy={planNotes.notes.energy} reviewed={reviewed} level="week" />
   ) : null
+  const menuNote = summary && desk ? <PeriodSummaryLine plannedAt={plannedAt} reviewed={reviewed} level="week" /> : null
   const controls = (
     <>
-      {!deckMode && <WeekLayoutSwitch />}
       {(plannable || deckMode === 'full') && <PlanChip level="week" word="the week" onStart={() => setMode('plan')} />}
       {primary && <button type="button" className="pv2-btn wk-plan" onClick={primary.run} data-explain="plan-deck" data-explain-label={primary.label}>{primary.label}</button>}
-      <WeekMenu offers={offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run }))} />
+      <WeekMenu offers={offers.filter((o) => o !== primary).map((o) => ({ id: o.id, label: o.label, onSelect: o.run }))}
+        layout={!deckMode && desk} note={menuNote} />
     </>
   )
   // A week gone by has nothing left to tell the family (its line is hidden).
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const weekGone = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7) <= todayStart
-  // HomeHeader's masthead, when it offers a place for the header (desktop
-  // only; HomeView decides).
-  const slots = useContext(PlanMastheadSlotsContext)
-
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
-      {slots?.subline && slots.controls ? (
+      {desk && slots?.subline && slots.controls ? (
         // Desktop: the header folds into the week's masthead (HomeHeader
         // draws it; layout system 2026-10-01).
         <>
@@ -229,7 +236,7 @@ export function WeekV2({ weekStart, isCurrent, canvas, today, deck }: {
           <div className="wk-head-actions">{controls}</div>
         </div>
       )}
-      {!(slots?.subline && slots.controls) && line}
+      {!desk && line}
 
       {session.saved?.notes?.focus && (
         // What the week is for, as agreed when it was planned.
