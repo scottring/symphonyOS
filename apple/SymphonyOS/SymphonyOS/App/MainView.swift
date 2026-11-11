@@ -235,7 +235,7 @@ private struct SymphonyDock: View {
 
 // MARK: - Capture Sheet (dock "+": typed capture, or snap a page → parse-page)
 
-private struct CaptureSheet: View {
+struct CaptureSheet: View {
     let userId: UUID
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss

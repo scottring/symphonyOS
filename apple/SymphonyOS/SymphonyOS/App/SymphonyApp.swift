@@ -21,6 +21,15 @@ struct SymphonyApp: App {
                 .environment(appState)
                 .background(Color.bgBase)
                 .demoContainerIfRequested()
+                // symphony://tell — the Lock Screen's Tell Symphony control.
+                // symphony://today — the Lock Screen's next-up Live Activity.
+                .onOpenURL { url in
+                    guard url.scheme == "symphony", url.host == "tell" || url.host == "today" else { return }
+                    appState.activeTab = .planner
+                    appState.horizon = .today
+                    appState.goToToday()
+                    if url.host == "tell" { appState.tellRequested = true }
+                }
         }
         .modelContainer(for: [
             SymphonyTask.self,

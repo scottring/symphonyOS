@@ -50,30 +50,52 @@ struct TodayView: View {
         return dinners.dinner(on: date)
     }
 
-    /// Two columns once there's room (iPhone Duo's inside screen): the day on
-    /// the left, the lists on the right. Width decides, not orientation or
-    /// device, as Apple's iPhone Duo guidance asks.
-    @State private var width: CGFloat = 0
-    static let twoColumnMinWidth: CGFloat = 600
-    private var isTwoColumn: Bool { width >= Self.twoColumnMinWidth }
-
-    /// The outside screen of iPhone Duo — narrow, with the system's bars in a
-    /// side column — opens Today as a dashboard. The bar's edge, not the
-    /// device, decides; a regular iPhone keeps the full Today.
-    private var isDashboard: Bool {
+    /// Which Today this window gets (TodayLayout: one per iPhone Duo screen
+    /// and way of holding it; a regular iPhone keeps its one column). The
+    /// window's shape decides, not the device, as Apple's Duo guidance asks.
+    @State private var size: CGSize = .zero
+    private var layout: TodayLayout {
         #if os(iOS)
-        return appState.dockLayout.edge != .bottom && !isTwoColumn
+        let sideBars = appState.dockLayout.edge != .bottom
         #else
-        return false
+        let sideBars = false
         #endif
+        return TodayLayout.decide(width: size.width, height: size.height, sideBars: sideBars)
     }
+    #if DEBUG
+    static let pinnedSize: CGSize? = {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-TodaySize"), i + 1 < args.count else { return nil }
+        let parts = args[i + 1].split(separator: "x").compactMap { Double($0) }
+        return parts.count == 2 ? CGSize(width: parts[0], height: parts[1]) : nil
+    }()
+    #else
+    static let pinnedSize: CGSize? = nil
+    #endif
     @State private var showWholeDay = false
+    @State private var showWeek = false
+    @State private var showAdd = false
+    @State private var showTell = false
+    /// The day as a short list, or to scale (web "Show hours"); remembered.
+    @AppStorage("today.showHours") private var showHours = false
 
     var body: some View {
         Group {
-            if isTwoColumn { twoColumns } else if isDashboard { dashboard } else { oneColumn }
+            switch layout {
+            case .journal: journal
+            case .dayPage: dayPage
+            case .glance: glance
+            case .glanceWide: glanceWide
+            case .oneColumn: oneColumn
+            }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        #if DEBUG
+        // Debug builds only: `-TodaySize 818x626` pins Today to a Duo screen's
+        // size on any simulator, to check each layout without folding one.
+        .frame(width: Self.pinnedSize?.width, height: Self.pinnedSize?.height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        #endif
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size = Self.pinnedSize ?? $0 }
         .scrollDismissesKeyboard(.interactively)
         .background(Color.bgBase.ignoresSafeArea())
         .statusBarScrim()
@@ -91,6 +113,12 @@ struct TodayView: View {
                 .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showAdd) {
+            CaptureSheet(userId: userId).presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showTell) {
+            TellSheet(userId: userId).presentationDetents([.medium, .large])
+        }
         // Rebuild from the shared cache first (no blank schedule on return),
         // then refresh the day in the background.
         .onAppear { rebuildTimeline() }
@@ -107,6 +135,11 @@ struct TodayView: View {
         .onChange(of: focusRows.count) { _, _ in rebuildTimeline() }
         .onChange(of: eventNotesRevision) { _, _ in rebuildTimeline() }
         .onChange(of: eventsRevision) { _, _ in rebuildTimeline() }
+        // Tell from the Lock Screen control or a symphony://tell link.
+        .onChange(of: appState.tellRequested) { _, asked in
+            if asked { appState.tellRequested = false; showTell = true }
+        }
+        .onAppear { if appState.tellRequested { appState.tellRequested = false; showTell = true } }
     }
 
     // MARK: - Layouts
@@ -127,66 +160,203 @@ struct TodayView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { captureBar }
     }
 
-    /// What's on now or next, the day's lists, and the whole day on request.
-    private var dashboard: some View {
+    /// Outside screen, upright: the heading, what's on next, the three quick
+    /// actions, To do, and the whole day on request.
+    private var glance: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                topControls
-                if isSearching {
-                    searchResultsContent
-                } else {
+                JournalHeading(date: date, compact: true)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                NextUpCard(items: viewModel.schedule, isToday: appState.isToday) { opened = $0 }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                QuickActions(toDo: viewModel.forToday, onAdd: { showAdd = true }, onTell: { showTell = true })
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                lists
+                CalmRow(text: showWholeDay ? "Hide the whole day" : "The whole day") {
+                    withAnimation(.easeInOut(duration: 0.2)) { showWholeDay.toggle() }
+                }
+                if showWholeDay { day }
+            }
+            .padding(.bottom, 16)
+        }
+    }
+
+    /// Outside screen held sideways (any short, wide window): next up and
+    /// the actions on the left, To do on the right.
+    private var glanceWide: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    JournalHeading(date: date, compact: true)
                     NextUpCard(items: viewModel.schedule, isToday: appState.isToday) { opened = $0 }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 14)
+                    QuickActions(toDo: viewModel.forToday, compact: true, onAdd: { showAdd = true }, onTell: { showTell = true })
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+            .frame(maxWidth: .infinity)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     lists
                     CalmRow(text: showWholeDay ? "Hide the whole day" : "The whole day") {
                         withAnimation(.easeInOut(duration: 0.2)) { showWholeDay.toggle() }
                     }
                     if showWholeDay { day }
                 }
+                .padding(.bottom, 12)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .safeAreaPadding(.bottom, appState.bottomInset)
+    }
+
+    /// Inside screen, upright: the day page fills the screen; the week hangs
+    /// from its top as one line and unfolds over it.
+    private var dayPage: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                weekStrip
+                if showWeek {
+                    WeekPage(date: date, plan: plan, userId: userId)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 12)
+                        .background(Color.bgWarm)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                pageHead
+                    .padding(.horizontal, 22)
+                    .padding(.top, 12)
+                HStack(alignment: .top, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 0) { dayList }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 0) { lists }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.leading, 6)
             }
             .padding(.bottom, 12)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { captureBar }
     }
 
-    private var twoColumns: some View {
+    /// Inside screen, sideways: the open journal — the week page on the left,
+    /// the day page on the right, meeting at the fold when it runs top to
+    /// bottom (iPhone Duo half-open like a book).
+    private var journal: some View {
         HStack(spacing: 0) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    topControls
-                    if isSearching { searchResultsContent } else { day }
-                }
-                .padding(.bottom, 12)
+                WeekPage(date: date, plan: plan, userId: userId)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
             }
-            .frame(width: leftColumnWidth)
+            .frame(width: weekPageWidth)
+            .background(Color.bgWarm)
             .safeAreaPadding(.bottom, appState.bottomInset)
 
             Rectangle().fill(Color.cardBorder).frame(width: 1).ignoresSafeArea(edges: .vertical)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) { lists }
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    pageHead
+                        .padding(.horizontal, 24)
+                        .padding(.top, 8)
+                    if isSearching { searchResultsContent } else {
+                        HStack(alignment: .top, spacing: 18) {
+                            VStack(alignment: .leading, spacing: 0) { dayList }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 0) { lists }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.leading, 8)
+                    }
+                }
+                .padding(.bottom, 12)
             }
             .frame(maxWidth: .infinity)
             .safeAreaInset(edge: .bottom, spacing: 0) { captureBar }
         }
     }
 
-    /// The columns meet at the fold when the screen has one running top to
-    /// bottom (iPhone Duo held sideways or half-open like a book), so nothing
-    /// sits in the crease; otherwise they share the width.
-    private var leftColumnWidth: CGFloat {
+    /// The week page's width: at the fold when the screen has one running
+    /// top to bottom, else about a third (the web's 0.24–0.38 of a spread).
+    private var weekPageWidth: CGFloat {
         #if os(iOS)
         let layout = appState.dockLayout
         if let fold = layout.fold, fold.height > fold.width {
             let leadingInset = layout.edge == .leading ? layout.contentInset : 0
             let x = fold.midX - leadingInset
-            if x > 240 && x < width - 240 { return x }
+            if x > 240 && x < size.width - 360 { return x }
         }
         #endif
-        return (width / 2).rounded()
+        return min(340, max(260, (size.width * 0.34).rounded()))
+    }
+
+    /// The day page's heading: the one-line date and the day in a sentence.
+    private var pageHead: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            JournalHeading(date: date)
+            if let sentence = DaySentence.make(schedule: viewModel.schedule, toDo: viewModel.forToday.filter { !$0.completed }.count,
+                                               now: .now, isToday: appState.isToday) {
+                Text(sentence)
+                    .font(.custom("CrimsonPro-Italic", size: 18))
+                    .foregroundStyle(Color.textSecondary)
+            }
+            if showSearch {
+                searchField.padding(.top, 6)
+            }
+        }
+        .padding(.bottom, 6)
+    }
+
+    /// The week as one line across the top of the upright inside screen.
+    private var weekStrip: some View {
+        let count = plan.chooserTasks(on: date).count + plan.chooserRoutines(on: date).filter { !$0.chosen }.count
+        return Button {
+            withAnimation(.easeInOut(duration: 0.25)) { showWeek.toggle() }
+        } label: {
+            HStack {
+                Text(count > 0 ? "This week · \(count) to pick from" : "This week")
+                    .font(.bodySmallBold).foregroundStyle(Color.textSecondary)
+                Spacer()
+                Text(showWeek ? "Fold up" : "Unfold")
+                    .font(.bodySmall).foregroundStyle(Color.ink)
+                Image(systemName: showWeek ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.ink)
+            }
+            .padding(.horizontal, 22)
+            .frame(minHeight: 44)
+            .background(Color.bgWarm)
+            .overlay(alignment: .bottom) { Rectangle().fill(Color.cardBorder).frame(height: 1) }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(showWeek ? "Folds the week away" : "Shows this week's tasks and routines to pick from")
+    }
+
+    /// The day as a short list, or to scale with Show hours.
+    @ViewBuilder
+    private var dayList: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("The day").eyebrowStyle().accessibilityAddTraits(.isHeader)
+            Spacer()
+            Button(showHours ? "Short list" : "Show hours") {
+                withAnimation(.easeInOut(duration: 0.2)) { showHours.toggle() }
+            }
+            .font(.bodySmall).foregroundStyle(Color.ink).buttonStyle(.plain)
+            .frame(minHeight: 44)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 6)
+        if showHours {
+            TodayDayColumn(items: viewModel.schedule, isToday: appState.isToday, members: familyMembers) { opened = $0 }
+                .padding(.horizontal, 8)
+        } else {
+            DayAgendaList(items: viewModel.schedule, isToday: appState.isToday) { opened = $0 }
+                .padding(.horizontal, 8)
+        }
     }
 
     private var topControls: some View {
@@ -220,10 +390,12 @@ struct TodayView: View {
 
         let forToday = viewModel.forToday
         if !forToday.isEmpty || offerTasks + offerRoutines > 0 {
-            Eyebrow(text: "For today")
+            Eyebrow(text: "To do")
             ForEach(forToday) { item in card(item) }
         }
-        if offerTasks + offerRoutines > 0 {
+        // Beside the week page (the Duo's inside screen) the week is already
+        // there to pick from; elsewhere this line leads to it.
+        if offerTasks + offerRoutines > 0 && layout != .journal && layout != .dayPage {
             CalmRow(text: "Choose from this week", detail: offerDetail(offerTasks, offerRoutines),
                     shortDetail: "\(offerTasks + offerRoutines)") {
                 showChooser = true
@@ -510,6 +682,10 @@ struct TodayView: View {
             userId: auth.currentUser?.id
         )
         NotificationManager.reconcile(allTasks)
+        #if os(iOS)
+        // The Lock Screen's next up follows today's schedule.
+        NextUpActivity.sync(items: viewModel.schedule, isToday: appState.isToday)
+        #endif
     }
 }
 

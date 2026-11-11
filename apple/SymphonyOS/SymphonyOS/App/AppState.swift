@@ -102,6 +102,9 @@ final class AppState {
 
     // Presentation state
     var showingQuickCapture = false
+    /// Tell Symphony was asked for from outside the app (the Lock Screen
+    /// control, `symphony://tell`); Today opens its Tell sheet and clears it.
+    var tellRequested = false
     var showingSettings = false
 
     // MARK: - Date Navigation
