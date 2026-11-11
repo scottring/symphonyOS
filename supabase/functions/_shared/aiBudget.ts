@@ -16,7 +16,7 @@ const SEARCH_RESULT_TOKENS=10_000
 /** Hard caps a declared web tool may ask for before it is unbounded. */
 const MAX_WEB_USES=10, MAX_FETCH_TOKENS=50_000
 /** Input price, cents per million tokens, for the models that carry web tools. */
-const INPUT_CENTS_PER_MILLION:Record<string,number>={'claude-sonnet-4-6':300,'claude-opus-5-5':400,'claude-haiku-4-5':100}
+const INPUT_CENTS_PER_MILLION:Record<string,number>={'claude-sonnet-4-6':300,'claude-sonnet-5-5':200,'claude-opus-5-5':400,'claude-haiku-4-5':100}
 /** Web search bills $10 per 1,000 searches (pricing page, checked 2026-10-15).
  *  The ledger prices tokens, so the 1¢ fee is carried as the input tokens that
  *  cost 1¢ on this model — at $1/M (10,000) when the model is not listed. */

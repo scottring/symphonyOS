@@ -96,7 +96,17 @@ function scopeFor(
   return assignees.some((a) => a && a !== self) ? 'couple' : 'individual'
 }
 
-const MODEL = 'claude-sonnet-4-6'
+// The model is a deploy-time choice (secret SYMPHONY_AGENT_MODEL), so it can
+// move to Sonnet 5.5 after a bench run without a code change, and back.
+// Sonnet 5.5 thinks by default: the loop already passes each response's
+// content back unchanged, which its thinking blocks need; it gets room for
+// thinking plus the reply, and medium effort for a chat-paced agent.
+export const AGENT_MODELS = {
+  'claude-sonnet-4-6': { max_tokens: 2048 },
+  'claude-sonnet-5-5': { max_tokens: 8192, output_config: { effort: 'medium' } },
+} as const
+type AgentModel = keyof typeof AGENT_MODELS
+const MODEL: AgentModel = (Object.keys(AGENT_MODELS) as AgentModel[]).find((m) => m === Deno.env.get('SYMPHONY_AGENT_MODEL')) ?? 'claude-sonnet-4-6'
 const MAX_TURNS = 14
 
 const SYSTEM_PROMPT = `${ASSISTANT_PERSONALITY}
@@ -1433,7 +1443,7 @@ async function callAnthropic(
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2048,
+      ...AGENT_MODELS[MODEL],
       system: [{ type: 'text', text: systemForSurface(SYSTEM_PROMPT, surface) + (web.length ? WEB_PROMPT_SECTION : '\nWeb search is not available here. If a request needs current web information (stock, hours, prices), say that plainly and offer what Symphony can do instead (a task to check it, a link the person can open); never claim you searched or verified it.'), cache_control: { type: 'ephemeral' } }],
       tools: tools.map((t, i) =>
         i === tools.length - 1

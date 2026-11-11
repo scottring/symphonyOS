@@ -17,7 +17,10 @@ function sources(dir: string): string[] {
 
 describe('Claude models named in edge functions', () => {
   it('are all present in the deployed pricing configuration', () => {
-    const prices = readFileSync('supabase/migrations/20261015150000_ai_spend_ledger.sql', 'utf8')
+    // Every migration that adds a price row (the ledger, then later models).
+    const prices = readdirSync('supabase/migrations').filter((f) => f.endsWith('.sql'))
+      .map((f) => readFileSync(join('supabase/migrations', f), 'utf8'))
+      .filter((sql) => sql.includes('ai_model_prices')).join('\n')
     const priced = new Set([...prices.matchAll(/\('([^']+)',\s*\d+,\s*\d+,\s*null,/g)].map((match) => match[1]))
     const unpriced = sources(FUNCTIONS).flatMap((file) =>
       [...readFileSync(file, 'utf8').matchAll(/['"`](claude-(?:opus|sonnet|haiku)-[0-9a-z-]+)['"`]/g)]
