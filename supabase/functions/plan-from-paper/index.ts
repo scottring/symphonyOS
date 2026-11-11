@@ -22,7 +22,8 @@ import {
   PAPER_SCHEMA, buildPaperPrompt, normalizePaper,
   type Analysis, type RevisionPatch,
 } from './lib/plan.ts'
-import { AiUsageError, reserveAiProviderCall } from '../_shared/aiUsage.ts'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
+import { serviceBudgetControl } from '../_shared/aiBudget.ts'
 
 // Reading the photo: Opus. On a real two-page spread (2026-09-23) it kept the
 // page's own misspellings and noted the likely word, where Sonnet silently
@@ -50,12 +51,16 @@ type Block =
   | { type: 'text'; text: string }
 
 /**
- * One streamed Messages call whose reply is constrained to `schema`. Streamed
- * so a long transcription is not cut off by an HTTP timeout; server-side
- * fallbacks re-run a refused request on another model inside the same call.
+ * Opens one streamed Messages call whose reply is constrained to `schema`.
+ * Streamed so a long transcription is not cut off by an HTTP timeout;
+ * server-side fallbacks re-run a refused request on another model inside the
+ * same call. `paidFetch` is the spend guard (_shared/aiUsage.ts): it reserves
+ * the call's cost before it is sent and settles what the stream reports. It
+ * resolves as soon as the reply's headers arrive, so an allowance refusal or
+ * a provider error is known before the heartbeat response opens.
  */
-async function callModel(content: Block[], schema: unknown, apiKey: string, { model, effort }: ModelChoice): Promise<{ text: string; usage: Record<string, number> }> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function openModel(paidFetch: typeof fetch, content: Block[], schema: unknown, apiKey: string, { model, effort }: ModelChoice): Promise<Response> {
+  const res = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -77,11 +82,16 @@ async function callModel(content: Block[], schema: unknown, apiKey: string, { mo
     console.error('model http error', res.status, (await res.text()).slice(0, 500))
     throw classifyModelHttpError(res.status)
   }
+  return res
+}
 
+/** The text of an opened model stream; throws on a refusal, a cut-off reply
+ *  or a stream error. */
+async function readModel(res: Response, { model, effort }: ModelChoice): Promise<{ text: string; usage: Record<string, number> }> {
   let text = ''
   let stopReason: string | null = null
   const usage: Record<string, number> = {}
-  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+  const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader()
   let buffer = ''
   for (;;) {
     const { value, done } = await reader.read()
@@ -175,12 +185,14 @@ Deno.serve(async (req) => {
     const service = createClient(url, serviceKey)
     const { data: { user }, error: authErr } = await service.auth.getUser(authHeader.slice('Bearer '.length))
     if (authErr || !user) throw new PlanError('unauthorized', 'Invalid token', 401)
-    // Caller-scoped client for the AI allowance: the reservation runs as the
-    // signed-in person. Each action makes exactly ONE model request, and the
-    // reply is streamed with status 200 from the first byte, so the call is
-    // reserved here, before the stream opens, and a refusal still arrives
-    // with its own HTTP status (429/503) and body.
+    // The AI allowance, charged to the signed-in person: each action makes
+    // exactly ONE model request, reserved at its bounded cost before it is
+    // sent and settled at what the stream reports. The model stream is opened
+    // before the heartbeat response, so a refusal still arrives with its own
+    // HTTP status (429/503) and body. (Until 2026-11-11 this route called
+    // reserve_ai_provider_call, revoked 2026-10-16, and recorded no spend.)
     const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+    const paidFetch = guardedAiFetch(db, 'plan-from-paper', fetch, undefined, await serviceBudgetControl(db, user.id))
 
     // Bodies are small (paths, text, a proposal); refuse anything outsized
     // before parsing it.
@@ -214,12 +226,12 @@ Deno.serve(async (req) => {
         if (error || !signed?.signedUrl) throw new PlanError('image_unavailable', `Image ${i + 1} could not be opened`, 404)
         images.push({ type: 'text', text: `Image ${i + 1}:` }, { type: 'image', source: { type: 'url', url: signed.signedUrl } })
       }
-      await reserveAiProviderCall(db, 'plan-from-paper')
+      const res = await openModel(paidFetch,
+        [...images, { type: 'text', text: buildAnalysisPrompt(ctx, paths.length, instructions) }],
+        ANALYSIS_SCHEMA, apiKey, READ,
+      )
       return streamed(async () => {
-        const { text, usage } = await callModel(
-          [...images, { type: 'text', text: buildAnalysisPrompt(ctx, paths.length, instructions) }],
-          ANALYSIS_SCHEMA, apiKey, READ,
-        )
+        const { text, usage } = await readModel(res, READ)
         const analysis = normalizeAnalysis(parseReply(text))
         console.log('analyze ok', JSON.stringify({ ms: Date.now() - started, images: paths.length, items: analysis.items.length, usage }))
         return { ok: true, analysis }
@@ -236,17 +248,17 @@ Deno.serve(async (req) => {
       if (currentJson.length > LIMITS.analysisJsonChars) throw new PlanError('bad_request', 'Proposal too large to revise', 413)
       const history = (Array.isArray(body.conversation) ? body.conversation : []).slice(-LIMITS.conversationTurns)
         .map((m) => `${m?.role === 'user' ? 'User' : 'You'}: ${String(m?.text ?? '').slice(0, LIMITS.conversationChars)}`).join('\n\n')
-      await reserveAiProviderCall(db, 'plan-from-paper')
-      return streamed(async () => {
-        const { text, usage } = await callModel([{
-          type: 'text',
-          text: `${buildRevisionPrompt(ctx, instructions)}
+      const res = await openModel(paidFetch, [{
+        type: 'text',
+        text: `${buildRevisionPrompt(ctx, instructions)}
 
 Current proposal (JSON):
 ${currentJson}
 
 ${history ? `Conversation so far:\n${history}\n\n` : ''}User: ${message}`,
-        }], REVISION_SCHEMA, apiKey, REVISE)
+      }], REVISION_SCHEMA, apiKey, REVISE)
+      return streamed(async () => {
+        const { text, usage } = await readModel(res, REVISE)
         const reply = parseReply<{ reply?: string; changes?: string[] } & RevisionPatch>(text)
         const analysis = applyRevision(current, reply)
         console.log('revise ok', JSON.stringify({ ms: Date.now() - started, items: analysis.items.length, usage }))
@@ -269,9 +281,9 @@ ${history ? `Conversation so far:\n${history}\n\n` : ''}User: ${message}`,
         if (error || !signed?.signedUrl) throw new PlanError('image_unavailable', `Image ${i + 1} could not be opened`, 404)
         images.push({ type: 'image', source: { type: 'url', url: signed.signedUrl } })
       }
-      await reserveAiProviderCall(db, 'plan-from-paper')
+      const res = await openModel(paidFetch, [...images, { type: 'text', text: buildPaperPrompt(ctx) }], PAPER_SCHEMA, apiKey, PAPER)
       return streamed(async () => {
-        const { text, usage } = await callModel([...images, { type: 'text', text: buildPaperPrompt(ctx) }], PAPER_SCHEMA, apiKey, PAPER)
+        const { text, usage } = await readModel(res, PAPER)
         const paper = normalizePaper(parseReply(text))
         console.log('read-paper ok', JSON.stringify({ ms: Date.now() - started, found: !!paper, usage }))
         return { ok: true, paper }

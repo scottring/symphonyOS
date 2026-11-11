@@ -1,4 +1,4 @@
-import { searchFeeTokens, serviceBudgetControl, textBudget, type BudgetControl } from './aiBudget.ts'
+import { pdfSourcePages, requestBudget, searchFeeTokens, serviceBudgetControl, statedBudget, type BudgetControl, type PdfSource } from './aiBudget.ts'
 /** Provider-call admission with a conservative monetary hold. No local fallback: a
  * missing migration/configuration or failed reservation means no paid call. */
 /** Every interactive paid route (the caller is a signed-in person). Must match
@@ -74,59 +74,133 @@ export class AiUsageError extends Error {
   constructor(reason: string, readonly retryAt?: string) {
     const limited = reason === 'daily_limit' || reason === 'monthly_limit'
     const when = reason === 'monthly_limit' ? 'month' : 'day'
+    // Every refusal that is not a spent allowance keeps the one client code
+    // (ai_usage_unavailable); the words say which it is. Until 2026-11-11 a
+    // PDF attachment and an account with no household both read "usage
+    // controls are not ready", which pointed at the wrong thing.
     super(limited
       ? `The AI allowance for this ${when} has been reached. It resets ${retryAt ? `at ${retryAt}` : `next ${when}`} (UTC). You can still view and change your plans directly.`
-      : 'AI is unavailable while its usage controls are not ready. You can still view and change your plans directly.')
+      : reason === 'no_household'
+        ? 'AI needs your account to belong to a household, because the household shares its allowance. You can still view and change your plans directly.'
+        : reason === 'unpriceable'
+          ? 'AI can’t take this request yet: Symphony can’t tell what it would cost (an attachment it can’t open or measure, for example). You can still view and change your plans directly.'
+          : 'AI is unavailable while its usage controls are not ready. You can still view and change your plans directly.')
     this.name = 'AiUsageError'
     this.status = limited ? 429 : 503
     this.code = limited ? `ai_${reason}` : 'ai_usage_unavailable'
   }
 }
 
-export async function reserveAiProviderCall(db: UsageDb, route: GuardedAiRoute, model: string | null = null): Promise<void> {
-  let result: { data: unknown; error: unknown }
-  try { result = await db.rpc('reserve_ai_provider_call', { p_route: route, ...(model ? { p_model: model } : {}) }) }
-  catch { throw new AiUsageError('unavailable') }
-  if (result.error) throw new AiUsageError('unavailable')
-  const value = result.data as { allowed?: unknown; reason?: unknown; retry_at?: unknown } | null
-  if (value?.allowed === true) return
-  const reset = typeof value?.retry_at === 'string' && Number.isFinite(Date.parse(value.retry_at))
-    ? new Date(value.retry_at).toISOString() : undefined
-  throw new AiUsageError(typeof value?.reason === 'string' ? value.reason : 'unavailable', reset)
-}
-
 /** One reservation per outbound provider attempt, including retries/tool-loop
- * follow-ups and embeddings. Supply this only for paid provider requests. */
+ * follow-ups and embeddings. Supply this only for paid provider requests.
+ * `estimate` is for audio whose reply carries no usage (speech, a realtime
+ * call): it is accepted only for the models and caps aiBudget.ts lists
+ * (STATED_AUDIO), and charged as stated. */
 export function guardedAiFetch(db: UsageDb, route: GuardedAiRoute, transport: typeof fetch = fetch, estimate?: AiUsageEstimate, control?: BudgetControl): typeof fetch {
   return budgetFetch(()=>control?Promise.resolve(control):serviceBudgetControl(db),route,transport,estimate)
+}
+
+/** PostgREST's answer for a function signature the database does not have:
+ *  the minutes / cache-multiplier arguments before migration 20261111120000. */
+function missingSignature(error: unknown): boolean {
+  const e = error as { code?: unknown; status?: unknown } | null
+  return !!e && typeof e === 'object' && (e.code === 'PGRST202' || e.status === 404)
 }
 
 /** Settle only confirmed usage. A failed settlement keeps the conservative
  * monetary hold in place; the response remains readable by the caller. */
 function budgetFetch(authority:()=>Promise<BudgetControl>,route:string,transport:typeof fetch,estimate?:AiUsageEstimate):typeof fetch {
   let control:Promise<BudgetControl>|undefined
+  // Until migration 20261111120000 is applied the reservation takes no minutes
+  // or cache multiplier: token requests then reserve at the old 2x input
+  // (safe, only larger), and per-minute audio is refused.
+  let legacy=false
+  // A PDF at a URL is measured once per request, not once per tool-loop pass.
+  const pages=new Map<string,Promise<number|null|'unreadable'>>()
+  const pagesOf=(source:PdfSource)=>{
+    if('data' in source) return pdfSourcePages(source)
+    if(!pages.has(source.url)) pages.set(source.url,pdfSourcePages(source))
+    return pages.get(source.url)!
+  }
   return async(input,init)=>{
-    // No guessed audio liability in the chat beta. Those routes fail before
-    // any provider call until a measured, bounded policy is supplied.
-    const budget=estimate?null:textBudget(init)
-    if(!budget) throw new AiUsageError('unavailable')
+    const budget=estimate?statedBudget(estimate,init):await requestBudget(init,pagesOf)
+    if(!budget) throw new AiUsageError('unpriceable')
     let owner:BudgetControl, reservation:{allowed?:boolean;reservation_id?:string;reason?:string;retry_at?:string}
     try {
       owner=await(control??=authority())
-      const result=await owner.db.rpc('reserve_ai_budget',{p_user:owner.userId,p_route:route,p_model:budget.model,p_input:budget.input,p_output:budget.output})
+      const args={p_user:owner.userId,p_route:route,p_model:budget.model,p_input:budget.input,p_output:budget.output}
+      let result=legacy?null:await owner.db.rpc('reserve_ai_budget',{...args,p_minutes:budget.minutes,p_input_multiplier:budget.inputMultiplier})
+      if(result && missingSignature(result.error)) { legacy=true; result=null }
+      if(!result) {
+        if(budget.minutes>0) throw new Error('Per-minute funding needs migration 20261111120000')
+        result=await owner.db.rpc('reserve_ai_budget',args)
+      }
       if(result.error) throw new Error('Reservation failed')
       reservation=(result.data??{}) as typeof reservation
     } catch {throw new AiUsageError('unavailable')}
     if(reservation.allowed!==true||!reservation.reservation_id) throw new AiUsageError(reservation.reason??'unavailable',reservation.retry_at)
+    const id=reservation.reservation_id
+    const settle=(usage:{inputTokens:number;outputTokens:number;minutes:number}|null)=>owner.db.rpc('settle_ai_budget',{
+      p_id:id,p_user:owner.userId,p_input:usage?.inputTokens??0,p_output:usage?.outputTokens??0,
+      ...(legacy?{}:{p_minutes:usage?.minutes??0}),
+    })
     const response=await transport(input,init) // A timeout leaves its hold intact.
+    const refused=[400,401,403,404,422,429].includes(response.status)
     try {
-      const usage=/json/i.test(response.headers.get('content-type')??'')?usageOf(await response.clone().json().catch(()=>null),budget.model):null
-      if(usage || [400,401,403,404,422,429].includes(response.status)) {
-        await owner.db.rpc('settle_ai_budget',{p_id:reservation.reservation_id,p_user:owner.userId,p_input:usage?.inputTokens??0,p_output:usage?.outputTokens??0})
+      if(budget.stated) {
+        // Speech and realtime replies carry no usage: an accepted call is
+        // charged what was stated (and held); a refused one nothing.
+        if(response.ok) await settle({inputTokens:budget.input,outputTokens:0,minutes:budget.minutes})
+        else if(refused) await settle(null)
+        return response
       }
+      if(budget.stream && response.ok && response.body && /event-stream/i.test(response.headers.get('content-type')??'')) {
+        return settledStream(response,budget.model,settle)
+      }
+      const usage=/json/i.test(response.headers.get('content-type')??'')?usageOf(await response.clone().json().catch(()=>null),budget.model):null
+      if(usage || refused) await settle(usage)
     } catch { /* The hold stays charged when settlement cannot be confirmed. */ }
     return response
   }
+}
+
+/** The streamed reply, passed through unchanged, with its usage read from
+ *  the events on the way: Anthropic's message_start (input, cache) and
+ *  message_delta (output, cumulative), or OpenAI's final usage chunk. It is
+ *  settled only when the stream finished (message_stop or [DONE]); a stream
+ *  cut short, cancelled or errored keeps its hold. */
+function settledStream(response:Response,model:string,settle:(usage:AiUsageRecord|null)=>PromiseLike<unknown>):Response {
+  const decoder=new TextDecoder()
+  const usage:Record<string,unknown>={}
+  let finished=false, buffer=''
+  const read=(line:string)=>{
+    line=line.trim()
+    if(!line.startsWith('data:')) return
+    const data=line.slice(5).trim()
+    if(data==='[DONE]') { finished=true; return }
+    let event:{type?:unknown;usage?:unknown;message?:{usage?:unknown}}
+    try { event=JSON.parse(data) } catch { return }
+    if(!event || typeof event!=='object') return
+    const message=event.message && typeof event.message==='object' ? event.message : null
+    if(message?.usage && typeof message.usage==='object') Object.assign(usage,message.usage)
+    if(event.usage && typeof event.usage==='object') Object.assign(usage,event.usage)
+    if(event.type==='message_stop') finished=true
+  }
+  const scan=(text:string)=>{
+    buffer+=text
+    let nl
+    while((nl=buffer.indexOf('\n'))>=0) { read(buffer.slice(0,nl)); buffer=buffer.slice(nl+1) }
+  }
+  const body=response.body!.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({
+    transform(chunk,controller) { controller.enqueue(chunk); scan(decoder.decode(chunk,{stream:true})) },
+    async flush() {
+      scan(decoder.decode()); read(buffer)
+      if(!finished) return
+      // Priced at the reserved model (settle_ai_budget uses the reservation's).
+      try { await settle(usageOf({model,usage},model)) } catch { /* the hold stays */ }
+    },
+  }))
+  return new Response(body,{status:response.status,statusText:response.statusText,headers:response.headers})
 }
 
 /** Background paid routes: a worker or cron charging the person it works
@@ -134,20 +208,9 @@ function budgetFetch(authority:()=>Promise<BudgetControl>,route:string,transport
 export const BACKGROUND_AI_ROUTES = ['email-scanner', 'extract-email', 'gmail-check', 'school-digest', 'proactive-engine', 'vault-sync', 'extract-capture', 'parse-page'] as const
 export type BackgroundAiRoute = typeof BACKGROUND_AI_ROUTES[number]
 type ServiceDb = { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }
-
-/** Reserve on behalf of `userId` through a SERVICE-ROLE client. The database
- *  refuses this call from any other role, so a person cannot charge another. */
-export async function reserveAiProviderCallFor(db: ServiceDb, userId: string, route: BackgroundAiRoute, model: string | null = null): Promise<void> {
-  let result: { data: unknown; error: unknown }
-  try { result = await db.rpc('reserve_ai_provider_call_for', { p_user: userId, p_route: route, ...(model ? { p_model: model } : {}) }) }
-  catch { throw new AiUsageError('unavailable') }
-  if (result.error) throw new AiUsageError('unavailable')
-  const value = result.data as { allowed?: unknown; reason?: unknown; retry_at?: unknown } | null
-  if (value?.allowed === true) return
-  const reset = typeof value?.retry_at === 'string' && Number.isFinite(Date.parse(value.retry_at))
-    ? new Date(value.retry_at).toISOString() : undefined
-  throw new AiUsageError(typeof value?.reason === 'string' ? value.reason : 'unavailable', reset)
-}
+// reserveAiProviderCall / reserveAiProviderCallFor (call counts, no money)
+// were removed 2026-11-11: migration 20261016094000 revoked their database
+// functions from every role, so they could only ever refuse.
 
 /** One reservation per outbound provider attempt, charged to `userId`. */
 export function guardedAiFetchFor(db: ServiceDb, userId: string, route: BackgroundAiRoute, transport: typeof fetch = fetch, estimate?: AiUsageEstimate): typeof fetch {

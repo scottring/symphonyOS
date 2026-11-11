@@ -58,7 +58,7 @@ async function run(route: typeof routes[number]) {
 describe.each(routes)('%s usage guard', (route) => {
   it('calls the provider after a confirmed server reservation', async () => {
     quotaReady = true
-    if(route==='wall-say'||route==='workspace-voice'){expect((await run(route)).status).toBe(503);expect(providerCalls).toBe(0);return}
+    // Speech and realtime voice are funded at their stated, capped cost (2026-11-11).
     expect((await run(route)).status).toBe(200)
     expect(providerCalls).toBe(1)
     expect(rpc).toHaveBeenCalledWith('reserve_ai_budget', expect.objectContaining({ p_route: route }))
@@ -67,7 +67,6 @@ describe.each(routes)('%s usage guard', (route) => {
   it('denies an exhausted allowance without any provider request', async () => {
     const result = await run(route)
     expect(providerCalls).toBe(0)
-    if(route==='wall-say'||route==='workspace-voice'){expect(result.status).toBe(503);return}
     expect(result.status).toBe(route === 'symphony-agent' ? 200 : 429)
     expect(result.body).toContain('AI allowance')
     expect(result.body).toContain('view and change your plans directly')
@@ -97,4 +96,50 @@ it('reserves the next agent tool-loop attempt and stops when it is refused', asy
   expect(providerCalls).toBe(1)
   expect(response.body).toContain('AI allowance')
   expect(response.body).not.toContain('"type":"done"')
+})
+
+// plan-from-paper called reserve_ai_provider_call, revoked on 2026-10-16, so
+// every reading was refused; it now runs on the funded guard (2026-11-11).
+describe('plan-from-paper usage guard', () => {
+  const revise = () => handler(new Request('https://example.invalid/plan-from-paper', {
+    method: 'POST', headers: { Authorization: 'Bearer member-token', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'revise', message: 'Move it to Friday', context: { today: '2026-11-11' }, analysis: {}, conversation: [] }),
+  }))
+  const stream = (text: string) => {
+    const events = [
+      { type: 'message_start', message: { model: 'claude-sonnet-4-6', usage: { input_tokens: 900, output_tokens: 1 } } },
+      { type: 'content_block_delta', delta: { type: 'text_delta', text } },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 40 } },
+      { type: 'message_stop' },
+    ]
+    return new Response(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } })
+  }
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/rest/v1/rpc/')) { const result = await rpc(String(input).split('/').at(-1), JSON.parse(String(init?.body))); return new Response(JSON.stringify(result.data), { headers: { 'content-type': 'application/json' } }) }
+      providerCalls++
+      expect(JSON.parse(String(init?.body)).stream).toBe(true)
+      return stream(JSON.stringify({ reply: 'Moved.', changes: ['Moved to Friday'], upserts: [], remove: [] }))
+    }))
+  })
+
+  it('reserves, streams the reading, and settles what the stream reported', async () => {
+    quotaReady = true
+    await import('../plan-from-paper/index.ts')
+    const response = await revise()
+    expect(response.status).toBe(200)
+    expect(JSON.parse(await response.text())).toMatchObject({ ok: true, reply: 'Moved.' })
+    expect(providerCalls).toBe(1)
+    expect(rpc).toHaveBeenCalledWith('reserve_ai_budget', expect.objectContaining({ p_route: 'plan-from-paper', p_user: 'member', p_model: 'claude-sonnet-4-6', p_output: 32000 }))
+    expect(rpc).toHaveBeenCalledWith('settle_ai_budget', { p_id: 'reservation', p_user: 'member', p_input: 900, p_output: 40, p_minutes: 0 })
+    expect(rpc).not.toHaveBeenCalledWith('reserve_ai_provider_call', expect.anything())
+  })
+
+  it('refuses a spent allowance with its own status, before the reading starts', async () => {
+    await import('../plan-from-paper/index.ts')
+    const response = await revise()
+    expect(response.status).toBe(429)
+    expect(JSON.parse(await response.text())).toMatchObject({ code: 'ai_daily_limit' })
+    expect(providerCalls).toBe(0)
+  })
 })
