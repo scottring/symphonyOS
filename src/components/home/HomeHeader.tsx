@@ -9,6 +9,7 @@ import { readCadenceConfig } from '@/lib/cadence/config'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { ShelvesButton } from '@/components/reference/ShelvesButton'
 import { planV2Enabled } from '@/lib/planning/v2/planV2'
+import { monthsTitle } from '@/lib/planning/journalHeading'
 
 interface HomeHeaderProps {
   currentView: HomeViewType
@@ -48,12 +49,12 @@ interface HomeHeaderProps {
   journal?: boolean
 }
 
-/** "This week", "Last week", "Next week"; further off, the year. */
+/** "This week", "Last week", "Next week"; further off, just "Week". */
 function weekName(start: Date): string {
   const now = weekRange(new Date(), readCadenceConfig().weekStartsOn)[0]
   const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
   const weeks = Math.round((day(start) - day(now)) / (7 * 86400000))
-  return weeks === 0 ? 'This week' : weeks === -1 ? 'Last week' : weeks === 1 ? 'Next week' : String(start.getFullYear())
+  return weeks === 0 ? 'This week' : weeks === -1 ? 'Last week' : weeks === 1 ? 'Next week' : 'Week'
 }
 
 /** An empty element whose node goes to `onHost` — where WeekV2 portals the
@@ -274,11 +275,9 @@ export function HomeHeader(props: HomeHeaderProps) {
     // week's own controls (Plan this week, ⋯) at the right.
     const slots = planV2Enabled() ? props.planSlots : undefined
     if (props.journal && rangeDays === 7) {
-      // "7–13" in the margin; "‹ This week ›" above "November"; the dates
+      // "7–13" in the margin; "‹ This week ›" above "November, 2026"; the dates
       // stay the heading's (and the range menu's) name for a screen reader.
-      const months = rangeEnd.getMonth() === weekStart.getMonth()
-        ? weekStart.toLocaleDateString('en-US', { month: 'long' })
-        : `${weekStart.toLocaleDateString('en-US', { month: 'short' })} – ${rangeEnd.toLocaleDateString('en-US', { month: 'short' })}`
+      const months = monthsTitle(weekStart, rangeEnd)
       const named = <><span aria-hidden="true">{months}</span><span className="sr-only">{label.long}</span></>
       return (
         <MastheadCard

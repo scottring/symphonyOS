@@ -326,3 +326,40 @@
 .jc-now i { display: block; align-self: center; height: 1.5px; margin: 4px 0; background: var(--today-now); }
 .jc-now .jc-dot::after { border-color: var(--today-now); background: var(--today-now); top: 2px; }
 .jc-specials { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+
+/* ---- One heading on every horizon (Scott's sketch, 2026-11-11) ---------
+   The span as a big number in the margin; "‹ This month ›" small over the
+   period's name, "November, 2026". Today and Week draw it through
+   MastheadCard; Month, Season and Year through .plan-period.is-journal. */
+.today-mast-eyebrow { display: inline-flex; margin-left: -6px; }
+.today-mast-eyebrow .uppercase { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; color: var(--color-neutral-600); }
+.plan-period.is-journal { align-items: flex-end; flex-wrap: nowrap; gap: 16px; }
+.plan-numeral {
+  flex: none; font: 200 72px/.8 'Jost', var(--font-family-sans); letter-spacing: -0.03em; color: var(--color-neutral-900); white-space: nowrap;
+}
+.plan-numeral[data-len="6"], .plan-numeral[data-len="7"] { font-size: 58px; }
+.plan-period-text { min-width: 0; }
+.plan-period-name {
+  display: flex; align-items: center; gap: 2px; margin: 0 0 4px -6px;
+  font: 600 13px/1.2 var(--font-family-sans); color: var(--color-neutral-600);
+}
+.plan-horizon .plan-period-name .plan-step {
+  width: 26px; height: 26px; border: 0; background: none; color: var(--color-neutral-500);
+}
+.plan-horizon .plan-period-name .plan-step:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.plan-horizon .plan-period.is-journal h1 { margin: 0; font-size: 40px; font-weight: 500; line-height: 1.05; }
+/* On the desk the heading stands on the sheet itself. */
+.plan-sheet-mast:empty { display: none; }
+.plan-sheet-mast .plan-head { margin: 0; align-items: flex-start; }
+.plan-sheet-mast .plan-head-tools { align-self: flex-start; }
+.plan-sheet-mast:not(:empty) ~ .plan-sheet-title {
+  margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--color-neutral-200);
+  font: 600 13px/1.2 var(--font-family-sans); color: var(--color-neutral-600);
+}
+@media (max-width: 767px) {
+  .plan-numeral { font-size: 52px; }
+  .plan-numeral[data-len="6"], .plan-numeral[data-len="7"] { font-size: 40px; }
+  .plan-horizon .plan-period.is-journal h1 { font-size: 30px; }
+  .plan-horizon .plan-period-name .plan-step { width: 40px; height: 40px; }
+}
+.plan-head-main:has(> .plan-period.is-journal) { gap: 12px; }

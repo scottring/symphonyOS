@@ -86,6 +86,9 @@ import { restoreDeleted } from '@/lib/planning/restoreDeleted'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { useMobile } from '@/hooks/useMobile'
+import { periodHeading } from '@/lib/planning/journalHeading'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { describeTriageWhen } from '@/lib/triage/applyWhen'
 import { compareSortOrder, nextTaskSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
@@ -163,6 +166,9 @@ function Inner() {
   const { getRoutinesForDate } = useRoutines()
   // The shell's "How this page works", or the page's own ask where it offers none.
   const shellHelp = usePageHelp()
+  const isMobile = useMobile()
+  // Where the sheet offers a place for the heading (desktop).
+  const [mastHost, setMastHost] = useState<HTMLElement | null>(null)
 
   // ---- Where we are -------------------------------------------------------
   const raw = params.get('start')
@@ -964,7 +970,8 @@ function Inner() {
       {justMarked && !planning && <PlannedStamp at={justMarkedAt} />}
       {/* Named like the sheets folded beside it (Scott, 2026-11-07): "Fall
           2026" at its left, "November" at its right, so this one too. */}
-      <p className="above-sheet-kicker plan-sheet-kicker">{level === 0 ? 'Year' : `${level === 1 ? 'Season' : 'Month'} · ${periodRange(bounds.start, bounds.end)}`}</p>
+      {!isMobile && <div className="plan-sheet-mast" ref={setMastHost} />}
+      {(isMobile || !mastHost) && <p className="above-sheet-kicker plan-sheet-kicker">{level === 0 ? 'Year' : `${level === 1 ? 'Season' : 'Month'} · ${periodRange(bounds.start, bounds.end)}`}</p>}
       <h2 className="above-sheet-title plan-sheet-title">{periodWord} goals</h2>
       <PlanOrderList key={`${level}:${localYmd(bounds.start)}`} label={`${periodWord} goals`} items={items} headingOf={headingOf} groupOf={groupOf}
         keyOf={(n) => n.key} titleOf={(n) => n.title}
@@ -1053,13 +1060,24 @@ function Inner() {
     </div>
   )
 
-  return <main ref={mainRef} className={`plan-canvas plan-horizon ${PAGE_PLANNING}`} data-horizon={level}>
+  // One heading on every horizon (Scott's sketch, 2026-11-11): "1–30" in
+  // the margin, "‹ This month ›" over "November, 2026"; the heading still
+  // reads "November 2026". On the desk it stands on the sheet itself, as
+  // Today's and Week's do; on a phone, above it.
+  const journal = periodHeading(bounds, now, seasons)
+  const head = (
     <header className="plan-head">
       <div className="plan-head-main">
-        <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
-          <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
-          <h1 data-guide-anchor="title">{periodTitle}</h1>
-          <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
+        <div className="plan-period is-journal" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
+          <span className="plan-numeral" aria-hidden="true" data-len={journal.numeral.length}>{journal.numeral}</span>
+          <div className="plan-period-text">
+            <p className="plan-period-name">
+              <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={16} aria-hidden="true" /></button>
+              <span>{journal.name}</span>
+              <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={16} aria-hidden="true" /></button>
+            </p>
+            <h1 data-guide-anchor="title"><span aria-hidden="true">{journal.title}</span><span className="sr-only">{periodTitle}</span></h1>
+          </div>
         </div>
         {/* The review and the plan say where the period stands in their own
             words: the fact line steps aside while one is open. */}
@@ -1077,6 +1095,10 @@ function Inner() {
         </PageHelpContext.Provider>
       </div>
     </header>
+  )
+
+  return <main ref={mainRef} className={`plan-canvas plan-horizon ${PAGE_PLANNING}`} data-horizon={level}>
+    {mastHost && !isMobile ? createPortal(head, mastHost) : head}
     {freshOpen && level === 2 && <div className="plan-fresh" role="region" aria-label="Fresh start">
       <div className="page-section-head">
         <h3 className="page-section-title">Fresh start · {periodWord}</h3>
