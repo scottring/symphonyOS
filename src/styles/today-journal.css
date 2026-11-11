@@ -81,13 +81,21 @@
   font-style: italic; font-size: 21px; line-height: 1.35; color: var(--color-neutral-700);
 }
 .today-page .today-sentence-link { font-style: italic; }
+/* When the page narrows (the details pane open beside it), the weather and
+   dinner drop under the title rather than squeezing the sentence into a
+   column: the row wraps, the number and title keep their room. */
+.today-page .daybook-masthead-row:has(> .masthead-numeral) { flex-wrap: wrap; row-gap: 14px; }
+.today-page .daybook-masthead-row:has(> .masthead-numeral) > .daybook-masthead-text { flex: 1 1 16rem; }
+.today-page .daybook-masthead-row:has(> .masthead-numeral) > .daybook-masthead-controls {
+  flex: 0 1 auto; max-width: 100%; margin-left: auto;
+}
 .today-mast-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .today-mast-facts {
   display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
   font-family: var(--font-family-sans); font-size: 13.5px; line-height: 1.3; color: var(--color-neutral-700);
   text-align: right;
 }
-.today-mast-facts .today-dinner { color: inherit; text-decoration: none; max-width: 22rem; }
+.today-mast-facts .today-dinner { color: inherit; text-decoration: none; max-width: 18rem; white-space: normal; }
 .today-mast-facts .today-dinner:hover { color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---- Section headings and labels: no italic ----------------------------- */
