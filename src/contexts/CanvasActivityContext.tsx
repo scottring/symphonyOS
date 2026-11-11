@@ -229,8 +229,15 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   const toolResult = useCallback((result: { name: string; ok: boolean; ids?: string[]; error?: string }) => {
     const turn = turnRef.current
     if (!turn) return
-    if (result.ok) { turn.reportedOk = true; turn.reportedIds.push(...(result.ids ?? [])); markArrived(result.ids ?? []) }
-    else turn.failures.push(toolSavingLabel(result.name).replace(/…$/, ''))
+    const label = toolSavingLabel(result.name).replace(/…$/, '')
+    if (result.ok) {
+      turn.reportedOk = true; turn.reportedIds.push(...(result.ids ?? [])); markArrived(result.ids ?? [])
+      // The same kind of step going through after it failed is the retry of
+      // that step, not a second one: drop the earlier failure.
+      const retried = turn.failures.indexOf(label)
+      if (retried >= 0) turn.failures.splice(retried, 1)
+    }
+    else turn.failures.push(label)
   }, [markArrived])
 
   const finishDiff = useCallback(() => {
@@ -244,9 +251,11 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     // Nothing visible changed: a failure only when the write was one this
     // canvas can see. A note, contact or event saved elsewhere is reported as
     // saved when the server confirmed it, otherwise as not checked here.
+    // Nothing visible changed but the server confirmed some writes (a list,
+    // a note) while another step failed: partly saved, never "nothing changed".
     const state: SaveState = changes.length
       ? (failed ? 'partial' : 'saved')
-      : failed ? 'failed'
+      : failed ? (turn.reportedOk && !error ? 'partial' : 'failed')
         : turn.trackedWrite ? 'failed'
           : turn.wrote ? (turn.reportedOk ? 'saved' : 'unverified')
             : 'answered'
@@ -257,7 +266,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
       : state === 'failed'
       ? (turn.wrote && !error && !turn.failures.length ? 'Nothing changed. The request may not have saved.' : "Didn't save. Nothing changed.")
       : state === 'partial'
-        ? `${describeChanges(changes)}. Some of it didn't save.`
+        ? changes.length ? `${describeChanges(changes)}. Some of it didn't save.` : `Some of it saved. ${turn.failures.join(', ')} didn't.`
         : describeChanges(changes)
     undoRef.current = null
     setReceipt({ key: turn.key, source: 'conversation', state, request: turn.request, summary, changes, failures: turn.failures, undoable, canRetry: failed && !!retryRef.current })

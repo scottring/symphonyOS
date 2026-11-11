@@ -162,6 +162,40 @@ describe('CanvasActivityProvider — writes the canvas does not hold', () => {
     vi.useRealTimers()
   })
 
+  // 2026-11-11, prod: symphony_create_list failed once, the retry made the
+  // list, and four list items saved. None of it shows on the Week page, so the
+  // receipt read "Didn't save. Nothing changed." while all of it had saved.
+  it('a step that failed once and then went through is not reported as a failure', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let api!: CanvasActivity
+    render(<Harness initial={[]} after={[]} writers={{}} onReady={(a) => { api = a }} retryTurn={() => {}} />)
+    act(() => api.turnStarted('Yes, please create it.', false))
+    act(() => api.toolUsed('symphony_create_list'))
+    act(() => api.toolResult({ name: 'symphony_create_list', ok: false, error: 'bad input' }))
+    act(() => api.toolResult({ name: 'symphony_create_list', ok: true, ids: ['l1'] }))
+    act(() => api.toolUsed('symphony_add_list_item'))
+    act(() => api.toolResult({ name: 'symphony_add_list_item', ok: true, ids: ['i1'] }))
+    act(() => api.turnEnded({ didWrite: true, error: null, text: 'Done.' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('saved|Saved||'))
+    vi.useRealTimers()
+  })
+
+  it('writes the server confirmed are not called "nothing changed" when another step failed', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let api!: CanvasActivity
+    render(<Harness initial={[]} after={[]} writers={{}} onReady={(a) => { api = a }} retryTurn={() => {}} />)
+    act(() => api.turnStarted('Make a packing list', false))
+    act(() => api.toolUsed('symphony_create_list'))
+    act(() => api.toolResult({ name: 'symphony_create_list', ok: true, ids: ['l1'] }))
+    act(() => api.toolUsed('symphony_add_list_item'))
+    act(() => api.toolResult({ name: 'symphony_add_list_item', ok: false, error: 'bad input' }))
+    act(() => api.turnEnded({ didWrite: true, error: null, text: '' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toMatch(/^partial\|Some of it saved\. .+ didn't\.\|\|retry$/))
+    vi.useRealTimers()
+  })
+
   it('does not call an untracked write (a note) a failure', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let api!: CanvasActivity

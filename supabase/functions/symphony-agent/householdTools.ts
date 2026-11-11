@@ -532,6 +532,10 @@ export function syncSteps(needed: ConsolidatedIngredient[], lines: MealGroceryLi
 // are stored under the Sunday week of their date (src/lib/mealWeek.ts).
 
 const GROCERIES_LIST = 'Groceries'
+/** Said when there is no synced Groceries list. On 2026-11-11 the bare "no
+ * Groceries list" led the assistant to offer to create one; a list made here
+ * is a plain list that meals never update, so it must not offer that. */
+export const NO_GROCERIES_LIST = 'no Groceries list. Meals update only the Apple Reminders list named Groceries (synced from the Mac). A list made in Symphony will not follow the meal plan, so do not offer to create one; say the ingredients can go on the list once Reminders is connected, or list them in the reply.'
 
 async function groceriesList(db: Db): Promise<string | null> {
   const { data, error } = await db.from('lists').select('id')
@@ -716,7 +720,7 @@ export async function syncGroceriesForDate(db: Db, userId: string, date: string,
   const out: GrocerySync = { synced: false, windows: [], added: [], checked_off: [], rewritten: [] }
   try {
     const listId = await groceriesList(db)
-    if (!listId) return { ...out, reason: 'no Groceries list' }
+    if (!listId) return { ...out, reason: NO_GROCERIES_LIST }
     const windows = await builtWindowsHolding(db, listId, date)
     if (!windows.length) return { ...out, reason: 'shopping list not built for this week' }
     for (const windowStart of windows) {
@@ -755,7 +759,7 @@ export async function readGroceries(db: Db, input: Record<string, unknown>, ctx:
     const date = resolveDate(input.date, ctx.today)
     if (!date) return 'Error: date must be YYYY-MM-DD, "today" or "tomorrow"'
     const listId = await groceriesList(db)
-    if (!listId) return JSON.stringify({ list: null, note: 'No Groceries list yet. It comes from the Apple Reminders list named Groceries.' })
+    if (!listId) return JSON.stringify({ list: null, note: `No Groceries list yet: ${NO_GROCERIES_LIST}` })
     const windowStart = (await builtWindowsHolding(db, listId, date))[0] ?? null
     const { data: items, error } = await db.from('list_items').select('id, text, sort_order')
       .eq('list_id', listId).eq('completed', false).order('sort_order', { ascending: true, nullsFirst: false }).limit(300)

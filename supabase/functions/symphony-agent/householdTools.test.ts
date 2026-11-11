@@ -271,7 +271,7 @@ describe('syncGroceriesForDate', () => {
 
   it('without a Groceries list there is nothing to sync', async () => {
     const { db } = groceryWorld({ lists: [] })
-    expect(await syncGroceriesForDate(db, 'scott', '2026-11-04')).toMatchObject({ synced: false, reason: 'no Groceries list' })
+    expect(await syncGroceriesForDate(db, 'scott', '2026-11-04')).toMatchObject({ synced: false, reason: expect.stringMatching(/^no Groceries list\. .*do not offer to create one/) })
   })
 
   it('does not check anything off while a meal\'s recipe cannot be read', async () => {
