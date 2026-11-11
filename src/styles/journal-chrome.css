@@ -31,12 +31,12 @@
   flex: 1; min-width: 0; padding: 8px 4px; border: 0; outline: 0; background: transparent;
   font: 400 15px/1.3 var(--font-family-sans); color: var(--color-neutral-900);
 }
-.tell-bar-field::placeholder { color: var(--color-neutral-500); }
+.tell-bar-field::placeholder { color: var(--color-neutral-600); }
 .tell-bar-send {
   flex: none; display: grid; place-items: center; width: 40px; height: 40px; min-width: 0; min-height: 0;
   padding: 0; border: 0; border-radius: 999px; background: var(--color-primary-600); color: #fff; cursor: pointer;
 }
-.tell-bar-send:disabled { background: var(--color-neutral-200); color: var(--color-neutral-500); cursor: default; }
+.tell-bar-send:disabled { background: var(--color-neutral-200); color: var(--color-neutral-600); cursor: default; }
 .tell-bar :is(.tell-bar-icon, .tell-bar-send):focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 
 /* ---- The Details / Chat pane as a card of paper ----------------------- */
@@ -73,7 +73,7 @@
 /* ---- Inside the card: journal type, quiet controls -------------------- */
 /* Small spaced capitals ("EVENT", "LOCATION") read as a form; plain small
    labels read as a note. */
-.side-column .uppercase { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.side-column .uppercase { text-transform: none; letter-spacing: 0; font-size: 13px; }
 .side-column .panel-kind { font-weight: 500; color: var(--color-neutral-600); }
 /* The item's name, in the journal's serif. */
 .side-column .panel-shell .font-display.text-\[24px\] { font-size: 28px; font-weight: 500; letter-spacing: 0; }
@@ -140,17 +140,17 @@
 .scenery-dial-switch:checked { background: var(--color-primary-600); }
 .scenery-dial-switch:checked::after { transform: translateX(14px); }
 .scenery-dial-switch:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
-.scenery-dial-label { display: block; margin: 12px 0 4px; font-size: 12.5px; color: var(--color-neutral-600); }
+.scenery-dial-label { display: block; margin: 12px 0 4px; font-size: 13px; color: var(--color-neutral-600); }
 .scenery-dial-slider { display: flex; align-items: center; gap: 10px; }
 .scenery-dial-slider input { flex: 1; accent-color: var(--color-primary-600); }
 .scenery-dial-slider input:disabled { opacity: .4; }
-.scenery-dial-slider span { width: 34px; text-align: right; font-size: 12.5px; color: var(--color-neutral-600); }
+.scenery-dial-slider span { width: 34px; text-align: right; font-size: 13px; color: var(--color-neutral-600); }
 
 /* ---- How you're getting there (TravelChip) ---------------------------- */
 .travel-chip { position: relative; display: inline-flex; pointer-events: auto; }
 .travel-chip-button {
   display: inline-flex; align-items: center; gap: 5px; min-width: 0; min-height: 0; padding: 1px 6px; margin-left: -6px;
-  border: 0; border-radius: 6px; background: none; color: var(--color-neutral-500);
+  border: 0; border-radius: 6px; background: none; color: var(--color-neutral-600);
   font: 400 13px/1.3 var(--font-family-sans); cursor: pointer;
 }
 .travel-chip-button:hover, .travel-chip-button[aria-expanded="true"] { background: var(--color-neutral-100); color: var(--color-neutral-800); }
@@ -172,4 +172,32 @@
 .ag-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .ag-main .ag-open { align-self: stretch; }
 .panel-travel { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 13px; }
-.panel-travel-label { color: var(--color-neutral-500); min-width: 88px; }
+.panel-travel-label { color: var(--color-neutral-600); min-width: 88px; }
+
+/* ---- Refinements (Scott, 2026-11-11, from a review of Week) ---------- */
+/* One paper tone for both side pages (the month or week page and the days
+   page), so the white middle page leads; stronger ink on every sheet. */
+.paper-fold.paper-fold {
+  --paper-fold-paper-above: color-mix(in srgb, var(--color-bg-elevated) 95%, var(--color-neutral-400));
+  --paper-fold-paper-cal: color-mix(in srgb, var(--color-bg-elevated) 95%, var(--color-neutral-400));
+  --paper-fold-ink-soft: var(--color-neutral-700);
+  --paper-fold-ink-faint: var(--color-neutral-600);
+}
+/* The pages lie flat: a hairline at each crease instead of a band of shade,
+   and one soft shadow outward. */
+.paper-fold .paper-fold-current::before, .paper-fold .paper-fold-current::after {
+  width: 1px; background: var(--paper-fold-rule, var(--color-neutral-200));
+}
+.paper-fold .paper-fold-flap[data-flat] .paper-fold-front::after { opacity: 0; }
+.paper-fold .paper-fold-front, .paper-fold > .paper-fold-current {
+  box-shadow: 0 1px 2px hsl(var(--paper-fold-shadow) / .05), 0 16px 36px -18px hsl(var(--paper-fold-shadow) / .24);
+}
+/* Small text you have to read, readable. */
+.paper-fold .above-sheet-foot { font-size: 13px; }
+.paper-fold .cw-context { font-size: 13px; color: var(--color-neutral-600); }
+.paper-fold .cal-sheet .gw-row-note { color: var(--color-neutral-600); }
+/* The page's one strong action: Plan the week, Plan today. */
+.plan-chip:not(.is-on):not(:disabled) {
+  background: var(--color-primary-600); border-color: var(--color-primary-600); color: #fff; font-weight: 600;
+}
+.plan-chip:not(.is-on):not(:disabled):hover { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
