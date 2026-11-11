@@ -851,8 +851,9 @@ export function TodayView({
   // The open journal's eyebrow: where the day sits and its month — the
   // weekday is the title and the number stands in the margin.
   const journalMonth = viewedDate.toLocaleDateString('en-US', { month: 'long' })
-  const journalEyebrow = data.isToday ? `Today · ${journalMonth}`
-    : relativeDayLabel === dayName ? journalMonth : `${relativeDayLabel} · ${journalMonth}`
+  // The month and year; where the day sits (Today, Tomorrow) is on the
+  // arrows at the right.
+  const journalEyebrow = `${journalMonth} ${viewedDate.getFullYear()}`
 
   // ── Drag: the pure resolver's inputs ─────────────────────────────────────────
   const { isReadOnlyCalendar } = useCalendarPermissions()
@@ -1442,8 +1443,12 @@ export function TodayView({
         // The date gives the page its identity; the chosen work gives it its
         // purpose (2026-09-19). The eyebrow says where the day sits — Today,
         // Tomorrow, a weekday — and still opens the date picker.
-        eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline"
-          label={foldedControls ? journalEyebrow : data.isToday ? 'Today' : relativeDayLabel} />}
+        // Wide page: the eyebrow is the month in plain words; the day's
+        // arrows move to the controls at the right (masthead cleanup, Scott,
+        // 2026-11-11: "a bit of a mess").
+        eyebrow={foldedControls
+          ? <span className="today-mast-eyebrow">{journalEyebrow}</span>
+          : <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} />}
         // The open journal (Scott, 2026-11-11, board A): on a wide page the
         // day's number stands in the margin and the weekday is the title; the
         // heading still reads the whole date.
@@ -1462,7 +1467,7 @@ export function TodayView({
         // dinner stand at the right under the controls (board A, 2026-11-11).
         // The week's dates are on the week's own page beside it.
         subline={foldedControls
-          ? (headerLine || journal.allDayEvents.length > 0) ? <>{headerLine}{allDayBlock}</> : undefined
+          ? headerLine ?? undefined
           : dinnerLink ? <>{headerLine}{headerLine && ' '}<span className="today-sentence-meta">{dinnerLink}</span></> : headerLine ?? undefined}
         // Domain chooser + assistant toggle, in the card's corner.
         // Desktop: the page's controls sit in the control row below, as on
@@ -1470,13 +1475,8 @@ export function TodayView({
         // there is no control row to hold them.
         controls={foldedControls
           ? <div className="today-mast-right">
-              <div className="flex items-center justify-end gap-1">{dayFlowButton}{desktopToolbar}</div>
-              {(data.isToday || dinnerLink) && (
-                <div className="today-mast-facts">
-                  {data.isToday && <WeatherChip now={nowForDisplay} />}
-                  {dinnerLink}
-                </div>
-              )}
+              <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} />
+              {dayFlowButton}{desktopToolbar}
             </div>
           : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
@@ -1489,7 +1489,17 @@ export function TodayView({
         // mounts retain the footer controls as a fallback.
         // Standalone mounts keep their controls along the foot; in the Shell
         // there is no foot row at all (it was an empty ruled row, 2026-09-23).
-        footer={!desktopControls ? desktopToolbar : undefined}
+        // Wide page: the day's details on one line under the title — the
+        // specials and other all-day things, the weather, dinner.
+        footer={foldedControls
+          ? (journal.allDayEvents.length > 0 || data.isToday || dinnerLink) && (
+            <div className="today-mast-meta">
+              {allDayBlock}
+              {data.isToday && <WeatherChip now={nowForDisplay} />}
+              {dinnerLink}
+            </div>
+          )
+          : !desktopControls ? desktopToolbar : undefined}
 
       />
       {/* What the day's planning left: one quiet line under the title. */}

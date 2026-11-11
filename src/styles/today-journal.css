@@ -89,22 +89,24 @@
   font-style: italic; font-size: 21px; line-height: 1.35; color: var(--color-neutral-700);
 }
 .today-page .today-sentence-link { font-style: italic; }
-/* When the page narrows (the details pane open beside it), the weather and
-   dinner drop under the title rather than squeezing the sentence into a
-   column: the row wraps, the number and title keep their room. */
-.today-page .daybook-masthead-row:has(> .masthead-numeral) { flex-wrap: wrap; row-gap: 14px; }
+/* The masthead, cleaned up (Scott, 2026-11-11): the number and the three
+   lines beside it (month, weekday, sentence) share one bottom edge; the
+   day's arrows, Plan today and ⋯ are one row at the top right; the day's
+   details are one line underneath. */
+.today-page .daybook-masthead-row:has(> .masthead-numeral) { align-items: flex-end; flex-wrap: wrap; row-gap: 12px; }
 .today-page .daybook-masthead-row:has(> .masthead-numeral) > .daybook-masthead-text { flex: 1 1 16rem; }
-.today-page .daybook-masthead-row:has(> .masthead-numeral) > .daybook-masthead-controls {
-  flex: 0 1 auto; max-width: 100%; margin-left: auto;
+.today-page .daybook-masthead-row:has(> .masthead-numeral) > .daybook-masthead-controls { align-self: flex-start; margin-left: auto; }
+.today-page .daybook-masthead-row:has(> .masthead-numeral) [data-testid="masthead-eyebrow"] { margin: 0 0 4px; }
+.today-mast-eyebrow { font: 600 13px/1.2 var(--font-family-sans); color: var(--color-neutral-600); }
+.today-mast-right { display: flex; align-items: center; gap: 6px; }
+.today-page .daybook-masthead .daybook-tools:has(> .today-mast-meta) { justify-content: flex-start; margin-top: 16px; padding: 0; border-top: 0; }
+.today-mast-right .uppercase { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500; color: var(--color-neutral-700); }
+.today-mast-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+  font: 400 13.5px/1.3 var(--font-family-sans); color: var(--color-neutral-700);
 }
-.today-mast-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-.today-mast-facts {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
-  font-family: var(--font-family-sans); font-size: 13.5px; line-height: 1.3; color: var(--color-neutral-700);
-  text-align: right;
-}
-.today-mast-facts .today-dinner { color: inherit; text-decoration: none; max-width: 18rem; white-space: normal; }
-.today-mast-facts .today-dinner:hover { color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 3px; }
+.today-mast-meta .today-dinner { color: inherit; text-decoration: none; }
+.today-mast-meta .today-dinner:hover { color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---- Section headings and labels: no italic ----------------------------- */
 .today-page .daybook-journal-heading h2 { font-size: 24px; }
@@ -242,9 +244,9 @@
   .today-page .daybook-masthead .daybook-title > :not(span) { opacity: 0; transition: opacity .15s; }
   .today-page .daybook-masthead:is(:hover, :focus-within) .daybook-title > :not(span) { opacity: 1; }
 }
-/* The specials and the day's other all-day things, under its sentence. */
+/* The specials and the day's other all-day things, on the details line. */
 .today-page .daybook-masthead .daybook-journal-allday {
-  flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 12px 0 0;
+  flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 0; margin: 0;
 }
 .today-page .daybook-masthead .daybook-journal-allday button { font-size: 13.5px; }
 
