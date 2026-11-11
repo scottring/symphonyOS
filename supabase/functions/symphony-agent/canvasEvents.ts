@@ -12,7 +12,7 @@
 
 export const CANVAS_WRITE_TOOLS = new Set([
   'symphony_create_plan_item', 'symphony_link_plan_item', 'symphony_update_intention',
-  'symphony_create_task', 'symphony_create_calendar_event', 'symphony_update_task',
+  'symphony_create_task', 'symphony_create_calendar_event', 'symphony_update_calendar_event', 'symphony_move_calendar_event', 'symphony_delete_calendar_event', 'symphony_update_task',
   'symphony_complete_task', 'symphony_order_tasks', 'symphony_create_routine', 'symphony_update_routine',
   'symphony_create_note', 'symphony_set_meal',
   'symphony_create_contact', 'symphony_update_contact',

@@ -139,3 +139,10 @@ describe('webLocationFromHome', () => {
     expect(webLocationFromHome('1 Rue X, Paris, Île-de-France, France', 'Not/AZone')).toEqual({ city: 'Paris', region: 'Île-de-France' })
   })
 })
+
+describe('calendar delete after a web read (AI audit 2026-11-11)', () => {
+  it('is withheld like the other deletes', async () => {
+    const { DESTRUCTIVE_TOOL_NAMES } = await import('./webAccess.ts')
+    expect(DESTRUCTIVE_TOOL_NAMES.has('symphony_delete_calendar_event')).toBe(true)
+  })
+})

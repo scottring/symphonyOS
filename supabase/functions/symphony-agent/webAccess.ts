@@ -83,6 +83,8 @@ export const WEB_TOOL_NAMES: ReadonlySet<string> = new Set(WEB_TOOLS.map((t) => 
 export const DESTRUCTIVE_TOOL_NAMES: ReadonlySet<string> = new Set([
   // Tasks and routines have no delete tool at all (set aside / rest instead).
   'symphony_delete_list_item',
+  // A real calendar event: permanent on Google or Outlook.
+  'symphony_delete_calendar_event',
 ])
 
 /** Anthropic content-block types produced by the server tools. Their

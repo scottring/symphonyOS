@@ -32,6 +32,7 @@ import { EVERYDAY_TALK_RULES, HARD_RULES, MONTH_SEASON_YEAR_NOTE, SESSION_SPINE_
 import { normalizeSchedule, etOffsetMinutes, APP_TZ, localDayBounds, localToday } from './schedule.ts'
 import { TASK_STATUS_PROPERTIES, orderWrites, taskStatusPatch } from './taskStatus.ts'
 import { noteKeyword } from './notesQuery.ts'
+import { DELETE_CALENDAR_EVENT_TOOL, MOVE_CALENDAR_EVENT_TOOL, RECURRENCE_DESCRIPTION_NOTE, RECURRENCE_SCHEMA_PROPERTIES, UPDATE_CALENDAR_EVENT_TOOL, deleteCalendarEvent, moveCalendarEvent, recurrenceLines, updateCalendarEvent } from './calendarTools.ts'
 import { MEAL_SLOTS, type MealSlot, getMeals, resolveDate, setMeal } from './meals.ts'
 import { summarizeTurn, type TurnWrite } from './outcome.ts'
 import { fenceRetrieved } from './untrusted.ts'
@@ -556,10 +557,11 @@ const TOOLS = [
   {
     name: 'symphony_create_calendar_event',
     description:
-      "Create a REAL Google Calendar event on the user's calendar. Use this for calendar events. If the user explicitly requests a timed task, use a scheduled task instead, even when it has a fixed date and time. Times without a UTC offset are read as the user's LOCAL time (US Eastern).",
+      "Create a REAL Google Calendar event on the user's calendar. Use this for calendar events. If the user explicitly requests a timed task, use a scheduled task instead, even when it has a fixed date and time. Times without a UTC offset are read as the user's LOCAL time (US Eastern). " + RECURRENCE_DESCRIPTION_NOTE,
     input_schema: {
       type: 'object',
       properties: {
+        ...RECURRENCE_SCHEMA_PROPERTIES,
         title: { type: 'string' },
         start_time: { type: 'string', description: 'ISO8601, e.g. 2026-07-10T15:00:00 (local time when no offset)' },
         end_time: { type: 'string', description: 'ISO8601; defaults to one hour after start_time' },
@@ -571,6 +573,9 @@ const TOOLS = [
       required: ['title', 'start_time', 'domain'],
     },
   },
+  UPDATE_CALENDAR_EVENT_TOOL,
+  MOVE_CALENDAR_EVENT_TOOL,
+  DELETE_CALENDAR_EVENT_TOOL,
   {
     name: 'symphony_search_email',
     description:
@@ -944,6 +949,8 @@ async function runTool(
         const end = input.end_time
           ? toUtcIso(String(input.end_time))
           : new Date(Date.parse(start) + 60 * 60000).toISOString()
+        const rec = recurrenceLines(input.recurrence, { startTime: start, allDay: input.all_day === true, timeZone: APP_TZ })
+        if (rec.error) return rec.error.startsWith('Error') ? rec.error : `Error: ${rec.error}`
         // The user's default WRITABLE calendar for the requested domain.
         const { data: mappings, error: mapErr } = await db
           .from('calendar_domain_mappings')
@@ -971,6 +978,7 @@ async function runTool(
             timeZone: APP_TZ,
             location: input.location,
             calendarId: target.calendar_id,
+            ...(rec.recurrence ? { recurrence: rec.recurrence } : {}),
             // Stable across a resent turn, so a retry after a dropped
             // connection cannot put the same event on the calendar twice.
             requestId: stableId ?? crypto.randomUUID(),
@@ -978,7 +986,17 @@ async function runTool(
         })
         const body = await res.text()
         if (!res.ok) return `Error creating calendar event (${res.status}): ${body.slice(0, 300)}`
+        // Outlook and some Google token failures answer 200 with { error }.
+        try { const parsed = JSON.parse(body); if (parsed && typeof parsed === 'object' && parsed.error) return `Error creating calendar event: ${String(parsed.error).slice(0, 300)}` } catch { /* not JSON: report as before */ }
         return `Created Google Calendar event on "${target.calendar_name}" (${start} to ${end} UTC): ${body.slice(0, 400)}`
+      }
+      case 'symphony_update_calendar_event':
+      case 'symphony_move_calendar_event':
+      case 'symphony_delete_calendar_event': {
+        const calCtx = { userId, authHeader, supabaseUrl: Deno.env.get('SUPABASE_URL')!, timeZone: APP_TZ }
+        if (name === 'symphony_update_calendar_event') return await updateCalendarEvent(db, input, calCtx)
+        if (name === 'symphony_move_calendar_event') return await moveCalendarEvent(db, input, calCtx)
+        return await deleteCalendarEvent(db, input, calCtx)
       }
       case 'symphony_list_contacts': {
         let q = db.from('contacts').select('*').order('name')
