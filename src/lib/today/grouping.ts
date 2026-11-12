@@ -153,6 +153,10 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
     for (const child of arr) {
       if (placed.has(child.id)) continue
       if (relocatedIds.has(child.id)) { child.isSubtask = false; child.parentTaskId = undefined }
+      // A step on the day without its parent (+ from the week strip) is a row
+      // of its own: left as a child, the To do list counted it as nobody's and
+      // it vanished (2026-11-12). It keeps parentTaskId, so it still names it.
+      else child.isSubtask = false
       const sec = originalSection.get(child.id)
       if (sec) sections[sec].push(child)
     }

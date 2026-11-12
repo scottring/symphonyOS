@@ -391,3 +391,23 @@ describe('computeTodayData — Background routines', () => {
     expect(d.dayPlan.chooserRoutines).toEqual([])
   })
 })
+
+describe('a step planned for today without its parent', () => {
+  // Scott, 2026-11-12: + on "ella's sleepover invite" (a step of "Kids
+  // birthday plan", which sits on the week list) dated the step today, and it
+  // vanished: Today drew it as a child of a parent that wasn't there, and the
+  // To do list counts only top-level rows, so it read "Everything is done".
+  it('is its own row on the day, counted by To do', async () => {
+    const { splitCompletedFocus } = await import('./journalSplit')
+    const day = new Date('2026-05-19T00:00:00')
+    const step = task({ id: 'step', title: 'Sleepover invite', parentTaskId: 'parent', isAllDay: true, scheduledFor: new Date('2026-05-19T17:26:00') })
+    const parent = task({ id: 'parent', title: 'Kids birthday plan', bucket: 'week', subtasks: [step] })
+    const d = computeTodayData(baseInput({ viewedDate: day, tasks: [parent] }))
+    const rows = Object.values(d.grouped).flat()
+    const row = rows.find((r) => r.id === 'task-step')
+    expect(row).toBeDefined()
+    expect(row!.isSubtask).toBe(false)
+    expect(row!.parentTaskId).toBe('parent') // still names its parent
+    expect(splitCompletedFocus(d.grouped).activeCount).toBe(1)
+  })
+})
