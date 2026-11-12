@@ -18,7 +18,9 @@
 --    displays) never get one. The trigger can never fail a sign-up: on error
 --    it warns and first-run setup still makes the household as before.
 -- 3. Backfill: every non-anonymous account with no active household gets
---    one.
+--    one, except three inactive beta accounts Scott left out on 2026-11-11
+--    (no AI allowance for them). If one of them signs in again it still has
+--    no household until first-run setup or Invite partner makes one.
 --
 -- 4. accept_household_invitation really leaves the person's own household.
 --    It tested `current_membership is not null`, which for a row is true only
@@ -121,6 +123,7 @@ begin
     select au.id from auth.users au
     where not coalesce(au.is_anonymous, false)
       and not exists (select 1 from public.household_members m where m.user_id = au.id and m.status = 'active')
+      and lower(coalesce(au.email, '')) not in ('meganhryan@gmail.com', 'tim.rappold@gmail.com', 'stephanie.nothelle@gmail.com')
   loop
     perform public.ensure_own_household(u.id);
     n := n + 1;
