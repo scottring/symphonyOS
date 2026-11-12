@@ -93,6 +93,9 @@ final class Routine {
     /// "Show on the week" (web switch, 2026-11-08): a routine is Today's, on
     /// its days; on, the Week's By day view shows it too. Default off.
     var showOnWeek: Bool = false
+    /// "Keep it until it's done" (web switch, 2026-11-11): a missed occurrence
+    /// stays on Today until ticked off or skipped (CarriedRoutines). Default off.
+    var keepUntilDone: Bool = false
     /// Set on a collection's Step — the collection renders it, not the day.
     var parentRoutineId: UUID? = nil
     var pausedUntil: Date? = nil

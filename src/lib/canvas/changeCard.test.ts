@@ -15,6 +15,7 @@ describe('opRow', () => {
   it('names the routine display switches the card sets',()=>{
     expect(opRow(op({op:'routine_change',showOnWeek:true,showOnKiosk:false}),today)).toMatchObject({kind:'CHANGE',where:'→ On the week · Off the kiosk'})
     expect(opRow(op({op:'routine_add',days:['mon'],background:true}),today).where).toContain('· In the background')
+    expect(opRow(op({op:'routine_change',keepUntilDone:true}),today)).toMatchObject({kind:'CHANGE',where:'→ Kept until it\u2019s done'})
   })
   it('says where each change lands, in the card’s words', () => {
     expect(opRow(op({ date: '2026-10-14', time: '09:00' }), today)).toEqual({ kind: 'MOVE', title: 'Reply to Christian', where: '→ Today 9:00' })

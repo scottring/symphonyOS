@@ -18,6 +18,7 @@ import { routineDayIndex, routineDayState, routineIdOf } from '@/lib/planning/we
 import { weekendBand, sometimeThisWeekend } from '@/lib/week/weekendBand'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { compareSortOrder } from '@/lib/today/taskOrdering'
+import { carriedFrom as carriedFromLabel, type CarriedRoutine } from '@/lib/today/carriedRoutines'
 
 export interface JournalEntry {
   /** Selectable id — 'task-<uuid>', 'event-<id>', 'routine-<id>'. */
@@ -40,6 +41,9 @@ export interface JournalEntry {
    *  unless tagged): its "Show on the week" switch is on, or someone gave
    *  this occurrence its day. */
   onWeek?: boolean
+  /** Routines: carried onto today ("Keep it until it's done") — the missed
+   *  occurrence's own date, which a tick writes. */
+  carriedFrom?: Date
 }
 
 export interface JournalDay {
@@ -240,4 +244,25 @@ function routinePeople(r: TimelineItem): string[] {
   const routine = r.originalRoutine
   if (!routine) return []
   return routine.assigned_to_all ?? (routine.assigned_to ? [routine.assigned_to] : [])
+}
+
+/** "Keep it until it's done" on the Week page (Scott, 2026-11-12): today's
+ *  day lists each carried routine first among its untimed work, "from Nov
+ *  10", ticking the ORIGINAL occurrence — the same rows Today's "Still to do"
+ *  draws (carriedRoutines.ts). Other days, and weeks without today, as built. */
+export function withCarriedRoutines(days: JournalDay[], carried: readonly CarriedRoutine[], today: Date): JournalDay[] {
+  if (carried.length === 0) return days
+  const key = localYmd(today)
+  return days.map((d) => {
+    if (d.key !== key) return d
+    const extra: JournalEntry[] = carried.map((c) => ({
+      id: `routine-${c.routine.id}`, kind: 'routine', title: c.routine.name,
+      subtitle: carriedFromLabel(c.dueOn, today), completed: false,
+      routineId: c.routine.id, carriedFrom: c.date, onWeek: true,
+      people: c.routine.assigned_to_all ?? (c.routine.assigned_to ? [c.routine.assigned_to] : []),
+    }))
+    const timed = d.entries.filter((e) => e.time)
+    const untimed = d.entries.filter((e) => !e.time)
+    return { ...d, entries: [...timed, ...extra, ...untimed] }
+  })
 }

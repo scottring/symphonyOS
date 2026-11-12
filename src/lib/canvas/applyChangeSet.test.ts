@@ -300,6 +300,14 @@ describe('applyChangeSet: done, merge and routine ops (stage 3)', () => {
     expect(d.updateRoutine).toHaveBeenLastCalledWith('r1', { show_on_week: false, background: false })
   })
 
+  it('routine_change writes "Keep it until it\'s done"; Undo puts it back (Pay FFG, 2026-11-12)', async () => {
+    const d = deps()
+    const r = await applyOk(one({ key: 'k:0', op: 'routine_change', routineId: 'r1', title: 'r1', seen, keepUntilDone: true }), d)
+    expect(d.updateRoutine).toHaveBeenCalledWith('r1', { keep_until_done: true })
+    await r.undo()
+    expect(d.updateRoutine).toHaveBeenLastCalledWith('r1', { keep_until_done: false })
+  })
+
   it('routine_change turns a non-weekly rule weekly, and clears a time', async () => {
     const d = deps({ routines: [routine('r1', { recurrence_pattern: { type: 'daily', start_date: '2026-02-01' } })] })
     await applyOk(one({ key: 'k:0', op: 'routine_change', routineId: 'r1', title: 'r1', days: ['sat', 'sun'], clearTime: true }), d)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildJournalDays, inDayOrder } from './journalDays'
+import { buildJournalDays, inDayOrder, withCarriedRoutines } from './journalDays'
 import type { TimelineItem } from '@/types/timeline'
 import { buildWeekRoutineItems } from '@/components/home/week/weekRoutineItems'
 import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
@@ -186,5 +186,18 @@ describe('the day’s order', () => {
   it('the day’s untimed entries follow the same order (as Today’s All Day does)', () => {
     const { days } = build([], [], { tasks })
     expect(days[2].entries.filter((e) => !e.time).map((e) => e.task?.id)).toEqual(['first', 'apples', 'zoo'])
+  })
+})
+
+describe('Keep it until it\'s done on the Week page (2026-11-12)', () => {
+  it('lists a carried routine on today only, from its day, ticking the original occurrence', () => {
+    const { days } = build([])
+    const today = new Date(2026, 9, 6, 9) // Tue Oct 6
+    const ffg = createMockRoutine({ id: 'ffg', name: 'Pay FFG' })
+    const out = withCarriedRoutines(days, [{ routine: ffg, date: new Date(2026, 9, 4), dueOn: new Date(2026, 9, 4) }], today)
+    const tue = out.find((d) => d.key === '2026-10-06')!
+    expect(tue.entries.map((e) => [e.title, e.subtitle, e.carriedFrom?.getDate()])).toEqual([['Pay FFG', 'from Sun', 4]])
+    expect(out.filter((d) => d.key !== '2026-10-06').flatMap((d) => d.entries)).toEqual([])
+    expect(withCarriedRoutines(days, [], today)).toBe(days)
   })
 })

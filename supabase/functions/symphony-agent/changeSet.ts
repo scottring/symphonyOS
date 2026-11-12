@@ -91,6 +91,9 @@ export interface ChangeOp {
   showOnKiosk?: boolean
   showOnDayGrid?: boolean
   background?: boolean
+  /** routine_add/change: "Keep it until it's done" (2026-11-11) — a missed
+   *  occurrence stays on Today until ticked off or skipped. */
+  keepUntilDone?: boolean
   /** routine_rest: YYYY-MM-DD it wakes; none = rest with no date. */
   until?: string
   /** routine_add, add, plan_add: the space (Work, Family or Personal). */
@@ -320,6 +323,7 @@ export function changeSetFromInput(input: Record<string, unknown>, key: string, 
 const ROUTINE_SWITCHES = [
   ['show_on_week', 'showOnWeek'], ['show_on_kiosk', 'showOnKiosk'],
   ['show_on_day_grid', 'showOnDayGrid'], ['background', 'background'],
+  ['keep_until_done', 'keepUntilDone'],
 ] as const
 
 /** One routine op. A routine may hold one lasting op (change or rest) AND
@@ -437,7 +441,7 @@ function routineOp(
     base.assignees = who
     changed = true
   }
-  if (!changed) return { error: `${at}: routine_change needs at least one of name, time, days, assignees, show_on_timeline, show_on_week, show_on_kiosk, show_on_day_grid or background` }
+  if (!changed) return { error: `${at}: routine_change needs at least one of name, time, days, assignees, show_on_timeline, show_on_week, show_on_kiosk, show_on_day_grid, background or keep_until_done` }
   return { op: base }
 }
 
@@ -760,6 +764,7 @@ export const PROPOSE_CHANGES_TOOL = {
             show_on_kiosk: { type: 'boolean', description: 'routine_add/routine_change: show it on the kitchen kiosk and the kids\' tablets (default on).' },
             show_on_day_grid: { type: 'boolean', description: 'routine_add/routine_change: pin it to Today\'s hour grid (default off: it sits on the day\'s checklist).' },
             background: { type: 'boolean', description: 'routine_add/routine_change: true = no row on Today, the kiosk or the tablets, while its time still counts against the hours open (e.g. sleep, school hours).' },
+            keep_until_done: { type: 'boolean', description: 'routine_add/routine_change: "Keep it until it\'s done". true = if an occurrence is missed it stays on Today ("from Nov 10") until ticked off or skipped, for infrequent, important routines like paying a bill; false (default) = a missed occurrence stays on its own day.' },
             until: { type: 'string', description: 'routine_rest: YYYY-MM-DD it wakes (omit to rest with no date)' },
             context: { type: 'string', enum: ['family', 'personal', 'work'], description: 'The space. routine_add: default family; add: optional; plan_add: optional (defaults to its parent\'s, or its life area\'s)' },
             area_id: { type: 'string', description: 'add, plan_add, optional: the id of the life area it is filed under (one of the life areas you were given; never invent one)' },

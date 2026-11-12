@@ -134,6 +134,7 @@ enum RowMapper {
         routine.showOnTimeline = row.bool("show_on_timeline") ?? true
         routine.pinToTimeline = row.bool("pin_to_timeline") ?? false
         routine.showOnWeek = row.bool("show_on_week") ?? false
+        routine.keepUntilDone = row.bool("keep_until_done") ?? false
         routine.parentRoutineId = row.uuid("parent_routine_id")
         routine.pausedUntil = row.date("paused_until")
         routine.assignedToAll = row.uuidArray("assigned_to_all")

@@ -13,7 +13,7 @@ export type TaskRow = { id: string; title: string; scheduled_for: string | null;
   sort_order?: number | null; started_at?: string | null; is_waiting?: boolean | null; waiting_for?: string | null; owed_to?: string | null; needed_on?: string | null }
 export type EventRow = { id: string; title: string; start_time: string; end_time: string; all_day: boolean | null }
 export type RoutineRow = { id: string; name: string; recurrence_pattern: unknown; time_of_day: string | null; parent_routine_id: string | null; assigned_to_all?: string[] | null; visibility?: string | null; paused_until?: string | null
-  show_on_timeline?: boolean | null; show_on_week?: boolean | null; show_on_kiosk?: boolean | null; show_on_day_grid?: boolean | null; background?: boolean | null }
+  show_on_timeline?: boolean | null; show_on_week?: boolean | null; show_on_kiosk?: boolean | null; show_on_day_grid?: boolean | null; background?: boolean | null; keep_until_done?: boolean | null }
 /** One routine occurrence row (actionable_instances, entity_type 'routine'). */
 export type InstanceRow = { entity_id: string; date: string; status: string; deferred_to: string | null; assigned_to_override: string | null }
 
@@ -28,7 +28,7 @@ export type WeekRoutine = {
   resting?: { until: string | null }
   thisWeek?: RoutineException[]
   /** Its display switches, only where they differ from the defaults. */
-  display?: { hidden?: true; onWeek?: true; offKiosk?: true; onDayGrid?: true; background?: true }
+  display?: { hidden?: true; onWeek?: true; offKiosk?: true; onDayGrid?: true; background?: true; keepUntilDone?: true }
 }
 
 /** A task's status marks, as the week sheet shows them; absent when plain. */
@@ -49,6 +49,7 @@ function routineDisplay(r: RoutineRow): WeekRoutine['display'] | undefined {
   if (r.show_on_kiosk === false) d.offKiosk = true
   if (r.show_on_day_grid) d.onDayGrid = true
   if (r.background) d.background = true
+  if (r.keep_until_done) d.keepUntilDone = true
   return Object.keys(d).length ? d : undefined
 }
 

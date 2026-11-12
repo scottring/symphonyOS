@@ -399,6 +399,16 @@ struct TodayView: View {
                 .accessibilityHint("Decide what happens to each. Nothing moves on its own.")
         }
 
+        // "Keep it until it's done": a missed routine stays on today until
+        // ticked off or skipped (CarriedRoutines, as on the web).
+        if appState.isToday {
+            StillToDo(carried: CarriedRoutines.select(routines: routines, instances: instances, today: .now,
+                                                      domain: appState.domainFilter.contextValue),
+                      today: .now,
+                      onDone: { c in settleCarried(c, status: "completed") },
+                      onSkip: { c in settleCarried(c, status: "skipped") })
+        }
+
         let forToday = viewModel.forToday
         if !forToday.isEmpty || offerTasks + offerRoutines > 0 {
             Eyebrow(text: "To do")
@@ -484,6 +494,14 @@ struct TodayView: View {
                 }
                 .presentationDetents([.large, .medium])
             }
+        }
+    }
+
+    /// Done or Skip on a carried routine writes its ORIGINAL occurrence.
+    private func settleCarried(_ c: CarriedRoutines.Carried, status: String) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            PlanWriter(context: modelContext, userId: userId)
+                .setOccurrence(entityType: "routine", entityId: c.routine.id.uuidString.lowercased(), on: c.date, status: status)
         }
     }
 

@@ -170,6 +170,7 @@ export interface CreateRoutineInput {
   show_on_week?: boolean
   show_on_day_grid?: boolean
   background?: boolean
+  keep_until_done?: boolean
   target_amount?: number | null
   target_unit?: TargetUnit | null
   // Fallback assignee if assigned_to is undefined (not null)
@@ -391,6 +392,7 @@ export function useRoutines(supabase = defaultSupabase) {
           ...(input.show_on_week !== undefined ? { show_on_week: input.show_on_week } : {}),
           ...(input.show_on_day_grid !== undefined ? { show_on_day_grid: input.show_on_day_grid } : {}),
           ...(input.background !== undefined ? { background: input.background } : {}),
+          ...(input.keep_until_done !== undefined ? { keep_until_done: input.keep_until_done } : {}),
           default_assignee: input.default_assignee || null,
           assigned_to: effectiveAssignedTo,
           assigned_to_all: input.assigned_to_all ?? null,

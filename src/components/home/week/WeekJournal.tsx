@@ -131,7 +131,7 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, den
   // One drag rule (Scott, 2026-10-03): a task moves to another day — a timed
   // one keeping its time — and a routine moves as that one occurrence. An
   // event never moves; a done row stays where it was done.
-  const drag = !dragEnabled || entry.completed || entry.kind === 'event' ? null
+  const drag = !dragEnabled || entry.completed || entry.kind === 'event' || entry.carriedFrom ? null
     : entry.kind === 'task' && entry.task ? { id: `journal:${entry.task.id}`, data: { kind: 'chip', taskId: entry.task.id, ...(entry.time ? { keepTime: true } : {}) } }
     : entry.kind === 'routine' && entry.routineId ? { id: `occ:${entry.routineId}:${day.key}`, data: { kind: 'routineOcc', routineId: entry.routineId, fromIso: day.key, title: entry.title, ...(fromSometime ? { fromSometime: true } : {}) } }
     : null

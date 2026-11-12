@@ -151,6 +151,7 @@ function routineChange(op: ChangeOp, r: Routine): { updates: UpdateRoutineInput;
   if (op.showOnKiosk !== undefined) { updates.show_on_kiosk = op.showOnKiosk; previous.show_on_kiosk = r.show_on_kiosk ?? true }
   if (op.showOnDayGrid !== undefined) { updates.show_on_day_grid = op.showOnDayGrid; previous.show_on_day_grid = r.show_on_day_grid ?? false }
   if (op.background !== undefined) { updates.background = op.background; previous.background = r.background ?? false }
+  if (op.keepUntilDone !== undefined) { updates.keep_until_done = op.keepUntilDone; previous.keep_until_done = r.keep_until_done ?? false }
   if (op.assignees) {
     updates.assigned_to_all = [...op.assignees]
     updates.assigned_to = op.assignees[0] ?? null
@@ -171,6 +172,7 @@ function routineAdd(op: ChangeOp): CreateRoutineInput {
     ...(op.showOnKiosk !== undefined ? { show_on_kiosk: op.showOnKiosk } : {}),
     ...(op.showOnDayGrid !== undefined ? { show_on_day_grid: op.showOnDayGrid } : {}),
     ...(op.background !== undefined ? { background: op.background } : {}),
+    ...(op.keepUntilDone !== undefined ? { keep_until_done: op.keepUntilDone } : {}),
     recurrence_pattern,
     ...(op.time ? { time_of_day: dbTime(op.time) } : {}),
     assigned_to_all: op.assignees?.length ? [...op.assignees] : null,

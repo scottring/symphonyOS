@@ -34,9 +34,10 @@ import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { buildWeekRoutineItems } from './weekRoutineItems'
 import { useDayChoices } from '@/hooks/useDayChoices'
 import { useWeekInstances } from './useWeekInstances'
+import { useCarriedRoutines } from '@/hooks/useCarriedRoutines'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal } from './WeekJournal'
-import { buildJournalDays, inDayOrder, type JournalDay, type JournalEntry, type JournalWeekend } from '@/lib/week/journalDays'
+import { buildJournalDays, withCarriedRoutines, inDayOrder, type JournalDay, type JournalEntry, type JournalWeekend } from '@/lib/week/journalDays'
 import { reorderTasksToIndex } from '@/lib/today/taskOrdering'
 import { routineMoveKind } from '@/lib/week/routineMove'
 import type { DensitySources } from '@/lib/planning/dayDensity'
@@ -416,7 +417,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
     weekStart, dayCount, tasks: drawnTasks, weekendTasks, userId, eventItems, events,
     dinnersByDay: extras.dinnersByDay, routineItems, instances: weekInstances, labelFor,
   }), [drawnTasks, weekendTasks, userId, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
-  const journalDays = journal.days
+  // "Keep it until it's done": a missed routine stays on today's day here
+  // too, as on Today (Scott, 2026-11-12).
+  const weekHasToday = useMemo(() => {
+    const t = localYmd(new Date())
+    return Array.from({ length: dayCount }, (_, i) => localYmd(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i))).includes(t)
+  }, [weekStart, dayCount])
+  const carriedRoutines = useCarriedRoutines(routines, weekHasToday)
+  const journalDays = useMemo(() => withCarriedRoutines(journal.days, carriedRoutines.carried, new Date()), [journal.days, carriedRoutines.carried])
   const journalWeekend = journal.weekend
 
   /**
@@ -479,9 +487,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
     if (entry.routineId) {
       const id = entry.routineId
       const done = !entry.completed
-      void (done ? markDone('routine', id, day.date) : undoDone('routine', id, day.date))
+      // A carried routine ticks its ORIGINAL occurrence (carriedRoutines.ts).
+      const date = entry.carriedFrom ?? day.date
+      void (done ? markDone('routine', id, date) : undoDone('routine', id, date))
       pushAction?.(done ? 'Routine completed' : 'Routine marked incomplete', () => {
-        void (done ? undoDone('routine', id, day.date) : markDone('routine', id, day.date))
+        void (done ? undoDone('routine', id, date) : markDone('routine', id, date))
       })
     }
   }, [toggleTask, onUpdateTask, pushAction, markDone, undoDone])

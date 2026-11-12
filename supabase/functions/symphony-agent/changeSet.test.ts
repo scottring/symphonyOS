@@ -195,6 +195,8 @@ describe('routine ops: from now on', () => {
     const [a] = ok([{ op: 'routine_add', name: 'Sleep', days: ['mon'], background: true, show_on_day_grid: false }])
     expect(a).toMatchObject({ op: 'routine_add', background: true, showOnDayGrid: false })
     expect(err([{ op: 'routine_change', routine_id: R, background: 'yes' }])).toContain('background must be true or false')
+    const [k] = ok([{ op: 'routine_change', routine_id: R, keep_until_done: true }])
+    expect(k).toMatchObject({ op: 'routine_change', keepUntilDone: true })
     expect(err([{ op: 'routine_skip', routine_id: R, date: '2026-10-15', show_on_week: true }])).toContain('show_on_week')
   })
   it('refuses a change that changes nothing, or bad fields', () => {
@@ -356,7 +358,7 @@ describe('agent wiring', () => {
   })
   it("reads this week's routine exceptions for read_week", () => {
     expect(src).toContain("db.from('actionable_instances').select('entity_id, date, status, deferred_to, assigned_to_override')")
-    expect(src).toContain("assigned_to_all, visibility, paused_until, show_on_timeline, show_on_week, show_on_kiosk, show_on_day_grid, background')")
+    expect(src).toContain("assigned_to_all, visibility, paused_until, show_on_timeline, show_on_week, show_on_kiosk, show_on_day_grid, background, keep_until_done')")
   })
   it('documents every op in the tool', () => {
     const schema = JSON.stringify(PROPOSE_CHANGES_TOOL.input_schema)

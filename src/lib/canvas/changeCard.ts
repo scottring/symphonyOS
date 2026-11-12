@@ -83,6 +83,9 @@ export interface ChangeOp {
   showOnKiosk?: boolean
   showOnDayGrid?: boolean
   background?: boolean
+  /** routine_add/change: "Keep it until it's done" — a missed occurrence
+   *  stays on Today until ticked off or skipped. */
+  keepUntilDone?: boolean
   /** routine_rest: YYYY-MM-DD it wakes; none = rest with no date. */
   until?: string
   /** routine_add, add, plan_add: the space (Work, Family or Personal). */
@@ -425,11 +428,12 @@ export function opWrite(op: ChangeOp, task: Task): { updates: Partial<Task>; pre
 }
 
 /** The routine display switches a card sets, in the routine panel's words. */
-export function switchWords(op: Pick<ChangeOp, 'showOnWeek' | 'showOnKiosk' | 'showOnDayGrid' | 'background'>): string {
+export function switchWords(op: Pick<ChangeOp, 'showOnWeek' | 'showOnKiosk' | 'showOnDayGrid' | 'background' | 'keepUntilDone'>): string {
   const words: string[] = []
   if (op.showOnWeek !== undefined) words.push(op.showOnWeek ? 'On the week' : 'Off the week')
   if (op.showOnKiosk !== undefined) words.push(op.showOnKiosk ? 'On the kiosk' : 'Off the kiosk')
   if (op.showOnDayGrid !== undefined) words.push(op.showOnDayGrid ? 'Kept on the day grid' : 'On the day\u2019s checklist')
   if (op.background !== undefined) words.push(op.background ? 'In the background' : 'Out of the background')
+  if (op.keepUntilDone !== undefined) words.push(op.keepUntilDone ? 'Kept until it\u2019s done' : 'Stays on its own day if missed')
   return words.join(' · ')
 }
