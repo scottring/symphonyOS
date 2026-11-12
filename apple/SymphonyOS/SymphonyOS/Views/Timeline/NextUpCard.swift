@@ -50,6 +50,9 @@ struct DayGlance {
 struct NextUpCard: View {
     let items: [TimelineItem]
     let isToday: Bool
+    /// With nothing timed ahead, say so in a plain line, not an empty card
+    /// (the Duo's outside screen).
+    var quietWhenEmpty = false
     var onOpen: (TimelineItem) -> Void
 
     private static let clock: DateFormatter = {
@@ -63,7 +66,14 @@ struct NextUpCard: View {
         TimelineView(.everyMinute) { context in
             let glance = DayGlance.make(items: items, now: context.date, isToday: isToday)
             VStack(alignment: .leading, spacing: 8) {
-                card(glance, now: context.date)
+                if quietWhenEmpty && glance.featured == nil {
+                    Text(glance.timedCount == 0 ? "Nothing timed today." : "Nothing else timed today.")
+                        .font(.custom("CrimsonPro-Italic", size: 18, relativeTo: .body))
+                        .foregroundStyle(Color.textSecondary)
+                        .padding(.horizontal, 4)
+                } else {
+                    card(glance, now: context.date)
+                }
                 if !glance.allDay.isEmpty {
                     Text("All day: " + glance.allDay.map(\.title).joined(separator: " · "))
                         .font(.bodySmall)

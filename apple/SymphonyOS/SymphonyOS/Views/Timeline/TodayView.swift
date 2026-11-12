@@ -74,7 +74,6 @@ struct TodayView: View {
     #endif
     @State private var showWholeDay = false
     @State private var showWeek = false
-    @State private var showAdd = false
     @State private var showTell = false
     /// The day as a short list, or to scale (web "Show hours"); remembered.
     @AppStorage("today.showHours") private var showHours = false
@@ -112,9 +111,6 @@ struct TodayView: View {
             UnfinishedSheet(tasks: viewModel.carriedOverTasks)
                 .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
                 .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showAdd) {
-            CaptureSheet(userId: userId).presentationDetents([.medium])
         }
         .sheet(isPresented: $showTell) {
             TellSheet(userId: userId).presentationDetents([.medium, .large])
@@ -168,10 +164,10 @@ struct TodayView: View {
                 JournalHeading(date: date, compact: true)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
-                NextUpCard(items: viewModel.schedule, isToday: appState.isToday) { opened = $0 }
+                NextUpCard(items: viewModel.schedule, isToday: appState.isToday, quietWhenEmpty: true) { opened = $0 }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
-                QuickActions(toDo: viewModel.forToday, onAdd: { showAdd = true }, onTell: { showTell = true })
+                QuickActions(toDo: viewModel.forToday, onTell: { showTell = true })
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                 lists
@@ -191,8 +187,8 @@ struct TodayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     JournalHeading(date: date, compact: true)
-                    NextUpCard(items: viewModel.schedule, isToday: appState.isToday) { opened = $0 }
-                    QuickActions(toDo: viewModel.forToday, compact: true, onAdd: { showAdd = true }, onTell: { showTell = true })
+                    NextUpCard(items: viewModel.schedule, isToday: appState.isToday, quietWhenEmpty: true) { opened = $0 }
+                    QuickActions(toDo: viewModel.forToday, compact: true, onTell: { showTell = true })
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)

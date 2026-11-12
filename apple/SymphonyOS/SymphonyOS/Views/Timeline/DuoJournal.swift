@@ -17,9 +17,33 @@ struct JournalHeading: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
+        // The outside screen is narrow: keep the heading one line, shortening
+        // the month and weekday before it ever wraps.
+        Group {
+            if compact {
+                ViewThatFits(in: .horizontal) {
+                    row(full, lines: 1)
+                    row(short, lines: 1)
+                    row(full, lines: 2)
+                }
+            } else {
+                row(full, lines: 2)
+            }
+        }
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+    }
+
+    private var full: String {
+        "\(date.formatted(.dateTime.month(.wide).year())), \(date.formatted(.dateTime.weekday(.wide)))"
+    }
+    private var short: String {
+        "\(date.formatted(.dateTime.month(.abbreviated).year())), \(date.formatted(.dateTime.weekday(.abbreviated)))"
+    }
+
+    private func row(_ title: String, lines: Int) -> some View {
         let numberSize: CGFloat = compact ? 46 : 60
         let titleSize: CGFloat = compact ? 20 : 26
-        HStack(alignment: .center, spacing: 6) {
+        return HStack(alignment: .center, spacing: 6) {
             arrow("chevron.left", label: "Previous day") { appState.goToPreviousDay() }
                 .padding(.leading, -10)
             Text(date.formatted(.dateTime.day()))
@@ -27,11 +51,12 @@ struct JournalHeading: View {
                 .foregroundStyle(Color.textPrimary)
                 .accessibilityHidden(true)
                 .layoutPriority(1)
-            Text("\(date.formatted(.dateTime.month(.wide).year())), \(date.formatted(.dateTime.weekday(.wide)))")
+            Text(title)
                 .font(.custom("CrimsonPro-Regular", size: titleSize))
                 .foregroundStyle(Color.textPrimary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .lineLimit(lines)
+                .fixedSize(horizontal: lines == 1, vertical: false)
+                .minimumScaleFactor(lines == 1 ? 1 : 0.8)
                 .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                 .accessibilityAddTraits(.isHeader)
             arrow("chevron.right", label: "Next day") { appState.goToNextDay() }
@@ -39,6 +64,8 @@ struct JournalHeading: View {
                 Button("Today") { withAnimation(.easeInOut(duration: 0.2)) { appState.goToToday() } }
                     .font(.captionBold)
                     .foregroundStyle(Color.ink)
+                    .lineLimit(1)
+                    .fixedSize()
                     .padding(.horizontal, 10)
                     .frame(minHeight: 28)
                     .background(Color.bgWarm, in: Capsule())
@@ -48,7 +75,6 @@ struct JournalHeading: View {
             }
             Spacer(minLength: 0)
         }
-        .dynamicTypeSize(...DynamicTypeSize.xLarge)
     }
 
     private func arrow(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
@@ -181,12 +207,11 @@ struct DayAgendaList: View {
 
 // MARK: - Quick actions
 
-/// Add · Tell Symphony · Done — the three things the outside screen is for.
-/// Done ticks off the first task in To do, with Undo.
+/// Tell Symphony · Done — what the outside screen is for (the dock's + is
+/// Add). Done ticks off the first task in To do, with Undo.
 struct QuickActions: View {
     let toDo: [TimelineItem]
     var compact = false
-    let onAdd: () -> Void
     let onTell: () -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -201,7 +226,6 @@ struct QuickActions: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                action("Add", symbol: "plus", primary: false, action: onAdd)
                 action("Tell Symphony", symbol: "mic", primary: true, action: onTell)
                 let next = firstTask
                 action("Done", symbol: "checkmark", primary: false) { complete(next) }
@@ -241,11 +265,12 @@ struct QuickActions: View {
 
     private func action(_ title: String, symbol: String, primary: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: symbol).font(.system(size: compact ? 17 : 20, weight: .medium))
-                Text(title).font(.captionBold).lineLimit(1).minimumScaleFactor(0.8)
+            HStack(spacing: 8) {
+                Image(systemName: symbol).font(.system(size: compact ? 16 : 18, weight: .medium))
+                Text(title).font(.bodyMedium).lineLimit(1).minimumScaleFactor(0.75)
             }
-            .frame(maxWidth: .infinity, minHeight: compact ? 54 : 64)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: compact ? 48 : 56)
             .foregroundStyle(primary ? Color.white : Color.ink)
             .background(primary ? Color.ink : Color.bgElevated, in: RoundedRectangle(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(primary ? Color.clear : Color.cardBorder, lineWidth: 1))
