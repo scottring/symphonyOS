@@ -25,7 +25,6 @@ struct SymphonyApp: App {
                 // symphony://today — the Lock Screen's next-up Live Activity.
                 .onOpenURL { url in
                     guard url.scheme == "symphony", url.host == "tell" || url.host == "today" else { return }
-                    appState.notebookClosed = false
                     appState.activeTab = .planner
                     appState.horizon = .today
                     appState.goToToday()

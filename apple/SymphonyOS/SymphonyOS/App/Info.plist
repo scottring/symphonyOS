@@ -41,8 +41,6 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan documents to create tasks with the photo attached.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Save the notebook cover to Photos to use as your Lock Screen wallpaper.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Attach a photo or screenshot to a new task.</string>
 	<key>UIAppFonts</key>

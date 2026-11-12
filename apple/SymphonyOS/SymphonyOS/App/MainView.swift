@@ -23,15 +23,6 @@ struct iOSMainView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @State private var showCapture = false
-    /// The notebook cover on the outside screen (Settings → Notebook cover).
-    @AppStorage(NotebookCoverRules.enabledKey) private var coverEnabled = true
-    @State private var windowMeasured = false
-
-    /// The window is the iPhone Duo's outside screen.
-    private var onOutsideScreen: Bool {
-        UIDevice.current.userInterfaceIdiom == .phone
-            && NotebookCoverRules.isOutsideScreen(appState.dockLayout.window, hasFold: appState.dockLayout.fold != nil)
-    }
 
     private var dock: some View {
         @Bindable var state = appState
@@ -108,21 +99,9 @@ struct iOSMainView: View {
         .padding(.leading, sidePadding(.leading))
         .padding(.trailing, sidePadding(.trailing))
         .overlay { sideDock }
-        // The outside screen opens on the closed notebook; snap its band to open.
-        .overlay {
-            if coverEnabled && onOutsideScreen && appState.notebookClosed {
-                NotebookCover { appState.notebookClosed = false }
-            }
-        }
         .background {
             Color.bgBase.ignoresSafeArea()
             DockLayoutReader { layout in appState.dockLayout = layout }
-        }
-        // Folding the phone shuts the notebook; opening it opens the notebook.
-        // (Not the first measure on launch: a Lock Screen link opened it.)
-        .onChange(of: onOutsideScreen) { _, outside in
-            if appState.dockLayout.window != .zero, windowMeasured { appState.notebookClosed = outside }
-            windowMeasured = true
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             appState.keyboardVisible = true
@@ -138,8 +117,6 @@ struct iOSMainView: View {
         }
         // Re-drive photo captures that never finished (offline snap, killed app).
         .onChange(of: scenePhase) { _, phase in
-            // Locking the phone or leaving the app shuts the notebook.
-            if phase == .background { appState.notebookClosed = true }
             guard phase == .active else { return }
             Task { await PhotoCaptureService.retryPending(modelContext: modelContext) }
         }

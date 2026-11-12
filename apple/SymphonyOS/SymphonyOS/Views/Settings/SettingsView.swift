@@ -54,10 +54,6 @@ struct SettingsView: View {
                 }
             }
 
-            #if os(iOS)
-            NotebookCoverSettings()
-            #endif
-
             // About
             Section("About") {
                 HStack {
