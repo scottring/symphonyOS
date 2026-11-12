@@ -105,6 +105,10 @@ final class AppState {
     /// Tell Symphony was asked for from outside the app (the Lock Screen
     /// control, `symphony://tell`); Today opens its Tell sheet and clears it.
     var tellRequested = false
+    /// The notebook is shut: the outside screen shows its cover until the
+    /// band is snapped (iPhone Duo). Shut on launch, on leaving the app and
+    /// on folding the phone; a Lock Screen link skips it.
+    var notebookClosed = true
     var showingSettings = false
 
     // MARK: - Date Navigation

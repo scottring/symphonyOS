@@ -34,6 +34,8 @@ struct DockLayout: Equatable {
     /// The fold, in window coordinates, when the screen has one (iPhone Duo's
     /// inside screen): two-column layouts split along it.
     var fold: CGRect?
+    /// The whole window's size (the notebook cover asks which screen it is).
+    var window: CGSize = .zero
 
     static let sideWidth: CGFloat = 72
 
@@ -106,6 +108,7 @@ struct DockLayoutReader: UIViewRepresentable {
                 }
                 layout.fold = window.reservedRegions(kind: .division, options: .includeInactive).first?.frame
             }
+            layout.window = window.bounds.size
             guard layout != last else { return }
             last = layout
             let onChange = onChange
