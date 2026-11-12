@@ -36,8 +36,14 @@ enum DemoMode {
         Dinner(id: UUID(), title: "Sheet-Pan Salmon with Sweet Potatoes and Green Beans",
                notes: "Roast double sweet potatoes — half for Wednesday. Kids: plain salmon.",
                imageURL: nil, prepMinutes: 45, sourceURL: URL(string: "https://example.com/salmon"),
-               ingredients: ["1 1/4 lb salmon", "4 small sweet potatoes, cubed", "12 oz green beans", "2 tbsp Dijon", "2 tbsp maple syrup"],
-               instructions: ["Heat the oven to 425°F.", "Roast the sweet potatoes 15 minutes.", "Add the salmon and beans; roast 12–15 minutes more."])
+               ingredients: ["1 1/4 lb salmon, in 4 fillets", "4 small sweet potatoes, cubed", "12 oz green beans, trimmed",
+                             "2 tbsp olive oil", "2 tbsp Dijon", "2 tbsp maple syrup", "1 lemon", "Salt and pepper"],
+               instructions: ["Heat the oven to 425°F and line a sheet pan.",
+                              "Toss the sweet potatoes with half the olive oil, salt and pepper, and roast 15 minutes.",
+                              "Whisk the Dijon and maple syrup together for the glaze.",
+                              "Push the sweet potatoes aside, lay in the salmon and green beans, and brush the salmon with the glaze.",
+                              "Roast 12–15 minutes, until the salmon flakes.",
+                              "Squeeze the lemon over everything and serve."])
     }
 
     /// Sample calendar events: school drop-off on weekdays, a Monday dentist

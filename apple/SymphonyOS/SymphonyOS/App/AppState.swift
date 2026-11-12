@@ -93,6 +93,10 @@ final class AppState {
     /// Bottom, or a side column where the system puts its bars (iPhone Duo).
     var dockLayout = DockLayout()
     var bottomInset: CGFloat { keyboardVisible || dockLayout.edge != .bottom ? 0 : dockHeight }
+    /// The Duo set down partly open shows the half-open display.
+    var posture: DuoPosture = .flat
+    /// Tonight's dinner being cooked on the half-open display.
+    var cook: CookSession?
     #else
     var bottomInset: CGFloat { keyboardVisible ? 0 : dockHeight }
     #endif

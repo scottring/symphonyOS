@@ -108,7 +108,7 @@ struct TodayView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(item: $opened) { item in openedDetail(item) }
+        .sheet(item: $opened) { item in OpenedItemSheet(item: item, date: date, userId: userId) }
         .sheet(isPresented: $showUnfinished) {
             UnfinishedSheet(tasks: viewModel.carriedOverTasks)
                 .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
@@ -518,37 +518,6 @@ struct TodayView: View {
             .padding(.bottom, appState.bottomInset)
     }
 
-    /// What a tap on the day column opens: a task's details, an event's, or
-    /// the routine occurrence (Done / Move / Skip / Edit routine).
-    @ViewBuilder
-    private func openedDetail(_ item: TimelineItem) -> some View {
-        switch item.type {
-        case .task:
-            if let task = allTasks.first(where: { $0.id == item.entityId }) {
-                NavigationStack {
-                    TaskDetailView(task: task)
-                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { opened = nil } } }
-                }
-                .presentationDetents([.large, .medium])
-            }
-        case .routine:
-            if let routine = routines.first(where: { $0.id == item.entityId }) {
-                RoutineOccurrenceSheet(routine: routine, date: date, completed: item.completed)
-                    .presentationDetents([.medium, .large])
-            }
-        case .event:
-            if let key = item.eventKey {
-                NavigationStack {
-                    EventDetailView(googleEventId: key, eventTitle: item.title, eventStart: item.startTime,
-                                    eventLocation: item.location, recurringEventId: item.recurringEventId,
-                                    date: date, userId: userId)
-                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { opened = nil } } }
-                }
-                .presentationDetents([.large, .medium])
-            }
-        }
-    }
-
     /// Done or Skip on a carried routine writes its ORIGINAL occurrence.
     private func settleCarried(_ c: CarriedRoutines.Carried, status: String) {
         withAnimation(.easeInOut(duration: 0.2)) {
@@ -687,68 +656,11 @@ struct TodayView: View {
 
     // MARK: - Rebuild triggers
 
-    /// A content fingerprint of the task list — completion/reschedule/edits
-    /// leave the count unchanged, so keying on count alone went stale.
-    private var tasksRevision: Int {
-        var hasher = Hasher()
-        hasher.combine(allTasks.count)
-        for task in allTasks {
-            hasher.combine(task.id)
-            hasher.combine(task.completed)
-            hasher.combine(task.scheduledFor)
-            hasher.combine(task.bucket)
-            hasher.combine(task.title)
-            hasher.combine(task.notes)
-            hasher.combine(task.phoneNumber)
-            hasher.combine(task.links?.count)
-            hasher.combine(task.location)
-            hasher.combine(task.parentTaskId)
-            hasher.combine(task.captureId)
-            hasher.combine(task.scope)
-            hasher.combine(task.context)
-            hasher.combine(task.assignedTo)
-            hasher.combine(task.assignedToAll?.count)
-        }
-        return hasher.finalize()
-    }
-
-    /// Changes when the displayed day's cached events arrive or change.
-    private var eventsRevision: Int {
-        var hasher = Hasher()
-        let items = calendar.items(for: appState.selectedDate)
-        hasher.combine(items == nil)
-        for item in items ?? [] {
-            hasher.combine(item.id)
-            hasher.combine(item.startTime)
-            hasher.combine(item.title)
-        }
-        return hasher.finalize()
-    }
-
-    private var eventNotesRevision: Int {
-        var hasher = Hasher()
-        hasher.combine(eventNotes.count)
-        for note in eventNotes {
-            hasher.combine(note.id)
-            hasher.combine(note.notes)
-            hasher.combine(note.links?.count)
-            hasher.combine(note.isFree)
-        }
-        return hasher.finalize()
-    }
-
-    /// Routine completions and choices write `ActionableInstance` in place.
-    private var instancesRevision: Int {
-        var hasher = Hasher()
-        hasher.combine(instances.count)
-        for instance in instances {
-            hasher.combine(instance.id)
-            hasher.combine(instance.status)
-            hasher.combine(instance.plannedOn)
-            hasher.combine(instance.deferredTo)
-        }
-        return hasher.finalize()
-    }
+    // Fingerprints of what Today is built from (TimelineRevision).
+    private var tasksRevision: Int { TimelineRevision.tasks(allTasks) }
+    private var eventsRevision: Int { TimelineRevision.events(calendar.items(for: appState.selectedDate)) }
+    private var eventNotesRevision: Int { TimelineRevision.eventNotes(eventNotes) }
+    private var instancesRevision: Int { TimelineRevision.instances(instances) }
 
     private func rebuildTimeline() {
         viewModel.buildTimeline(
@@ -787,7 +699,7 @@ enum NotificationManager {
         let now = Date()
         let due = tasks.filter { !$0.completed && !$0.isAllDay && ($0.scheduledFor ?? .distantPast) > now }
 
-        center.removeAllPendingNotificationRequests()
+        var requests: [UNNotificationRequest] = []
         for task in due {
             guard let when = task.scheduledFor else { continue }
             let content = UNMutableNotificationContent()
@@ -796,7 +708,16 @@ enum NotificationManager {
             content.sound = .default
             let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: when)
             let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
-            center.add(UNNotificationRequest(identifier: task.id.uuidString, content: content, trigger: trigger))
+            requests.append(UNNotificationRequest(identifier: task.id.uuidString, content: content, trigger: trigger))
+        }
+        // Task reminders only: the cooking timer ("symphony.…") keeps ringing.
+        center.getPendingNotificationRequests { pending in
+            let stale = pending.map(\.identifier).filter { !$0.hasPrefix(ownPrefix) }
+            center.removePendingNotificationRequests(withIdentifiers: stale)
+            for request in requests { center.add(request) }
         }
     }
+
+    /// Reminders the app schedules for itself, not for a task.
+    static let ownPrefix = "symphony."
 }

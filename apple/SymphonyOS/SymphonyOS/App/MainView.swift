@@ -23,6 +23,7 @@ struct iOSMainView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @State private var showCapture = false
+    @State private var hinge: HingeReader.Reading?
 
     private var dock: some View {
         @Bindable var state = appState
@@ -102,7 +103,18 @@ struct iOSMainView: View {
         .background {
             Color.bgBase.ignoresSafeArea()
             DockLayoutReader { layout in appState.dockLayout = layout }
+            HingeReader { reading in hinge = reading }
         }
+        // Set down partly open: the half-open display, over everything.
+        .overlay {
+            if appState.posture.isHalfOpen {
+                HalfOpenView(posture: appState.posture)
+                    .transition(.opacity)
+            }
+        }
+        .onChange(of: hinge) { _, _ in updatePosture() }
+        .onChange(of: appState.dockLayout) { _, _ in updatePosture() }
+        .onAppear { updatePosture() }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             appState.keyboardVisible = true
         }
@@ -115,11 +127,35 @@ struct iOSMainView: View {
                     .presentationDetents([.medium])
             }
         }
+        .onChange(of: appState.posture) { _, posture in
+            // Opening the phone flat after the last step leaves nothing to come back to.
+            if posture == .flat, let cook = appState.cook, cook.isLast, cook.timer == nil { appState.cook = nil }
+        }
         // Re-drive photo captures that never finished (offline snap, killed app).
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await PhotoCaptureService.retryPending(modelContext: modelContext) }
         }
+    }
+}
+
+extension iOSMainView {
+    private func updatePosture() {
+        let next: DuoPosture
+        if let pinned = HalfOpen.pinned {
+            next = pinned
+            #if DEBUG
+            if HalfOpen.pinnedCooking, appState.cook == nil, let dinner = DemoMode.dinner(on: .now) {
+                appState.cook = CookSession(dinner: dinner)
+            }
+            #endif
+        } else {
+            next = HalfOpen.posture(angle: hinge?.angle, partlyOpen: hinge?.partlyOpen ?? false,
+                                    fold: appState.dockLayout.fold, window: appState.dockLayout.window,
+                                    current: appState.posture)
+        }
+        guard next != appState.posture else { return }
+        withAnimation(.easeInOut(duration: 0.3)) { appState.posture = next }
     }
 }
 

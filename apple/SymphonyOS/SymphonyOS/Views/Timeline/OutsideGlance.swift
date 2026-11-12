@@ -62,6 +62,8 @@ struct GlanceHeading: View {
 struct GlanceNow: View {
     let items: [TimelineItem]
     let isToday: Bool
+    /// Bigger, for the half-open display seen from across a table.
+    var prominent = false
     var onOpen: (TimelineItem) -> Void
 
     private static let clock: DateFormatter = {
@@ -82,27 +84,28 @@ struct GlanceNow: View {
                             .kerning(1.2)
                             .foregroundStyle(Color.amberStrong)
                         Text(item.title)
-                            .font(.custom("DMSans-Medium", size: 18, relativeTo: .body))
+                            .font(prominent ? .custom("CrimsonPro-Regular", size: 30, relativeTo: .title)
+                                            : .custom("DMSans-Medium", size: 18, relativeTo: .body))
                             .foregroundStyle(Color.textPrimary)
                             .multilineTextAlignment(.leading)
                             .lineLimit(2)
                         if let then = glance.then.first, let at = then.startTime {
                             Text("Next \(Self.clock.string(from: at)) · \(then.title)")
-                                .font(.bodySmall)
+                                .font(prominent ? .bodyMedium : .bodySmall)
                                 .foregroundStyle(Color.textSecondary)
                                 .lineLimit(1)
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, prominent ? 18 : 14)
+                    .padding(.vertical, prominent ? 16 : 12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.accentBg, in: RoundedRectangle(cornerRadius: 14))
+                    .background(Color.accentBg, in: RoundedRectangle(cornerRadius: prominent ? 16 : 14))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             } else {
                 Text(glance.timedCount == 0 ? "Nothing timed today." : "Nothing else timed today.")
-                    .font(.custom("CrimsonPro-Italic", size: 17, relativeTo: .body))
+                    .font(.custom("CrimsonPro-Italic", size: prominent ? 22 : 17, relativeTo: .body))
                     .foregroundStyle(Color.textSecondary)
             }
         }
