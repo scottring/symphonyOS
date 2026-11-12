@@ -34,6 +34,15 @@ struct DockLayout: Equatable {
     /// The fold, in window coordinates, when the screen has one (iPhone Duo's
     /// inside screen): two-column layouts split along it.
     var fold: CGRect?
+    /// The whole window's size.
+    var window: CGSize = .zero
+
+    /// A short window with the bars at its side — the iPhone Duo's outside
+    /// screen, either way up — gets the dock as icons alone, without the +
+    /// (its Today has the Tell bar's + instead).
+    var iconsOnly: Bool {
+        edge != .bottom && window.width > 0 && min(window.width, window.height) < TodayLayout.shortHeight
+    }
 
     static let sideWidth: CGFloat = 72
 
@@ -106,6 +115,7 @@ struct DockLayoutReader: UIViewRepresentable {
                 }
                 layout.fold = window.reservedRegions(kind: .division, options: .includeInactive).first?.frame
             }
+            layout.window = window.bounds.size
             guard layout != last else { return }
             last = layout
             let onChange = onChange

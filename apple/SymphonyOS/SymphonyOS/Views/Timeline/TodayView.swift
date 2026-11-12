@@ -75,6 +75,8 @@ struct TodayView: View {
     @State private var showWholeDay = false
     @State private var showWeek = false
     @State private var showTell = false
+    /// The outside screen's quick add (the Tell bar's +).
+    @State private var showAdd = false
     /// The day as a short list, or to scale (web "Show hours"); remembered.
     @AppStorage("today.showHours") private var showHours = false
 
@@ -115,6 +117,11 @@ struct TodayView: View {
         .sheet(isPresented: $showTell) {
             TellSheet(userId: userId).presentationDetents([.medium, .large])
         }
+        #if os(iOS)
+        .sheet(isPresented: $showAdd) {
+            CaptureSheet(userId: userId).presentationDetents([.medium])
+        }
+        #endif
         // Rebuild from the shared cache first (no blank schedule on return),
         // then refresh the day in the background.
         .onAppear { rebuildTimeline() }
@@ -156,57 +163,102 @@ struct TodayView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { captureBar }
     }
 
-    /// Outside screen, upright: the heading, what's on next, the three quick
-    /// actions, To do, and the whole day on request.
+    /// Outside screen, upright (the approved 2026-11-12 mockup): the date on
+    /// one line, what's on now, To do in one row style with finished items
+    /// folded away, and the Tell bar. Swipe sideways for another day.
     private var glance: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                JournalHeading(date: date, compact: true)
-                    .padding(.horizontal, 20)
+            VStack(alignment: .leading, spacing: 0) {
+                GlanceHeading(date: date)
+                    .padding(.top, 14)
+                GlanceNow(items: viewModel.schedule, isToday: appState.isToday) { opened = $0 }
                     .padding(.top, 8)
-                NextUpCard(items: viewModel.schedule, isToday: appState.isToday, quietWhenEmpty: true) { opened = $0 }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                QuickActions(toDo: viewModel.forToday, onTell: { showTell = true })
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                lists
-                CalmRow(text: showWholeDay ? "Hide the whole day" : "The whole day") {
-                    withAnimation(.easeInOut(duration: 0.2)) { showWholeDay.toggle() }
-                }
-                if showWholeDay { day }
+                glanceLists
+                    .padding(.top, 22)
             }
+            .padding(.leading, 20)
+            .padding(.trailing, 12)
             .padding(.bottom, 16)
+        }
+        .simultaneousGesture(daySwipe)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            glanceTellBar
+                .padding(.leading, 16)
+                .padding(.trailing, 8)
+                .padding(.vertical, 8)
+                .background(Color.bgBase)
+        }
+        .safeAreaPadding(.bottom, appState.bottomInset)
+    }
+
+    /// Outside screen held sideways (any short, wide window): the date, now
+    /// and the Tell bar on the left; To do on the right.
+    private var glanceWide: some View {
+        HStack(alignment: .top, spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
+                GlanceHeading(date: date)
+                GlanceNow(items: viewModel.schedule, isToday: appState.isToday) { opened = $0 }
+                    .padding(.top, 10)
+                Spacer(minLength: 12)
+                glanceTellBar
+            }
+            .frame(width: min(270, size.width * 0.42))
+            .padding(.vertical, 12)
+            ScrollView {
+                glanceLists
+                    .padding(.vertical, 12)
+            }
+            .frame(maxWidth: .infinity)
+            .simultaneousGesture(daySwipe)
+        }
+        .padding(.leading, 20)
+        .padding(.trailing, 8)
+        .safeAreaPadding(.bottom, appState.bottomInset)
+    }
+
+    /// The outside screen's lists: routines kept until done, To do, a review
+    /// of anything unfinished, tonight's dinner.
+    @ViewBuilder
+    private var glanceLists: some View {
+        let carried = appState.isToday
+            ? CarriedRoutines.select(routines: routines, instances: instances, today: .now,
+                                     domain: appState.domainFilter.contextValue)
+            : []
+        if !carried.isEmpty {
+            StillToDo(carried: carried, today: .now,
+                      onDone: { c in settleCarried(c, status: "completed") },
+                      onSkip: { c in settleCarried(c, status: "skipped") },
+                      plain: true)
+            Color.clear.frame(height: 18)
+        }
+        GlanceToDoList(items: viewModel.forToday, date: date, userId: userId) { opened = $0 }
+        if !viewModel.carriedOverTasks.isEmpty {
+            let n = viewModel.carriedOverTasks.count
+            CalmRow(text: "Review \(n) unfinished \(n == 1 ? "item" : "items")") { showUnfinished = true }
+                .padding(.horizontal, -20)
+                .padding(.top, 4)
+                .accessibilityHint("Decide what happens to each. Nothing moves on its own.")
+        }
+        if let dinner {
+            GlanceDinner(dinner: dinner)
+                .padding(.top, 4)
         }
     }
 
-    /// Outside screen held sideways (any short, wide window): next up and
-    /// the actions on the left, To do on the right.
-    private var glanceWide: some View {
-        HStack(alignment: .top, spacing: 10) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    JournalHeading(date: date, compact: true)
-                    NextUpCard(items: viewModel.schedule, isToday: appState.isToday, quietWhenEmpty: true) { opened = $0 }
-                    QuickActions(toDo: viewModel.forToday, compact: true, onTell: { showTell = true })
+    private var glanceTellBar: some View {
+        GlanceTellBar(onTell: { showTell = true }, onAdd: { showAdd = true })
+    }
+
+    /// A sideways swipe on the outside screen turns the day.
+    private var daySwipe: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onEnded { value in
+                let dx = value.translation.width, dy = value.translation.height
+                guard abs(dx) > 70, abs(dx) > abs(dy) * 2 else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if dx < 0 { appState.goToNextDay() } else { appState.goToPreviousDay() }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
             }
-            .frame(maxWidth: .infinity)
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    lists
-                    CalmRow(text: showWholeDay ? "Hide the whole day" : "The whole day") {
-                        withAnimation(.easeInOut(duration: 0.2)) { showWholeDay.toggle() }
-                    }
-                    if showWholeDay { day }
-                }
-                .padding(.bottom, 12)
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .safeAreaPadding(.bottom, appState.bottomInset)
     }
 
     /// Inside screen, upright: the day page fills the screen; the week hangs

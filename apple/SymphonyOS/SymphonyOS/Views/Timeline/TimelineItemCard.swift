@@ -121,7 +121,8 @@ struct TimelineItemCard: View {
                     showRoutine = true
                 },
                 SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Color.textSecondary) {
-                    setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString.lowercased(), status: "skipped")
+                    ItemCompletion.setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString.lowercased(), status: "skipped",
+                                                     modelContext: modelContext, userId: userId, date: date)
                 },
             ]
         case .event:
@@ -131,7 +132,8 @@ struct TimelineItemCard: View {
                     showEventDetail = true
                 },
                 SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Color.textSecondary) {
-                    setInstanceStatus(entityType: "calendar_event", entityId: key, status: "skipped")
+                    ItemCompletion.setInstanceStatus(entityType: "calendar_event", entityId: key, status: "skipped",
+                                                     modelContext: modelContext, userId: userId, date: date)
                 },
             ]
         default:
@@ -444,29 +446,35 @@ struct TimelineItemCard: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         #endif
+        ItemCompletion.set(item, completed: isCompleted, modelContext: modelContext, userId: userId, date: date)
+    }
+}
 
-        let vm = TaskViewModel(modelContext: modelContext)
+/// Ticks a Today item off (or back on) the way every surface must: a task
+/// toggles; a routine or calendar event writes THIS day's occurrence.
+/// Shared by the Today card and the outside screen's rows.
+enum ItemCompletion {
+    @MainActor
+    static func set(_ item: TimelineItem, completed: Bool, modelContext: ModelContext, userId: UUID, date: Date) {
         let entityId = item.entityId
-
         switch item.type {
         case .task:
             // Fetch all tasks, filter in code (Predicate can't capture local vars)
             let descriptor = FetchDescriptor<SymphonyTask>()
-            if let task = (try? modelContext.fetch(descriptor))?.first(where: { $0.id == entityId }) {
-                vm.toggleComplete(task)
+            if let task = (try? modelContext.fetch(descriptor))?.first(where: { $0.id == entityId }),
+               task.completed != completed {
+                TaskViewModel(modelContext: modelContext).toggleComplete(task)
             }
         case .routine:
             setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString.lowercased(),
-                              status: isCompleted ? "completed" : "pending")
+                              status: completed ? "completed" : "pending", modelContext: modelContext, userId: userId, date: date)
         case .event:
             // Web parity: events check off via actionable_instances keyed by the
             // Google event id.
             if let key = item.eventKey {
                 setInstanceStatus(entityType: "calendar_event", entityId: key,
-                                  status: isCompleted ? "completed" : "pending")
+                                  status: completed ? "completed" : "pending", modelContext: modelContext, userId: userId, date: date)
             }
-        default:
-            break
         }
     }
 
@@ -477,7 +485,9 @@ struct TimelineItemCard: View {
     /// queues a sync push; without it the completion never left the phone (and
     /// the next pull's reconciler deleted the local instance — completions
     /// silently vanished).
-    private func setInstanceStatus(entityType: String, entityId entityIdString: String, status: String) {
+    @MainActor
+    static func setInstanceStatus(entityType: String, entityId entityIdString: String, status: String,
+                                          modelContext: ModelContext, userId: UUID, date: Date) {
         let cal = Calendar.current
         let allInstances = (try? modelContext.fetch(FetchDescriptor<ActionableInstance>())) ?? []
         let instance = allInstances.first {

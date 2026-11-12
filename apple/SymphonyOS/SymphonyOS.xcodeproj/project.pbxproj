@@ -22,6 +22,7 @@
 		1E15B8038AA0A30609A3F2C3 /* ScopeRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1754976AD84C21B40C2EF7 /* ScopeRule.swift */; };
 		259AB34194126091758C9152 /* PageParse.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6B5DC5116EEAC80B7EE476 /* PageParse.swift */; };
 		25D57A063F8E5D66235418D3 /* GoalEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB69B50EF59A9617786BC1E /* GoalEditorSheet.swift */; };
+		2702FA26DA66FC30F7E2998C /* GlanceToDoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A932C77F9DCE9A3582897E6A /* GlanceToDoTests.swift */; };
 		276DF25838D34029D6EF8E9A /* DMSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BAC1B4BFBF9C9FD19A476F6A /* DMSans-Regular.ttf */; };
 		27AD0E372EA06FE074F8B64F /* ChooserSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4639DAB84CA71AE3E1BF1431 /* ChooserSheet.swift */; };
 		296C67879E486F3CBE93D3ED /* DocumentScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47BBD0F267EDEE37831CD019 /* DocumentScanner.swift */; };
@@ -92,6 +93,7 @@
 		9F7F645DDEABED299DE4578C /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EBED2D101D6AFAD857742E3 /* SyncEngine.swift */; };
 		A04D19140224352F7967DA60 /* CalendarSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCEA1013A6E197978F4C424 /* CalendarSettingsView.swift */; };
 		A08B7D0D23E567D4D9E509E1 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 936EBEFDA2D82A91BDC6877A /* Typography.swift */; };
+		A418B990FC5A297B39CEFD65 /* OutsideGlance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5618B899980DE85C6DE0BA61 /* OutsideGlance.swift */; };
 		A558EB89256A9A88556E2464 /* TodayLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB29FF05A2D7D279DC175F6A /* TodayLayoutTests.swift */; };
 		A5D8A8346B621F57B8565CF3 /* DomainFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27058614DEA3A0A75E46BF59 /* DomainFilter.swift */; };
 		A7809E3241758A15BF8843C1 /* DMSans-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 51E807DEDAD9A55C7D33504B /* DMSans-Medium.ttf */; };
@@ -227,6 +229,7 @@
 		51E807DEDAD9A55C7D33504B /* DMSans-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "DMSans-Medium.ttf"; sourceTree = "<group>"; };
 		52420F36177A3E0B1C256DAF /* SymphonyOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SymphonyOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		527B3D33FF88A9A84A5DD5F8 /* Household.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Household.swift; sourceTree = "<group>"; };
+		5618B899980DE85C6DE0BA61 /* OutsideGlance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutsideGlance.swift; sourceTree = "<group>"; };
 		5A49D0D02CF868490292308C /* CameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPicker.swift; sourceTree = "<group>"; };
 		5D4179C34EBA0E91CD8EE164 /* LogMedicationIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogMedicationIntent.swift; sourceTree = "<group>"; };
 		5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyOSTests.swift; sourceTree = "<group>"; };
@@ -269,6 +272,7 @@
 		9C9A6ACB7B9E46F44B52B56F /* PaperFoldTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaperFoldTests.swift; sourceTree = "<group>"; };
 		9F45CDE5093407A022589D06 /* ListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListsView.swift; sourceTree = "<group>"; };
 		A1D31FA63E65DA22E03392AD /* PlannerComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerComponents.swift; sourceTree = "<group>"; };
+		A932C77F9DCE9A3582897E6A /* GlanceToDoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceToDoTests.swift; sourceTree = "<group>"; };
 		A99D77B01B73C4E9753A3494 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedOverTests.swift; sourceTree = "<group>"; };
 		AA1EA822F7B9C07ECFC0E916 /* SymphonyWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SymphonyWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -646,6 +650,7 @@
 				FDA21FA32A236A44EDB99EE6 /* DesignSystemTests.swift */,
 				E7A9598FAC1528BAE33CC441 /* DinnerPickTests.swift */,
 				6C272C7DF4B6BF8AA2ED024E /* DockLayoutTests.swift */,
+				A932C77F9DCE9A3582897E6A /* GlanceToDoTests.swift */,
 				217B2A6BEE77F0C6CE19306F /* MonthlyPositionTests.swift */,
 				6B165E6B770010DB9EC2731C /* NotesHTMLTests.swift */,
 				E835A0EB2F2BE8C29B990F52 /* PageIngestTests.swift */,
@@ -706,6 +711,7 @@
 				C98347D43F09BA622FEB4503 /* DomainSwitcher.swift */,
 				813059185BE971ADE0DC6388 /* DuoJournal.swift */,
 				6BD95A959DE58FFA206B8F70 /* NextUpCard.swift */,
+				5618B899980DE85C6DE0BA61 /* OutsideGlance.swift */,
 				D1383EE5C83DE0489DE695E0 /* RoutineOccurrenceSheet.swift */,
 				93D83DAC938B3E5C5B0328E6 /* StillToDo.swift */,
 				96334CB8EF20C74A0CFEF840 /* TimelineItemCard.swift */,
@@ -910,6 +916,7 @@
 				6FA7A8C0F8DCA3F3F9D2293F /* DesignSystemTests.swift in Sources */,
 				1A33ACD19D55C2BC2F3E4BAA /* DinnerPickTests.swift in Sources */,
 				307BCF9BB18ECAD6D4CEFAB8 /* DockLayoutTests.swift in Sources */,
+				2702FA26DA66FC30F7E2998C /* GlanceToDoTests.swift in Sources */,
 				BD782E62D9ADFC3814E41900 /* MonthlyPositionTests.swift in Sources */,
 				F9A19E455568DEDDF7B3CCCA /* NotesHTMLTests.swift in Sources */,
 				E57C504F359B868F330F8AD7 /* PageIngestTests.swift in Sources */,
@@ -982,6 +989,7 @@
 				41AE4C762EAFD3902E7DF083 /* NextUpCard.swift in Sources */,
 				69C0D3EC970FE467BCEB47DC /* NordicColors.swift in Sources */,
 				1D60E707A576F8C670198484 /* NotesHTML.swift in Sources */,
+				A418B990FC5A297B39CEFD65 /* OutsideGlance.swift in Sources */,
 				E37FD1B1732BE60FE7357D84 /* PageIngest.swift in Sources */,
 				259AB34194126091758C9152 /* PageParse.swift in Sources */,
 				75940016428E88F3EEF2EBF1 /* PageReviewSheet.swift in Sources */,

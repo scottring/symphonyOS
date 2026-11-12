@@ -46,7 +46,7 @@ struct iOSMainView: View {
         if layout.edge != .bottom {
             ZStack(alignment: .topLeading) {
                 Color.clear
-                SymphonyDock(activeTab: $state.activeTab, edge: layout.edge) { showCapture = true }
+                SymphonyDock(activeTab: $state.activeTab, edge: layout.edge, iconsOnly: layout.iconsOnly) { showCapture = true }
                     .frame(width: layout.frame.width, height: layout.frame.height, alignment: .top)
                     .offset(x: layout.frame.minX, y: layout.frame.minY)
             }
@@ -148,6 +148,8 @@ enum DockMetrics {
 private struct SymphonyDock: View {
     @Binding var activeTab: AppTab
     var edge: DockEdge = .bottom
+    /// The outside screen: icons alone, no + (Today's Tell bar has it).
+    var iconsOnly = false
     var onAdd: () -> Void
 
     var body: some View {
@@ -156,9 +158,11 @@ private struct SymphonyDock: View {
 
     // Side column: "+" on top, then the tabs, as the system's vertical bars.
     private var sideColumn: some View {
-        VStack(spacing: 4) {
-            addButton
-                .padding(.bottom, 10)
+        VStack(spacing: iconsOnly ? 14 : 4) {
+            if !iconsOnly {
+                addButton
+                    .padding(.bottom, 10)
+            }
             tab(.planner, icon: AppTab.planner.icon, label: "Planner")
             tab(.inbox, icon: AppTab.inbox.icon, label: "Inbox")
             tab(.routines, icon: AppTab.routines.icon, label: "Routines")
@@ -196,14 +200,15 @@ private struct SymphonyDock: View {
             activeTab = t
         } label: {
             VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 20, weight: activeTab == t ? .semibold : .regular))
-                Text(label).font(.captionBold)
+                Image(systemName: icon).font(.system(size: iconsOnly ? 21 : 20, weight: activeTab == t ? .semibold : .regular))
+                if !iconsOnly { Text(label).font(.captionBold) }
             }
             .foregroundStyle(activeTab == t ? Color.ink : Color.textTertiary)
             .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
         .accessibilityAddTraits(activeTab == t ? .isSelected : [])
         .accessibilityShowsLargeContentViewer {
             Image(systemName: icon)
