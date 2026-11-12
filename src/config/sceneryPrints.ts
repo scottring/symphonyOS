@@ -1,10 +1,11 @@
 // src/config/sceneryPrints.ts
 //
-// Backgrounds that belong to no place: single prints Scott chose, offered in
-// the scenery dial beside the five places' own scenes. Each is one picture
-// for every light and style; its art lives in components/place/panoramas.ts.
+// The page's backgrounds (Scott, 2026-11-12: "remove all backgrounds except
+// the woodcut overlook and the trains"): two prints, offered in the scenery
+// dial. Each is one picture for every light and place; your place still
+// tints the sky and the accent. Their art lives in components/place/panoramas.ts.
 
-export type SceneryPrintId = 'train-yard'
+export type SceneryPrintId = 'overlook' | 'train-yard'
 
 export interface SceneryPrint {
   id: SceneryPrintId
@@ -12,8 +13,12 @@ export interface SceneryPrint {
 }
 
 export const SCENERY_PRINTS: SceneryPrint[] = [
+  { id: 'overlook', name: 'Mountain overlook' },
   { id: 'train-yard', name: 'Train yard' },
 ]
+
+/** What a device shows until someone chooses. */
+export const DEFAULT_SCENERY_PRINT: SceneryPrintId = 'overlook'
 
 export function isSceneryPrintId(v: unknown): v is SceneryPrintId {
   return typeof v === 'string' && SCENERY_PRINTS.some((p) => p.id === v)

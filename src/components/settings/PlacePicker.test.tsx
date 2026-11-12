@@ -3,7 +3,7 @@ import { render, screen } from '@/test/test-utils'
 import { PlacePicker } from './PlacePicker'
 import { PLACES } from '@/config/places'
 import { PlaceScenery } from '@/components/place/PlaceScenery'
-import { PANORAMAS, WOODBLOCK } from '@/components/place/panoramas'
+import { PRINTS } from '@/components/place/panoramas'
 
 describe('PlacePicker', () => {
   beforeEach(() => localStorage.clear())
@@ -31,7 +31,8 @@ describe('PlacePicker', () => {
       await user.selectOptions(screen.getByRole('combobox', { name: 'Lighting' }), lighting)
       const card = screen.getByRole('button', { name: /Densely Urban/ })
       const preview = card.querySelector('img')!
-      expect(preview.src).toContain(`painted/urban-${lighting}`)
+      // One background for every light; the sky carries the light.
+      expect(preview.getAttribute('src')).toBe(PRINTS.overlook.src)
       // The card's sky wears its own place's hue in the chosen light.
       const sky = card.querySelector('.place-theme-preview')!
       expect(sky).toHaveAttribute('data-sky-place', 'urban')
@@ -60,22 +61,13 @@ describe('PlacePicker', () => {
     for (const sky of container.querySelectorAll('.place-theme-preview')) expect(sky).toHaveAttribute('data-scenery-lighting', lighting)
   })
 
-  it('Style switches the page and every chooser card to the woodblock prints, and is saved', async () => {
+  it('has no Style: every card and the page show the chosen background under its own sky', async () => {
+    localStorage.setItem('symphony-scenery-background', 'train-yard')
     const { user, container } = render(<><PlacePicker /><PlaceScenery scroller={null} /></>)
+    expect(screen.queryByRole('combobox', { name: 'Style' })).toBeNull()
     await user.click(screen.getByRole('button', { name: /Small Mountain Town/ }))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Style' }), 'woodblock')
-    expect(localStorage.getItem('symphony-scenery-style')).toBe('woodblock')
-    for (const lighting of ['daytime', 'dusk-dawn', 'nighttime'] as const) {
-      await user.selectOptions(screen.getByRole('combobox', { name: 'Lighting' }), lighting)
-      const scenery = container.querySelector('[data-place-scenery]')!
-      expect(scenery).toHaveAttribute('data-style', 'woodblock')
-      expect(scenery.querySelector('img')).toHaveAttribute('src', WOODBLOCK['mountain-town'][lighting].src)
-      // Each card previews its own place in the same style and light.
-      const cards = [...container.querySelectorAll('.place-theme-preview img')].map(img => img.getAttribute('src'))
-      expect(cards).toEqual(PLACES.map(p => WOODBLOCK[p.id][lighting].src))
-    }
-    // Back to Painted: the original art, untouched.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Style' }), 'painted')
-    expect(container.querySelector('[data-place-scenery] img')).toHaveAttribute('src', PANORAMAS['mountain-town'].nighttime.src)
+    expect(container.querySelector('[data-place-scenery] img')).toHaveAttribute('src', PRINTS['train-yard'].src)
+    const cards = [...container.querySelectorAll('.place-theme-preview img')].map(img => img.getAttribute('src'))
+    expect(cards).toEqual(PLACES.map(() => PRINTS['train-yard'].src))
   })
 })

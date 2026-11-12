@@ -58,11 +58,11 @@ describe('foreground scenery', () => {
     unmount()
     expect(scroller.style.getPropertyValue('--scenery-clearance')).toBe('')
   })
-  it('shows the chosen lighting of the painted landscape', () => {
+  it('shows the chosen lighting over the mountain overlook by default', () => {
     localStorage.setItem('symphony-scenery-lighting', 'dusk-dawn')
     const { container } = render(<PlaceScenery scroller={null} />)
     expect(container.querySelector('[data-place-scenery]')).toHaveAttribute('data-lighting', 'dusk-dawn')
-    expect(container.querySelector('img')!.getAttribute('src')).toContain('painted/cabin-dusk-dawn')
+    expect(container.querySelector('img')!.getAttribute('src')).toContain('woodblock/mountain-town-daytime')
     localStorage.removeItem('symphony-scenery-lighting')
   })
   it('detaches the focus listener on unmount', () => {

@@ -34,19 +34,16 @@ describe('scenery style resolution', () => {
 })
 
 describe('chosen background', () => {
-  it('follows your place by default, in the chosen style and light', () => {
-    expect(backgroundArt('place', 'woodblock', 'farm', 'nighttime')).toBe(WOODBLOCK.farm.nighttime)
-    expect(backgroundArt('place', 'painted', 'cabin', 'daytime')).toBe(PANORAMAS.cabin.daytime)
-  })
-
-  it("draws another place's scene without changing the place", () => {
-    expect(backgroundArt('urban', 'painted', 'cabin', 'dusk-dawn')).toBe(PANORAMAS.urban['dusk-dawn'])
-  })
-
-  it('shows a print the same in every style and light', () => {
-    for (const style of ['painted', 'woodblock'] as const) {
-      for (const light of LIGHTS) expect(backgroundArt('train-yard', style, 'farm', light)).toBe(PRINTS['train-yard'])
-    }
+  it('offers only the mountain overlook and the train yard', () => {
+    expect(Object.keys(PRINTS).sort()).toEqual(['overlook', 'train-yard'])
+    expect(backgroundArt('overlook')).toBe(WOODBLOCK['mountain-town'].daytime)
+    expect(backgroundArt('train-yard')).toBe(PRINTS['train-yard'])
     expect(PRINTS['train-yard'].veil).not.toBe(PRINTS['train-yard'].src)
+  })
+
+  it('stands the trains high in the band, below a feathered top', () => {
+    // The middle of the print: trains from near the top, no wires above them.
+    expect(PRINTS['train-yard'].skyline).toBeGreaterThan(0.05)
+    expect(PRINTS['train-yard'].skyline).toBeLessThan(0.3)
   })
 })

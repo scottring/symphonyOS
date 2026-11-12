@@ -38,8 +38,8 @@ export function PlaceScenery({ scroller, right = 0, floor, vivid = false }: {
   vivid?: boolean
 }) {
   const place = usePlaceOrDefault()
-  const { showScenery, sceneryLighting, sceneryStyle, sceneryScene, sceneryStrength, sceneryBackground } = useSceneryPreferences()
-  const art = backgroundArt(sceneryBackground, sceneryStyle, place, sceneryLighting)
+  const { showScenery, sceneryLighting, sceneryScene, sceneryStrength, sceneryBackground } = useSceneryPreferences()
+  const art = backgroundArt(sceneryBackground)
   const box = useRef<HTMLDivElement>(null)
   const catcher = useRef<HTMLDivElement>(null)
   // How much of the window's bottom the scene conceals (over the text
@@ -121,7 +121,7 @@ export function PlaceScenery({ scroller, right = 0, floor, vivid = false }: {
     ...(floor ? { '--scenery-floor': floor } : {}),
   } as CSSProperties
   return (
-    <div ref={box} aria-hidden="true" className={`place-scenery${faint ? ' is-faint' : ''}${vivid ? ' is-vivid' : ''}`} data-place-scenery={place} data-lighting={sceneryLighting} data-style={sceneryStyle} data-background={sceneryBackground} style={css}>
+    <div ref={box} aria-hidden="true" className={`place-scenery${faint ? ' is-faint' : ''}${vivid ? ' is-vivid' : ''}`} data-place-scenery={place} data-lighting={sceneryLighting} data-background={sceneryBackground} style={css}>
       <div className="place-scenery-veil" />
       <img className="place-scenery-panorama" src={art.src} alt="" decoding="async" draggable={false} />
       <div className="place-scenery-haze" />

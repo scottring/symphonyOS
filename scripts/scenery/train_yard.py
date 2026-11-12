@@ -6,18 +6,19 @@ cumulus sky behind, inside a cream paper margin. It is a background of its
 own (choosable from the scenery dial), one picture for every light and style.
 
 A square picture cannot stand full width in the scenery's 3:1 band whole.
-The band is the TOP of the print (Scott, 2026-11-11: "use the top of the
-print instead, with the wires"): the poles and their wires, the gantries,
-the hazy city and the first curving trains, its painted sky keyed out so it
-stands under Symphony's own sky like every other scene.
+The band is the MIDDLE of the print (Scott, 2026-11-12: "we need the trains
+to be visible, not the wires"; the top, with the wires, was 2026-11-11's):
+the fan of curving trains below the gantries, one train's face at the left.
+Nothing in it is sky, so its top is feathered into Symphony's own sky.
 
 Steps:
   1. crop inside the print's rounded frame;
-  2. key the sky: above the city line, every sky-blue or pale cloud pixel
+  2. key the sky (none in the middle band): above the city line, every sky-blue or pale cloud pixel
      (the print is flat colour, so no connectivity is needed — the dark
      poles, wires and gantries are never sky-coloured), then drop the small
      specks left by cloud outlines;
-  3. take the 3:1 band from TOP and scale to the woodblock set's 2172x724;
+  3. take the 3:1 band from TOP, feather its top FEATHER of its height into
+     the sky, and scale to the woodblock set's 2172x724;
   4. write the veil and the skyline, both measured on the land with the thin
      wires and poles opened away (they draw over the page; they do not
      conceal it).
@@ -40,7 +41,8 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 W, H = 2172, 724                 # the woodblock set's band size
 FRAME = (64, 78, 1866, 1890)     # inside the print's rounded frame (l, t, r, b)
-TOP = 290                        # the band's top row in the framed print (pole tops just in)
+TOP = 800                        # the band's top row in the framed print (below the gantries)
+FEATHER = 0.28                   # share of the band's height its top fades over
 CITY = 690                       # nothing below this row is sky
 FADE = round(64 * W / 1506)      # extract_landscapes.py's FADE, at this width
 
@@ -61,6 +63,8 @@ lowest = ndi.maximum(rows.repeat(rgb.shape[1], 1), labels, range(1, n + 1))
 specks = [i + 1 for i in range(n) if sizes[i] < 400 and lowest[i] < CITY - 20]
 land &= ~np.isin(labels, specks)
 alpha = ndi.gaussian_filter(land.astype(float), 0.7)
+ramp = np.clip(np.arange(rgb.shape[0]) / (FEATHER * rgb.shape[0]), 0, 1)
+alpha *= (ramp * ramp * (3 - 2 * ramp))[:, None]
 
 rgba = np.dstack([rgb * alpha[..., None], alpha * 255]).clip(0, 255).astype(np.uint8)
 img = Image.fromarray(rgba, 'RGBA').resize((W, H), Image.LANCZOS)

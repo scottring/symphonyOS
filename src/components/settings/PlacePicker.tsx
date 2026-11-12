@@ -7,8 +7,8 @@
 // heading or display options, and `onPick` told of each place tapped.
 import { PLACES, type PlaceId } from '@/config/places'
 import { usePlace } from '@/hooks/usePlace'
-import { sceneryArt } from '@/components/place/panoramas'
-import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice, type SceneryScene, type SceneryStyle } from '@/hooks/useSceneryPreferences'
+import { backgroundArt } from '@/components/place/panoramas'
+import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice, type SceneryScene } from '@/hooks/useSceneryPreferences'
 import { SectionHeading } from '@/components/layout/SectionHeading'
 
 const LIGHTING_LABEL = { 'daytime': 'Daytime', 'dusk-dawn': 'Dusk / Dawn', 'nighttime': 'Nighttime' } as const
@@ -19,7 +19,7 @@ export function PlacePicker({ compact = false, onPick }: {
   onPick?: (place: PlaceId) => void
 } = {}) {
   const { place, setPlace } = usePlace()
-  const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene } = useSceneryPreferences()
+  const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryBackground, sceneryScene, setSceneryScene } = useSceneryPreferences()
   const next = lightingChoice === 'auto' ? nextAutomaticChange() : null
 
   const grid = (
@@ -39,10 +39,10 @@ export function PlacePicker({ compact = false, onPick }: {
                 : 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm'}
             `}
           >
-            {/* The place's own sky and landscape, in the chosen light —
-                the same artwork and hue the page wears. */}
+            {/* The place's own sky in the chosen light, over the chosen
+                background — the same artwork and hue the page wears. */}
             <span className="place-theme-preview" data-sky-place={p.id} data-scenery-lighting={sceneryLighting} aria-hidden="true">
-              <img src={sceneryArt(sceneryStyle, p.id, sceneryLighting).src} alt="" loading="lazy" />
+              <img src={backgroundArt(sceneryBackground).src} alt="" loading="lazy" />
             </span>
             <div className="flex items-center gap-1.5">
               {/* The colour this place gives the app. */}
@@ -80,13 +80,6 @@ export function PlacePicker({ compact = false, onPick }: {
             <option value="full">Full, at the foot of the page</option>
           </select>
         </label>
-        {/* Painted landscapes or woodblock prints, under the same sky. */}
-        <label className="place-art-setting">Style
-          <select value={sceneryStyle} onChange={e => setSceneryStyle(e.target.value as SceneryStyle)}>
-            <option value="painted">Painted</option>
-            <option value="woodblock">Woodblock</option>
-          </select>
-        </label>
         <label className="place-art-setting">Lighting
           <select value={lightingChoice} onChange={e => setSceneryLighting(e.target.value as SceneryLightingChoice)}>
             <option value="auto">Automatic</option>
@@ -102,7 +95,7 @@ export function PlacePicker({ compact = false, onPick }: {
           <>Automatic follows sunrise and sunset: now {LIGHTING_LABEL[sceneryLighting]}
             {next ? `, changing at ${new Date(next).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. </>
         )}
-        Scenery visibility, scene, style and lighting are saved on this device. Short windows always get the faint scene.
+        Scenery visibility, scene, background and lighting are saved on this device; choose the background from the mountain at the foot of the page. Short windows always get the faint scene.
       </p>
       {grid}
     </section>

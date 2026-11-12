@@ -1,5 +1,8 @@
 import type { PlaceId } from '@/config/places'
 import type { SceneryBackground, SceneryLighting, SceneryStyle } from '@/hooks/useSceneryPreferences'
+
+/** Where the train yard's trains begin under the page (train_yard.py prints it). */
+const TRAIN_YARD_SKYLINE = 0.1423
 import type { SceneryPrintId } from '@/config/sceneryPrints'
 import train_yard from '@/assets/scenery/prints/train-yard.webp'
 import train_yard_veil from '@/assets/scenery/prints/train-yard-veil.webp'
@@ -146,20 +149,18 @@ export function sceneryArt(style: SceneryStyle, place: PlaceId, lighting: Scener
   return (style === 'woodblock' ? WOODBLOCK : PANORAMAS)[place][lighting]
 }
 
-// Prints that belong to no place (config/sceneryPrints.ts): one picture for
-// every light and style, in the woodblock band (2172x724).
-// Train yard (Scott, 2026-11-11): the top of his print — poles, wires and
-// gantries against the sky, the hazy city, the first curving trains — its
-// painted sky keyed out (scripts/scenery/train_yard.py). The skyline is the
-// city's: the wires and gantries draw over the page, they do not conceal it.
+// The page's two backgrounds (config/sceneryPrints.ts; Scott, 2026-11-12):
+// one picture each for every light and place, in the woodblock band
+// (2172x724). The overlook is the woodblock mountain print above. Train yard
+// (2026-11-12: "we need the trains to be visible, not the wires") is the
+// middle of his print — the fan of curving trains, below the gantries and
+// wires — its top feathered into the sky (scripts/scenery/train_yard.py).
 export const PRINTS: Record<SceneryPrintId, Panorama> = {
-  'train-yard': { src: train_yard, veil: train_yard_veil, skyline: 0.49 },
+  'overlook': MOUNTAIN_OVERLOOK,
+  'train-yard': { src: train_yard, veil: train_yard_veil, skyline: TRAIN_YARD_SKYLINE },
 }
 
-/** The art for the chosen background: your place's own scene ('place'),
- *  another place's in the same style and light, or a print. */
-export function backgroundArt(background: SceneryBackground, style: SceneryStyle, place: PlaceId, lighting: SceneryLighting): Panorama {
-  if (background === 'place') return sceneryArt(style, place, lighting)
-  if (background in PRINTS) return PRINTS[background as SceneryPrintId]
-  return sceneryArt(style, background as PlaceId, lighting)
+/** The art for the chosen background. */
+export function backgroundArt(background: SceneryBackground): Panorama {
+  return PRINTS[background] ?? PRINTS.overlook
 }

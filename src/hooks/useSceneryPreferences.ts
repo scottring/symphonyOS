@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { lightingAt, readCachedCoords } from '@/components/place/sceneryLighting'
-import { isPlaceId, type PlaceId } from '@/config/places'
-import { isSceneryPrintId, type SceneryPrintId } from '@/config/sceneryPrints'
+import { DEFAULT_SCENERY_PRINT, isSceneryPrintId, type SceneryPrintId } from '@/config/sceneryPrints'
 
 export type SceneryLighting = 'daytime' | 'dusk-dawn' | 'nighttime'
 /** What the person chose: one lighting, or 'auto' to follow the sun. */
@@ -14,9 +13,10 @@ export type SceneryStyle = 'painted' | 'woodblock'
  *  front of it at the foot of the window. */
 export type SceneryScene = 'faint' | 'full'
 /** Which picture stands at the foot of the page (Scott, 2026-11-11: "give
- *  the user the option to choose the background they want"): 'place' follows
- *  your place (the default), or another place's scene, or a print. */
-export type SceneryBackground = 'place' | PlaceId | SceneryPrintId
+ *  the user the option to choose the background they want"; 2026-11-12: only
+ *  the mountain overlook and the train yard). An older choice of a place's
+ *  scene reads as the overlook. */
+export type SceneryBackground = SceneryPrintId
 const EVENT = 'symphony:scenery-preferences'
 const SHOW_KEY = 'symphony-show-scenery'
 const LIGHTING_KEY = 'symphony-scenery-lighting'
@@ -82,7 +82,7 @@ const getStrength = (): number => {
 }
 const getBackground = (): SceneryBackground => {
   const value = read(BACKGROUND_KEY)
-  return isPlaceId(value) || isSceneryPrintId(value) ? value : 'place'
+  return isSceneryPrintId(value) ? value : DEFAULT_SCENERY_PRINT
 }
 const setSceneryBackground = (background: SceneryBackground) => write(BACKGROUND_KEY, background)
 const setSceneryStrength = (strength: number) => write(STRENGTH_KEY, String(Math.min(100, Math.max(0, Math.round(strength)))))
@@ -100,7 +100,7 @@ export function useSceneryPreferences() {
   const sceneryStyle = useSyncExternalStore(subscribe, getStyle, () => 'painted' as const)
   const sceneryScene = useSyncExternalStore(subscribe, getScene, () => 'faint' as const)
   const sceneryStrength = useSyncExternalStore(subscribe, getStrength, () => DEFAULT_SCENERY_STRENGTH)
-  const sceneryBackground = useSyncExternalStore(subscribe, getBackground, () => 'place' as const)
+  const sceneryBackground = useSyncExternalStore(subscribe, getBackground, () => DEFAULT_SCENERY_PRINT)
   return { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene, sceneryStrength, setSceneryStrength, sceneryBackground, setSceneryBackground }
 }
 
