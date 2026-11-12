@@ -122,3 +122,15 @@ button.rp-open[draggable="true"] { cursor: grab; }
 @media (max-width: 767px) {
   .rp { padding-top: 44px; }
 }
+
+/* "Which routines mustn't slip?" — one quiet line under the masthead
+   (KeepUntilDoneOffer, 2026-11-12). */
+.rp-keep-offer {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  margin: 12px 0 4px; padding: 12px 16px; border-radius: 14px;
+  border: 1px solid var(--color-neutral-200); background: var(--color-bg-elevated);
+}
+.rp-keep-offer p { flex: 1 1 280px; margin: 0; font-family: var(--font-family-display); font-style: italic; font-size: 17px; line-height: 1.35; color: var(--color-neutral-700); }
+.rp-keep-offer-actions { display: flex; align-items: center; gap: 8px; }
+.rp-keep-offer-later { min-height: 44px; padding: 0 10px; font-size: 14px; color: var(--color-neutral-500); }
+.rp-keep-offer-later:hover { color: var(--color-neutral-800); }

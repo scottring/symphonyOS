@@ -17,6 +17,7 @@ import { RoutinesList, RoutineForm, RoutineInput } from '@/components/lazy'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
+import { KeepUntilDoneOffer } from '@/components/routine/KeepUntilDoneOffer'
 
 /** Changing routines is a conversation (spec 2026-10-14-routines-talk-first):
  *  Symphony reads the week's routines, then asks what is changing, and ends
@@ -58,6 +59,8 @@ function RoutinesIndex() {
   const walkInBar = useConversationWalk(CHANGE_WALK)
   const { openAssistant } = useAssistantLauncher()
   const startWalk = useCallback(() => openAssistant({ message: CHANGE_WALK.message, autoSend: true }), [openAssistant])
+  // Which rare routines mustn't slip: Symphony picks, one change card.
+  const askKeep = useCallback((message: string) => openAssistant({ message, autoSend: true }), [openAssistant])
 
   return (
     <Suspense fallback={<LoadingFallback />}>
@@ -69,6 +72,7 @@ function RoutinesIndex() {
         familyMembers={familyMembers}
         layers={layers}
         walk={walkInBar ? undefined : { label: CHANGE_WALK.label, onStart: startWalk }}
+        notice={<KeepUntilDoneOffer routines={filtered} onAsk={askKeep} />}
       />
     </Suspense>
   )

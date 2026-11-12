@@ -19,7 +19,7 @@
 // offers "Change our routines"; a small New routine link stays for anyone who
 // never talks to it.
 
-import { useMemo, useState, type DragEvent } from 'react'
+import { useMemo, useState, type DragEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
@@ -54,6 +54,8 @@ export interface RoutinesPictureProps {
   layers?: ReadonlySet<Layer>
   /** Phones have no conversation bar: the page offers the walk itself. */
   walk?: { label: string; onStart: () => void }
+  /** A quiet line under the masthead (the keep-until-done offer). */
+  notice?: ReactNode
 }
 
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
@@ -61,7 +63,7 @@ const monthDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', da
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' })
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function RoutinesPicture({ routines, loading = false, hiddenByFilter = false, onShowAllDomains, familyMembers = [], layers = ALL_LAYERS, walk }: RoutinesPictureProps) {
+export function RoutinesPicture({ routines, loading = false, hiddenByFilter = false, onShowAllDomains, familyMembers = [], layers = ALL_LAYERS, walk, notice }: RoutinesPictureProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const { config } = useCadenceConfig()
   const thisWeek = weekStartAnchor(new Date(), config.weekStartsOn)
@@ -230,6 +232,8 @@ export function RoutinesPicture({ routines, loading = false, hiddenByFilter = fa
         <MastheadCard variant="page" eyebrow={eyebrow} title="Routines"
           subline={sentence ? <span className="rp-sentence" data-explain="rhythm-sentence" data-explain-label="The week in a sentence">{sentence}</span> : undefined}
           footer={tools} />
+
+        {notice}
 
         {loading && routines.length === 0 && <EmptyState title="Loading your routines…" />}
 
