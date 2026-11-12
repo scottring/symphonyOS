@@ -43,6 +43,21 @@ describe('changeSetFromInput', () => {
     expect(r).toEqual({ error: expect.stringContaining('one op per task') })
   })
 
+  it('keeps a school item\'s kind, and only on a dated add (school email, 2026-11-12)', () => {
+    const r = changeSetFromInput({ ops: [
+      { op: 'add', title: 'Spelling test (list 7)', date: '2026-11-20', assignee: M, school: 'homework' },
+      { op: 'add', title: 'Book fair money', date: '2026-11-16', school: 'bring' },
+      { op: 'add', title: 'Permission slip', date: '2026-11-17', school: 'paper' },
+    ] }, 'k')
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.ops.map((o) => o.school)).toEqual(['homework', 'bring', 'paper'])
+    expect('error' in changeSetFromInput({ ops: [{ op: 'add', title: 'Spelling test', school: 'homework' }] }, 'k')).toBe(true)
+    expect('error' in changeSetFromInput({ ops: [{ op: 'add', title: 'Spelling test', date: '2026-11-20', school: 'quiz' }] }, 'k')).toBe(true)
+    expect('error' in changeSetFromInput({ ops: [{ op: 'place', task_id: A, date: '2026-11-20', school: 'homework' }] }, 'k')).toBe(true)
+    const school = (PROPOSE_CHANGES_TOOL.input_schema.properties.ops.items.properties as Record<string, { enum?: string[] }>).school
+    expect(school?.enum).toEqual(['homework', 'bring', 'paper'])
+  })
+
   it('refuses an add with a time but no date', () => {
     const r = changeSetFromInput({ ops: [{ op: 'add', title: 'Call the bank', time: '09:00' }] }, 'k')
     expect(r).toEqual({ error: expect.stringContaining('needs a date') })

@@ -10,6 +10,7 @@ import { ACCOUNT_GROUNDING_RULES, ASSISTANT_PERSONALITY, RESULT_LANGUAGE_RULES }
 import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
+import { dayTableLine } from './dayTable.ts'
 import { PROPOSE_CHANGES_TOOL, changeCardNote, changeSetFromInput, resolveRefs } from './changeSet.ts'
 import { type GuideTurnContext, guideForTurn, guidePromptBlock, guideToolAllowed, sessionPromptBlock, stepCard, toolsForGuide } from './guideMode.ts'
 import { READ_WEEK_TOOL, local, readCalendarCoverage, shapeWeek, weekWindow } from './readWeek.ts'
@@ -1576,7 +1577,7 @@ Deno.serve(async (req) => {
   const nowLocal = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
   const part = (t: string) => nowLocal.find((x) => x.type === t)?.value ?? ''
   const today = `${part('year')}-${part('month')}-${part('day')}`
-  let datePrefix = `(Today is ${today}, ${part('hour')}:${part('minute')} local time, ${tz}.)${familyLine}`
+  let datePrefix = `(Today is ${today}, ${part('hour')}:${part('minute')} local time, ${tz}.)${dayTableLine(today)}${familyLine}`
   if (wall) datePrefix += wallClockLine(new Date(), tz)
   // "Help me plan the week": the days, and how to help plan them (wallMode.ts).
   const planLine = wall ? wallPlanLine(body.wallPlan) : ''

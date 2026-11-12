@@ -48,6 +48,9 @@ export interface ChangeOp {
   title: string
   /** YYYY-MM-DD. For routine_skip/move/who: the occurrence's own day. */
   date?: string
+  /** add: a school item, written where the wall looks for it — homework (due
+   *  that day), bring (in the bag that day), paper (to return by that day). */
+  school?: 'homework' | 'bring' | 'paper'
   /** HH:MM, 24-hour. routine_move: the new time; routine_change/add: the routine's time. */
   time?: string
   assignee?: string

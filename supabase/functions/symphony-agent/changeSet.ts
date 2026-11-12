@@ -35,6 +35,8 @@ export type OptionStatus = 'considering' | 'contacted' | 'heard_back' | 'ruled_o
 export type ColumnKind = 'text' | 'money' | 'date' | 'yesno'
 export interface ChoiceColumn { id: string; label: string; kind: ColumnKind }
 export type CellValue = string | number | boolean | null
+export const SCHOOL_KINDS = ['homework', 'bring', 'paper'] as const
+export type SchoolKind = typeof SCHOOL_KINDS[number]
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
 export type RoutineContext = 'family' | 'personal' | 'work'
 
@@ -50,6 +52,10 @@ export interface ChangeOp {
   title: string
   /** YYYY-MM-DD. For routine_skip/move/who: the occurrence's own day. */
   date?: string
+  /** add: a school item, so the wall shows it where it looks: homework (due
+   *  that day), bring (goes in the bag that day) or paper (to sign and return
+   *  by that day). Needs a date. */
+  school?: SchoolKind
   /** HH:MM, 24-hour. routine_move: the new time; routine_change/add: the routine's time. */
   time?: string
   assignee?: string
@@ -281,6 +287,12 @@ export function changeSetFromInput(input: Record<string, unknown>, key: string, 
       const time = realTime(o.time)
       if (!time) return { error: `Op ${i + 1}: time must be HH:MM (24-hour)` }
       base.time = time
+    }
+    if (o.school !== undefined && o.school !== null) {
+      if (op !== 'add') return { error: `Op ${i + 1}: school is for an add only` }
+      if (!(SCHOOL_KINDS as readonly unknown[]).includes(o.school)) return { error: `Op ${i + 1}: school must be homework, bring or paper` }
+      if (!base.date) return { error: `Op ${i + 1}: a school item needs a date: the day it is due, needed or must be returned` }
+      base.school = o.school as SchoolKind
     }
     if (op === 'add') {
       const title = typeof o.title === 'string' ? o.title.trim().slice(0, 300) : ''
@@ -717,7 +729,7 @@ export function changeCardNote(raw: unknown): string {
 
 export const PROPOSE_CHANGES_TOOL = {
   name: 'symphony_propose_changes',
-  description: 'Propose ONE list of changes to the person\'s tasks, routines and goals, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, for any routine change, and always at the end of a planning conversation. Never call write tools for the same changes. Nothing is deleted. Task ops (one per task): place (give it a day, optionally a time), unplace (take its day away), add (a new task), someday (not now: it waits on Someday; on a Month or Season look back it comes off that period only, and goes to Someday when that was its last list), assign (one household member), done (mark it finished), merge (task_id is the one kept, from_task_id the duplicate that closes into it, notes kept), talk (to talk about with someone before deciding; note like "with Iris"). Routine ops for this week only, on one day\'s occurrence (date = that occurrence\'s day; the routine itself is untouched): routine_skip, routine_move (to_date, optional time), routine_who (assignee). Routine ops from now on: routine_change (any of name, time or null for any time, days, assignees), routine_rest (stops it, optional until), routine_add (name, days, time, assignees, context). One lasting op per routine, one this-week op per routine and day. Routine ids come from symphony_read_week. Plan ops, for goals on the Month, Season and Year lists (ids and period starts come from symphony_read_plan; a month starts YYYY-MM-01, a year YYYY-01-01, a season on the household\'s boundary): plan_add (level, period_start, title in the person\'s words, optional parent_id: a season goal for a month goal, a year goal for a season goal), plan_carry (item_id, to_period_start, a later period; optional new_title when they reword it), plan_let_go (item_id; not ever: a month or season item comes off every list and Someday, a year goal is set aside; nothing deleted, search still finds it), plan_done (item_id; a year goal is marked met). Send level with an item only when it is on both a season and a month list. One op per goal or task. Month and season goals are tasks too: merge and someday work on them. Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change.',
+  description: 'Propose ONE list of changes to the person\'s tasks, routines and goals, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, for any routine change, and always at the end of a planning conversation. Never call write tools for the same changes. Nothing is deleted. Task ops (one per task): place (give it a day, optionally a time), unplace (take its day away), add (a new task; for a child\'s school homework, thing to bring or form to return, set school and assign the child), someday (not now: it waits on Someday; on a Month or Season look back it comes off that period only, and goes to Someday when that was its last list), assign (one household member), done (mark it finished), merge (task_id is the one kept, from_task_id the duplicate that closes into it, notes kept), talk (to talk about with someone before deciding; note like "with Iris"). Routine ops for this week only, on one day\'s occurrence (date = that occurrence\'s day; the routine itself is untouched): routine_skip, routine_move (to_date, optional time), routine_who (assignee). Routine ops from now on: routine_change (any of name, time or null for any time, days, assignees), routine_rest (stops it, optional until), routine_add (name, days, time, assignees, context). One lasting op per routine, one this-week op per routine and day. Routine ids come from symphony_read_week. Plan ops, for goals on the Month, Season and Year lists (ids and period starts come from symphony_read_plan; a month starts YYYY-MM-01, a year YYYY-01-01, a season on the household\'s boundary): plan_add (level, period_start, title in the person\'s words, optional parent_id: a season goal for a month goal, a year goal for a season goal), plan_carry (item_id, to_period_start, a later period; optional new_title when they reword it), plan_let_go (item_id; not ever: a month or season item comes off every list and Someday, a year goal is set aside; nothing deleted, search still finds it), plan_done (item_id; a year goal is marked met). Send level with an item only when it is on both a season and a month list. One op per goal or task. Month and season goals are tasks too: merge and someday work on them. Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change.',
   input_schema: {
     type: 'object',
     properties: {
@@ -736,6 +748,7 @@ export const PROPOSE_CHANGES_TOOL = {
             routine_id: { type: 'string', description: 'Existing routine id (routine ops except routine_add)' },
             name: { type: 'string', description: 'routine_add: the name; routine_change: a new name' },
             date: { type: 'string', description: 'YYYY-MM-DD: place; optional for add; routine_skip/move/who: the occurrence\'s day' },
+            school: { type: 'string', enum: [...SCHOOL_KINDS], description: 'add, for a child\'s school item (needs date): homework = work or a test to prepare for, dated the day it is due; bring = something to take to school, dated the day it goes in the bag; paper = a form to sign and return, dated the day it is due back. Leave it off events (field trips, early dismissal, picture day) and everything else.' },
             to_date: { type: 'string', description: 'routine_move: YYYY-MM-DD the occurrence moves to' },
             time_source: { type: 'string', description: 'Onboarding routine_add only: short verbatim user clause naming this routine and its exact clock. Omit for flexible times.' },
           time: { type: ['string', 'null'], description: 'HH:MM 24-hour (optional: place, add, routine_move, routine_add; routine_change: null means any time of day)' },

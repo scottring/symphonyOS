@@ -6,7 +6,7 @@
 // before anything is written, and a failure part way puts back what already
 // saved. One Undo reverses the lot, newest first.
 
-import type { Task, TaskBucket, TaskContext, TaskLink, TaskCommitment, PlacementLevel } from '@/types/task'
+import type { Task, TaskBucket, TaskCategory, TaskContext, TaskLink, TaskCommitment, PlacementLevel } from '@/types/task'
 import type { Goal, GoalStatus } from '@/types/goal'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { CreateRoutineInput, UpdateRoutineInput } from '@/hooks/useRoutines'
@@ -45,6 +45,8 @@ export interface ApplyDeps extends Partial<MoreApplyDeps> {
     monthStart?: Date; seasonStart?: Date; goalId?: string; context?: TaskContext
     /** add / plan_add: the life area it is filed under. */
     areaId?: string
+    /** add with `school`: what kind of school item, and the day it is needed. */
+    category?: TaskCategory; neededOn?: Date
   }) => Promise<string | undefined>
   deleteTask: (id: string) => Promise<unknown>
   /** The planned week's start, for an add with no day (plannedWeekStart). */
@@ -632,8 +634,12 @@ export async function applyChangeSet(card: ChangeSet, given: ApplyDeps): Promise
           const who = op.assignee ? { assignedTo: op.assignee, assignedToAll: [op.assignee] } : {}
           // The space and life area it was filed under on the card.
           const filed = { ...(op.context ? { context: op.context } : {}), ...(op.areaId ? { areaId: op.areaId } : {}) }
+          // A school item: the wall's homework, bag and papers read these.
+          const school = op.school && when
+            ? { ...(op.school === 'bring' ? {} : { category: op.school === 'homework' ? 'homework' as const : 'paper' as const }), neededOn: localDay(op.date!) }
+            : {}
           const options = when
-            ? { isAllDay: !op.time, bucket: 'timed' as const, ...who, ...(op.goalId && !deps.inSession ? { sourceId: op.goalId } : {}), ...filed }
+            ? { isAllDay: !op.time, bucket: 'timed' as const, ...who, ...(op.goalId && !deps.inSession ? { sourceId: op.goalId } : {}), ...filed, ...school }
             : { bucket: 'week' as const, weekStart: deps.weekStart, ...who, ...(op.goalId && !deps.inSession ? { sourceId: op.goalId } : {}), ...filed }
           const id = await deps.addTask(op.title, when, options)
           if (!id) return fail()

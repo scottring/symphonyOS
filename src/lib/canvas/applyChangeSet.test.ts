@@ -133,6 +133,19 @@ describe('applyChangeSet', () => {
     expect(d.addTask).toHaveBeenCalledWith('Call the bank', undefined, { bucket: 'week', weekStart: new Date(2026, 9, 10), assignedTo: 'm1', assignedToAll: ['m1'] })
   })
 
+  it('a school item lands where the wall looks: homework, a thing to bring, a paper (school email, 2026-11-12)', async () => {
+    const d = deps()
+    await applyChangeSet({ key: 'e', title: '3 changes', ops: [
+      { key: 'e:0', op: 'add', title: 'Spelling test (list 7)', date: '2026-11-20', assignee: 'm1', school: 'homework' },
+      { key: 'e:1', op: 'add', title: 'Book fair money ($10)', date: '2026-11-16', assignee: 'm1', school: 'bring' },
+      { key: 'e:2', op: 'add', title: 'Field trip permission slip', date: '2026-11-17', school: 'paper' },
+    ] }, d)
+    const who = { assignedTo: 'm1', assignedToAll: ['m1'] }
+    expect(d.addTask).toHaveBeenNthCalledWith(1, 'Spelling test (list 7)', new Date(2026, 10, 20), { isAllDay: true, bucket: 'timed', ...who, category: 'homework', neededOn: new Date(2026, 10, 20) })
+    expect(d.addTask).toHaveBeenNthCalledWith(2, 'Book fair money ($10)', new Date(2026, 10, 16), { isAllDay: true, bucket: 'timed', ...who, neededOn: new Date(2026, 10, 16) })
+    expect(d.addTask).toHaveBeenNthCalledWith(3, 'Field trip permission slip', new Date(2026, 10, 17), { isAllDay: true, bucket: 'timed', category: 'paper', neededOn: new Date(2026, 10, 17) })
+  })
+
   it('finds a step nested inside its parent (read_week lists steps as ordinary tasks)', async () => {
     const step = task('s1', { parentTaskId: 'p' })
     const parent = task('p', { subtasks: [step] })
