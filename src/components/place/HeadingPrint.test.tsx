@@ -44,3 +44,25 @@ describe("Scott's own prints in the heading (2026-11-13)", () => {
     expect(PRINTS.subway.headingSrc).not.toBe(PRINTS.subway.src)
   })
 })
+
+describe('The heading print runs corner to corner of the page (Scott, 2026-11-13)', () => {
+  it('reaches from the heading back out to the sheet edges', () => {
+    prefs.showScenery = true
+    prefs.sceneryBackground = 'overlook'
+    const rect = (left: number, top: number, right: number, bottom: number) =>
+      ({ left, top, right, bottom, width: right - left, height: bottom - top, x: left, y: top, toJSON: () => ({}) }) as DOMRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('paper-fold-current')) return rect(90, 72, 1653, 900)
+      if (this.classList.contains('daybook-masthead')) return rect(194, 114, 1553, 281)
+      return rect(0, 0, 0, 0)
+    })
+    const { getByTestId } = render(
+      <article className="paper-fold-current"><section className="daybook-masthead"><HeadingPrint /></section></article>,
+    )
+    const print = getByTestId('heading-print')
+    expect(print.style.getPropertyValue('--heading-print-top')).toBe('42px')
+    expect(print.style.getPropertyValue('--heading-print-left')).toBe('104px')
+    expect(print.style.getPropertyValue('--heading-print-right')).toBe('100px')
+    spy.mockRestore()
+  })
+})

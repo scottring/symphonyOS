@@ -415,8 +415,13 @@
    popovers anchored in the heading are never cut off. */
 .daybook-masthead:has(> .heading-print) { isolation: isolate; border-bottom: 0; }
 .heading-print {
-  position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
-  border-radius: inherit;
+  /* Corner to corner of the sheet: HeadingPrint measures how far the
+     heading sits inside the page and the print reaches back out to it. */
+  position: absolute; z-index: -1; overflow: hidden; pointer-events: none;
+  top: calc(-1 * var(--heading-print-top, 0px)); bottom: 0;
+  left: calc(-1 * var(--heading-print-left, 0px));
+  right: calc(-1 * var(--heading-print-right, 0px));
+  border-radius: 3px 10px 0 0;
   background: var(--scenery-sky, linear-gradient(to bottom, hsl(208 30% 80%), hsl(208 22% 92%)));
   -webkit-mask-image: linear-gradient(90deg, rgb(0 0 0 / .06) 0%, rgb(0 0 0 / .18) 35%, rgb(0 0 0 / .6) 70%, #000 100%);
   mask-image: linear-gradient(90deg, rgb(0 0 0 / .06) 0%, rgb(0 0 0 / .18) 35%, rgb(0 0 0 / .6) 70%, #000 100%);
@@ -426,7 +431,7 @@
   object-fit: cover; object-position: var(--heading-print-focus, center 30%);
   -webkit-user-drag: none; user-select: none;
 }
-.daybook-masthead:has(> .heading-print) .daybook-masthead-inner { padding-left: 24px; padding-right: 24px; padding-bottom: 18px; }
+.daybook-masthead:has(> .heading-print) .daybook-masthead-inner { padding-bottom: 18px; }
 /* Over the print, the weather line and the controls keep a little paper
    behind them so they read on the ridge. */
 .daybook-masthead:has(> .heading-print) .today-mast-right { background: color-mix(in srgb, var(--color-bg-elevated) 70%, transparent); border-radius: 999px; padding: 2px; }
