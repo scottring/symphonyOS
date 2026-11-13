@@ -80,14 +80,16 @@ export class AiUsageError extends Error {
     // controls are not ready", which pointed at the wrong thing.
     super(limited
       ? `The AI allowance for this ${when} has been reached. It resets ${retryAt ? `at ${retryAt}` : `next ${when}`} (UTC). You can still view and change your plans directly.`
+      : reason === 'light_edition'
+        ? 'AI features come with Symphony Plus, which is on its way. You can still view and change your plans directly.'
       : reason === 'no_household'
         ? 'AI needs your account to belong to a household, because the household shares its allowance. You can still view and change your plans directly.'
         : reason === 'unpriceable'
           ? 'AI can’t take this request yet: Symphony can’t tell what it would cost (an attachment it can’t open or measure, for example). You can still view and change your plans directly.'
           : 'AI is unavailable while its usage controls are not ready. You can still view and change your plans directly.')
     this.name = 'AiUsageError'
-    this.status = limited ? 429 : 503
-    this.code = limited ? `ai_${reason}` : 'ai_usage_unavailable'
+    this.status = limited ? 429 : reason === 'light_edition' ? 403 : 503
+    this.code = limited || reason === 'light_edition' ? `ai_${reason}` : 'ai_usage_unavailable'
   }
 }
 

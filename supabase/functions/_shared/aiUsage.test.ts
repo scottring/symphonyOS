@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { guardedAiFetch, guardedAiFetchFor, modelOf, usageOf } from './aiUsage'
+import { AiUsageError, guardedAiFetch, guardedAiFetchFor, modelOf, usageOf } from './aiUsage'
 import { PDF_PAGE_TOKENS, requestBudget, searchFeeTokens, textBudget } from './aiBudget'
 const init = { method:'POST', body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2048,messages:[{role:'user',content:'Hello'}]}) }
 const reply = (usage:unknown={input_tokens:10,output_tokens:20},status=200)=>new Response(JSON.stringify({usage}),{status,headers:{'content-type':'application/json'}})
@@ -174,6 +174,17 @@ describe('2026-11-11 guard fixes',()=>{
   it('says when the account has no household',async()=>{
     const f=fixture({allowed:false,reason:'no_household'})
     await expect(f.fetch('https://provider.test',init)).rejects.toMatchObject({status:503,code:'ai_usage_unavailable',message:expect.stringContaining('belong to a household')})
+  })
+  it('refuses a light household plainly with a 403 and never calls the provider',async()=>{
+    const f=fixture({allowed:false,reason:'light_edition'})
+    await expect(f.fetch('https://provider.test',init)).rejects.toMatchObject({status:403,code:'ai_light_edition',message:'AI features come with Symphony Plus, which is on its way. You can still view and change your plans directly.'})
+    expect(f.transport).not.toHaveBeenCalled()
+  })
+  it('builds the light-edition error and keeps the other reasons as they were',()=>{
+    const light=new AiUsageError('light_edition')
+    expect([light.status,light.code,light.message]).toEqual([403,'ai_light_edition','AI features come with Symphony Plus, which is on its way. You can still view and change your plans directly.'])
+    expect([new AiUsageError('daily_limit').status,new AiUsageError('daily_limit').code]).toEqual([429,'ai_daily_limit'])
+    expect([new AiUsageError('something_new').status,new AiUsageError('something_new').code]).toEqual([503,'ai_usage_unavailable'])
   })
   it('funds speech per character and a realtime call per minute, as stated, within caps',async()=>{
     const f=fixture()
