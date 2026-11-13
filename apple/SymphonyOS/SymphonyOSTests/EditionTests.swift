@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import Symphony
 
 struct EditionTests {
@@ -26,5 +27,36 @@ struct EditionTests {
     @Test func assumedLifeArea() {
         #expect(Edition.light.assumedLifeArea == "personal")
         #expect(Edition.full.assumedLifeArea == nil)
+    }
+}
+
+struct EditionLastKnownTests {
+    @Test func emptyListKeepsLastKnown() {
+        #expect(Edition.resolve([], lastKnown: .full) == .full)
+        #expect(Edition.resolve([], lastKnown: nil) == .light)
+        #expect(Edition.resolve([], lastKnown: .light) == .light)
+    }
+
+    @Test func nonEmptyListIgnoresLastKnown() {
+        #expect(Edition.resolve(["light"], lastKnown: .full) == .light)
+        #expect(Edition.resolve([nil], lastKnown: .light) == .full)
+    }
+
+    @MainActor @Test func appStateDefaultsToFull() {
+        #expect(AppState().edition == .full)
+    }
+
+    @Test func memoryIsPerUser() throws {
+        let suite = "EditionMemoryTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let memory = EditionMemory(defaults: defaults)
+        let a = UUID(), b = UUID()
+        #expect(memory.lastKnown(for: a) == nil)
+        memory.remember(.full, for: a)
+        #expect(memory.lastKnown(for: a) == .full)
+        #expect(memory.lastKnown(for: b) == nil)
+        #expect(memory.lastKnown(for: nil) == nil)
+        #expect(defaults.string(forKey: "edition.lastKnown.\(a.uuidString.lowercased())") == "full")
     }
 }

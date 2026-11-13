@@ -71,9 +71,19 @@ struct iOSMainView: View {
         #else
         let demoEdition: Edition? = nil
         #endif
-        let edition = demoEdition ?? Edition.resolve(households.map(\.edition))
+        let edition: Edition
+        if let demoEdition {
+            edition = demoEdition
+        } else {
+            let memory = EditionMemory()
+            let userId = auth.currentUser?.id
+            let editions = households.map(\.edition)
+            edition = Edition.resolve(editions, lastKnown: memory.lastKnown(for: userId))
+            if !editions.isEmpty { memory.remember(edition, for: userId) }
+        }
+        let changedToLight = edition == .light && appState.edition != .light
         appState.edition = edition
-        if edition == .light {
+        if changedToLight {
             if appState.activeTab == .routines { appState.activeTab = .planner }
             appState.domainFilter = .all
         }

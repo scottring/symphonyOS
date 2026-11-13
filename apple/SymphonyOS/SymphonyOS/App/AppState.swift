@@ -104,7 +104,7 @@ final class AppState {
     // Domain filter
     var domainFilter: DomainFilter = .all
     /// The household's edition; set by the main view from the synced household.
-    var edition: Edition = .light
+    var edition: Edition = .full
 
     // Presentation state
     var showingQuickCapture = false
