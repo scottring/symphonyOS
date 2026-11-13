@@ -254,4 +254,115 @@ private struct Saved {
         #expect(decide(false, false, nil, [nil], true, 0) == .none)
         #expect(decide(false, false, nil, ["light", "full"], true, 0) == .none)
     }
+
+    // MARK: Fix round 1
+
+    private func goals(_ ids: [UUID], area: UUID) -> [WalkItem] {
+        ids.map { WalkItem(id: $0, level: .year, title: "Goal", areaId: area) }
+    }
+
+    @Test func aWholeYearWalkRestoredOntoSeasonKeepsItsTour() {
+        let saved = Saved()
+        let (a, b, c) = (UUID(), UUID(), UUID())
+        var state = saved.state(step: 5)
+        state.focus[.season] = a
+        state.tour = []
+        let before = periods(2026, 11, 13), after = periods(2027, 3, 1)
+        let position = WalkPosition(state, status: .inProgress, planted: [], periods: before, now: before.today)
+        let restored = position.restored(for: after, existing: [a, b, c])
+        #expect(restored.step == 2)
+        var fresh = WalkState()
+        fresh.items = goals([a, b, c], area: saved.area.id)
+        fresh.areas = [saved.area, saved.other]
+        restored.apply(to: &fresh)
+        #expect(fresh.focus[.season] == a)
+        #expect(fresh.tour == [b, c])
+        _ = fresh.act(.next, WalkEnv(periods: after, now: after.today))
+        #expect(fresh.focus[.season] == b)
+        #expect(fresh.tour == [c])
+    }
+
+    @Test func aRememberedSeasonFocusThatIsStillAStopIsKept() {
+        let saved = Saved()
+        let (a, b, c) = (UUID(), UUID(), UUID())
+        var state = saved.state(step: 2)
+        state.focus[.season] = b
+        let p = periods(2026, 11, 13)
+        let restored = WalkPosition(state, status: .inProgress, planted: [], periods: p, now: p.today)
+            .restored(for: p, existing: [a, b, c])
+        var fresh = WalkState()
+        fresh.items = goals([a, b, c], area: saved.area.id)
+        fresh.areas = [saved.area, saved.other]
+        restored.apply(to: &fresh)
+        #expect(fresh.focus[.season] == b)
+        #expect(fresh.tour == [c])
+    }
+
+    @Test func lastPlantedRoundTripsAndIsDroppedForADeletedRow() {
+        let saved = Saved()
+        let p = periods(2026, 11, 13)
+        var state = saved.state(step: 2)
+        state.lastPlanted = [.year: saved.yearGoal, .season: saved.seasonGoal]
+        let position = WalkPosition(state, status: .inProgress, planted: [], periods: p, now: p.today)
+        let s = store(), me = UUID()
+        s.save(position, for: me)
+        #expect(s.load(for: me) == position)
+        let kept = position.restored(for: p, existing: saved.everything)
+        #expect(kept.lastPlanted.count == 2)
+        let dropped = position.restored(for: p, existing: [saved.yearGoal])
+        #expect(dropped.lastPlanted == [String(WalkLevel.year.rawValue): saved.yearGoal])
+    }
+
+    @Test func afterARestoreWalkingOnLinksToTheLastPlantedParent() {
+        let parent = WalkItem(id: UUID(), level: .year, title: "Goal", areaId: nil)
+        var state = WalkState()
+        state.depth = .quick; state.step = 1; state.items = [parent]
+        state.lastPlanted = [.year: parent.id]
+        let p = periods(2026, 11, 13)
+        let position = WalkPosition(state, status: .inProgress, planted: [], periods: p, now: p.today)
+        var fresh = WalkState()
+        fresh.items = [parent]
+        position.restored(for: p, existing: [parent.id]).apply(to: &fresh)
+        _ = fresh.act(.next, WalkEnv(periods: p, now: p.today))
+        #expect(fresh.step == 2)
+        #expect(fresh.focus[.season] == parent.id)
+    }
+
+    @Test func aPositionWithoutLastPlantedStillLoads() throws {
+        let s = store(), me = UUID()
+        var object = try #require(JSONSerialization.jsonObject(
+            with: JSONEncoder.walk.encode(Saved().position(step: 2, on: periods(2026, 11, 13)))) as? [String: Any])
+        object.removeValue(forKey: "lastPlanted")
+        s.defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: WalkPositionStore.key(me))
+        #expect(s.load(for: me)?.lastPlanted == [:])
+    }
+
+    @Test func duplicateFocusKeysLoadWithoutTrapping() throws {
+        let s = store(), me = UUID()
+        let id = UUID()
+        var object = try #require(JSONSerialization.jsonObject(
+            with: JSONEncoder.walk.encode(Saved().position(step: 2, on: periods(2026, 11, 13)))) as? [String: Any])
+        object["focus"] = ["1": id.uuidString, "01": id.uuidString]
+        object["lastPlanted"] = ["1": id.uuidString, "01": id.uuidString]
+        s.defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: WalkPositionStore.key(me))
+        var fresh = WalkState()
+        let p = periods(2026, 11, 13)
+        s.load(for: me)?.restored(for: p, existing: [id]).apply(to: &fresh)
+        #expect(fresh.focus[.year] == id)
+    }
+
+    @Test func anOutOfRangeStepRestoresToOneTheWalkCanLeave() {
+        let p = periods(2026, 11, 13)
+        let env = WalkEnv(periods: p, now: p.today)
+        for raw in [99, -3] {
+            var position = Saved().position(step: 2, on: p)
+            position.step = raw
+            var fresh = WalkState()
+            position.restored(for: p, existing: Saved().everything).apply(to: &fresh)
+            #expect((0...6).contains(fresh.step))
+            let start = fresh.step
+            _ = fresh.act(raw > 0 ? .back : .next, env)
+            #expect(fresh.step != start)
+        }
+    }
 }

@@ -187,7 +187,7 @@ struct WalkState: Equatable {
     /// Season in a whole-year walk: the first time, the tour starts at the first
     /// year goal; after that it picks up at the remembered focus. A focus that is
     /// no longer a stop (its goal was pulled up) starts it again.
-    private mutating func resumeSeasonTour() {
+    mutating func resumeSeasonTour() {
         let stops = tourStops
         if let current = focus[.season], let index = stops.firstIndex(of: current) {
             tour = Array(stops[(index + 1)...])
