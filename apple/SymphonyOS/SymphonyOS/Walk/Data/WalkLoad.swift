@@ -41,7 +41,14 @@ enum WalkLoad {
     }
 
     static func items(goals: [Goal], tasks: [SymphonyTask], periods: WalkPeriods, me: UUID,
-                      planted: Set<UUID>) -> [WalkItem] {
+                      planted: Set<UUID>, areas: [WalkArea]? = nil) -> [WalkItem] {
+        // An area the walk does not show (a ninth, a work area, a duplicate name)
+        // leaves the item on the unlabeled post.
+        let shown = areas.map { Set($0.map(\.id)) }
+        func area(_ id: UUID?) -> UUID? {
+            guard let id else { return nil }
+            return shown.map { $0.contains(id) ? id : nil } ?? id
+        }
         let own = tasks.filter {
             $0.userId == me && isPersonal($0.context) && $0.dismissedAt == nil && $0.parentTaskId == nil
         }
@@ -50,7 +57,7 @@ enum WalkLoad {
             .filter { $0.userId == me && isPersonal($0.context) && $0.year == periods.year && $0.status == "active" }
             .sorted { ($0.sortOrder, $0.createdAt) < ($1.sortOrder, $1.createdAt) }
         let yearItems = years.map {
-            WalkItem(id: $0.id, level: .year, title: $0.name, areaId: $0.areaId, parentId: nil,
+            WalkItem(id: $0.id, level: .year, title: $0.name, areaId: area($0.areaId), parentId: nil,
                      day: nil, done: false, mine: planted.contains($0.id))
         }
         let yearIds = Set(yearItems.map(\.id))
@@ -59,7 +66,7 @@ enum WalkLoad {
             rows.sorted { ($0.sortOrder ?? 0, $0.createdAt) < ($1.sortOrder ?? 0, $1.createdAt) }
         }
         func item(_ t: SymphonyTask, _ level: WalkLevel, parent: UUID?, keep: Set<UUID>) -> WalkItem {
-            WalkItem(id: t.id, level: level, title: t.title, areaId: t.areaId,
+            WalkItem(id: t.id, level: level, title: t.title, areaId: area(t.areaId),
                      parentId: parent.flatMap { keep.contains($0) ? $0 : nil },
                      day: t.scheduledFor, done: t.completed, mine: planted.contains(t.id))
         }

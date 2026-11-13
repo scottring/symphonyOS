@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 /// The ending sheet's rows: today's tasks, each with what it is for.
 enum WalkEnding {
@@ -22,7 +21,8 @@ enum WalkEnding {
             .sorted {
                 let a = $0.id == firstThing, b = $1.id == firstThing
                 if a != b { return a }
-                return $0.createdAt < $1.createdAt
+                if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
+                return $0.id.uuidString < $1.id.uuidString
             }
             .map {
                 Row(id: $0.id, title: $0.title, forGoal: forGoal($0, tasks: tasks, goals: goals),
@@ -34,18 +34,27 @@ enum WalkEnding {
     /// links whose `goalId` resolves; failing that, the title of the highest
     /// row reached. A self-link or a cycle ends the climb.
     static func forGoal(_ task: SymphonyTask, tasks: [SymphonyTask], goals: [Goal]) -> String? {
+        // Only this person's own personal rows are ever named.
+        let me = task.userId
+        func personal(_ c: String?) -> Bool { c == nil || c == "personal" }
         func goalName(_ id: UUID?) -> String? {
             guard let id else { return nil }
-            return goals.first { $0.id == id }?.name
+            return goals.first { $0.id == id && $0.userId == me && personal($0.context) }?.name
+        }
+        func link(_ t: SymphonyTask) -> UUID? {
+            let source = t.sourceId == t.id ? nil : t.sourceId
+            let goalTask = t.goalTaskId == t.id ? nil : t.goalTaskId
+            return source ?? goalTask
         }
         if let name = goalName(task.goalId) { return name }
         var visited: Set<UUID> = [task.id]
         var current = task
         var highest: SymphonyTask?
         for _ in 0..<4 {
-            guard let next = current.sourceId ?? current.goalTaskId,
+            guard let next = link(current),
                   !visited.contains(next),
-                  let parent = tasks.first(where: { $0.id == next }) else { break }
+                  let parent = tasks.first(where: { $0.id == next && $0.userId == me && personal($0.context) })
+            else { break }
             visited.insert(next)
             highest = parent
             if let name = goalName(parent.goalId) { return name }

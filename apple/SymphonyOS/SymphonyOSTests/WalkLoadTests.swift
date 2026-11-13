@@ -215,4 +215,107 @@ struct WalkLoadTests {
         var s3 = item(.season, "S3"); s3.parentId = y3.id
         #expect(WalkEnding.nextToWalk([y1, y2, y3, s, s2, s3]) == nil)
     }
+
+    @Test func writerRoundTripKeepsAreaDayAndDone() throws {
+        let ctx = try makeContext()
+        let w = WalkWriter(context: ctx, userId: me, periods: periods)
+        let areas = WalkLoad.areas([], me: me)
+        let health = areas[0], home = areas[1]
+        for a in [health, home] { w.ensureArea(a) }
+        let y1 = item(.year, "Strong", area: health.id), y2 = item(.year, "No area")
+        let season = item(.season, "S", area: health.id), month = item(.month, "M", area: health.id)
+        let dated = item(.week, "Dated", area: health.id, day: day(2026, 11, 14))
+        let undated = item(.week, "Undated", area: home.id)
+        w.create(y1, parent: nil); w.create(y2, parent: nil)
+        w.create(season, parent: y1); w.create(month, parent: season)
+        w.create(dated, parent: month); w.create(undated, parent: month)
+        w.toggleDone(dated.id)
+        let (g, t) = all(ctx)
+        let planted: Set<UUID> = [y1.id, y2.id, season.id, month.id, dated.id, undated.id]
+        let items = WalkLoad.items(goals: g, tasks: t, periods: periods, me: me, planted: planted, areas: areas)
+        func get(_ title: String) -> WalkItem { items.first { $0.title == title }! }
+        #expect(get("Strong").areaId == health.id)
+        #expect(get("No area").areaId == nil)
+        #expect(get("S").areaId == health.id && get("M").areaId == health.id)
+        #expect(get("Dated").areaId == health.id)
+        #expect(get("Dated").day == day(2026, 11, 14))
+        #expect(get("Dated").done == true)
+        #expect(get("Undated").day == nil)
+        #expect(get("Undated").done == false)
+        #expect(get("Undated").areaId == home.id)
+        #expect(get("Undated").parentId == month.id)
+        #expect(get("S").parentId == y1.id)
+
+        // An area the walk does not show leaves the item unlabeled.
+        let fewer = WalkLoad.items(goals: g, tasks: t, periods: periods, me: me, planted: planted,
+                                   areas: [home])
+        #expect(fewer.first { $0.title == "Strong" }?.areaId == nil)
+        #expect(fewer.first { $0.title == "Undated" }?.areaId == home.id)
+    }
+
+    @Test func timeOfDaySomedayAndPartnerPins() {
+        let noon = { (d: Date) in PlanCalendar.addDays(d, 0).addingTimeInterval(12 * 3600) }
+        let season = task("Noon season"); season.bucket = "quarter"
+        season.seasonStart = noon(periods.season.start)
+        let month = task("Month"); month.bucket = "month"; month.monthStart = periods.monthStart
+        let someday = task("Someday"); someday.sourceId = month.id; someday.isSomeday = true
+        someday.scheduledFor = noon(day(2026, 11, 14))
+        let done = task("Done"); done.sourceId = month.id; done.completed = true
+        done.scheduledFor = day(2026, 11, 14)
+        let partner = Goal(id: UUID(), userId: other, name: "Partner", year: periods.year)
+        partner.context = "personal"
+        let items = WalkLoad.items(goals: [partner], tasks: [season, month, someday, done], periods: periods,
+                                   me: me, planted: [])
+        #expect(items.contains { $0.title == "Noon season" })
+        #expect(items.contains { $0.title == "Someday" })
+        #expect(items.first { $0.title == "Done" }?.done == true)
+        #expect(!items.contains { $0.title == "Partner" })
+    }
+
+    @Test func theForLineNamesOnlyMyPersonalRows() {
+        let workGoal = Goal(id: UUID(), userId: me, name: "Work goal", year: 2027)
+        workGoal.context = "work"
+        let partnerGoal = Goal(id: UUID(), userId: other, name: "Partner goal", year: 2027)
+        partnerGoal.context = "personal"
+        let workParent = task("Work parent"); workParent.context = "work"
+        let partnerParent = task("Partner parent", user: other)
+        let a = task("A"); a.sourceId = workParent.id
+        let b = task("B"); b.sourceId = partnerParent.id
+        let c = task("C"); c.goalId = workGoal.id
+        let d = task("D"); d.goalId = partnerGoal.id
+        let all = [workParent, partnerParent, a, b, c, d]
+        for t in [a, b, c, d] { #expect(WalkEnding.forGoal(t, tasks: all, goals: [workGoal, partnerGoal]) == nil) }
+        // A work parent whose goal is theirs does not leak its goal name either.
+        workParent.goalId = workGoal.id
+        #expect(WalkEnding.forGoal(a, tasks: all, goals: [workGoal]) == nil)
+    }
+
+    @Test func theClimbPins() {
+        let goal = Goal(id: UUID(), userId: me, name: "Goal", year: 2027)
+        let other1 = Goal(id: UUID(), userId: me, name: "Other", year: 2027)
+        let up = task("Up"); up.goalId = other1.id
+        let both = task("Both"); both.goalId = goal.id; both.sourceId = up.id
+        #expect(WalkEnding.forGoal(both, tasks: [up, both], goals: [goal, other1]) == "Goal")
+
+        // A self sourceId counts as no link, so goalTaskId is still tried.
+        let parent = task("Parent")
+        let selfish = task("Selfish"); selfish.sourceId = selfish.id; selfish.goalTaskId = parent.id
+        #expect(WalkEnding.forGoal(selfish, tasks: [parent, selfish], goals: []) == "Parent")
+
+        // A three-row cycle ends.
+        let a = task("A"), b = task("B"), c = task("C")
+        a.sourceId = b.id; b.sourceId = c.id; c.sourceId = a.id
+        #expect(WalkEnding.forGoal(a, tasks: [a, b, c], goals: []) == "C")
+    }
+
+    @Test func equalTimestampsKeepAStableOrder() {
+        let today = periods.today
+        let stamp = Date(timeIntervalSince1970: 100)
+        let ts = (0..<4).map { i -> SymphonyTask in
+            let t = task("T\(i)"); t.scheduledFor = today; t.createdAt = stamp; return t
+        }
+        let expected = ts.sorted { $0.id.uuidString < $1.id.uuidString }.map(\.id)
+        #expect(WalkEnding.rows(tasks: ts, goals: [], today: today, me: me, firstThing: nil).map(\.id) == expected)
+        #expect(WalkEnding.rows(tasks: ts.reversed(), goals: [], today: today, me: me, firstThing: nil).map(\.id) == expected)
+    }
 }
