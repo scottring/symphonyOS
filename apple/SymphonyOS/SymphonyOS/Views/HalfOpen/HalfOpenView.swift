@@ -15,7 +15,7 @@ struct HalfOpenView: View {
     @Environment(AuthService.self) private var auth
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = TimelineViewModel()
-    @State private var calendar = GoogleCalendarService.shared
+    @State private var calendar = CalendarFeed.shared
     @State private var dinners = DinnerService.shared
     @State private var today = Date.now
     @State private var opened: TimelineItem?

@@ -32,7 +32,7 @@ struct WeekPlanView: View {
     /// another change, or leaving the page. Undo just shows it again.
     @State private var deleting: SymphonyTask?
     @State private var deleteToast: UUID?
-    @State private var calendar = GoogleCalendarService.shared
+    @State private var calendar = CalendarFeed.shared
     @Environment(\.dynamicTypeSize) private var typeSize
 
     /// With routines and instances — for each day's routine occurrences.

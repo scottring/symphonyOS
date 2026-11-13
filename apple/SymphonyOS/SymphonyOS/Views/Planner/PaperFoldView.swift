@@ -872,7 +872,7 @@ struct CalendarSheet: View {
     /// Exclusive.
     let end: Date
 
-    @State private var calendar = GoogleCalendarService.shared
+    @State private var calendar = CalendarFeed.shared
     @Environment(\.paperFoldOpened) private var opened
 
     static let foot = "For reading. Add events the usual way."

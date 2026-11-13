@@ -83,6 +83,7 @@ struct iOSMainView: View {
         }
         let changedToLight = edition == .light && appState.edition != .light
         appState.edition = edition
+        CalendarFeed.shared.edition = edition
         if changedToLight {
             if appState.activeTab == .routines { appState.activeTab = .planner }
             appState.domainFilter = .all

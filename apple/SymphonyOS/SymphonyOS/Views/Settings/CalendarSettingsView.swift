@@ -5,9 +5,75 @@ import SwiftUI
 /// events appear on the Today timeline.
 struct CalendarSettingsView: View {
     @State private var service = GoogleCalendarService.shared
+    @State private var apple = AppleCalendarService.shared
     @State private var showConnect = false
+    @Environment(AppState.self) private var appState
 
     var body: some View {
+        if CalendarFeed.source(for: appState.edition) == .apple {
+            appleBody
+        } else {
+            googleBody
+        }
+    }
+
+    /// Light: the phone's own calendar. No Google wording, no server call.
+    private var appleBody: some View {
+        Form {
+            Section {
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.primaryTint)
+                        .frame(width: 28)
+                    Text("Apple Calendar")
+                        .font(.bodyMedium)
+                        .foregroundStyle(Color.textPrimary)
+                    Spacer()
+                    if apple.access == .allowed {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Color.primaryTint)
+                    }
+                }
+                .padding(.vertical, 2)
+            } footer: {
+                switch apple.access {
+                case .notAsked: Text("See your calendar on Today too")
+                case .allowed:  Text("Your Apple Calendar shows on Today and Week.")
+                case .denied:   Text("Calendar access is off.")
+                }
+            }
+
+            Section {
+                switch apple.access {
+                case .notAsked:
+                    Button {
+                        Task {
+                            await apple.requestAccess()
+                            await CalendarFeed.shared.refresh(.now)
+                        }
+                    } label: {
+                        Label("Show my calendar", systemImage: "calendar.badge.plus")
+                    }
+                case .denied:
+                    #if os(iOS)
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Label("Open Settings", systemImage: "gearshape")
+                    }
+                    #endif
+                case .allowed:
+                    EmptyView()
+                }
+            }
+        }
+        .navigationTitle("Calendar")
+    }
+
+    private var googleBody: some View {
         Form {
             Section {
                 HStack(spacing: 12) {
