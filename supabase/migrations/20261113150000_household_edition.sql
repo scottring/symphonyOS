@@ -19,7 +19,7 @@ alter table public.households
 alter table public.households alter column edition set default 'light';
 
 create function public.guard_household_edition()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin
   if coalesce(auth.role(), '') in ('authenticated', 'anon') then
     if tg_op = 'INSERT' then

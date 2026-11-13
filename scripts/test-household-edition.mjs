@@ -48,7 +48,16 @@ try {
     '20261024120000_ai_route_question_ideas', '20261111120000_ai_budget_minutes_cache_household', '20261111130000_ai_price_sonnet_5_5']) {
     psql(['-f', file(`../supabase/migrations/${m}.sql`)])
   }
-  if (!before) psql(['-f', file(migration)])
+  // A household that exists before the migration (with a member) must read 'full' afterwards.
+  const OLD_USER = '00000000-0000-0000-0000-0000000000a1', OLD_HH = '10000000-0000-0000-0000-0000000000a1'
+  psql(['-c', `insert into auth.users(id, email) values ('${OLD_USER}', 'old@example.com');
+    insert into public.households(id, owner_id) values ('${OLD_HH}', '${OLD_USER}');
+    insert into public.household_members(household_id, user_id, role, status) values ('${OLD_HH}', '${OLD_USER}', 'owner', 'active');`])
+  const oldEdition = () => psql(['-At', '-c', `select edition from public.households where id = '${OLD_HH}'`]).trim()
+  if (!before) {
+    psql(['-f', file(migration)])
+    if (oldEdition() !== 'full') throw new Error(`existing household should be full after the migration, is ${oldEdition()}`)
+  }
   console.log(psql(['-o', '/dev/null', '-f', file('../supabase/tests/106_household_edition.test.sql')]) || 'SQL test passed')
   if (!before) {
     const has = (what) => psql(['-At', '-c', what]).trim()
@@ -58,6 +67,7 @@ try {
     if (column() !== '0' || refusal() !== 'f') throw new Error('rollback left the column or the refusal behind')
     if (has(`select count(*) from pg_proc where proname in ('my_edition','guard_household_edition')`) !== '0') throw new Error('rollback left a function behind')
     psql(['-f', file(migration)])
+    if (oldEdition() !== 'full') throw new Error(`existing household should be full after re-apply, is ${oldEdition()}`)
     if (column() !== '1' || refusal() !== 't') throw new Error('re-apply did not restore the column and the refusal')
     console.log(psql(['-o', '/dev/null', '-f', file('../supabase/tests/106_household_edition.test.sql')]) || 'SQL test passed after re-apply')
     console.log('rollback then re-apply: ok')
