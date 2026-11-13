@@ -236,9 +236,21 @@ enum PhotoCaptureService {
         guard let base = try? FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
         ) else { return nil }
-        let dir = base.appendingPathComponent("pending-captures", isDirectory: true)
+        let dir = spoolDirectory(in: base)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
+    }
+
+    nonisolated static func spoolDirectory(in base: URL) -> URL {
+        base.appendingPathComponent("pending-captures", isDirectory: true)
+    }
+
+    /// Removes queued photos (account deletion). `base` defaults to Application Support.
+    nonisolated static func deleteSpool(base: URL? = nil) {
+        guard let root = base ?? (try? FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
+        )) else { return }
+        try? FileManager.default.removeItem(at: spoolDirectory(in: root))
     }
 
     private static func spoolURL(taskId: UUID) -> URL? {

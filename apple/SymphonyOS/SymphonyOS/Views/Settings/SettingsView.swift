@@ -22,7 +22,7 @@ struct SettingsView: View {
                     DeleteAccountView()
                 } label: {
                     Text("Delete account")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.feedbackRed)
                 }
             }
 

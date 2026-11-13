@@ -19,7 +19,7 @@ struct DeleteAccountView: View {
         Form {
             Section {
                 Text(AccountDeletion.warning(sharesHousehold: shares))
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(Color.textPrimary)
             }
             Section {
                 Button(role: .destructive) {
@@ -32,11 +32,13 @@ struct DeleteAccountView: View {
                 if failed {
                     Text("Symphony couldn't delete your account. Try again in a moment, or write to hello@symphony-os.com.")
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.feedbackRed)
                 }
             }
         }
         .navigationTitle("Delete account")
+        .navigationBarBackButtonHidden(running)
+        .interactiveDismissDisabled(running)
         .navigationBarTitleDisplayModeIfAvailable()
         .confirmationDialog("Delete your account?", isPresented: $confirming, titleVisibility: .visible) {
             Button("Delete my account", role: .destructive) { start() }

@@ -61,10 +61,58 @@ struct AccountDeletionTests {
         defaults.set("tok", forKey: MedTokenStore.key)
         defaults.set(1, forKey: PlanCalendar.weekStartsOnKey)
         defaults.set(false, forKey: "planner.paperSound")
-        AccountDeletion.clearDeviceLeftovers(userId: uid, defaults: defaults)
+        AccountDeletion.clearDeviceLeftovers(userId: uid, defaults: defaults, spoolBase: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         #expect(EditionMemory(defaults: defaults).lastKnown(for: uid) == nil)
         #expect(defaults.string(forKey: MedTokenStore.key) == nil)
         #expect(defaults.object(forKey: PlanCalendar.weekStartsOnKey) == nil)
         #expect(defaults.object(forKey: "planner.paperSound") != nil)   // device preference stays
+    }
+
+    @Test func spoolIsRemoved() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let dir = PhotoCaptureService.spoolDirectory(in: base)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = dir.appendingPathComponent("\(UUID().uuidString).jpg")
+        try Data([1, 2, 3]).write(to: file)
+        PhotoCaptureService.deleteSpool(base: base)
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+        #expect(!FileManager.default.fileExists(atPath: dir.path))
+        try? FileManager.default.removeItem(at: base)
+    }
+
+    private struct Boom: Error {}
+
+    @Test func localFailureStillForgetsSession() async throws {
+        let container = try ModelContainer(
+            for: Schema(SymphonyApp.modelTypes),
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let defaults = UserDefaults(suiteName: "AccountDeletionTests.\(UUID())")!
+        let uid = UUID()
+        EditionMemory(defaults: defaults).remember(.light, for: uid)
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        var stopped = false, forgot = false
+        await AccountDeletion.finishLocally(
+            container: container, stopSync: { stopped = true }, userId: uid,
+            wipeStore: { _ in throw Boom() }, defaults: defaults, spoolBase: base,
+            forgetSession: { forgot = true }
+        )
+        #expect(stopped && forgot)
+        #expect(EditionMemory(defaults: defaults).lastKnown(for: uid) == nil)
+    }
+
+    @Test func modelTypesIsComplete() throws {
+        let container = try ModelContainer(
+            for: Schema(SymphonyApp.modelTypes),
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        #expect(container.schema.entities.count == SymphonyApp.modelTypes.count)
+        let names = Set(SymphonyApp.modelTypes.map { String(describing: $0) })
+        let expected: Set<String> = [
+            "SymphonyTask", "Project", "Routine", "Contact", "FamilyMember", "ActionableInstance",
+            "EventNote", "WeeklyTemplate", "Household", "UserProfile", "SymphonyList",
+            "SymphonyListItem", "TaskCommitment", "TaskFocus", "Goal", "PendingChange",
+        ]
+        #expect(names == expected)
     }
 }
