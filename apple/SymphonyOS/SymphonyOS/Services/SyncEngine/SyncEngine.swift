@@ -158,31 +158,30 @@ actor SyncEngine {
             // times is dropped, silently losing the link). Only links the phone
             // set (linksDirty / areaDirty) name a parent, so a clean row never
             // waits: a queue without walk-made links runs exactly as before.
-            var unpushedInserts = Set(pendingChanges.filter { $0.changeType == "insert" }.map(\.recordId))
+            var queuedInserts: [UUID: PendingChange] = [:]
+            for change in pendingChanges where change.changeType == "insert" {
+                queuedInserts[change.recordId] = change
+            }
             for change in pendingChanges {
+                var parents: [UUID] = []
                 if change.changeType != "delete" {
-                    let parents = Self.parentIds(table: change.tableName, id: change.recordId, context: context)
+                    parents = Self.parentIds(table: change.tableName, id: change.recordId, context: context)
                     // Skipped for this pass without counting an attempt; it goes
-                    // once its parent's insert lands (inserts are never dropped).
-                    if Self.mustWait(parents: parents, unpushedInserts: unpushedInserts) { continue }
+                    // once its parent's insert lands — or, if that insert keeps
+                    // failing, it stops waiting and takes the ordinary path.
+                    if !parents.isEmpty, Self.mustWait(parents: parents, unpushedInserts: Self.insertsWorthWaitingFor(Array(queuedInserts.values))) {
+                        Self.syncLog.info("push \(change.tableName, privacy: .public) \(change.changeType, privacy: .public) \(change.recordId.uuidString, privacy: .public) waits for its parent's insert")
+                        continue
+                    }
                     // Likewise an update to a row whose own insert has not landed:
                     // it would "succeed" on zero rows and clear the link flag, and
                     // the insert would then go up without the links. Only for a
-                    // row that sends links, so no other queue changes.
-                    if change.changeType == "update", unpushedInserts.contains(change.recordId),
-                       Self.linkStamp(table: change.tableName, id: change.recordId, context: context) != nil { continue }
-                    // A parent with no insert waiting and no row on this phone is
-                    // gone for good (deleted elsewhere and pulled away, or taken
-                    // back): unlink it and send the null, never wait on it.
-                    if !parents.isEmpty {
-                        let lost = Self.lostParents(parents, unpushedInserts: unpushedInserts, known: Self.knownIds(context: context))
-                        if !lost.isEmpty {
-                            for parent in lost {
-                                Self.syncLog.error("push \(change.tableName, privacy: .public) \(change.recordId.uuidString, privacy: .public): link to \(parent.uuidString, privacy: .public) is gone; sending null")
-                            }
-                            Self.clearLinks(to: lost, table: change.tableName, id: change.recordId, context: context)
-                            try? context.save()
-                        }
+                    // row that sends links, so no other queue changes. (Its own
+                    // queued insert already shields the row, so this adds no stall.)
+                    if change.changeType == "update", queuedInserts[change.recordId] != nil,
+                       Self.linkStamp(table: change.tableName, id: change.recordId, context: context) != nil {
+                        Self.syncLog.info("push \(change.tableName, privacy: .public) update \(change.recordId.uuidString, privacy: .public) waits for its own insert")
+                        continue
                     }
                 }
                 // The links this push sends, to compare with the row after the
@@ -190,7 +189,7 @@ actor SyncEngine {
                 let sentLinks = Self.linkStamp(table: change.tableName, id: change.recordId, context: context)
                 do {
                     try await pushChange(change, context: context)
-                    if change.changeType == "insert" { unpushedInserts.remove(change.recordId) }
+                    if change.changeType == "insert" { queuedInserts[change.recordId] = nil }
                     // Read the row as saved now, in a fresh context (this one's
                     // copy was read before the await). Re-linked meanwhile: the
                     // new links were never sent, so keep the flag and keep a
@@ -198,14 +197,17 @@ actor SyncEngine {
                     // pull — and the next pass sends them.
                     let linksNow = Self.linkStamp(table: change.tableName, id: change.recordId,
                                                   context: ModelContext(modelContainer))
-                    let linksSettled = Self.linksSettled(sent: sentLinks, now: linksNow)
-                    if linksSettled {
+                    let outcome = Self.afterPush(changeType: change.changeType, sent: sentLinks, now: linksNow)
+                    switch outcome {
+                    case .done:
                         context.delete(change)
-                    } else if change.changeType != "update" {
+                    case .queueUpdateThenDone:
                         // The insert landed; the new links follow as an update.
                         context.queueSync(table: change.tableName, recordId: change.recordId, type: "update")
                         context.delete(change)
-                    }   // an update stays queued as it is and is sent again
+                    case .keepQueued:
+                        break   // the update stays queued as it is and is sent again
+                    }
                     // The phone's locally-derived scope just pushed — stop
                     // sending it on the next UPDATE until another edit
                     // recomputes it (SyncEngine.taskRow gates on this flag).
@@ -217,14 +219,44 @@ actor SyncEngine {
                         task.dismissedAtDirty = false
                         task.sortOrderDirty = false
                     }
-                    if linksSettled {
+                    if outcome == .done {
                         Self.clearLinkFlags(table: change.tableName, id: change.recordId, context: context)
                     }
                     if change.tableName == "routines",
                        let routine = (try? context.fetch(FetchDescriptor<Routine>()))?.first(where: { $0.id == change.recordId }) {
                         routine.scopeDirty = false
                     }
+                    // A row that sends (or now has) links: write the decision to
+                    // the store at once, with no await since the fresh read. Left
+                    // for the end of the pass, a re-link made during a LATER
+                    // change's await would dedupe against this still-stored
+                    // change, which the end-of-pass save then deletes: nothing
+                    // queued, and the next pull puts the server's links back.
+                    if sentLinks != nil || linksNow != nil {
+                        do { try context.save() } catch {
+                            Self.syncLog.error("push \(change.tableName, privacy: .public): saving the link outcome FAILED: \(error.localizedDescription, privacy: .public)")
+                        }
+                    }
                 } catch {
+                    // A foreign-key refusal of a row that sends links: the server
+                    // says a parent is not there. The links whose parents are not
+                    // on this phone are the only candidates; unlink those, keep
+                    // the flag and the change, and the next pass sends the nulls.
+                    // Never decided from local absence alone: a partner's goal or
+                    // area is valid on the server but never pulled here.
+                    let rejection: RejectionAction = parents.isEmpty ? .countAttempt
+                        : Self.onPushRejected(code: Self.postgresCode(of: error), parents: parents,
+                                              queuedInserts: Set(queuedInserts.keys), known: Self.knownIds(context: context))
+                    if case .unlink(let lost) = rejection {
+                        for parent in lost {
+                            Self.syncLog.error("push \(change.tableName, privacy: .public) \(change.recordId.uuidString, privacy: .public): the server has no \(parent.uuidString, privacy: .public); unlinking it")
+                        }
+                        Self.clearLinks(to: lost, table: change.tableName, id: change.recordId, context: context)
+                        do { try context.save() } catch {
+                            Self.syncLog.error("push \(change.tableName, privacy: .public): saving the unlinked row FAILED: \(error.localizedDescription, privacy: .public)")
+                        }
+                        continue
+                    }
                     change.attempts += 1
                     change.lastAttemptAt = Date()
                     // Surface the failure — silent push errors hid a schema drift
@@ -237,7 +269,7 @@ actor SyncEngine {
                     // that exists nowhere else. That failure mode is real: a schema
                     // drift once rejected every iOS write for days. Updates/deletes
                     // are safe to give up on — the server row survives them.
-                    if change.attempts >= 10 && change.changeType != "insert" {
+                    if change.attempts >= Self.maxPushAttempts && change.changeType != "insert" {
                         Self.syncLog.error("DROPPING \(change.tableName, privacy: .public) \(change.changeType, privacy: .public) after 10 failed attempts")
                         context.delete(change)
                         // Given up on: a later unrelated edit must not re-send
@@ -1053,6 +1085,60 @@ extension SyncEngine {
         parents.contains { unpushedInserts.contains($0) }
     }
 
+    /// Failed pushes after which an update or delete is dropped, and after
+    /// which a child stops waiting on its parent's insert.
+    static let maxPushAttempts = 10
+
+    /// The queued inserts a child waits for: those that have not yet failed
+    /// `maxPushAttempts` times. A parent whose insert keeps being refused
+    /// never lands, so its child takes the ordinary count-and-drop path
+    /// instead of waiting forever (and shielding its row from every pull).
+    static func insertsWorthWaitingFor(_ changes: [PendingChange]) -> Set<UUID> {
+        Set(changes.filter { $0.changeType == "insert" && $0.attempts < maxPushAttempts }.map(\.recordId))
+    }
+
+    /// What a refused push of a row with links does.
+    enum RejectionAction: Equatable {
+        /// The server refused a parent that is not on this phone: set these
+        /// links to nil, keep the flag and the change, retry next pass.
+        case unlink([UUID])
+        /// An ordinary failure: count the attempt (and drop at the limit).
+        case countAttempt
+    }
+
+    /// Postgres `foreign_key_violation`.
+    static func isForeignKeyRejection(code: String?) -> Bool { code == "23503" }
+
+    /// The Postgres error code PostgREST returned, if the error is one.
+    static func postgresCode(of error: Error) -> String? { (error as? PostgrestError)?.code }
+
+    /// "Lost" is the server's call: only a foreign-key refusal makes a parent
+    /// lost, and then only the parents that are not on this phone (no row, no
+    /// queued insert) can be the missing one. If every parent is here, the
+    /// refusal is something else and counts as an ordinary failure.
+    static func onPushRejected(code: String?, parents: [UUID], queuedInserts: Set<UUID>, known: Set<UUID>) -> RejectionAction {
+        guard isForeignKeyRejection(code: code) else { return .countAttempt }
+        let lost = lostParents(parents, unpushedInserts: queuedInserts, known: known)
+        return lost.isEmpty ? .countAttempt : .unlink(lost)
+    }
+
+    /// What happens to a change once its push has succeeded.
+    enum AfterPush: Equatable {
+        /// Delete the change (and clear the link flag).
+        case done
+        /// An insert landed but its links moved meanwhile: queue an update
+        /// for them, then delete the insert. The link flag stays set.
+        case queueUpdateThenDone
+        /// An update whose links moved meanwhile: leave it queued as it is;
+        /// the next pass sends it again. The link flag stays set.
+        case keepQueued
+    }
+
+    static func afterPush(changeType: String, sent: LinkStamp?, now: LinkStamp?) -> AfterPush {
+        if linksSettled(sent: sent, now: now) { return .done }
+        return changeType == "update" ? .keepQueued : .queueUpdateThenDone
+    }
+
     /// The ids of every goal, task and life area on this phone.
     static func knownIds(context: ModelContext) -> Set<UUID> {
         let tasks = (try? context.fetch(FetchDescriptor<SymphonyTask>()))?.map(\.id) ?? []
@@ -1062,6 +1148,7 @@ extension SyncEngine {
     }
 
     /// Parents that will never arrive: no insert waiting and no row on this phone.
+    /// Called only once the server has refused the row (`onPushRejected`).
     static func lostParents(_ parents: [UUID], unpushedInserts: Set<UUID>, known: Set<UUID>) -> [UUID] {
         parents.filter { !unpushedInserts.contains($0) && !known.contains($0) }
     }

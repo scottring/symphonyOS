@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import SwiftData
+import PostgREST   // PostgrestError, to build a refusal as the server sends it
 @testable import Symphony
 
 /// The push queue sends a parent before any child that links to it. A child
@@ -124,13 +125,74 @@ struct SyncOrderTests {
         context.insert(source); context.insert(task)
         try context.save()
 
-        SyncEngine.clearLinks(to: [g], table: "tasks", id: task.id, context: context)
+        // The server refused the row on a foreign key: the goal (not on this
+        // phone) is the only candidate; the source (here) is left alone.
+        let parents = SyncEngine.parentIds(table: "tasks", id: task.id, context: context)
+        let action = SyncEngine.onPushRejected(code: "23503", parents: parents, queuedInserts: [],
+                                               known: SyncEngine.knownIds(context: context))
+        #expect(action == .unlink([g]))
+        guard case .unlink(let lost) = action else { return }
+        SyncEngine.clearLinks(to: lost, table: "tasks", id: task.id, context: context)
         #expect(task.goalId == nil)
         #expect(task.sourceId == source.id)
         #expect(task.linksDirty)
         let row = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
         #expect(row["goal_id"] == .null)
         #expect(row["source_id"] == .string(source.id.uuidString))
+    }
+
+    /// A partner's personal goal or area is valid on the server but never
+    /// pulled here: absence from this phone alone must never null the link.
+    @Test func aParentNotOnThisPhoneIsLeftAloneUntilTheServerRefuses() throws {
+        let context = try makeContext()
+        let partnersArea = UUID()   // not on this phone, no insert queued
+        let task = SymphonyTask(userId: UUID(), title: "Shared chore")
+        task.areaId = partnersArea
+        task.linksDirty = true
+        context.insert(task)
+        try context.save()
+
+        // Before any refusal it is pushed as it is: no wait, link intact.
+        let parents = SyncEngine.parentIds(table: "tasks", id: task.id, context: context)
+        #expect(parents == [partnersArea])
+        #expect(!SyncEngine.mustWait(parents: parents, unpushedInserts: []))
+        let row = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        #expect(row["area_id"] == .string(partnersArea.uuidString))
+
+        let known = SyncEngine.knownIds(context: context)
+        // Any other failure (network, RLS, a check constraint) is an ordinary one.
+        #expect(SyncEngine.onPushRejected(code: nil, parents: parents, queuedInserts: [], known: known) == .countAttempt)
+        #expect(SyncEngine.onPushRejected(code: "42501", parents: parents, queuedInserts: [], known: known) == .countAttempt)
+        // A foreign-key refusal when every parent is on this phone: not ours to unlink.
+        #expect(SyncEngine.onPushRejected(code: "23503", parents: parents, queuedInserts: [],
+                                          known: known.union([partnersArea])) == .countAttempt)
+        // Nor when the parent's insert is still queued.
+        #expect(SyncEngine.onPushRejected(code: "23503", parents: parents, queuedInserts: [partnersArea],
+                                          known: known) == .countAttempt)
+        // Only the server's refusal of a parent that is not here unlinks it.
+        #expect(SyncEngine.onPushRejected(code: "23503", parents: parents, queuedInserts: [], known: known)
+                == .unlink([partnersArea]))
+        #expect(task.areaId == partnersArea)   // deciding changed nothing
+    }
+
+    @Test func onlyAForeignKeyRefusalCounts() {
+        #expect(SyncEngine.isForeignKeyRejection(code: "23503"))
+        #expect(!SyncEngine.isForeignKeyRejection(code: "23505"))
+        #expect(!SyncEngine.isForeignKeyRejection(code: nil))
+        #expect(SyncEngine.postgresCode(of: PostgrestError(code: "23503", message: "violates foreign key constraint")) == "23503")
+        #expect(SyncEngine.postgresCode(of: URLError(.notConnectedToInternet)) == nil)
+    }
+
+    @Test func aChildStopsWaitingOnAParentThatKeepsFailing() {
+        let g = UUID()
+        let parentInsert = PendingChange(tableName: "goals", recordId: g, changeType: "insert")
+        parentInsert.attempts = SyncEngine.maxPushAttempts - 1
+        #expect(SyncEngine.mustWait(parents: [g], unpushedInserts: SyncEngine.insertsWorthWaitingFor([parentInsert])))
+        parentInsert.attempts = SyncEngine.maxPushAttempts
+        #expect(!SyncEngine.mustWait(parents: [g], unpushedInserts: SyncEngine.insertsWorthWaitingFor([parentInsert])))
+        // Only inserts are waited for.
+        let parentUpdate = PendingChange(tableName: "goals", recordId: g, changeType: "update")
+        #expect(SyncEngine.insertsWorthWaitingFor([parentUpdate]).isEmpty)
     }
 
     @Test func aGoalsLostAreaIsCleared() throws {
@@ -149,16 +211,45 @@ struct SyncOrderTests {
         #expect(row["area_id"] == .null)
     }
 
+    /// Walks a pass the way the loop does: oldest first, a child skips while
+    /// its parent's insert is queued, a pushed insert leaves the queue.
+    private func pass(_ queue: [PendingChange], context: ModelContext) -> [UUID] {
+        var waiting = queue
+        var pushed: [UUID] = []
+        for change in queue.sorted(by: { $0.createdAt < $1.createdAt }) {
+            let parents = SyncEngine.parentIds(table: change.tableName, id: change.recordId, context: context)
+            if SyncEngine.mustWait(parents: parents, unpushedInserts: SyncEngine.insertsWorthWaitingFor(waiting)) { continue }
+            pushed.append(change.recordId)
+            waiting.removeAll { $0 === change }
+        }
+        return pushed
+    }
+
     @Test func theQueueKeepsParentsFirst() throws {
         let context = try makeContext()
         let writer = PlanWriter(context: context, userId: UUID())
         let goal = writer.createGoal(name: "A summer outdoors", notes: nil, context: "personal", year: 2027)
         let season = writer.createPeriodTask(title: "Get outside every weekend", level: "season",
                                              periodStart: PlanCalendar.season(containing: Date(), boundaries: nil).start)
-        let queue = try context.fetch(FetchDescriptor<PendingChange>(sortBy: [SortDescriptor(\.createdAt)]))
-        let goalInsert = try #require(queue.firstIndex { $0.tableName == "goals" && $0.recordId == goal.id && $0.changeType == "insert" })
-        let taskInsert = try #require(queue.firstIndex { $0.tableName == "tasks" && $0.recordId == season.id && $0.changeType == "insert" })
-        #expect(goalInsert < taskInsert)
+        season.goalId = goal.id
+        season.linksDirty = true
+        try context.save()
+        let queue = try context.fetch(FetchDescriptor<PendingChange>())
+        let goalInsert = try #require(queue.first { $0.tableName == "goals" && $0.recordId == goal.id && $0.changeType == "insert" })
+        let taskInsert = try #require(queue.first { $0.tableName == "tasks" && $0.recordId == season.id && $0.changeType == "insert" })
+        let inserts = [goalInsert, taskInsert]
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+
+        // Parent queued first: both go in one pass, the goal first.
+        goalInsert.createdAt = t0
+        taskInsert.createdAt = t0.addingTimeInterval(1)
+        #expect(pass(inserts, context: context) == [goal.id, season.id])
+
+        // Child queued first: it waits this pass, and goes on the next.
+        goalInsert.createdAt = t0.addingTimeInterval(1)
+        taskInsert.createdAt = t0
+        #expect(pass(inserts, context: context) == [goal.id])
+        #expect(pass([taskInsert], context: context) == [season.id])
     }
 
     // MARK: Links re-set while a push is in flight
@@ -199,6 +290,22 @@ struct SyncOrderTests {
         // Nothing dirty now (or the row is gone): nothing left to send.
         #expect(SyncEngine.linksSettled(sent: sent, now: nil))
         #expect(SyncEngine.linksSettled(sent: nil, now: nil))
+    }
+
+    @Test func aPushedChangeIsDoneOrKeptForItsMovedLinks() {
+        let g = UUID(), s = UUID(), moved = UUID()
+        let sent = SyncEngine.LinkStamp(goalId: g, sourceId: s, areaId: nil)
+        let now = SyncEngine.LinkStamp(goalId: g, sourceId: moved, areaId: nil)
+        // No links at all (every row that is not the walk's): done, as before.
+        for type in ["insert", "update", "delete"] {
+            #expect(SyncEngine.afterPush(changeType: type, sent: nil, now: nil) == .done)
+        }
+        #expect(SyncEngine.afterPush(changeType: "update", sent: sent, now: sent) == .done)
+        #expect(SyncEngine.afterPush(changeType: "insert", sent: sent, now: sent) == .done)
+        // Re-linked during the await.
+        #expect(SyncEngine.afterPush(changeType: "update", sent: sent, now: now) == .keepQueued)
+        #expect(SyncEngine.afterPush(changeType: "insert", sent: sent, now: now) == .queueUpdateThenDone)
+        #expect(SyncEngine.afterPush(changeType: "insert", sent: nil, now: now) == .queueUpdateThenDone)
     }
 
     @Test func droppingAChangeForgetsItsLocalLinks() throws {
