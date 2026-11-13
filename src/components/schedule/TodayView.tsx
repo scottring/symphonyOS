@@ -40,6 +40,7 @@ import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { TodayWeekFold, SheetRoutines } from './TodayWeekColumn'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 import { TodayComingUp } from './TodayComingUp'
+import { TodayListsLine } from './TodayListsLine'
 import { nextWeekEntries } from '@/lib/today/dayPlan'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
@@ -1900,6 +1901,8 @@ export function TodayView({
           {data.isToday && editionPreview && <DailyEditionPreview onHide={hideEditionPreview} />}
           </TodayDragProvider>
         )}
+        {/* The lists you reach for daily, one tap away (2026-11-13). */}
+        <TodayListsLine />
 
       </div>
         </main>)}

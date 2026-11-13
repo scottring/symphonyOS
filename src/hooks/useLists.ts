@@ -16,6 +16,7 @@ function dbListToList(dbList: DbList): List {
     sortOrder: dbList.sort_order,
     externalId: dbList.external_id ?? undefined,
     externalSource: dbList.external_source ?? undefined,
+    showOnToday: dbList.show_on_today ?? false,
     createdAt: new Date(dbList.created_at),
     updatedAt: new Date(dbList.updated_at),
   }
@@ -150,6 +151,7 @@ export function useLists() {
     if (updates.visibility !== undefined) dbUpdates.visibility = updates.visibility
     if (updates.hiddenFrom !== undefined) dbUpdates.hidden_from = updates.hiddenFrom ?? null
     if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder
+    if (updates.showOnToday !== undefined) dbUpdates.show_on_today = updates.showOnToday
 
     const { error: updateError } = await supabase
       .from('lists')

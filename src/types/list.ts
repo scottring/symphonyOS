@@ -28,6 +28,8 @@ export interface DbList {
   sort_order: number
   external_id: string | null
   external_source: string | null
+  /** In the Lists line on Today (2026-11-13). Absent before that migration. */
+  show_on_today?: boolean
   created_at: string
   updated_at: string
 }
@@ -43,6 +45,8 @@ export interface List {
   sortOrder: number
   externalId?: string
   externalSource?: string
+  /** In the quiet Lists line at the foot of Today (Scott, 2026-11-13). */
+  showOnToday?: boolean
   createdAt: Date
   updatedAt: Date
 }

@@ -92,6 +92,12 @@ export function ListsProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** The lists, where a provider is mounted; null otherwise (Today's Lists
+ *  line renders nothing outside the shell). */
+export function useOptionalListsContext(): ListsContextValue | null {
+  return useContext(ListsContext)
+}
+
 export function useListsContext(): ListsContextValue {
   const ctx = useContext(ListsContext)
   if (!ctx) throw new Error('useListsContext must be used within ListsProvider')

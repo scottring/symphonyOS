@@ -239,6 +239,15 @@ export function ListView({
                     Clear checked
                   </button>
                 )}
+                {/* The quiet Lists line at the foot of Today (2026-11-13). */}
+                <button
+                  type="button"
+                  onClick={() => onUpdateList(list.id, { showOnToday: !list.showOnToday })}
+                  aria-pressed={!!list.showOnToday}
+                  className={`px-2.5 py-1.5 mr-1 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${list.showOnToday ? 'text-primary-700 bg-primary-50' : 'text-neutral-500 hover:bg-neutral-100'}`}
+                >
+                  {list.showOnToday ? 'On Today' : 'Show on Today'}
+                </button>
                 {onPin && onUnpin && (
                   <PinButton
                     entityType="list"

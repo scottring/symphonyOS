@@ -19,6 +19,7 @@ const NOT_FOR_AI: Record<string, string> = {
   weekend_start: 'internal: weekend fold window',
   group_members: 'internal: Today grouping, set by drag',
   is_fun: 'gap: the "for fun" mark on a task',
+  due_on: 'gap (2026-11-13): the done-by date ("return by Mon 16"); teach the assistant when the Today facelift ships, as that needs an edge-function deploy',
   is_someday: 'internal: legacy flag; someday is a change-card op',
   link_type: 'internal: what a linked activity is',
   linked_activity_id: 'internal: link to a routine or event the task came from',

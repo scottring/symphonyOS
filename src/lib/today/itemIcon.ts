@@ -7,11 +7,13 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Banknote, Briefcase, Cake, Car, Dumbbell, FileText, Hammer, Heart, Moon, PackageOpen,
-  Phone, Plane, School, ShoppingBasket, Stethoscope, Truck, UtensilsCrossed, Users,
+  Phone, Plane, School, ShoppingBasket, SprayCan, Stethoscope, Truck, UtensilsCrossed, Users,
 } from 'lucide-react'
 
 const RULES: [RegExp, LucideIcon][] = [
   [/\breturns?\b/i, PackageOpen],
+  [/\bamazon\b/i, PackageOpen],
+  [/\b(sundries|toiletries|household|cleaning)\b/i, SprayCan],
   [/\b(deliver|delivery|arriv(es|ing)|package)\b/i, Truck],
   [/\b(pay|deposit|invoice|bill|tax(es)?)\b|\$\d/i, Banknote],
   [/\b(doctor|dentist|neuro\w*|appointment|clinic|therapy|physio|med(s|ication)?)\b/i, Stethoscope],
