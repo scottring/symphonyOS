@@ -126,10 +126,8 @@ struct TodayView: View {
         // Rebuild from the shared cache first (no blank schedule on return),
         // then refresh the day in the background.
         .onAppear { rebuildTimeline() }
-        .task { await calendar.refresh(date, maxAge: 60) }
-        .onChange(of: calendar.refreshKey) { _, _ in
-            Task { await calendar.refresh(appState.selectedDate, maxAge: 60) }
-        }
+        // The one calendar trigger: first appearance, a new day, or a new source.
+        .task(id: calendar.readKey(for: date)) { await calendar.refresh(date, maxAge: 60) }
         .task { if appState.edition.allows(.dinner) { await dinners.refresh(date) } }
         #if os(iOS)
         // The widgets carry tomorrow and the day after as well.
@@ -142,7 +140,6 @@ struct TodayView: View {
         #endif
         .onChange(of: appState.selectedDate) { _, _ in
             rebuildTimeline()
-            Task { await calendar.refresh(appState.selectedDate, maxAge: 60) }
             if appState.edition.allows(.dinner) { Task { await dinners.refresh(appState.selectedDate) } }
         }
         .onChange(of: appState.domainFilter) { _, _ in rebuildTimeline() }

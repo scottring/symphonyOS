@@ -55,6 +55,10 @@ final class CalendarFeed {
         }
     }
 
+    /// The id for a view's single `.task(id:)`: it changes with the day (or
+    /// week start) and with the source, and is stable otherwise.
+    func readKey(for day: Date) -> String { "\(refreshKey)|\(PlanCalendar.ymd(day))" }
+
     /// Cached events for `date`. Google: nil until loaded. Apple: an empty
     /// list while access is off, so a view never waits on a calendar that
     /// will not come; nil only until the day is first read.

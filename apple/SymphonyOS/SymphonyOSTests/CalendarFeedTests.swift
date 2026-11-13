@@ -110,4 +110,16 @@ struct CalendarFeedTests {
         await service.requestAccess()
         #expect(feed.refreshKey == before)
     }
+
+    @Test func readKeyChangesWithDayAndSourceAndIsStableOtherwise() {
+        let (feed, _) = make(FakeAppleSource(access: .notAsked), FakeGoogle(), nil)
+        let unknown = feed.readKey(for: at(13))
+        feed.edition = .full
+        let full = feed.readKey(for: at(13))
+        #expect(full != unknown)
+        #expect(feed.readKey(for: at(13, 15)) == full)      // same day, other hour
+        #expect(feed.readKey(for: at(14)) != full)           // other day
+        feed.edition = .light
+        #expect(feed.readKey(for: at(13)) != full)           // other source
+    }
 }

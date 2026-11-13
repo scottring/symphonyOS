@@ -920,13 +920,9 @@ struct CalendarSheet: View {
             }
             SheetFoot(text: Self.foot)
         }
-        .task(id: Self.readKey(start: start, end: end, opened: opened)) {
+        .task(id: Self.readKey(start: start, end: end, opened: opened).map { "\($0)|\(calendar.refreshKey)" }) {
             guard Self.readKey(start: start, end: end, opened: opened) != nil else { return }
             await calendar.refreshPeriod(from: start, to: end)
-        }
-        .onChange(of: calendar.refreshKey) { _, _ in
-            guard Self.readKey(start: start, end: end, opened: opened) != nil else { return }
-            Task { await calendar.refreshPeriod(from: start, to: end) }
         }
     }
 }
