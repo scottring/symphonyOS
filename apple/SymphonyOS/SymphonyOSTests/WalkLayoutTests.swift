@@ -140,14 +140,115 @@ struct WalkLayoutTests {
         #expect(open.banners.allSatisfy { $0.frame.minY >= 250 })
     }
 
-    @Test func aStubNeverRisesAboveItsCeiling() {
-        // Look back up, one area, two Season flags: the stub may not climb into the Year band.
+    @Test func lookingBackUpShowsTheNewestWithACount() {
+        // Look back up, one area, two Season flags: the newest, readable, carrying "+1"; no stub.
         let a = flag(.season, "Lift twice a week", in: "Home"), b = flag(.season, "Sleep by ten", in: "Home")
         let layout = WalkLayout.make(state(6, kept: ["Home"], items: [a, b]), today: today)
         let ceiling = (art.bandY(.year) - layout.camera.y) * layout.camera.k + 6
         let banners = layout.banners(on: .season)
+        #expect(banners.count == 1)
+        #expect(banners.first?.kind == .compact && banners.first?.itemId == b.id && banners.first?.more == 1)
+        #expect(banners.first?.label == "Season: Sleep by ten, 1 more, tap to show")
         #expect(banners.allSatisfy { $0.frame.minY >= ceiling - 0.01 }, "\(banners.map(\.frame))")
-        #expect(banners.map(\.kind) == [.stub(2)])
+    }
+
+    @Test func theStepsOwnFlagsNeverCoverARisenFlag() {
+        // The reviewer's case: Week, zoomed on Health, the month flag focused, two dated week flags.
+        let month = flag(.month, "Get back to the gym", in: "Health")
+        let older = flag(.week, "Gym", in: "Health", parent: month.id, day: day(2026, 11, 17))
+        let newer = flag(.week, "Swim", in: "Health", parent: month.id, day: day(2026, 11, 18))
+        var s = state(4, kept: ["Health", "Home"], items: [month, older, newer])
+        s.focus[.week] = month.id
+        let layout = WalkLayout.make(s, today: today)
+        #expect(layout.camera.k == 0.8)
+        let risen = layout.banner(for: month)!
+        #expect(risen.kind == .compact && risen.glows)
+        let weeks = layout.banners(on: .week)
+        #expect(weeks.allSatisfy { !$0.frame.intersects(risen.frame) || $0.frame.maxY <= risen.frame.minY },
+                "\(weeks.map(\.frame)) vs \(risen.frame)")
+        #expect(weeks.allSatisfy { $0.frame.minY >= risen.frame.maxY + 4 - 0.01 })
+        #expect(layout.banner(for: newer)?.kind == .full)
+        #expect(weeks.contains { $0.kind == .stub(1) })
+    }
+
+    @Test func theFirstThingKeepsClearOfItsWeekPost() {
+        // Look back up: the first thing's column also holds three week flags.
+        let weeks = (1...3).map { flag(.week, "Week task \($0)", in: "Home") }
+        var s = state(6, kept: ["Health", "Home"], items: weeks)
+        s.firstThing = weeks[2].id
+        let layout = WalkLayout.make(s, today: today)
+        let first = layout.banners(on: .today)
+        #expect(first.count == 1 && first[0].tag == WalkCopy.firstThingTag)
+        let week = layout.banners(on: .week)
+        #expect(week.count == 1 && week[0].more == 2 && week[0].itemId == weeks[2].id)
+        #expect(!week[0].frame.intersects(first[0].frame), "\(week[0].frame) vs \(first[0].frame)")
+    }
+
+    @Test func lookingBackUpShowsTheWholePlan() {
+        // Three areas, two year goals, one season line, one month line and three week tasks each.
+        let kept = ["Health", "Home", "People"]
+        var items: [WalkItem] = []
+        for name in kept {
+            items += [flag(.year, "\(name) goal one", in: name), flag(.year, "\(name) goal two", in: name),
+                      flag(.season, "\(name) season", in: name), flag(.month, "\(name) month", in: name)]
+            items += (1...3).map { flag(.week, "\(name) task \($0)", in: name, day: today) }
+        }
+        var s = state(6, kept: kept, items: items)
+        s.firstThing = items.last!.id
+        let layout = WalkLayout.make(s, today: today)
+        let expectedMore: [WalkLevel: Int?] = [.year: 1, .season: nil, .month: nil, .week: 2]
+        for name in kept {
+            for level in [WalkLevel.year, .season, .month, .week] {
+                let post = layout.post(level, area(name).id)
+                #expect(post?.banners.count == 1, "\(name) \(level)")
+                guard let b = post?.banners.first else { continue }
+                let newest = items.last { $0.level == level && $0.areaId == area(name).id }!
+                #expect(b.kind == .compact && b.itemId == newest.id && b.text == newest.title)
+                #expect(b.more == expectedMore[level]!, "\(name) \(level) \(String(describing: b.more))")
+            }
+        }
+        #expect(layout.posts.flatMap(\.banners).allSatisfy { if case .stub = $0.kind { return false }; return true })
+    }
+
+    @Test func openingAStackOnLookingBackUpShowsMore() {
+        let month = flag(.month, "Home month", in: "Home")
+        let weeks = (1...4).map { flag(.week, "Week task \($0)", in: "Home") }
+        var s = state(6, kept: ["Health", "Home"], items: [month] + weeks)
+        s.expanded = WalkPostKey(level: .week, column: area("Home").id)
+        let layout = WalkLayout.make(s, today: today)
+        let week = layout.banners(on: .week)
+        let monthFrame = layout.banner(for: month)!.frame
+        #expect(week.count >= 2 && week.allSatisfy { $0.kind == .compact })
+        #expect(week.compactMap(\.itemId).count + (week.last?.more ?? 0) == 4)
+        #expect(week.allSatisfy { !$0.frame.intersects(monthFrame) })
+    }
+
+    @Test func peaksInTheQuestionAreNotLabeled() {
+        // Zoomed on Week, the Year band is at stage y 160: its labels would sit in the question.
+        let (s, _) = zoomed(on: 4)
+        #expect(WalkLayout.make(s, today: today).labels.isEmpty)
+        #expect(!WalkLayout.make(state(4, kept: ["Health", "Home"]), today: today).labels.isEmpty)
+    }
+
+    @Test func anExampleKeepsItsIdWhenAnotherIsPlanted() {
+        var s = state(1)
+        s.examplesOn = [1]
+        let before = WalkLayout.make(s, today: today).posts.flatMap(\.banners).filter { $0.kind == .ghost }
+        s.items = [flag(.year, "Run a 5K")]
+        let after = WalkLayout.make(s, today: today).posts.flatMap(\.banners).filter { $0.kind == .ghost }
+        #expect(after.count == 2)
+        for ghost in after { #expect(before.first { $0.text == ghost.text }?.id.hasSuffix(ghost.text) == true) }
+        #expect(Set(after.map(\.id)).isSubset(of: Set(before.map(\.id))))
+    }
+
+    @Test func artWithFewStopsDoesNotTrap() {
+        let short = WalkArt(imageName: art.imageName, stage: art.stage, world: art.world, image: art.image,
+                            bands: art.bands, land: art.land, stops: Array(art.stops.prefix(1)))
+        let week = flag(.week, "Gym", in: "Home")
+        var s = state(5, kept: ["Home"], items: [week])
+        s.firstThing = week.id
+        #expect(WalkLayout.make(s, today: today, art: short).camera == art.stops[0])
+        #expect(WalkLayout.make(state(1, kept: ["Home"]), today: today, art: short).labels.count == 1)
     }
 
     // MARK: Levels
@@ -160,6 +261,14 @@ struct WalkLayoutTests {
         var layout = WalkLayout.make(s, today: today)
         #expect(layout.banners(on: .year).allSatisfy { $0.kind == .tip })
         #expect(layout.banners(on: .season).allSatisfy { $0.kind == .tip })
+        // A small flag's frame is its pennant: from 1.5 left of the pole to 23.5 right, scaled with distance.
+        for (lvl, scale) in [(WalkLevel.year, 0.9), (.season, 1.0)] as [(WalkLevel, CGFloat)] {
+            for post in layout.posts(on: lvl) { for b in post.banners {
+                #expect(near(b.frame.minX, post.base.x - 1.5 * scale, 0.01) && near(b.frame.maxX, post.base.x + 23.5 * scale, 0.01),
+                        "\(lvl) \(b.frame) at pole \(post.base.x)")
+                #expect(near(b.frame.height, 20 * scale, 0.01))
+            } }
+        }
 
         s.focus[.month] = season.id
         layout = WalkLayout.make(s, today: today)
@@ -385,7 +494,7 @@ struct WalkLayoutTests {
             if !problems.isEmpty { return }
             checked += 1
         }
-        #expect(checked >= 2900)
+        #expect(checked >= 3500)
     }
 
     @Test func postsStandOnTheirBand() {
@@ -394,8 +503,8 @@ struct WalkLayoutTests {
             for post in layout.posts {
                 let worldY = post.base.y / layout.camera.k + layout.camera.y
                 let fraction = (worldY - art.image.minY) / art.image.height
-                guard art.land[post.key.level]!.contains(fraction) else {
-                    Issue.record("\(Generated.describe(s)): \(post.id) at \(fraction)")
+                guard abs(worldY - art.bandY(post.key.level)) <= 0.5, art.land[post.key.level]!.contains(fraction) else {
+                    Issue.record("\(Generated.describe(s)): \(post.id) at \(worldY), band \(art.bandY(post.key.level))")
                     return
                 }
             }
@@ -406,9 +515,11 @@ struct WalkLayoutTests {
 // MARK: - The generator
 
 /// Every count of kept areas, with and without the unlabeled post, one to six flags
-/// on every post of every level up to the step, each step, and five ways of
+/// on every post of every level up to the step, each step, and six ways of
 /// touching it (nothing; a focus; examples; examples, focus and a selection; a
-/// selection, focus and an open stack). Ids, titles and counts are fixed.
+/// selection, focus and an open stack; a focus over a tall stack of long dated
+/// flags in the first column, with examples, the last planted elsewhere, and on
+/// Look back up that column's week post open). Ids, titles and counts are fixed.
 private enum Generated {
     static let titles = [
         "Gym",
@@ -425,7 +536,7 @@ private enum Generated {
             for keptCount in 1...WalkLoad.maxAreas {
                 for unlabeled in [false, true] {
                     for perPost in 1...6 {
-                        for variant in 0..<5 {
+                        for variant in 0..<6 {
                             out.append(make(step: step, keptCount: keptCount, unlabeled: unlabeled,
                                             perPost: perPost, variant: variant))
                         }
@@ -474,13 +585,14 @@ private enum Generated {
         for raw in 1...top {
             let level = WalkLevel(rawValue: raw)!
             for (c, column) in columns.enumerated() {
-                let count = variant == 2 ? perPost : 1 + (perPost + c + raw - 1) % 6
+                let tall = variant == 5 && c == 0
+                let count = variant == 2 || tall ? perPost : 1 + (perPost + c + raw - 1) % 6
                 for i in 0..<count {
                     n += 1
                     let parent = raw > 1 ? parents[WalkLevel(rawValue: raw - 1)!]?.first : nil
-                    let item = WalkItem(id: uid(n), level: level, title: titles[(n + c + i) % titles.count],
+                    let item = WalkItem(id: uid(n), level: level, title: tall ? titles[2] : titles[(n + c + i) % titles.count],
                                         areaId: column, parentId: parent?.id,
-                                        day: level == .week && i % 2 == 0 ? today : nil, mine: i % 3 != 2)
+                                        day: level == .week && (tall || i % 2 == 0) ? today : nil, mine: i % 3 != 2)
                     s.items.append(item)
                     parents[level, default: []].append(item)
                 }
@@ -514,6 +626,20 @@ private enum Generated {
                 let own = s.items(on: level).filter(\.mine)
                 if !own.isEmpty { s.selected = own[(perPost * 3) % own.count].id }
             }
+        }
+        if variant == 5 {
+            let first = columns.first ?? nil
+            if let level, level != .year, let above = WalkLevel(rawValue: level.rawValue - 1) {
+                let parents = s.items(on: above == .today ? .week : above).filter { $0.areaId == first }
+                if let p = parents.first { s.focus[level] = p.id }
+                if level == .today, let last = parents.last { s.firstThing = last.id }
+            }
+            if (1...4).contains(step) { s.examplesOn = [step] }
+            for raw in 1...4 {
+                let lvl = WalkLevel(rawValue: raw)!
+                if let last = s.items(on: lvl).last(where: { $0.areaId == columns.last ?? nil }) { s.lastPlanted[lvl] = last.id }
+            }
+            if step == 6 { s.expanded = WalkPostKey(level: .week, column: first) }
         }
         if variant == 4, let column = columns.last {
             let expandLevel = level ?? .month
@@ -575,6 +701,27 @@ private enum Invariants {
         } else if layout.labels.contains(where: \.tappable) {
             problems.append("a label takes taps on step \(s.step)")
         }
+        // The step's own flags never cover a flag risen from the level above.
+        if let level = s.level, s.step >= 2, s.step <= 5 {
+            let above = WalkLevel(rawValue: level.rawValue - 1)!
+            let risen = banners.filter { $0.level == above && $0.kind == .compact && $0.glows }
+            for r in risen { for b in banners where b.level == level && overlap(b.frame, r.frame) {
+                problems.append("\(b.id) \(b.frame) covers the risen \(r.id) \(r.frame)")
+            } }
+        }
+        // Looking back up, no flags of different levels meet, and no post has a stub beside a banner.
+        if s.step >= 6 {
+            for i in banners.indices { for j in banners.indices where j > i && banners[i].level != banners[j].level
+                && overlap(banners[i].frame, banners[j].frame) {
+                problems.append("\(banners[i].id) \(banners[i].frame) meets \(banners[j].id) \(banners[j].frame)")
+            } }
+            for post in layout.posts where post.banners.count > 1 && post.banners.contains(where: {
+                if case .stub = $0.kind { return true }; return false }) {
+                problems.append("\(post.id) has a stub beside its banners")
+            }
+        }
+        // No label sits in the question.
+        for l in layout.labels where l.frame.minY < 250 - 0.01 { problems.append("label \(l.name) at \(l.frame.minY)") }
         // Nothing meets the orb.
         for b in banners where meetsOrb(b.frame) { problems.append("\(b.id) \(b.frame) meets the orb") }
         for l in layout.labels where meetsOrb(l.frame) { problems.append("label \(l.name) meets the orb") }
@@ -632,7 +779,10 @@ private enum Invariants {
         for level in WalkLevel.allCases where layout.posts.contains(where: { $0.key.level == level }) {
             let onLevel = layout.banners(on: level)
             let shown = onLevel.compactMap(\.itemId).count
-            let folded = onLevel.reduce(0) { sum, b in if case .stub(let n) = b.kind { return sum + n }; return sum }
+            let folded = onLevel.reduce(0) { sum, b in
+                if case .stub(let n) = b.kind { return sum + n }
+                return sum + (b.more ?? 0)
+            }
             let expected = level == .today ? 1 : s.items(on: level).filter { item in
                 s.ground ? item.areaId.map { id in s.areas.contains { $0.id == id } } ?? false : true
             }.count
