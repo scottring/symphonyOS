@@ -82,7 +82,7 @@ struct WalkStepsTests {
         #expect(s.depth == .quick)
         #expect(s.kept.isEmpty)
         #expect(s.focusArea == nil)
-        #expect(effects.contains(.save))
+        #expect(effects == [.save])
 
         var w = m.welcome()
         _ = w.act(.full, m.env)
@@ -100,14 +100,12 @@ struct WalkStepsTests {
 
         let first = s.apply(.areaTapped(m.health.id), m.env)
         #expect(s.kept == [m.health.id])
-        #expect(first.contains(.sound(.tick, afterMs: 0)))
-        #expect(first.contains(.timer(.undo, ms: WalkState.undoMs)))
-        #expect(first.contains(.save))
-        #expect(!first.contains { if case .write = $0 { return true } else { return false } })
+        #expect(first == [.sound(.tick, afterMs: 0), .timer(.undo, ms: WalkState.undoMs), .save])   // no row until something is planted
+        #expect(s.undoShowing == true)
 
         let second = s.apply(.areaTapped(m.health.id), m.env)
         #expect(s.kept.isEmpty)
-        #expect(second.contains(.sound(.tick, afterMs: 0)))
+        #expect(second == [.sound(.tick, afterMs: 0), .timer(.undo, ms: WalkState.undoMs), .save])
         #expect(s.undo == [.keep(m.health.id), .unkeep(m.health.id, index: 0)])
     }
 
@@ -130,7 +128,7 @@ struct WalkStepsTests {
         let effects = s.act(.next, m.env)
         #expect(s.step == 2)
         #expect(s.focus[.season] == m.strong.id)
-        #expect(effects.contains(.save))
+        #expect(effects == [.save])
 
         // With nothing planted on Year there is nothing to focus.
         var empty = m.at(1)
@@ -150,7 +148,7 @@ struct WalkStepsTests {
         #expect(s.step == 1)
         #expect(s.focusArea == nil)
         #expect(s.tour.isEmpty)
-        #expect(effects.contains(.save))
+        #expect(effects == [.save])
     }
 
     // MARK: The whole year
@@ -168,7 +166,7 @@ struct WalkStepsTests {
         let toHealth = s.act(.next, m.env)
         #expect(s.step == 1)
         #expect(s.focusArea == m.health.id)
-        #expect(toHealth.contains(.save))
+        #expect(toHealth == [.save])
 
         _ = s.act(.next, m.env)
         #expect(s.step == 1)
@@ -241,20 +239,135 @@ struct WalkStepsTests {
 
         let back = s.act(.back, m.env)
         #expect(s.step == 2)
-        #expect(back.contains(.save))
+        #expect(back == [.save])
         _ = s.act(.next, m.env)
         #expect(s.step == 3)
         #expect(s.focus[.month] == m.lift.id)
     }
 
-    @Test func aTourStartsAgainWhenItsStepIsEnteredAgain() {
+    // MARK: A tour remembers its place (controller ruling on the Task 8 review)
+
+    @Test func backUpFromSeasonThenWalkOnReturnsToTheSameGoalInOnePress() {
         var s = m.at(1, depth: .full)
-        _ = s.act(.next, m.env)                 // Season: Feel strong again, with two more ahead
+        _ = s.act(.next, m.env)                 // Season: Feel strong again, two more ahead
         _ = s.act(.next, m.env)                 // Finish the bathroom
-        _ = s.act(.back, m.env)                 // back up to Year
+        #expect(s.focus[.season] == m.bathroom.id)
+
+        _ = s.act(.back, m.env)                 // up to Year: the tour is over, the whole range in view
         #expect(s.step == 1)
+        #expect(!s.ground)
+        #expect(s.focusArea == nil)
+        #expect(s.tour.isEmpty)
+
+        _ = s.act(.next, m.env)                 // one press back down
+        #expect(s.step == 2)
+        #expect(s.focus[.season] == m.bathroom.id)
+        #expect(s.tour == [m.weekends.id])
+    }
+
+    @Test func backFromMonthToSeasonKeepsTheSeasonFocusAndTheStopsLeft() {
+        var finished = m.at(2, depth: .full)
+        _ = finished.act(.back, m.env)
+        _ = finished.act(.next, m.env)          // Season tour from the top: strong, then bathroom, weekends
+        _ = finished.act(.next, m.env)
+        _ = finished.act(.next, m.env)
+        #expect(finished.focus[.season] == m.weekends.id && finished.tour.isEmpty)
+        _ = finished.act(.next, m.env)
+        #expect(finished.step == 3)
+        _ = finished.act(.back, m.env)
+        #expect(finished.step == 2)
+        #expect(finished.focus[.season] == m.weekends.id)
+        #expect(finished.tour.isEmpty)
+
+        var midway = m.at(3, depth: .full)
+        midway.focus[.season] = m.bathroom.id
+        _ = midway.act(.back, m.env)
+        #expect(midway.focus[.season] == m.bathroom.id)
+        #expect(midway.tour == [m.weekends.id])
+    }
+
+    @Test func aRememberedFocusThatIsNoLongerAStopRestartsTheTour() {
+        var s = m.at(3, depth: .full)
+        s.focus[.season] = UUID()               // its goal was pulled up
+        _ = s.act(.back, m.env)
+        #expect(s.focus[.season] == m.strong.id)
+        #expect(s.tour == [m.bathroom.id, m.weekends.id])
+    }
+
+    @Test func nudgingToTheLastStopThenWalkingOnLeavesTheStep() {
+        var s = leftTheGround(keeping: [m.home, m.health, m.people])
+        #expect(s.focusArea == m.home.id && s.tour == [m.health.id, m.people.id])
+        _ = s.act(.nudge, m.env)
+        _ = s.act(.nudge, m.env)
+        #expect(s.focusArea == m.people.id)
+        #expect(s.tour.isEmpty)
+        _ = s.act(.next, m.env)
+        #expect(s.step == 2)
+    }
+
+    @Test func nudgingToAMiddleStopThenWalkingOnGoesToTheStopAfterIt() {
+        var s = leftTheGround(keeping: [m.home, m.health, m.people])
+        _ = s.act(.nudge, m.env)
         #expect(s.focusArea == m.health.id)
-        #expect(s.tour == [m.home.id, m.people.id])
+        #expect(s.tour == [m.people.id])
+        _ = s.act(.next, m.env)
+        #expect(s.step == 1 && s.focusArea == m.people.id)
+
+        // The same on the Season tour, by tapping a parent flag.
+        var season = m.at(1, depth: .full)
+        _ = season.act(.next, m.env)            // Feel strong again; Finish the bathroom and More slow weekends ahead
+        _ = season.apply(.bannerTapped(m.bathroom.id), m.env)
+        #expect(season.tour == [m.weekends.id])
+        _ = season.act(.next, m.env)
+        #expect(season.step == 2 && season.focus[.season] == m.weekends.id)
+        _ = season.act(.next, m.env)
+        #expect(season.step == 3)
+    }
+
+    @Test func aReleasedFocusKeepsTheStopsLeft() {
+        var s = leftTheGround(keeping: [m.home, m.health, m.people])
+        _ = s.apply(.areaTapped(m.home.id), m.env)  // back to the whole range
+        #expect(s.focusArea == nil)
+        #expect(s.tour == [m.health.id, m.people.id])
+        _ = s.act(.next, m.env)
+        #expect(s.focusArea == m.health.id)
+    }
+
+    @Test func aTourStepPutsAwayWhatBelongedToTheLastStop() {
+        var s = leftTheGround(keeping: [m.home, m.health, m.people])
+        s.selected = m.bathroom.id
+        s.expanded = WalkPostKey(level: .year, column: m.home.id)
+        s.typing = "half a thought"
+        s.orb = .open
+        let effects = s.act(.next, m.env)
+        #expect(s.focusArea == m.health.id)
+        #expect(s.selected == nil)
+        #expect(s.expanded == nil)
+        #expect(s.typing == nil)
+        #expect(s.orb == .idle)
+        #expect(effects == [.save])
+    }
+
+    @Test func aWholeYearWalkWithNothingKeptReachesTheBottom() {
+        var s = m.welcome()
+        _ = s.act(.full, m.env)
+        for _ in 0..<6 { _ = s.act(.next, m.env) }
+        #expect(s.step == 6)
+    }
+
+    @Test func aWholeYearWalkWithNoYearGoalsReachesTheBottom() {
+        var s = leftTheGround(keeping: [m.home, m.health, m.people])
+        for _ in 0..<7 { _ = s.act(.next, m.env) }      // two more peaks, then Season…Look back up
+        #expect(s.step == 6)
+    }
+
+    /// A whole-year walk just off the ground, nothing planted.
+    private func leftTheGround(keeping areas: [WalkArea]) -> WalkState {
+        var s = m.welcome()
+        _ = s.act(.full, m.env)
+        for a in areas { _ = s.apply(.areaTapped(a.id), m.env) }
+        _ = s.act(.next, m.env)
+        return s
     }
 
     @Test func backFromYearReturnsToGround() {
@@ -267,7 +380,7 @@ struct WalkStepsTests {
         #expect(s.focusArea == nil)
         #expect(s.tour.isEmpty)
         #expect(s.kept == [m.health.id, m.home.id, m.people.id])
-        #expect(effects.contains(.save))
+        #expect(effects == [.save])
     }
 
     @Test func backFromGroundReturnsToWelcome() {
@@ -276,7 +389,7 @@ struct WalkStepsTests {
         let effects = s.act(.back, m.env)
         #expect(s.step == 0)
         #expect(!s.ground)
-        #expect(effects.contains(.save))
+        #expect(effects == [.save])
         #expect(s.act(.back, m.env).isEmpty)    // nowhere higher than Welcome
         #expect(s.step == 0)
     }
@@ -341,7 +454,7 @@ struct WalkStepsTests {
         #expect(s.focusArea == m.health.id)
         let third = s.act(.nudge, m.env)
         #expect(s.focusArea == m.home.id)
-        #expect(third.contains(.save))
+        #expect(third == [.save])
         _ = s.act(.nudge, m.env)
         #expect(s.focusArea == m.people.id)
 
@@ -410,14 +523,16 @@ struct WalkStepsTests {
         #expect(s.typing == nil)
         #expect(s.orb == .idle)
         #expect(s.undoShowing == false)
-        #expect(effects.contains(.save))
+        #expect(effects == [.save])
     }
 
     @Test func stepsNeverPassSix() {
         var s = m.at(6)
-        _ = s.act(.next, m.env)
-        _ = s.act(.next, m.env)
+        s.sheetOpen = true
+        #expect(s.act(.next, m.env) == [])
+        #expect(s.act(.next, m.env) == [])
         #expect(s.step == 6)
+        #expect(s.sheetOpen)                    // walking on at the bottom changes nothing
     }
 
     @Test func enteringTodayOffersTheCalendarOnlyWhenAsked() {

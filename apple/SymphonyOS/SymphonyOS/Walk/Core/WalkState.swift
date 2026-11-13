@@ -107,7 +107,11 @@ struct WalkState: Equatable {
             return [.save]
         }
         if let stop = tour.first {
+            // The stops left always follow the focus (see `follow`), so the next one is first.
             tour.removeFirst()
+            selected = nil
+            expanded = nil
+            typing = nil
             orb = .idle
             if step == 1 { focusArea = stop } else if let level { focus[level] = stop }
             return [.save]
@@ -136,18 +140,16 @@ struct WalkState: Equatable {
         return [.save]
     }
 
-    /// Arrives on a step, from above or below. Focus per step is remembered; a
-    /// tour starts again each time its step is entered.
+    /// Arrives on a step, from above or below. Focus per step is remembered. Year
+    /// entered from below has its tour over: no peak focused, the whole range in view.
     private mutating func enter(_ newStep: Int, _ env: WalkEnv) {
         step = newStep
         focusArea = nil
         tour = []
         settle()
-        guard let level else { return }
-        if level == .year {
-            startTour()
-        } else if level == .season, depth == .full {
-            startTour()
+        guard let level, level != .year else { return }
+        if level == .season, depth == .full {
+            resumeSeasonTour()
         } else if focus[level] == nil, let above = WalkLevel(rawValue: level.rawValue - 1),
                   let last = item(lastPlanted[above]) {
             // The flag planted last on the level above, so the next flag links to it.
@@ -156,22 +158,50 @@ struct WalkState: Equatable {
         if level == .today, env.canAskCalendar { calendarOffer = true }
     }
 
-    /// Whole year: on Year, each kept area in kept order; on Season, each year
-    /// goal in column order. The first stop is focused, the rest wait in `tour`.
+    /// Leaving the ground: in a whole-year walk the Year tour starts at the first
+    /// kept area, the rest waiting in `tour`.
     private mutating func startTour() {
         guard depth == .full else {
             focusArea = nil
             tour = []
             return
         }
-        if step == 1 {
-            focusArea = kept.first
-            tour = Array(kept.dropFirst())
-        } else if step == 2 {
-            let stops = yearGoalsInColumnOrder().map(\.id)
+        focusArea = kept.first
+        tour = Array(kept.dropFirst())
+    }
+
+    /// Season in a whole-year walk: the first time, the tour starts at the first
+    /// year goal; after that it picks up at the remembered focus. A focus that is
+    /// no longer a stop (its goal was pulled up) starts it again.
+    private mutating func resumeSeasonTour() {
+        let stops = tourStops
+        if let current = focus[.season], let index = stops.firstIndex(of: current) {
+            tour = Array(stops[(index + 1)...])
+        } else {
             focus[.season] = stops.first
             tour = Array(stops.dropFirst())
         }
+    }
+
+    /// A whole-year tour's full order: kept areas in kept order on Year, year goals
+    /// in column order on Season. Derived, so only the stops still ahead are stored.
+    private var tourStops: [UUID] {
+        guard depth == .full, !ground else { return [] }
+        switch step {
+        case 1: return kept
+        case 2: return yearGoalsInColumnOrder().map(\.id)
+        default: return []
+        }
+    }
+
+    /// A tap or a nudge that moves the focus during a tour moves the tour with it:
+    /// the stops left are the ones after the new focus. Releasing the focus (nil)
+    /// leaves the stops as they were.
+    private mutating func follow(_ newFocus: UUID?) {
+        guard !tour.isEmpty, let newFocus else { return }
+        let stops = tourStops
+        guard let index = stops.firstIndex(of: newFocus) else { return }
+        tour = Array(stops[(index + 1)...])
     }
 
     /// Columns follow `areas`; the unlabeled post is last; planting order inside a column.
@@ -211,6 +241,7 @@ struct WalkState: Equatable {
         }
         guard kept.contains(id) else { return [] }
         focusArea = focusArea == id ? nil : id
+        follow(focusArea)
         return [.save]
     }
 
@@ -219,6 +250,7 @@ struct WalkState: Equatable {
         guard let level, let item = item(id),
               item.level.rawValue == level.rawValue - 1 else { return [] }
         focus[level] = focus[level] == id ? nil : id
+        follow(focus[level])
         return [.save]
     }
 
@@ -228,6 +260,7 @@ struct WalkState: Equatable {
             guard !kept.isEmpty else { return [] }
             let next = focusArea.flatMap { kept.firstIndex(of: $0) }.map { ($0 + 1) % kept.count } ?? 0
             focusArea = kept[next]
+            follow(focusArea)
             return [.save]
         }
         guard let above = WalkLevel(rawValue: level.rawValue - 1) else { return [] }
@@ -236,6 +269,7 @@ struct WalkState: Equatable {
         let next = focus[level].flatMap { id in parents.firstIndex { $0.id == id } }
             .map { ($0 + 1) % parents.count } ?? 0
         focus[level] = parents[next].id
+        follow(focus[level])
         return [.save]
     }
 }
