@@ -12,6 +12,7 @@
 		03A5E53758E11DAA36391C9A /* PhotoCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D281A39DAC953BBEB0F5A15B /* PhotoCaptureService.swift */; };
 		0630729249000F4EC7E32774 /* AccountDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D25E6463326D082AF845C7 /* AccountDeletion.swift */; };
 		07094B11FD0EFD2BC3927820 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777FA26749C1A4208B9DDC94 /* RoutineDetailView.swift */; };
+		095EB0D565A667604C269A43 /* WalkLoadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E8E58E265506F189EADDEE /* WalkLoadTests.swift */; };
 		0C4A58B20B67EBDA3028040D /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */; };
 		0CE48E3DFD5F5A01A8B18529 /* TaskViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9031A67BD188FEA2743DE71D /* TaskViewModel.swift */; };
 		0D34C6B5FDC9D86C5A042651 /* DinnerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4559D7757792E8224AEBAD9 /* DinnerCard.swift */; };
@@ -161,10 +162,12 @@
 		E9931F907BB03878B9C2E2D4 /* SyncOrderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F10C1B10246EDA085A4AAEB /* SyncOrderTests.swift */; };
 		EC475DE919BDE2B3F16AB6DD /* SymphonyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976CC1C0AE86C75E25C45F45 /* SymphonyApp.swift */; };
 		ED73ECCD14D5BD8905977FBC /* MedTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E5D5FD9C80A901E371BBA0 /* MedTokenStore.swift */; };
+		EE599002146DDAF319E7E450 /* WalkLoad.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBBB488F79A3F4EA90C13F96 /* WalkLoad.swift */; };
 		EF989D585C3EFDBF3B9F28AC /* ActionableInstance.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF475C4AF30EC00DCE982A8C /* ActionableInstance.swift */; };
 		F0115C80484E86958FFACD0F /* WalkClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C158967C47A0AB76A11DCAD0 /* WalkClassifierTests.swift */; };
 		F0197E1212180F211236F0B3 /* WalkWordsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB3AEE2C54522D3756F63C5 /* WalkWordsTests.swift */; };
 		F13311D96ED0C89151D9A8B7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F95E01EADA6CAD09DF1A9B0A /* SettingsView.swift */; };
+		F3E521D498496E982353B3BE /* WalkEnding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 399D0D1A5900BCD6EAF3F051 /* WalkEnding.swift */; };
 		F43839CC6571F712B5D5D175 /* WalkClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = D349620293CBF9CE126ECA7D /* WalkClassifier.swift */; };
 		F6622C0BA431BC0127286CC5 /* SymphonyOSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */; };
 		F6867823613D7C736CEE671D /* RoutineOccurrenceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1383EE5C83DE0489DE695E0 /* RoutineOccurrenceSheet.swift */; };
@@ -234,6 +237,7 @@
 		1A3E9139010E51C7040394A0 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
 		1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
 		1D73CE19B7F2E740A74F4192 /* ScopeRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeRuleTests.swift; sourceTree = "<group>"; };
+		20E8E58E265506F189EADDEE /* WalkLoadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkLoadTests.swift; sourceTree = "<group>"; };
 		217B2A6BEE77F0C6CE19306F /* MonthlyPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyPositionTests.swift; sourceTree = "<group>"; };
 		23C9315FE094AD463C763A78 /* RowMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowMapper.swift; sourceTree = "<group>"; };
 		27058614DEA3A0A75E46BF59 /* DomainFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainFilter.swift; sourceTree = "<group>"; };
@@ -250,6 +254,7 @@
 		37846053B387BAA8FC10D3E6 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		394F2642EB45FC8B817CA33F /* TellSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TellSheet.swift; sourceTree = "<group>"; };
 		39946BD93A7DD6FB74C15D93 /* TriageController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriageController.swift; sourceTree = "<group>"; };
+		399D0D1A5900BCD6EAF3F051 /* WalkEnding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkEnding.swift; sourceTree = "<group>"; };
 		39EA5F28070C6203DFC10DC7 /* TimelineViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineViewModel.swift; sourceTree = "<group>"; };
 		3AB69B50EF59A9617786BC1E /* GoalEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalEditorSheet.swift; sourceTree = "<group>"; };
 		3B6B9CC39AA73C9E5C18E58A /* HingeReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HingeReader.swift; sourceTree = "<group>"; };
@@ -349,6 +354,7 @@
 		CAB41AA36899F9E925114A11 /* WalkWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkWriter.swift; sourceTree = "<group>"; };
 		CAEC2212D6BF83452FC75F4B /* PlanCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCalendar.swift; sourceTree = "<group>"; };
 		CB914E1C7496FD41FBD275B4 /* PlanningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningTests.swift; sourceTree = "<group>"; };
+		CBBB488F79A3F4EA90C13F96 /* WalkLoad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkLoad.swift; sourceTree = "<group>"; };
 		CBF0FC1CF6088ADE5D739EB5 /* EventNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventNote.swift; sourceTree = "<group>"; };
 		CCA7DCDE1B3C18FAAD465BDB /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		CF475C4AF30EC00DCE982A8C /* ActionableInstance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionableInstance.swift; sourceTree = "<group>"; };
@@ -397,6 +403,8 @@
 		044CC96AD9094C57DD3D8DD2 /* Data */ = {
 			isa = PBXGroup;
 			children = (
+				399D0D1A5900BCD6EAF3F051 /* WalkEnding.swift */,
+				CBBB488F79A3F4EA90C13F96 /* WalkLoad.swift */,
 				CAB41AA36899F9E925114A11 /* WalkWriter.swift */,
 			);
 			path = Data;
@@ -755,6 +763,7 @@
 				C4E6747A78170172B1525262 /* TimelineEnrichmentTests.swift */,
 				BB29FF05A2D7D279DC175F6A /* TodayLayoutTests.swift */,
 				C158967C47A0AB76A11DCAD0 /* WalkClassifierTests.swift */,
+				20E8E58E265506F189EADDEE /* WalkLoadTests.swift */,
 				891666939A8FC92F36CE9644 /* WalkPeriodsTests.swift */,
 				9CB3AEE2C54522D3756F63C5 /* WalkWordsTests.swift */,
 				810A53A98309C06B117920DC /* WalkWriterTests.swift */,
@@ -1057,6 +1066,7 @@
 				F90FEBB07169AAE26DA4DC6F /* TimelineEnrichmentTests.swift in Sources */,
 				A558EB89256A9A88556E2464 /* TodayLayoutTests.swift in Sources */,
 				F0115C80484E86958FFACD0F /* WalkClassifierTests.swift in Sources */,
+				095EB0D565A667604C269A43 /* WalkLoadTests.swift in Sources */,
 				D8D3DD0112C5FFB01AE063EA /* WalkPeriodsTests.swift in Sources */,
 				F0197E1212180F211236F0B3 /* WalkWordsTests.swift in Sources */,
 				B801C725F4C1032E966C76B6 /* WalkWriterTests.swift in Sources */,
@@ -1183,6 +1193,8 @@
 				30D02C1243BC999F654F3957 /* UserProfile.swift in Sources */,
 				7726C3A546FB6B4FE09495A9 /* View+Extensions.swift in Sources */,
 				F43839CC6571F712B5D5D175 /* WalkClassifier.swift in Sources */,
+				F3E521D498496E982353B3BE /* WalkEnding.swift in Sources */,
+				EE599002146DDAF319E7E450 /* WalkLoad.swift in Sources */,
 				1F88DB610A36225ABB6A4B8B /* WalkPeriods.swift in Sources */,
 				E7C7EB89D64D38D5E4C1844A /* WalkTypes.swift in Sources */,
 				9E7CADF4761927B56C7D738E /* WalkWords.swift in Sources */,
