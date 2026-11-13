@@ -128,11 +128,15 @@ begin
   -- D's sign-in row was added by E with no role (role_label null).
   insert into public.family_members (user_id, auth_user_id, is_full_user, name, role_label, display_order) values
     (e, null, true, '107 E self', 'parent', 0), (e, d, true, '107 D in E', null, 1), (d, null, true, '107 D self', 'parent', 0);
-  -- Assignments to D's own seed row: E's tasks, and D's shared task that passes to E.
-  insert into public.tasks (user_id, scope, title, assigned_to) values
-    (e, 'individual', '107 E for D', (select id from public.family_members where name = '107 D self'));
-  insert into public.tasks (user_id, scope, title, assigned_to_all) values
-    (e, 'couple', '107 E for D and E', array[(select id from public.family_members where name = '107 D self'), (select id from public.family_members where name = '107 E self')]);
+  -- E's rows that point at D's own seed row: an assignment, a SET NULL
+  -- reference and a CASCADE one. D's shared task (passing to E) points at it too.
+  insert into public.tasks (user_id, scope, title, assigned_to, held_by) values
+    (e, 'individual', '107 E for D', (select id from public.family_members where name = '107 D self'),
+                                     (select id from public.family_members where name = '107 D self'));
+  insert into public.meal_plans (user_id, week_start) values (e, '2026-11-23');
+  insert into public.meal_plan_entries (meal_plan_id, ad_hoc_title, for_member_id) values
+    ((select id from public.meal_plans where user_id = e and week_start = '2026-11-23'), '107 E dinner for D',
+     (select id from public.family_members where name = '107 D self'));
   update public.tasks set assigned_to = (select id from public.family_members where name = '107 D self') where title = '107 D shared';
 
   insert into ids values ('a', a), ('b', b), ('ad', ad), ('c', c), ('cd', cd), ('d', d), ('e', e),
@@ -251,23 +255,23 @@ begin
   assert (select assigned_to from public.tasks where title = '107 B for A child') = pg_temp.id('a_child'), '5: B''s task lost its assignment to A''s child';
   assert (select assigned_to from public.tasks where title = '107 B for A') = (select id from public.family_members where name = '107 A self'), '5: B''s task lost its assignment to A';
 
-  -- D, who joined E's household, stays in E's family as ONE person row with no sign-in;
-  -- D's own seed row goes with D, and what pointed at it now points at D's remaining row.
-  assert (select (user_id = pg_temp.id('e') and auth_user_id is null and not is_full_user) from public.family_members where name = '107 D in E'),
-    '5: D''s row in E''s family is gone, still signed in, or still a full user';
-  assert not exists (select 1 from public.family_members where name = '107 D self'), '5: D''s seed row was handed on';
+  -- D, who joined E's household with a seed row of their own, leaves both rows
+  -- with E as ordinary adult person rows, neither level with E's own self row.
+  assert (select (user_id = pg_temp.id('e') and auth_user_id is null and not is_full_user and role_label = 'parent' and display_order >= 1)
+          from public.family_members where name = '107 D in E'), '5: D''s sign-in row is not an ordinary adult row of E''s after display_order 0';
+  assert (select (user_id = pg_temp.id('e') and auth_user_id is null and not is_full_user and role_label = 'parent' and display_order >= 1)
+          from public.family_members where name = '107 D self'), '5: D''s seed row is not an ordinary adult row of E''s after display_order 0';
   assert (select (auth_user_id is null and is_full_user and display_order = 0) from public.family_members where name = '107 E self'), '5: E''s self row changed';
-  assert (select count(*) from public.family_members where user_id = pg_temp.id('e') and auth_user_id is null and display_order = 0) = 1,
-    '5: E does not own exactly one row at the tie';
-  assert (select count(*) from public.family_members where user_id = pg_temp.id('e') and auth_user_id is null and is_full_user) = 1,
-    '5: E does not have exactly one self row';
-  assert (select assigned_to from public.tasks where title = '107 E for D') = (select id from public.family_members where name = '107 D in E'),
-    '5: E''s task for D did not move to D''s remaining row';
-  assert (select assigned_to_all from public.tasks where title = '107 E for D and E')
-       = array[(select id from public.family_members where name = '107 D in E'), (select id from public.family_members where name = '107 E self')],
-    '5: E''s task for D and E did not move to D''s remaining row';
-  assert (select (user_id = pg_temp.id('e') and assigned_to = (select id from public.family_members where name = '107 D in E')) from public.tasks where title = '107 D shared'),
-    '5: D''s shared task (now E''s) did not move to D''s remaining row';
+  assert (select count(*) from public.family_members where user_id = pg_temp.id('e') and display_order = 0) = 1
+     and (select count(*) from public.family_members where user_id = pg_temp.id('e') and display_order = 0 and is_full_user) = 1,
+    '5: E''s self row is not the only row E owns at display_order 0';
+  -- Nothing that pointed at D's seed row is lost: it is E's row now.
+  assert (select (assigned_to = d_self and held_by = d_self) from public.tasks, (select id as d_self from public.family_members where name = '107 D self') x
+          where title = '107 E for D'), '5: E''s task lost its assignment or held_by for D';
+  assert (select for_member_id from public.meal_plan_entries where ad_hoc_title = '107 E dinner for D') = (select id from public.family_members where name = '107 D self'),
+    '5: E''s dinner for D was deleted or changed';
+  assert (select (user_id = pg_temp.id('e') and assigned_to = (select id from public.family_members where name = '107 D self')) from public.tasks where title = '107 D shared'),
+    '5: D''s shared task did not pass to E still assigned to D';
 
   -- A departed adult stays an adult. The web's rule (useScreenTime.ts isChildMember,
   -- useShellChrome.ts familyKids): a child is role_label 'child', or role_label not

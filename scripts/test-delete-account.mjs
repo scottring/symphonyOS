@@ -94,7 +94,8 @@ try {
     create table public.recipes(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, title text);
     create table public.meal_plans(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, week_start date not null, unique (user_id, week_start));
     create table public.meal_plan_entries(id uuid primary key default gen_random_uuid(), meal_plan_id uuid not null references public.meal_plans(id) on delete cascade,
-      recipe_id uuid references public.recipes(id) on delete set null, ad_hoc_title text);
+      recipe_id uuid references public.recipes(id) on delete set null, ad_hoc_title text,
+      for_member_id uuid references public.family_members(id) on delete cascade);
     create table public.scratchpad_notes(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, body text);
     create table public.captures(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
       household_id uuid references public.households(id) on delete set null, body text);
@@ -106,8 +107,10 @@ try {
 
     -- Live: these point at family_members(id) with no delete action (2026-11-13 read).
     alter table public.tasks add column assigned_to uuid references public.family_members(id);
-    -- Live: family_members ids with no foreign key (032_event_multi_assignment.sql shape).
-    alter table public.tasks add column assigned_to_all uuid[] default '{}';
+    -- A household member's rows can point at another member's family row with a delete
+    -- action; they must survive when that member leaves (live: tasks.held_by SET NULL,
+    -- meal_plan_entries.for_member_id CASCADE, among others).
+    alter table public.tasks add column held_by uuid references public.family_members(id) on delete set null;
     alter table public.routines add column assigned_to uuid references public.family_members(id);
     create table public.event_notes(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
       assigned_to uuid references public.family_members(id), body text);
