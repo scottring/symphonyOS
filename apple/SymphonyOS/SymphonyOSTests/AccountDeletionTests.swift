@@ -21,11 +21,13 @@ struct AccountDeletionTests {
         #expect(AccountDeletion.warning(sharesHousehold: true) == base + " Things you share with your household stay with them.")
     }
 
-    /// A lost reply: the server deleted the account, the retry gets 401.
-    /// Only 2xx and 401 finish locally; everything else changes nothing.
+    /// A lost reply: the server deleted the account, the retry gets 410.
+    /// Only 2xx and 410 finish locally; a 401 (a refresh that failed, a
+    /// revoked session) and everything else change nothing.
     @Test func outcomeForHTTPStatus() {
         #expect(AccountDeletion.outcome(forHTTPStatus: 200) == .deleted)
-        #expect(AccountDeletion.outcome(forHTTPStatus: 401) == .alreadyGone)
+        #expect(AccountDeletion.outcome(forHTTPStatus: 410) == .alreadyGone)
+        #expect(AccountDeletion.outcome(forHTTPStatus: 401) == .failed)
         #expect(AccountDeletion.outcome(forHTTPStatus: 503) == .failed)
         #expect(AccountDeletion.outcome(forHTTPStatus: 500) == .failed)
         #expect(AccountDeletion.outcome(forHTTPStatus: 403) == .failed)

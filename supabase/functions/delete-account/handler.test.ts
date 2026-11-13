@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { handleDeleteAccount, type DeleteAccountDeps } from './handler'
+import { handleDeleteAccount, readUserLookup, type DeleteAccountDeps } from './handler'
 
 const CONFIRM = 'delete my account'
 const U1 = '6f1c2b8e-3d4a-4c5b-9e7f-0a1b2c3d4e5f'
@@ -9,7 +9,7 @@ function setup(over: Partial<DeleteAccountDeps> = {}, displayIds: unknown[] = []
   const deps: DeleteAccountDeps = {
     userFor: async () => {
       calls.push('userFor')
-      return { id: U1, isAnonymous: false }
+      return { kind: 'user', id: U1, isAnonymous: false }
     },
     removeFiles: async (id) => {
       calls.push(`removeFiles:${id}`)
@@ -72,6 +72,19 @@ describe('delete-account', () => {
     expect(calls).toEqual([])
   })
 
+  it('410 account_gone when the sign-in\'s user no longer exists, and nothing else runs', async () => {
+    const { deps, calls } = setup({
+      userFor: async () => {
+        calls.push('userFor')
+        return { kind: 'gone' }
+      },
+    })
+    const res = await handleDeleteAccount(req(), deps)
+    expect(res.status).toBe(410)
+    expect(await res.json()).toEqual({ error: 'This account has already been deleted.', code: 'account_gone' })
+    expect(calls).toEqual(['userFor'])
+  })
+
   it('503 auth_unavailable when userFor throws (Auth unreachable), and nothing else runs', async () => {
     const { deps, calls } = setup({
       userFor: async () => {
@@ -90,7 +103,7 @@ describe('delete-account', () => {
     ['a path', '../other'],
     ['a uuid with a suffix', `${U1}/x`],
   ])('401 and no storage walk when the verified id is %s', async (_n, id) => {
-    const { deps, calls } = setup({ userFor: async () => ({ id, isAnonymous: false }) })
+    const { deps, calls } = setup({ userFor: async () => ({ kind: 'user', id, isAnonymous: false }) })
     const res = await handleDeleteAccount(req(), deps)
     expect(res.status).toBe(401)
     expect((await res.json()).code).toBe('unauthorized')
@@ -98,7 +111,7 @@ describe('delete-account', () => {
   })
 
   it('403 not_a_person for an anonymous display session', async () => {
-    const { deps, calls } = setup({ userFor: async () => ({ id: '0b9d8c7a-6f5e-4d3c-8b2a-1f0e9d8c7b6a', isAnonymous: true }) })
+    const { deps, calls } = setup({ userFor: async () => ({ kind: 'user', id: '0b9d8c7a-6f5e-4d3c-8b2a-1f0e9d8c7b6a', isAnonymous: true }) })
     const res = await handleDeleteAccount(req(), deps)
     expect(res.status).toBe(403)
     expect((await res.json()).code).toBe('not_a_person')
@@ -181,5 +194,44 @@ describe('delete-account', () => {
     const res = await handleDeleteAccount(req(), deps)
     expect(res.status).toBe(500)
     expect(await res.json()).toMatchObject({ code: 'delete_failed', step: 'auth' })
+  })
+})
+
+describe('readUserLookup (what a getUser answer means)', () => {
+  const user = { id: U1, is_anonymous: false }
+
+  it('a user is a user', () => {
+    expect(readUserLookup(user, null)).toEqual({ kind: 'user', id: U1, isAnonymous: false })
+    expect(readUserLookup({ id: U1, is_anonymous: true }, null)).toEqual({ kind: 'user', id: U1, isAnonymous: true })
+  })
+
+  it.each([
+    ['AuthRetryableFetchError (network, status 0)', { name: 'AuthRetryableFetchError', status: 0 }],
+    ['AuthRetryableFetchError (502)', { name: 'AuthRetryableFetchError', status: 502 }],
+    ['status 0 by itself', { name: 'AuthError', status: 0 }],
+    ['a 500 api error', { name: 'AuthApiError', status: 500, code: 'unexpected_failure' }],
+    ['a 503 that also says user_not_found', { name: 'AuthApiError', status: 503, code: 'user_not_found' }],
+  ])('throws when Auth itself failed: %s', (_n, error) => {
+    expect(() => readUserLookup(null, error)).toThrow()
+  })
+
+  it.each([
+    ['403 user_not_found (what GoTrue answers)', { name: 'AuthApiError', status: 403, code: 'user_not_found' }],
+    ['404 user_not_found', { name: 'AuthApiError', status: 404, code: 'user_not_found' }],
+  ])('gone only when the user does not exist: %s', (_n, error) => {
+    expect(readUserLookup(null, error)).toEqual({ kind: 'gone' })
+  })
+
+  it.each([
+    ['a revoked or signed-out session', { name: 'AuthSessionMissingError', status: 400 }],
+    ['session_not_found', { name: 'AuthApiError', status: 403, code: 'session_not_found' }],
+    ['a bad or expired JWT', { name: 'AuthApiError', status: 403, code: 'bad_jwt' }],
+    ['an error with no status', { name: 'AuthUnknownError' }],
+  ])('anything else that is not a user is null (401): %s', (_n, error) => {
+    expect(readUserLookup(null, error)).toBeNull()
+  })
+
+  it('no user and no error is null', () => {
+    expect(readUserLookup(null, null)).toBeNull()
   })
 })

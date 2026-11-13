@@ -36,11 +36,12 @@ enum AccountDeletion {
     enum Outcome: Equatable {
         /// The server deleted the account just now.
         case deleted
-        /// 401: this sign-in no longer exists. The server deleted the account
-        /// on an earlier try whose reply was lost (the server answers a failed
-        /// Auth lookup with 503, not 401).
+        /// 410: this sign-in's user no longer exists. The server deleted the
+        /// account on an earlier try whose reply was lost.
         case alreadyGone
-        /// Anything else (no network, 400, 403, 500, 503): nothing changes here.
+        /// Anything else (no network, 400, 401, 403, 500, 503): nothing
+        /// changes here. A 401 is not proof the account is gone: a session
+        /// refresh that failed or a revoked session also answers 401.
         case failed
     }
 
@@ -48,7 +49,7 @@ enum AccountDeletion {
     static func outcome(forHTTPStatus status: Int?) -> Outcome {
         switch status {
         case .some(200..<300): .deleted
-        case .some(401): .alreadyGone
+        case .some(410): .alreadyGone
         default: .failed
         }
     }
@@ -72,7 +73,7 @@ enum AccountDeletion {
         }
         switch outcome(forHTTPStatus: status) {
         case .deleted: break
-        case .alreadyGone: log.notice("delete-account answered 401: the account is already gone; finishing on the phone")
+        case .alreadyGone: log.notice("delete-account answered 410: the account is already gone; finishing on the phone")
         case .failed: throw failure ?? URLError(.badServerResponse)
         }
         await finishLocally(container: container, stopSync: stopSync, userId: userId,

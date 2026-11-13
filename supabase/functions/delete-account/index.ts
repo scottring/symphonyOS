@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { handleDeleteAccount, isUserId } from './handler.ts'
+import { handleDeleteAccount, isUserId, readUserLookup } from './handler.ts'
 
 const BUCKETS = ['attachments', 'asset-photos']
 const BATCH = 100
@@ -39,8 +39,7 @@ Deno.serve((req) =>
         data: { user },
         error,
       } = await db.auth.getUser(authorization.replace(/^Bearer\s+/i, ''))
-      if (error || !user) return null
-      return { id: user.id, isAnonymous: user.is_anonymous === true }
+      return readUserLookup(user, error)
     },
     removeFiles: async (userId) => {
       // Never walk anything but one person's folder: an empty or odd prefix would reach other people's files.
