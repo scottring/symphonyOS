@@ -709,7 +709,7 @@ export function SettingsPage({
             <section>
               <SectionHeading>Founding households</SectionHeading>
               <p className="text-sm text-neutral-500 mb-6">
-                Signup is open to everyone. These are the people who asked for an invite before it opened.
+                People who asked for an invite. While signup is invite-only, approving one lets that email create an account.
               </p>
               {/* An approve that the database refused. Without this the row
                   simply stayed un-approved and nothing said why — an admin

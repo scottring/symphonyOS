@@ -139,6 +139,7 @@ window.addEventListener('vite:preloadError', (event) => {
 })
 import { FirstRunGate } from './components/setup/FirstRunGate'
 import { EditionGate } from './components/edition/EditionGate'
+import { EditionGateIfSignedIn } from './components/edition/EditionGateIfSignedIn'
 import { OnboardingFlow } from './components/setup/OnboardingFlow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
@@ -227,15 +228,15 @@ createRoot(document.getElementById('root')!).render(
                   shell rendered chrome around an empty body. Send stale kiosk
                   bookmarks to the current board instead. */}
               <Route path="/wall/*" element={<Navigate to="/wall-v2" replace />} />
-              <Route path="/wall-v2/*" element={<Shell />} />
+              <Route path="/wall-v2/*" element={<EditionGateIfSignedIn><Shell /></EditionGateIfSignedIn>} />
               <Route path="/wall-lanes" element={<Suspense fallback={null}><WallV2LanePreview /></Suspense>} />
               {/* Dev only: every approved kiosk board with fixed data — no reads,
                   writes or calls — for design review screenshots. */}
               {import.meta.env.DEV && <Route path="/kiosk-preview" element={<Suspense fallback={null}><KioskScenePreview /></Suspense>} />}
               {/* A kid's tablet: paired for one kid in Settings → Displays. A
                   grown-up can open /kid/<member id>?layout=trail|list. */}
-              <Route path="/kid" element={<Suspense fallback={null}><KidKiosk /></Suspense>} />
-              <Route path="/kid/:memberId" element={<Suspense fallback={null}><KidKiosk /></Suspense>} />
+              <Route path="/kid" element={<EditionGateIfSignedIn><Suspense fallback={null}><KidKiosk /></Suspense></EditionGateIfSignedIn>} />
+              <Route path="/kid/:memberId" element={<EditionGateIfSignedIn><Suspense fallback={null}><KidKiosk /></Suspense></EditionGateIfSignedIn>} />
               {/* The plural is the natural thing to type on a tablet; it
                   opened an empty Today (Scott, 2026-10-27). */}
               <Route path="/kids" element={<Navigate to="/kid" replace />} />
