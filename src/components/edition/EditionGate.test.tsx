@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { render } from '@/test/test-utils'
 import type { User } from '@supabase/supabase-js'
@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({ rpc: vi.fn() }))
 vi.mock('@/lib/supabase', () => ({ supabase: { rpc: h.rpc } }))
 
 import { EditionGate } from './EditionGate'
+import { EDITION_LOOKUP_TIMEOUT_MS } from '@/lib/edition'
 
 const user = { id: 'u-ed', email: 'a@b.c' } as unknown as User
 const signOut = vi.fn(async () => ({ error: null }))
@@ -76,5 +77,20 @@ describe('EditionGate', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }))
     expect(signOut).toHaveBeenCalled()
     expect(screen.getByText('Signed in as a@b.c')).toBeInTheDocument()
+  })
+
+  it('shows the app, and does not cache it, when the lookup never answers', async () => {
+    vi.useFakeTimers()
+    try {
+      h.rpc.mockReturnValue(new Promise(() => {}))
+      render(gate())
+      expect(screen.getByText('Loading...')).toBeInTheDocument()
+      await act(async () => { await vi.advanceTimersByTimeAsync(EDITION_LOOKUP_TIMEOUT_MS + 1) })
+      expect(screen.getByText('APP')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Symphony is on iPhone for now' })).not.toBeInTheDocument()
+      expect(localStorage.getItem('symphony.edition.full.u-ed')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -7,13 +7,24 @@ export type Edition = 'light' | 'full'
  * on any error or unexpected answer: the server enforces the edition, so a
  * failed lookup must show the app rather than lock a full household out.
  */
+export const EDITION_LOOKUP_TIMEOUT_MS = 8000
+
 export async function loadEdition(): Promise<Edition | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  // A lookup that never settles (stalled auth lock, dead network) must not
+  // strand the user on "Loading...": time out as null, which shows the app.
+  const timeout = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), EDITION_LOOKUP_TIMEOUT_MS) })
   try {
-    const { data, error } = await supabase.rpc('my_edition')
-    if (error) return null
-    return data === 'light' || data === 'full' ? data : null
+    const lookup = (async () => {
+      const { data, error } = await supabase.rpc('my_edition')
+      if (error) return null
+      return data === 'light' || data === 'full' ? (data as Edition) : null
+    })()
+    return await Promise.race([lookup, timeout])
   } catch {
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }
 

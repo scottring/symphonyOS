@@ -187,7 +187,7 @@ if (isDesktopShell()) {
 startRealtimeKeepAlive()
 
 // A brand-new account sees the one-screen household setup before the Shell.
-const cutoverShell = <AuthGate>{({ user, signOut }) => <EditionGate user={user} signOut={signOut}><FirstRunGate user={user}><Shell /></FirstRunGate></EditionGate>}</AuthGate>
+const cutoverShell = <AuthGate>{({ user, signOut }) => <EditionGate key={user.id} user={user} signOut={signOut}><FirstRunGate user={user}><Shell /></FirstRunGate></EditionGate>}</AuthGate>
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -198,7 +198,7 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <GoogleCalendarProvider>
             <Routes>
-              <Route path="/getting-started" element={<AuthGate>{({ user, signOut }) => <EditionGate user={user} signOut={signOut}><OnboardingFlow key={user.id} user={user} /></EditionGate>}</AuthGate>} />
+              <Route path="/getting-started" element={<AuthGate>{({ user, signOut }) => <EditionGate key={user.id} user={user} signOut={signOut}><OnboardingFlow key={user.id} user={user} /></EditionGate>}</AuthGate>} />
               {/* /, /today, /inbox, /task/:id are served by the Shell via the
                   /* catch-all below (explicit routes here win by specificity). */}
               <Route path="/goals/*" element={cutoverShell} />
@@ -262,7 +262,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/join/:token" element={<JoinHousehold />} />
               <Route
                 path="/paper/phone/:id"
-                element={<AuthGate>{({ user, signOut }) => <EditionGate user={user} signOut={signOut}><Suspense fallback={null}><PhonePaperPage user={user} /></Suspense></EditionGate>}</AuthGate>}
+                element={<AuthGate>{({ user, signOut }) => <EditionGate key={user.id} user={user} signOut={signOut}><Suspense fallback={null}><PhonePaperPage user={user} /></Suspense></EditionGate>}</AuthGate>}
               />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
               {/* The Shell owns the cutover paths (/, /today, /inbox, /task/:id)
