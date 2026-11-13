@@ -268,15 +268,21 @@ struct WalkWriter {
     }
 
     /// Moves today's first-thing mark from `previous` to `id` (either may be
-    /// nil). The first thing is dated today if it is not already.
+    /// nil). The first thing is dated today if it is not already; when the
+    /// mark leaves a task it dated, that task goes back to where it was (as
+    /// long as this writer remembers: a relaunch leaves it on today).
     func setFirstThing(_ id: UUID?, previous: UUID?) {
         let today = periods.today
         if let previous, let f = focusRow(TaskFocus.key(taskId: previous, userId: userId, date: today)) {
             unfocus(f)
         }
+        if let previous, previous != id, let placement = memory.datedToday.removeValue(forKey: previous),
+           myTask(previous) != nil {
+            plan.undo(placement)            // puts the placement back and queues the update
+        }
         if let id, let t = myTask(id) {
             if !PlanCalendar.sameDay(t.scheduledFor, today) {
-                plan.planTask(t, on: today, focusToday: true)
+                memory.datedToday[id] = plan.planTask(t, on: today, focusToday: true)
             }
             // planTask focuses only on the clock's today; the walk's today is
             // the one it was opened on.
@@ -298,6 +304,8 @@ struct WalkWriter {
         var madeAreas: Set<UUID> = []
         /// Names of areas this walk made and then dropped, so Undo can bring one back.
         var droppedAreas: [UUID: String] = [:]
+        /// Tasks the first-thing mark dated today, with where they were before.
+        var datedToday: [UUID: PlanWriter.Snapshot] = [:]
     }
 
     private struct Removed {

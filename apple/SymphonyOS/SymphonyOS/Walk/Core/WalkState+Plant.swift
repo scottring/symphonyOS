@@ -22,9 +22,15 @@ extension WalkState {
 
     /// An example is planted as the person's own words, only while examples are
     /// on for this step, with the focused peak's or parent's area and no classifying.
+    /// Once it is planted (same words, and on Week the same day) another tap does nothing.
     mutating func plantExample(_ text: String, _ env: WalkEnv) -> [WalkEffect] {
         guard let level, !ground, examplesOn.contains(step), WalkCopy.examples(level).contains(text),
               let said = WalkWords.said(text, level: level, today: env.periods.today) else { return [] }
+        let planted = items(on: level).contains {
+            $0.title.caseInsensitiveCompare(said.title) == .orderedSame
+                && (level != .week || $0.day.map(PlanCalendar.day) == said.day.map(PlanCalendar.day))
+        }
+        guard !planted else { return [] }
         return [.sound(.poles, afterMs: 0)] + plantFlag(said, on: level, classify: false, plantSoundMs: 160, env)
     }
 
@@ -49,7 +55,7 @@ extension WalkState {
         // The first thing is a week task dated today, titled with everything that was said.
         let item = WalkItem(id: env.newId(), level: level == .today ? .week : level, title: said.title,
                             areaId: areaId, parentId: parent?.id,
-                            day: level == .today ? env.periods.today : said.day)
+                            day: level == .today ? env.periods.today : said.day, mine: true)
         items.append(item)
 
         var effects: [WalkEffect] = []
@@ -58,7 +64,7 @@ extension WalkState {
         if level == .today {
             effects.append(.write(.firstThing(item.id, previous: firstThing)))
             undo.append(.firstThing(previous: firstThing, created: item.id))
-            firstThing = item.id
+            moveMark(to: item.id, env.periods.today)
         } else {
             undo.append(.plant(item.id))
         }
@@ -107,16 +113,45 @@ extension WalkState {
 
     /// Today, a week flag focused: that task becomes the one first thing. The
     /// earlier first thing stays where it is.
-    mutating func startThere() -> [WalkEffect] {
+    mutating func startThere(_ env: WalkEnv) -> [WalkEffect] {
         guard level == .today, let id = focus[.today], id != firstThing, item(id) != nil else { return [] }
         let previous = firstThing
-        firstThing = id
+        moveMark(to: id, env.periods.today)
         undo.append(.firstThing(previous: previous, created: nil))
         undoShowing = true
         return [.write(.firstThing(id, previous: previous)), .timer(.undo, ms: WalkState.undoMs), .save]
     }
 
+    /// Moves the mark as the writer does: a task marked from another day is
+    /// dated today, and gets its day back when the mark leaves it.
+    private mutating func moveMark(to id: UUID?, _ today: Date) {
+        if let old = firstThing, old != id, let before = dayBeforeFirst.removeValue(forKey: old),
+           let index = items.firstIndex(where: { $0.id == old }) {
+            items[index].day = before
+        }
+        if let id, let index = items.firstIndex(where: { $0.id == id }), !PlanCalendar.sameDay(items[index].day, today) {
+            dayBeforeFirst.updateValue(items[index].day, forKey: id)
+            items[index].day = today
+        }
+        firstThing = id
+    }
+
     // MARK: Selecting, moving, pulling up
+
+    /// Whether a tap selects this flag rather than focusing it: a flag on the
+    /// step's own level, and on Today the first thing, if this walk planted it.
+    func selects(_ id: UUID) -> Bool {
+        guard let level, let item = item(id) else { return false }
+        if level == .today { return id == firstThing && item.mine }
+        return item.level == level
+    }
+
+    /// The areas the selected flag can move to: every label but its own. None
+    /// for Today's first thing, whose area comes from its parent: it can only be pulled up.
+    var moveTargets: [WalkArea] {
+        guard let item = item(selected), level != .today else { return [] }
+        return areas.filter { $0.id != item.areaId }
+    }
 
     /// A flag on the step's own level, planted by this walk: selected (or let go).
     mutating func select(_ id: UUID) -> [WalkEffect] {
@@ -148,7 +183,7 @@ extension WalkState {
     /// The selected flag goes to another area; an area not kept is kept, so its column appears.
     mutating func moveSelected(to areaId: UUID) -> [WalkEffect] {
         guard let id = selected, let index = items.firstIndex(where: { $0.id == id }), items[index].mine,
-              let target = area(areaId), items[index].areaId != areaId else { return [] }
+              let target = moveTargets.first(where: { $0.id == areaId }) else { return [] }
         let from = items[index].areaId
         let keptAdded: UUID? = kept.contains(areaId) ? nil : areaId
         if keptAdded != nil { kept.append(areaId) }
@@ -180,7 +215,7 @@ extension WalkState {
 
     /// Reverses the newest action, whatever step it was taken on. The stack
     /// lives as long as the walk runs; the pill hiding does not empty it.
-    mutating func undoLast() -> [WalkEffect] {
+    mutating func undoLast(_ env: WalkEnv) -> [WalkEffect] {
         guard let entry = undo.popLast() else { return [] }
         var effects: [WalkEffect] = []
         switch entry {
@@ -199,6 +234,8 @@ extension WalkState {
             if let index = items.firstIndex(where: { $0.id == id }), items[index].mine {
                 let to = items[index].areaId
                 items[index].areaId = from
+                // The area it left may have been dropped meanwhile: it comes back before the row names it.
+                if let a = area(from) { effects.append(.write(.area(a))) }
                 effects.append(.write(.setArea(id, items[index].level, from)))
                 if let to { effects.append(.write(.dropArea(to))) }
                 if let keptAdded {
@@ -220,7 +257,7 @@ extension WalkState {
             pulledChildren[item.id] = nil
         case .firstThing(let previous, let created):
             effects.append(.write(.firstThing(previous, previous: firstThing)))
-            firstThing = previous
+            moveMark(to: previous, env.periods.today)
             if let created { effects += takeBack(created) }
         }
         selected = nil

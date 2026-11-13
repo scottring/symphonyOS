@@ -543,6 +543,152 @@ struct WalkPlantTests {
         #expect(s.selected == nil)
     }
 
+    // MARK: Fix round 1
+
+    @Test func undoingAMoveBringsBackTheAreaItLeft() {
+        // Name Garden, plant A on it, move A to Work, plant B on Garden, then undo twice.
+        var s = m.ground()
+        _ = s.plant("garden", m.env)
+        let garden = s.areas[6]
+        _ = s.act(.next, m.env)
+        _ = s.apply(.areaTapped(garden.id), m.env)
+        _ = s.plant("learn the cello", m.env)
+        let a = s.items[0]
+        #expect(a.areaId == garden.id)
+        _ = s.apply(.bannerTapped(a.id), m.env)
+        _ = s.apply(.moveTo(m.work.id), m.env)
+        _ = s.plant("learn the flute", m.env)
+        let b = s.items[1]
+        #expect(b.areaId == garden.id)
+
+        let takeB = s.apply(.undo, m.env)
+        #expect(takeB.contains(.write(.dropArea(garden.id))))      // the writer may now drop Garden
+
+        let moveBack = s.apply(.undo, m.env)
+        #expect(moveBack == [
+            .write(.area(garden)), .write(.setArea(a.id, .year, garden.id)), .write(.dropArea(m.work.id)),
+            .sound(.poles, afterMs: 0), .save,
+        ])
+        #expect(s.items.map(\.areaId) == [garden.id])
+    }
+
+    @Test func anExampleIsYoursOnce() {
+        var s = m.on(4, items: [m.tile])
+        s.examplesOn = [4]
+        _ = s.apply(.exampleTapped("Gym on Tuesday"), m.env)
+        let once = s
+        #expect(s.apply(.exampleTapped("Gym on Tuesday"), m.env).isEmpty)
+        #expect(s == once)
+
+        // The same words on another day are another task.
+        var otherDay = m.on(4, items: [WalkItem(id: UUID(), level: .week, title: "gym", day: m.today)])
+        otherDay.examplesOn = [4]
+        _ = otherDay.apply(.exampleTapped("Gym on Tuesday"), m.env)
+        #expect(otherDay.items.count == 2)
+
+        // Without case, and on Year too.
+        var year = m.on(1, items: [WalkItem(id: UUID(), level: .year, title: "run a 5k")])
+        year.examplesOn = [1]
+        #expect(year.apply(.exampleTapped("Run a 5K"), m.env).isEmpty)
+        #expect(year.items.count == 1)
+    }
+
+    @Test func startThereDatesTheTaskTodayAndUndoGivesItsDayBack() {
+        let thursday = day(2026, 11, 12)
+        let call = WalkItem(id: UUID(), level: .week, title: "Call the tile shop", areaId: m.home.id, day: thursday)
+        var s = m.on(5, items: [call])
+        s.focus[.today] = call.id
+        _ = s.act(.startThere, m.env)
+        #expect(s.items[0].day == m.today)
+        #expect(s.firstThing == call.id)
+
+        _ = s.act(.undo, m.env)
+        #expect(s.items[0].day == thursday)
+        #expect(s.firstThing == nil)
+
+        // A task with no day gets no day back.
+        let loose = WalkItem(id: UUID(), level: .week, title: "Book the plumber")
+        var noDay = m.on(5, items: [loose])
+        noDay.focus[.today] = loose.id
+        _ = noDay.act(.startThere, m.env)
+        #expect(noDay.items[0].day == m.today)
+        _ = noDay.act(.undo, m.env)
+        #expect(noDay.items[0].day == nil)
+    }
+
+    @Test func whenTheMarkMovesOnTheTaskGetsItsDayBack() {
+        let thursday = day(2026, 11, 12)
+        let call = WalkItem(id: UUID(), level: .week, title: "Call the tile shop", day: thursday)
+        var s = m.on(5, items: [call, m.deposit])
+        s.focus[.today] = call.id
+        _ = s.act(.startThere, m.env)
+        #expect(s.items[0].day == m.today)
+
+        _ = s.plant("find the cheque book", m.env)            // a new first thing
+        #expect(s.items[0].day == thursday)
+
+        _ = s.apply(.undo, m.env)                              // the mark comes back: today again
+        #expect(s.firstThing == call.id)
+        #expect(s.items[0].day == m.today)
+
+        // A task already on today is not touched either way.
+        s.focus[.today] = m.deposit.id
+        _ = s.act(.startThere, m.env)
+        #expect(s.items[0].day == thursday)
+        #expect(s.items[1].day == m.today)
+        _ = s.act(.undo, m.env)
+        #expect(s.items[1].day == m.today)
+        #expect(s.items[0].day == m.today)
+    }
+
+    @Test func onTodayThePlantedFirstThingCanBePulledUp() {
+        var s = m.on(5)
+        _ = s.plant("call the plumber", m.env)
+        let first = s.items[0]
+        _ = s.apply(.undoExpired, m.env)
+
+        let tap = s.apply(.bannerTapped(first.id), m.env)
+        #expect(s.selected == first.id)
+        #expect(tap == [.sound(.tick, afterMs: 0)])
+        #expect(s.focus[.today] == nil)
+        #expect(s.moveTargets.isEmpty)                         // its area is inherited: Pull it up only
+        #expect(s.apply(.moveTo(m.home.id), m.env).isEmpty)
+
+        let pulled = s.apply(.pullUp, m.env)
+        #expect(s.items.isEmpty)
+        #expect(s.firstThing == nil)
+        #expect(pulled == [
+            .write(.remove(first.id, .week)), .sound(.poles, afterMs: 0), .timer(.undo, ms: WalkState.undoMs), .save,
+        ])
+        _ = s.apply(.undo, m.env)
+        #expect(s.items == [first])
+        #expect(s.firstThing == first.id)
+    }
+
+    @Test func onTodayOtherFlagsAreStillFocused() {
+        var theirs = m.deposit
+        theirs.mine = false
+        let mine = WalkItem(id: UUID(), level: .week, title: "Choose the tile", day: m.today)
+        var s = m.on(5, items: [theirs, mine])
+        s.firstThing = theirs.id
+
+        _ = s.apply(.bannerTapped(theirs.id), m.env)          // a first thing the walk did not plant
+        #expect(s.selected == nil)
+        #expect(s.focus[.today] == theirs.id)
+
+        _ = s.apply(.bannerTapped(mine.id), m.env)            // a week flag that is not the first thing
+        #expect(s.selected == nil)
+        #expect(s.focus[.today] == mine.id)
+    }
+
+    @Test func moveTargetsAreEveryOtherArea() {
+        var s = m.on(1, items: [m.bathroom])
+        #expect(s.moveTargets.isEmpty)
+        _ = s.apply(.bannerTapped(m.bathroom.id), m.env)
+        #expect(s.moveTargets == [m.health, m.people, m.work, m.money, m.fun])
+        #expect(s.apply(.moveTo(m.home.id), m.env).isEmpty)    // its own area is not a move
+    }
+
     // MARK: Stubs
 
     @Test func aStubOpensItsColumn() {

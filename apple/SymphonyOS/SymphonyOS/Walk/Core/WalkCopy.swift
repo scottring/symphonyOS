@@ -214,7 +214,7 @@ enum WalkCopy {
         }
     }
 
-    enum BannerRole: Equatable { case mine, plain, focusable, focused, firstThing, example, stub(Int) }
+    enum BannerRole: Equatable { case mine, plain, focusable, focused, firstThing, firstThingMine, example, stub(Int) }
 
     static func bannerLabel(_ text: String, level: WalkLevel, tag: String?, role: BannerRole) -> String {
         let head = "\(levelName(level)): \(text)"
@@ -225,6 +225,7 @@ enum WalkCopy {
         case .focusable: return "\(withTag), tap to focus"
         case .focused: return "\(withTag), focused, tap to let go"
         case .firstThing: return "Today: \(text), first thing"
+        case .firstThingMine: return "Today: \(text), first thing, tap to pull up"   // planted by the walk
         case .example: return "Example: \(text), tap to make it yours"
         case .stub(let n): return "\(n) more, tap to show"
         }

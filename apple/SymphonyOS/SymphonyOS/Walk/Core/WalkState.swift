@@ -28,6 +28,7 @@ struct WalkState: Equatable {
     var note: String?; var undoShowing = false
     var undo: [WalkUndoEntry] = []         // in memory only, by design: never saved, so a relaunch starts with nothing to undo
     var pulledChildren: [UUID: [UUID]] = [:]   // a pulled-up flag → the flags that named it as parent; in memory, for Undo
+    var dayBeforeFirst: [UUID: Date?] = [:]    // a task the first-thing mark dated today → its day before; in memory
     var sheetOpen = false; var calendarOffer = false
 
     enum Orb: Equatable { case idle, holding(hover: CompassPoint?), open, speaking(live: String) }
@@ -48,8 +49,8 @@ struct WalkState: Equatable {
         switch event {
         case .areaTapped(let id): return tapArea(id)
         case .bannerTapped(let id):
-            // A flag on the step's own level is selected (Move to, Pull it up); one level up, focused.
-            if let level, item(id)?.level == level { return select(id) }
+            // A flag on the step's own level (on Today, the first thing) is selected; one level up, focused.
+            if selects(id) { return select(id) }
             return focusParent(id)
         case .noteExpired:
             note = nil
@@ -63,7 +64,7 @@ struct WalkState: Equatable {
         case .exampleTapped(let text): return plantExample(text, env)
         case .moveTo(let areaId): return moveSelected(to: areaId)
         case .pullUp: return pullUpSelected()
-        case .undo: return undoLast()
+        case .undo: return undoLast(env)
         case .undoExpired:
             undoShowing = false             // only the pill goes: the stack stays
             return []
@@ -88,8 +89,8 @@ struct WalkState: Equatable {
             guard (1...4).contains(step), !ground else { return [] }
             if examplesOn.contains(step) { examplesOn.remove(step) } else { examplesOn.insert(step) }
             return []
-        case .undo: return undoLast()
-        case .startThere: return startThere()
+        case .undo: return undoLast(env)
+        case .startThere: return startThere(env)
         // Typing (Task 11), the calendar (Task 20).
         case .type, .calendar:
             return []

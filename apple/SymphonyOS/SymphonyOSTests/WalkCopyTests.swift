@@ -207,6 +207,8 @@ struct WalkCopyTests {
         #expect(b("Run a 5K", .year, nil, .focusable) == "Year: Run a 5K, tap to focus")
         #expect(b("Run a 5K", .year, nil, .focused) == "Year: Run a 5K, focused, tap to let go")
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThing) == "Today: Gym induction, first thing")
+        #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingMine)
+                == "Today: Gym induction, first thing, tap to pull up")
         #expect(b("Run a 5K", .year, nil, .example) == "Example: Run a 5K, tap to make it yours")
         #expect(b("", .year, nil, .stub(3)) == "3 more, tap to show")
         #expect(WalkCopy.areaHint(ground: true, kept: false, focused: false) == "Tap to keep")

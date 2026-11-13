@@ -524,6 +524,69 @@ struct WalkWriterTests {
         everyFlagIsQueued(ctx)
     }
 
+    @Test func aTaskMarkedFirstFromAnotherDayGoesBackWhenTheMarkMoves() throws {
+        let ctx = try makeContext()
+        let w = writer(ctx)
+        let thursday = day(2026, 11, 12)
+        let t = WalkItem(id: UUID(), level: .week, title: "Call the tile shop", day: thursday)
+        let b = WalkItem(id: UUID(), level: .week, title: "Buy running shoes", day: periods.today)
+        w.create(t, parent: nil)
+        w.create(b, parent: nil)
+        try pushAll(ctx)
+
+        w.setFirstThing(t.id, previous: nil)
+        #expect(task(ctx, t.id)?.scheduledFor == periods.today)
+
+        try pushAll(ctx)
+        w.setFirstThing(b.id, previous: t.id)
+        #expect(task(ctx, t.id)?.scheduledFor == thursday)
+        #expect(task(ctx, t.id)?.weekStart == PlanCalendar.weekStart(thursday))
+        #expect(task(ctx, t.id)?.placementDirty == true)
+        #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == t.id && $0.changeType == "update" })
+        let marked = focus(ctx).filter { PlanCalendar.sameDay($0.date, periods.today) }
+        #expect(marked.map(\.taskId) == [b.id])
+        everyFlagIsQueued(ctx)
+
+        // Remembered once: marking it again and clearing the mark puts it back again.
+        w.setFirstThing(t.id, previous: b.id)
+        #expect(task(ctx, t.id)?.scheduledFor == periods.today)
+        w.setFirstThing(nil, previous: t.id)
+        #expect(task(ctx, t.id)?.scheduledFor == thursday)
+        #expect(focus(ctx).isEmpty)
+    }
+
+    @Test func clearingTheMarkPutsTheTaskBack() throws {
+        let ctx = try makeContext()
+        let w = writer(ctx)
+        let thursday = day(2026, 11, 12)
+        let t = WalkItem(id: UUID(), level: .week, title: "Call the tile shop", day: thursday)
+        w.create(t, parent: nil)
+        w.setFirstThing(t.id, previous: nil)
+        try pushAll(ctx)
+
+        w.setFirstThing(nil, previous: t.id)
+        #expect(task(ctx, t.id)?.scheduledFor == thursday)
+        #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == t.id && $0.changeType == "update" })
+
+        // A relaunch remembers nothing: a new writer leaves the task on today.
+        w.setFirstThing(t.id, previous: nil)
+        writer(ctx).setFirstThing(nil, previous: t.id)
+        #expect(task(ctx, t.id)?.scheduledFor == periods.today)
+    }
+
+    @Test func aTaskAlreadyOnTodayIsNotTouchedEitherWay() throws {
+        let ctx = try makeContext()
+        let w = writer(ctx)
+        let a = WalkItem(id: UUID(), level: .week, title: "Buy running shoes", day: periods.today)
+        w.create(a, parent: nil)
+        try pushAll(ctx)
+
+        w.setFirstThing(a.id, previous: nil)
+        w.setFirstThing(nil, previous: a.id)
+        #expect(task(ctx, a.id)?.scheduledFor == periods.today)
+        #expect(!pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == a.id })
+    }
+
     @Test func tickingTogglesAnyTask() throws {
         let ctx = try makeContext()
         let t = SymphonyTask(userId: me, title: "Water the plants", context: "family", syncStatus: .synced)
