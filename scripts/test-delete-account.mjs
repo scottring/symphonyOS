@@ -16,7 +16,9 @@
 // tables, and kid_math_prefs.user_id. The nullable no-action references to
 // family_members (tasks/routines/event_notes.assigned_to,
 // actionable_instances.assigned_to_override) and the NOT NULL one from
-// screen_time_entries mirror the live database. The real owner-immutable,
+// screen_time_entries mirror the live database, as do the unique indexes
+// family_members_one_self_row and actionable_instances
+// (user_id, entity_type, entity_id, date). The real owner-immutable,
 // AI budget, edition and membership-guard migrations are applied on top.
 // Never contacts a remote database.
 import { execFileSync } from 'node:child_process'
@@ -85,7 +87,9 @@ try {
 
     -- Shared by ownership.
     create table public.family_members(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id),
-      auth_user_id uuid references auth.users(id) on delete set null, name text);
+      auth_user_id uuid references auth.users(id) on delete set null, is_full_user boolean not null default false, name text);
+    -- Live (2026-07-20_family_members_one_self_row.sql): one self row per owner.
+    CREATE UNIQUE INDEX family_members_one_self_row ON public.family_members (user_id) WHERE (is_full_user AND (auth_user_id IS NULL));
     create table public.recipes(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, title text);
     create table public.meal_plans(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, week_start date not null, unique (user_id, week_start));
     create table public.meal_plan_entries(id uuid primary key default gen_random_uuid(), meal_plan_id uuid not null references public.meal_plans(id) on delete cascade,
@@ -105,7 +109,9 @@ try {
     create table public.event_notes(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
       assigned_to uuid references public.family_members(id), body text);
     create table public.actionable_instances(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
-      assigned_to_override uuid references public.family_members(id));
+      entity_type text not null check (entity_type in ('calendar_event', 'routine')), entity_id text not null, date date not null,
+      assignee uuid references auth.users(id) on delete set null, assigned_to_override uuid references public.family_members(id));
+    create unique index actionable_instances_user_id_entity_type_entity_id_date_key on public.actionable_instances (user_id, entity_type, entity_id, date);
     create table public.screen_time_entries(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id),
       family_member_id uuid not null references public.family_members(id), minutes int);
     -- In the move list but without a user_id column here: skipped, not an error.

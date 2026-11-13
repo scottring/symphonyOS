@@ -75,7 +75,9 @@ export class AiUsageError extends Error {
     const limited = reason === 'daily_limit' || reason === 'monthly_limit'
     const when = reason === 'monthly_limit' ? 'month' : 'day'
     // Every refusal that is not a spent allowance keeps the one client code
-    // (ai_usage_unavailable); the words say which it is. Until 2026-11-11 a
+    // (ai_usage_unavailable, 503); the words say which it is. The exception
+    // is a light household (light_edition), which answers 403 with its own
+    // code, ai_light_edition. Until 2026-11-11 a
     // PDF attachment and an account with no household both read "usage
     // controls are not ready", which pointed at the wrong thing.
     super(limited

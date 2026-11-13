@@ -16,6 +16,11 @@ export interface DeleteAccountDeps {
 
 const CONFIRM_PHRASE = 'delete my account'
 
+/** A Supabase user id. Storage paths start with it, so anything else (an
+ *  empty id would walk the bucket root) must never reach the storage walk. */
+export const isUserId = (id: unknown): id is string =>
+  typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'content-type': 'application/json' } })
 
@@ -32,10 +37,13 @@ export async function handleDeleteAccount(req: Request, deps: DeleteAccountDeps)
   let user: { id: string; isAnonymous: boolean } | null
   try {
     user = await deps.userFor(authorization)
-  } catch {
-    user = null
+  } catch (e) {
+    // Auth could not be asked; the sign-in may be fine. Not a 401, which the
+    // phone reads as "this account is already gone".
+    console.error('delete-account: could not check the sign-in', e)
+    return json({ error: 'We could not check your sign-in. Nothing was changed; please try again.', code: 'auth_unavailable' }, 503)
   }
-  if (!user) return json({ error: 'Sign in to delete your account.', code: 'unauthorized' }, 401)
+  if (!user || !isUserId(user.id)) return json({ error: 'Sign in to delete your account.', code: 'unauthorized' }, 401)
   if (user.isAnonymous) return json({ error: 'This session is a display, not a person.', code: 'not_a_person' }, 403)
 
   let confirm: unknown

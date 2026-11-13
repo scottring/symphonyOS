@@ -18,7 +18,15 @@
 --      all rows: family_members, meal_plans, recipes, scratchpad_notes,
 --        notices, homes, kid_math_prefs, kid_math_problems;
 --      goal_areas where context = 'family'; captures where household_id is
---        not null.
+--        not null;
+--      actionable_instances (who did what on which day) where the household
+--        can read them: calendar events, and routines whose routine is
+--        couple/compound.
+--    Before the move, the leaver's own self row in family_members
+--    (is_full_user, no auth_user_id) becomes a plain person row
+--    (is_full_user := false): the leaver stays in the heir's family list,
+--    but never as a second self row for the heir, which the unique index
+--    family_members_one_self_row would refuse.
 --    Then spaces and assets the leaver created follow their home's owner
 --    (created_by := homes.user_id where that owner is not the leaver), with
 --    or without an heir.
@@ -43,6 +51,12 @@
 --    rows go. Repeated while it makes progress, so one such table may
 --    reference another; with no progress it raises, and nothing is changed.
 -- 6. task_focus rows go (no foreign key). AI spend tables are left alone.
+-- 7. A row in someone else's family that carries the leaver's sign-in (an
+--    invited partner, linked by accept_household_invitation) lets go of it
+--    (auth_user_id := null, is_full_user := false), so the leaver stays there
+--    as a person with no sign-in. Otherwise the auth row's ON DELETE SET NULL
+--    would turn it into a second self row for its owner, the unique index
+--    would refuse, and deleting the auth user would fail on every retry.
 --
 -- The live schema and the migrations differ, so every table and column named
 -- above is skipped when it does not exist. The owner-immutable trigger on the
@@ -105,8 +119,12 @@ begin
     array_position(array['owner', 'admin', 'member'], o.role), o.joined_at nulls last, o.user_id
   limit 1;
 
-  -- 2. Hand shared things on.
+  -- 2. Hand shared things on. The leaver's self row first becomes a person row.
   if v_heir is not null then
+    if public.delete_account_has_columns('family_members', array['user_id', 'is_full_user', 'auth_user_id']) then
+      execute 'update public.family_members set is_full_user = false where user_id = $1 and is_full_user and auth_user_id is null'
+        using p_user;
+    end if;
     for v_move in
       select * from (values
         ('tasks', 'user_id', 'scope', $c$scope in ('couple', 'compound')$c$),
@@ -125,10 +143,17 @@ begin
         ('kid_math_prefs', 'user_id', null, null),
         ('kid_math_problems', 'user_id', null, null),
         ('goal_areas', 'user_id', 'context', $c$context = 'family'$c$),
-        ('captures', 'user_id', 'household_id', 'household_id is not null')
+        ('captures', 'user_id', 'household_id', 'household_id is not null'),
+        ('actionable_instances', 'user_id', 'entity_type',
+          $c$(entity_type = 'calendar_event' or (entity_type = 'routine' and exists (
+              select 1 from public.routines r
+              where r.id::text = actionable_instances.entity_id and r.scope in ('couple', 'compound'))))$c$)
       ) as m(tbl, col, cond_col, cond)
     loop
       continue when not public.delete_account_has_columns(v_move.tbl, array_remove(array[v_move.col, v_move.cond_col], null));
+      continue when v_move.tbl = 'actionable_instances'
+        and not (public.delete_account_has_columns('actionable_instances', array['entity_id'])
+                 and public.delete_account_has_columns('routines', array['id', 'scope']));
       begin
         execute format('update public.%I set %I = $1 where %I = $2', v_move.tbl, v_move.col, v_move.col)
           || coalesce(' and ' || v_move.cond, '')
@@ -291,6 +316,13 @@ begin
   -- 6. task_focus has no foreign key.
   if public.delete_account_has_columns('task_focus', array['user_id']) then
     execute 'delete from public.task_focus where user_id = $1' using p_user;
+  end if;
+
+  -- 7. Let go of the leaver's sign-in on rows in other people's families.
+  if public.delete_account_has_columns('family_members', array['auth_user_id', 'is_full_user']) then
+    execute 'update public.family_members set auth_user_id = null, is_full_user = false where auth_user_id = $1' using p_user;
+  elsif public.delete_account_has_columns('family_members', array['auth_user_id']) then
+    execute 'update public.family_members set auth_user_id = null where auth_user_id = $1' using p_user;
   end if;
 
   return jsonb_build_object(

@@ -57,6 +57,36 @@ begin
   assert not has_function_privilege('anon', 'public.my_edition()', 'execute'), '2: anon may execute my_edition';
 end $$;
 
+-- 2b. The guard holds inside a SECURITY DEFINER function a signed-in person
+-- calls (setup_household's shape): it reads the JWT role, not current_user.
+-- The two stand-in functions are owned by postgres and rolled back with the rest.
+reset role;
+select set_config('request.jwt.claims', '', true);
+create function public.test_106_definer_insert(p_owner uuid) returns uuid
+language plpgsql security definer set search_path = '' as $f$
+declare v uuid;
+begin
+  insert into public.households (owner_id, edition) values (p_owner, 'full') returning id into v;
+  return v;
+end $f$;
+create function public.test_106_definer_update(p_household uuid) returns void
+language sql security definer set search_path = '' as $f$
+  update public.households set edition = 'full' where id = p_household
+$f$;
+grant execute on function public.test_106_definer_insert(uuid), public.test_106_definer_update(uuid) to authenticated;
+
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', (select v from ids where k = 'a'), 'role', 'authenticated')::text, true);
+do $$
+declare a uuid := (select v from ids where k = 'a'); hh_a uuid := (select v from ids where k = 'hh_a'); hh_x uuid;
+begin
+  hh_x := public.test_106_definer_insert(a);
+  assert (select edition from public.households where id = hh_x) = 'light', '2b: a definer insert as full, called signed in, read back full';
+  delete from public.households where id = hh_x;
+  perform public.test_106_definer_update(hh_a);
+  assert (select edition from public.households where id = hh_a) = 'light', '2b: a definer update, called signed in, flipped the edition';
+end $$;
+
 -- 3. No JWT context again: this is how Plus, or Scott by hand, flips a household.
 reset role;
 select set_config('request.jwt.claims', '', true);

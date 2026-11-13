@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handleDeleteAccount, type DeleteAccountDeps } from './handler'
 
 const CONFIRM = 'delete my account'
+const U1 = '6f1c2b8e-3d4a-4c5b-9e7f-0a1b2c3d4e5f'
 
 function setup(over: Partial<DeleteAccountDeps> = {}, displayIds: unknown[] = []) {
   const calls: string[] = []
   const deps: DeleteAccountDeps = {
     userFor: async () => {
       calls.push('userFor')
-      return { id: 'u1', isAnonymous: false }
+      return { id: U1, isAnonymous: false }
     },
     removeFiles: async (id) => {
       calls.push(`removeFiles:${id}`)
@@ -71,8 +72,33 @@ describe('delete-account', () => {
     expect(calls).toEqual([])
   })
 
+  it('503 auth_unavailable when userFor throws (Auth unreachable), and nothing else runs', async () => {
+    const { deps, calls } = setup({
+      userFor: async () => {
+        throw new Error('fetch failed')
+      },
+    })
+    const res = await handleDeleteAccount(req(), deps)
+    expect(res.status).toBe(503)
+    expect((await res.json()).code).toBe('auth_unavailable')
+    expect(calls).toEqual([])
+  })
+
+  it.each([
+    ['empty', ''],
+    ['not a uuid', 'u1'],
+    ['a path', '../other'],
+    ['a uuid with a suffix', `${U1}/x`],
+  ])('401 and no storage walk when the verified id is %s', async (_n, id) => {
+    const { deps, calls } = setup({ userFor: async () => ({ id, isAnonymous: false }) })
+    const res = await handleDeleteAccount(req(), deps)
+    expect(res.status).toBe(401)
+    expect((await res.json()).code).toBe('unauthorized')
+    expect(calls).toEqual([])
+  })
+
   it('403 not_a_person for an anonymous display session', async () => {
-    const { deps, calls } = setup({ userFor: async () => ({ id: 'd1', isAnonymous: true }) })
+    const { deps, calls } = setup({ userFor: async () => ({ id: '0b9d8c7a-6f5e-4d3c-8b2a-1f0e9d8c7b6a', isAnonymous: true }) })
     const res = await handleDeleteAccount(req(), deps)
     expect(res.status).toBe(403)
     expect((await res.json()).code).toBe('not_a_person')
@@ -96,13 +122,13 @@ describe('delete-account', () => {
     const res = await handleDeleteAccount(req(), deps)
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true })
-    expect(calls).toEqual(['userFor', 'removeFiles:u1', 'deleteData:u1', 'deleteAuthUser:d1', 'deleteAuthUser:d2', 'deleteAuthUser:u1'])
+    expect(calls).toEqual(['userFor', `removeFiles:${U1}`, `deleteData:${U1}`, 'deleteAuthUser:d1', 'deleteAuthUser:d2', `deleteAuthUser:${U1}`])
   })
 
   it('skips display ids that are the caller or not strings', async () => {
-    const { deps, calls } = setup({}, ['u1', 5, null, 'd1'])
+    const { deps, calls } = setup({}, [U1, 5, null, 'd1'])
     await handleDeleteAccount(req(), deps)
-    expect(calls.filter((c) => c.startsWith('deleteAuthUser'))).toEqual(['deleteAuthUser:d1', 'deleteAuthUser:u1'])
+    expect(calls.filter((c) => c.startsWith('deleteAuthUser'))).toEqual(['deleteAuthUser:d1', `deleteAuthUser:${U1}`])
   })
 
   it('a failing display user does not stop the caller deletion', async () => {
@@ -117,7 +143,7 @@ describe('delete-account', () => {
     )
     const res = await handleDeleteAccount(req(), deps)
     expect(res.status).toBe(200)
-    expect(calls).toContain('deleteAuthUser:u1')
+    expect(calls).toContain(`deleteAuthUser:${U1}`)
   })
 
   it('removeFiles failing gives 500 step files and stops', async () => {

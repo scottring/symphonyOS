@@ -1,10 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { handleDeleteAccount } from './handler.ts'
+import { handleDeleteAccount, isUserId } from './handler.ts'
 
 const BUCKETS = ['attachments', 'asset-photos']
 const BATCH = 100
 
-type Admin = ReturnType<typeof createClient>
+const adminClient = () =>
+  createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+type Admin = ReturnType<typeof adminClient>
 
 /** Every object path under `prefix/` (recursing into folders, which list with a null id). */
 async function listAll(admin: Admin, bucket: string, prefix: string): Promise<string[]> {
@@ -16,18 +21,13 @@ async function listAll(admin: Admin, bucket: string, prefix: string): Promise<st
     const entries = data ?? []
     for (const entry of entries) {
       const full = `${prefix}/${entry.name}`
-      if (entry.id === null) paths.push(...(await listAll(admin, bucket, full)))
+      if (entry.id == null) paths.push(...(await listAll(admin, bucket, full)))
       else paths.push(full)
     }
     if (entries.length < PAGE) break
   }
   return paths
 }
-
-const adminClient = () =>
-  createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
 
 Deno.serve((req) =>
   handleDeleteAccount(req, {
@@ -43,6 +43,8 @@ Deno.serve((req) =>
       return { id: user.id, isAnonymous: user.is_anonymous === true }
     },
     removeFiles: async (userId) => {
+      // Never walk anything but one person's folder: an empty or odd prefix would reach other people's files.
+      if (!isUserId(userId)) throw new Error('removeFiles needs a user id')
       const admin = adminClient()
       for (const bucket of BUCKETS) {
         const paths = await listAll(admin, bucket, userId)

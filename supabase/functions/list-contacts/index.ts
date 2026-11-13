@@ -2,11 +2,14 @@
 // Keeps the shared secret server-side; returns name/photo/favorite/enabled only.
 //
 // Auth: the caller's Supabase JWT (Authorization: Bearer). No body required.
+// Full households only (403 full_household_only otherwise); a paired wall
+// display reads full through its display membership.
 // No-op-safe: returns 503 until KIDPHONE_LIST_CONTACTS_URL + KIDPHONE_CALL_SECRET
 // are configured.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { parseContactsResponse } from './lib/validate.ts'
+import { fullHouseholdGate, FULL_HOUSEHOLD_ONLY } from '../_shared/fullHousehold.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +37,10 @@ Deno.serve(async (req: Request) => {
   })
   const { data: userData, error: userErr } = await userClient.auth.getUser()
   if (userErr || !userData?.user) return jsonResponse({ error: 'unauthorized' }, 401)
+  // Full households only: a light account (or a stranger) never reaches the bridge.
+  if ((await fullHouseholdGate({ edition: () => userClient.rpc('my_edition') })) === 'refuse') {
+    return jsonResponse(FULL_HOUSEHOLD_ONLY, 403)
+  }
 
   const listUrl = Deno.env.get('KIDPHONE_LIST_CONTACTS_URL') ?? ''
   const secret = Deno.env.get('KIDPHONE_CALL_SECRET') ?? ''

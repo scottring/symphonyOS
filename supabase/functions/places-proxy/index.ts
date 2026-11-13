@@ -5,7 +5,12 @@
 // Relay, DNS filters): the Maps JS gRPC transport throws "Rpc failed due to xhr
 // error" and even plain REST fetch throws "Load failed". Calling Google
 // server-side from the edge function sidesteps all of that.
+//
+// Auth: the caller's Supabase JWT (Authorization: Bearer), and a full
+// household (403 full_household_only otherwise): every call is billed.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { fullHouseholdGate, FULL_HOUSEHOLD_ONLY } from '../_shared/fullHousehold.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +29,15 @@ serve(async (req: Request) => {
       status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+
+  const authHeader = req.headers.get('Authorization') ?? ''
+  if (!authHeader.startsWith('Bearer ')) return json({ error: 'missing bearer token' }, 401)
+  const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: authHeader } },
+  })
+  if ((await fullHouseholdGate({ edition: () => userClient.rpc('my_edition') })) === 'refuse') {
+    return json(FULL_HOUSEHOLD_ONLY, 403)
+  }
 
   try {
     const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')

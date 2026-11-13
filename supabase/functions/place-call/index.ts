@@ -7,10 +7,13 @@
 // it returns 503 (telephony not configured) and places no call.
 //
 // Auth: the caller's Supabase JWT (Authorization: Bearer). Ownership of a
-// referenced task is enforced by RLS via the user-scoped client.
+// referenced task is enforced by RLS via the user-scoped client. Full
+// households only (403 full_household_only otherwise); a paired wall display
+// reads full through its display membership.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateBody, buildLogRow, bridgeToFor, type PlaceCallBody } from './lib/validate.ts'
+import { fullHouseholdGate, FULL_HOUSEHOLD_ONLY } from '../_shared/fullHousehold.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,6 +52,10 @@ Deno.serve(async (req: Request) => {
   })
   const { data: userData, error: userErr } = await userClient.auth.getUser()
   if (userErr || !userData?.user) return jsonResponse({ error: 'unauthorized' }, 401)
+  // Full households only: a light account (or a stranger) never reaches the bridge.
+  if ((await fullHouseholdGate({ edition: () => userClient.rpc('my_edition') })) === 'refuse') {
+    return jsonResponse(FULL_HOUSEHOLD_ONLY, 403)
+  }
   const userId = userData.user.id
 
   // contactId path: kid-phone resolves the number server-side. Otherwise resolve

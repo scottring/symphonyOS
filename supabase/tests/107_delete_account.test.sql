@@ -9,6 +9,11 @@
 -- A owns household H1, B is an active member, AD is H1's display.
 -- C is alone in H2 with display CD. E owns H3, D is a member who leaves.
 -- F owns H4, where G's invitation is still pending: F counts as alone.
+-- Family rows have the live invitation shape: each owner's self row
+-- (is_full_user, no sign-in), plus a row in the inviter's family carrying the
+-- joiner's sign-in (accept_household_invitation). B joined A's household and
+-- D joined E's; B and D also have their own self rows. A (the owner) leaving
+-- is the mirror of D (the joiner) leaving.
 begin;
 
 create temp table ids (k text primary key, v uuid) on commit drop;
@@ -61,10 +66,21 @@ begin
   insert into public.goals (user_id, scope, name) values (a, 'couple', '107 A shared goal'), (a, 'individual', '107 A private goal');
   insert into public.contacts (user_id, scope, name) values (a, 'compound', '107 A shared contact');
   insert into public.projects (user_id, scope, name) values (a, 'individual', '107 A private project');
-  insert into public.family_members (user_id, auth_user_id, name) values (a, a, '107 A self');
+  insert into public.family_members (user_id, auth_user_id, is_full_user, name) values
+    (a, null, true, '107 A self'), (a, b, true, '107 B in A'), (b, null, true, '107 B self');
   insert into public.family_members (user_id, auth_user_id, name) values (a, null, '107 A child') returning id into a_child;
-  -- B's own task assigned to A's child.
+  -- B's own tasks assigned to A's child and to A.
   insert into public.tasks (user_id, scope, title, assigned_to) values (b, 'individual', '107 B for A child', a_child);
+  insert into public.tasks (user_id, scope, title, assigned_to) values
+    (b, 'individual', '107 B for A', (select id from public.family_members where name = '107 A self'));
+  -- Who did what on which day: a shared routine's, a calendar event's, a
+  -- private routine's, and one that clashes with B's own row for the same day.
+  insert into public.actionable_instances (user_id, entity_type, entity_id, date) values
+    (a, 'routine', (select id::text from public.routines where name = '107 A shared routine'), '2026-11-10'),
+    (a, 'calendar_event', 'gcal-107', '2026-11-10'),
+    (a, 'routine', r_priv::text, '2026-11-10'),
+    (a, 'calendar_event', 'gcal-107-clash', '2026-11-11'),
+    (b, 'calendar_event', 'gcal-107-clash', '2026-11-11');
   insert into public.chat_sessions (user_id, scope, title) values (a, 'individual', '107 A private chat'), (a, 'couple', '107 A shared chat');
   insert into public.evening_reflections (user_id, body) values (a, '107 A reflection');
   insert into public.scratchpad_notes (user_id, body) values (a, '107 A scratch');
@@ -101,10 +117,13 @@ begin
   insert into public.routines (user_id, scope, name, assigned_to) values (c, 'individual', '107 C routine for child', c_child);
   insert into public.tasks (user_id, scope, title, assigned_to) values (c, 'individual', '107 C task for child', c_child);
   insert into public.event_notes (user_id, assigned_to, body) values (c, c_child, '107 C event note');
-  insert into public.actionable_instances (user_id, assigned_to_override) values (c, c_child);
+  insert into public.actionable_instances (user_id, entity_type, entity_id, date, assigned_to_override) values (c, 'calendar_event', 'gcal-107-c', '2026-11-10', c_child);
   insert into public.screen_time_entries (user_id, family_member_id, minutes) values (c, c_child, 30);
   insert into public.tasks (user_id, scope, title) values (f, 'couple', '107 F shared');
   insert into public.chat_sessions (user_id, scope, title) values (d, 'individual', '107 D chat');
+  -- D joined E's household by invitation.
+  insert into public.family_members (user_id, auth_user_id, is_full_user, name) values
+    (e, null, true, '107 E self'), (e, d, true, '107 D in E'), (d, null, true, '107 D self');
 
   insert into ids values ('a', a), ('b', b), ('ad', ad), ('c', c), ('cd', cd), ('d', d), ('e', e),
     ('f', f), ('g', g), ('h1', h1), ('h2', h2), ('h3', h3), ('h4', h4), ('a_child', a_child), ('t_priv', t_priv), ('t_shared', t_shared), ('recipe', recipe);
@@ -150,7 +169,7 @@ declare ra jsonb := (select r from results where k = 'a'); rc jsonb := (select r
 begin
   assert (ra->>'heir')::uuid = pg_temp.id('b'), '3: A''s heir is not B: ' || ra::text;
   assert (ra->>'households_handed_on')::int = 1 and (ra->>'households_deleted')::int = 0, '3: A''s household counts: ' || ra::text;
-  assert ra->'not_moved' = '["meal_plans"]'::jsonb, '3: A''s not_moved should name only meal_plans: ' || ra::text;
+  assert ra->'not_moved' = '["meal_plans", "actionable_instances"]'::jsonb, '3: A''s not_moved should name only meal_plans and actionable_instances: ' || ra::text;
   assert ra->'display_user_ids' = '[]'::jsonb, '3: a kept household''s display was listed: ' || ra::text;
 
   assert ra ? 'heir' and rc ? 'heir' and rc->>'heir' is null, '3: C has an heir: ' || rc::text;
@@ -160,6 +179,7 @@ begin
 
   assert (rd->>'heir')::uuid = pg_temp.id('e'), '3: D''s heir is not E: ' || rd::text;
   assert (rd->>'households_handed_on')::int = 0 and (rd->>'households_deleted')::int = 0, '3: D''s household counts: ' || rd::text;
+  assert rd->'not_moved' = '[]'::jsonb, '3: D''s family rows did not all move to E: ' || rd::text;
   assert (select owner_id from public.households where id = pg_temp.id('h3')) = pg_temp.id('e'), '3: H3 lost its owner';
   assert (select role from public.household_members where household_id = pg_temp.id('h3') and user_id = pg_temp.id('e')) = 'owner', '3: E is no longer owner';
   assert (rd2->>'households_handed_on')::int = 0 and (rd2->>'households_deleted')::int = 0 and rd2->'not_moved' = '[]'::jsonb,
@@ -172,11 +192,18 @@ begin
   assert (select user_id from public.tasks where title = '107 F shared') = pg_temp.id('f'), '3: F''s shared task moved to the pending invitee';
 end $$;
 
--- 4. Deleting the auth users raises no foreign-key error.
+-- 4. Deleting the auth users raises nothing. D first and alone: D's sign-in
+-- is on E's row, and the auth row's ON DELETE SET NULL must not make a second
+-- self row for E.
 do $$ begin
   begin
-    delete from auth.users where id in (pg_temp.id('a'), pg_temp.id('c'), pg_temp.id('cd'), pg_temp.id('d'), pg_temp.id('f'));
-  exception when foreign_key_violation then
+    delete from auth.users where id = pg_temp.id('d');
+  exception when others then
+    assert false, '4: deleting D (who joined E''s household by invitation) failed: ' || sqlerrm;
+  end;
+  begin
+    delete from auth.users where id in (pg_temp.id('a'), pg_temp.id('c'), pg_temp.id('cd'), pg_temp.id('f'));
+  exception when others then
     assert false, '4: deleting the auth users was blocked: ' || sqlerrm;
   end;
 end $$;
@@ -201,9 +228,30 @@ begin
   assert (select user_id from public.goal_areas where name = '107 A family area') = b, '5: A''s family goal area did not pass to B';
   assert not exists (select 1 from public.goal_areas where name = '107 A private area'), '5: A''s private goal area survived';
 
-  assert (select count(*) from public.family_members where name in ('107 A self', '107 A child') and user_id = b) = 2, '5: A''s family members did not pass to B';
-  assert (select auth_user_id from public.family_members where name = '107 A self') is null, '5: A''s family row still links to A';
+  assert (select count(*) from public.family_members where name in ('107 A self', '107 A child', '107 B in A') and user_id = b) = 3, '5: A''s family members did not pass to B';
+  -- The mirror of D: A stays in B's family as a person with no sign-in, not
+  -- as a second self row for B; B's own self row and sign-in row are as they were.
+  assert (select (auth_user_id is null and not is_full_user) from public.family_members where name = '107 A self'), '5: A''s self row is still a self row';
+  assert (select (user_id = b and auth_user_id is null and is_full_user) from public.family_members where name = '107 B self'), '5: B''s own self row changed';
+  assert (select (auth_user_id = b and is_full_user) from public.family_members where name = '107 B in A'), '5: B''s sign-in row changed';
+  assert (select count(*) from public.family_members where user_id = b and is_full_user and auth_user_id is null) = 1, '5: B does not have exactly one self row';
   assert (select assigned_to from public.tasks where title = '107 B for A child') = pg_temp.id('a_child'), '5: B''s task lost its assignment to A''s child';
+  assert (select assigned_to from public.tasks where title = '107 B for A') = (select id from public.family_members where name = '107 A self'), '5: B''s task lost its assignment to A';
+
+  -- D, who joined E's household, stays in E's family as a person with no sign-in.
+  assert (select (user_id = pg_temp.id('e') and auth_user_id is null and not is_full_user) from public.family_members where name = '107 D in E'),
+    '5: D''s row in E''s family is gone, still signed in, or still a full user';
+  assert (select (user_id = pg_temp.id('e') and not is_full_user) from public.family_members where name = '107 D self'), '5: D''s own row did not pass to E as a person';
+  assert (select (auth_user_id is null and is_full_user) from public.family_members where name = '107 E self'), '5: E''s self row changed';
+
+  -- Who did what on which day: shared routine and calendar rows pass to B, a private routine's go,
+  -- and the clashing one is left to go while B's own row for that day stays.
+  assert (select user_id from public.actionable_instances where entity_type = 'routine'
+          and entity_id = (select id::text from public.routines where name = '107 A shared routine')) = b, '5: A''s shared routine instance did not pass to B';
+  assert (select user_id from public.actionable_instances where entity_id = 'gcal-107') = b, '5: A''s calendar event instance did not pass to B';
+  assert not exists (select 1 from public.actionable_instances where entity_id = pg_temp.id('r_priv')::text), '5: A''s private routine instance survived';
+  assert (select count(*) from public.actionable_instances where entity_id = 'gcal-107-clash') = 1
+     and (select user_id from public.actionable_instances where entity_id = 'gcal-107-clash') = b, '5: the clashing instance was not left to go, or B''s own was lost';
 
   assert not exists (select 1 from public.chat_sessions where title = '107 A private chat'), '5: A''s private chat survived';
   assert (select user_id from public.chat_sessions where title = '107 A shared chat') = b, '5: A''s shared chat did not pass to B';
@@ -227,7 +275,7 @@ begin
   assert (select created_by from public.spaces where name = '107 A space in E home') = pg_temp.id('e'), '5: A''s space in E''s home did not follow E';
   assert not exists (select 1 from public.family_members where name in ('107 C self', '107 C child')), '5: C''s family rows survived';
   assert not exists (select 1 from public.screen_time_entries) and not exists (select 1 from public.event_notes)
-    and not exists (select 1 from public.actionable_instances), '5: C''s child-linked rows survived';
+    and not exists (select 1 from public.actionable_instances where entity_id = 'gcal-107-c'), '5: C''s child-linked rows survived';
 
   assert not exists (select 1 from public.playbook_blocks where user_id = a) and not exists (select 1 from public.playbook_instances where user_id = a), '5: A''s playbook rows survived';
   assert not exists (select 1 from public.task_focus where user_id = a), '5: A''s task_focus row survived';
