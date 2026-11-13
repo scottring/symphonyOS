@@ -292,6 +292,7 @@ enum RowMapper {
         model.address = row.string("address")
         model.seasons = row.codable("seasons")
         model.weekStartsOn = row.int("week_starts_on")
+        model.edition = row.string("edition")
         model.lastSyncedAt = Date()
         model.createdAt = row.date("created_at") ?? Date()
         model.updatedAt = row.date("updated_at") ?? Date()

@@ -299,6 +299,19 @@ struct SyncSerializationTests {
     /// A wait is set on the web (#115); the phone only reads it. A task push
     /// must never carry the waiting columns, or a row pulled before the wait
     /// was set would clear it.
+    @Test func householdRowReadsEdition() throws {
+        let id = UUID(), owner = UUID()
+        let light = try #require(RowMapper.toModel(Household.self, from: [
+            "id": .string(id.uuidString.lowercased()), "owner_id": .string(owner.uuidString.lowercased()),
+            "edition": .string("light"),
+        ]))
+        #expect(light.edition == "light")
+        let bare = try #require(RowMapper.toModel(Household.self, from: [
+            "id": .string(id.uuidString.lowercased()), "owner_id": .string(owner.uuidString.lowercased()),
+        ]))
+        #expect(bare.edition == nil)
+    }
+
     @Test func taskPushNeverCarriesTheWait() throws {
         let context = try makeContext()
         let task = SymphonyTask(userId: UUID(), title: "Call the bank")

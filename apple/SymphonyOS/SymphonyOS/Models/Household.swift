@@ -13,6 +13,9 @@ final class Household {
     /// The day the household's weeks start (`households.week_starts_on`):
     /// 0 Sunday, 1 Monday, 6 Saturday. Nil → Sunday.
     var weekStartsOn: Int? = nil
+    /// `households.edition`: "light" or "full". Read-only on the phone (never pushed).
+    /// Nil → not synced yet; treated as full.
+    var edition: String? = nil
 
     // Sync
     var syncStatus: SyncStatus

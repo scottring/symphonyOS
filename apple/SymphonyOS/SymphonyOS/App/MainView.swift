@@ -22,6 +22,7 @@ struct iOSMainView: View {
     @Environment(AuthService.self) private var auth
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Query private var households: [Household]
     @State private var showCapture = false
     @State private var hinge: HingeReader.Reading?
 
@@ -61,6 +62,21 @@ struct iOSMainView: View {
     private func sidePadding(_ edge: DockEdge) -> CGFloat {
         let layout = appState.dockLayout
         return layout.edge == edge ? max(0, layout.contentInset - layout.safeInset) : 0
+    }
+
+    private func applyEdition() {
+        #if DEBUG
+        let demoEdition: Edition? = DemoMode.isOn
+            ? (ProcessInfo.processInfo.arguments.contains("-SymphonyLight") ? .light : .full) : nil
+        #else
+        let demoEdition: Edition? = nil
+        #endif
+        let edition = demoEdition ?? Edition.resolve(households.map(\.edition))
+        appState.edition = edition
+        if edition == .light {
+            if appState.activeTab == .routines { appState.activeTab = .planner }
+            appState.domainFilter = .all
+        }
     }
 
     var body: some View {
@@ -114,7 +130,8 @@ struct iOSMainView: View {
         }
         .onChange(of: hinge) { _, _ in updatePosture() }
         .onChange(of: appState.dockLayout) { _, _ in updatePosture() }
-        .onAppear { updatePosture() }
+        .onAppear { updatePosture(); applyEdition() }
+        .onChange(of: households.map(\.edition)) { _, _ in applyEdition() }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             appState.keyboardVisible = true
         }
