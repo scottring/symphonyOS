@@ -296,6 +296,11 @@ verify_jwt = false
 [functions.capture-retry]
 verify_jwt = true
 
+# Called from the iPhone app by a signed-in person to delete their own account.
+# The handler also rejects anonymous display sessions; JWT verification stays on.
+[functions.delete-account]
+verify_jwt = true
+
 # GitHub webhook (scottring/scotts-world) calls this with an x-hub-signature-256
 # HMAC, not a Supabase JWT. JWT verification must stay off or the webhook 401s
 # at the platform gateway before the function's own signature check runs.
