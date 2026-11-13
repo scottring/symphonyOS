@@ -661,12 +661,12 @@ function ShellLayoutInner({ children }: Props) {
           </div>
           </>
         )}
-        {showScenery && isMobile && <div className="scenery-end-clearance" aria-hidden="true" />}
+        {showScenery && isMobile && location.pathname !== '/today' && <div className="scenery-end-clearance" aria-hidden="true" />}
         {/* The landscape's switch and strength, at the foot on the right (2026-11-11). */}
         {!isMobile && <SceneryDial right={paneWidth} />}
-        {/* Today on a wide screen carries the print in its heading instead
-            (HeadingPrint): one picture per page (Scott, 2026-11-13). */}
-        {!(location.pathname === '/today' && !isMobile) && (
+        {/* Today carries the print in its heading instead (HeadingPrint):
+            one picture per page (Scott, 2026-11-13). */}
+        {location.pathname !== '/today' && (
           <PlaceScenery scroller={pageScroller} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} vivid={location.pathname === HOME_ROUTE} />
         )}
       </div>

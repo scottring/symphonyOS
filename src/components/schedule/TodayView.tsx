@@ -1496,7 +1496,7 @@ export function TodayView({
         } : undefined}
         // The chosen print across the heading, fading in from the left
         // (Scott, 2026-11-13); Today's one picture.
-        backdrop={foldedControls ? <HeadingPrint /> : undefined}
+        backdrop={<HeadingPrint />}
         helpButton={!foldedControls}
         title={foldedControls
           ? journalEyebrow
