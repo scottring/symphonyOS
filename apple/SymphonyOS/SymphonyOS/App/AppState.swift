@@ -112,6 +112,9 @@ final class AppState {
     /// control, `symphony://tell`); Today opens its Tell sheet and clears it.
     var tellRequested = false
     var showingSettings = false
+    /// Stops sync and waits for it to finish; set by `ContentView` so the
+    /// delete-account flow can wipe without the engine re-inserting rows.
+    var stopSync: (() async -> Void)?
 
     // MARK: - Date Navigation
 

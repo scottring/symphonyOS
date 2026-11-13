@@ -10,6 +10,7 @@
 		02E7F7BF8E5CF9DB0592F619 /* SyncSerializationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91980E464779ADF9B4FE89A3 /* SyncSerializationTests.swift */; };
 		03A332C11095EAD4D374B404 /* PageParseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B66CBCA35142878EF0695A6 /* PageParseTests.swift */; };
 		03A5E53758E11DAA36391C9A /* PhotoCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D281A39DAC953BBEB0F5A15B /* PhotoCaptureService.swift */; };
+		0630729249000F4EC7E32774 /* AccountDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D25E6463326D082AF845C7 /* AccountDeletion.swift */; };
 		07094B11FD0EFD2BC3927820 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777FA26749C1A4208B9DDC94 /* RoutineDetailView.swift */; };
 		0C4A58B20B67EBDA3028040D /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */; };
 		0CE48E3DFD5F5A01A8B18529 /* TaskViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9031A67BD188FEA2743DE71D /* TaskViewModel.swift */; };
@@ -38,6 +39,7 @@
 		34196EFC75ABC5854A38F5B0 /* DMSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 03604927E77497336FD51F47 /* DMSans-SemiBold.ttf */; };
 		345A03B2728966CE5D57458D /* Edition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E0C9C5D59DC16582C09AD07 /* Edition.swift */; };
 		35F21F6A8EF1704BD98B3FF5 /* Routine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3E9139010E51C7040394A0 /* Routine.swift */; };
+		362B11DE188D47915394215C /* AccountDeletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48DEE8D67C715E1A3A6D4F5 /* AccountDeletionTests.swift */; };
 		3641A8E852B7D7F7979163DC /* HingeReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B6B9CC39AA73C9E5C18E58A /* HingeReader.swift */; };
 		386379CF5A08540EE1B036D4 /* CarriedOverUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */; };
 		38A50C4687C8342D2B6F0DE0 /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B89F2EB3CAD8F9EF5A476A8 /* Contact.swift */; };
@@ -89,6 +91,7 @@
 		7DCE89EE7B3BC6737A9B3186 /* NextUpAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC8B5C1B3F02A4A0A6605A4 /* NextUpAttributes.swift */; };
 		833AB2FEDEF3A4A388D4AEA5 /* DMSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 03604927E77497336FD51F47 /* DMSans-SemiBold.ttf */; };
 		83E6A0E1DACEF68A62C34134 /* CarriedRoutinesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32F0BBA293AAE16EF7CCA0C /* CarriedRoutinesTests.swift */; };
+		85A5B920DCEB705D40F84D50 /* DeleteAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79154EC8C219862BC8DE0004 /* DeleteAccountView.swift */; };
 		8C98360DEAF146AE5D93DC8C /* UnfinishedSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C187119C5CCA41423F1F668C /* UnfinishedSheet.swift */; };
 		95C88F1CF1EAAAC66D77A250 /* TriageController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39946BD93A7DD6FB74C15D93 /* TriageController.swift */; };
 		9629B1BFE3138DBA463C6A9C /* DayScaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056F5BF746D2B10ED8954A53 /* DayScaleTests.swift */; };
@@ -272,6 +275,7 @@
 		76C2953FF3E1846C8971CA4D /* CarriedRoutines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedRoutines.swift; sourceTree = "<group>"; };
 		777FA26749C1A4208B9DDC94 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
 		779DC68DE6348BF47C96A130 /* PendingChange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingChange.swift; sourceTree = "<group>"; };
+		79154EC8C219862BC8DE0004 /* DeleteAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountView.swift; sourceTree = "<group>"; };
 		7C0DDF026CD23250BDF7AB83 /* ProjectListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectListView.swift; sourceTree = "<group>"; };
 		7F3522449230AFDDBFBBAA95 /* DateNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateNavigator.swift; sourceTree = "<group>"; };
 		7FC8B5C1B3F02A4A0A6605A4 /* NextUpAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextUpAttributes.swift; sourceTree = "<group>"; };
@@ -298,6 +302,7 @@
 		9C9A6ACB7B9E46F44B52B56F /* PaperFoldTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaperFoldTests.swift; sourceTree = "<group>"; };
 		9F45CDE5093407A022589D06 /* ListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListsView.swift; sourceTree = "<group>"; };
 		A1D31FA63E65DA22E03392AD /* PlannerComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerComponents.swift; sourceTree = "<group>"; };
+		A48DEE8D67C715E1A3A6D4F5 /* AccountDeletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionTests.swift; sourceTree = "<group>"; };
 		A932C77F9DCE9A3582897E6A /* GlanceToDoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceToDoTests.swift; sourceTree = "<group>"; };
 		A99D77B01B73C4E9753A3494 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedOverTests.swift; sourceTree = "<group>"; };
@@ -318,6 +323,7 @@
 		C187119C5CCA41423F1F668C /* UnfinishedSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnfinishedSheet.swift; sourceTree = "<group>"; };
 		C1A8120C9CE4FA0B9EF5ED68 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
 		C23B67137E33CC905675B67C /* DockEdge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockEdge.swift; sourceTree = "<group>"; };
+		C4D25E6463326D082AF845C7 /* AccountDeletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletion.swift; sourceTree = "<group>"; };
 		C4E6747A78170172B1525262 /* TimelineEnrichmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineEnrichmentTests.swift; sourceTree = "<group>"; };
 		C98347D43F09BA622FEB4503 /* DomainSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainSwitcher.swift; sourceTree = "<group>"; };
 		CAEC2212D6BF83452FC75F4B /* PlanCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCalendar.swift; sourceTree = "<group>"; };
@@ -459,6 +465,7 @@
 			children = (
 				6340F25ABCF75EBC70087F8E /* Planning */,
 				BFF85C9DB0CF7505AD653FAD /* SyncEngine */,
+				C4D25E6463326D082AF845C7 /* AccountDeletion.swift */,
 				6D38EDCE2DD84715A97BA245 /* AppleCalendar.swift */,
 				B9226E1CF4B413ACEF22DDCA /* AuthService.swift */,
 				29510C99D64F28DB39EC4658 /* CalendarFeed.swift */,
@@ -678,6 +685,7 @@
 		D2B0F106883B7CE27ADDB25B /* SymphonyOSTests */ = {
 			isa = PBXGroup;
 			children = (
+				A48DEE8D67C715E1A3A6D4F5 /* AccountDeletionTests.swift */,
 				84A599D6B5D4173901A63E21 /* AppleCalendarTests.swift */,
 				2DA3F6E2C9518EE578D16841 /* CalendarFeedTests.swift */,
 				A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */,
@@ -739,6 +747,7 @@
 			isa = PBXGroup;
 			children = (
 				0CCEA1013A6E197978F4C424 /* CalendarSettingsView.swift */,
+				79154EC8C219862BC8DE0004 /* DeleteAccountView.swift */,
 				F95E01EADA6CAD09DF1A9B0A /* SettingsView.swift */,
 			);
 			path = Settings;
@@ -962,6 +971,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				362B11DE188D47915394215C /* AccountDeletionTests.swift in Sources */,
 				7628D998245B64D55D27C1B5 /* AppleCalendarTests.swift in Sources */,
 				5C17CC50C06C21FE279844E9 /* CalendarFeedTests.swift in Sources */,
 				3BD45BCD6DC5749F4AA19BC0 /* CarriedOverTests.swift in Sources */,
@@ -1004,6 +1014,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0630729249000F4EC7E32774 /* AccountDeletion.swift in Sources */,
 				EF989D585C3EFDBF3B9F28AC /* ActionableInstance.swift in Sources */,
 				C32F7D0A51A46659926AD3F6 /* AppState.swift in Sources */,
 				F886798113D26346BE9A08B3 /* AppleCalendar.swift in Sources */,
@@ -1023,6 +1034,7 @@
 				1A4329534E810EBF6BF16103 /* Date+Extensions.swift in Sources */,
 				53CDAD91081EB2442A2A0010 /* DateNavigator.swift in Sources */,
 				4E48550B7C5BA7A5FDA362F5 /* DayScale.swift in Sources */,
+				85A5B920DCEB705D40F84D50 /* DeleteAccountView.swift in Sources */,
 				708959FDE7111867F169E963 /* DemoMode.swift in Sources */,
 				7A33D62ACF6AB04220E0F62D /* Dinner.swift in Sources */,
 				0D34C6B5FDC9D86C5A042651 /* DinnerCard.swift in Sources */,

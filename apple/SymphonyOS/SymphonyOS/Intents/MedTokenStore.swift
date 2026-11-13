@@ -9,7 +9,7 @@ import Foundation
 // login-flow wiring is required — as long as a Supabase session exists, the
 // intent can obtain the token on demand.
 enum MedTokenStore {
-    private static let key = "med_log_token"
+    static let key = "med_log_token"
 
     static func cached() -> String? {
         UserDefaults.standard.string(forKey: key)

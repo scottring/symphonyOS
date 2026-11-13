@@ -145,6 +145,18 @@ final class AuthService {
         }
     }
 
+    // MARK: - Forget session
+
+    /// Local sign-out after the server deleted this account: the server no
+    /// longer knows the user, so a global sign-out would fail. Always clears.
+    func forgetSession() async {
+        _ = try? await supabase.auth.signOut(scope: .local)
+        await MainActor.run {
+            currentUser = nil
+            isAuthenticated = false
+        }
+    }
+
     // MARK: - Sign Out
 
     func signOut() async {

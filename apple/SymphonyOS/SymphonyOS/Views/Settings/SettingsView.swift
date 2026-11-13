@@ -18,6 +18,12 @@ struct SettingsView: View {
                             .foregroundStyle(Color.textSecondary)
                     }
                 }
+                NavigationLink {
+                    DeleteAccountView()
+                } label: {
+                    Text("Delete account")
+                        .foregroundStyle(.red)
+                }
             }
 
             // Integrations

@@ -52,6 +52,11 @@ struct EditionMemory {
         return Edition(rawValue: raw)
     }
 
+    func forget(for userId: UUID?) {
+        guard let userId else { return }
+        defaults.removeObject(forKey: key(userId))
+    }
+
     func remember(_ edition: Edition, for userId: UUID?) {
         guard let userId else { return }
         defaults.set(edition.rawValue, forKey: key(userId))

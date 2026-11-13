@@ -31,25 +31,31 @@ struct SymphonyApp: App {
                     if url.host == "tell" { appState.tellRequested = true }
                 }
         }
-        .modelContainer(for: [
-            SymphonyTask.self,
-            Project.self,
-            Routine.self,
-            Contact.self,
-            FamilyMember.self,
-            ActionableInstance.self,
-            EventNote.self,
-            WeeklyTemplate.self,
-            Household.self,
-            UserProfile.self,
-            SymphonyList.self,
-            SymphonyListItem.self,
-            TaskCommitment.self,
-            TaskFocus.self,
-            Goal.self,
-            PendingChange.self,
-        ])
+        .modelContainer(for: Self.modelTypes)
     }
+}
+
+extension SymphonyApp {
+    /// Every stored model: the container is built from it and account
+    /// deletion wipes it, so the wipe can never miss one.
+    static let modelTypes: [any PersistentModel.Type] = [
+        SymphonyTask.self,
+        Project.self,
+        Routine.self,
+        Contact.self,
+        FamilyMember.self,
+        ActionableInstance.self,
+        EventNote.self,
+        WeeklyTemplate.self,
+        Household.self,
+        UserProfile.self,
+        SymphonyList.self,
+        SymphonyListItem.self,
+        TaskCommitment.self,
+        TaskFocus.self,
+        Goal.self,
+        PendingChange.self,
+    ]
 }
 
 // MARK: - Siri / Shortcuts capture

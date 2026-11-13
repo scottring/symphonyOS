@@ -3,6 +3,7 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(AuthService.self) private var auth
+    @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @State private var syncEngine: SyncEngine?
@@ -65,6 +66,8 @@ struct ContentView: View {
         let container = modelContext.container
         let engine = SyncEngine(modelContainer: container)
         syncEngine = engine
+        // Lets account deletion stop sync and wait for it before wiping.
+        appState.stopSync = { [weak engine] in await engine?.stop() }
         Task {
             await previous?.stop()   // never leave two engines on one socket
             await engine.start(userId: userId)
