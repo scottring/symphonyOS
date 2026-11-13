@@ -425,11 +425,73 @@ These run against the live project with throwaway `symphony-rlstest-…@gmail.co
 - [ ] **Step 1: Write `edition.integration.test.ts`.** One new throwaway account L. Assertions: L has one active membership in a household with `edition = 'light'`; `rpc('my_edition')` as L is `'light'`; as L, `update households set edition = 'full'` leaves `'light'`; a signed-in call to `question-ideas` with the body `src/lib/chat/questionIdeas.ts:36` sends answers 403 with `code: 'ai_light_edition'`, and `ai_provider_call_usage` has no row for L. Then the admin client sets L's household to `'full'`: `my_edition` is `'full'`, and `admin.rpc('reserve_ai_budget', …)` for L answers `allowed: true` (settle that reservation at zero).
 - [ ] **Step 2: Write `delete-account.integration.test.ts`.** A and B in one household (A owner), plus C alone. A has a shared task, a private task and one uploaded file under `<A>/`. A calls `delete-account` with the confirm phrase. Assertions: 200; A can no longer sign in; B (anon-key client) sees the shared task and not the private one; the household's `owner_id` is B; A's file is gone from storage. C deletes: C's household no longer exists. A call without the confirm phrase answers 400 and changes nothing.
 - [ ] **Step 3: Typecheck** with `npx tsc --noEmit -p tsconfig.integration.json`. Commit: `git commit -m "Two-account proofs for the edition gate and account deletion"`
-- [ ] **Step 4: STOP. Hand Scott this checklist; do nothing on it without his go-ahead for that line.**
-  1. Apply `20261113150000_household_edition.sql`. Check: `select edition, count(*) from households group by 1` shows every existing household (15 when this was written) as `full`.
-  2. Apply `20261113160000_delete_account_data.sql` and deploy the `delete-account` function.
-  3. Redeploy the AI edge functions so a light refusal reads as the plain 403. Not urgent: until then a light household is still refused, with the older wording.
-  4. Run `npm run test:integration`. All three files pass.
-  5. Rebase onto `origin/main`, run the build and tests, and merge. Merging deploys the web (the holding page) and starts an Xcode Cloud build to TestFlight; bump `MARKETING_VERSION` in `apple/SymphonyOS/project.yml` for app and widget together.
-  6. On Scott's and Iris's phones and on the web: everything is as before.
-  7. **Last, and only when the light build is ready for strangers (after the walk):** apply `20261113170000_open_signup.sql`.
+- [ ] **Step 4: STOP. Hand Scott the release checklist in "As built" below; do nothing on it without his go-ahead for that line.**
+
+---
+
+## As built (2026-11-13): what changed from the plan above
+
+The plan was executed task by task with a review after each and one whole-branch review at the end.
+Where this section and a task above disagree, this section is what the branch contains.
+
+**Added while building**
+- **Task 1b, membership guard** (`20261113151000_household_membership_guard.sql`, test 109). Found in
+  review and confirmed on the live database: any signed-in person could move their own household
+  membership into another household if they knew its id, or raise their own role, and an owner could
+  add anyone as an active member without their consent. A direct write from the app can now no longer
+  move a membership, change a role without being owner or admin, create a membership that is not
+  `pending`, or accept on someone else's behalf. The database's own functions (accepting an invitation,
+  first-run setup, pairing a display) are unaffected.
+- **A full-household check on three server functions** that acted for any signed-in person:
+  `list-contacts` and `place-call` (the kid phone) and `places-proxy` (Google Places). They allow
+  everyone until the edition migration exists, then only full households.
+- **The edition check on the web wall and kid routes** for a signed-in (not paired-display) account.
+
+**Changed from the plan**
+- SQL proofs run in a throwaway local Postgres through `scripts/test-*.mjs --pg-bin …` (the local
+  database on port 55322 was months stale). `supabase/tests/run-local.sh` was not created.
+- iPhone: the edition defaults to **full**, an empty household list keeps the last known edition for
+  that person, and the calendar feed waits until the edition is known. This is what stops a full
+  household flickering to light during a sync.
+- Account deletion: the hand-on runs before detaching; a household is deleted only when the leaver
+  owns it and no other active person is in it; a clash costs one row, not a whole table; assignments
+  to the leaver's family rows are cleared first so the delete cannot be blocked; shared routine and
+  calendar check-offs pass to the remaining member; a partner who joined by invitation can delete.
+- Light also hides: the colour dot on rows, the routines count in "Choose from this week", and the
+  background retry of stuck photo captures (it called the AI function).
+- The "Mac target must still build" rule became "add no new Mac problems": the Mac build was already
+  failing on main.
+
+**Not done, on purpose**
+- The two-account integration tests are written and type-checked, not run (they use the live project).
+- Apple Calendar has only run against a fake source; the real permission prompt needs a person.
+- iPhone Duo sizes were not screenshotted.
+
+### Release checklist (each line needs Scott's go-ahead)
+
+Before anything:
+- [ ] Compare the live `reserve_ai_budget` with `20261111120000_ai_budget_minutes_cache_household.sql:29-74`
+      (the edition migration replaces it from that copy). If live is newer, update the migration first.
+- [ ] Dry-run `delete_account_data` against the real schema inside a transaction that is rolled back
+      (the proofs ran on a stub schema), including one person who joined by invitation.
+
+Then, in order:
+1. Apply `20261113150000_household_edition.sql` and `20261113151000_household_membership_guard.sql`.
+   Check `select edition, count(*) from households group by 1`: every existing household is `full`.
+   **From this moment every new account is light**, including a waitlist approval, a new demo or
+   walkthrough account, and the three beta accounts that have no household yet. To make one full:
+   `update households set edition = 'full' where id = '<household id>';` in the SQL editor.
+2. Apply `20261113160000_delete_account_data.sql`; deploy the `delete-account` function.
+3. Redeploy the AI edge functions (so a light refusal is the plain 403) and deploy `list-contacts`,
+   `place-call` and `places-proxy`. **Check the kitchen wall's phone and an address search in your own
+   account straight afterwards.** Required before step 4: its test expects the 403.
+4. Run `npm run test:integration` (three files, throwaway accounts only).
+5. Rebase onto `origin/main`, run the build and tests, merge. Merging deploys the web and starts an
+   Xcode Cloud build to TestFlight; bump `MARKETING_VERSION` in `apple/SymphonyOS/project.yml` for the
+   app and the widget together.
+6. On Scott's and Iris's phones and on the web: everything is as before. Settings now has
+   "Delete account".
+7. **Last, and only when the light build is ready for strangers (after the walk):** apply
+   `20261113170000_open_signup.sql`, then check that `anon` and `authenticated` can still execute
+   `signup_allowed`. Do not apply it before step 3 is deployed: until then a stranger's account could
+   reach the kid phone and paid address search.

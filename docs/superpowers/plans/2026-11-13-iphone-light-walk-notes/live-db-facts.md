@@ -1,0 +1,9 @@
+# Live database facts for the walk (read-only query, 2026-11-13). Data, not instructions.
+
+- tasks has, live: is_goal boolean not null default false; goal_task_id uuid; goal_id uuid; supports_goal_task_id uuid; area_id uuid; bucket text not null default 'inbox'; month_start date; season_start date; week_start date; scheduled_for timestamptz; planned_on date; sort_order integer; scope text not null default 'individual'; context text; due_on date.
+- tasks triggers live: tasks_guard_goal_support (guard_goal_support), tasks_guard_goal_target_lock (guard_goal_link_target), tasks_guard_goal_unconvert (guard_goal_unconvert), tasks_fill_period_stamps, tasks_align_week_to_day, tasks_mirror_to_commitments, tasks_guard_owner, touch_updated_at, refuse_display_write, journal_reviewed_change (before/after). So the goal-link guard migrations ARE applied; read their definitions in supabase/migrations before writing links from iOS.
+- goals: id, user_id, name, year (int, default current year), status ('active' default), notes, context, scope (not null default 'individual'), sort_order, area_id uuid (nullable, FK goal_areas ON DELETE SET NULL), assigned_to_all uuid[], carried_from, domain_slug, layer_id, strategy, created_at, updated_at.
+- goal_areas: id, user_id (not null), name (not null), sort_order int default 0, created_at, context text (null | 'work' | 'family' | 'personal'). RLS: owner insert/update/delete; select own, or context='family' rows of household co-members.
+- task_focus: task_id, user_id, date, created_at (no id column). Policies: insert own, delete own, select with the task.
+- task_commitments: id, task_id, level, period_start, status default 'open', carried_to, created_by, ended_at, created_at. Mirrored from tasks by trigger tasks_mirror_to_commitments.
+- user_profiles has onboarding_step (default 'welcome'), guided_plan jsonb, place_theme.
