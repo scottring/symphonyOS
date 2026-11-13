@@ -5,7 +5,7 @@
 // dial. Each is one picture for every light and place; your place still
 // tints the sky and the accent. Their art lives in components/place/panoramas.ts.
 
-export type SceneryPrintId = 'overlook' | 'train-yard'
+export type SceneryPrintId = 'overlook' | 'train-yard' | 'subway' | 'skyline'
 
 export interface SceneryPrint {
   id: SceneryPrintId
@@ -15,6 +15,9 @@ export interface SceneryPrint {
 export const SCENERY_PRINTS: SceneryPrint[] = [
   { id: 'overlook', name: 'Mountain overlook' },
   { id: 'train-yard', name: 'Train yard' },
+  // Scott's prints, 2026-11-13.
+  { id: 'subway', name: 'Subway platform' },
+  { id: 'skyline', name: 'City skyline' },
 ]
 
 /** What a device shows until someone chooses. */

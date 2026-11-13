@@ -32,3 +32,15 @@ describe("Today's heading print (Scott, 2026-11-13)", () => {
     expect(queryByTestId('heading-print')).toBeNull()
   })
 })
+
+describe("Scott's own prints in the heading (2026-11-13)", () => {
+  it('a print with a heading picture shows it whole, not the cut band', async () => {
+    const { PRINTS } = await import('./panoramas')
+    prefs.showScenery = true
+    prefs.sceneryBackground = 'subway' as never
+    const { getByTestId } = render(<HeadingPrint />)
+    const img = getByTestId('heading-print').querySelector('img')!
+    expect(img.getAttribute('src')).toBe(PRINTS.subway.headingSrc)
+    expect(PRINTS.subway.headingSrc).not.toBe(PRINTS.subway.src)
+  })
+})

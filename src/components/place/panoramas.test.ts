@@ -34,8 +34,12 @@ describe('scenery style resolution', () => {
 })
 
 describe('chosen background', () => {
-  it('offers only the mountain overlook and the train yard', () => {
-    expect(Object.keys(PRINTS).sort()).toEqual(['overlook', 'train-yard'])
+  it('offers the overlook, the train yard and Scott\'s two prints of 2026-11-13', () => {
+    expect(Object.keys(PRINTS).sort()).toEqual(['overlook', 'skyline', 'subway', 'train-yard'])
+    for (const id of ['subway', 'skyline'] as const) {
+      expect(PRINTS[id].veil).not.toBe(PRINTS[id].src)
+      expect(PRINTS[id].headingSrc).toBeTruthy()
+    }
     expect(backgroundArt('overlook')).toBe(WOODBLOCK['mountain-town'].daytime)
     expect(backgroundArt('train-yard')).toBe(PRINTS['train-yard'])
     expect(PRINTS['train-yard'].veil).not.toBe(PRINTS['train-yard'].src)

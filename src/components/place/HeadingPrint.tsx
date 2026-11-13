@@ -14,7 +14,7 @@ export function HeadingPrint() {
   return (
     <div className="heading-print" aria-hidden="true" data-testid="heading-print" data-background={sceneryBackground}
       style={{ '--heading-print-focus': art.headingFocus ?? 'center 30%' } as CSSProperties}>
-      <img src={art.src} alt="" draggable={false} />
+      <img src={art.headingSrc ?? art.src} alt="" draggable={false} />
     </div>
   )
 }

@@ -6,6 +6,12 @@ const TRAIN_YARD_SKYLINE = 0.1423
 import type { SceneryPrintId } from '@/config/sceneryPrints'
 import train_yard from '@/assets/scenery/prints/train-yard.webp'
 import train_yard_veil from '@/assets/scenery/prints/train-yard-veil.webp'
+import subway from '@/assets/scenery/prints/subway.webp'
+import subway_veil from '@/assets/scenery/prints/subway-veil.webp'
+import subway_heading from '@/assets/scenery/prints/subway-heading.webp'
+import skyline from '@/assets/scenery/prints/skyline.webp'
+import skyline_veil from '@/assets/scenery/prints/skyline-veil.webp'
+import skyline_heading from '@/assets/scenery/prints/skyline-heading.webp'
 import urban_daytime from '@/assets/scenery/painted/urban-daytime.webp'
 import urban_daytime_veil from '@/assets/scenery/painted/urban-daytime-veil.webp'
 import urban_dusk_dawn from '@/assets/scenery/painted/urban-dusk-dawn.webp'
@@ -74,6 +80,9 @@ export interface Panorama {
   /** Which part of the art shows in Today's heading strip (an
    *  object-position): the peaks for the overlook, the trains for the yard. */
   headingFocus?: string
+  /** The whole print, uncut, for the heading (its own sky and all), where
+   *  the page's band is a cut-down version of it. Absent: the band. */
+  headingSrc?: string
 }
 
 // The low landscape of each approved scene concept, cut out by
@@ -161,6 +170,12 @@ export function sceneryArt(style: SceneryStyle, place: PlaceId, lighting: Scener
 export const PRINTS: Record<SceneryPrintId, Panorama> = {
   'overlook': MOUNTAIN_OVERLOOK,
   'train-yard': { src: train_yard, veil: train_yard_veil, skyline: TRAIN_YARD_SKYLINE, headingFocus: 'center 55%' },
+  // Scott's prints of 2026-11-13, cut by scripts/scenery/cut_print.py: the
+  // subway platform (indoors, its top feathered into the sky) and the city
+  // skyline with its bridge (its blue sky keyed out). The heading shows each
+  // whole.
+  'subway': { src: subway, veil: subway_veil, skyline: 0.1423, headingSrc: subway_heading, headingFocus: 'center 52%' },
+  'skyline': { src: skyline, veil: skyline_veil, skyline: 0.1645, headingSrc: skyline_heading, headingFocus: 'center 45%' },
 }
 
 /** The art for the chosen background. */
