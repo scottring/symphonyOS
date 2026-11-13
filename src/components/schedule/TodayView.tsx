@@ -1540,13 +1540,17 @@ export function TodayView({
         // Wide page: the day's details on one line under the title — the
         // specials and other all-day things, the weather, dinner.
         footer={journalHead
-          ? (journal.allDayEvents.length > 0 || data.isToday || dinnerLink) && (
-            <div className="today-mast-meta">
-              {allDayBlock}
-              {data.isToday && <WeatherChip now={nowForDisplay} />}
-              {dinnerLink}
-            </div>
-          )
+          ? <>
+              {(journal.allDayEvents.length > 0 || data.isToday || dinnerLink) && (
+                <div className="today-mast-meta" data-testid="today-mast-meta">
+                  {allDayBlock}
+                  {data.isToday && <WeatherChip now={nowForDisplay} />}
+                  {dinnerLink}
+                </div>
+              )}
+              {/* A phone outside the shell keeps its controls strip here. */}
+              {!foldedControls && !desktopControls && desktopToolbar}
+            </>
           : !desktopControls ? desktopToolbar : undefined}
 
       />

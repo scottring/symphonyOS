@@ -1072,7 +1072,8 @@ describe('TodayView — the Day session', () => {
   })
 })
 
-// ── Weather in the masthead's ear ──
+// ── Weather in the masthead, on the line under the day's sentence
+// (stacked heading, 2026-11-13; it was the masthead's ear) ──
 describe('TodayView weather', () => {
   afterEach(() => mockUseWeather.mockImplementation(() => noWeather))
   const reading = { weather: { currentTemp: 63, weatherCode: 0, condition: 'Clear', highTemp: 78, lowTemp: 58, hourlyForecast: [] }, loading: false, error: null, requestLocation: vi.fn() }
@@ -1080,7 +1081,7 @@ describe('TodayView weather', () => {
   it("rides in the masthead on today's page", () => {
     mockUseWeather.mockImplementation(() => reading)
     renderView()
-    const ear = within(screen.getByTestId('masthead-card')).getByTestId('masthead-aside')
+    const ear = within(screen.getByTestId('masthead-card')).getByTestId('today-mast-meta')
     expect(within(ear).getByText('63°')).toBeInTheDocument()
     expect(within(ear).getByText('78° / 58°')).toBeInTheDocument()
   })
@@ -1088,12 +1089,13 @@ describe('TodayView weather', () => {
     mockUseWeather.mockImplementation(() => reading)
     const tomorrow = new Date(TODAY); tomorrow.setDate(tomorrow.getDate() + 1)
     renderView({ viewedDate: tomorrow })
+    expect(screen.queryByText('63°')).not.toBeInTheDocument()
     expect(screen.queryByTestId('masthead-aside')).not.toBeInTheDocument()
   })
   it('renders no line and no placeholder with no location', () => {
     renderView()
     expect(screen.queryByRole('button', { name: /^weather/i })).not.toBeInTheDocument()
-    expect(screen.getByTestId('masthead-aside')).toBeEmptyDOMElement()
+    expect(screen.getByTestId('today-mast-meta')).not.toHaveTextContent('°')
   })
 })
 
