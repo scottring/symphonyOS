@@ -123,13 +123,14 @@ struct PlanWriter {
 
     /// Plan a week task into a day from the chooser. No commitment changes:
     /// its week stays open (moving down keeps the higher commitments).
+    /// `focusToday: false` (the walk) dates it today without choosing it.
     @discardableResult
-    func planTask(_ task: SymphonyTask, on date: Date) -> Snapshot {
+    func planTask(_ task: SymphonyTask, on date: Date, focusToday: Bool = true) -> Snapshot {
         var snap = Snapshot(tasks: [capture(task)])
         revive(task)
         let day = PlanCalendar.day(date)
         placeOnDay(task, day: day, allDay: true)
-        if PlanCalendar.calendar.isDateInToday(day) { snap.createdFocus += focus(task, on: day) }
+        if focusToday, PlanCalendar.calendar.isDateInToday(day) { snap.createdFocus += focus(task, on: day) }
         touch(task)
         save()
         return snap
@@ -205,9 +206,10 @@ struct PlanWriter {
     /// belongs to one period, and nothing is copied or brought down from the
     /// sheet above. `lifeArea` is the page's lens (nil under All).
     @discardableResult
-    func createPeriodTask(title: String, level: String, periodStart: Date, context lifeArea: String? = nil) -> SymphonyTask {
+    func createPeriodTask(title: String, level: String, periodStart: Date, context lifeArea: String? = nil,
+                          id: UUID = UUID()) -> SymphonyTask {
         let start = PlanCalendar.day(periodStart)
-        let t = SymphonyTask(userId: userId, title: title, context: lifeArea)
+        let t = SymphonyTask(id: id, userId: userId, title: title, context: lifeArea)
         t.bucket = PlanSnapshot.bucket(for: level)
         switch level {
         case "week": t.weekStart = start
@@ -520,9 +522,9 @@ struct PlanWriter {
     // MARK: Year goals (web useGoals addGoal / updateGoal)
 
     @discardableResult
-    func createGoal(name: String, notes: String?, context: String?, year: Int) -> Goal {
+    func createGoal(name: String, notes: String?, context: String?, year: Int, id: UUID = UUID()) -> Goal {
         let all = (try? context_fetchGoals()) ?? []
-        let g = Goal(id: UUID(), userId: userId, name: name, year: year, syncStatus: .pending)
+        let g = Goal(id: id, userId: userId, name: name, year: year, syncStatus: .pending)
         g.notes = notes
         g.context = context
         g.sortOrder = all.filter { $0.year == year }.count
