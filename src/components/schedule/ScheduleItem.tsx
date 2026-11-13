@@ -1,6 +1,7 @@
 import { KindIcon as KindIconMark } from './KindIcon'
 import { itemIcon } from '@/lib/today/itemIcon'
 import { dueLabel } from '@/lib/today/dueSoon'
+import { sourceMark } from '@/lib/today/sourceMark'
 import { memo, useState, useRef, useEffect } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
@@ -147,13 +148,14 @@ export const ScheduleItem = memo(function ScheduleItem({
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   const hasKindIcon = !!itemIcon(item.title)
+  const source = item.originalTask ? sourceMark(item.originalTask) : null
   // Needed-today mark: STATE, so it lives with the title chips. The item
   // panel sets it ("Need today"); the chip here only clears it. A mark
   // expires by ceasing to match the VIEWED day (src/lib/today/neededToday.ts),
   // not the real calendar day — nothing ever clears `neededOn` — so compare
   // against ctx.viewedDate. Fall back to "now" only when no provider supplies
   // it (e.g. a test rendering ScheduleItem in isolation).
-  const { onSetNeededToday, viewedDate } = useScheduleActionsContext()
+  const { onSetNeededToday, viewedDate, meId } = useScheduleActionsContext()
   const isNeededToday = !!item.neededOn && isSameDay(item.neededOn, viewedDate ?? new Date())
   // Hover state powers the smooth expanding banner (location-only metadata row).
   // On mobile we never expand — preserves the pre-existing behavior where
@@ -208,6 +210,8 @@ export const ScheduleItem = memo(function ScheduleItem({
   // Only someone the household knows: an id with no member behind it drew a
   // blank grey people icon at rest (Boxing, Marta — 2026-10-06).
   const assigned = [assignedTo, ...assignedToAll].some((id) => !!id && (familyMembers.length === 0 || familyMembers.some((m) => m.id === id)))
+  const whoIds = [assignedTo, ...assignedToAll].filter((id): id is string => !!id)
+  const onlySelf = !!meId && whoIds.length > 0 && whoIds.every((id) => id === meId)
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -518,9 +522,11 @@ export const ScheduleItem = memo(function ScheduleItem({
             <RoutineMoveButton item={item} />
           )}
           {/* Initials whenever someone is assigned, you included. The sheet
-              still assigns an unassigned row. */}
+              still assigns an unassigned row. On Today, only other people's
+              (2026-11-13): an item that is only yours is marked, and
+              today-journal.css leaves its badge off (the details reassign). */}
           {!assigned ? null : familyMembers.length > 0 && onAssignAll ? (
-            <div onClick={(e) => e.stopPropagation()}>
+            <div onClick={(e) => e.stopPropagation()} data-only-self-mobile={onlySelf || undefined}>
               <MultiAssigneeDropdown
                 members={familyMembers}
                 selectedIds={assignedToAll}
@@ -763,6 +769,11 @@ export const ScheduleItem = memo(function ScheduleItem({
                 <AlertCircle className="w-3 h-3" aria-hidden />
                 Today
               </button>
+            )}
+            {/* Where it came from (Amazon, the sender of an email), on
+                Today's To do only (today-journal.css, 2026-11-13). */}
+            {source && (
+              <span className="row-source" title={`From ${source.label}`} aria-label={`From ${source.label}`} style={{ background: source.color }}>{source.letter}</span>
             )}
             {/* A done-by date: "by Mon 16" (Scott, 2026-11-13). */}
             {item.originalTask?.dueOn && !item.completed && (

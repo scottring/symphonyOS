@@ -518,6 +518,8 @@ export function TodayView({
   // standalone mounts keep it as its own row.
   const foldedControls = !!desktopControls && !isMobile
   const pageHelp = usePageHelp()
+  // The stacked journal heading: wide pages, and phones (2026-11-13).
+  const journalHead = foldedControls || isMobile
   const poolMatchMine = useMemo(
     () => (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) =>
       !meId || doableBy({ assignedTo: assignedTo ?? undefined, assignedToAll: assignedToAll ? [...assignedToAll] : undefined }, meId),
@@ -1474,7 +1476,7 @@ export function TodayView({
         // One heading on every horizon (Scott's sketch, 2026-11-11): "11" in
         // the margin, "‹ Today ›" (the day's arrows, its picker) over
         // "November, 2026".
-        eyebrow={foldedControls
+        eyebrow={journalHead
           ? undefined
           : <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} />}
         // The open journal (Scott, 2026-11-11, board A): on a wide page the
@@ -1482,7 +1484,8 @@ export function TodayView({
         // heading still reads the whole date.
         // One plain line (Scott's sketch, 2026-11-11): "‹ 11 November 2026,
         // Wednesday ›"; the weekday opens the date picker.
-        journal={foldedControls ? {
+        // Phones wear the same stacked heading (2026-11-13).
+        journal={journalHead ? {
           numeral: String(viewedDate.getDate()),
           srTitle: viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
           tag: <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="tag" label={data.isToday ? 'Today' : relativeDayLabel} />,
@@ -1499,7 +1502,7 @@ export function TodayView({
         // (Scott, 2026-11-13); Today's one picture.
         backdrop={<HeadingPrint />}
         helpButton={!foldedControls}
-        title={foldedControls
+        title={journalHead
           ? journalEyebrow
           : viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         // No big numeral (approved Today board, 2026-10-10): the date is the title.

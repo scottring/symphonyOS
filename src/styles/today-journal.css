@@ -499,3 +499,13 @@
 /* The list page's own wide margins, narrowed for the sheet. */
 .today-list-sheet .max-w-2xl { padding: 16px 20px; }
 .today-list-sheet .mb-6 > .flex.items-start.justify-between { flex-wrap: wrap; gap: 8px; padding-right: 36px; }
+/* Phones have no hover: on Today an item that is only yours shows no badge. */
+.today-page [data-only-self-mobile] { display: none; }
+
+/* Where a task came from: a lettered mark (2026-11-13), To do only. */
+.row-source { display: none; }
+.today-page .today-focus-card .row-source {
+  display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 4px;
+  font: 700 11px/1 var(--font-family-sans); color: #fff; text-transform: lowercase;
+}
+.today-page .today-focus-card .row-source:not([aria-label="From Amazon"]) { text-transform: none; }
