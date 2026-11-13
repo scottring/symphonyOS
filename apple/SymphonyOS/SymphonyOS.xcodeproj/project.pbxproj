@@ -90,6 +90,7 @@
 		75940016428E88F3EEF2EBF1 /* PageReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5472D887E316ADEF911E0AF /* PageReviewSheet.swift */; };
 		7628D998245B64D55D27C1B5 /* AppleCalendarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A599D6B5D4173901A63E21 /* AppleCalendarTests.swift */; };
 		7726C3A546FB6B4FE09495A9 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D19E4BEB2CD68FA6F5256F36 /* View+Extensions.swift */; };
+		79EC933EDA9E42058D95632E /* WalkPlantTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64C51DAF6700CC7943620DF5 /* WalkPlantTests.swift */; };
 		7A33D62ACF6AB04220E0F62D /* Dinner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47FCCB2BAC393252D399DB7 /* Dinner.swift */; };
 		7B3914ADD95F6F5B95EA377F /* GoogleCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 692BB44DC5FA145FA412DB96 /* GoogleCalendarService.swift */; };
 		7D3F7AFD6919D617D6E70284 /* DockEdge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23B67137E33CC905675B67C /* DockEdge.swift */; };
@@ -138,6 +139,7 @@
 		BD782E62D9ADFC3814E41900 /* MonthlyPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 217B2A6BEE77F0C6CE19306F /* MonthlyPositionTests.swift */; };
 		BF10BB1DF753FAED453DB947 /* NextUpActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F97EA2155A9D1F178034EBAB /* NextUpActivity.swift */; };
 		BF88A69DE3576ADBEA6AC909 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A8120C9CE4FA0B9EF5ED68 /* InboxView.swift */; };
+		BFF8FD46589AB3670A904D01 /* WalkState+Plant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D4A6D0E39EF42BBDAF92B3 /* WalkState+Plant.swift */; };
 		C32F7D0A51A46659926AD3F6 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9595773CA7713C5157B3B01 /* AppState.swift */; };
 		C5AF72182F53874B1ACB4111 /* HalfOpenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2AF4DCA0960E25B5C75CC9 /* HalfOpenView.swift */; };
 		C6B505CEF4DB56102D196C70 /* WalkPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C45BEE6B6D60DA976F88DE6 /* WalkPositionTests.swift */; };
@@ -237,6 +239,7 @@
 		12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCaptureBar.swift; sourceTree = "<group>"; };
 		15938703D22CD34580553E2F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		15C9B2674A0AE5DFA973DAF0 /* CardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStyle.swift; sourceTree = "<group>"; };
+		15D4A6D0E39EF42BBDAF92B3 /* WalkState+Plant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WalkState+Plant.swift"; sourceTree = "<group>"; };
 		169FC19A952F954EECF671DF /* DayGlanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayGlanceTests.swift; sourceTree = "<group>"; };
 		1819AEB94BF4C55147945909 /* SymphonyWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyWidgets.swift; sourceTree = "<group>"; };
 		187DEF77B7597EB968E30562 /* PeriodPlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodPlanView.swift; sourceTree = "<group>"; };
@@ -283,6 +286,7 @@
 		5D4179C34EBA0E91CD8EE164 /* LogMedicationIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogMedicationIntent.swift; sourceTree = "<group>"; };
 		5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyOSTests.swift; sourceTree = "<group>"; };
 		61E19EB4F8AFB3B2057038A2 /* HalfOpenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HalfOpenTests.swift; sourceTree = "<group>"; };
+		64C51DAF6700CC7943620DF5 /* WalkPlantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkPlantTests.swift; sourceTree = "<group>"; };
 		67A7372203050D025A28D396 /* CrimsonPro-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CrimsonPro-Regular.ttf"; sourceTree = "<group>"; };
 		681A9DD4788EEF1FCA8A3D32 /* PlanWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanWriter.swift; sourceTree = "<group>"; };
 		692BB44DC5FA145FA412DB96 /* GoogleCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCalendarService.swift; sourceTree = "<group>"; };
@@ -778,6 +782,7 @@
 				4FED05BB7B5F3E143C3086DF /* WalkCopyTests.swift */,
 				20E8E58E265506F189EADDEE /* WalkLoadTests.swift */,
 				891666939A8FC92F36CE9644 /* WalkPeriodsTests.swift */,
+				64C51DAF6700CC7943620DF5 /* WalkPlantTests.swift */,
 				3C45BEE6B6D60DA976F88DE6 /* WalkPositionTests.swift */,
 				C9446B555371801002DA2D25 /* WalkStepsTests.swift */,
 				9CB3AEE2C54522D3756F63C5 /* WalkWordsTests.swift */,
@@ -890,6 +895,7 @@
 				7090D3ED9CC051D67543EED2 /* WalkPeriods.swift */,
 				8F4C326BCC8EE9A0B6507F51 /* WalkPosition.swift */,
 				C4D4754E1CB6E482DC14096B /* WalkState.swift */,
+				15D4A6D0E39EF42BBDAF92B3 /* WalkState+Plant.swift */,
 				9A62F7A67123AF40218075F3 /* WalkTypes.swift */,
 				729A9989150DA6C5BAC4922C /* WalkWords.swift */,
 			);
@@ -1087,6 +1093,7 @@
 				D5C683AA1A8D4CC32DAAAE40 /* WalkCopyTests.swift in Sources */,
 				095EB0D565A667604C269A43 /* WalkLoadTests.swift in Sources */,
 				D8D3DD0112C5FFB01AE063EA /* WalkPeriodsTests.swift in Sources */,
+				79EC933EDA9E42058D95632E /* WalkPlantTests.swift in Sources */,
 				C6B505CEF4DB56102D196C70 /* WalkPositionTests.swift in Sources */,
 				DB862C0E3FA5ECCE82711887 /* WalkStepsTests.swift in Sources */,
 				F0197E1212180F211236F0B3 /* WalkWordsTests.swift in Sources */,
@@ -1219,6 +1226,7 @@
 				EE599002146DDAF319E7E450 /* WalkLoad.swift in Sources */,
 				1F88DB610A36225ABB6A4B8B /* WalkPeriods.swift in Sources */,
 				D072E61D7068CA5497FFEBF1 /* WalkPosition.swift in Sources */,
+				BFF8FD46589AB3670A904D01 /* WalkState+Plant.swift in Sources */,
 				D52502C3E1F001480C5AEB97 /* WalkState.swift in Sources */,
 				E7C7EB89D64D38D5E4C1844A /* WalkTypes.swift in Sources */,
 				9E7CADF4761927B56C7D738E /* WalkWords.swift in Sources */,

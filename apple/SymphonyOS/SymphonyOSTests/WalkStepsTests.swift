@@ -478,6 +478,37 @@ struct WalkStepsTests {
         #expect(bare.focus[.season] == nil)
     }
 
+    @Test func seasonNudgeFollowsTheTourOrder() {
+        // Year goals planted out of column order: People, then Health, then Home.
+        var s = m.at(2)
+        s.items = [m.weekends, m.strong, m.bathroom]
+        _ = s.act(.nudge, m.env)
+        #expect(s.focus[.season] == m.strong.id)                       // Health is the first column
+        _ = s.act(.nudge, m.env)
+        #expect(s.focus[.season] == m.bathroom.id)
+        _ = s.act(.nudge, m.env)
+        #expect(s.focus[.season] == m.weekends.id)
+        _ = s.act(.nudge, m.env)
+        #expect(s.focus[.season] == m.strong.id)
+    }
+
+    @Test func choosingADepthStartsWithNoFocus() {
+        // A quick walk left a Season focus behind, then the person went back up to Welcome.
+        var s = m.at(1)
+        s.focus[.season] = m.bathroom.id
+        s.focus[.month] = m.lift.id
+        s.step = 0
+        _ = s.act(.full, m.env)
+        #expect(s.focus.isEmpty)
+
+        // So a first whole-year visit to Season starts at the first goal and skips none.
+        _ = s.act(.next, m.env)                 // off the ground (nothing kept)
+        _ = s.act(.next, m.env)                 // Season
+        #expect(s.step == 2)
+        #expect(s.focus[.season] == m.strong.id)
+        #expect(s.tour == [m.bathroom.id, m.weekends.id])
+    }
+
     @Test func examplesToggleButNotOnToday() {
         var s = m.at(3)
         _ = s.act(.examples, m.env)

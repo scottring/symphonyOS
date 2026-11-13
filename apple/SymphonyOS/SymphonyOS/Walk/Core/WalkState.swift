@@ -27,6 +27,7 @@ struct WalkState: Equatable {
     var orb: Orb = .idle; var typing: String?
     var note: String?; var undoShowing = false
     var undo: [WalkUndoEntry] = []         // in memory only, by design: never saved, so a relaunch starts with nothing to undo
+    var pulledChildren: [UUID: [UUID]] = [:]   // a pulled-up flag → the flags that named it as parent; in memory, for Undo
     var sheetOpen = false; var calendarOffer = false
 
     enum Orb: Equatable { case idle, holding(hover: CompassPoint?), open, speaking(live: String) }
@@ -46,7 +47,10 @@ struct WalkState: Equatable {
     mutating func apply(_ event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
         switch event {
         case .areaTapped(let id): return tapArea(id)
-        case .bannerTapped(let id): return focusParent(id)
+        case .bannerTapped(let id):
+            // A flag on the step's own level is selected (Move to, Pull it up); one level up, focused.
+            if let level, item(id)?.level == level { return select(id) }
+            return focusParent(id)
         case .noteExpired:
             note = nil
             return []
@@ -54,9 +58,16 @@ struct WalkState: Equatable {
         case .orbDown, .orbHeld, .orbMoved, .orbUp, .orbCancelled,
              .heard, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point:
             return []
-        // Planting, examples, undo, move and pull up (Task 10).
-        case .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo, .undoExpired, .rowToggled:
+        // Planting, examples, undo, move and pull up (WalkState+Plant.swift).
+        case .stubTapped(let key): return openStub(key)
+        case .exampleTapped(let text): return plantExample(text, env)
+        case .moveTo(let areaId): return moveSelected(to: areaId)
+        case .pullUp: return pullUpSelected()
+        case .undo: return undoLast()
+        case .undoExpired:
+            undoShowing = false             // only the pill goes: the stack stays
             return []
+        case .rowToggled(let taskId): return toggleRow(taskId)
         // The calendar and the ending (Tasks 17 and 20).
         case .calendarAnswered, .sheetHandle, .walkAnother, .goToToday:
             return []
@@ -77,8 +88,10 @@ struct WalkState: Equatable {
             guard (1...4).contains(step), !ground else { return [] }
             if examplesOn.contains(step) { examplesOn.remove(step) } else { examplesOn.insert(step) }
             return []
-        // Typing (Task 11), undo and starting there (Task 10), the calendar (Task 20).
-        case .type, .undo, .startThere, .calendar:
+        case .undo: return undoLast()
+        case .startThere: return startThere()
+        // Typing (Task 11), the calendar (Task 20).
+        case .type, .calendar:
             return []
         }
     }
@@ -91,6 +104,7 @@ struct WalkState: Equatable {
         ground = true
         kept = []
         focusArea = nil
+        focus = [:]                         // a focus left from an earlier walk must not skip a first visit
         tour = []
         step = 1
         settle()
@@ -264,7 +278,8 @@ struct WalkState: Equatable {
             return [.save]
         }
         guard let above = WalkLevel(rawValue: level.rawValue - 1) else { return [] }
-        let parents = items(on: above)
+        // Season goes through the year goals in the order its tour visits them.
+        let parents = level == .season ? yearGoalsInColumnOrder() : items(on: above)
         guard !parents.isEmpty else { return [] }
         let next = focus[level].flatMap { id in parents.firstIndex { $0.id == id } }
             .map { ($0 + 1) % parents.count } ?? 0
