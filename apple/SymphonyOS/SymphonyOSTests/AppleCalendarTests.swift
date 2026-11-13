@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import EventKit   // for the notification name only; no EKEventStore is created
 @testable import Symphony
 
 /// A source that never touches EventKit.
@@ -121,7 +122,7 @@ struct AppleCalendarTests {
 
     @MainActor @Test func neverReadsEventsUntilAllowed() {
         let src = FakeAppleSource(access: .notAsked)
-        let service = AppleCalendarService(source: src)
+        let service = AppleCalendarService(source: src, calendar: cal)
         service.refresh(at(13))
         service.refreshWeek(at(9))
         service.refreshPeriod(from: at(1), to: at(30))
@@ -132,7 +133,7 @@ struct AppleCalendarTests {
 
     @MainActor @Test func grantingAccessLetsADayLoad() async {
         let src = FakeAppleSource(access: .notAsked, events: [ev("a", "Dentist", at(13, 9), at(13, 10))])
-        let service = AppleCalendarService(source: src)
+        let service = AppleCalendarService(source: src, calendar: cal)
         await service.requestAccess()
         #expect(service.access == .allowed)
         service.refresh(at(13))
@@ -143,7 +144,7 @@ struct AppleCalendarTests {
 
     @MainActor @Test func deniedGivesNilAndDoesNotThrow() async {
         let src = FakeAppleSource(access: .denied, grants: false)
-        let service = AppleCalendarService(source: src)
+        let service = AppleCalendarService(source: src, calendar: cal)
         await service.requestAccess()
         service.refresh(at(13))
         #expect(service.access == .denied)
@@ -151,14 +152,76 @@ struct AppleCalendarTests {
         #expect(src.eventReads == 0)
     }
 
-    @MainActor @Test func rereadsCachedDaysWhenTheCalendarChanges() async {
+    @MainActor @Test func rereadsCachedDaysWhenTheCalendarChanges() {
         let src = FakeAppleSource(access: .allowed)
-        let service = AppleCalendarService(source: src)
+        let service = AppleCalendarService(source: src, calendar: cal)
         service.refresh(at(13))
         #expect(service.items(for: at(13))?.isEmpty == true)
         src.stored = [ev("a", "New", at(13, 9), at(13, 10))]
-        NotificationCenter.default.post(name: Notification.Name("EKEventStoreChangedNotification"), object: nil)
-        await Task.yield()
+        service.calendarDidChange()
         #expect(service.items(for: at(13))?.map(\.title) == ["New"])
+    }
+
+    @MainActor @Test func theStoreChangedNotificationReachesTheService() async {
+        let src = FakeAppleSource(access: .allowed)
+        let service = AppleCalendarService(source: src, calendar: cal)
+        service.refresh(at(13))
+        src.stored = [ev("a", "New", at(13, 9), at(13, 10))]
+        NotificationCenter.default.post(name: .EKEventStoreChanged, object: nil)
+        for _ in 0..<100 where service.items(for: at(13))?.isEmpty != false {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(service.items(for: at(13))?.map(\.title) == ["New"])
+    }
+
+    @MainActor @Test func revokedAccessShowsNothingAndForgetsTheCache() {
+        let src = FakeAppleSource(access: .allowed, events: [ev("a", "Dentist", at(13, 9), at(13, 10))])
+        let service = AppleCalendarService(source: src, calendar: cal)
+        service.refresh(at(13))
+        service.refreshPeriod(from: at(1), to: at(30))
+        #expect(service.items(for: at(13))?.count == 1)
+        #expect(service.entries(from: at(1), to: at(30)) != nil)
+
+        src.access = .denied
+        service.calendarDidChange()
+        #expect(service.items(for: at(13)) == nil)
+        #expect(service.entries(from: at(1), to: at(30)) == nil)
+
+        src.access = .allowed
+        service.calendarDidChange()
+        #expect(service.items(for: at(13)) == nil)   // nothing stale before a refresh
+        #expect(service.entries(from: at(1), to: at(30)) == nil)
+        service.refresh(at(13))
+        #expect(service.items(for: at(13))?.count == 1)
+    }
+
+    // MARK: Daylight saving (America/New_York)
+
+    func nyDate(_ y: Int, _ mo: Int, _ d: Int, _ h: Int = 0) -> Date {
+        cal.date(from: DateComponents(year: y, month: mo, day: d, hour: h))!
+    }
+
+    @Test(arguments: [(2026, 11, 1, 25.0), (2026, 3, 8, 23.0)])
+    func daylightSavingDays(year: Int, month: Int, day: Int, hours: Double) {
+        let dayStart = nyDate(year, month, day)
+        let next = cal.date(byAdding: .day, value: 1, to: dayStart)!
+        #expect(next.timeIntervalSince(dayStart) == hours * 3600)
+
+        // 22:00 the night before to 01:00 on the DST day.
+        let prev = cal.date(byAdding: .day, value: -1, to: dayStart)!
+        let late = ev("a", "Late", cal.date(bySettingHour: 22, minute: 0, second: 0, of: prev)!,
+                      cal.date(byAdding: .hour, value: 1, to: dayStart)!)
+        let before = AppleCalendarMapper.items([late], on: prev, calendar: cal)
+        let after = AppleCalendarMapper.items([late], on: dayStart, calendar: cal)
+        #expect(before.count == 1)
+        #expect(after.count == 1)
+        #expect(after[0].startTime == dayStart)
+        #expect(after[0].endTime == dayStart.addingTimeInterval(3600))
+
+        // An event covering the whole DST day is all-day on it.
+        let whole = ev("b", "Away", prev, next.addingTimeInterval(3600))
+        let item = AppleCalendarMapper.items([whole], on: dayStart, calendar: cal)[0]
+        #expect(item.isAllDay)
+        #expect(item.startTime == nil)
     }
 }

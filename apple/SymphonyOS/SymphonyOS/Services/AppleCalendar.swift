@@ -128,7 +128,7 @@ enum AppleCalendarMapper {
         return e.start < dayEnd && e.end > dayStart
     }
 
-    private static func dayKey(_ day: Date, _ calendar: Calendar) -> String {
+    static func dayKey(_ day: Date, _ calendar: Calendar) -> String {
         let c = calendar.dateComponents([.year, .month, .day], from: day)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
@@ -139,12 +139,14 @@ enum AppleCalendarMapper {
 /// Today and Week read the device calendar through this. It never asks for
 /// permission on its own (`requestAccess()` is called from a deliberate tap),
 /// caches by day, and re-reads what it has cached when the calendar changes.
+/// When access goes away it forgets everything it cached.
 @Observable
 @MainActor
 final class AppleCalendarService {
     static let shared = AppleCalendarService()
 
     private let source: AppleEventSource
+    private let calendar: Calendar
     private(set) var access: AppleCalendarAccess
 
     private var byDay: [String: [TimelineItem]] = [:]
@@ -154,15 +156,14 @@ final class AppleCalendarService {
 
     private struct PeriodKey: Hashable { let start: Date; let end: Date }
 
-    init(source: AppleEventSource = EventKitSource()) {
+    init(source: AppleEventSource = EventKitSource(), calendar: Calendar = .current) {
         self.source = source
+        self.calendar = calendar
         self.access = source.access
-        // EventKit's change notification, by name, so only `EventKitSource`
-        // needs to import EventKit.
         observer = NotificationCenter.default.addObserver(
-            forName: Notification.Name("EKEventStoreChangedNotification"), object: nil, queue: .main
+            forName: .EKEventStoreChanged, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reloadCached() }
+            MainActor.assumeIsolated { self?.calendarDidChange() }
         }
     }
 
@@ -172,8 +173,7 @@ final class AppleCalendarService {
 
     func requestAccess() async {
         _ = await source.requestAccess()
-        access = source.access
-        reloadCached()
+        calendarDidChange()
     }
 
     /// Cached events for `date`, or nil when not allowed or never loaded.
@@ -183,14 +183,13 @@ final class AppleCalendarService {
     }
 
     func refresh(_ date: Date) {
-        load(days: [Calendar.current.startOfDay(for: date)])
+        load(days: [calendar.startOfDay(for: date)])
     }
 
     /// The seven days from `weekStart`, in one read.
     func refreshWeek(_ weekStart: Date) {
-        let cal = Calendar.current
-        let first = cal.startOfDay(for: weekStart)
-        load(days: (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: first) })
+        let first = calendar.startOfDay(for: weekStart)
+        load(days: (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: first) })
     }
 
     func entries(from start: Date, to end: Date) -> [PeriodCalendar.Entry]? {
@@ -200,35 +199,42 @@ final class AppleCalendarService {
 
     func refreshPeriod(from start: Date, to end: Date) {
         guard syncAccess() else { return }
-        byPeriod[PeriodKey(start: start, end: end)] = AppleCalendarMapper.entries(source.events(from: start, to: end))
+        byPeriod[PeriodKey(start: start, end: end)] =
+            AppleCalendarMapper.entries(source.events(from: start, to: end), calendar: calendar)
+    }
+
+    /// The device calendar changed, or access did: re-read what is cached, or
+    /// forget it all if access is gone.
+    func calendarDidChange() {
+        guard syncAccess() else { return }
+        for day in dayStarts.values.sorted() { load(days: [day]) }
+        for p in Array(byPeriod.keys) { refreshPeriod(from: p.start, to: p.end) }
     }
 
     // MARK: Private
 
     private func key(_ date: Date) -> String {
-        PlanCalendar.ymd(Calendar.current.startOfDay(for: date))
+        AppleCalendarMapper.dayKey(calendar.startOfDay(for: date), calendar)
     }
 
-    /// Re-reads the source's access (the user can change it in Settings) and
-    /// says whether events may be read.
+    /// Re-reads the source's access (the user can change it in Settings),
+    /// clears the caches when it is not allowed, and says whether events may
+    /// be read.
     private func syncAccess() -> Bool {
         access = source.access
+        if access != .allowed {
+            byDay = [:]; dayStarts = [:]; byPeriod = [:]
+        }
         return access == .allowed
     }
 
     private func load(days: [Date]) {
         guard syncAccess(), let first = days.first, let last = days.last,
-              let end = Calendar.current.date(byAdding: .day, value: 1, to: last) else { return }
+              let end = calendar.date(byAdding: .day, value: 1, to: last) else { return }
         let events = source.events(from: first, to: end)
         for day in days {
-            byDay[key(day)] = AppleCalendarMapper.items(events, on: day)
+            byDay[key(day)] = AppleCalendarMapper.items(events, on: day, calendar: calendar)
             dayStarts[key(day)] = day
         }
-    }
-
-    private func reloadCached() {
-        guard syncAccess() else { return }
-        for day in dayStarts.values.sorted() { load(days: [day]) }
-        for p in Array(byPeriod.keys) { refreshPeriod(from: p.start, to: p.end) }
     }
 }
