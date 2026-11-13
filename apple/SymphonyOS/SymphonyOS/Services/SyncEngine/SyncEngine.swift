@@ -26,6 +26,7 @@ actor SyncEngine {
         ("family_members", FamilyMember.self),
         ("contacts", Contact.self),
         ("projects", Project.self),
+        ("goal_areas", GoalArea.self),
         ("tasks", SymphonyTask.self),
         ("routines", Routine.self),
         ("lists", SymphonyList.self),
@@ -158,6 +159,11 @@ actor SyncEngine {
                         task.completedAtDirty = false
                         task.dismissedAtDirty = false
                         task.sortOrderDirty = false
+                        task.linksDirty = false
+                    }
+                    if change.tableName == "goals",
+                       let goal = (try? context.fetch(FetchDescriptor<Goal>()))?.first(where: { $0.id == change.recordId }) {
+                        goal.areaDirty = false
                     }
                     if change.tableName == "routines",
                        let routine = (try? context.fetch(FetchDescriptor<Routine>()))?.first(where: { $0.id == change.recordId }) {
@@ -203,6 +209,10 @@ actor SyncEngine {
         await pullTable("family_members", as: FamilyMember.self, userId: userId)
         await pullTable("contacts", as: Contact.self, userId: userId)
         await pullTable("projects", as: Project.self, userId: userId)
+        // Life areas before the tasks and goals filed under them. Includes a
+        // partner's Family areas (readable by RLS); the phone never edits one
+        // whose userId is not the signed-in person.
+        await pullTable("goal_areas", as: GoalArea.self, userId: userId)
         // Tasks reconcile like every other table. They used to be exempt, to protect
         // locally-created rows that hadn't pushed yet — but `pendingIds` in
         // `pullTable` already does exactly that, so the exemption bought nothing and
@@ -454,6 +464,9 @@ actor SyncEngine {
         case "goals":
             guard let g = find(Goal.self) else { return nil }
             return goalRow(g, forInsert: forInsert)
+        case "goal_areas":
+            guard let a = find(GoalArea.self) else { return nil }
+            return goalAreaRow(a)
         default:
             return nil   // other tables aren't edited from iOS
         }
@@ -557,6 +570,17 @@ actor SyncEngine {
         // nil over a Let go made on the web.
         if t.dismissedAtDirty {
             row["dismissed_at"] = d(t.dismissedAt)
+        }
+        // Links: only when the phone itself set them (linksDirty), and then
+        // all three, nulls included — like placementDirty. A row pulled from
+        // the server sends none back, so an edit here never overwrites or
+        // nulls a link made on the web. is_goal, goal_task_id and
+        // supports_goal_task_id are never sent (guarded server-side; the web
+        // writes source_id / goal_id instead).
+        if t.linksDirty {
+            row["goal_id"] = u(t.goalId)
+            row["source_id"] = u(t.sourceId)
+            row["area_id"] = u(t.areaId)
         }
         return row
     }
@@ -714,8 +738,9 @@ actor SyncEngine {
     }
 
     /// The fields the phone edits — the web's addGoal / updateGoal columns.
-    /// area/strategy/domain/layer/carried_from are web-owned and omitted, so an
-    /// UPDATE leaves them untouched. `scope` rides on INSERT only (derived from
+    /// strategy/domain/layer/carried_from are web-owned and omitted, so an
+    /// UPDATE leaves them untouched; `area_id` goes up only when the phone
+    /// itself set it (`areaDirty`). `scope` rides on INSERT only (derived from
     /// the life area, as the web does); an update never re-derives sharing.
     private static func goalRow(_ g: Goal, forInsert: Bool) -> [String: AnyJSON] {
         var row: [String: AnyJSON] = [
@@ -730,7 +755,20 @@ actor SyncEngine {
             "updated_at": .string(isoOut.string(from: Date())),
         ]
         if forInsert { row["scope"] = .string(g.scope ?? "individual") }
+        if g.areaDirty { row["area_id"] = u(g.areaId) }
         return row
+    }
+
+    /// The live `goal_areas` columns (it has no updated_at).
+    private static func goalAreaRow(_ a: GoalArea) -> [String: AnyJSON] {
+        [
+            "id": .string(a.id.uuidString),
+            "user_id": .string(a.userId.uuidString),
+            "name": .string(a.name),
+            "sort_order": .integer(a.sortOrder),
+            "context": s(a.context),
+            "created_at": .string(isoOut.string(from: a.createdAt)),
+        ]
     }
 
     private static func focusRow(_ f: TaskFocus) -> [String: AnyJSON] {
@@ -944,6 +982,7 @@ extension FamilyMember: HasUUID {}
 extension TaskCommitment: HasUUID {}
 extension TaskFocus: HasUUID {}
 extension Goal: HasUUID {}
+extension GoalArea: HasUUID {}
 extension ActionableInstance: HasUUID {}
 extension EventNote: HasUUID {}
 extension WeeklyTemplate: HasUUID {}

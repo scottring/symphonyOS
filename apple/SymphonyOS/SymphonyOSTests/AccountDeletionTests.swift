@@ -52,6 +52,7 @@ struct AccountDeletionTests {
         let ctx = ModelContext(container)
         ctx.insert(SymphonyTask(userId: uid, title: "t"))
         ctx.insert(Goal(id: UUID(), userId: uid, name: "g", year: 2026))
+        ctx.insert(GoalArea(userId: uid, name: "Health"))
         ctx.insert(Household(ownerId: uid))
         ctx.insert(FamilyMember(userId: uid, name: "M", initials: "M", color: "#000000"))
         ctx.insert(PendingChange(tableName: "tasks", recordId: UUID(), changeType: "insert"))
@@ -63,6 +64,7 @@ struct AccountDeletionTests {
         let after = ModelContext(container)
         #expect(try after.fetchCount(FetchDescriptor<SymphonyTask>()) == 0)
         #expect(try after.fetchCount(FetchDescriptor<Goal>()) == 0)
+        #expect(try after.fetchCount(FetchDescriptor<GoalArea>()) == 0)
         #expect(try after.fetchCount(FetchDescriptor<Household>()) == 0)
         #expect(try after.fetchCount(FetchDescriptor<FamilyMember>()) == 0)
         #expect(try after.fetchCount(FetchDescriptor<PendingChange>()) == 0)
@@ -125,7 +127,7 @@ struct AccountDeletionTests {
         let expected: Set<String> = [
             "SymphonyTask", "Project", "Routine", "Contact", "FamilyMember", "ActionableInstance",
             "EventNote", "WeeklyTemplate", "Household", "UserProfile", "SymphonyList",
-            "SymphonyListItem", "TaskCommitment", "TaskFocus", "Goal", "PendingChange",
+            "SymphonyListItem", "TaskCommitment", "TaskFocus", "Goal", "GoalArea", "PendingChange",
         ]
         #expect(names == expected)
     }

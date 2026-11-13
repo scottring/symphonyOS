@@ -109,6 +109,17 @@ final class SymphonyTask {
     var goalTaskId: UUID? = nil
     /// The year goal (`goals` row) this serves.
     var goalId: UUID? = nil
+    /// The row this was planned from (web `tasks.source_id`): a month goal
+    /// names its season goal, a week task its month goal.
+    var sourceId: UUID? = nil
+    /// The life area (`goal_areas` row) this is filed under.
+    var areaId: UUID? = nil
+    /// True when the phone itself set `goalId` / `sourceId` / `areaId` and
+    /// they haven't pushed yet. Like `placementDirty`: only then does a push
+    /// carry the three link columns (nulls included), so a row pulled from
+    /// the server never sends its links back over ones made on the web.
+    /// Inline defaults for SwiftData's lightweight migration.
+    var linksDirty: Bool = false
     /// Legacy shared "chosen for this day" date. Read-only: the web now keeps
     /// focus per person in `task_focus` and only reads this when a task has no
     /// focus rows at all.

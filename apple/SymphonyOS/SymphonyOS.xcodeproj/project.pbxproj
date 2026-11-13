@@ -47,6 +47,7 @@
 		3DDF32C0A94CAC8D5B9F0AD0 /* DuoJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813059185BE971ADE0DC6388 /* DuoJournal.swift */; };
 		414C7AC80E35A0CC4027D21D /* EventNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF0FC1CF6088ADE5D739EB5 /* EventNote.swift */; };
 		41AE4C762EAFD3902E7DF083 /* NextUpCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BD95A959DE58FFA206B8F70 /* NextUpCard.swift */; };
+		4208F629385AA987AD3E7D44 /* GoalArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34D062F44681ECA79ADFED80 /* GoalArea.swift */; };
 		4277DB8F889F7D8CABBB42B1 /* HalfOpenPosture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 079D78D4528A16F9867FCC94 /* HalfOpenPosture.swift */; };
 		4368E0DCEC662C3E25FA39DE /* LightEditionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8E81530D37318E5E8C758EA /* LightEditionUITests.swift */; };
 		47E06813C2F26251F785910B /* RoutineListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C82C536D6E13BD9ECB5DDD /* RoutineListView.swift */; };
@@ -234,6 +235,7 @@
 		2D25CC3400D409DAF4D6E68C /* DocumentIngest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentIngest.swift; sourceTree = "<group>"; };
 		2DA3F6E2C9518EE578D16841 /* CalendarFeedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarFeedTests.swift; sourceTree = "<group>"; };
 		30642091C5E45B47ECA3FA0C /* SymphonyOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SymphonyOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		34D062F44681ECA79ADFED80 /* GoalArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalArea.swift; sourceTree = "<group>"; };
 		3550614A2441567DA7ED9B00 /* NordicColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NordicColors.swift; sourceTree = "<group>"; };
 		37846053B387BAA8FC10D3E6 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		394F2642EB45FC8B817CA33F /* TellSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TellSheet.swift; sourceTree = "<group>"; };
@@ -419,6 +421,7 @@
 				6E0C9C5D59DC16582C09AD07 /* Edition.swift */,
 				CBF0FC1CF6088ADE5D739EB5 /* EventNote.swift */,
 				B03612661785F1EE17B02E03 /* FamilyMember.swift */,
+				34D062F44681ECA79ADFED80 /* GoalArea.swift */,
 				527B3D33FF88A9A84A5DD5F8 /* Household.swift */,
 				779DC68DE6348BF47C96A130 /* PendingChange.swift */,
 				9AAB2B6E9FC48131AEE8F13F /* Planning.swift */,
@@ -1049,6 +1052,7 @@
 				DA525AE0EB06BB4184E85BC8 /* EventDetailView.swift in Sources */,
 				414C7AC80E35A0CC4027D21D /* EventNote.swift in Sources */,
 				FB97C68042921BA69DA1E83A /* FamilyMember.swift in Sources */,
+				4208F629385AA987AD3E7D44 /* GoalArea.swift in Sources */,
 				25D57A063F8E5D66235418D3 /* GoalEditorSheet.swift in Sources */,
 				7B3914ADD95F6F5B95EA377F /* GoogleCalendarService.swift in Sources */,
 				4277DB8F889F7D8CABBB42B1 /* HalfOpenPosture.swift in Sources */,

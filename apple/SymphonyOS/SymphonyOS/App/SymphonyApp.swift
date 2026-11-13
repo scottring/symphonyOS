@@ -54,6 +54,7 @@ extension SymphonyApp {
         TaskCommitment.self,
         TaskFocus.self,
         Goal.self,
+        GoalArea.self,
         PendingChange.self,
     ]
 }

@@ -336,4 +336,142 @@ struct SyncSerializationTests {
             #expect(row["waiting_since"] == nil)
         }
     }
+
+    // MARK: - Links and life areas (the walk)
+    //
+    // A task's goal_id / source_id / area_id and a goal's area_id go up only
+    // when the phone itself set them (linksDirty / areaDirty), like
+    // placementDirty: a row pulled from the server never echoes its links
+    // back, so an edit here can never overwrite or null a link made on the web.
+
+    private func makeLinkContext() throws -> ModelContext {
+        let container = try ModelContainer(
+            for: SymphonyTask.self, Goal.self, GoalArea.self, PendingChange.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        return ModelContext(container)
+    }
+
+    private static let linkKeysNeverSentByDefault = [
+        "goal_id", "source_id", "area_id", "goal_task_id", "supports_goal_task_id", "is_goal",
+    ]
+    private static let goalColumnsNeverSent = ["is_goal", "goal_task_id", "supports_goal_task_id"]
+
+    @Test func aTaskPulledWithLinksSendsNoneOfThemBack() throws {
+        let context = try makeLinkContext()
+        let id = UUID(), user = UUID(), goal = UUID(), source = UUID(), area = UUID(), step = UUID()
+        let task = try #require(RowMapper.toModel(SymphonyTask.self, from: [
+            "id": .string(id.uuidString.lowercased()),
+            "user_id": .string(user.uuidString.lowercased()),
+            "title": .string("Book the cabin"),
+            "goal_id": .string(goal.uuidString.lowercased()),
+            "source_id": .string(source.uuidString.lowercased()),
+            "area_id": .string(area.uuidString.lowercased()),
+            "goal_task_id": .string(step.uuidString.lowercased()),
+            "is_goal": .bool(true),
+        ]))
+        #expect(task.goalId == goal)
+        #expect(task.sourceId == source)
+        #expect(task.areaId == area)
+        #expect(task.linksDirty == false)
+        context.insert(task)
+        try context.save()
+
+        for forInsert in [false, true] {
+            let row = try #require(SyncEngine.serializeRow(table: "tasks", id: id, context: context, forInsert: forInsert))
+            for key in Self.linkKeysNeverSentByDefault {
+                #expect(row[key] == nil, "\(key) sent with forInsert \(forInsert)")
+            }
+        }
+    }
+
+    @Test func aLinkedTaskSendsExactlyTheThreeLinkColumns() throws {
+        let context = try makeLinkContext()
+        let g = UUID(), a = UUID()
+        let task = SymphonyTask(userId: UUID(), title: "Call the campsite")
+        task.goalId = g
+        task.sourceId = nil
+        task.areaId = a
+        task.linksDirty = true
+        context.insert(task)
+        try context.save()
+
+        for forInsert in [false, true] {
+            let row = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context, forInsert: forInsert))
+            #expect(row["goal_id"] == .string(g.uuidString))
+            #expect(row["source_id"] == .null)
+            #expect(row["area_id"] == .string(a.uuidString))
+            for key in Self.goalColumnsNeverSent {
+                #expect(row[key] == nil, "\(key) sent with forInsert \(forInsert)")
+            }
+        }
+    }
+
+    @Test func aGoalSendsItsAreaOnlyWhenThePhoneSetIt() throws {
+        let context = try makeLinkContext()
+        let id = UUID(), area = UUID()
+        let goal = try #require(RowMapper.toModel(Goal.self, from: [
+            "id": .string(id.uuidString.lowercased()),
+            "user_id": .string(UUID().uuidString.lowercased()),
+            "name": .string("A summer outdoors"),
+            "year": .integer(2027),
+            "area_id": .string(area.uuidString.lowercased()),
+        ]))
+        #expect(goal.areaId == area)
+        #expect(goal.areaDirty == false)
+        context.insert(goal)
+        try context.save()
+
+        for forInsert in [false, true] {
+            let row = try #require(SyncEngine.serializeRow(table: "goals", id: id, context: context, forInsert: forInsert))
+            #expect(row["area_id"] == nil, "area_id sent with forInsert \(forInsert)")
+        }
+
+        goal.areaDirty = true
+        try context.save()
+        for forInsert in [false, true] {
+            let row = try #require(SyncEngine.serializeRow(table: "goals", id: id, context: context, forInsert: forInsert))
+            #expect(row["area_id"] == .string(area.uuidString))
+        }
+    }
+
+    @Test func aGoalAreaRowHasTheLiveColumns() throws {
+        let context = try makeLinkContext()
+        let area = GoalArea(userId: UUID(), name: "Health", sortOrder: 2, context: "personal")
+        context.insert(area)
+        try context.save()
+
+        let row = try #require(SyncEngine.serializeRow(table: "goal_areas", id: area.id, context: context, forInsert: true))
+        #expect(Set(row.keys) == ["id", "user_id", "name", "sort_order", "context", "created_at"])
+        #expect(row["name"]?.stringValue == "Health")
+        #expect(row["sort_order"] == .integer(2))
+        #expect(row["context"]?.stringValue == "personal")
+    }
+
+    @Test func goalAreasMapFromRows() throws {
+        let id = UUID(), user = UUID()
+        let area = try #require(RowMapper.toModel(GoalArea.self, from: [
+            "id": .string(id.uuidString.lowercased()),
+            "user_id": .string(user.uuidString.lowercased()),
+            "name": .string("Family"),
+            "sort_order": .integer(3),
+            "context": .string("family"),
+            "created_at": .string("2026-11-01T09:30:00Z"),
+        ]))
+        #expect(area.id == id)
+        #expect(area.userId == user)
+        #expect(area.name == "Family")
+        #expect(area.sortOrder == 3)
+        #expect(area.context == "family")
+        #expect(area.createdAt == Date.fromISO("2026-11-01T09:30:00Z"))
+        #expect(area.syncStatus == .synced)
+        #expect(area.lastSyncedAt != nil)
+
+        let nameless = RowMapper.toModel(GoalArea.self, from: [
+            "id": .string(UUID().uuidString.lowercased()),
+            "user_id": .string(user.uuidString.lowercased()),
+            "sort_order": .integer(0),
+        ])
+        #expect(nameless == nil)
+    }
 }

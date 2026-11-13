@@ -26,7 +26,7 @@ enum DemoMode {
     static let types: [any PersistentModel.Type] = [
         SymphonyTask.self, Project.self, Routine.self, Contact.self, FamilyMember.self,
         ActionableInstance.self, EventNote.self, WeeklyTemplate.self, Household.self, UserProfile.self,
-        SymphonyList.self, SymphonyListItem.self, TaskCommitment.self, TaskFocus.self, Goal.self, PendingChange.self,
+        SymphonyList.self, SymphonyListItem.self, TaskCommitment.self, TaskFocus.self, Goal.self, GoalArea.self, PendingChange.self,
     ]
 
     @MainActor static let sharedContainer: ModelContainer = container(for: types)

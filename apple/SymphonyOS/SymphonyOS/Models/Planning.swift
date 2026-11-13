@@ -107,6 +107,12 @@ final class Goal {
     /// Who can see it — RLS shares goals on scope. Derived from the life area
     /// at creation (like the web's addGoal); sent on insert only.
     var scope: String? = nil
+    /// The life area (`goal_areas` row) this is filed under. Sent only when
+    /// `areaDirty` (the phone itself set it), so a goal pulled from the server
+    /// never sends back an area over one changed on the web. Inline defaults
+    /// for SwiftData's lightweight migration.
+    var areaId: UUID? = nil
+    var areaDirty: Bool = false
 
     var syncStatus: SyncStatus
     var lastSyncedAt: Date?

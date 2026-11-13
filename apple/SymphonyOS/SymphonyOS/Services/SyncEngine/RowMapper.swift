@@ -39,6 +39,8 @@ enum RowMapper {
             return focusFromRow(row) as? T
         case is Goal.Type:
             return goalFromRow(row) as? T
+        case is GoalArea.Type:
+            return goalAreaFromRow(row) as? T
         default:
             return nil
         }
@@ -85,6 +87,8 @@ enum RowMapper {
         task.isGoal = row.bool("is_goal") ?? false
         task.goalTaskId = row.uuid("goal_task_id")
         task.goalId = row.uuid("goal_id")
+        task.sourceId = row.uuid("source_id")
+        task.areaId = row.uuid("area_id")
         task.plannedOn = row.date("planned_on")
         task.sortOrder = row.int("sort_order")
         task.dismissedAt = row.date("dismissed_at")
@@ -335,10 +339,22 @@ enum RowMapper {
         g.context = row.string("context")
         g.sortOrder = row.int("sort_order") ?? 0
         g.scope = row.string("scope")
+        g.areaId = row.uuid("area_id")
         g.lastSyncedAt = Date()
         g.createdAt = row.date("created_at") ?? Date()
         g.updatedAt = row.date("updated_at") ?? Date()
         return g
+    }
+
+    private static func goalAreaFromRow(_ row: [String: AnyJSON]) -> GoalArea? {
+        guard let id = row.uuid("id"),
+              let userId = row.uuid("user_id"),
+              let name = row.string("name") else { return nil }
+        let a = GoalArea(id: id, userId: userId, name: name, sortOrder: row.int("sort_order") ?? 0,
+                         context: row.string("context"), syncStatus: .synced)
+        a.createdAt = row.date("created_at") ?? Date()
+        a.lastSyncedAt = Date()
+        return a
     }
 
     private static func userProfileFromRow(_ row: [String: AnyJSON]) -> UserProfile? {
