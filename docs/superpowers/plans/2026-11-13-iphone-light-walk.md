@@ -23,7 +23,10 @@
 - Everything the walk creates has `context = "personal"`. It never asks work / family / personal.
 - The walk is iPhone-only. Files in `R/Walk/Core` and `R/Walk/Data` import only Foundation, CoreGraphics and SwiftData and compile everywhere; every other file under `R/Walk` is wrapped in `#if os(iOS) … #endif` (as `R/Platform/iOS` is). Add no new Mac compile problem.
 - TDD for every pure piece: failing test, see it fail, implement, see it pass, commit. Views hold no rules: if a view needs an `if` about how the walk behaves, the rule belongs in the core with a test.
-- No dictation and no typing in UI tests (typing stalls this simulator: `apple/SymphonyOS/PLANNING.md:50-63`).
+- No dictation and no typing, in UI tests or by hand in the simulator (typing stalls this simulator: `apple/SymphonyOS/PLANNING.md:50-63`). Checks that need words use the example flags and the demo launch arguments.
+- The test targets also build for macOS. Every new test file that references an iOS-only type (`WalkModel`, `WalkScheduling`, `WalkListening`, `WalkSoundPlaying`, `UIImage`, anything in `WalkTestSupport.swift`) is wrapped whole in `#if os(iOS) … #endif`: `WalkTestSupport.swift`, `WalkModelTests.swift`, `WalkFlowTests.swift`, `WalkSoundTests.swift`, `WalkUITests.swift`. Test files for `R/Walk/Core` and `R/Walk/Data` are not wrapped.
+- One name per shared number and per string. Numbers: `WalkLoad.maxAreas` (areas on the ridge), `WalkWords.maxTitle` and `WalkWords.maxAreaName` (lengths), `WalkCopy.shortLength` (a title quoted in a question), `WalkState.undoMs`, `WalkState.noteMs` and `WalkState.calendarNoteMs` (how long the Undo pill and a note show), `WalkOrb.holdMs` (the hold). Strings: every word the walk shows or speaks comes from `WalkCopy` (Task 9). Code and unit tests use the names; only Task 9's tests and the UI test (which cannot see the app's types) spell a string out.
+- Anything that waits (a timer, a delayed sound, starting speech, asking for the calendar) goes through the injected `WalkScheduling` (Task 14), so tests drive time with `ManualWalkScheduler` and never sleep. Fakes shared by tests live in one file, `SymphonyOSTests/WalkTestSupport.swift`: Task 14 creates it with `ManualWalkScheduler` and `walkTestContext()`, Task 16 adds `FakeWalkListener`, Task 19 adds `FakeWalkSound`, Task 20 adds `FakeWalkCalendar`. Tasks 16 to 20 use them from there and declare no fake of their own.
 - **Screenshots.** Every task that changes what is seen ends by saving screenshots to the session's scratch folder under `walk-shots/task-<N>/` (never inside the repo) and listing the paths in its report. Recipe (never during a test run: UI tests hang if the app is launched by hand meanwhile): `cd apple/SymphonyOS && xcodebuild build -scheme SymphonyOS -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath "$TMPDIR/walk-dd" 2>&1 | tail -3 && xcrun simctl install booted "$TMPDIR/walk-dd/Build/Products/Debug-iphonesimulator/Symphony.app" && xcrun simctl launch booted com.scottkaufman.symphonyos -SymphonyDemo -SymphonyLight -SymphonyWalk -SymphonyWalkStep <0…6> && sleep 4 && xcrun simctl io booted screenshot <path>.png`. Judge each against the contract's numbers, not taste.
 - Line numbers below were read at commit `657548be`; another session was still committing to this branch, so find a cited function by name if a number is off. Commit after each task, ending the message with the session's attribution lines.
 
@@ -51,9 +54,9 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 ## File map
 
 - `R/Models/GoalArea.swift`: the synced `goal_areas` model.
-- `R/Walk/Core/`: `WalkTypes.swift` (levels, items, areas, compass points, actions), `WalkPeriods.swift` (which year, season, month, week), `WalkWords.swift` (tidying, pulling out a day), `WalkClassifier.swift` (keyword lists, placement), `WalkState.swift` + `WalkState+Plant.swift` + `WalkState+Orb.swift` (state, events, effects, the reducer), `WalkCopy.swift` (every string, the compass point sets), `WalkOrb.swift` (orb geometry), `WalkArt.swift` + `WalkLayout.swift` (art data; state → camera, labels, posts, banners), `WalkPosition.swift` (saved position, restore rule, when the walk appears).
+- `R/Walk/Core/`: `WalkTypes.swift` (levels, items, areas, compass points, actions), `WalkPeriods.swift` (which year, season, month, week), `WalkWords.swift` (tidying, pulling out a day), `WalkClassifier.swift` (keyword lists, placement), `WalkState.swift` + `WalkState+Plant.swift` + `WalkState+Orb.swift` (state, events, effects, the reducer), `WalkCopy.swift` (every string, the compass point sets), `WalkOrb.swift` (orb geometry), `WalkStage.swift` (device ↔ stage), `WalkArt.swift` + `WalkLayout.swift` (art data; state → camera, labels, posts, banners), `WalkPosition.swift` (saved position, restore rule, when the walk appears).
 - `R/Walk/Data/`: `WalkWriter.swift` (rows and links), `WalkLoad.swift` (reading the plan back), `WalkEnding.swift` (the ending's rows).
-- `R/Walk/`: `WalkModel.swift` (the one observable object), `WalkSound.swift`; `Views/WalkView.swift`, `WalkSceneView.swift`, `WalkBannerViews.swift`, `WalkOrbView.swift`, `WalkHintRow.swift`, `WalkEndingSheet.swift` (drawing only).
+- `R/Walk/`: `WalkModel.swift` (the one observable object), `WalkScheduling.swift` (the clock seam), `WalkSound.swift`; `Views/WalkView.swift`, `WalkSceneView.swift`, `WalkBannerViews.swift`, `WalkOrbView.swift`, `WalkHintRow.swift`, `WalkEndingSheet.swift` (drawing only).
 
 ---
 
@@ -96,15 +99,23 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 ### Task 2: Sync: parents go up before children, and the app knows when the first pull has finished
 **Files:**
 - Modify: `R/Services/SyncEngine/SyncEngine.swift` (`start` :48-62, `resync` :75-80, `pushPendingChanges` :135-189, `performInitialSync` :193-227, `pullTable` :231-307), `R/App/AppState.swift`, `R/App/ContentView.swift` (the foreground resync :38-41, `startSync` :55-76, `stopSync` :78-86)
-- Test: `SymphonyOSTests/SyncOrderTests.swift` (new)
+- Test: `SymphonyOSTests/SyncOrderTests.swift` (new; not wrapped, it uses no iOS-only type)
 
 **Interfaces:**
+- Consumes: Task 1's `SymphonyTask.goalId / sourceId / areaId / linksDirty`, `Goal.areaId / areaDirty`, `GoalArea`.
 - Produces:
   ```swift
   extension SyncEngine {
-      /// The rows this one points at that must be on the server first: a task's goalId, sourceId, areaId; a goal's areaId.
+      /// The rows this one's SENT links point at: a task's goalId, sourceId, areaId when `linksDirty`;
+      /// a goal's areaId when `areaDirty`; otherwise none (a clean row sends no link, so it has nothing to wait for).
       static func parentIds(table: String, id: UUID, context: ModelContext) -> [UUID]
       static func mustWait(parents: [UUID], unpushedInserts: Set<UUID>) -> Bool
+      /// The ids of every goal, task and life area on this phone.
+      static func knownIds(context: ModelContext) -> Set<UUID>
+      /// Parents that will never arrive: no insert waiting and no row on this phone.
+      static func lostParents(_ parents: [UUID], unpushedInserts: Set<UUID>, known: Set<UUID>) -> [UUID]
+      /// Sets the row's links to `lost` to nil and leaves its dirty flag set, so the null is what gets sent.
+      static func clearLinks(to lost: [UUID], table: String, id: UUID, context: ModelContext)
   }
   @discardableResult func start(userId: UUID) async -> Bool     // true when the first pull really ran
   @discardableResult func resync() async -> Bool
@@ -113,13 +124,17 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 
 **Why.** The queue is pushed oldest first (`SyncEngine.swift:141-147`), so a parent queued before its child goes first. But each change is pushed on its own: when the parent's push fails, the child is still tried, the foreign key refuses it, and an update that fails ten times is dropped (`:179`), which would silently lose a link. So a change whose row points at a parent with an insert still waiting is skipped for this pass, without counting an attempt.
 
+**The parent that never comes.** Inserts are never dropped by the engine, so a waiting child is released when its parent's insert lands. The one way a parent can be gone for good is that its row is no longer on this phone at all: it was deleted on another device and the pull removed it, or its row and queued insert were taken back. Such a parent has no insert waiting and is not in `knownIds`. The child does not wait for it: the link is set to nil on the local row (`clearLinks`), the row keeps its dirty flag, and it is sent with that column null, so the phone and the server agree and the child is never stuck behind a foreign key.
+
 - [ ] **Step 1: Write the failing tests:**
-  - `aTaskNamesItsGoalItsSourceAndItsArea`: `parentIds(table: "tasks", …)` is `[goalId, sourceId, areaId]` without the nils. `aGoalNamesItsArea`. `otherTablesNameNoParents` (`"task_commitments"` → `[]`).
+  - `aTaskNamesItsGoalItsSourceAndItsArea`: for a task with `linksDirty`, `parentIds(table: "tasks", …)` is `[goalId, sourceId, areaId]` without the nils. `aCleanRowNamesNoParents`: the same task with `linksDirty == false` → `[]`. `aGoalNamesItsArea`: with `areaDirty` → `[areaId]`, without → `[]`. `otherTablesNameNoParents` (`"task_commitments"` → `[]`).
   - `aChildWaitsForItsUnpushedParent`: `mustWait(parents: [g], unpushedInserts: [g])` is true; with `unpushedInserts: []` false; with `parents: []` false.
+  - `aParentThatIsGoneIsLost`: `lostParents([g], unpushedInserts: [], known: []) == [g]`; with `known: [g]` → `[]`; with `unpushedInserts: [g]` and `known: []` → `[]` (still waiting, not lost).
+  - `aLostLinkIsClearedAndTheNullIsSent`: a task with `linksDirty`, `goalId = g` (no such goal in the store) and `sourceId = s` (a task in the store); `clearLinks(to: [g], table: "tasks", …)` → `goalId == nil`, `sourceId == s`, `linksDirty` still true, and its serialized row has `goal_id == .null` and `source_id == .string(s.uuidString)`.
   - `theQueueKeepsParentsFirst`: `PlanWriter.createGoal` then `createPeriodTask`; the pending changes sorted by `createdAt` list the `goals` insert before the `tasks` insert.
   - `aFreshAppHasNotSynced`: `AppState().initialSyncFinished == false`.
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/SyncOrderTests`. Expected: FAIL to compile.
-- [ ] **Step 3: Implement the order.** In `pushPendingChanges`, build `unpushedInserts` from the fetched changes of type `insert`; before each non-delete change, `continue` when `mustWait(parents: parentIds(…), unpushedInserts:)`; remove a record id from the set when its insert succeeds.
+- [ ] **Step 3: Implement the order.** In `pushPendingChanges`, build `unpushedInserts` from the fetched changes of type `insert`. Before each non-delete change: `let parents = parentIds(…)`; `continue` when `mustWait(parents:unpushedInserts:)`; then `clearLinks(to: lostParents(parents, unpushedInserts:, known: knownIds(context:)), …)`, logging each lost link through `syncLog`; then push. Remove a record id from `unpushedInserts` when its insert succeeds.
 - [ ] **Step 4: Implement the signal.** `pullTable` returns whether its fetch and saves succeeded. `performInitialSync` returns true only when it was online and the `households`, `goal_areas`, `tasks` and `goals` pulls all succeeded; `start` and `resync` return that. In `ContentView`: after `await engine.start(userId:)` and after the foreground `resync()`, set `appState.initialSyncFinished = true` on the main actor when the result is true (a failed resync never sets it back); in demo mode (`startSync`'s early return) set it true; `stopSync()` sets it false.
 - [ ] **Step 5: Run** `SyncOrderTests`, then the whole unit suite (`-only-testing:SymphonyOSTests`). Expected: PASS, no existing test changed.
 - [ ] **Step 6: Commit.** `git commit -m "Sync: a child waits for its parent, and the first pull says when it is done"`
@@ -190,7 +205,7 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
   enum WalkWords {
       static let fillers: Set<String> = ["um", "uh", "uhm", "er", "erm", "hmm"]
       static let softFillers: Set<String> = ["so", "okay", "ok", "well", "like"]
-      static let maxTitle = 200
+      static let maxTitle = 200; static let maxAreaName = 24
       struct Said: Equatable { let title: String; let day: Date? }
       static func tidy(_ raw: String) -> String?
       static func said(_ raw: String, level: WalkLevel, today: Date, calendar: Calendar = PlanCalendar.calendar,
@@ -201,23 +216,24 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
   ```
 
 **The rules** (spec: "tidies spoken filler and pulls out a day … it doesn't rewrite"; D8).
-- `tidy`: trim; while the first word (ignoring a comma or "…" after it) is in `fillers`, drop it; a first word in `softFillers` is dropped only when a comma follows it or the next word is itself a filler, because "Like myself again" and "Well water tested" are real titles; drop one trailing full stop; capitalise the first letter; if longer than `maxTitle`, cut at the last space before it (at `maxTitle` when there is none). Returns nil when no letter or digit is left. Nothing else changes.
-- `said`: for every level, `title = tidy(…)`. A day is looked for only on `.week` and `.today`, and only at the end: (a) if there is a comma, the text after the last comma; otherwise (b) the last one, two or three words. That tail is a day when, after an optional leading `on`, `this` or `by`, it is exactly `today`, `tonight`, `tomorrow`, `weekend`, `the weekend`, or a weekday name; or (comma tail only) when `detect(tail)` returns a date. `today` / `tonight` → today; `tomorrow` → the next day; a weekday → its next date on or after today (today's own name means today); the weekend → today on a Saturday or Sunday, else the coming Saturday. The day leaves the title, with the comma and any `on` / `this` / `by` before it. If that leaves nothing, the whole text is the title and the day is kept.
+- `tidy`: split the text on whitespace into words. A word's *core* is the word lowercased with any `,` `.` `…` `!` `?` at its ends removed. If there are no words, or every word's core is in `fillers` or `softFillers`, return nil: fillers alone are nothing to plant. Otherwise, repeatedly: drop the first word when its core is in `fillers`; drop it when its core is in `softFillers` and either the word ends with a comma or the next word's core is in `fillers` (a soft filler otherwise stays, because "Like myself again" and "Well water tested" are real titles). Then join the words with single spaces, drop one trailing full stop, capitalise the first letter, and if the result is longer than `maxTitle` cut it at the last space before that (at `maxTitle` when there is none). Return nil when no letter or digit is left. Nothing else changes.
+- `said`: for every level, `title = tidy(…)`. A day is looked for only on `.week`, and only at the end: (a) if there is a comma, the text after the last comma; otherwise (b) the last one, two or three words. That tail is a day when, after an optional leading `on`, `this` or `by`, it is exactly `today`, `tonight`, `tomorrow`, `weekend`, `the weekend`, or a weekday name; or (comma tail only) when `detect(tail)` returns a date. `today` / `tonight` → today; `tomorrow` → the next day; a weekday → its next date on or after today (today's own name means today); the weekend → today on a Saturday or Sunday, else the coming Saturday. The day leaves the title, with the comma and any `on` / `this` / `by` before it. If that leaves nothing, the whole text is the title and the day is kept.
+- On `.today` nothing is pulled out: whatever is said is the first thing, whole, and the reducer dates it today (Task 10).
 - `detectedDate` is `CaptureParser.parse(tail)`: its date when the parser's title equals the tail (the whole tail was the date), else nil.
-- `tag`: "Today", "Tomorrow", a weekday name within the next six days, else `EEE d` ("Mon 23"). The banner uppercases it.
+- `tag` is uppercase, as the banner shows it (contract §5, line 320): `TODAY`, `TOMORROW`, a weekday name within the next six days (`TUESDAY`), else `EEE d` uppercased (`MON 23`). Nothing downstream changes its case.
 
 - [ ] **Step 1: Write the failing tests** (`today` = Friday 2026-11-13; `detect` injected as `{ _ in nil }` unless said):
   - `fillerGoes`: `tidy("um finish the bathroom.") == "Finish the bathroom"`; `tidy("So, um, feel strong again") == "Feel strong again"`; `tidy("Okay, run a 5K.") == "Run a 5K"`; `tidy("  read more  ") == "Read more"`.
   - `realWordsStay`: `tidy("like myself again") == "Like myself again"`; `tidy("well water tested") == "Well water tested"`; `tidy("so much more reading") == "So much more reading"`; `tidy("What next?") == "What next?"`.
-  - `nothingToPlant`: `tidy("")`, `tidy("   ")`, `tidy("um")`, `tidy("uh, um.")`, `tidy("…")` and an emoji-only string are all nil; a title with an emoji among its words is unchanged.
+  - `nothingToPlant`: `tidy("")`, `tidy("   ")`, `tidy("um")`, `tidy("uh, um.")`, `tidy("…")`, `tidy("okay")`, `tidy("so, um")` and an emoji-only string are all nil; a title with an emoji among its words is unchanged.
   - `longSpeechIsCutAtAWord`: 60 repetitions of "walk more " give a title of at most 200 characters ending in a whole word; one 260-letter word gives 200 characters.
   - `theDepositToday`: `said("the deposit, today", level: .week, …) == Said(title: "The deposit", day: 2026-11-13)`.
   - `trailingDays`: "Gym on Tuesday" → ("Gym", 2026-11-17); "call the tile shop tomorrow" → ("Call the tile shop", 2026-11-14); "choose the tile, Saturday" → ("Choose the tile", 2026-11-14); "breakfast out this weekend" → ("Breakfast out", 2026-11-14); "measure the wall on Friday" → ("Measure the wall", 2026-11-13); "ring mum, Monday" → ("Ring mum", 2026-11-16).
   - `aDayInTheMiddleStays`: "Friday night dinner with Sam" → that title, day nil; "plan Saturday breakfast out" → "Plan Saturday breakfast out", nil.
   - `aDayAloneIsATitle`: `said("today", level: .week, …) == Said(title: "Today", day: 2026-11-13)`.
-  - `upperLevelsKeepTheirWords`: `said("ship the deck by Friday", level: .month, …)` → title "Ship the deck by Friday", day nil.
+  - `upperLevelsKeepTheirWords`: `said("ship the deck by Friday", level: .month, …)` → title "Ship the deck by Friday", day nil. `todayKeepsItsWords`: `said("call mum tomorrow", level: .today, …)` → title "Call mum tomorrow", day nil.
   - `aWrittenDateAfterAComma`: with `detect` returning 2026-11-20 for "November 20", "pay the deposit, November 20" → ("Pay the deposit", 2026-11-20); the same words with no comma keep the whole title and no day.
-  - `tags`: today → "Today"; +1 → "Tomorrow"; 2026-11-17 → "Tuesday"; 2026-11-23 → "Mon 23".
+  - `tags`: today → "TODAY"; +1 → "TOMORROW"; 2026-11-17 → "TUESDAY"; 2026-11-23 → "MON 23".
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkWordsTests`. Expected: FAIL to compile.
 - [ ] **Step 3: Implement** `WalkWords`.
 - [ ] **Step 4: Run.** Expected: PASS.
@@ -271,7 +287,7 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - Test: `SymphonyOSTests/WalkWriterTests.swift`
 
 **Interfaces:**
-- Consumes: Task 1's fields; `WalkItem`, `WalkArea`, `WalkPeriods`; `PlanWriter`, `TaskViewModel.toggleComplete`, `ModelContext.queueSync` / `queueKeyedDelete` (`R/Models/PendingChange.swift:39-60`).
+- Consumes: Task 1's fields; `WalkItem`, `WalkArea`, `WalkPeriods`; `PlanWriter` (with its `complete(_:)`, :516), `ModelContext.queueSync` / `queueKeyedDelete` (`R/Models/PendingChange.swift:39-60`).
 - Produces:
   ```swift
   // PlanWriter, new defaulted parameters:
@@ -288,18 +304,19 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
       func restore(_ id: UUID)
       func setArea(_ id: UUID, level: WalkLevel, to areaId: UUID?)
       func setFirstThing(_ id: UUID?, previous: UUID?)
-      func setDone(_ id: UUID, _ done: Bool)
+      func toggleDone(_ id: UUID)                      // any task, planted by the walk or not
   }
   ```
   A struct over one small reference box (the removed-row snapshots and the ids of the areas it made), so copies share them.
 
 **What each call writes.**
 - `links`: year → (nil, nil). Season → (goalId: parentId, nil). Month and week → (goalId: parentGoalId, sourceId: parentId).
-- `ensureArea`: nothing if a `GoalArea` with that id exists; else insert one with `context = "personal"` and `sortOrder` one more than the highest among this person's areas (0 when none), queue its insert, and remember that this walk made it. Always called before the row that points at it, so the area is queued first. `dropAreaIfUnused` removes an area only when this walk made it and no goal or task names it.
+- `ensureArea`: nothing if a `GoalArea` with that id exists; else insert one with `context = "personal"` and `sortOrder` one more than the highest among this person's areas (0 when none), queue its insert, and remember that this walk made it. Always called before the row that points at it, so the area is queued first.
+- `dropAreaIfUnused`: does nothing unless this walk made the area and no goal or task names it. Then, if the area's insert is still queued, the queued change and the local row are both deleted, so nothing about it reaches the server; otherwise the local row is deleted and a `goal_areas` delete is queued.
 - `create`: year → `PlanWriter.createGoal(name:, notes: nil, context: "personal", year: periods.year, id: item.id)`, then `areaId` and `areaDirty = true`. Season → `createPeriodTask(level: "season", periodStart: periods.season.start, context: "personal", id:)`. Month → `level: "month", periodStart: periods.monthStart`. Week → `level: "week", periodStart: PlanCalendar.weekStart(item.day ?? periods.today)`, then, when it has a day, `planTask(task, on: day, focusToday: false)`: a week task said for today is on today but is not the first thing. On every task: `goalId` / `sourceId` from `links` (the parent's goal id read from the parent's row), `areaId`, `linksDirty = true`.
 - `remove`: when the row's own insert is still queued, delete every queued change for it and for its commitments and focus rows, and the local rows, so nothing reaches the server; otherwise delete locally and queue a delete (as `TaskViewModel.deleteTask` does; the same for a `Goal`). Rows that pointed at it (`goalId` or `sourceId`) lose that link locally with `linksDirty = true` and a queued update, mirroring the server's `SET NULL`. The snapshot holds the row's fields, its commitment periods, whether it was focused today, and the ids it unlinked.
 - `restore`: re-inserts the row with the same id (queued as an insert), its commitments and focus, and puts the unlinked children's links back.
-- `setFirstThing`: removes today's `TaskFocus` for `previous` (through `queueKeyedDelete`, as `PlanWriter.unfocus` does); for `id`, if the task is not on today `planTask(task, on: periods.today, focusToday: true)`, else insert today's `TaskFocus` and queue it. `setDone` goes through `TaskViewModel.toggleComplete`.
+- `setFirstThing`: removes today's `TaskFocus` for `previous` (through `queueKeyedDelete`, as `PlanWriter.unfocus` does); for `id`, if the task is not on today `planTask(task, on: periods.today, focusToday: true)`, else insert today's `TaskFocus` and queue it. `toggleDone` finds the task by id and calls `PlanWriter(context:userId:).complete(task)`; an id that is not a task does nothing.
 
 - [ ] **Step 1: Write the failing tests** (in-memory container: `SymphonyTask`, `Goal`, `GoalArea`, `TaskCommitment`, `TaskFocus`, `PendingChange`, `Routine`, `ActionableInstance`, `FamilyMember`; periods for 2026-11-13):
   - `linkPlan`: the four cases of `links` above.
@@ -308,10 +325,11 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
   - `aWeekTaskWithNoDayIsOnTheWeek`: bucket "week", `weekStart` 2026-11-08, `scheduledFor == nil`. `aDayNextWeekGoesToThatWeek`: day 2026-11-16 → `scheduledFor` that day, `weekStart` 2026-11-15.
   - `pullingUpAnUnsentRowLeavesNothingBehind`: create S then `remove` → no `SymphonyTask`, no `TaskCommitment`, and no `PendingChange` for either. `pullingUpASentRowQueuesADelete`: empty the queue after creating S (as if pushed), `remove` → one `tasks` delete queued.
   - `pullingUpAParentUnlinksItsChildrenAndUndoRelinksThem`: remove S with M under it → `M.sourceId == nil`, `M.linksDirty`; `restore(S.id)` → S exists with the same id and title, `M.sourceId == S.id`.
-  - `anAreaIsMadeOnceAndInOrder`: `ensureArea` twice makes one row; a second area gets `sortOrder` 1; `dropAreaIfUnused` removes an unused area it made and leaves one that a goal names.
+  - `anAreaIsMadeOnceAndInOrder`: `ensureArea` twice makes one row; a second area gets `sortOrder` 1; `dropAreaIfUnused` leaves an area that a goal names.
+  - `droppingAnUnsentAreaLeavesNothingQueued`: `ensureArea`, then `dropAreaIfUnused` → no `GoalArea` and no `PendingChange` for `goal_areas`. `droppingASentAreaQueuesADelete`: empty the queue after `ensureArea` (as if pushed), then drop → no `GoalArea`, one `goal_areas` delete queued.
   - `anAreaItDidNotMakeIsNeverDropped`: a `GoalArea` already in the store, unused, survives `ensureArea` + `dropAreaIfUnused` with its id.
   - `movingSetsTheAreaAndMarksItToSend`: `setArea` on a goal sets `areaDirty`, on a task `linksDirty`, each with one queued change.
-  - `firstThingMovesTheMark`: `setFirstThing(W.id, previous: nil)` → one `TaskFocus` today; `setFirstThing(W2.id, previous: W.id)` → the only focus today is W2's, and W is still dated today.
+  - `firstThingMovesTheMark`: `setFirstThing(W.id, previous: nil)` → one `TaskFocus` today; `setFirstThing(W2.id, previous: W.id)` → the only focus today is W2's, and W is still dated today. `tickingTogglesAnyTask`: `toggleDone` on a task the writer did not create sets `completed`, and again clears it; an unknown id changes nothing.
   - `existingCallersAreUnchanged`: `planTask(t, on: today)` with no third argument still focuses.
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkWriterTests`. Expected: FAIL to compile.
 - [ ] **Step 3: Implement** the three `PlanWriter` parameters, then `WalkWriter`.
@@ -342,18 +360,19 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 
 **The rules.**
 - `areas`: the six defaults in order, then this person's other areas by `sortOrder`, eight at most. A label takes the id of an existing row of this person's with the same name, compared without case, whose `context` is "personal" or nil; otherwise a new id. A partner's areas and Work or Family areas are never offered.
-- `items`: only rows where `userId == me`, `context` is "personal" or nil, and (tasks) `dismissedAt == nil` and `parentTaskId == nil`. Year: goals with `year == periods.year` and `status == "active"`, by `sortOrder`. Season: bucket "quarter" with `seasonStart` on `periods.season.start`. Month: bucket "month" with `monthStart` on `periods.monthStart`. Week: tasks in the walk's week (`weekStart` on `periods.weekStart`, or dated inside it) that are in `planted` or whose `sourceId` is a month item shown; the week's other to-dos are not the walk's to show. `parentId` is `goalId` for a season item and `sourceId ?? goalTaskId` for month and week (the web's reading order, `journalGroups.ts:33`), kept only when that parent is among the items. `mine` is `planted.contains(id)`; `day` is the task's date; `done` its `completed`.
-- `forGoal`: the task's own `goalId` names a goal → that goal's name. Otherwise climb `sourceId ?? goalTaskId`, at most four steps, until a row whose `goalId` resolves; failing that, the title of the highest row reached; nil when the task has no parent.
-- `rows`: this person's tasks dated today (not dismissed, no parent task), the first thing first, then by `createdAt`. `nextToWalk`: the first year item with no season item whose `parentId` is it.
+- `items`: only rows where `userId == me`, `context` is "personal" or nil, and (tasks) `dismissedAt == nil` and `parentTaskId == nil`. Year: goals with `year == periods.year` and `status == "active"`, by `sortOrder`. Season: bucket "quarter" with `seasonStart` on `periods.season.start`. Month: bucket "month" with `monthStart` on `periods.monthStart`. Week: a task is found by its link, not by the week it sits in: it must be in `planted` or have a `sourceId` that is a month item shown, and then it loads when it is dated from `periods.weekStart` through the last day of the following week (13 days later), or is undated with `weekStart` on `periods.weekStart`. So a task said on Friday for next Tuesday is still on the mountain after a reload, with its day. The week's other to-dos are not the walk's to show. `parentId` is `goalId` for a season item and `sourceId ?? goalTaskId` for month and week (the web's reading order, `journalGroups.ts:33`), kept only when that parent is among the items. `mine` is `planted.contains(id)`; `day` is the task's date; `done` its `completed`.
+- `forGoal`: the task's own `goalId` names a goal → that goal's name. Otherwise climb `sourceId ?? goalTaskId`, at most four steps, until a row whose `goalId` resolves. A link from a row to itself counts as no link, and the climb stops rather than visit a row twice. Failing a goal, the answer is the title of the highest row reached other than the task itself; nil when the task has no parent.
+- `rows`: today's tasks straight from the store, whether or not the walk planted them: `userId == me`, `context` "personal" or nil, dated today, `dismissedAt == nil`, `parentTaskId == nil`; the first thing first, then by `createdAt`. `Row.id` is the task's id and `Row.done` its `completed`. Work and Family tasks are not listed, as nowhere else in the walk. `nextToWalk`: the first year item with no season item whose `parentId` is it.
 
 - [ ] **Step 1: Write the failing tests:**
   - `sixDefaultsThenMyOwn`: no rows → the six names in order with distinct ids; rows "Faith" and "Learning" of mine follow; a ninth label is left out.
   - `anExistingAreaIsReusedByName`: my personal row "health" gives the "Health" label that row's id; my row "Work" with `context == "work"` does not (a new id); a partner's "Home" does not.
   - `onlyPlantedRowsAreMine`: a personal year goal for 2027 not in `planted` loads with `mine == false`; one in `planted` with `mine == true`; a goal with `context == "family"`, an archived goal, a 2026 goal and another person's goal do not load.
   - `eachLevelComesFromItsPeriod`: a "quarter" task stamped 2026-12-01 loads as season and one stamped 2026-09-01 does not; a month task for November loads; a week task loads only when planted or linked to a shown month item; a let-go task never loads.
+  - `aTaskSaidForNextWeekIsStillThere` (periods for Friday 2026-11-13): a planted task dated Tuesday 2026-11-17 (`weekStart` 2026-11-15) loads as a week item with `day` 2026-11-17; so does an unplanted one whose `sourceId` is a shown month item; one dated 2026-11-22 does not; an undated one with `weekStart` 2026-11-15 does not.
   - `parentsResolveOrAreNil`: season `parentId == goalId`; month reads `sourceId`, then `goalTaskId`; a link to a row that is not shown gives nil.
-  - `forWalksUp`: week → month → season by `sourceId` alone, the season naming year goal "Feel strong again" → "Feel strong again"; a chain that ends at a season item with no year goal gives that item's title; an unlinked task gives nil; a row that links to itself gives nil and does not loop.
-  - `todaysRowsFirstThingFirst`: three tasks today, the marked one first; another person's task and one dated tomorrow are absent.
+  - `forWalksUp`: week → month → season by `sourceId` alone, the season naming year goal "Feel strong again" → "Feel strong again"; a chain that ends at a season item with no year goal gives that item's title; an unlinked task gives nil; a row whose only link is to itself gives nil; two rows that link to each other give the other's title and do not loop.
+  - `todaysRowsFirstThingFirst`: three tasks today, the marked one first, one of them never planted by the walk; another person's task, a task with `context == "family"` and one dated tomorrow are absent.
   - `theNextGoalWithNothingUnderIt`: of three year items where the first has a season item, the second is returned; nil when all have one.
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkLoadTests`. Expected: FAIL to compile.
 - [ ] **Step 3: Implement.**
@@ -371,6 +390,7 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
   ```swift
   struct WalkEnv { var periods: WalkPeriods; var now: Date; var newId: () -> UUID = UUID.init; var canAskCalendar = false }
   struct WalkState: Equatable {
+      static let undoMs = 7000; static let noteMs = 3200; static let calendarNoteMs = 6000    // the Undo pill, a note, the calendar line
       var step = 0; var ground = false       // 0 Welcome, 1 Year, 2 Season, 3 Month, 4 Week, 5 Today, 6 Look back up
       var depth: WalkDepth = .quick
       var areas: [WalkArea] = []; var kept: [UUID] = []     // ground labels in order; kept ids in the order kept
@@ -381,7 +401,8 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
       var firstThing: UUID?; var lastPlanted: [WalkLevel: UUID] = [:]
       var examplesOn: Set<Int> = []; var selected: UUID?; var expanded: WalkPostKey?
       var orb: Orb = .idle; var typing: String?
-      var note: String?; var undoShowing = false; var undo: [WalkUndoEntry] = []
+      var note: String?; var undoShowing = false
+      var undo: [WalkUndoEntry] = []         // in memory only, by design: never saved, so a relaunch starts with nothing to undo
       var sheetOpen = false; var calendarOffer = false
       enum Orb: Equatable { case idle, holding(hover: CompassPoint?), open, speaking(live: String) }
       var level: WalkLevel? { get }          // nil on Welcome and Look back up
@@ -395,17 +416,17 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
       case heard(String), speechUnavailable, typeChanged(String), typeSubmitted, typeDismissed, point(CompassPoint)
       case areaTapped(UUID), bannerTapped(UUID), stubTapped(WalkPostKey), exampleTapped(String)
       case moveTo(UUID), pullUp, undo, undoExpired, noteExpired, calendarAnswered
-      case sheetHandle, rowToggled(UUID), walkAnother, walkAgain, goToToday
+      case sheetHandle, rowToggled(UUID), walkAnother, goToToday             // rowToggled carries a task id
   }
   enum WalkTimer: Equatable { case hold, undo, note }
   enum WalkWrite: Equatable {
       case area(WalkArea), dropArea(UUID), create(WalkItem, parent: WalkItem?), remove(UUID, WalkLevel), restore(UUID)
-      case setArea(UUID, WalkLevel, UUID?), firstThing(UUID?, previous: UUID?), done(UUID, Bool)
+      case setArea(UUID, WalkLevel, UUID?), firstThing(UUID?, previous: UUID?), toggleDone(UUID)
   }
   enum WalkEffect: Equatable {
       case sound(WalkSoundName, afterMs: Int), listen(Bool), write(WalkWrite)
       case timer(WalkTimer, ms: Int?)        // nil cancels
-      case askCalendar, save, end(WalkStatus), replay
+      case askCalendar, save, end(WalkStatus)
   }
   enum WalkUndoEntry: Equatable {
       case plant(UUID), nameArea(WalkArea), keep(UUID), unkeep(UUID, index: Int)
@@ -413,14 +434,14 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
       case firstThing(previous: UUID?, created: UUID?)
   }
   ```
-  This task implements `act` for `.quick`, `.full`, `.notNow`, `.back`, `.next`, `.nudge`, `.examples` and `apply` for `.areaTapped`, `.bannerTapped` (focusing a parent), `.noteExpired`. Tasks 10, 11 and 20 add the rest.
+  This task implements `act` for `.quick`, `.full`, `.notNow`, `.back`, `.next`, `.nudge`, `.examples` and `apply` for `.areaTapped`, `.bannerTapped` (focusing a parent), `.noteExpired`. Tasks 10, 11, 17 and 20 add the rest.
 
 **The rules** (contract §2 "Advancing", §3 "Triggers", §7 "Actions"; D14).
-- `quick` / `full`: set `depth`, `ground = true`, `kept = []`, `focusArea = nil`, `step = 1`. `notNow` (Welcome only): `[.end(.left)]`.
-- Ground: `areaTapped` toggles the area in `kept` (append / remove), pushes `.keep` or `.unkeep`, and emits `.sound(.tick, afterMs: 0)`, `.timer(.undo, ms: 7000)`, `.save`. No row is written for a kept area until something is planted on it.
+- `quick` / `full`: set `depth`, `ground = true`, `kept = []`, `focusArea = nil`, `step = 1`, and emit `.save`: choosing a depth is the moment a position is first saved. `notNow` (Welcome only): `[.end(.left)]`.
+- Ground: `areaTapped` toggles the area in `kept` (append / remove), pushes `.keep` or `.unkeep`, and emits `.sound(.tick, afterMs: 0)`, `.timer(.undo, ms: WalkState.undoMs)`, `.save`. No row is written for a kept area until something is planted on it.
 - `next` on ground: `ground = false`. Whole year: `focusArea = kept.first`, `tour` = the rest of `kept`. Quick: `focusArea = nil`.
 - `next` with a non-empty `tour`: take its first stop; on Year it becomes `focusArea`, on Season `focus[.season]`.
-- `next` otherwise: `step = min(6, step + 1)`, clearing `focusArea`, `selected`, `expanded`, `undoShowing`, `typing`, and setting `orb = .idle`, `sheetOpen = false`. Entering Season in a whole-year walk: `tour` = the year items in column order (the order of `areas`, unlabeled last, planting order inside a column); the first becomes `focus[.season]`. Entering Season, Month, Week or Today in a quick walk with no focus remembered for that step: focus the item most recently planted on the level above (`lastPlanted`), so one goal is walked down. Entering Today with `env.canAskCalendar`: `calendarOffer = true`.
+- `next` otherwise: `step = min(6, step + 1)`, clearing `focusArea`, `selected`, `expanded`, `undoShowing`, `typing`, and setting `orb = .idle`, `sheetOpen = false`. Entering Season in a whole-year walk: `tour` = the year items in column order (the order of `areas`, unlabeled last, planting order inside a column); the first becomes `focus[.season]`. Entering Month, Week or Today in either depth, or Season in a quick walk, with no focus remembered for that step: focus the item most recently planted on the level above (`lastPlanted`), so the next flag links to it. Entering Today with `env.canAskCalendar`: `calendarOffer = true`.
 - `back`: Year → ground (`focusArea = nil`, `tour = []`); ground → Welcome; otherwise `step - 1`. Focus per step is remembered; a tour starts again when its step is entered again.
 - `areaTapped` on Year (not ground), for a kept area only: toggles `focusArea`. On other steps it does nothing.
 - `bannerTapped` on an item one level above the step's level: toggles `focus[level]`.
@@ -429,11 +450,11 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - Every change of step, depth, focus or kept emits `.save`.
 
 - [ ] **Step 1: Write the failing tests** (a fixture with three kept areas and the mockup's script as items, `Walk.dc.html:230-234`):
-  - `quickStartOpensTheGround`; `notNowLeaves` (`[.end(.left)]`).
+  - `quickStartOpensTheGround` (its effects contain `.save`); `notNowLeaves` (`[.end(.left)]`).
   - `keepingIsATapAndCanBeTakenBack`: tap Health → kept, effects contain `.sound(.tick, afterMs: 0)`; tap again → not kept; the undo stack has two entries.
   - `quickWalksOneGoalDown`: with `lastPlanted[.year]` "Feel strong again", `next` from Year → step 2 with `focus[.season]` that goal; with nothing planted on Year, no focus.
   - `wholeYearVisitsEachArea`: kept [Home, Health, People] in that order: leaving ground focuses Home with `tour == [Health, People]`; `next` → Health; `next` → People; `next` → step 2.
-  - `wholeYearWalksEachYearGoalThroughTheSeason`: arriving at Season focuses the first year item in column order and `tour` holds the others; `next` moves to each; after the last, step 3.
+  - `wholeYearWalksEachYearGoalThroughTheSeason`: arriving at Season focuses the first year item in column order and `tour` holds the others; `next` moves to each; after the last, step 3. `wholeYearFocusesTheLastPlantedFromMonthDown`: in a whole-year walk with `lastPlanted[.season]` set, arriving at Month focuses it; the same from Month to Week and from Week to Today.
   - `backRemembersFocus`: focus a parent on Month, `back`, `next` → the same focus. `backFromYearReturnsToGround`. `backFromGroundReturnsToWelcome`.
   - `tappingAPeakZoomsAndTappingAgainReleases`; `aPeakNotKeptCannotBeFocused`; `peaksAreInertBelowTheYear`; `tappingAParentFlagFocusesIt`.
   - `nudgeCyclesAreasInKeptOrder`; `nudgeCyclesParents` (nil → first → second → first); `examplesToggleButNotOnToday`.
@@ -449,20 +470,52 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - Test: `SymphonyOSTests/WalkCopyTests.swift`
 
 **Interfaces:**
-- Consumes: `WalkState`, `WalkPeriods`.
-- Produces:
+- Consumes: `WalkState`, `WalkPeriods`, `WalkLevel`, `CompassPoint`, `WalkAction`.
+- Produces (the one place a string of the walk is written; every later task uses these names and types no string of its own):
   ```swift
   enum WalkCopy {
+      static let shortLength = 40
       static let wordmark = "Symphony"
       static let welcomeTitle = "Let’s start up high and walk down to today."
       static let welcomeSub = "Plant a flag for what matters, then follow it down."
-      static func eyebrow(_ s: WalkState, _ p: WalkPeriods) -> String      // question(_:_:) and why(_:_:) have the same shape
+      static func eyebrow(_ s: WalkState, _ p: WalkPeriods) -> String
+      static func question(_ s: WalkState, _ p: WalkPeriods) -> String
+      static func why(_ s: WalkState, _ p: WalkPeriods) -> String
       static func hint(_ s: WalkState) -> String
       struct Point: Equatable { let at: CompassPoint; let label: String; let action: WalkAction; let symbol: String }
       static func points(_ s: WalkState) -> [Point]
-      static func phrase(for areaName: String) -> String;  static func placed(_ areaName: String) -> String
+      static func phrase(for areaName: String) -> String
       static func examples(_ level: WalkLevel) -> [String]
-      static func short(_ title: String) -> String                         // at most 40 characters, then "…"
+      static func short(_ title: String) -> String            // unchanged up to shortLength characters; longer: the first 39, then "…"
+      // notes: the reducer puts these in `state.note`
+      static func placed(_ areaName: String) -> String
+      static let nothingToPlant = "Nothing to plant yet. Hold and speak, or slide left to type."
+      static let speechOff = "Speaking isn’t available here, so type it."
+      static let ridgeFull = "The ridge is full. Tap a peak to let one go first."
+      static let calendarLine = "See your calendar on Today too"
+      // the hint row and the banners
+      static let undo = "Undo"; static let moveTo = "Move to"; static let pullUp = "Pull it up"
+      static let typePlaceholder = "Type it, then return"; static let firstThingTag = "FIRST THING"
+      // the ending
+      static let lookBack = "Look back up: that’s your plan."; static let heresToday = "Here’s today."
+      static let showMyDay = "Show my day"; static let lookBackHandle = "Look back up at your plan"
+      static let todayEyebrow = "Today"; static let walkAnother = "Walk another one down"; static let goToToday = "Go to Today"
+      static let thatsTheDay = "That’s the day."; static let nothingToday = "Nothing planted for today yet."
+      static func nextFlag(_ name: String) -> String          // "Next flag: <name>"
+      static func forGoal(_ name: String) -> String           // "for <name>"
+      static func nextEvent(_ time: String) -> String         // "Next · <time>"
+      static func ringLabel(done: Int, total: Int) -> String  // "1 of 3 done"
+      // Settings
+      static let replayButton = "Walk the mountain again"
+      static let replayFooter = "Start at the top and walk down to today. Nothing you have is changed."
+      // VoiceOver
+      static let orbLabelWelcome = "Hold to begin"; static let orbLabel = "Hold and speak to plant a flag; tap for more"
+      static let rowDone = "Done"; static let rowOpen = "Not done"
+      static func levelName(_ level: WalkLevel) -> String     // "Year", "Season", "Month", "Week", "Today"
+      enum BannerRole: Equatable { case mine, plain, focusable, focused, firstThing, example, stub(Int) }
+      static func bannerLabel(_ text: String, level: WalkLevel, tag: String?, role: BannerRole) -> String
+      static func areaHint(ground: Bool, kept: Bool, focused: Bool) -> String
+      static func rowLabel(_ title: String, forGoal: String?) -> String
   }
   ```
 
@@ -482,10 +535,17 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - `placed("Home")` is `That sounded like home, so it went on the Home peak.`
 - Examples (contract §9): Year `Run a 5K`, `Read a book a month`, `Pay off the car`; Season `Clear out the garage`, `Get outside every weekend`; Month `Book the plumber`, `Two early nights a week`; Week `Call the tile shop`, `Gym on Tuesday`; Today none.
 - `hint`, first match wins: `note` set → the note; `typing != nil` → ``; orb `.holding(hover: some)` → `Let go to choose`; `.holding(hover: nil)` → ``; `.open` → `Tap a point, or tap the light to close`; `.speaking` → `Let go to plant it`; Welcome → `Hold the light to begin`; ground → `Tap the peaks that matter`; Today with a focused week flag that is not the first thing → `Slide down to start there · hold to say something else`; Today with a first thing → `That’s your first thing · slide down to walk on`; the step's level has a flag → `Hold to plant another · slide down to walk on`; else `Hold the light and speak · slide to its edge for more`.
-- Notes the reducer sets (Tasks 10, 11, 20): `Nothing to plant yet. Hold and speak, or slide left to type.` / `Speaking isn’t available here, so type it.` / `The ridge is full. Tap a peak to let one go first.` / `See your calendar on Today too`.
 - `points`. Welcome: S `Quick start` (.quick, `figure.walk`), E `Plan my whole year` (.full, `mountain.2`), N `Not now` (.notNow, `xmark`). Ground: N `Start` (.back), S `Plant goals` when anything is kept else `Skip` (.next), W `Name your own` (.type). Steps 1 to 5: N `Start` on Year else `Back up` (.back, `arrow.up`); S `Walk on` when the step's level has a flag (on Today: a first thing) else `Skip` (.next, `arrow.down`), except on Today with a focused week flag that is not the first thing, where S is `Start there` (.startThere); W `Type it` (.type, `keyboard`); NE `Nudge me` (.nudge, `sparkle`); E `Examples` / `Hide examples` on steps 1 to 4 (.examples, `flag`), and on Today `Calendar` (.calendar, `calendar`) while `calendarOffer`. On every set but Welcome: NW `Undo` (.undo, `arrow.uturn.backward`) while the undo stack is not empty. Step 6: none.
+- `bannerLabel`, where `L` is `levelName(level)` and `T` is the text, followed when there is a tag by `, ` and the tag with only first letters capital (`TUESDAY` → `Tuesday`, `MON 23` → `Mon 23`): `.mine` → `L: T, tap to move or pull up`; `.plain` → `L: T`; `.focusable` → `L: T, tap to focus`; `.focused` → `L: T, focused, tap to let go`; `.firstThing` → `Today: <text>, first thing`; `.example` → `Example: <text>, tap to make it yours`; `.stub(n)` → `<n> more, tap to show`.
+- `areaHint`: on ground `Tap to keep`, kept `Tap to let go`; off the ground `Tap to look closer`, focused `Tap to step back`. `rowLabel`: `<title>, for <goal>`, or the title alone.
 
-- [ ] **Step 1: Write the failing tests:** one per table row for 2026-11-13 (Season is the coming one: eyebrow `Winter · Dec 1 to Feb 28`, question `And this winter? What’s it about?`; Month `What’s one thing for the rest of November?`, `Small enough to finish by the 30th.`; Week `This week · to Sat 14`; Today `Friday, 13 November`); the coming-month wording on 2026-11-25 (`What’s one thing for December?`, `…by the 31st.`); the current-season eyebrow on 2026-10-01 (`This season · to Nov 30`); each focused question, including `What about the people in your life, this year?`, a named area `What about creative work, this year?`, and a 70-character title cut to 40 and `…`; the appended why sentence present and absent; `placed`; the example lists; every `hint` line; each `points` set, including `Skip` → `Walk on`, `Start` on Year, no Examples on Today, `Calendar` only while offered, `Undo` only with something to undo, and `Start there`.
+- [ ] **Step 1: Write the failing tests:**
+  - One per table row for 2026-11-13 (Season is the coming one: eyebrow `Winter · Dec 1 to Feb 28`, question `And this winter? What’s it about?`; Month `What’s one thing for the rest of November?`, `Small enough to finish by the 30th.`; Week `This week · to Sat 14`; Today `Friday, 13 November`); the coming-month wording on 2026-11-25 (`What’s one thing for December?`, `…by the 31st.`); the current-season eyebrow on 2026-10-01 (`This season · to Nov 30`).
+  - Each focused question, including `What about the people in your life, this year?` and a named area `What about creative work, this year?`; the appended why sentence present and absent; `placed`; the example lists.
+  - `shortQuotesFortyCharacters`: a 40-character title is unchanged; a 41-character and a 70-character title each become their first 39 characters and `…`.
+  - Every `hint` line; each `points` set, including `Skip` → `Walk on`, `Start` on Year, no Examples on Today, `Calendar` only while offered, `Undo` only with something to undo, and `Start there`.
+  - `theNamedStringsAreExact`: every `static let` above equals the literal written beside it; `nextFlag("Finish the bathroom") == "Next flag: Finish the bathroom"`; `forGoal("Feel strong again") == "for Feel strong again"`; `nextEvent("2:30 pm") == "Next · 2:30 pm"`; `ringLabel(done: 1, total: 3) == "1 of 3 done"`; `levelName` gives `Year`, `Season`, `Month`, `Week`, `Today`.
+  - `whatVoiceOverSays`: `bannerLabel("Run a 5K", level: .year, tag: nil, role: .mine) == "Year: Run a 5K, tap to move or pull up"`; `("Gym", .week, "TUESDAY", .mine)` → `Week: Gym, Tuesday, tap to move or pull up`; `.plain` → `Year: Run a 5K`; `.focusable` → `Year: Run a 5K, tap to focus`; `.focused` → `Year: Run a 5K, focused, tap to let go`; `("Gym induction", .today, WalkCopy.firstThingTag, .firstThing)` → `Today: Gym induction, first thing`; `.example` → `Example: Run a 5K, tap to make it yours`; `.stub(3)` → `3 more, tap to show`; the four `areaHint` answers; `rowLabel("Lift, 30 minutes", forGoal: "Feel strong again") == "Lift, 30 minutes, for Feel strong again"` and with nil the title alone.
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkCopyTests`. Expected: FAIL to compile.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run.** Expected: PASS.
@@ -497,37 +557,38 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - Test: `SymphonyOSTests/WalkPlantTests.swift`
 
 **Interfaces:**
-- Consumes: Tasks 4, 5, 8, 9.
+- Consumes: `WalkWords.said`, `WalkWords.tidy`, `WalkWords.maxAreaName` (Task 4); `WalkClassifier.place` (Task 5); `WalkLoad.maxAreas` (Task 7); `WalkState`, `WalkState.undoMs`, `WalkState.noteMs`, the event, effect, write and undo types (Task 8); `WalkCopy.placed`, `WalkCopy.nothingToPlant`, `WalkCopy.ridgeFull` (Task 9).
 - Produces: `extension WalkState { mutating func plant(_ raw: String, _ env: WalkEnv) -> [WalkEffect] }`; `apply` for `.exampleTapped`, `.bannerTapped` (own level), `.stubTapped`, `.moveTo`, `.pullUp`, `.undo`, `.undoExpired`, `.rowToggled`; `act` for `.undo`, `.startThere`.
 
 **The rules** (spec "Where a goal goes…", "Undo and fix"; D9 to D13; contract §6, §9, §10).
-- Nothing to plant (`WalkWords.said` is nil): the note `Nothing to plant yet. …` with `.timer(.note, ms: 3200)`; nothing is written.
-- On ground the words name an area (tidied, at most 24 characters). A label with that name (without case) is simply kept. Otherwise, with eight labels already, the note `The ridge is full. …`; else append the label and keep it, push `.nameArea`. Effects: `.sound(.plant, afterMs: 0)`, the undo timer, `.save`.
-- On Year: `WalkClassifier.place(title, kept: keptAreas, focus: focusArea)` decides the area; `moved: true` sets the note `WalkCopy.placed(name)` for 3200 ms. Effects, in order: `.write(.area(a))` when there is an area, `.write(.create(item, parent: nil))`, `.sound(.plant, afterMs: 0)`, timers, `.save`.
+- Nothing to plant (`WalkWords.said` is nil): `note = WalkCopy.nothingToPlant` with `.timer(.note, ms: WalkState.noteMs)`; nothing is written.
+- On ground the words name an area: `WalkWords.tidy`, cut to `WalkWords.maxAreaName` characters. A label with that name (without case) is simply kept. Otherwise, with `WalkLoad.maxAreas` labels already, `note = WalkCopy.ridgeFull` with the note timer; else append the label and keep it, push `.nameArea`. Effects: `.sound(.plant, afterMs: 0)`, the undo timer, `.save`.
+- On Year: `WalkClassifier.place(title, kept: keptAreas, focus: focusArea)` decides the area; `moved: true` sets `note = WalkCopy.placed(name)` with the note timer. Effects, in order: `.write(.area(a))` when there is an area, `.write(.create(item, parent: nil))`, `.sound(.plant, afterMs: 0)`, timers, `.save`.
 - On Season, Month, Week: the parent is the focused item (`focus[level]`), or none; the item takes the parent's area and is never classified; Week keeps the day `WalkWords.said` pulled out.
-- On Today: a new week-level item dated today; with a week flag focused it takes that flag's area and parent. It becomes the first thing: push `.firstThing(previous:, created:)`, effects `.write(.create…)` then `.write(.firstThing(id, previous:))`.
+- On Today: a new week-level item whose title is everything that was said (`WalkWords.said(…, level: .today)` pulls nothing out) and whose `day` is `env.periods.today`; with a week flag focused it takes that flag's area and parent. It becomes the first thing: push `.firstThing(previous:, created:)`, effects `.write(.create…)` then `.write(.firstThing(id, previous:))`.
 - `startThere` (Today, a focused week flag): that task becomes the first thing: `.write(.firstThing(id, previous:))`, push `.firstThing(previous:, created: nil)`. There is one first thing: marking another moves the mark and leaves the earlier task where it is.
-- Every plant sets `lastPlanted[level]` and `undoShowing = true`, emits `.timer(.undo, ms: 7000)`, pushes `.plant(id)` and clears `selected`.
+- Every plant sets `lastPlanted[level]` and `undoShowing = true`, emits `.timer(.undo, ms: WalkState.undoMs)`, pushes `.plant(id)` and clears `selected`.
 - `exampleTapped(text)`: only while examples are on for this step; planted through the same path as spoken words (so "Gym on Tuesday" becomes "Gym" on Tuesday), with the area of the focused peak or parent and no classification; effects start with `.sound(.poles, afterMs: 0)` and the plant sound comes at 160 ms.
 - `bannerTapped` on an item of the step's own level: ignored unless `mine`; else toggles `selected`, `.sound(.tick, afterMs: 0)`, hides the Undo pill. `stubTapped` sets `expanded` (again to close) and makes that column the open one (`lastPlanted[level]` = its newest item).
 - `moveTo(area)`: the selected item's area changes; an area not kept is kept; effects `.write(.area)`, `.write(.setArea)`, `.sound(.poles, afterMs: 0)`, `.sound(.plant, afterMs: 140)`; push `.move`; clear `selected`.
 - `pullUp`: removes the selected item (`.write(.remove)`, `.sound(.poles, afterMs: 0)`), drops any focus pointing at it and clears `firstThing` if it was that; items that named it as parent stay, with `parentId = nil`; push `.pullUp`.
-- `undo` (the pill or the compass point) pops the newest entry and reverses it: `.plant` → remove, then `.write(.dropArea)` for its area; `.nameArea` → remove the label and unkeep; `.keep` / `.unkeep` → the opposite, at its old place; `.move` → the old area back, the area the move kept unkept, `.write(.dropArea)`; `.pullUp` → `.write(.restore(id))`, the item back at its index with its children's `parentId` restored; `.firstThing` → the previous mark back and a created task removed. Always `.sound(.poles, afterMs: 0)` and `.save`. `undoExpired` only hides the pill: the stack stays for the whole walk.
-- `rowToggled(id)` (the ending sheet): flips `done`, `.write(.done(id, newValue))`.
+- `undo` (the pill or the compass point) pops the newest entry and reverses it: `.plant` → remove, then `.write(.dropArea)` for its area; `.nameArea` → remove the label and unkeep; `.keep` / `.unkeep` → the opposite, at its old place; `.move` → the old area back, the area the move kept unkept, `.write(.dropArea)`; `.pullUp` → `.write(.restore(id))`, the item back at its index with its children's `parentId` restored; `.firstThing` → the previous mark back and a created task removed. Always `.sound(.poles, afterMs: 0)` and `.save`. With an empty stack `undo` does nothing. `undoExpired` only hides the pill: the stack stays for as long as the app keeps running the walk.
+- `rowToggled(taskId)` (the ending sheet): emits `.write(.toggleDone(taskId))` for any id, and flips `done` on the item with that id when there is one. The sheet's rows and ring are read back from the store (Task 20), so a task the walk never planted is ticked the same way.
 
 - [ ] **Step 1: Write the failing tests:**
-  - `aGoalGoesToItsAreaEvenWhenAnotherPeakIsFocused`: focus Health, plant "finish the bathroom." → an item "Finish the bathroom" on Home, `note == "That sounded like home, so it went on the Home peak."`, and `.write(.area(home))` comes before `.write(.create(…))`.
+  - `aGoalGoesToItsAreaEvenWhenAnotherPeakIsFocused`: focus Health, plant "finish the bathroom." → an item "Finish the bathroom" on Home, `note == WalkCopy.placed("Home")`, and `.write(.area(home))` comes before `.write(.create(…))`.
   - `theFocusedPeakCatchesAnUnclearGoal`; `withNoFocusItGoesOnTheUnlabeledPost` (`areaId == nil`).
   - `lowerLevelsInheritAndAreNeverClassified`: on Season with a Health parent focused, "clear out the garage" lands on Health with `parentId` the parent; with no parent focused, no area and no parent.
   - `aWeekTaskKeepsItsDay`: "the deposit, today" → title "The deposit", `day` today.
-  - `theFirstThingIsOneTask`: on Today, plant → a week-level item dated today and `firstThing` it; plant again → `firstThing` is the second, effects contain `.write(.firstThing(second, previous: first))`, both items remain. `startThereMarksTheFocusedTask`.
-  - `namingAnAreaKeepsIt`; `namingAnExistingAreaJustKeepsIt`; `theRidgeHoldsEight`.
-  - `lettingGoWithNothingPlantsNothing`: `plant("um")` → no item, no `.write`, the "Nothing to plant yet" note.
+  - `theFirstThingIsOneTask`: on Today, plant → a week-level item dated today and `firstThing` it; plant again → `firstThing` is the second, effects contain `.write(.firstThing(second, previous: first))`, both items remain. `theFirstThingKeepsItsWords`: on Today, plant "call mum tomorrow" → title "Call mum tomorrow", `day` today. `startThereMarksTheFocusedTask`.
+  - `namingAnAreaKeepsIt`; `namingAnExistingAreaJustKeepsIt`; `aLongAreaNameIsCut` (40 letters → `WalkWords.maxAreaName`); `theRidgeIsFull`: with `WalkLoad.maxAreas` labels, naming another adds none and `note == WalkCopy.ridgeFull`.
+  - `lettingGoWithNothingPlantsNothing`: `plant("um")` → no item, no `.write`, `note == WalkCopy.nothingToPlant`, effects contain `.timer(.note, ms: WalkState.noteMs)`.
   - `examplesPlantAsYourOwn`: "Gym on Tuesday" on Week → "Gym" with Tuesday's date, `mine`, sounds `.poles` at 0 and `.plant` at 160; ignored when examples are off.
   - `aFlagIDidNotPlantCannotBeSelected`: tapping an item with `mine == false` leaves `selected` nil.
   - `movingToAnUnkeptAreaKeepsIt`; `pullingUpClearsFocusAndFirstThing`.
-  - `undoStepsBackThroughEverything`: name an area, walk on, plant, move, pull up; four undos return `items`, `kept` and `areas` to the start; the third's effects contain `.write(.remove…)`.
-  - `undoIsStillThereAfterThePillHides`: `undoExpired`, then `.undo` still reverses the plant. `undoOfAPullUpRestoresTheRowAndItsChildren`.
+  - `undoStepsBackThroughEverything`: name an area, walk on, plant, move, pull up; four undos return `items`, `kept` and `areas` to the start; the third's effects contain `.write(.remove…)`; a fifth does nothing.
+  - `undoIsStillThereAfterThePillHides`: `undoExpired`, then `.undo` still reverses the plant. `undoOfAPullUpRestoresTheRowAndItsChildren`. `everyPlantStartsTheUndoPill`: effects contain `.timer(.undo, ms: WalkState.undoMs)`.
+  - `tickingARowAsksTheWriterWhoeverPlantedIt`: `rowToggled(id)` for an id that is no item → `[.write(.toggleDone(id))]` and `items` unchanged; for an item's id the same effect and its `done` flipped.
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkPlantTests`. Expected: FAIL to compile.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** `WalkPlantTests` and `WalkStepsTests`. Expected: PASS.
@@ -539,8 +600,8 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - Test: `SymphonyOSTests/WalkOrbTests.swift`
 
 **Interfaces:**
-- Consumes: Tasks 8 to 10.
-- Produces:
+- Consumes: `WalkState` and its types (Task 8); `WalkCopy.points`, `WalkCopy.speechOff` (Task 9); `WalkState.plant`, `WalkState.noteMs` (Tasks 10, 8).
+- Produces (`holdMs` is the one hold threshold; the view and the model use it by name):
   ```swift
   enum WalkOrb {
       static let centre = CGPoint(x: 195, y: 678); static let radius: CGFloat = 48
@@ -553,11 +614,11 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 
 **The rules** (contract §7 "Press", "Slide", "Release", §8; D7).
 - `point(at:among:)`: nil inside `slideOut × radius` (67.2 pt) of the centre; otherwise the offered point nearest in angle, only if within 32°.
-- `orbDown`: ignored while speaking or typing. Orb → `.holding(hover: nil)`. On ground and steps 1 to 5: `.sound(.bag, afterMs: 0)`, `.sound(.poles, afterMs: 120)`, `.timer(.hold, ms: 420)`.
+- `orbDown`: ignored while speaking or typing. Orb → `.holding(hover: nil)`. On ground and steps 1 to 5: `.sound(.bag, afterMs: 0)`, `.sound(.poles, afterMs: 120)`, `.timer(.hold, ms: WalkOrb.holdMs)`.
 - `orbHeld` (still holding, nothing hovered, not Welcome): orb → `.speaking(live: "")`, effects `.listen(true)`, `.sound(.unfurl, afterMs: 280)`. `heard(text)` while speaking sets `live`.
-- `speechUnavailable`: orb → `.idle`, `typing = ""`, the note `Speaking isn’t available here, so type it.` with the note timer, `.listen(false)`.
+- `speechUnavailable`: orb → `.idle`, `typing = ""`, `note = WalkCopy.speechOff` with `.timer(.note, ms: WalkState.noteMs)`, `.listen(false)`.
 - `orbMoved(location)`: the hovered point is `point(at:among:)` over `WalkCopy.points(self)`. Sliding out while speaking cancels the speech (`.listen(false)`, live cleared) and the points show again. Entering a point emits `.sound(.tick, afterMs: 0)`.
-- `orbUp(heldMs)`, first match: hovering a point → `act` its action; speaking → `.listen(false)` then `plant(live, env)`; `heldMs < 420` → toggle `.open` / `.idle`; else → `.idle` (on Welcome a long hold leaves the points open). Always `.timer(.hold, ms: nil)`.
+- `orbUp(heldMs)`, first match: hovering a point → `act` its action; speaking → `.listen(false)` then `plant(live, env)`; `heldMs < WalkOrb.holdMs` → toggle `.open` / `.idle`; else → `.idle` (on Welcome a long hold leaves the points open). Always `.timer(.hold, ms: nil)`.
 - `point(p)` while `.open`: `act` that point's action and close. `orbCancelled`: `.idle`, `.listen(false)`, the hold timer cancelled.
 - `act(.type)`: `typing = ""`, orb `.idle`. `typeChanged` updates it. `typeSubmitted`: `plant(typing, env)`, then `typing = nil`. `typeDismissed`: `typing = nil`.
 
@@ -565,11 +626,11 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
   - `pointsSitOnTheCompass`: `position(of: .s) == (195, 794)`, `.n == (195, 562)`, `.w == (79, 678)`, `.ne` is (277, 596) within 0.5.
   - `slidingPicksTheNearestOfferedPoint`: (195, 750) among [.n, .s, .w] → `.s`; (195, 740) → nil; a location at −45° and 100 pt out, among [.n, .e] → nil, among [.n, .ne, .e] → `.ne`; 31° off `.s` → `.s`, 33° off → nil.
   - `aShortPressOpensThePoints`, then `aSecondShortPressClosesThem`.
-  - `holdingStartsListeningAndTheSoundsLineUp`: `orbDown` → bag at 0, poles at 120, the hold timer at 420; `orbHeld` → `.speaking`, `.listen(true)`, unfurl at 280.
+  - `holdingStartsListeningAndTheSoundsLineUp`: `orbDown` → bag at 0, poles at 120, `.timer(.hold, ms: WalkOrb.holdMs)`; `orbHeld` → `.speaking`, `.listen(true)`, unfurl at 280.
   - `lettingGoPlantsWhatWasHeard`: `heard("feel strong again")`, `orbUp(heldMs: 900)` → an item "Feel strong again", with `.listen(false)` first.
   - `slidingOutWhileSpeakingCancelsIt`: no item, `.listen(false)`, orb `.holding(hover: .n)` when over N.
   - `lettingGoOnAPointChoosesIt`: hover S on Year with a flag → step 2.
-  - `speechOffOpensTyping`: `speechUnavailable` → `typing == ""`, `note == "Speaking isn’t available here, so type it."`, orb idle, effects contain `.listen(false)`.
+  - `speechOffOpensTyping`: `speechUnavailable` → `typing == ""`, `note == WalkCopy.speechOff`, orb idle, effects contain `.listen(false)`.
   - `typingPlantsOnReturn`: `.type`, `typeChanged("run a 5K")`, `typeSubmitted` → item "Run a 5K", `typing == nil`; `typeSubmitted` with "" plants nothing.
   - `theOrbIgnoresPressesWhileTyping`; `onWelcomeAHoldKeepsThePointsOpen`; `aCancelledTouchLeavesNothingListening`.
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkOrbTests`. Expected: FAIL to compile.
@@ -583,7 +644,7 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - Test: `SymphonyOSTests/WalkLayoutTests.swift`
 
 **Interfaces:**
-- Consumes: `WalkState`, `WalkCopy.examples`, `WalkWords.tag`, `WalkOrb`.
+- Consumes: `WalkState`; `WalkCopy.examples`, `WalkCopy.firstThingTag`, `WalkCopy.bannerLabel`, `WalkCopy.BannerRole`, `WalkCopy.areaHint` (Task 9); `WalkWords.tag`, `WalkWords.said` (Task 4); `WalkLoad.maxAreas` (Task 7); `WalkOrb.centre`, `WalkOrb.radius` (Task 11).
 - Produces:
   ```swift
   struct WalkArt: Equatable {
@@ -599,11 +660,11 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
       struct Camera: Equatable { var x: CGFloat; var y: CGFloat; var k: CGFloat }      // stage = (world − (x, y)) × k
       enum Kind: Equatable { case full, compact, tip, stub(Int), ghost }
       struct Banner: Equatable, Identifiable { let id: String; let itemId: UUID?; let level: WalkLevel; let kind: Kind
-          let frame: CGRect; let lines: Int; let text: String; let tag: String?; let glows: Bool }
+          let frame: CGRect; let lines: Int; let text: String; let tag: String?; let glows: Bool; let label: String }
       struct Post: Equatable, Identifiable { let id: String; let key: WalkPostKey; let base: CGPoint; let top: CGFloat
           let opacity: Double; let saturation: Double; let pale: Bool; let banners: [Banner] }
       struct Label: Equatable, Identifiable { let id: UUID; let name: String; let frame: CGRect
-          let kept: Bool; let focused: Bool; let opacity: Double; let tappable: Bool }
+          let kept: Bool; let focused: Bool; let opacity: Double; let tappable: Bool; let hint: String? }
       let camera: Camera; let labels: [Label]; let posts: [Post]; let needleDown: Bool
       static func make(_ state: WalkState, today: Date, art: WalkArt = .overlookSquare) -> WalkLayout
       static func lines(for text: String, width: CGFloat) -> Int
@@ -617,13 +678,14 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - *Columns.* The kept areas in `areas` order (on ground: every label), then the unlabeled column when any item has no area or an area with no column (never on ground). With `cnt` columns, column `i` stands at Year-view stage x `lo + i × (hi − lo) / (cnt − 1)`, or 195 when alone; `lo…hi` is 87…302 for up to four columns off the ground, 50…340 on the ground and for five or more. World x = `stops[1].x + vx / stops[1].k`, the same on every level, so each area is one column down the slope. `gap` below is the Year-view spacing (200 for one column).
 - *Camera.* `stops[step]`, unless a column is zoomed: on Year (not ground) the focused area; on steps 2 to 5 the focused parent's area when it has a column. Then `k = 0.8`, `x = columnX − 195 / 0.8`, `y = bandY(step's level) − 520 / 0.8`.
 - *Posts never stagger.* Every post's base is on its level's band line in its column: `((columnX − camera.x) × k, (bandY(level) − camera.y) × k)`. The mockup raised alternate posts by 70 pt, which lifts them into the sky on the Year step; here only labels sit in rows.
-- *Levels.* Year to Week hold their items. The Today level holds one banner: the week item named by `firstThing`, in its column, tagged `FIRST THING`. Week banners carry their day tag; no other level has tags.
+- *Levels.* Year to Week hold their items. The Today level holds one banner: the week item named by `firstThing`, in its column, with `tag = WalkCopy.firstThingTag`. A Week banner whose item has a day carries `WalkWords.tag(for: day, today: today)`, already uppercase; no other level has tags. `text` is always the item's whole title: the frame and `lines` do the cutting.
+- *What VoiceOver hears.* `Banner.label` is `WalkCopy.bannerLabel(text, level:, tag:, role:)` with the role: a ghost `.example`; a stub `.stub(n)`; the Today band's banner `.firstThing`; everything on step 6 `.plain`; an item on the step's own level `.mine` when `item.mine`, else `.plain`; an item one level above the step's level `.focused` when it is the focused one, else `.focusable`; any other `.plain`. `Label.hint` is `WalkCopy.areaHint(ground:kept:focused:)` when the label is `tappable`, else nil.
 - *Labels* (look: contract lines 274-281): two rows when there are more than three columns (`i % 2`); width 90, or `min(90, floor(2 × gap − 6))` with more than three columns; height 30; top at the Year band's stage y `+ 3 + row × 34`; then scaled about the top centre by `max(0.6, 1 − 0.1·d)` and faded to `max(0.5, 1 − 0.1·d)`, `d` = steps below Year (on ground: scale 1, kept 1 / not kept 0.62). `tappable` on ground and on Year.
 - *What a level wants.* On step 6 every level is `compact`; otherwise the step's own level is `full` and the others `tip`. Widths: full `bw = clamp(floor(gap − 8), 62, 124)`; compact `round(0.85 × bw)`; tip and stub 26. Heights: full `19 + 16 × lines + (tag == nil ? 0 : 12)`; compact 23; tip 20; stub 20. `lines(for:width:)` is `min(3, max(1, ceil(count / floor((width − 16) / 6.6))))`.
 - *Room.* A level has room for a kind when neighbouring columns, on stage at the current camera, are at least that kind's width + 6 apart. Without room, only the level's **open column** draws that kind, and every other post on that level draws one `stub(n)` with its count. The open column holds the selected item, else the focused item or area, else `lastPlanted[level]`, else it is the first with anything on it.
 - *Stacking.* Banners rise from the post's base, newest lowest. The first bottom edge is `base.y − 24` (tips and stubs: `base.y`), with 4 pt between banners (tips: 3). The ceiling is stage y 250 for the step's own level and for Year; for any other level it is the band line of the level above plus 6. Banners are added newest first while the next one, plus a stub (20 + gap) if any would remain, stays below the ceiling; what remains becomes one `stub(n)` on top. The newest always shows, cut to one line if it must be. A post named by `expanded` draws all its banners `compact`.
 - *A focused or selected flag on a tip post* is drawn `compact` and glowing, its bottom edge 4 pt above the tallest tip stack among its own post and the posts within its width.
-- *Examples.* While examples are on for the step, up to three texts of `WalkCopy.examples` not already planted on this level are `ghost` banners on the post they would join: the focused column's, else the unlabeled post, which appears `pale` in the next column if nothing is on it yet. They are stacked first, so real banners fold before a ghost does, and that post is the open column while they show.
+- *Examples.* An example is already planted when some item on this level has its title: compare `WalkWords.said(example, level: level, today: today, detect: { _ in nil })?.title` with the item's title, without case, so "Gym on Tuesday" is matched by a flag called "Gym". While examples are on for the step, up to three texts of `WalkCopy.examples` not already planted on this level are `ghost` banners on the post they would join: the focused column's, else the unlabeled post, which appears `pale` in the next column if nothing is on it yet. They are stacked first, so real banners fold before a ghost does, and that post is the open column while they show.
 - *Edges.* Unzoomed, a frame that would leave x 4…386 is slid back inside. Nothing may meet the orb (a circle of radius 48 at `WalkOrb.centre`).
 - *Distance.* A post `d` levels from the step's level has opacity `max(0.6, 1 − 0.09·d)` and saturation `max(0.55, 1 − 0.1·d)`; tip frames are scaled about the base by `max(0.6, 1 − 0.1 × (d − 1))`. No blur. `needleDown`: Welcome, or the step's level has a flag (on Today, a first thing).
 
@@ -631,13 +693,14 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
   - `everyBandLandsAt560OnItsOwnStep`: for steps 1…5 with one column, the level's post base y is 560 ± 0.5; on step 6 the five bases are 321, 393, 456, 510, 552 ± 1.
   - `threeKeptAreasStandWhereTheMockupPutThem`: Year, three columns → base x 87, 194.5, 302 and full banners 99 wide; on ground with six labels → label centres 50, 108, 166, 224, 282, 340.
   - `zoomCentresTheColumn`: focus Home on Year → camera `k == 0.8`, Home's base at (195, 520) ± 0.5; a focused parent with no area does not zoom.
-  - `nothingOverlaps`: for every step 1…6, every count of kept areas 1…8, with and without an unlabeled column, 1…6 flags on every post of every level up to the step, with and without a focus, examples and a selection: no two banner frames of the same level intersect; no two label frames intersect; no banner or label frame meets the orb circle; unzoomed, every frame lies in x 0…390; every banner of the step's level has `frame.minY ≥ 250` unless it is the only one on its post.
+  - `nothingOverlaps`: for every step 1…6, every count of kept areas 1…`WalkLoad.maxAreas`, with and without an unlabeled column, 1…6 flags on every post of every level up to the step, with and without a focus, examples and a selection: no two banner frames of the same level intersect; no two label frames intersect; no banner or label frame meets the orb circle; unzoomed, every frame lies in x 0…390; every banner of the step's level has `frame.minY ≥ 250` unless it is the only one on its post.
   - `postsStandOnTheirBand`: in all those cases each post base, taken back to the world and expressed as a fraction of the picture's height, lies in `art.land[level]`.
   - `aCrowdedRidgeOpensOnePost`: six columns on Year with three flags each → exactly one post has `full` banners and the other five show one stub each; selecting a flag on another column makes that one the open post.
   - `whatDoesNotFitFoldsIntoAStub`: eight one-line flags on one of three posts → six banners and `stub(2)`; with that post `expanded`, eight `compact` banners, all below the ceiling.
   - `levelsAboveAreSmallFlags`: on Month, Year and Season items are `tip`; a focused Season item is `compact` and glows; on step 6 everything is `compact`.
-  - `theFirstThingStandsOnTheTodayBand`: one banner on the Today level, tag "FIRST THING", in the item's column.
-  - `examplesHangOnAPostNotInTheSky`: Year with examples on and nothing kept or planted → one pale post on the Year band with three `ghost` banners; with "Run a 5K" already planted → two.
+  - `theFirstThingStandsOnTheTodayBand`: one banner on the Today level, `tag == WalkCopy.firstThingTag`, in the item's column. `weekBannersCarryTheirDay`: on Week, an item dated 2026-11-17 has `tag == "TUESDAY"` and one with no day has nil; Year, Season and Month banners have nil.
+  - `examplesHangOnAPostNotInTheSky`: Year with examples on and nothing kept or planted → one pale post on the Year band with three `ghost` banners; with "Run a 5K" already planted → two. `aPlantedExampleDoesNotComeBack`: Week with examples on and an item "Gym" → the only ghost is "Call the tile shop"; an item "call the tile shop" hides that one too.
+  - `bannersSayWhatATapDoes`: on Year a planted flag has `label == "Year: Run a 5K, tap to move or pull up"` and one with `mine == false` `"Year: Run a 5K"`; on Season the same Year flag reads `…, tap to focus`, and `…, focused, tap to let go` once focused; a ghost reads `Example: Run a 5K, tap to make it yours`; a stub `2 more, tap to show`; a ground label's `hint` is `Tap to keep`, and a label on Month has no hint.
   - `longTitlesStayInsideTheirBanner`: a 200-character title and a single 60-letter word give `lines == 3` and a frame 67 tall (79 with a tag).
   - `theNeedlePointsDownOnceSomethingIsPlanted`.
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkLayoutTests`. Expected: FAIL to compile.
@@ -683,10 +746,11 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - `restored`: when a saved period no longer matches, step back to ask it again: a different `year` → `min(step, 1)`; `seasonStart` → `min(step, 2)`; `monthStart` → `min(step, 3)`; `weekStart` → `min(step, 4)`; `day` → `min(step, 5)` and `firstThing = nil`. Then drop every focus, tour stop and first thing whose id is not in `existing`, and every `focus` entry for a step now ahead. Kept areas stay (an area not yet used has no row). The periods in the result are the new ones.
 - `decide`, first match: `replay` → `.start`. `demoWalk` → `.start`. A position that is `.inProgress` → `.resume`. A position that is `.finished` or `.left` → `.none`. No position: `.start` only when `householdEditions` is not empty and every one is `"light"`, and `initialSyncFinished`, and `goalCount == 0`; otherwise `.none`.
 - `clearDeviceLeftovers` also calls `WalkPositionStore(defaults: defaults).forget(for: userId)`.
+- The undo stack is not part of the position, by design. `apply(to:)` leaves `undo` empty and `undoShowing` false (and `WalkWriter`'s removed-row snapshots are in memory too), so after a relaunch there is nothing to undo until the person does something new.
 
 - [ ] **Step 1: Write the failing tests:**
   - `itRoundTrips`: a state at Month with kept areas, a focus, a tour and a first thing saves and loads equal; another user's key is separate; garbage data loads nil. `theKeyIsPerPerson`: `key(id) == "walk.position." + id.uuidString.lowercased()`.
-  - `sameDaySamePlace`: `restored` with the same periods and every id existing changes nothing, a saved step 6 included.
+  - `sameDaySamePlace`: `restored` with the same periods and every id existing changes nothing, a saved step 6 included. `aRestoredWalkHasNothingToUndo`: a state with three undo entries, saved, loaded and applied to a fresh state → `undo.isEmpty`, `undoShowing == false`, and `WalkCopy.points` offers no `Undo`.
   - `aNewDayAsksForTheFirstThingAgain`: saved at step 6 on 2026-11-13, restored on 2026-11-14 → step 5, `firstThing == nil`.
   - `aNewWeekAsksTheWeekAgain`: saved at Today on Friday 2026-11-13, restored on Tuesday 2026-11-17 → step 4, no focus for Today.
   - `aNewMonthAsksTheMonthAgain`: saved 2026-11-20 at Week, restored 2026-11-26 → step 3, `monthStart == "2026-12-01"`. `aNewYearAsksTheYearAgain`.
@@ -719,104 +783,170 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 
 ### Task 14: The mountain on screen
 **Files:**
-- Create: `R/App/Assets.xcassets/WalkOverlook.imageset/` (`walk-overlook.jpg`, `Contents.json`), `R/Walk/WalkModel.swift`, `R/Walk/Views/WalkView.swift`, `R/Walk/Views/WalkSceneView.swift`, `R/Walk/Views/WalkBannerViews.swift`
+- Create: `R/App/Assets.xcassets/WalkOverlook.imageset/` (`walk-overlook.jpg`, `Contents.json`), `R/Walk/WalkScheduling.swift`, `R/Walk/WalkModel.swift`, `R/Walk/Views/WalkView.swift`, `R/Walk/Views/WalkSceneView.swift`, `R/Walk/Views/WalkBannerViews.swift`
 - Modify: `R/App/DemoMode.swift`, `R/App/MainView.swift` (`iOSMainView`, beside the half-open overlay near :137)
-- Test: `SymphonyOSTests/WalkModelTests.swift`
+- Test: `SymphonyOSTests/WalkTestSupport.swift` (new), `SymphonyOSTests/WalkModelTests.swift` (new); each wrapped whole in `#if os(iOS)`
 
 **Interfaces:**
-- Consumes: everything in Stage B.
+- Consumes: `WalkPeriods.pick` (Task 3); `WalkWriter` (6); `WalkLoad.areas`, `WalkLoad.items` (7); `WalkState`, `WalkEnv`, `WalkEvent`, `WalkEffect`, `WalkWrite`, `WalkTimer`, `WalkState.undoMs`, `WalkState.noteMs` (8); `WalkCopy` (9); `WalkLayout.make`, `WalkLayout.Banner.label`, `WalkArt.overlookSquare` (12); `WalkPosition`, `WalkPositionStore`, `WalkEntry` (13).
 - Produces:
   ```swift
+  @MainActor protocol WalkScheduling: AnyObject {                                   // R/Walk/WalkScheduling.swift
+      func after(_ ms: Int, key: String, _ work: @escaping @MainActor () -> Void)   // a later call with the same key replaces the earlier one
+      func cancel(key: String)
+      func run(_ work: @escaping @MainActor () async -> Void)                       // async work: starting speech, asking for the calendar
+  }
+  @MainActor final class WalkClock: WalkScheduling { init() }                       // the real one: Task.sleep and Task { }
   @MainActor @Observable final class WalkModel {
       private(set) var state: WalkState
       private(set) var periods: WalkPeriods
       var layout: WalkLayout { get }
-      var onEnd: ((WalkStatus) -> Void)?;  var onReplay: (() -> Void)?
+      var onEnd: ((WalkStatus) -> Void)?
       init(context: ModelContext, userId: UUID, entry: WalkEntry, position: WalkPosition?, edition: Edition,
-           now: Date = .now, seasons: [SeasonBoundary]? = nil, store: WalkPositionStore? = WalkPositionStore())
+           now: Date = .now, seasons: [SeasonBoundary]? = nil, store: WalkPositionStore? = WalkPositionStore(),
+           scheduler: WalkScheduling? = nil)                                        // nil → WalkClock()
       func send(_ event: WalkEvent)
       func choose(_ action: WalkAction)
   }
   struct WalkView: View { init(model: WalkModel) }
-  // DemoMode:  static var isWalk: Bool   (-SymphonyWalk);   static var walkStep: Int?   (-SymphonyWalkStep 0…6)
+  // DemoMode:  static var isWalk: Bool (-SymphonyWalk);  static var walkStep: Int? (-SymphonyWalkStep 0…6)
+  // SymphonyOSTests/WalkTestSupport.swift:
+  @MainActor final class ManualWalkScheduler: WalkScheduling {
+      init()
+      func advance(_ ms: Int)               // runs, in time order, every `after` that falls due within the next ms
+      func settle() async                   // runs and awaits every `run` handed over so far
+  }
+  @MainActor func walkTestContext() throws -> ModelContext     // over an in-memory container of SymphonyApp.modelTypes
   ```
-  `send` runs the reducer, then each effect: `.write` through one `WalkWriter` kept for the walk; `.save` through the store (`store == nil` saves nothing); `.timer` with cancellable `Task`s that send `.orbHeld`, `.undoExpired`, `.noteExpired`; `.end(status)` saves the position with that status, then calls `onEnd`; `.replay` calls `onReplay`. `.sound`, `.listen` and `.askCalendar` do nothing yet (Tasks 16, 19, 20). On init: `.start` loads `WalkLoad.areas` and `WalkLoad.items` into a fresh state at Welcome with an empty planted set; `.resume` loads them with the position's planted set, then `position.restored(…).apply(to:)`. The model keeps the set of ids it planted and passes it to every saved position.
+  Later tasks add defaulted `init` parameters after `scheduler:`, in this order: `listener:` (Task 16), `sound:` (Task 19), `calendarAccess:`, `requestCalendar:` (Task 20).
+
+**How `send` runs an effect.** It runs the reducer, then each effect in order:
+- `.write`, through one `WalkWriter` kept for the whole walk: `.area(a)` → `ensureArea(a)`; `.dropArea(id)` → `dropAreaIfUnused(id)`; `.create(item, parent:)` → `create(item, parent:)`; `.remove(id, level)` → `remove(id, level:)`; `.restore(id)` → `restore(id)`; `.setArea(id, level, area)` → `setArea(id, level:, to:)`; `.firstThing(id, previous:)` → `setFirstThing(id, previous:)`; `.toggleDone(id)` → `toggleDone(id)`. The model keeps the set of ids it planted: `.create` and `.restore` add the id, `.remove` takes it out.
+- `.save` → `store?.save(WalkPosition(state, status: .inProgress, planted:, periods:, now:), for: userId)`. Nothing is saved when the model is made: the first `.save` is the reducer's, when a depth is chosen on Welcome.
+- `.timer(t, ms:)` → `scheduler.after(ms, key:)` with the key `"hold"`, `"undo"` or `"note"`, sending `.orbHeld`, `.undoExpired` or `.noteExpired`; a nil `ms` → `scheduler.cancel(key:)`.
+- `.end(status)` saves the position with that status, then calls `onEnd`.
+- `.sound`, `.listen` and `.askCalendar` do nothing yet (Tasks 19, 16, 20).
+
+On init: `.start` loads `WalkLoad.areas` and `WalkLoad.items` into a fresh state at Welcome with an empty planted set; `.resume` loads them with the position's planted set, then `position.restored(for:existing:).apply(to:)`.
 
 **The picture** (D20). Source: `~/Pictures/Symphony scenery/overlook-square-3x.png` (5796 × 5796; the `-original` file beside it is now a 1200-pixel copy and is not used). Bundle one **3120 × 3120 JPEG at quality 88**, about 1.8 MB: 3120 = 1300 world units × the deepest zoom 0.8 × 3 pixels per point, so at the closest zoom on a 390-point, 3x phone one picture pixel is one screen pixel; larger adds megabytes and no sharpness, and a PNG this size is over 12 MB. Make it with `mkdir -p R/App/Assets.xcassets/WalkOverlook.imageset && sips -Z 3120 -s format jpeg -s formatOptions 88 "$HOME/Pictures/Symphony scenery/overlook-square-3x.png" --out R/App/Assets.xcassets/WalkOverlook.imageset/walk-overlook.jpg`, with a `Contents.json` naming that one file as a single universal image (no 2x / 3x entries, so the catalog never shrinks it). Draw it `.resizable().interpolation(.high)`, never blurred.
 
-- [ ] **Step 1: Write the failing tests** (in-memory container, `store: nil`, now = 2026-11-13):
+- [ ] **Step 1: Write the failing tests** in `WalkModelTests.swift` (`walkTestContext()`, a `ManualWalkScheduler`, `store: nil` unless said, now = 2026-11-13):
+  - `theManualSchedulerRunsInOrder`: `after(300, key: "a")`, `after(100, key: "b")`, then `after(200, key: "a")` again; `advance(150)` runs b only; `advance(100)` runs a, once; a cancelled key never runs; `settle()` awaits a `run`.
   - `aFreshWalkStartsAtWelcomeWithSixPeaks`.
+  - `nothingIsSavedBeforeADepthIsChosen`: with a store on a private `UserDefaults` suite, `load` is nil after init; after `choose(.quick)` it holds an `.inProgress` position at step 1, on the ground, with `planted` empty.
   - `plantingWritesTheRow`: `choose(.quick)`, `send(.areaTapped(health))`, `choose(.next)`, `choose(.type)`, `send(.typeChanged("feel strong again"))`, `send(.typeSubmitted)` → one `Goal` "Feel strong again" for 2027 with an `areaId`, one `GoalArea` "Health", and the layout has one full banner with that text. `undoTakesTheRowBack`: then `send(.undo)` → no `Goal`, no `GoalArea`, no queued change for either.
+  - `theUndoPillAndANoteHideInTheirTime`: after the plant `state.undoShowing`; `scheduler.advance(WalkState.undoMs)` → false. After submitting "um", `state.note == WalkCopy.nothingToPlant`; `scheduler.advance(WalkState.noteMs)` → nil.
   - `aResumedWalkShowsWhatWasPlanted`: a stored position at Season with one planted year goal, init with `.resume` → step 2, the goal is an item with `mine == true`.
   - `endingSavesTheStatus`: `choose(.notNow)` at Welcome with a real store → `onEnd(.left)` and a stored position with status `.left`.
-  - `theBundledPictureResolves`: `UIImage(named: "WalkOverlook")` is not nil and is 3120 pixels wide.
+  - `theBundledPictureResolves`: `UIImage(named: WalkArt.overlookSquare.imageName)?.cgImage?.width == 3120` (the pixel width, not the point size).
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkModelTests`. Expected: FAIL to compile.
-- [ ] **Step 3: Add the picture** (the command above) and implement `WalkModel`.
-- [ ] **Step 4: Draw it.** `WalkView` is the 390 × 844 stage scaled by `min(width / 390, height / 844)`, centred on a full-bleed `#00106e` ground, ignoring safe areas (D21). `WalkSceneView`, back to front, with the numbers in contract §3 "Stage and world" and §14 (lines 589-605): the stage gradient; the world (sky gradient, then the picture in `art.image`) drawn at 1300 × 1720 with `.scaleEffect(k, anchor: .topLeading).offset(x: -x * k, y: -y * k)`; the labels and posts at their layout frames in stage space; the dark band at the top (height 260); the text block (Welcome: lines 128 and 594; asking: eyebrow, question and why from `WalkCopy`, sizes on line 595) in white with the two-layer dark shadow of line 592. One animation carries the camera, labels and posts together: `.timingCurve(0.45, 0.05, 0.2, 1, duration: 1.4)` on the layout's camera. `WalkBannerViews`: full banner with its V notch, compact banner, tip pennant, stub (a pennant with its number), ghost (pale, dashed), pole and ground shadow, with the colours and paddings of contract §5 (lines 313-326) and §9 (lines 478-482), the flutter and drop-in of line 322, and the labels of lines 274-281. Labels and banners are buttons that send `.areaTapped`, `.bannerTapped`, `.stubTapped`, `.exampleTapped`.
-- [ ] **Step 5: Show it.** In `iOSMainView` add `@State private var walk: WalkModel?` and an overlay placed before the half-open overlay, so the walk covers the dock and the half-open display still covers the walk: `.overlay { if let walk { WalkView(model: walk).transition(.opacity) } }`. For now it is created only in demo, on appear, when `DemoMode.isWalk`. `DemoMode`: with `-SymphonyWalk` the store is not seeded; with `-SymphonyWalkStep N` it holds the mockup's preview (kept Health, Home, People; the script lines for levels 1…min(N, 5) from `Walk.dc.html:230-234`, written through `WalkWriter`) and the walk opens at step N with the mockup's preview focus (`Walk.dc.html:243-244`).
+- [ ] **Step 3: Add the picture** (the command above); write `WalkScheduling.swift`, `WalkTestSupport.swift` and `WalkModel`.
+- [ ] **Step 4: Draw it.** `WalkView` is the 390 × 844 stage scaled by `min(width / 390, height / 844)`, centred on a full-bleed `#00106e` ground, ignoring safe areas (D21). `WalkSceneView`, back to front, with the numbers in contract §3 "Stage and world" and §14 (lines 589-605): the stage gradient; the world (sky gradient, then the picture in `art.image`) drawn at 1300 × 1720 with `.scaleEffect(k, anchor: .topLeading).offset(x: -x * k, y: -y * k)`; the labels and posts at their layout frames in stage space; the dark band at the top (height 260); the text block (Welcome: `WalkCopy.wordmark`, `welcomeTitle`, `welcomeSub`, sizes on line 594; asking: `WalkCopy.eyebrow`, `question`, `why`, sizes on line 595) in white with the two-layer dark shadow of line 592. One animation carries the camera, labels and posts together: `.timingCurve(0.45, 0.05, 0.2, 1, duration: 1.4)` on the layout's camera. `WalkBannerViews`: full banner with its V notch, compact banner, tip pennant, stub (a pennant with its number), ghost (pale, dashed), pole and ground shadow, with the colours and paddings of contract §5 (lines 313-326) and §9 (lines 478-482), the flutter and drop-in of line 322, and the labels of lines 274-281. A banner draws `text` and, under it, `tag` exactly as given. Labels and banners are buttons that send `.areaTapped`, `.bannerTapped`, `.stubTapped`, `.exampleTapped`.
+- [ ] **Step 5: Show it.** In `iOSMainView` add `@State private var walk: WalkModel?` and an overlay placed before the half-open overlay, so the walk covers the dock and the half-open display still covers the walk: `.overlay { if let walk { WalkView(model: walk).transition(.opacity) } }`. For now it is created only in demo, on appear, when `DemoMode.isWalk`, with `store: nil` and `onEnd` setting `walk = nil`. `DemoMode`: with `-SymphonyWalk` the store is not seeded; with `-SymphonyWalkStep N` it holds the mockup's preview (kept Health, Home, People; the script lines for levels 1…min(N, 5) from `Walk.dc.html:230-234`, written through `WalkWriter`) and the walk opens at step N with the mockup's preview focus (`Walk.dc.html:243-244`).
 - [ ] **Step 6: Run** `WalkModelTests`. Expected: PASS.
 - [ ] **Step 7: Screenshots** of steps 0 to 6 into `walk-shots/task-14/`. Check against the contract: the picture's top edge at stage y 454, 409, 321, 234, 155, 87, 170; the current level's posts standing at 560; white text readable over the sky; no mist, no blur.
 - [ ] **Step 8: Commit.** `git commit -m "Walk: the mountain, the camera and the flags on screen"`
 
 ### Task 15: The orb, the compass, the live flag and the hint row
 **Files:**
-- Create: `R/Walk/Views/WalkOrbView.swift`, `R/Walk/Views/WalkHintRow.swift`
+- Create: `R/Walk/Core/WalkStage.swift`, `R/Walk/Views/WalkOrbView.swift`, `R/Walk/Views/WalkHintRow.swift`
 - Modify: `R/Walk/Views/WalkView.swift`, `R/App/DemoMode.swift`
-- Test: none new (the behaviour is Tasks 10 and 11); screenshots.
+- Test: `SymphonyOSTests/WalkStageTests.swift` (new; pure, not wrapped)
 
 **Interfaces:**
-- Consumes: `WalkModel.send`, `WalkOrb`, `WalkCopy.points`, `WalkCopy.hint`, `state.orb`, `state.typing`, `state.selected`, `state.undoShowing`, `layout.needleDown`.
-- Produces: `struct WalkOrbView: View { init(model: WalkModel) }`, `struct WalkHintRow: View { init(model: WalkModel) }`. Neither is shown on step 6.
+- Consumes: `WalkModel.send`, `WalkModel.state`, `WalkModel.layout` (Task 14); `WalkOrb.centre`, `WalkOrb.position(of:)` (11); `WalkCopy.points`, `WalkCopy.hint`, `WalkCopy.undo`, `WalkCopy.moveTo`, `WalkCopy.pullUp`, `WalkCopy.typePlaceholder` (9); `WalkArt.overlookSquare.stage` (12).
+- Produces:
+  ```swift
+  struct WalkStage: Equatable {                              // R/Walk/Core/WalkStage.swift
+      let scale: CGFloat; let origin: CGPoint                // the stage's top-left corner on the device
+      init(device: CGSize, stage: CGSize = WalkArt.overlookSquare.stage)
+      func toStage(_ devicePoint: CGPoint) -> CGPoint
+      func toDevice(_ stagePoint: CGPoint) -> CGPoint
+  }
+  extension WalkOrb { static let touchRadius: CGFloat = 56;  static func hits(_ stagePoint: CGPoint) -> Bool }
+  struct WalkOrbView: View { init(model: WalkModel) }
+  struct WalkHintRow: View { init(model: WalkModel) }
+  ```
+  `scale` is `min(device.width / stage.width, device.height / stage.height)` and `origin` centres the scaled stage. `hits` is true within `touchRadius` of `WalkOrb.centre`, the edge included. Neither view is shown on step 6.
 
-- [ ] **Step 1: The orb.** A 300 × 300 dial at stage (45, 528): halo, body, highlight, ring, four ticks and the needle exactly as contract §7 "Geometry", "Breathing", "Compass" (lines 357-378). One `DragGesture(minimumDistance: 0)` on the orb: began → `.orbDown`; changed → `.orbMoved(location in stage coordinates)`; ended → `.orbUp(heldMs:)`; a cancelled gesture → `.orbCancelled`. The view measures nothing and decides nothing.
-- [ ] **Step 2: The compass points.** For each of `WalkCopy.points(state)`, a button at `WalkOrb.position(of:)` with its SF Symbol and label (contract lines 431-435), shown while the orb is `.holding` or `.open`, the hovered one enlarged. A tap sends `.point`.
-- [ ] **Step 3: The live flag.** While `.speaking`: the pole rising from the top of the orb and the swallow-tailed cloth unfurling with the live words and a caret, in the step's level colour (contract lines 397-404).
-- [ ] **Step 4: The hint row** at the bottom (contract lines 596, 494, 501-504): `WalkCopy.hint(state)`, with the `Undo` pill beside it while `undoShowing` (sends `.undo`). When a flag is selected the row becomes `Move to`, one chip for every label except the flag's own, then `Pull it up` (`.moveTo`, `.pullUp`), scrolling sideways. When `typing != nil` the row becomes one text field (placeholder `Type it, then return`, return key "done"), focused at once, bound to `.typeChanged`, submitting `.typeSubmitted`, sending `.typeDismissed` when it loses focus; any hint text stays as a line above it, and the stage moves up with the keyboard so the field stays in view.
-- [ ] **Step 5: Screenshots** into `walk-shots/task-15/`: the idle orb on Year; the points open on Welcome, on ground and on Year (a DEBUG launch argument `-SymphonyWalkOrb open`, read in `DemoMode`, opens them); the hint with the Undo pill; the Move row. Check the orb's centre is at stage (195, 678) and the hint is readable above the home indicator.
-- [ ] **Step 6: Commit.** `git commit -m "Walk: the orb, its compass points, the rising flag and the hint line"`
+- [ ] **Step 1: Write the failing tests** in `WalkStageTests.swift`:
+  - `aRegularPhoneIsTheStage`: device 390 × 844 → `scale == 1`, `origin == .zero`.
+  - `aBiggerPhoneScalesUp`: 430 × 932 → scale 1.1026 ± 0.001, origin (0, 0.72 ± 0.05).
+  - `theDuoOutsideScreenLetterboxes`: 466 × 678 → scale 0.8033 ± 0.001, origin (76.35 ± 0.1, 0); `toDevice(WalkOrb.centre)` is (233.0, 544.65) ± 0.2.
+  - `pointsRoundTrip`: on each of the three sizes `toStage(toDevice(p))` is `p` ± 0.001 for (195, 678) and (0, 0).
+  - `aTouchOnTheLightCounts`: `hits((195, 678))`; `hits((195, 622))` (exactly 56 away); not `hits((195, 621))`; not `hits((252, 678))`.
+- [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkStageTests`. Expected: FAIL to compile.
+- [ ] **Step 3: Implement `WalkStage` and `WalkOrb.hits`;** `WalkView` now takes its scale and offset from `WalkStage(device:)` and names its full-bleed root coordinate space `"walk.device"`. Run the suite. Expected: PASS.
+- [ ] **Step 4: The orb.** A 300 × 300 dial at stage (45, 528): halo, body, highlight, ring, four ticks and the needle (down when `layout.needleDown`) exactly as contract §7 "Geometry", "Breathing", "Compass" (lines 357-378). Its touch area is a circle of `WalkOrb.touchRadius`. One `DragGesture(minimumDistance: 0, coordinateSpace: .named("walk.device"))` on it; every location goes through `WalkStage.toStage` before it is sent: began → `.orbDown`; changed → `.orbMoved(stagePoint)`; ended → `.orbUp(heldMs:)`; a cancelled gesture → `.orbCancelled`. The view decides nothing else.
+- [ ] **Step 5: The compass points.** For each of `WalkCopy.points(state)`, a button at `WalkOrb.position(of:)` with its SF Symbol and label (contract lines 431-435), shown while the orb is `.holding` or `.open`, the hovered one enlarged. A tap sends `.point`.
+- [ ] **Step 6: The live flag.** While `.speaking`: the pole rising from the top of the orb and the swallow-tailed cloth unfurling with the live words and a caret, in the step's level colour (contract lines 397-404).
+- [ ] **Step 7: The hint row** at the bottom (contract lines 596, 494, 501-504): `WalkCopy.hint(state)`, with a pill labelled `WalkCopy.undo` beside it while `undoShowing` (sends `.undo`). When a flag is selected the row becomes `WalkCopy.moveTo`, one chip for every label except the flag's own, then `WalkCopy.pullUp` (`.moveTo`, `.pullUp`), scrolling sideways. When `typing != nil` the row becomes one text field (placeholder `WalkCopy.typePlaceholder`, return key "done"), focused at once, bound to `.typeChanged`, submitting `.typeSubmitted`, sending `.typeDismissed` when it loses focus; any hint text stays as a line above it, and the stage moves up with the keyboard so the field stays in view.
+- [ ] **Step 8: Screenshots** into `walk-shots/task-15/`, all by launch argument (a DEBUG argument `-SymphonyWalkOrb open` opens the points and `-SymphonyWalkOrb type` opens the field; both read in `DemoMode`): the idle orb on Year; the points open on Welcome, on ground and on Year; the typing field up, empty; the hint with the Undo pill and the Move row are seen in Task 21's UI test run. Check the orb's centre is at stage (195, 678) and the hint is readable above the home indicator.
+- [ ] **Step 9: Commit.** `git commit -m "Walk: the orb, its compass points, the rising flag and the hint line"`
 
 ### Task 16: Speech
 **Files:**
-- Modify: `R/Views/Capture/TellSheet.swift` (`Dictation`, :93-180), `R/Walk/WalkModel.swift`
+- Modify: `R/Views/Capture/TellSheet.swift` (`Dictation`, :93-180), `R/Walk/WalkModel.swift`, `SymphonyOSTests/WalkTestSupport.swift`
 - Test: `SymphonyOSTests/WalkModelTests.swift`
 
 **Interfaces:**
+- Consumes: `WalkModel`, `WalkScheduling.run`, `ManualWalkScheduler`, `walkTestContext()` (Task 14); `.listen`, `.heard`, `.speechUnavailable` (8, 11); `WalkOrb.holdMs` (11); `WalkCopy.speechOff` (9).
 - Produces:
   ```swift
-  // Dictation:  var playsAlongside = false      // the walk sets it; Tell leaves it false
-  @MainActor protocol WalkListening: AnyObject { var transcript: String { get }; var problem: String? { get }
-                                                 func start() async; func stop() }
-  extension Dictation: WalkListening {}
-  // WalkModel.init gains:  listener: WalkListening? = nil      // nil → a Dictation with playsAlongside = true
+  // Dictation:  var playsAlongside = false            // the walk sets it; Tell leaves it false
+  //             var onWords: ((String) -> Void)?      // called on the main actor with each new transcript
+  @MainActor protocol WalkListening: AnyObject {       // declared in R/Walk/WalkModel.swift
+      var problem: String? { get }
+      var onWords: ((String) -> Void)? { get set }
+      func start() async
+      func stop()
+  }
+  extension Dictation: WalkListening {}                // in R/Walk/WalkModel.swift
+  // WalkModel.init gains, after scheduler:   listener: WalkListening? = nil     // nil → a Dictation with playsAlongside = true
+  // SymphonyOSTests/WalkTestSupport.swift gains (Tasks 17 and 20 use it from there):
+  @MainActor final class FakeWalkListener: WalkListening {
+      init()
+      var problem: String?; var onWords: ((String) -> Void)?
+      var problemOnStart: String?                      // start() copies it into `problem`
+      private(set) var starts = 0; private(set) var stops = 0
+      func start() async; func stop()
+      func hear(_ words: String)                       // calls onWords
+  }
   ```
 
-- [ ] **Step 1: Write the failing tests** with a fake listener (an `@Observable` class): `listeningStartsOnTheHoldNotBefore` (no `start()` until `.orbHeld`); `whatIsHeardFillsTheFlag` (the fake's transcript reaches `state.orb == .speaking(live:)`); `aProblemOpensTyping` (the fake sets `problem` in `start()` → `state.typing == ""` and the "Speaking isn’t available" note); `stopIsCalledOnRelease`.
-- [ ] **Step 2: Run** `WalkModelTests`. Expected: the new cases FAIL.
-- [ ] **Step 3: Fix `Dictation`** (D7). `start()` begins with `transcript = ""`. With `playsAlongside`, the session is `.playAndRecord`, mode `.default`, options `[.defaultToSpeaker, .mixWithOthers]`, with `setAllowHapticsAndSystemSoundsDuringRecording(true)`, and `stop()` leaves the session active and sets it back to `.ambient` with `.mixWithOthers`, so the walk's sounds play straight after. With `playsAlongside == false` nothing changes for Tell.
-- [ ] **Step 4: Wire it.** `.listen(true)` → `await listener.start()`; if `problem != nil`, `send(.speechUnavailable)`. The model follows `transcript` with `withObservationTracking` and sends `.heard`. `.listen(false)` → `stop()`. Permission is asked by `start()` on the first hold, never at launch.
+- [ ] **Step 1: Write the failing tests** (a `ManualWalkScheduler` and a `FakeWalkListener`; the walk taken to Year first):
+  - `listeningStartsOnTheHoldNotBefore`: after `send(.orbDown)`, `listener.starts == 0`; `scheduler.advance(WalkOrb.holdMs)` then `await scheduler.settle()` → `starts == 1`.
+  - `whatIsHeardFillsTheFlag`: then `listener.hear("feel strong")` → `state.orb == .speaking(live: "feel strong")`.
+  - `aProblemOpensTyping`: with `problemOnStart = "no microphone"`, hold and settle → `state.typing == ""`, `state.note == WalkCopy.speechOff`, `state.orb == .idle`.
+  - `stopIsCalledOnRelease`: `send(.orbUp(heldMs: 900))` → `listener.stops == 1`.
+- [ ] **Step 2: Run** `WalkModelTests`. Expected: FAIL to compile (`listener:` missing).
+- [ ] **Step 3: Fix `Dictation`** (D7). `start()` begins with `transcript = ""`. Wherever it sets `transcript`, it also calls `onWords`. With `playsAlongside`, the session is `.playAndRecord`, mode `.default`, options `[.defaultToSpeaker, .mixWithOthers]`, with `setAllowHapticsAndSystemSoundsDuringRecording(true)`, and `stop()` leaves the session active and sets it back to `.ambient` with `.mixWithOthers`, so the walk's sounds play straight after. With `playsAlongside == false` nothing changes for Tell.
+- [ ] **Step 4: Wire it.** At init the model sets `listener.onWords` to send `.heard`. `.listen(true)` → `scheduler.run { await listener.start(); if listener.problem != nil { send(.speechUnavailable) } }`. `.listen(false)` → `listener.stop()`. Permission is asked by `start()` on the first hold, never at launch.
 - [ ] **Step 5: Run** `WalkModelTests`. Expected: PASS.
 - [ ] **Step 6: Commit.** `git commit -m "Walk: hold the light and speak; if speech is off, type"`
 
 ### Task 17: The five steps, end to end
 **Files:**
-- Test: `SymphonyOSTests/WalkFlowTests.swift` (new)
-- Modify: `R/Walk/Core/WalkState+Plant.swift` (`.walkAnother`), and whatever the tests show is wrong under `R/Walk`.
+- Test: `SymphonyOSTests/WalkFlowTests.swift` (new; wrapped whole in `#if os(iOS)`)
+- Modify: `R/Walk/Core/WalkState+Plant.swift` (`.walkAnother`), `R/App/DemoMode.swift` (`-SymphonyWalkExamples`). If a flow test exposes a fault in an earlier task, the fix goes in the file that owns the rule, one of `WalkState.swift`, `WalkState+Plant.swift`, `WalkState+Orb.swift`, `WalkWriter.swift`, `WalkLoad.swift`, `WalkEnding.swift`, `WalkModel.swift`, with a failing test added to that file's own suite first; no other file is touched.
 
 **Interfaces:**
-- Consumes: `WalkModel` over the in-memory container, a fake listener, a store on a private `UserDefaults` suite.
-- Produces: `apply(.walkAnother)`: at step 6, with `WalkEnding.nextToWalk(items)` non-nil → `depth = .quick`, `step = 2`, `focus[.season]` that goal, `sheetOpen = false`, `.save`; nil does nothing.
+- Consumes: `WalkModel`, `ManualWalkScheduler`, `walkTestContext()` (Task 14); `FakeWalkListener` (16); `WalkEnding.rows`, `WalkEnding.nextToWalk` (7); `WalkCopy.question` (9); `WalkPositionStore` (13); `WalkOrb.holdMs` (11).
+- Produces: `apply(.walkAnother)`: at step 6, with `WalkEnding.nextToWalk(items)` non-nil → `depth = .quick`, `step = 2`, `focus[.season]` that goal, `sheetOpen = false`, `.save`; nil does nothing. `DemoMode.walkExamples: Bool` (`-SymphonyWalkExamples`): the demo walk opens with examples on for its step.
 
-- [ ] **Step 1: Write the failing tests** (now = Friday 2026-11-13; "say" = `orbDown`, `orbHeld`, the fake hears the text, `orbUp(heldMs: 900)`):
+- [ ] **Step 1: Write the failing tests** (now = Friday 2026-11-13; a store on a private `UserDefaults` suite; "say X" = `send(.orbDown)`, `scheduler.advance(WalkOrb.holdMs)`, `await scheduler.settle()`, `listener.hear(X)`, `send(.orbUp(heldMs: 900))`):
   - `aQuickStartLeavesOneLinkedChain`: quick; keep Health and Home; next; say "feel strong again"; next; say "lift twice a week"; next; say "book the gym induction"; next; say "gym induction, today"; next; `choose(.startThere)`; next. Then: one `Goal` (2027, personal, area Health); a season task with `goalId` it; a month task with `sourceId` the season task and the same `goalId`; a week task "Gym induction" dated today with `sourceId` the month task; exactly one `TaskFocus` today, for that task; `state.step == 6`; `WalkEnding.rows` gives one row with `forGoal == "Feel strong again"` and `first == true`. No task has `isGoal`; every one has `context == "personal"`. In the pending changes, oldest first, no row comes before a row it points at.
-  - `theWholeYearVisitsEveryAreaAndEveryGoal`: full; keep Health, Home, People; say one goal at each of the three stops (`WalkCopy.question` names the area each time); at Season the question is `For “…”, what’s this winter’s piece?` for each of the three goals in turn; three season tasks each link to their own goal and carry its area.
+  - `theWholeYearVisitsEveryAreaAndEveryGoal`: full; keep Health, Home, People; say one goal at each of the three stops (`WalkCopy.question` names the area each time); at Season the question is `For “…”, what’s this winter’s piece?` for each of the three goals in turn, and three season tasks each link to their own goal and carry its area. Walking on to Month, `state.focus[.month]` is the season goal said last; "book the plumber" said there is a month task whose `sourceId` is that season task.
   - `aGoalSaidOnTheWrongPeakMoves`: focus Health, say "finish the bathroom" → the goal's `areaId` is Home's.
   - `everyStepCanBeSkipped`: quick, then next six times with nothing said → step 6, no goal, task or `GoalArea` rows.
-  - `leavingAndComingBack`: after the Month answer, a new `WalkModel` with `.resume` over the same store and container → step 3, the three flags present and `mine`, the Month focus intact.
+  - `leavingAndComingBack`: after the Month answer, a new `WalkModel` with `.resume` over the same store and context → step 3, the three flags present and `mine`, the Month focus intact; `state.undo.isEmpty`, and `send(.undo)` changes no row.
+  - `aTaskSaidForNextWeekSurvivesAReload`: a quick walk to Week, then say "gym on Tuesday" → a task "Gym" dated 2026-11-17. A new model with `.resume` has a week item "Gym" with `day` 2026-11-17, and its layout has a Week banner with `tag == "TUESDAY"`.
   - `walkAnotherOneDown`: two year goals and a chain under the first; `send(.walkAnother)` at step 6 → step 2, `focus[.season]` the second goal, depth quick.
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkFlowTests`. Expected: FAIL (`walkAnother` at least).
-- [ ] **Step 3: Implement `.walkAnother` and fix** what else fails.
+- [ ] **Step 3: Implement `.walkAnother` and `DemoMode.walkExamples`.** Any other failure is fixed as the Files line says.
 - [ ] **Step 4: Run** every `Walk…` suite. Expected: PASS.
-- [ ] **Step 5: Walk it by hand** in the simulator (`-SymphonyDemo -SymphonyLight -SymphonyWalk`), typing through the compass: a quick start to step 5. Screenshots of each step into `walk-shots/task-17/`.
+- [ ] **Step 5: Screenshots, by launch argument only** (no typing, no hand walk): `-SymphonyDemo -SymphonyLight -SymphonyWalk -SymphonyWalkStep N -SymphonyWalkExamples` for N = 1…4 (ghost flags hanging on a post) and `-SymphonyWalkStep 5` and `6` without it, into `walk-shots/task-17/`.
 - [ ] **Step 6: Commit.** `git commit -m "Walk: both depths proven end to end against real rows"`
 
 ---
@@ -826,84 +956,127 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 ### Task 18: When it appears, resuming, replaying, and where the pages open
 **Files:**
 - Modify: `R/App/AppState.swift`, `R/App/MainView.swift` (`iOSMainView`), `R/Views/Settings/SettingsView.swift` (a section above "About", :69), `R/Views/Planner/PlannerView.swift` (`option`, :88-93)
-- Test: `SymphonyOSTests/WalkPositionTests.swift`
+- Test: `SymphonyOSTests/WalkModelTests.swift`
 
 **Interfaces:**
-- Consumes: `WalkEntry.decide`, `WalkPositionStore`, `AppState.initialSyncFinished`, `WalkPeriods.pageDate(for:)`, `WalkModel.onEnd` / `onReplay`.
-- Produces: `AppState.walkReplayRequested: Bool` (default false).
+- Consumes: `WalkEntry.decide`, `WalkPositionStore`, `WalkPosition` (Task 13); `AppState.initialSyncFinished` (2); `WalkPeriods.pick`, `pageDate(for:)` (3); `WalkModel`, `WalkModel.onEnd`, `DemoMode.isWalk` (14); `WalkCopy.replayButton`, `WalkCopy.replayFooter` (9).
+- Produces: `AppState.walkReplayRequested: Bool` (default false). Replay is asked for from Settings and nowhere else.
 
-- [ ] **Step 1: Write the failing test** `aFinishedWalkIsRememberedAndAReplayStartsFresh`: a model ended with `.finished` leaves a stored position with that status; `decide` then gives `.none`; with `replay: true` it gives `.start`, and a model started that way saves an `.inProgress` position whose `planted` is empty.
-- [ ] **Step 2: Run** `WalkPositionTests`. Expected: the new case FAILS.
-- [ ] **Step 3: The trigger.** `iOSMainView.considerWalk()`: return when `walk != nil` or nobody is signed in. Fetch the households' editions and the `Goal` count **from the model context at that moment** (not from a `@Query`, which can lag behind the pull), load the position, and call `WalkEntry.decide(replay: appState.walkReplayRequested, demoWalk: DemoMode.isWalk, …)`. `.start` and `.resume` create the `WalkModel` (demo: `store: nil`), with `onEnd` setting `walk = nil`, `appState.activeTab = .planner`, `appState.horizon = .today` and calling `appState.goToToday()`, and `onReplay` setting `appState.walkReplayRequested = true`. Call it on appear and on change of `appState.initialSyncFinished`, `appState.edition` and `appState.walkReplayRequested` (which it sets back to false). While the walk is up, the content beneath it is `.accessibilityHidden(true)`.
-- [ ] **Step 4: Replay.** `SettingsView`, both editions: a section with one button, `Walk the mountain again`, and the footer `Start at the top and walk down to today. Nothing you have is changed.` It sets `appState.walkReplayRequested = true`.
-- [ ] **Step 5: The pages show what the walk filed** (spec: "The Year, Season and Month pages must show what the walk filed"). In `PlannerView.option`, in the light edition only, choosing Month, Season or Year sets `appState.selectedDate = WalkPeriods.pick(now: .now, seasons: seasons).pageDate(for: h)`; the steppers still move from there. Full households are untouched.
-- [ ] **Step 6: Run** `WalkPositionTests`, then the whole unit suite. Expected: PASS.
-- [ ] **Step 7: Look at it.** `-SymphonyDemo` alone: no walk; Settings has the button; tapping it opens Welcome; `Not now` returns to Today. `-SymphonyDemo -SymphonyLight`: Year opens on 2027. Screenshots into `walk-shots/task-18/`.
+- [ ] **Step 1: Write the failing tests:**
+  - `aFreshAppHasNotAskedForAReplay`: `AppState().walkReplayRequested == false`.
+  - `aLeftWalkIsRememberedAndAReplayStartsFresh` (a store on a private `UserDefaults` suite): `choose(.notNow)` on a fresh model → the stored position is `.left`; `WalkEntry.decide(replay: false, demoWalk: false, position: thatPosition, householdEditions: ["light"], initialSyncFinished: true, goalCount: 0) == .none`; the same call with `replay: true` is `.start`. A second model made with `entry: .start` and that position leaves the stored position `.left` until `choose(.quick)`, after which it is `.inProgress`, step 1, with `planted` empty.
+- [ ] **Step 2: Run** `WalkModelTests`. Expected: FAIL to compile (`walkReplayRequested` missing).
+- [ ] **Step 3: The trigger.** `iOSMainView.considerWalk()`: return when `walk != nil` or nobody is signed in. Fetch the households' editions and the `Goal` count **from the model context at that moment** (not from a `@Query`, which can lag behind the pull), load the position, and call `WalkEntry.decide(replay: appState.walkReplayRequested, demoWalk: DemoMode.isWalk, position:, householdEditions:, initialSyncFinished: appState.initialSyncFinished, goalCount:)`. `.start` and `.resume` create the `WalkModel` (demo: `store: nil`) with `onEnd` setting `walk = nil`, `appState.activeTab = .planner`, `appState.horizon = .today` and calling `appState.goToToday()`. Call it on appear and on change of `appState.initialSyncFinished`, `appState.edition` and `appState.walkReplayRequested` (which it sets back to false). This replaces Task 14's demo-only creation. While the walk is up, the content beneath it is `.accessibilityHidden(true)`.
+- [ ] **Step 4: Replay.** `SettingsView`, both editions: a section with one button titled `WalkCopy.replayButton` and the footer `WalkCopy.replayFooter`. It sets `appState.walkReplayRequested = true`.
+- [ ] **Step 5: The pages show what the walk filed** (spec: "The Year, Season and Month pages must show what the walk filed"). In `PlannerView.option`, in the light edition only, choosing Month, Season or Year sets `appState.selectedDate = WalkPeriods.pick(now: .now, seasons: seasons).pageDate(for: h)` (`seasons` is `PlannerView`'s own property, :19); the steppers still move from there. Full households are untouched.
+- [ ] **Step 6: Run** `WalkModelTests`, then the whole unit suite. Expected: PASS.
+- [ ] **Step 7: Screenshots** into `walk-shots/task-18/`, by launch argument: `-SymphonyDemo` (Today, no walk) and `-SymphonyDemo -SymphonyLight -SymphonyWalk` (Welcome). The Settings button, the replay it starts and `Not now` are driven by Task 21's UI test, not by hand.
 - [ ] **Step 8: Commit.** `git commit -m "Walk: appears once for a new light account, resumes, and replays from Settings"`
 
 ### Task 19: Sounds and haptics
 **Files:**
 - Create: `scripts/render-walk-placeholder-sounds.py`; in `R/Resources/WalkSounds/`: `walk-bag.PLACEHOLDER.wav`, `walk-poles.PLACEHOLDER.wav`, `walk-unfurl.PLACEHOLDER.wav`, `walk-plant.PLACEHOLDER.wav`, `walk-tick.PLACEHOLDER.wav`; `R/Walk/WalkSound.swift`
-- Modify: `R/Walk/WalkModel.swift`
-- Test: `SymphonyOSTests/WalkSoundTests.swift`
+- Modify: `R/Walk/WalkModel.swift`, `SymphonyOSTests/WalkTestSupport.swift`
+- Test: `SymphonyOSTests/WalkSoundTests.swift` (new; wrapped whole in `#if os(iOS)`)
 
 **Interfaces:**
+- Consumes: `WalkSoundName` (Task 3); `.sound(_:afterMs:)` (8); `WalkModel`, `WalkScheduling.after`, `ManualWalkScheduler`, `walkTestContext()` (14); `PaperSound.shared.isOn`.
 - Produces:
   ```swift
   @MainActor protocol WalkSoundPlaying: AnyObject { func play(_ name: WalkSoundName) }
   @MainActor final class WalkSound: WalkSoundPlaying {
       static let shared = WalkSound()
+      static func bundleFiles(_ bundle: Bundle = .main) -> [String]     // the names of the bundle's files that begin "walk-"
       static func fileName(for name: WalkSoundName, in files: [String]) -> String?
       func play(_ name: WalkSoundName)
   }
-  // WalkModel.init gains:  sound: WalkSoundPlaying? = nil      // nil → WalkSound.shared
+  // WalkModel.init gains, after listener:   sound: WalkSoundPlaying? = nil      // nil → WalkSound.shared
+  // SymphonyOSTests/WalkTestSupport.swift gains:
+  @MainActor final class FakeWalkSound: WalkSoundPlaying { init(); private(set) var played: [WalkSoundName]; func play(_ name: WalkSoundName) }
   ```
 
 **The placeholders** (D19: no recordings exist yet and none may be taken from the internet). The script is plain Python 3, standard library only (`wave`, `struct`, `math`, `random` seeded with 13, so every run gives the same bytes). It renders the five recipes of contract §12 (lines 515-523: filtered noise bursts through its own biquad, tones with exponential glides and envelopes, master gain 0.6) to **mono, 44.1 kHz, 16-bit WAV**: bag 0.40 s, poles 0.45 s, unfurl 0.40 s, plant 0.40 s, tick 0.05 s. Run `python3 scripts/render-walk-placeholder-sounds.py apple/SymphonyOS/SymphonyOS/Resources/WalkSounds`. Files under R ship in the bundle automatically.
 
 **Replacing them.** `fileName(for:in:)` prefers a recording named `walk-<name>.wav`, `.caf` or `.m4a` and falls back to `walk-<name>.PLACEHOLDER.wav`. Scott drops five recordings beside the placeholders; nothing else changes.
 
-**Playing.** One preloaded `AVAudioPlayer` per sound, volume 0.6. Sound is skipped when `PaperSound.shared.isOn` is false (the existing setting); the session is `.ambient` with `.mixWithOthers` (the silent switch is respected) unless speech holds it. A haptic goes with every sound, sound on or off: bag `UIImpactFeedbackGenerator(style: .soft)` at 0.5; poles `.rigid` at 0.6; unfurl `.light` at 0.7; plant `.medium` at 1.0, 130 ms after the sound starts (the thud); tick `UISelectionFeedbackGenerator().selectionChanged()`.
+**Playing.** One preloaded `AVAudioPlayer` per sound, found with `fileName(for:in: bundleFiles())`, volume 0.6. Sound is skipped when `PaperSound.shared.isOn` is false (the existing setting); the session is `.ambient` with `.mixWithOthers` (the silent switch is respected) unless speech holds it. A haptic goes with every sound, sound on or off: bag `UIImpactFeedbackGenerator(style: .soft)` at 0.5; poles `.rigid` at 0.6; unfurl `.light` at 0.7; plant `.medium` at 1.0, 130 ms after the sound starts (the thud); tick `UISelectionFeedbackGenerator().selectionChanged()`. In the model, `.sound(name, afterMs: 0)` plays at once and any other delay goes through `scheduler.after(ms, key:)` with a key unique to that sound.
 
-- [ ] **Step 1: Write the failing tests:** `aRecordingBeatsAPlaceholder` (`fileName(for: .bag, in: ["walk-bag.PLACEHOLDER.wav", "walk-bag.caf"]) == "walk-bag.caf"`; with only the placeholder, the placeholder; with neither, nil); `everySoundIsInTheBundle` (for each `WalkSoundName` a file resolves in `Bundle.main`); `theModelPlaysWhatTheReducerAsks` (a fake `WalkSoundPlaying` gets `.bag` at once and `.poles` after its delay on `orbDown`, `.plant` on a plant, `.tick` on keeping a peak).
+- [ ] **Step 1: Write the failing tests:**
+  - `aRecordingBeatsAPlaceholder`: `fileName(for: .bag, in: ["walk-bag.PLACEHOLDER.wav", "walk-bag.caf"]) == "walk-bag.caf"`; with only the placeholder, the placeholder; with neither, nil.
+  - `everySoundIsInTheBundle`: for each `WalkSoundName`, `fileName(for: name, in: WalkSound.bundleFiles())` is not nil.
+  - `theModelPlaysWhatTheReducerAsks` (a `FakeWalkSound` and a `ManualWalkScheduler`, the walk on Year): `send(.orbDown)` → `played == [.bag]`; `scheduler.advance(120)` → `[.bag, .poles]`; a typed plant adds `.plant`; keeping a peak on the ground adds `.tick`.
 - [ ] **Step 2: Run** `-only-testing:SymphonyOSTests/WalkSoundTests`. Expected: FAIL to compile.
-- [ ] **Step 3: Write the script, render the five files, implement `WalkSound`,** and have `WalkModel` perform `.sound(name, afterMs:)`.
-- [ ] **Step 4: Run.** Expected: PASS. Then listen once in the simulator: bag and poles on a press, the flap as the flag opens, the thud on planting, quiet ticks on the compass.
+- [ ] **Step 3: Write the script, render the five files, implement `WalkSound` and `FakeWalkSound`,** and have `WalkModel` perform `.sound`.
+- [ ] **Step 4: Run.** Expected: PASS. (Hearing the sounds is part of the hand walk under "Stops for the owner".)
 - [ ] **Step 5: Commit.** `git commit -m "Walk: five sounds with haptics, on placeholder audio until the recordings arrive"`
 
 ### Task 20: The calendar ask and the ending
 **Files:**
 - Create: `R/Walk/Views/WalkEndingSheet.swift`
-- Modify: `R/Walk/WalkModel.swift`, `R/Walk/Core/WalkState.swift` (the Today entry in `next`), `R/Walk/Core/WalkState+Plant.swift`, `R/Walk/Views/WalkView.swift`
+- Modify: `R/Walk/WalkModel.swift`, `R/Walk/Core/WalkState.swift` (the Today entry in `next`), `R/Walk/Core/WalkState+Plant.swift`, `R/Walk/Views/WalkView.swift`, `R/App/DemoMode.swift` (`-SymphonyWalkSheet`), `SymphonyOSTests/WalkTestSupport.swift`
 - Test: `SymphonyOSTests/WalkFlowTests.swift`
 
 **Interfaces:**
-- Consumes: `WalkEnding.rows`, `WalkEnding.nextToWalk`, `AppleCalendarService.shared` (`access`, `requestAccess()`), `CalendarFeed.shared.items(for:)`.
-- Produces: `WalkModel.endingRows: [WalkEnding.Row]`, `WalkModel.nextUp: (title: String, start: Date)?`, `WalkModel.ring: (done: Int, total: Int)`; `apply` for `.sheetHandle`, `.walkAgain`, `.goToToday`, `.calendarAnswered`; `act` for `.calendar`.
+- Consumes: `WalkEnding.rows`, `WalkEnding.nextToWalk` (Task 7); `WalkEnv.canAskCalendar`, `calendarOffer`, `.askCalendar`, `.rowToggled`, `WalkState.calendarNoteMs` (8); the ending strings, `WalkCopy.calendarLine`, `WalkCopy.rowLabel`, `rowDone`, `rowOpen`, `ringLabel` (9); `WalkWriter.toggleDone` through `.write(.toggleDone)` (6, 10, 14); `WalkScheduling.run`, `ManualWalkScheduler`, `walkTestContext()` (14); `FakeWalkListener` (16); `AppleCalendarAccess`, `AppleCalendarService.shared`, `CalendarFeed.shared.items(for:)`.
+- Produces:
+  ```swift
+  // WalkModel:  private(set) var endingRows: [WalkEnding.Row]     // today's tasks, re-read from the store after every send
+  //             var ring: (done: Int, total: Int) { get }         // done and total of endingRows
+  //             var nextUp: (title: String, start: Date)? { get } // today's next calendar event, if any
+  // WalkModel.init gains, after sound:
+  //   calendarAccess: @escaping @MainActor () -> AppleCalendarAccess = { AppleCalendarService.shared.access },
+  //   requestCalendar: @escaping @MainActor () async -> Void = { await AppleCalendarService.shared.requestAccess() }
+  // SymphonyOSTests/WalkTestSupport.swift gains:
+  @MainActor final class FakeWalkCalendar { init()
+      var access: AppleCalendarAccess = .notAsked; var answer: AppleCalendarAccess = .allowed
+      private(set) var asks = 0
+      func request() async }                                       // asks += 1; access = answer
+  ```
+  and `apply` for `.sheetHandle`, `.goToToday`, `.calendarAnswered`; `act` for `.calendar`. Tests pass `calendarAccess: { fake.access }` and `requestCalendar: { await fake.request() }`.
 
 **The rules** (spec "It ends with Today rising in as a sheet…"; D17, D18; contract §13, lines 527-574).
-- The model sets `WalkEnv.canAskCalendar` when the edition is light and `AppleCalendarService.shared.access == .notAsked`. Arriving at Today with it, the note `See your calendar on Today too` shows for 6 s and the compass offers `Calendar`. `act(.calendar)` → `[.askCalendar]`; the model awaits `requestAccess()` and sends `.calendarAnswered`, which clears `calendarOffer`. It is asked at most once, and never in a full household.
-- Step 6: the camera's seventh stop, every level compact, no orb. Header: `Look back up: that’s your plan.` while the sheet is down and there are posts, else `Here’s today.`; and the link `Walk it again` (`.walkAgain` → `[.end(.finished), .replay]`). The sheet peeks at stage y 716; its handle (`Show my day` / `Look back up at your plan`) sends `.sheetHandle`, which raises it to y 130 and lowers it again.
-- In the sheet: `Today` and the date; the ring (`ring.done` of `ring.total`, accessibility label `k of n done`); the next calendar event today, if any (`Next · <time>`, its title); today's rows from `endingRows`, each with its check circle and `for <goal>` line, a tap sending `.rowToggled`; `Walk another one down` with `Next flag: <name>` when `nextToWalk` is not nil (`.walkAnother`); when there is at least one row and all are done, the line `That’s the day.`; with no rows, `Nothing planted for today yet.`; last, the link `Go to Today` (`.goToToday` → `[.end(.finished)]`). No praise, no count of what is left, nothing red.
+- Before each reducer call the model sets `WalkEnv.canAskCalendar` to `edition == .light && calendarAccess() == .notAsked`. On entering Today with it, `next` also sets `note = WalkCopy.calendarLine` with `.timer(.note, ms: WalkState.calendarNoteMs)`, and the compass offers `Calendar`. `act(.calendar)` → `[.askCalendar]`; the model does `scheduler.run { await requestCalendar(); send(.calendarAnswered) }`, and `.calendarAnswered` clears `calendarOffer`. It is asked at most once, and never in a full household.
+- Step 6: the camera's seventh stop, every level compact, no orb. The header is one line, `WalkCopy.lookBack` while the sheet is down and there are posts, else `WalkCopy.heresToday`, and nothing else: there is no "Walk it again" there; replay is in Settings. The sheet peeks at stage y 716; its handle (`WalkCopy.showMyDay` / `WalkCopy.lookBackHandle`) sends `.sheetHandle`, which raises it to y 130 and lowers it again.
+- In the sheet: `WalkCopy.todayEyebrow` and the date; the ring (`ring.done` of `ring.total`, labelled `WalkCopy.ringLabel`); the next calendar event today, if any (`WalkCopy.nextEvent(time)`, its title); `endingRows`, each with its check circle and `WalkCopy.forGoal(name)` line; `WalkCopy.walkAnother` with `WalkCopy.nextFlag(name)` when `nextToWalk` is not nil; when there is at least one row and all are done, `WalkCopy.thatsTheDay`; with no rows, `WalkCopy.nothingToday`; last, `WalkCopy.goToToday`. No praise, no count of what is left, nothing red.
+- The only things that take a tap in the sheet are its handle, its rows (`.rowToggled(row.id)`, where `row.id` is the task's id), `WalkCopy.walkAnother` (`.walkAnother`) and `WalkCopy.goToToday` (`.goToToday` → `[.end(.finished)]`). A row is ticked whether or not the walk planted it; `endingRows` and `ring` come back from the store after the write.
 
-- [ ] **Step 1: Write the failing tests** in `WalkFlowTests`: `theCalendarIsOfferedOnceInLightOnly`; `theSheetStartsDown` (`sheetOpen == false` on reaching step 6, true after `.sheetHandle`); `tickingARowCompletesTheTask` (the `SymphonyTask` is `completed`, `ring == (1, 1)`); `closingTheSheetFinishesTheWalk` (`.goToToday` → `onEnd(.finished)`, the stored position is finished); `walkItAgainEndsAndAsksForAReplay` (`onEnd(.finished)` then `onReplay`).
-- [ ] **Step 2: Run** `WalkFlowTests`. Expected: the new cases FAIL.
-- [ ] **Step 3: Implement** the reducer cases, the model's three readings, and `WalkEndingSheet` with the measurements and colours of contract lines 535-574 (first appearance 900 ms, raise 600 ms, `cubic-bezier(.2,.8,.2,1)`).
+- [ ] **Step 1: Write the failing tests** in `WalkFlowTests` (a `FakeWalkCalendar` behind the two closures):
+  - `theCalendarIsOfferedOnceInLightOnly`: light, `.notAsked`: on reaching Today `state.calendarOffer`, `state.note == WalkCopy.calendarLine`, and `WalkCopy.points(state)` has `Calendar`; `choose(.calendar)`, `await scheduler.settle()` → `fake.asks == 1`, `calendarOffer == false`; back and next again → no offer. Full edition with `.notAsked` → never offered, `asks == 0`. Light with `.denied` → never offered.
+  - `theCalendarLineStaysItsOwnTime`: `scheduler.advance(WalkState.noteMs)` → the note is still there; `scheduler.advance(WalkState.calendarNoteMs - WalkState.noteMs)` → nil.
+  - `theSheetStartsDown`: `sheetOpen == false` on reaching step 6, true after `.sheetHandle`, false after another.
+  - `tickingARowCompletesTheTaskWhoeverPlantedIt`: a walked first thing plus a second task dated today inserted straight into the store → `endingRows.count == 2`, `ring == (0, 2)`; `send(.rowToggled(secondId))` → that `SymphonyTask.completed`, `ring == (1, 2)`; again → not completed, `(0, 2)`.
+  - `closingTheSheetFinishesTheWalk`: `.goToToday` → `onEnd(.finished)`, the stored position is `.finished`.
+- [ ] **Step 2: Run** `WalkFlowTests`. Expected: FAIL to compile (`calendarAccess:` missing).
+- [ ] **Step 3: Implement** the reducer cases, the two closures, `FakeWalkCalendar`, the model's three readings, and `WalkEndingSheet` with the measurements and colours of contract lines 535-574 (first appearance 900 ms, raise 600 ms, `cubic-bezier(.2,.8,.2,1)`).
 - [ ] **Step 4: Run** `WalkFlowTests`. Expected: PASS.
-- [ ] **Step 5: Screenshots** into `walk-shots/task-20/`: step 6 with the sheet down (`-SymphonyWalkStep 6`), the sheet up with one row done, and every row done showing `That’s the day.`
+- [ ] **Step 5: Screenshots** into `walk-shots/task-20/`, by launch argument: step 6 with the sheet down (`-SymphonyWalkStep 6`), and with a DEBUG argument `-SymphonyWalkSheet up` (read in `DemoMode`) the sheet raised.
 - [ ] **Step 6: Commit.** `git commit -m "Walk: look back up, then Today rises with what each task is for"`
 
 ### Task 21: Accessibility minimum, other screen sizes, the UI test, the record
 **Files:**
 - Modify: `R/Walk/Views/*.swift`, `apple/SymphonyOS/PLANNING.md`
-- Create: `SymphonyOSUITests/WalkUITests.swift`
+- Create: `SymphonyOSUITests/WalkUITests.swift` (wrapped whole in `#if os(iOS)`)
 
-- [ ] **Step 1: VoiceOver minimum** (D22). The orb is one element, labelled `Hold to begin` on Welcome and otherwise `Hold and speak to plant a flag; tap for more`, with one `accessibilityAction(named:)` per entry of `WalkCopy.points(state)` calling `model.choose`. Area labels: the name, with the selected trait when kept or focused. Banners: `<Level>: <text>` plus `, tap to focus` or `, tap to move or pull up`; ghosts `Example: <text>, tap to make it yours`; stubs `<n> more, tap to show`. The live flag announces its words politely.
+**Interfaces:**
+- Consumes: `WalkLayout.Banner.label`, `WalkLayout.Label.hint`, `kept`, `focused` (Task 12); `WalkCopy.orbLabelWelcome`, `orbLabel`, `hint`, `points`, `rowLabel`, `rowDone`, `rowOpen`, `ringLabel` (9); `WalkModel.choose` (14).
+- Produces: the accessibility identifier `walk.orb` on the orb. Every label and hint below is a `WalkCopy` value; this task types none.
+
+- [ ] **Step 1: VoiceOver minimum** (D22), element by element:
+  - The orb: one button, identifier `walk.orb`, label `WalkCopy.orbLabelWelcome` on Welcome and `WalkCopy.orbLabel` on every other step, hint `WalkCopy.hint(state)`, and one `accessibilityAction(named:)` per entry of `WalkCopy.points(state)` (named by its `label`) calling `model.choose(action)`.
+  - A compass point, while shown: a button labelled with its `Point.label`.
+  - An area label: where `tappable`, a button labelled with the area's name, hint `Label.hint`, with the selected trait when `kept` (on ground) or `focused` (on Year); elsewhere plain text with the name.
+  - A banner, ghost or stub: a button labelled `Banner.label` (Task 12 has already chosen "tap to focus", "tap to move or pull up" or neither); a banner that does nothing on a tap is plain text with the same label.
+  - The live flag: its words, announced politely as they change.
+  - The hint row: the Undo pill and each chip are buttons labelled with their text.
+  - The sheet: the handle a button labelled with its text; a row a button labelled `WalkCopy.rowLabel(title, forGoal:)` with the value `WalkCopy.rowDone` or `WalkCopy.rowOpen`; the ring labelled `WalkCopy.ringLabel(done:total:)`.
 - [ ] **Step 2: Reduce Motion.** With `accessibilityReduceMotion`, the camera, labels and posts change with a 0.25 s cross-fade instead of the 1.4 s glide; banners do not flutter; the orb does not breathe.
-- [ ] **Step 3: Other sizes.** Screenshots on iPhone 17, iPhone 17 Pro Max and a Duo simulator if one is installed (say so if not): the stage is whole, centred, letterboxed in `#00106e`. With `-HalfOpen laptop` the half-open display covers the walk.
-- [ ] **Step 4: The UI test** `WalkUITests` (no typing, no dictation; allow 60 s for launch). `testAQuickStartPlantsAFlag` launches with `-SymphonyDemo -SymphonyLight -SymphonyWalk`; finds `Let’s start up high and walk down to today.`; taps the orb (`Hold to begin`), then `Quick start`; taps `Health`; taps the orb, then `Plant goals`; taps the orb, then `Examples`; taps `Example: Run a 5K, tap to make it yours`; asserts a button `Year: Run a 5K, tap to move or pull up` exists. `testAFullHouseholdSeesNoWalk` launches with `-SymphonyDemo` and asserts `Today. Switch horizon` exists and the welcome title does not. Run `-only-testing:SymphonyOSUITests/WalkUITests -test-timeouts-enabled YES -default-test-execution-time-allowance 300`.
-- [ ] **Step 5: Run the whole unit suite, then `LightEditionUITests`.** Expected: every earlier test still passes (250 before this plan).
-- [ ] **Step 6: Write it down.** In `apple/SymphonyOS/PLANNING.md`: a "The walk" section (what it writes at each level and the three link columns; `linksDirty` / `areaDirty`; parents-first pushing; the launch arguments `-SymphonyWalk`, `-SymphonyWalkStep`, `-SymphonyWalkOrb`; where the saved position lives), and a note at line 27 that the write line still makes no `source_id` and the walk is the exception.
+- [ ] **Step 3: Other sizes.** Run the screenshot recipe on iPhone 17, iPhone 17 Pro Max and the `iPhone Duo` simulator, which is installed and booted on the build machine (`xcrun simctl install "iPhone Duo" …`, `xcrun simctl launch "iPhone Duo" …`, `xcrun simctl io "iPhone Duo" screenshot …`), at steps 0, 1 and 6: the stage is whole, centred, letterboxed in `#00106e`. With `-HalfOpen laptop` on the Duo the half-open display covers the walk. Save into `walk-shots/task-21/`.
+- [ ] **Step 4: The UI test** `WalkUITests` (taps only; allow 60 s for launch). The UI test target cannot see `WalkCopy`, so the strings below are typed in it once and are the cross-check on Task 9.
+  - `testAQuickStartPlantsAFlag` launches with `-SymphonyDemo -SymphonyLight -SymphonyWalk`; waits for the text `Let’s start up high and walk down to today.`; taps `buttons["walk.orb"]`, then `buttons["Quick start"]`; taps `buttons["Health"]`; taps the orb, then `buttons["Plant goals"]`; taps the orb, then `buttons["Examples"]`; taps `buttons["Example: Run a 5K, tap to make it yours"]`; asserts `buttons["Year: Run a 5K, tap to move or pull up"]` exists and `buttons["Undo"]` exists; taps that banner and asserts `buttons["Pull it up"]` exists.
+  - `testAFullHouseholdSeesNoWalkUntilItAsks` launches with `-SymphonyDemo`; asserts `buttons["Today. Switch horizon"]` exists and the welcome text does not; taps `More`, `Settings`, then `Walk the mountain again`; the welcome text appears; taps `buttons["walk.orb"]`, then `buttons["Not now"]`; `buttons["Today. Switch horizon"]` exists again.
+  Run `-only-testing:SymphonyOSUITests/WalkUITests -test-timeouts-enabled YES -default-test-execution-time-allowance 300`.
+- [ ] **Step 5: Run the whole unit suite, then `LightEditionUITests`.** Expected: every test that passed before this plan still passes, unchanged.
+- [ ] **Step 6: Write it down.** In `apple/SymphonyOS/PLANNING.md`: a "The walk" section (what it writes at each level and the three link columns; `linksDirty` / `areaDirty`; parents-first pushing and the lost-parent rule; the launch arguments `-SymphonyWalk`, `-SymphonyWalkStep`, `-SymphonyWalkOrb`, `-SymphonyWalkExamples`, `-SymphonyWalkSheet`; where the saved position lives and that undo does not survive a relaunch), and a note at line 27 that the write line still makes no `source_id` and the walk is the exception.
 - [ ] **Step 7: Commit.** `git commit -m "Walk: VoiceOver actions, reduced motion, other screens, and the UI test"`
 
 ---
@@ -911,23 +1084,27 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 ## Calls made in this plan (owner to check)
 
 - **Links follow the web, not the decisions file.** Season and month goals are plain rows (not `is_goal`); a month goal names its season goal, and a week task its month goal, in `source_id`; `goal_id` is copied down the chain.
-- **Undo is always on the compass** (up-left) while there is something to undo, as well as the 7-second pill. "Back up" still means go back a step; it never deletes anything.
+- **Sync changes for every household's phone:** it now also reads the household's life areas; a row with a link the phone set waits until the row it points at has gone up; and a link to a row that is no longer on the phone is sent as empty rather than blocking.
+- **Undo is always on the compass** (up-left) while there is something to undo, as well as the 7-second pill. "Back up" still means go back a step; it never deletes anything. Undo does not survive closing the app.
 - **The welcome offers Quick start, Plan my whole year, and Not now.** The mockup's "Just today" is gone; Not now is how you leave.
 - **Posts do not stagger.** The mockup raised every other post by 70 points, which lifts them into the sky on the Year step. Only the labels sit in two rows.
 - **On a crowded ridge one post is open at a time.** With six or more columns only the post you last touched shows its banners; the others show one small flag with a count.
 - **Example flags hang on the post they would join.** In the mockup they float above the mountain, which is sky on the Year and Season steps.
 - **At most eight areas** on the ridge.
 - **A tall stack may pass in front of the small flags of the level above** in the same column, as in the mockup. Flags never overlap others of their own level, the labels, the question or the orb.
-- **Flags fade with distance by colour only**, not the mockup's slight blur. The bare pole under the lowest banner is 24 points, not 18.
-- **"So", "okay", "well", "like" are only dropped before a comma or another filler,** so "Like myself again" stays whole. "Uhm", "erm" and "ok" count as fillers too.
-- **A day is only pulled out on the Week and Today steps,** and only from the end of what was said. A weekday already past means next week's.
-- **Words that are only a day** ("today") become a task called "Today" on that day.
-- **Titles longer than 200 characters are cut at a word;** a question quotes at most 40 characters of a flag.
-- **Quick start focuses the flag you just planted** when you walk on, so the next question is about it. Tap it to let go.
+- **Flags fade with distance by colour only**, not the mockup's slight blur. The bare pole under the lowest banner is 24 points, not 18. The day on a banner is in capitals, as in the mockup.
+- **"So", "okay", "well", "like" are only dropped before a comma or another filler,** so "Like myself again" stays whole. "Uhm", "erm" and "ok" count as fillers too. Fillers alone ("um", "okay") plant nothing.
+- **A day is only pulled out on the Week step,** and only from the end of what was said. A weekday already past means next week's. At the Today step nothing is pulled out: what is said is today's first thing, whole.
+- **Words that are only a day** ("today", at the Week step) become a task called "Today" on that day.
+- **Titles longer than 200 characters are cut at a word;** an area name at 24; a question quotes at most 40 characters of a flag.
+- **Walking on focuses the flag you just planted,** so the next question is about it and the next flag links to it: from Season on in a quick start, from Month on in a whole year. Tap it to let go.
 - **Whole year** visits areas in the order you kept them, then asks about each year goal in turn at the Season step. Month, Week and Today then run as in a quick start.
-- **The first thing today** is one task. Saying a new one at the Today step makes a new task for today; marking another moves the mark. On the ordinary Today page, other tasks already chosen for today may sort beside it.
+- **The first thing today** is one task. Saying one at the Today step makes a new task for today; marking another moves the mark. On the ordinary Today page, other tasks already chosen for today may sort beside it.
 - **Week tasks said for today are not marked as chosen;** only the first thing is.
+- **Week flags are found by their link, not their week:** one said for a day up to the end of next week is still on the mountain after closing and reopening.
 - **The walk shows your own personal plan** for the periods it files into, but only moves or pulls up flags it planted itself. Work and Family items never appear in it. A replay starts with nothing counted as planted.
+- **The ending lists your personal tasks for today,** including ones the walk did not plant, and any of them can be ticked there.
+- **No "Walk it again" in the ending.** Replay is from Settings only. The sheet's taps are its handle, its rows, "Walk another one down" and "Go to Today".
 - **A kept area is only saved once something is planted on it.** An existing personal area with the same name is reused.
 - **The Week step always plans the week you are in,** even on its last day.
 - **In the light app, Year, Season and Month open on the period the walk files into** (in mid-November: next year, the coming winter).
@@ -937,12 +1114,42 @@ D3 maps the links to `supports_goal_task_id` and `goal_task_id`, and D4 makes se
 - **Haptics play even when sound is off.**
 - **The calendar is offered as a compass point, "Calendar",** on the Today step, with the quiet line, once.
 - **The ordinary Today page does not show "for <goal>" yet;** only the ending sheet does. Today's design is the next stage.
-- **The UI test plants an example flag instead of typing one,** because typing stalls this simulator.
+- **What VoiceOver says** for the light, peaks, flags and rows (Task 9) is this plan's wording.
+- **Nothing is typed in the simulator,** by a test or by hand, because typing stalls it. The UI test plants an example flag; typing is proven by unit tests and by the hand walk below.
 
 ## Stops for the owner
 
 - **Recorded sounds.** Five recordings are needed (bag rustle, poles clacking, cloth flap, swish and thud, tick; lengths and character in contract §12). Until then the app plays synthesized placeholders, which the spec says not to ship. Drop `walk-bag`, `walk-poles`, `walk-unfurl`, `walk-plant`, `walk-tick` (`.wav`, `.caf` or `.m4a`) into `R/Resources/WalkSounds`.
 - **The tall painting.** The walk is built on the square overlook, upscaled, at 3120 pixels. It is a little soft at the closest zoom on the largest phones, and plain colour shows below the picture on the Week and Today steps. The tall painting replaces it by adding one `WalkArt` value.
-- **Speech with sound, on a real iPhone.** Recording and playing at once cannot be proven in the simulator. On a device: hold, speak, let go; the words appear, the flap and thud are heard, and the next hold listens again.
+- **A real walk by hand, on a real iPhone.** Nobody types or speaks to the simulator in this plan. On a device, start to finish: hold, speak, let go (the words appear, the flap and thud are heard, the next hold listens again); type one through the compass; a quick start down to Today; listen to all five sounds.
 - **"The full plan is offered again at each new season"** is not built. It needs the daily signpost, which is not designed. Until then "Walk the mountain again" in Settings is the way back.
 - **Nothing here is pushed.** TestFlight and main wait for Scott.
+
+## Pre-flight amendments (2026-11-13)
+
+Changes made after the pre-flight scan (`.superpowers/sdd/2026-11-13-iphone-light-walk/preflight.md`). Tasks 1 and 3 are untouched.
+
+- **F1** Task 4: `tidy` now works on word cores and returns nil when only fillers remain; tests add "okay" and "so, um".
+- **F2** Task 7: in `forGoal` a self-link is no link and the climb never revisits a row; the test adds two rows that link to each other.
+- **F3** Task 7: week flags load by link (planted, or `sourceId` in view) from this week's start through the end of next week; tests in Tasks 7 and 17 ("gym on Tuesday" survives a reload).
+- **F4** Task 6: `dropAreaIfUnused` deletes a still-queued insert, or queues a delete for a sent area; two tests.
+- **F5** Tasks 4, 10 and the Calls: no day is pulled out on the Today step; tests `todayKeepsItsWords`, `theFirstThingKeepsItsWords`.
+- **F6** Task 8: the last-planted parent is focused on entering Month, Week and Today in both depths; tests in Tasks 8 and 17.
+- **F7** Tasks 6, 7, 8, 10, 14, 20: `WalkWrite.done` and `WalkWriter.setDone` became `toggleDone(UUID)` through `PlanWriter.complete`; the sheet's rows and ring are read from the store; `rowToggled` carries a task id and works for any task.
+- **F8** Task 12: an example counts as planted when its tidied, day-less title equals a flag's, without case.
+- **F9** Tasks 4, 12, 14: the day tag is uppercase from `WalkWords.tag` on; views draw it as given.
+- **F10** Task 9: every note, hint-row, ending, Settings and VoiceOver string is a named `WalkCopy` member; Tasks 10, 11, 15, 16, 18, 20 and 21 use the names.
+- **F11** Global Constraints and Tasks 14, 17, 19, 21: the test files that touch iOS-only types are named and wrapped in `#if os(iOS)`; Task 18's model test moved from `WalkPositionTests` to `WalkModelTests`.
+- **F12** Global Constraints, Tasks 15, 17, 18, 20: no typing by hand; screenshots come from launch arguments (`-SymphonyWalkOrb open|type`, `-SymphonyWalkExamples`, `-SymphonyWalkSheet up`); the hand walk is under Stops.
+- **F13** Tasks 8, 14, 18, 20: `walkAgain`, `WalkEffect.replay` and `WalkModel.onReplay` are gone; the ending has no replay control.
+- **F14** Global Constraints: `SymphonyOSTests/WalkTestSupport.swift` holds the shared fakes; Task 14 creates it, Tasks 16, 19 and 20 add to it, Tasks 16 to 20 consume it.
+- **F15** Tasks 9, 12, 21: exact VoiceOver labels and hints per element and state (`WalkCopy.bannerLabel`, `BannerRole`, `levelName`, `areaHint`, `rowLabel`), carried on `Banner.label` and `Label.hint`; the orb has the identifier `walk.orb`.
+- **F16** Task 20: `WalkModel` takes `calendarAccess` and `requestCalendar` closures defaulting to `AppleCalendarService.shared`; tests pass `FakeWalkCalendar`.
+- **F17** Tasks 8, 14, 18: a position is first saved when a depth is chosen on Welcome (`quick` / `full` emit `.save`); Task 14 pins that nothing is saved before, Task 18's test follows it.
+- **D1** Shared numbers have one name each (`WalkLoad.maxAreas`, `WalkWords.maxTitle`, `WalkWords.maxAreaName`, `WalkCopy.shortLength`, `WalkState.undoMs`, `noteMs`, `calendarNoteMs`, `WalkOrb.holdMs`) and are used by name.
+- **D2** Task 2: a clean row names no parents; a parent with no queued insert and no row on the phone is lost, its link is cleared and sent as null (`knownIds`, `lostParents`, `clearLinks`); tests.
+- **D3** Task 14: `WalkScheduling` (`after`, `cancel`, `run`), `WalkClock`, and `ManualWalkScheduler` for tests; Tasks 16, 19 and 20 route speech, delayed sounds and the calendar ask through it. Speech reaches the model through `WalkListening.onWords`, not observation. Task 19 adds `WalkSound.bundleFiles`.
+- **D4** Task 17's fixes are limited to seven named files; Task 21 uses the installed `iPhone Duo` simulator; a full banner's `text` is the whole title; `short` is 39 characters and an ellipsis.
+- **D5** Task 15 has `WalkStage` (device ↔ stage) and `WalkOrb.hits` with `WalkStageTests`; the picture test reads `cgImage.width`.
+- **D6** Tasks 8, 13, 17: the undo stack is in memory only; `aRestoredWalkHasNothingToUndo` and `leavingAndComingBack` pin it.
+- **Also** Task 14 writes out which `WalkWriter` method each `WalkWrite` case calls and sets `onEnd` in the demo path; Task 9 writes out `question` and `why`; Task 7's ending rows are personal tasks only; Task 18 cites `PlannerView.seasons`; Task 21 no longer quotes a test count.
