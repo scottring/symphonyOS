@@ -42,7 +42,10 @@ try {
       address text, inbound_token text, timezone text, seasons jsonb, week_starts_on int not null default 0);
     create table public.household_members(id uuid primary key default gen_random_uuid(), household_id uuid references public.households(id) on delete cascade not null, user_id uuid references auth.users(id) on delete cascade not null,
       role text not null default 'member' check (role in ('owner','admin','member','display')), status text not null default 'pending' check (status in ('pending','active','declined')), unique(household_id,user_id));
+    alter table public.household_members add column invited_by uuid;
     alter table public.household_members enable row level security;
+    create policy "Admins can invite members" on public.household_members for insert
+      with check (auth.uid() = invited_by and exists (select 1 from public.household_members hm where hm.household_id = household_members.household_id and hm.user_id = auth.uid() and hm.status = 'active' and hm.role in ('owner', 'admin')));
     create policy "Users can view memberships" on public.household_members for select using (true);
     create function public.is_household_owner_or_admin(p_household uuid)
     returns boolean language sql stable security definer set search_path = public, pg_temp as $f$
