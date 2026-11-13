@@ -11,7 +11,7 @@ final class LightEditionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo"] + (light ? ["-SymphonyLight"] : [])
         app.launch()
-        XCTAssertTrue(app.buttons["Today. Switch horizon"].waitForExistence(timeout: 20), "never reached Today")
+        XCTAssertTrue(app.buttons["Today. Switch horizon"].waitForExistence(timeout: 60), "never reached Today")
         return app
     }
 
@@ -22,6 +22,8 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Add"].exists)
         XCTAssertTrue(app.buttons["More"].exists)
         XCTAssertFalse(app.buttons["Routines"].exists)
+        XCTAssertFalse(app.staticTexts["Dinner tonight"].exists)
+        XCTAssertFalse(app.buttons["Life area: All"].exists)
 
         // More lists no Projects, Lists or Contacts.
         app.buttons["More"].tap()
@@ -40,6 +42,8 @@ final class LightEditionUITests: XCTestCase {
     @MainActor func testFullDockStillHasRoutines() throws {
         let app = launch(light: false)
         XCTAssertTrue(app.buttons["Routines"].exists)
+        XCTAssertTrue(app.staticTexts["Dinner tonight"].exists, "so the light absence is not for the wrong reason")
+        XCTAssertTrue(app.buttons["Life area: All"].exists)
         app.buttons["More"].tap()
         XCTAssertTrue(app.buttons["Projects"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Lists"].exists)

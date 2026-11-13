@@ -453,7 +453,8 @@ struct TodayView: View {
         let plan = plan
         let dinner = dinner
         let offerTasks = plan.chooserTasks(on: date).count
-        let offerRoutines = plan.chooserRoutines(on: date).filter { !$0.chosen }.count
+        let offerRoutines = appState.edition.allows(.routines)
+            ? plan.chooserRoutines(on: date).filter { !$0.chosen }.count : 0
 
         if !viewModel.carriedOverTasks.isEmpty {
             let n = viewModel.carriedOverTasks.count

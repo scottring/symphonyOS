@@ -605,12 +605,15 @@ struct EventMark: View {
 
 /// The small life-area dot.
 struct ContextDot: View {
+    @Environment(AppState.self) private var appState
     let context: String?
     var body: some View {
-        Circle()
-            .fill(Color.forContext(context))
-            .frame(width: 9, height: 9)
-            .accessibilityLabel(context?.capitalized ?? "No life area")
+        if appState.edition.allows(.spaces) {
+            Circle()
+                .fill(Color.forContext(context))
+                .frame(width: 9, height: 9)
+                .accessibilityLabel(context?.capitalized ?? "No life area")
+        }
     }
 }
 
@@ -681,6 +684,7 @@ struct ContextBadge: View {
 
 /// Overlapping initial-circles for the assigned family members (up to 3, then +N).
 struct AssigneeAvatars: View {
+    @Environment(AppState.self) private var appState
     let memberIds: [UUID]
     let members: [FamilyMember]
     var size: CGFloat = 22
@@ -689,7 +693,7 @@ struct AssigneeAvatars: View {
         let assigned = members
             .filter { memberIds.contains($0.id) }
             .sorted { $0.displayOrder < $1.displayOrder }
-        if !assigned.isEmpty {
+        if appState.edition.allows(.people), !assigned.isEmpty {
             HStack(spacing: -6) {
                 ForEach(assigned.prefix(3), id: \.id) { member in
                     Text(member.initials)

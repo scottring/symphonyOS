@@ -67,6 +67,7 @@ struct ChooserSheet: View {
                         }
                     }
 
+                    if appState.edition.allows(.routines) {
                     Eyebrow(text: isToday ? "Routines due today" : "Routines due \(date.formatted(.dateTime.weekday(.wide)))",
                             count: offeredRoutines.count)
                     if offeredRoutines.isEmpty {
@@ -82,6 +83,7 @@ struct ChooserSheet: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
                         .padding(.bottom, 24)
+                    }
                 }
             }
             .background(Color.bgBase)

@@ -160,7 +160,7 @@ struct iOSMainView: View {
         }
         // Re-drive photo captures that never finished (offline snap, killed app).
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
+            guard phase == .active, appState.edition.allows(.photoCapture) else { return }
             Task { await PhotoCaptureService.retryPending(modelContext: modelContext) }
         }
     }
@@ -172,7 +172,7 @@ extension iOSMainView {
         if let pinned = HalfOpen.pinned {
             next = pinned
             #if DEBUG
-            if HalfOpen.pinnedCooking, appState.cook == nil, let dinner = DemoMode.dinner(on: .now) {
+            if HalfOpen.pinnedCooking, appState.edition.allows(.dinner), appState.cook == nil, let dinner = DemoMode.dinner(on: .now) {
                 appState.cook = CookSession(dinner: dinner)
             }
             #endif

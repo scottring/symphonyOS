@@ -46,7 +46,7 @@ final class TriageController {
             perform(tasks, to: destination, areas: [:], context: context, userId: userId, members: members)
         } else if let assumedLifeArea {
             // The light edition has one life area: no sheet, just that one.
-            let areas = Dictionary(uniqueKeysWithValues: unclassified.map { ($0.id, assumedLifeArea) })
+            let areas = Dictionary(unclassified.map { ($0.id, assumedLifeArea) }, uniquingKeysWith: { first, _ in first })
             perform(tasks, to: destination, areas: areas, context: context, userId: userId, members: members)
         } else {
             areaRequest = AreaRequest(tasks: tasks, unclassified: unclassified, destination: destination)
