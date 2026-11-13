@@ -45,6 +45,17 @@ const ideasBody = {
   conversation: [{ role: 'assistant', content: 'What should we make for dinner on Thursday?' }],
 }
 
+/** Remove one throwaway user's AI rows (they do not cascade). Filtered by that user's id only. */
+async function clearAiRows(userId: string): Promise<void> {
+  for (const table of ['ai_budget_reservations', 'ai_provider_call_usage', 'ai_spend']) {
+    try {
+      await admin.from(table).delete().eq('user_id', userId)
+    } catch {
+      // a table that does not exist is fine
+    }
+  }
+}
+
 async function editionOf(householdId: string): Promise<string> {
   const { data, error } = await admin.from('households').select('edition').eq('id', householdId).single()
   if (error) throw new Error(`could not read edition: ${error.message}`)
@@ -68,7 +79,10 @@ describeIf('household edition gate', () => {
 
   afterAll(async () => {
     if (!admin) return
-    for (const p of [L, M]) await removePerson(admin, p)
+    for (const p of [L, M]) {
+      if (p) await clearAiRows(p.userId)
+      await removePerson(admin, p)
+    }
     for (const id of [lHousehold, mHousehold]) if (id) await admin.from('households').delete().eq('id', id)
   })
 
@@ -88,12 +102,17 @@ describeIf('household edition gate', () => {
     expect(data).toBe('light')
   })
 
-  it('keeps an update to full as it was, without an error', async () => {
-    const { error } = await L.client.from('households').update({ edition: 'full' }).eq('id', lHousehold)
+  it('keeps an update to full as it was, without an error, while a name change by L persists', async () => {
+    const { error } = await L.client
+      .from('households')
+      .update({ edition: 'full', name: 'Edition test renamed' })
+      .eq('id', lHousehold)
     expect(error).toBeNull()
-    expect(await editionOf(lHousehold)).toBe('light')
-    const { data } = await L.client.rpc('my_edition')
-    expect(data).toBe('light')
+    // The update reached the row (the name changed) but the edition did not.
+    const { data } = await admin.from('households').select('edition, name').eq('id', lHousehold).single()
+    expect(data).toEqual({ edition: 'light', name: 'Edition test renamed' })
+    const { data: mine } = await L.client.rpc('my_edition')
+    expect(mine).toBe('light')
   })
 
   it("will not move L's membership into the full household", async () => {
@@ -102,6 +121,7 @@ describeIf('household edition gate', () => {
       .update({ household_id: mHousehold })
       .eq('user_id', L.userId)
     expect(error?.code).toBe('42501')
+    expect(error?.message).toContain('A membership cannot be moved to another household or person.')
 
     const { data } = await admin.from('household_members').select('household_id').eq('user_id', L.userId)
     expect(data).toEqual([{ household_id: lHousehold }])
@@ -115,6 +135,7 @@ describeIf('household edition gate', () => {
       status: 'active',
     })
     expect(error?.code).toBe('42501')
+    expect(error?.message).toContain('A new membership starts as pending.')
 
     const { data } = await admin
       .from('household_members')
@@ -122,6 +143,40 @@ describeIf('household edition gate', () => {
       .eq('user_id', M.userId)
       .eq('status', 'active')
     expect(data).toEqual([{ household_id: mHousehold }])
+    const { data: lRows } = await admin.from('household_members').select('household_id').eq('user_id', L.userId)
+    expect(lRows).toEqual([{ household_id: lHousehold }])
+  })
+
+  it('lets L invite M as pending, but L cannot make that membership active', async () => {
+    const { error } = await L.client.from('household_members').insert({
+      household_id: lHousehold,
+      user_id: M.userId,
+      role: 'member',
+      status: 'pending',
+      invited_by: L.userId,
+    })
+    try {
+      // The permitted leg: the same insert shape succeeds when pending, so the
+      // refusals above come from the guard, not from everything being denied.
+      expect(error).toBeNull()
+
+      const flip = await L.client
+        .from('household_members')
+        .update({ status: 'active' })
+        .eq('household_id', lHousehold)
+        .eq('user_id', M.userId)
+      expect(flip.error?.code).toBe('42501')
+      expect(flip.error?.message).toContain('Only the person invited can accept a membership.')
+
+      const { data } = await admin
+        .from('household_members')
+        .select('status')
+        .eq('household_id', lHousehold)
+        .eq('user_id', M.userId)
+      expect(data).toEqual([{ status: 'pending' }])
+    } finally {
+      await admin.from('household_members').delete().eq('household_id', lHousehold).eq('user_id', M.userId)
+    }
   })
 
   it('refuses the AI to a light household with 403 ai_light_edition and records no usage', async () => {
@@ -150,16 +205,21 @@ describeIf('household edition gate', () => {
     })
     expect(reserved.error).toBeNull()
     const result = reserved.data as { allowed: boolean; reservation_id?: string; reason?: string }
-    expect(result.allowed).toBe(true)
-    expect(result.reservation_id).toBeTruthy()
-
-    const settled = await admin.rpc('settle_ai_budget', {
-      p_id: result.reservation_id,
-      p_user: L.userId,
-      p_input: 0,
-      p_output: 0,
-    })
-    expect(settled.error).toBeNull()
+    try {
+      expect(result.allowed).toBe(true)
+      expect(result.reservation_id).toBeTruthy()
+    } finally {
+      if (result?.reservation_id) {
+        const settled = await admin.rpc('settle_ai_budget', {
+          p_id: result.reservation_id,
+          p_user: L.userId,
+          p_input: 0,
+          p_output: 0,
+        })
+        expect(settled.error).toBeNull()
+        expect(settled.data).toBe(true)
+      }
+    }
   })
 })
 

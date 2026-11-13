@@ -36,6 +36,7 @@ let aHousehold: string
 let cHousehold: string
 let sharedTaskId: string
 let privateTaskId: string
+let uploaded = false
 const filePath = () => `${A.userId}/integration/delete-account.txt`
 
 const describeIf = canRun ? describe : describe.skip
@@ -71,10 +72,13 @@ describeIf('account deletion', () => {
       .from('attachments')
       .upload(filePath(), new Blob(['integration test file'], { type: 'text/plain' }), { contentType: 'text/plain' })
     if (upload.error) throw new Error(`A could not upload: ${upload.error.message}`)
+    uploaded = true
   })
 
   afterAll(async () => {
     if (!admin) return
+    // A failed run must not leave A's object behind (removing a missing one is harmless).
+    if (uploaded) await admin.storage.from('attachments').remove([filePath()])
     // Deleted users are already gone; removePerson tolerates "not found".
     for (const p of [A, B, C]) await removePerson(admin, p)
     for (const id of [aHousehold, cHousehold]) if (id) await admin.from('households').delete().eq('id', id)
@@ -99,6 +103,7 @@ describeIf('account deletion', () => {
 
     const wrong = await callFunction(A, 'delete-account', { confirm: 'yes' })
     expect(wrong.status).toBe(400)
+    expect(wrong.json.code).toBe('confirm_required')
 
     const { data: user } = await admin.auth.admin.getUserById(A.userId)
     expect(user.user).not.toBeNull()
@@ -118,29 +123,42 @@ describeIf('account deletion', () => {
   })
 
   it('deletes A: 200, no sign-in, B keeps the shared task and the household, the file is gone', async () => {
-    const { status, json } = await callFunction(A, 'delete-account', { confirm: 'delete my account' })
-    expect(status).toBe(200)
-    expect(json.ok).toBe(true)
+    try {
+      const { status, json } = await callFunction(A, 'delete-account', { confirm: 'delete my account' })
+      expect(status).toBe(200)
+      expect(json.ok).toBe(true)
 
-    // A can no longer sign in.
-    const fresh = createClient(SUPABASE_URL!, ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
-    const signIn = await fresh.auth.signInWithPassword({ email: A.email, password: PASSWORD })
-    expect(signIn.error).not.toBeNull()
-    expect(signIn.data.session).toBeNull()
+      // A can no longer sign in.
+      const fresh = createClient(SUPABASE_URL!, ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
+      const signIn = await fresh.auth.signInWithPassword({ email: A.email, password: PASSWORD })
+      expect(signIn.error).not.toBeNull()
+      expect(signIn.data.session).toBeNull()
 
-    // B (anon-key client) still sees the shared task, never the private one.
-    const { data: tasks, error } = await B.client.from('tasks').select('id').in('id', [sharedTaskId, privateTaskId])
-    expect(error).toBeNull()
-    expect((tasks ?? []).map((t) => t.id)).toEqual([sharedTaskId])
+      // B (anon-key client) still sees the shared task, never the private one.
+      const { data: tasks, error } = await B.client.from('tasks').select('id').in('id', [sharedTaskId, privateTaskId])
+      expect(error).toBeNull()
+      expect((tasks ?? []).map((t) => t.id)).toEqual([sharedTaskId])
 
-    // The household passed to B.
-    const { data: h } = await admin.from('households').select('owner_id').eq('id', aHousehold).single()
-    expect(h?.owner_id).toBe(B.userId)
+      // The private task is gone, not merely hidden from B.
+      const { data: privateRows, error: privateError } = await admin.from('tasks').select('id').eq('id', privateTaskId)
+      expect(privateError).toBeNull()
+      expect(privateRows).toEqual([])
 
-    // A's file is gone from storage.
-    const { data: files, error: listError } = await admin.storage.from('attachments').list(`${A.userId}/integration`)
-    expect(listError).toBeNull()
-    expect(files ?? []).toEqual([])
+      // A's old access token no longer reads A's rows.
+      const stale = await A.client.from('tasks').select('id').eq('id', sharedTaskId)
+      expect((stale.data ?? []).map((t) => t.id)).not.toContain(sharedTaskId)
+
+      // The household passed to B.
+      const { data: h } = await admin.from('households').select('owner_id').eq('id', aHousehold).single()
+      expect(h?.owner_id).toBe(B.userId)
+
+      // A's file is gone from storage.
+      const { data: files, error: listError } = await admin.storage.from('attachments').list(`${A.userId}/integration`)
+      expect(listError).toBeNull()
+      expect(files ?? []).toEqual([])
+    } finally {
+      await admin.storage.from('attachments').remove([filePath()])
+    }
   })
 
   it('deletes C: its household goes with it', async () => {
