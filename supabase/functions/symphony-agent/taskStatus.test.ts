@@ -51,3 +51,12 @@ describe('orderWrites', () => {
     expect(orderWrites('a,b')).toHaveProperty('error')
   })
 })
+
+describe('due_on, the done-by date (2026-11-13)', () => {
+  const at = () => '2026-11-16T12:00:00Z'
+  it('writes a real date, clears with null, refuses anything else', () => {
+    expect(taskStatusPatch({ due_on: '2026-11-16' }, null, new Date(), at)).toEqual({ patch: { due_on: '2026-11-16' } })
+    expect(taskStatusPatch({ due_on: null }, null, new Date(), at)).toEqual({ patch: { due_on: null } })
+    expect(taskStatusPatch({ due_on: '2026-02-30' }, null, new Date(), at)).toHaveProperty('error')
+  })
+})

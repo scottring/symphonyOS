@@ -10,7 +10,7 @@ import { APP_TZ } from './schedule.ts'
 
 export type TaskRow = { id: string; title: string; scheduled_for: string | null; is_all_day: boolean | null; bucket: string | null; week_start: string | null; completed: boolean; assigned_to: string | null; updated_at: string
   // Where it stands and its place on the Week list (2026-11-08 to 11-10).
-  sort_order?: number | null; started_at?: string | null; is_waiting?: boolean | null; waiting_for?: string | null; owed_to?: string | null; needed_on?: string | null }
+  sort_order?: number | null; started_at?: string | null; is_waiting?: boolean | null; waiting_for?: string | null; owed_to?: string | null; needed_on?: string | null; due_on?: string | null }
 export type EventRow = { id: string; title: string; start_time: string; end_time: string; all_day: boolean | null }
 export type RoutineRow = { id: string; name: string; recurrence_pattern: unknown; time_of_day: string | null; parent_routine_id: string | null; assigned_to_all?: string[] | null; visibility?: string | null; paused_until?: string | null
   show_on_timeline?: boolean | null; show_on_week?: boolean | null; show_on_kiosk?: boolean | null; show_on_day_grid?: boolean | null; background?: boolean | null; keep_until_done?: boolean | null }
@@ -32,13 +32,14 @@ export type WeekRoutine = {
 }
 
 /** A task's status marks, as the week sheet shows them; absent when plain. */
-export type TaskMarks = { status?: 'started' | 'waiting'; waitingOn?: string; owedTo?: string; neededOn?: string }
+export type TaskMarks = { status?: 'started' | 'waiting'; waitingOn?: string; owedTo?: string; neededOn?: string; dueOn?: string }
 export function taskMarks(t: TaskRow): TaskMarks {
   const m: TaskMarks = {}
   if (t.is_waiting) { m.status = 'waiting'; if (t.waiting_for) m.waitingOn = t.waiting_for }
   else if (t.started_at) m.status = 'started'
   if (t.owed_to) m.owedTo = t.owed_to
   if (t.needed_on) m.neededOn = t.needed_on
+  if (t.due_on) m.dueOn = t.due_on
   return m
 }
 

@@ -16,6 +16,7 @@ export const TASK_STATUS_PROPERTIES = {
   check_back: { type: 'string', description: 'With status "waiting", optional YYYY-MM-DD: the day to check back. Moves the task to that day, all-day, as the app does.' },
   owed_to: { type: ['string', 'null'], description: 'Someone waiting on US for this (e.g. "Kaisa"); null clears it. Separate from status.' },
   needed_on: { type: ['string', 'null'], description: 'YYYY-MM-DD the task is needed that day ("need it today"), shown on that day without giving it a time; null clears it.' },
+  due_on: { type: ['string', 'null'], description: 'YYYY-MM-DD the task must be done BY (e.g. "return the charger by Monday"). Today shows it from three days before, as "by Mon 16". Not a day to do it: keep scheduled_for for that. null clears it.' },
 } as const
 
 export interface StatusBefore {
@@ -92,6 +93,17 @@ export function taskStatusPatch(
       patch.needed_on = day
     }
     delete input.needed_on
+  }
+  // The done-by date (tasks.due_on, 2026-11-13), the app's "Due by" field.
+  if ('due_on' in input) {
+    const v = input.due_on
+    if (v === null || v === '') patch.due_on = null
+    else {
+      const day = realYmd(v)
+      if (!day) return { error: 'due_on must be a real YYYY-MM-DD date, or null' }
+      patch.due_on = day
+    }
+    delete input.due_on
   }
   return { patch }
 }

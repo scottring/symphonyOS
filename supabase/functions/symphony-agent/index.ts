@@ -150,7 +150,7 @@ Symphony domain model:
 - Tasks have a context: work, family, or personal. An unscheduled task (bucket "inbox") needs triage; a scheduled task has bucket "timed" and a scheduled_for date.
 - contact_id = who the task is ABOUT. assigned_to = who should DO it (a household member id). They are different.
 - To schedule a task, set scheduled_for; the system files it as "timed" automatically.
-- Where a task stands is its status on the week sheet: started (in progress), waiting (on someone: waiting_for, optionally a check_back day), or not started. Set it with symphony_update_task status; never with notes. owed_to is someone waiting on US for it; needed_on is the day it is needed (shown that day without a time). Report these from the read tools when asked what is in progress or what is waiting.
+- Where a task stands is its status on the week sheet: started (in progress), waiting (on someone: waiting_for, optionally a check_back day), or not started. Set it with symphony_update_task status; never with notes. owed_to is someone waiting on US for it; needed_on is the day it is needed (shown that day without a time); due_on is the day it must be done BY (a return window, a deadline), shown on Today from three days before. Report these from the read tools when asked what is in progress or what is waiting.
 - The Week list ("sometime this week"), Today's week sheet, and month and season lists have a manual order the person sets by dragging. When asked to prioritize or reorder one, say the order you suggest, and when they agree (or asked you to order it), write it with symphony_order_tasks, passing every task on that list, top first. Reordering is a direct write: it changes only the order and the person can drag to undo.
 - When unsure which context or date the user means, ask one short question rather than guessing.
 - Dates are ISO (YYYY-MM-DD). Today's date is provided in the first user message.
@@ -239,7 +239,7 @@ const TOOLS = [
   { name: 'symphony_update_intention', description: 'Edit the wording or completion state of an existing year goal. Does not change its year, sharing or links.', input_schema:{type:'object',properties:{id:{type:'string'},name:{type:'string'},status:{type:'string',enum:['active','completed']}},required:['id']}},
   {
     name: 'symphony_list_tasks',
-    description: 'List tasks (max 50). Filter by bucket, context, completed, is_waiting, scheduled_for (YYYY-MM-DD, the person\'s day), or search (title substring). order_by "list" returns them in the order the Week list and Today\'s sheet show (sort_order). Rows include started_at, is_waiting/waiting_for, owed_to and needed_on. Items the user let go are left out unless you search.',
+    description: 'List tasks (max 50). Filter by bucket, context, completed, is_waiting, scheduled_for (YYYY-MM-DD, the person\'s day), or search (title substring). order_by "list" returns them in the order the Week list and Today\'s sheet show (sort_order). Rows include started_at, is_waiting/waiting_for, owed_to, needed_on and due_on. Items the user let go are left out unless you search.',
     input_schema: {
       type: 'object',
       properties: {
@@ -273,6 +273,7 @@ const TOOLS = [
         estimated_duration: { type: 'number', description: 'minutes' },
         owed_to: TASK_STATUS_PROPERTIES.owed_to,
         needed_on: TASK_STATUS_PROPERTIES.needed_on,
+        due_on: TASK_STATUS_PROPERTIES.due_on,
         parent_task_id: {
           type: 'string',
           description:
@@ -284,7 +285,7 @@ const TOOLS = [
   },
   {
     name: 'symphony_update_task',
-    description: 'Update a task by id. Set scheduled_for to reschedule (or null to move to inbox), change context, notes, duration, etc. status sets where it stands (started, waiting on someone, or not started) exactly as the week sheet does; owed_to and needed_on sit beside it.',
+    description: 'Update a task by id. Set scheduled_for to reschedule (or null to move to inbox), change context, notes, duration, etc. status sets where it stands (started, waiting on someone, or not started) exactly as the week sheet does; owed_to, needed_on and due_on sit beside it.',
     input_schema: {
       type: 'object',
       properties: {
@@ -780,7 +781,7 @@ async function runTool(
           : (() => { const d = new Date(`${today}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 1) % 7)); return d.toISOString().slice(0, 10) })()
         const { end, lastStart } = weekWindow(start)
         const shift = (ymd: string, n: number) => { const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
-        const cols = 'id, title, scheduled_for, is_all_day, bucket, week_start, completed, assigned_to, updated_at, sort_order, started_at, is_waiting, waiting_for, owed_to, needed_on'
+        const cols = 'id, title, scheduled_for, is_all_day, bucket, week_start, completed, assigned_to, updated_at, sort_order, started_at, is_waiting, waiting_for, owed_to, needed_on, due_on'
         const [dated, week, inbox, events, routines, talks, members] = await Promise.all([
           // A day wider each side: stored times are UTC; shapeWeek files them by local day.
           db.from('tasks').select(cols).gte('scheduled_for', `${shift(lastStart, -1)}T00:00:00Z`).lt('scheduled_for', `${shift(end, 1)}T00:00:00Z`).limit(300),
@@ -898,7 +899,7 @@ async function runTool(
         }
         // Where it stands (started / waiting on / not started), owed to and
         // needed on: the week sheet's own write (taskStatus.ts).
-        if (['status', 'waiting_for', 'check_back', 'owed_to', 'needed_on', 'is_waiting'].some((k) => k in updates)) {
+        if (['status', 'waiting_for', 'check_back', 'owed_to', 'needed_on', 'due_on', 'is_waiting'].some((k) => k in updates)) {
           const { data: was } = await db.from('tasks').select('is_waiting, waiting_since').eq('id', id).maybeSingle()
           const marks = taskStatusPatch(updates, was ?? null, new Date(), (d) => normalizeSchedule(d, true).scheduled_for!)
           if ('error' in marks) return `Error: ${marks.error}`
