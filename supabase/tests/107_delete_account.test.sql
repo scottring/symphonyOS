@@ -13,7 +13,10 @@
 -- (is_full_user, no sign-in), plus a row in the inviter's family carrying the
 -- joiner's sign-in (accept_household_invitation). B joined A's household and
 -- D joined E's; B and D also have their own self rows. A (the owner) leaving
--- is the mirror of D (the joiner) leaving.
+-- is the mirror of D (the joiner) leaving. Seed self rows sit at
+-- display_order 0, rows an owner added after it at 1 or more (the app's
+-- members.length); the web picks "me" for a creator by user_id in
+-- display_order, so nothing else may land at 0 for the remaining person.
 begin;
 
 create temp table ids (k text primary key, v uuid) on commit drop;
@@ -66,9 +69,9 @@ begin
   insert into public.goals (user_id, scope, name) values (a, 'couple', '107 A shared goal'), (a, 'individual', '107 A private goal');
   insert into public.contacts (user_id, scope, name) values (a, 'compound', '107 A shared contact');
   insert into public.projects (user_id, scope, name) values (a, 'individual', '107 A private project');
-  insert into public.family_members (user_id, auth_user_id, is_full_user, name) values
-    (a, null, true, '107 A self'), (a, b, true, '107 B in A'), (b, null, true, '107 B self');
-  insert into public.family_members (user_id, auth_user_id, name) values (a, null, '107 A child') returning id into a_child;
+  insert into public.family_members (user_id, auth_user_id, is_full_user, name, role_label, display_order) values
+    (a, null, true, '107 A self', null, 0), (a, b, true, '107 B in A', 'parent', 2), (b, null, true, '107 B self', 'parent', 0);
+  insert into public.family_members (user_id, auth_user_id, name, role_label, display_order) values (a, null, '107 A child', 'child', 1) returning id into a_child;
   -- B's own tasks assigned to A's child and to A.
   insert into public.tasks (user_id, scope, title, assigned_to) values (b, 'individual', '107 B for A child', a_child);
   insert into public.tasks (user_id, scope, title, assigned_to) values
@@ -122,8 +125,15 @@ begin
   insert into public.tasks (user_id, scope, title) values (f, 'couple', '107 F shared');
   insert into public.chat_sessions (user_id, scope, title) values (d, 'individual', '107 D chat');
   -- D joined E's household by invitation.
-  insert into public.family_members (user_id, auth_user_id, is_full_user, name) values
-    (e, null, true, '107 E self'), (e, d, true, '107 D in E'), (d, null, true, '107 D self');
+  -- D's sign-in row was added by E with no role (role_label null).
+  insert into public.family_members (user_id, auth_user_id, is_full_user, name, role_label, display_order) values
+    (e, null, true, '107 E self', 'parent', 0), (e, d, true, '107 D in E', null, 1), (d, null, true, '107 D self', 'parent', 0);
+  -- Assignments to D's own seed row: E's tasks, and D's shared task that passes to E.
+  insert into public.tasks (user_id, scope, title, assigned_to) values
+    (e, 'individual', '107 E for D', (select id from public.family_members where name = '107 D self'));
+  insert into public.tasks (user_id, scope, title, assigned_to_all) values
+    (e, 'couple', '107 E for D and E', array[(select id from public.family_members where name = '107 D self'), (select id from public.family_members where name = '107 E self')]);
+  update public.tasks set assigned_to = (select id from public.family_members where name = '107 D self') where title = '107 D shared';
 
   insert into ids values ('a', a), ('b', b), ('ad', ad), ('c', c), ('cd', cd), ('d', d), ('e', e),
     ('f', f), ('g', g), ('h1', h1), ('h2', h2), ('h3', h3), ('h4', h4), ('a_child', a_child), ('t_priv', t_priv), ('t_shared', t_shared), ('recipe', recipe);
@@ -232,17 +242,41 @@ begin
   -- The mirror of D: A stays in B's family as a person with no sign-in, not
   -- as a second self row for B; B's own self row and sign-in row are as they were.
   assert (select (auth_user_id is null and not is_full_user) from public.family_members where name = '107 A self'), '5: A''s self row is still a self row';
+  assert (select display_order >= 1 from public.family_members where name = '107 A self'), '5: A''s row sits at display_order 0 beside B''s own';
+  assert (select count(*) from public.family_members where user_id = b and auth_user_id is null and display_order = 0) = 1
+     and (select display_order from public.family_members where name = '107 B self') = 0, '5: B''s own self row is not alone at the tie';
   assert (select (user_id = b and auth_user_id is null and is_full_user) from public.family_members where name = '107 B self'), '5: B''s own self row changed';
   assert (select (auth_user_id = b and is_full_user) from public.family_members where name = '107 B in A'), '5: B''s sign-in row changed';
   assert (select count(*) from public.family_members where user_id = b and is_full_user and auth_user_id is null) = 1, '5: B does not have exactly one self row';
   assert (select assigned_to from public.tasks where title = '107 B for A child') = pg_temp.id('a_child'), '5: B''s task lost its assignment to A''s child';
   assert (select assigned_to from public.tasks where title = '107 B for A') = (select id from public.family_members where name = '107 A self'), '5: B''s task lost its assignment to A';
 
-  -- D, who joined E's household, stays in E's family as a person with no sign-in.
+  -- D, who joined E's household, stays in E's family as ONE person row with no sign-in;
+  -- D's own seed row goes with D, and what pointed at it now points at D's remaining row.
   assert (select (user_id = pg_temp.id('e') and auth_user_id is null and not is_full_user) from public.family_members where name = '107 D in E'),
     '5: D''s row in E''s family is gone, still signed in, or still a full user';
-  assert (select (user_id = pg_temp.id('e') and not is_full_user) from public.family_members where name = '107 D self'), '5: D''s own row did not pass to E as a person';
-  assert (select (auth_user_id is null and is_full_user) from public.family_members where name = '107 E self'), '5: E''s self row changed';
+  assert not exists (select 1 from public.family_members where name = '107 D self'), '5: D''s seed row was handed on';
+  assert (select (auth_user_id is null and is_full_user and display_order = 0) from public.family_members where name = '107 E self'), '5: E''s self row changed';
+  assert (select count(*) from public.family_members where user_id = pg_temp.id('e') and auth_user_id is null and display_order = 0) = 1,
+    '5: E does not own exactly one row at the tie';
+  assert (select count(*) from public.family_members where user_id = pg_temp.id('e') and auth_user_id is null and is_full_user) = 1,
+    '5: E does not have exactly one self row';
+  assert (select assigned_to from public.tasks where title = '107 E for D') = (select id from public.family_members where name = '107 D in E'),
+    '5: E''s task for D did not move to D''s remaining row';
+  assert (select assigned_to_all from public.tasks where title = '107 E for D and E')
+       = array[(select id from public.family_members where name = '107 D in E'), (select id from public.family_members where name = '107 E self')],
+    '5: E''s task for D and E did not move to D''s remaining row';
+  assert (select (user_id = pg_temp.id('e') and assigned_to = (select id from public.family_members where name = '107 D in E')) from public.tasks where title = '107 D shared'),
+    '5: D''s shared task (now E''s) did not move to D''s remaining row';
+
+  -- A departed adult stays an adult. The web's rule (useScreenTime.ts isChildMember,
+  -- useShellChrome.ts familyKids): a child is role_label 'child', or role_label not
+  -- 'parent' and not is_full_user. Both rows here started with role_label null.
+  assert (select role_label = 'parent' and not (role_label = 'child' or (role_label is distinct from 'parent' and not is_full_user))
+          from public.family_members where name = '107 D in E'), '5: D''s remaining row reads as a child';
+  assert (select role_label = 'parent' and not (role_label = 'child' or (role_label is distinct from 'parent' and not is_full_user))
+          from public.family_members where name = '107 A self'), '5: A''s row in B''s family reads as a child';
+  assert (select role_label from public.family_members where name = '107 A child') = 'child', '5: A''s child stopped being a child';
 
   -- Who did what on which day: shared routine and calendar rows pass to B, a private routine's go,
   -- and the clashing one is left to go while B's own row for that day stays.

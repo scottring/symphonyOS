@@ -22,11 +22,18 @@
 --      actionable_instances (who did what on which day) where the household
 --        can read them: calendar events, and routines whose routine is
 --        couple/compound.
---    Before the move, the leaver's own self row in family_members
---    (is_full_user, no auth_user_id) becomes a plain person row
---    (is_full_user := false): the leaver stays in the heir's family list,
---    but never as a second self row for the heir, which the unique index
---    family_members_one_self_row would refuse.
+--    The leaver's own seed self row in family_members (is_full_user, no
+--    auth_user_id) depends on whether another family already carries the
+--    leaver's sign-in (a partner who joined by invitation):
+--      - no: it moves as an ordinary adult person row (is_full_user := false,
+--        role_label 'parent' if it had none, display_order at least 1), so the
+--        leaver stays in the heir's family list but never as a second self
+--        row for the heir (the unique index family_members_one_self_row) and
+--        never level with the heir's own row at display_order 0, where the
+--        apps look for "me";
+--      - yes: it does not move. What other people's rows assign to it
+--        (assigned_to, assigned_to_override, assigned_to_all) is pointed at
+--        the row carrying the leaver's sign-in, and it goes with the leaver.
 --    Then spaces and assets the leaver created follow their home's owner
 --    (created_by := homes.user_id where that owner is not the leaver), with
 --    or without an heir.
@@ -53,8 +60,9 @@
 -- 6. task_focus rows go (no foreign key). AI spend tables are left alone.
 -- 7. A row in someone else's family that carries the leaver's sign-in (an
 --    invited partner, linked by accept_household_invitation) lets go of it
---    (auth_user_id := null, is_full_user := false), so the leaver stays there
---    as a person with no sign-in. Otherwise the auth row's ON DELETE SET NULL
+--    (auth_user_id := null, is_full_user := false, role_label 'parent' if it
+--    had none), so the leaver stays there as an adult with no sign-in. The
+--    web counts a row that is neither 'parent' nor a full user as a child. Otherwise the auth row's ON DELETE SET NULL
 --    would turn it into a second self row for its owner, the unique index
 --    would refuse, and deleting the auth user would fail on every retry.
 --
@@ -102,6 +110,11 @@ declare
   v_ids uuid[];
   v_row record;
   v_left boolean;
+  v_seed uuid;
+  v_linked uuid;
+  v_adult text := '';
+  v_fm_cond_col text;
+  v_fm_cond text;
 begin
   if p_user is null then
     raise exception 'delete_account_data needs a user id' using errcode = '22004';
@@ -119,11 +132,32 @@ begin
     array_position(array['owner', 'admin', 'member'], o.role), o.joined_at nulls last, o.user_id
   limit 1;
 
-  -- 2. Hand shared things on. The leaver's self row first becomes a person row.
+  -- The leaver's seed self row, and a row in another family carrying the
+  -- leaver's sign-in (the heir's family first).
+  if public.delete_account_has_columns('family_members', array['id', 'user_id', 'is_full_user', 'auth_user_id']) then
+    execute 'select id from public.family_members where user_id = $1 and is_full_user and auth_user_id is null order by id limit 1'
+      into v_seed using p_user;
+    execute 'select id from public.family_members where auth_user_id = $1 and user_id <> $1
+             order by (user_id = $2) desc nulls last, id limit 1'
+      into v_linked using p_user, v_heir;
+    -- Turning a row into an ordinary person keeps an adult an adult.
+    if public.delete_account_has_columns('family_members', array['role_label']) then
+      v_adult := ', role_label = coalesce(role_label, ''parent'')';
+    end if;
+  end if;
+
+  -- 2. Hand shared things on. The seed self row first becomes an adult
+  -- person row, or, when another family carries the leaver's sign-in, stays.
   if v_heir is not null then
-    if public.delete_account_has_columns('family_members', array['user_id', 'is_full_user', 'auth_user_id']) then
-      execute 'update public.family_members set is_full_user = false where user_id = $1 and is_full_user and auth_user_id is null'
-        using p_user;
+    if v_seed is not null and v_linked is null then
+      execute 'update public.family_members set is_full_user = false' || v_adult
+        || case when public.delete_account_has_columns('family_members', array['display_order'])
+                then ', display_order = greatest(coalesce(display_order, 0), 1)' else '' end
+        || ' where id = $1'
+        using v_seed;
+    elsif v_seed is not null then
+      v_fm_cond_col := 'id';
+      v_fm_cond := format('id <> %L::uuid', v_seed);
     end if;
     for v_move in
       select * from (values
@@ -134,7 +168,7 @@ begin
         ('routines', 'user_id', 'scope', $c$scope in ('couple', 'compound')$c$),
         ('projects', 'user_id', 'scope', $c$scope in ('couple', 'compound')$c$),
         ('chat_sessions', 'user_id', 'scope', $c$scope in ('couple', 'compound')$c$),
-        ('family_members', 'user_id', null, null),
+        ('family_members', 'user_id', v_fm_cond_col, v_fm_cond),
         ('meal_plans', 'user_id', null, null),
         ('recipes', 'user_id', null, null),
         ('scratchpad_notes', 'user_id', null, null),
@@ -192,6 +226,31 @@ begin
       end;
     end if;
   end loop;
+
+  -- The seed self row stays behind when another family carries the leaver's
+  -- sign-in: what other people's rows assign to it moves to that row.
+  if v_seed is not null and v_linked is not null then
+    for v_move in
+      select * from (values ('tasks', 'assigned_to'), ('routines', 'assigned_to'), ('event_notes', 'assigned_to'),
+                            ('actionable_instances', 'assigned_to_override')) as m(tbl, col)
+    loop
+      if public.delete_account_has_columns(v_move.tbl, array[v_move.col, 'user_id']) then
+        execute format('update public.%I set %I = $1 where %I = $2 and user_id <> $3', v_move.tbl, v_move.col, v_move.col)
+          using v_linked, v_seed, p_user;
+      end if;
+    end loop;
+    for v_move in select unnest(array['tasks', 'routines', 'event_notes', 'goals']) as tbl loop
+      if public.delete_account_has_columns(v_move.tbl, array['user_id'])
+         and exists (select 1 from pg_catalog.pg_attribute a
+                     where a.attrelid = to_regclass(format('public.%I', v_move.tbl)) and a.attname = 'assigned_to_all'
+                       and a.atttypid = 'uuid[]'::pg_catalog.regtype and not a.attisdropped) then
+        execute format('update public.%I set assigned_to_all = case when $1 = any(assigned_to_all)
+                          then array_remove(assigned_to_all, $2) else array_replace(assigned_to_all, $2, $1) end
+                        where $2 = any(assigned_to_all) and user_id <> $3', v_move.tbl)
+          using v_linked, v_seed, p_user;
+      end if;
+    end loop;
+  end if;
 
   -- 3. Detach other people's rows from the leaver's.
   if public.delete_account_has_columns('tasks', array['id', 'user_id', 'parent_task_id']) then
@@ -320,7 +379,7 @@ begin
 
   -- 7. Let go of the leaver's sign-in on rows in other people's families.
   if public.delete_account_has_columns('family_members', array['auth_user_id', 'is_full_user']) then
-    execute 'update public.family_members set auth_user_id = null, is_full_user = false where auth_user_id = $1' using p_user;
+    execute 'update public.family_members set auth_user_id = null, is_full_user = false' || v_adult || ' where auth_user_id = $1' using p_user;
   elsif public.delete_account_has_columns('family_members', array['auth_user_id']) then
     execute 'update public.family_members set auth_user_id = null where auth_user_id = $1' using p_user;
   end if;

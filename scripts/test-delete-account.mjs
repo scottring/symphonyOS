@@ -87,7 +87,8 @@ try {
 
     -- Shared by ownership.
     create table public.family_members(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id),
-      auth_user_id uuid references auth.users(id) on delete set null, is_full_user boolean not null default false, name text);
+      auth_user_id uuid references auth.users(id) on delete set null, is_full_user boolean not null default false, name text,
+      role_label text, display_order int default 0);
     -- Live (2026-07-20_family_members_one_self_row.sql): one self row per owner.
     CREATE UNIQUE INDEX family_members_one_self_row ON public.family_members (user_id) WHERE (is_full_user AND (auth_user_id IS NULL));
     create table public.recipes(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, title text);
@@ -105,6 +106,8 @@ try {
 
     -- Live: these point at family_members(id) with no delete action (2026-11-13 read).
     alter table public.tasks add column assigned_to uuid references public.family_members(id);
+    -- Live: family_members ids with no foreign key (032_event_multi_assignment.sql shape).
+    alter table public.tasks add column assigned_to_all uuid[] default '{}';
     alter table public.routines add column assigned_to uuid references public.family_members(id);
     create table public.event_notes(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
       assigned_to uuid references public.family_members(id), body text);
