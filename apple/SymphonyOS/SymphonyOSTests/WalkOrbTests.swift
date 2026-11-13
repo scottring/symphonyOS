@@ -24,6 +24,25 @@ private func polar(_ degrees: CGFloat, _ distance: CGFloat) -> CGPoint {
 }
 
 struct WalkOrbTests {
+    @Test func thePointsShowWhileHeldOrOpen() {
+        var s = state(step: 1)
+        for (orb, shows) in [(WalkState.Orb.idle, false), (.open, true), (.holding(hover: nil), true),
+                             (.holding(hover: .s), true), (.speaking(live: "x"), false)] {
+            s.orb = orb
+            #expect(s.showsPoints == shows)
+        }
+    }
+
+    @Test func theUndoPillGivesWayToThePoints() {
+        var s = state(step: 1, planted: true)
+        s.undoShowing = true
+        #expect(s.showsUndoPill)
+        s.orb = .open; #expect(!s.showsUndoPill)
+        s.orb = .holding(hover: .nw); #expect(!s.showsUndoPill)
+        s.orb = .idle; #expect(s.showsUndoPill)
+        s.undoShowing = false; #expect(!s.showsUndoPill)
+    }
+
     @Test func pointsSitOnTheCompass() {
         #expect(WalkOrb.position(of: .s) == CGPoint(x: 195, y: 794))
         #expect(WalkOrb.position(of: .n) == CGPoint(x: 195, y: 562))

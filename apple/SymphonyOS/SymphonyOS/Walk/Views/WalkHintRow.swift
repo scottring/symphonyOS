@@ -9,6 +9,8 @@ struct WalkHintRow: View {
     let model: WalkModel
     @Environment(\.walkKeyboardLift) private var lift
     @FocusState private var fieldFocused: Bool
+    /// Return was pressed: the reducer's submit closes the field, so the blur that follows is not a dismiss.
+    @State private var submitted = false
 
     init(model: WalkModel) {
         self.model = model
@@ -23,7 +25,7 @@ struct WalkHintRow: View {
             } else if s.selected != nil {
                 moveRow(s.moveTargets)
             } else {
-                hintRow(WalkCopy.hint(s), undo: s.undoShowing)
+                hintRow(WalkCopy.hint(s), undo: s.showsUndoPill)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 38)
@@ -45,7 +47,7 @@ struct WalkHintRow: View {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 14, weight: .semibold))
                         Text(WalkCopy.undo)
-                            .font(.custom("DMSans-SemiBold", size: 13))
+                            .font(.custom("DMSans-SemiBold", size: 13))     // the contract's 700: no Bold face is bundled
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
@@ -77,7 +79,7 @@ struct WalkHintRow: View {
             HStack(spacing: 6) {
                 if !targets.isEmpty {
                     Text(WalkCopy.moveTo)
-                        .font(.custom("DMSans-SemiBold", size: 12))
+                        .font(.custom("DMSans-SemiBold", size: 12))     // the contract's 700: no Bold face is bundled
                         .foregroundStyle(.white)
                         .walkGlow()
                         .fixedSize()
@@ -97,7 +99,7 @@ struct WalkHintRow: View {
     private func chip(_ label: String, colour: Color, border: Color, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label.uppercased())
-                .font(.custom("DMSans-SemiBold", size: 11))
+                .font(.custom("DMSans-SemiBold", size: 11))     // the contract's 700: no Bold face is bundled
                 .tracking(0.66)
                 .foregroundStyle(colour)
                 .lineLimit(1)
@@ -127,14 +129,27 @@ struct WalkHintRow: View {
                 .tint(WalkPalette.gold)
                 .submitLabel(.done)
                 .focused($fieldFocused)
-                .onSubmit { model.send(.typeSubmitted) }
+                .onSubmit {
+                    submitted = true
+                    model.send(.typeSubmitted)
+                }
                 .padding(.horizontal, 16)
                 .frame(minHeight: 44)
                 .background(WalkPillBackground(fill: WalkPalette.navy.opacity(0.72), border: .white.opacity(0.55)))
         }
-        .onAppear { fieldFocused = true }
+        .onAppear {
+            submitted = false
+            fieldFocused = true
+        }
         .onChange(of: fieldFocused) { _, focused in
-            if !focused { model.send(.typeDismissed) }
+            // Only a blur with no return before it dismisses: after a submit it would close
+            // nothing (the submit already planted and closed), and it must never drop the words.
+            guard !focused else { return }
+            if submitted {
+                submitted = false
+            } else {
+                model.send(.typeDismissed)
+            }
         }
     }
 }

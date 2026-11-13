@@ -71,14 +71,12 @@ enum WalkCopy {
     }
 
     static func hint(_ s: WalkState) -> String {
+        // Blank while the points show (the mockup): the bottom point's label sits on this line.
+        // A note gives way too, and is back once they close if it has not run out.
+        if s.showsPoints { return "" }
         if let note = s.note { return note }
         if s.typing != nil { return "" }
-        switch s.orb {
-        case .holding(let hover): return hover == nil ? "" : "Let go to choose"
-        case .open: return "Tap a point, or tap the light to close"
-        case .speaking: return "Let go to plant it"
-        case .idle: break
-        }
+        if case .speaking = s.orb { return "Let go to plant it" }
         if s.step == 0 { return "Hold the light to begin" }
         if s.ground { return "Tap the peaks that matter" }
         guard let level = s.level else { return "" }

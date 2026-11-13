@@ -7,6 +7,18 @@ import CoreGraphics
 /// or planted here, only asked for as effects.
 extension WalkState {
 
+    /// The compass points are out: the light is held (before speaking) or open.
+    var showsPoints: Bool {
+        switch orb {
+        case .holding, .open: return true
+        case .idle, .speaking: return false
+        }
+    }
+
+    /// The quiet Undo pill beside the hint; it gives way while the points show,
+    /// where Undo is the up-left point instead.
+    var showsUndoPill: Bool { undoShowing && !showsPoints }
+
     mutating func applyOrb(_ event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
         switch event {
         case .orbDown: return orbDown()

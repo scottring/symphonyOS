@@ -24,12 +24,7 @@ struct WalkOrbView: View {
     var body: some View {
         let s = model.state
         let points = WalkCopy.points(s)
-        let showsPoints: Bool = {
-            switch s.orb {
-            case .holding, .open: return true
-            case .idle, .speaking: return false
-            }
-        }()
+        let showsPoints = s.showsPoints
         ZStack(alignment: .topLeading) {
             dial(needleDown: model.layout.needleDown, wash: showsPoints)
                 .frame(width: Self.dial.width, height: Self.dial.height)
@@ -67,6 +62,12 @@ struct WalkOrbView: View {
         }
         .frame(width: WalkArt.overlookSquare.stage.width, height: WalkArt.overlookSquare.stage.height,
                alignment: .topLeading)
+        .onDisappear {
+            // Gone mid-press: the release will never come, so the hold must not start listening.
+            guard pressStart != nil else { return }
+            pressStart = nil
+            if pressOnLight { model.send(.orbCancelled) }
+        }
         .onChange(of: pressing) { _, down in
             // The press went away without ending: the system took the touch.
             guard !down, pressStart != nil else { return }
@@ -260,7 +261,7 @@ struct WalkPointView: View {
                 }
                 .frame(width: hot ? 54 : 46, height: hot ? 54 : 46)
                 Text(point.label)
-                    .font(.custom("DMSans-SemiBold", size: 12))
+                    .font(.custom("DMSans-SemiBold", size: 12))     // the contract's 700: no Bold face is bundled
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .fixedSize()
@@ -282,7 +283,7 @@ struct WalkLiveFlag: View {
     @State private var poleUp = false
     @State private var clothOut = false
 
-    /// The cloth never runs past the stage's right edge (the mockup's 220 would, from x 197).
+    /// 186, not the contract's 220: from x 197 a 220-wide cloth would run off the stage's right edge.
     static let maxClothWidth: CGFloat = 186
 
     var body: some View {

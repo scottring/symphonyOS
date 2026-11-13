@@ -106,9 +106,12 @@ struct WalkCopyTests {
         #expect(WalkCopy.hint(s) == "Hold the light to begin")
         s.note = "A note"; #expect(WalkCopy.hint(s) == "A note"); s.note = nil
         s.typing = ""; #expect(WalkCopy.hint(s) == ""); s.typing = nil
-        s.orb = .holding(hover: .s); #expect(WalkCopy.hint(s) == "Let go to choose")
+        // While the compass points show, the line is blank (the mockup): a note gives way, and is back once they close.
+        s.orb = .holding(hover: .s); #expect(WalkCopy.hint(s) == "")
         s.orb = .holding(hover: nil); #expect(WalkCopy.hint(s) == "")
-        s.orb = .open; #expect(WalkCopy.hint(s) == "Tap a point, or tap the light to close")
+        s.orb = .open; #expect(WalkCopy.hint(s) == "")
+        s.note = "A note"; #expect(WalkCopy.hint(s) == "")
+        s.orb = .idle; #expect(WalkCopy.hint(s) == "A note"); s.note = nil
         s.orb = .speaking(live: "x"); #expect(WalkCopy.hint(s) == "Let go to plant it")
         var g = state(step: 1); g.ground = true
         #expect(WalkCopy.hint(g) == "Tap the peaks that matter")
