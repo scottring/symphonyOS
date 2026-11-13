@@ -182,6 +182,8 @@ enum WalkCopy {
 
     static let undo = "Undo"; static let moveTo = "Move to"; static let pullUp = "Pull it up"
     static let typePlaceholder = "Type it, then return"; static let firstThingTag = "FIRST THING"
+    /// How many flags a stub, or a banner on Look back up, stands for.
+    static func more(_ count: Int) -> String { "+\(count)" }
 
     // MARK: The ending
 

@@ -76,7 +76,7 @@ struct WalkSceneView: View {
                     .walkPlaced(CGRect(x: post.base.x - 9, y: post.top, width: 18, height: max(0, post.base.y - post.top)),
                                 camera)
                 ForEach(post.banners) { banner in
-                    Button { tap(banner, on: post) } label: { WalkBannerView(banner: banner, dropsIn: arrived) }
+                    Button { tap(banner, on: post) } label: { WalkBannerView(banner: banner, poleX: post.base.x, dropsIn: arrived) }
                         .buttonStyle(.plain)
                         .saturation(post.saturation)
                         .opacity(post.opacity)
@@ -92,6 +92,11 @@ struct WalkSceneView: View {
     }
 
     private func tap(_ banner: WalkLayout.Banner, on post: WalkLayout.Post) {
+        // A banner that also stands for older flags ("+n") opens its post, as a stub does.
+        if banner.more != nil {
+            model.send(.stubTapped(post.key))
+            return
+        }
         switch banner.kind {
         case .stub: model.send(.stubTapped(post.key))
         case .ghost: model.send(.exampleTapped(banner.text))

@@ -181,8 +181,9 @@ struct iOSMainView: View {
 }
 
 extension iOSMainView {
-    /// Debug demo only: `-SymphonyDemo -SymphonyWalk [-SymphonyWalkStep N]` opens the
-    /// walk over an empty in-memory store, or over the mockup's preview at step N.
+    /// Debug demo only: `-SymphonyDemo -SymphonyWalk [-SymphonyWalkStep N] [-SymphonyWalkOrb …]` opens
+    /// the walk over an empty in-memory store, or over the mockup's preview at step N, then
+    /// drives it into a state for a screenshot.
     private func openDemoWalk() {
         #if DEBUG
         guard DemoMode.isOn, DemoMode.isWalk, !demoWalkOpened else { return }
@@ -191,6 +192,7 @@ extension iOSMainView {
         let model = WalkModel(context: modelContext, userId: DemoMode.userId, entry: position == nil ? .start : .resume,
                               position: position, edition: appState.edition, store: nil)
         model.onEnd = { _ in withAnimation(.easeInOut(duration: 0.4)) { walk = nil } }
+        DemoMode.showWalk(model, DemoMode.walkOrb)
         walk = model
         #endif
     }

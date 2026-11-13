@@ -12,6 +12,7 @@
 		03A5E53758E11DAA36391C9A /* PhotoCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D281A39DAC953BBEB0F5A15B /* PhotoCaptureService.swift */; };
 		0630729249000F4EC7E32774 /* AccountDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D25E6463326D082AF845C7 /* AccountDeletion.swift */; };
 		07094B11FD0EFD2BC3927820 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777FA26749C1A4208B9DDC94 /* RoutineDetailView.swift */; };
+		08DDA9901453C20A237E408D /* WalkHintRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5CFFF63F2366985E81E3414 /* WalkHintRow.swift */; };
 		095EB0D565A667604C269A43 /* WalkLoadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E8E58E265506F189EADDEE /* WalkLoadTests.swift */; };
 		0C4A58B20B67EBDA3028040D /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */; };
 		0CE48E3DFD5F5A01A8B18529 /* TaskViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9031A67BD188FEA2743DE71D /* TaskViewModel.swift */; };
@@ -34,6 +35,7 @@
 		276DF25838D34029D6EF8E9A /* DMSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BAC1B4BFBF9C9FD19A476F6A /* DMSans-Regular.ttf */; };
 		27AD0E372EA06FE074F8B64F /* ChooserSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4639DAB84CA71AE3E1BF1431 /* ChooserSheet.swift */; };
 		296C67879E486F3CBE93D3ED /* DocumentScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47BBD0F267EDEE37831CD019 /* DocumentScanner.swift */; };
+		2A234D7447F08796F126B742 /* WalkStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5319C584A439CFC6C34F0EC /* WalkStage.swift */; };
 		2A74129707085D80D5C57282 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCA7DCDE1B3C18FAAD465BDB /* TodayView.swift */; };
 		2AF7D113E4F53ABB1961D3B1 /* StillToDo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D83DAC938B3E5C5B0328E6 /* StillToDo.swift */; };
 		2BF5BECF97E75FEA7A2B03EE /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66A3BA0E2CBF7FCE61EA47F /* TaskDetailView.swift */; };
@@ -156,6 +158,7 @@
 		C6B505CEF4DB56102D196C70 /* WalkPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C45BEE6B6D60DA976F88DE6 /* WalkPositionTests.swift */; };
 		CD119D61EA774D4915017DF0 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9226E1CF4B413ACEF22DDCA /* AuthService.swift */; };
 		CD8B9C043925051B39B9F5E7 /* TellSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394F2642EB45FC8B817CA33F /* TellSheet.swift */; };
+		CE6CA42A39088ECDC4C15871 /* WalkStageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F5BE6C9CAEC48BD0D615768 /* WalkStageTests.swift */; };
 		D072E61D7068CA5497FFEBF1 /* WalkPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4C326BCC8EE9A0B6507F51 /* WalkPosition.swift */; };
 		D2CDE9C241755F754033C17E /* RoutineOccurrenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA72DC60A9EA66D9743639A /* RoutineOccurrenceTests.swift */; };
 		D354A97A4ECB2147BCF1653C /* SyncStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14F0DAE984F23F841936E31 /* SyncStatus.swift */; };
@@ -198,6 +201,7 @@
 		F9EB7BF519EDB9C1BC2FAC56 /* CrimsonPro-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2A262D445DAE6081A4A96C82 /* CrimsonPro-SemiBold.ttf */; };
 		FAFD767BFF267AA59D716420 /* DinnerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FCECAA1BF7A02A85614C2D0 /* DinnerService.swift */; };
 		FB97C68042921BA69DA1E83A /* FamilyMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = B03612661785F1EE17B02E03 /* FamilyMember.swift */; };
+		FBC7FD7E2A3E599D46489B47 /* WalkOrbView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E087899B5C5E4DE9FEE71D16 /* WalkOrbView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -261,6 +265,7 @@
 		1A3E9139010E51C7040394A0 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
 		1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
 		1D73CE19B7F2E740A74F4192 /* ScopeRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeRuleTests.swift; sourceTree = "<group>"; };
+		1F5BE6C9CAEC48BD0D615768 /* WalkStageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkStageTests.swift; sourceTree = "<group>"; };
 		20E8E58E265506F189EADDEE /* WalkLoadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkLoadTests.swift; sourceTree = "<group>"; };
 		217B2A6BEE77F0C6CE19306F /* MonthlyPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyPositionTests.swift; sourceTree = "<group>"; };
 		23C9315FE094AD463C763A78 /* RowMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowMapper.swift; sourceTree = "<group>"; };
@@ -368,6 +373,7 @@
 		B14F0DAE984F23F841936E31 /* SyncStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatus.swift; sourceTree = "<group>"; };
 		B4559D7757792E8224AEBAD9 /* DinnerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DinnerCard.swift; sourceTree = "<group>"; };
 		B51C0BB869FEE85FEC50B9ED /* WalkArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkArt.swift; sourceTree = "<group>"; };
+		B5319C584A439CFC6C34F0EC /* WalkStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkStage.swift; sourceTree = "<group>"; };
 		B55EEBF75CF09F5235D227D4 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
 		B5F58C1D241835418FB0DB47 /* TimelineRevision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineRevision.swift; sourceTree = "<group>"; };
 		B78D16284B67024E3C00F636 /* TodayLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayLayout.swift; sourceTree = "<group>"; };
@@ -401,10 +407,12 @@
 		D349620293CBF9CE126ECA7D /* WalkClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkClassifier.swift; sourceTree = "<group>"; };
 		D3E5D5FD9C80A901E371BBA0 /* MedTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedTokenStore.swift; sourceTree = "<group>"; };
 		D4D6F0507BFAF3A740903CCB /* CookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookView.swift; sourceTree = "<group>"; };
+		D5CFFF63F2366985E81E3414 /* WalkHintRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkHintRow.swift; sourceTree = "<group>"; };
 		D9E9788163FF0C909D5FD21E /* PlanSelectors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanSelectors.swift; sourceTree = "<group>"; };
 		DC2535BB1638E97B5DED27A2 /* KeyboardShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcuts.swift; sourceTree = "<group>"; };
 		DD2AF4DCA0960E25B5C75CC9 /* HalfOpenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HalfOpenView.swift; sourceTree = "<group>"; };
 		DF25E9E482069019BECD2364 /* PaperSound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaperSound.swift; sourceTree = "<group>"; };
+		E087899B5C5E4DE9FEE71D16 /* WalkOrbView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkOrbView.swift; sourceTree = "<group>"; };
 		E12210E8350B86DE59D6A16E /* WalkScheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkScheduling.swift; sourceTree = "<group>"; };
 		E346776783AE17D6B32B20FE /* WalkModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkModelTests.swift; sourceTree = "<group>"; };
 		E4053D1678E9C1DF45E6BA6C /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
@@ -494,6 +502,8 @@
 			isa = PBXGroup;
 			children = (
 				E8FDDE639E062C6E13265AC2 /* WalkBannerViews.swift */,
+				D5CFFF63F2366985E81E3414 /* WalkHintRow.swift */,
+				E087899B5C5E4DE9FEE71D16 /* WalkOrbView.swift */,
 				112539BA8D97B92C4D064876 /* WalkSceneView.swift */,
 				F965A54FF53FA305FCD38C0B /* WalkView.swift */,
 			);
@@ -826,6 +836,7 @@
 				891666939A8FC92F36CE9644 /* WalkPeriodsTests.swift */,
 				64C51DAF6700CC7943620DF5 /* WalkPlantTests.swift */,
 				3C45BEE6B6D60DA976F88DE6 /* WalkPositionTests.swift */,
+				1F5BE6C9CAEC48BD0D615768 /* WalkStageTests.swift */,
 				C9446B555371801002DA2D25 /* WalkStepsTests.swift */,
 				F7272175141F27602DFD60E4 /* WalkTestSupport.swift */,
 				9CB3AEE2C54522D3756F63C5 /* WalkWordsTests.swift */,
@@ -940,6 +951,7 @@
 				B1105AF4CFEBB15EE2FA9752 /* WalkOrb.swift */,
 				7090D3ED9CC051D67543EED2 /* WalkPeriods.swift */,
 				8F4C326BCC8EE9A0B6507F51 /* WalkPosition.swift */,
+				B5319C584A439CFC6C34F0EC /* WalkStage.swift */,
 				C4D4754E1CB6E482DC14096B /* WalkState.swift */,
 				298482E97F5E1153139815AC /* WalkState+Orb.swift */,
 				15D4A6D0E39EF42BBDAF92B3 /* WalkState+Plant.swift */,
@@ -1145,6 +1157,7 @@
 				D8D3DD0112C5FFB01AE063EA /* WalkPeriodsTests.swift in Sources */,
 				79EC933EDA9E42058D95632E /* WalkPlantTests.swift in Sources */,
 				C6B505CEF4DB56102D196C70 /* WalkPositionTests.swift in Sources */,
+				CE6CA42A39088ECDC4C15871 /* WalkStageTests.swift in Sources */,
 				DB862C0E3FA5ECCE82711887 /* WalkStepsTests.swift in Sources */,
 				8CC62F967B14432A0E0FCCEE /* WalkTestSupport.swift in Sources */,
 				F0197E1212180F211236F0B3 /* WalkWordsTests.swift in Sources */,
@@ -1276,14 +1289,17 @@
 				F43839CC6571F712B5D5D175 /* WalkClassifier.swift in Sources */,
 				18A64F27A6883A49F7579FEE /* WalkCopy.swift in Sources */,
 				F3E521D498496E982353B3BE /* WalkEnding.swift in Sources */,
+				08DDA9901453C20A237E408D /* WalkHintRow.swift in Sources */,
 				EBC854E2F35C05C5F2210BEC /* WalkLayout.swift in Sources */,
 				EE599002146DDAF319E7E450 /* WalkLoad.swift in Sources */,
 				0D1B77E1A046D40EA4C380C2 /* WalkModel.swift in Sources */,
 				12F63A8A23F6BC436BE52ABB /* WalkOrb.swift in Sources */,
+				FBC7FD7E2A3E599D46489B47 /* WalkOrbView.swift in Sources */,
 				1F88DB610A36225ABB6A4B8B /* WalkPeriods.swift in Sources */,
 				D072E61D7068CA5497FFEBF1 /* WalkPosition.swift in Sources */,
 				8D021752D7B958E5DCEAAB11 /* WalkSceneView.swift in Sources */,
 				729B19F01EF1AE819AC492D4 /* WalkScheduling.swift in Sources */,
+				2A234D7447F08796F126B742 /* WalkStage.swift in Sources */,
 				E54556A265B7BAD27E15FEC7 /* WalkState+Orb.swift in Sources */,
 				BFF8FD46589AB3670A904D01 /* WalkState+Plant.swift in Sources */,
 				D52502C3E1F001480C5AEB97 /* WalkState.swift in Sources */,

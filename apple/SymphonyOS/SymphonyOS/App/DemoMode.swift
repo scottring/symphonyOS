@@ -21,6 +21,14 @@ enum DemoMode {
         return step
     }
 
+    /// `-SymphonyWalkOrb a,b,…`: after the walk opens, drive it into a state for a
+    /// screenshot, in order, through the reducer's own events (see `showWalk`).
+    static var walkOrb: [String] {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-SymphonyWalkOrb"), i + 1 < args.count else { return [] }
+        return args[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+    }
+
     static let userId = UUID(uuidString: "00000000-0000-4000-8000-00000000D3E0")!
 
     static var user: User? {
@@ -141,6 +149,50 @@ enum DemoMode {
         }
         return WalkPosition(s, status: .inProgress, planted: planted, periods: periods, now: now)
     }
+
+    #if os(iOS)
+    /// Drives an open walk into the states that need a touch, for screenshots
+    /// (nobody can tap or type in this simulator). Every step is a reducer event
+    /// or a compass action, as a person's touch would send:
+    /// - `ground`: back up from Year onto the ground (the kept peaks).
+    /// - `open`: a tap on the light, so the compass points open.
+    /// - `hold`: a press held and slid onto the point below (Walk on, or Quick start), hovered.
+    /// - `speak`: a hold that reaches speaking, with words arriving as a listener would send them.
+    /// - `type`: the Type it point: the one-line field, empty.
+    /// - `select`: a tap on the newest flag the walk planted on this step (Today: the first thing).
+    /// - `undo`: a flag typed and planted, so the Undo pill shows.
+    @MainActor static func showWalk(_ model: WalkModel, _ steps: [String]) {
+        for step in steps {
+            switch step {
+            case "ground":
+                if model.state.step == 1, !model.state.ground { model.choose(.back) }
+            case "open":
+                model.send(.orbDown)
+                model.send(.orbUp(heldMs: 0))
+            case "hold":
+                model.send(.orbDown)
+                model.send(.orbMoved(WalkOrb.position(of: .s)))
+            case "speak":
+                model.send(.orbDown)
+                model.send(.orbHeld)
+                model.send(.heard("Pick up the tile samples"))
+            case "type":
+                model.choose(.type)
+            case "select":
+                let s = model.state
+                let id = s.level == .today ? s.firstThing
+                    : s.level.flatMap { level in s.items(on: level).last(where: \.mine)?.id }
+                if let id { model.send(.bannerTapped(id)) }
+            case "undo":
+                model.choose(.type)
+                model.send(.typeChanged("Two early nights a week"))
+                model.send(.typeSubmitted)
+            default:
+                break
+            }
+        }
+    }
+    #endif
 
     // MARK: Seed
 

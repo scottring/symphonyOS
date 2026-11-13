@@ -541,7 +541,7 @@ private struct Builder {
     func stub(_ id: String, _ lvl: WalkLevel, base: CGPoint, count: Int, scale: CGFloat, below: CGFloat?) -> L.Banner {
         let w = 26 * scale, h = 20 * scale
         let frame = slid(CGRect(x: base.x - w / 2, y: (below ?? base.y) - h, width: w, height: h))
-        let e = Entry(kind: .stub(count), item: nil, text: "+\(count)", tag: nil, glows: false,
+        let e = Entry(kind: .stub(count), item: nil, text: WalkCopy.more(count), tag: nil, glows: false,
                       label: WalkCopy.bannerLabel("", level: lvl, tag: nil, role: .stub(count)))
         return banner(id: "\(id)-more", e, lvl, frame: frame, lines: 1)
     }

@@ -83,11 +83,14 @@ struct WalkPennant: Shape {
 /// that arrives after the scene is up drops in, as a flag being planted does.
 struct WalkBannerView: View {
     let banner: WalkLayout.Banner
+    /// The stage x of the post's pole; a small flag hangs from it.
+    let poleX: CGFloat
     @State private var fluttering = false
     @State private var landed: Bool
 
-    init(banner: WalkLayout.Banner, dropsIn: Bool) {
+    init(banner: WalkLayout.Banner, poleX: CGFloat, dropsIn: Bool) {
         self.banner = banner
+        self.poleX = poleX
         _landed = State(initialValue: !dropsIn)
     }
 
@@ -116,11 +119,25 @@ struct WalkBannerView: View {
 
     @ViewBuilder private var cloth: some View {
         switch banner.kind {
-        case .full: full
-        case .ghost: ghost
+        case .full: full.overlay(alignment: .topTrailing) { moreBadge }
+        case .ghost: ghost.overlay(alignment: .topTrailing) { moreBadge }
         case .compact: compact
-        case .tip: tip
+        case .tip: tip.overlay(alignment: .topLeading) { moreBadge.offset(x: poleX - banner.frame.minX + 26 * banner.frame.height / 20) }
         case .stub(let count): stub(count)
+        }
+    }
+
+    /// A banner that also stands for older flags says how many ("+n"); a compact one says it after its words.
+    @ViewBuilder private var moreBadge: some View {
+        if let more = banner.more {
+            Text(WalkCopy.more(more))
+                .font(.custom("DMSans-SemiBold", size: 10))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 3)
+                .padding(.vertical, 1)
+                .walkGlow()
         }
     }
 
@@ -174,27 +191,40 @@ struct WalkBannerView: View {
         .walkBannerShadow(glows: false)
     }
 
+    /// One line. On Look back up it may stand for older flags too: "+n" after the words.
     private var compact: some View {
-        Text(banner.text)
-            .font(.custom("DMSans-SemiBold", size: 11))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .padding(EdgeInsets(top: 3, leading: 6, bottom: 6, trailing: 6))
-            .frame(width: banner.frame.width, height: banner.frame.height)
-            .background(WalkNotchedCloth(notch: 5).fill(colour))
-            .walkBannerShadow(glows: banner.glows)
+        HStack(spacing: 4) {
+            Text(banner.text)
+                .font(.custom("DMSans-SemiBold", size: 11))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if let more = banner.more {
+                Text(WalkCopy.more(more))
+                    .font(.custom("DMSans-SemiBold", size: 10))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        }
+        .padding(EdgeInsets(top: 3, leading: 6, bottom: 6, trailing: 6))
+        .frame(width: banner.frame.width, height: banner.frame.height)
+        .background(WalkNotchedCloth(notch: 5).fill(colour))
+        .walkBannerShadow(glows: banner.glows)
     }
 
     /// Contract §5: a 22 × 15 cloth just right of the pole, in a wrap 17 tall
     /// (here the frame, 20 at full size); it grows and shrinks with the frame.
+    /// It hangs from the pole itself, from 1.5 to 23.5 right of the pole's centre,
+    /// wherever the frame stands: a frame slid in from the stage's edge must not
+    /// pull the cloth off its pole.
     private var tip: some View {
         let unit = banner.frame.height / 20
         return WalkPennant()
             .fill(colour)
             .frame(width: 22 * unit, height: 15 * unit)
             .shadow(color: Color(white: 20 / 255).opacity(0.35), radius: 1, x: 0, y: 1)
-            .offset(x: banner.frame.width / 2 + 1.5 * unit, y: 0)
+            .offset(x: poleX - banner.frame.minX + 1.5 * unit, y: 0)
             .frame(width: banner.frame.width, height: banner.frame.height, alignment: .topLeading)
     }
 

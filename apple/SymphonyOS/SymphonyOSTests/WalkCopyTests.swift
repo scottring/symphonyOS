@@ -181,6 +181,7 @@ struct WalkCopyTests {
         #expect(WalkCopy.calendarLine == "See your calendar on Today too")
         #expect(WalkCopy.undo == "Undo"); #expect(WalkCopy.moveTo == "Move to"); #expect(WalkCopy.pullUp == "Pull it up")
         #expect(WalkCopy.typePlaceholder == "Type it, then return"); #expect(WalkCopy.firstThingTag == "FIRST THING")
+        #expect(WalkCopy.more(2) == "+2")
         #expect(WalkCopy.lookBack == "Look back up: that’s your plan."); #expect(WalkCopy.heresToday == "Here’s today.")
         #expect(WalkCopy.showMyDay == "Show my day"); #expect(WalkCopy.lookBackHandle == "Look back up at your plan")
         #expect(WalkCopy.todayEyebrow == "Today"); #expect(WalkCopy.walkAnother == "Walk another one down")
