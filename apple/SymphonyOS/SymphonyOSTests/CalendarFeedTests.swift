@@ -122,4 +122,14 @@ struct CalendarFeedTests {
         feed.edition = .light
         #expect(feed.readKey(for: at(13)) != full)           // other source
     }
+
+    /// A read SwiftUI cancels (a quick day or week flip) is not a failure:
+    /// the fetch paths change nothing for it.
+    @Test func cancelledReadIsNotAFailure() {
+        #expect(GoogleCalendarService.isCancellation(CancellationError(), taskCancelled: false))
+        #expect(GoogleCalendarService.isCancellation(URLError(.cancelled), taskCancelled: false))
+        #expect(GoogleCalendarService.isCancellation(URLError(.timedOut), taskCancelled: true))
+        #expect(!GoogleCalendarService.isCancellation(URLError(.notConnectedToInternet), taskCancelled: false))
+        #expect(!GoogleCalendarService.isCancellation(URLError(.timedOut), taskCancelled: false))
+    }
 }

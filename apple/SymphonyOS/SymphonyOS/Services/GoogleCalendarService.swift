@@ -57,6 +57,15 @@ final class GoogleCalendarService {
         }
     }
 
+    /// A read SwiftUI cancelled (`.task(id:)` on a quick day or week flip) is
+    /// not a failure: the fetch paths keep whatever was cached, mark nothing
+    /// failed and set no fetched-at time for it.
+    nonisolated static func isCancellation(_ error: Error, taskCancelled: Bool = Task.isCancelled) -> Bool {
+        if error is CancellationError { return true }
+        if let url = error as? URLError, url.code == .cancelled { return true }
+        return taskCancelled
+    }
+
     // MARK: - A whole period (the calendar fold, 2026-11-04)
 
     /// Events for a period (a month, a season, a year), read in one call for
@@ -111,6 +120,7 @@ final class GoogleCalendarService {
             periodFetchedAt[key] = Date()
             failedPeriods.remove(key)
         } catch {
+            if Self.isCancellation(error) { return }
             // Keep what was read before; say so only when there is nothing.
             if byPeriod[key] == nil { failedPeriods.insert(key) }
         }
@@ -194,6 +204,7 @@ final class GoogleCalendarService {
             fetchedAt[key] = Date()
             eventItems = items
         } catch {
+            if Self.isCancellation(error) { return }   // a flip, not a failure: change nothing
             // Keep what was cached — a transient failure must not blank a day
             // that already showed its events. A day never loaded stays empty.
             if byDay[key] == nil { byDay[key] = [] }

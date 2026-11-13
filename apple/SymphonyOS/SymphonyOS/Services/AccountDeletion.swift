@@ -33,15 +33,48 @@ enum AccountDeletion {
 
     private static let log = Logger(subsystem: "com.symphonyos.app", category: "account-deletion")
 
+    enum Outcome: Equatable {
+        /// The server deleted the account just now.
+        case deleted
+        /// 401: this sign-in no longer exists. The server deleted the account
+        /// on an earlier try whose reply was lost (the server answers a failed
+        /// Auth lookup with 503, not 401).
+        case alreadyGone
+        /// Anything else (no network, 400, 403, 500, 503): nothing changes here.
+        case failed
+    }
+
+    /// What a `delete-account` answer means for the phone; nil is no HTTP answer at all.
+    static func outcome(forHTTPStatus status: Int?) -> Outcome {
+        switch status {
+        case .some(200..<300): .deleted
+        case .some(401): .alreadyGone
+        default: .failed
+        }
+    }
+
     /// Server first: a failure throws and nothing local changes. Once the
-    /// server has deleted the account the local steps never throw, so a local
-    /// fault can't leave a signed-in session for a deleted user.
+    /// server has deleted the account (now, or on a try whose reply was lost)
+    /// the local steps never throw, so a local fault can't leave a signed-in
+    /// session for a deleted user.
     static func run(container: ModelContainer, auth: AuthService, stopSync: () async -> Void) async throws {
         let userId = auth.currentUser?.id   // captured before the auth listener can clear it
-        try await supabase.functions.invoke(
-            "delete-account",
-            options: FunctionInvokeOptions(body: ["confirm": confirmPhrase])
-        )
+        var status: Int? = 200
+        var failure: Error?
+        do {
+            try await supabase.functions.invoke(
+                "delete-account",
+                options: FunctionInvokeOptions(body: ["confirm": confirmPhrase])
+            )
+        } catch {
+            failure = error
+            if case FunctionsError.httpError(let code, _) = error { status = code } else { status = nil }
+        }
+        switch outcome(forHTTPStatus: status) {
+        case .deleted: break
+        case .alreadyGone: log.notice("delete-account answered 401: the account is already gone; finishing on the phone")
+        case .failed: throw failure ?? URLError(.badServerResponse)
+        }
         await finishLocally(container: container, stopSync: stopSync, userId: userId,
                             forgetSession: { await auth.forgetSession() })
     }

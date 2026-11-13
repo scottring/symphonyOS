@@ -21,6 +21,18 @@ struct AccountDeletionTests {
         #expect(AccountDeletion.warning(sharesHousehold: true) == base + " Things you share with your household stay with them.")
     }
 
+    /// A lost reply: the server deleted the account, the retry gets 401.
+    /// Only 2xx and 401 finish locally; everything else changes nothing.
+    @Test func outcomeForHTTPStatus() {
+        #expect(AccountDeletion.outcome(forHTTPStatus: 200) == .deleted)
+        #expect(AccountDeletion.outcome(forHTTPStatus: 401) == .alreadyGone)
+        #expect(AccountDeletion.outcome(forHTTPStatus: 503) == .failed)
+        #expect(AccountDeletion.outcome(forHTTPStatus: 500) == .failed)
+        #expect(AccountDeletion.outcome(forHTTPStatus: 403) == .failed)
+        #expect(AccountDeletion.outcome(forHTTPStatus: 400) == .failed)
+        #expect(AccountDeletion.outcome(forHTTPStatus: nil) == .failed)   // no network: no status at all
+    }
+
     @Test func sharesHouseholdRules() {
         let me = UUID()
         #expect(AccountDeletion.sharesHousehold(members: [member(authUserId: me), member(authUserId: UUID())], me: me))

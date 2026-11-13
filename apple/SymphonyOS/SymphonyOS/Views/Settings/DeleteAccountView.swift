@@ -40,9 +40,11 @@ struct DeleteAccountView: View {
         .navigationBarBackButtonHidden(running)
         .interactiveDismissDisabled(running)
         .navigationBarTitleDisplayModeIfAvailable()
-        .confirmationDialog("Delete your account?", isPresented: $confirming, titleVisibility: .visible) {
+        .alert("Delete your account?", isPresented: $confirming) {
             Button("Delete my account", role: .destructive) { start() }
             Button("Keep my account", role: .cancel) {}
+        } message: {
+            Text(AccountDeletion.warning(sharesHousehold: shares))
         }
     }
 
