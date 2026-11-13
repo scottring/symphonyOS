@@ -6,10 +6,12 @@
 // in its notes ("From Oak Hill School · …", extract-email's sourceNote), and
 // an Amazon task says Amazon in its title. Nothing else gets a mark.
 import type { Task } from '@/types/task'
+// The Amazon mark (homarr-labs/dashboard-icons, svg/amazon.svg, 2026-11-13).
+import amazonMark from '@/assets/marks/amazon.svg'
 
-export interface SourceMark { letter: string; label: string; color: string }
+export interface SourceMark { letter: string; label: string; color: string; /** A real logo, where we have one. */ image?: string }
 
-const AMAZON: SourceMark = { letter: 'a', label: 'Amazon', color: '#232f3e' }
+const AMAZON: SourceMark = { letter: 'a', label: 'Amazon', color: '#ffffff', image: amazonMark }
 const MUTED = ['hsl(205 45% 32%)', 'hsl(150 34% 28%)', 'hsl(330 35% 36%)', 'hsl(28 55% 34%)', 'hsl(262 30% 38%)']
 
 export function sourceMark(task: Pick<Task, 'title' | 'notes' | 'captureId'>): SourceMark | null {

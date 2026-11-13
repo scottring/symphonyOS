@@ -3,7 +3,7 @@ import { sourceMark } from './sourceMark'
 
 describe('sourceMark (2026-11-13)', () => {
   it('marks an Amazon task and an emailed one by its sender; nothing else', () => {
-    expect(sourceMark({ title: 'amazon returns' })?.label).toBe('Amazon')
+    expect(sourceMark({ title: 'amazon returns' })).toMatchObject({ label: 'Amazon', image: expect.any(String) })
     const school = sourceMark({ title: 'Return audition slip', captureId: 'c1', notes: 'From Oak Hill School · Auditions\n\n“bring the slip”' })
     expect(school).toMatchObject({ letter: 'O', label: 'Oak Hill School' })
     expect(sourceMark({ title: 'Return audition slip', notes: 'From Oak Hill School · Auditions' })).toBeNull()

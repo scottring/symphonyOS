@@ -509,3 +509,5 @@
   font: 700 11px/1 var(--font-family-sans); color: #fff; text-transform: lowercase;
 }
 .today-page .today-focus-card .row-source:not([aria-label="From Amazon"]) { text-transform: none; }
+.today-page .today-focus-card .row-source.has-image { box-shadow: inset 0 0 0 1px var(--color-neutral-200); padding: 2px; }
+.today-page .today-focus-card .row-source.has-image img { width: 100%; height: 100%; display: block; }

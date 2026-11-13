@@ -773,7 +773,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             {/* Where it came from (Amazon, the sender of an email), on
                 Today's To do only (today-journal.css, 2026-11-13). */}
             {source && (
-              <span className="row-source" title={`From ${source.label}`} aria-label={`From ${source.label}`} style={{ background: source.color }}>{source.letter}</span>
+              <span className={`row-source${source.image ? ' has-image' : ''}`} title={`From ${source.label}`} aria-label={`From ${source.label}`} style={{ background: source.color }}>{source.image ? <img src={source.image} alt="" /> : source.letter}</span>
             )}
             {/* A done-by date: "by Mon 16" (Scott, 2026-11-13). */}
             {item.originalTask?.dueOn && !item.completed && (
