@@ -16,6 +16,7 @@
 		0C4A58B20B67EBDA3028040D /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */; };
 		0CE48E3DFD5F5A01A8B18529 /* TaskViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9031A67BD188FEA2743DE71D /* TaskViewModel.swift */; };
 		0D34C6B5FDC9D86C5A042651 /* DinnerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4559D7757792E8224AEBAD9 /* DinnerCard.swift */; };
+		18A64F27A6883A49F7579FEE /* WalkCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CF4F2A50CFDC9B5E80D18AF /* WalkCopy.swift */; };
 		192ED9D3663E12CA6180044B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6E12BCB3F98A56A73FBB104A /* Assets.xcassets */; };
 		1A33ACD19D55C2BC2F3E4BAA /* DinnerPickTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A9598FAC1528BAE33CC441 /* DinnerPickTests.swift */; };
 		1A4329534E810EBF6BF16103 /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81E58F1162C67DF3D96052F8 /* Date+Extensions.swift */; };
@@ -148,6 +149,7 @@
 		D47BEFFBD405389B753302A3 /* ProjectListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C0DDF026CD23250BDF7AB83 /* ProjectListView.swift */; };
 		D4B40B6C5DF437E57BA45693 /* LogMedicationIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D4179C34EBA0E91CD8EE164 /* LogMedicationIntent.swift */; };
 		D52502C3E1F001480C5AEB97 /* WalkState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D4754E1CB6E482DC14096B /* WalkState.swift */; };
+		D5C683AA1A8D4CC32DAAAE40 /* WalkCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FED05BB7B5F3E143C3086DF /* WalkCopyTests.swift */; };
 		D649033FC497E5CAE0F323F8 /* DocumentIngest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D25CC3400D409DAF4D6E68C /* DocumentIngest.swift */; };
 		D877F5B78755D8B44347A102 /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55EEBF75CF09F5235D227D4 /* Project.swift */; };
 		D8D3DD0112C5FFB01AE063EA /* WalkPeriodsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891666939A8FC92F36CE9644 /* WalkPeriodsTests.swift */; };
@@ -269,6 +271,7 @@
 		47BBD0F267EDEE37831CD019 /* DocumentScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentScanner.swift; sourceTree = "<group>"; };
 		4990741A74AC21CB7B92A74A /* SymphonyTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyTask.swift; sourceTree = "<group>"; };
 		4F10C1B10246EDA085A4AAEB /* SyncOrderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncOrderTests.swift; sourceTree = "<group>"; };
+		4FED05BB7B5F3E143C3086DF /* WalkCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkCopyTests.swift; sourceTree = "<group>"; };
 		51E807DEDAD9A55C7D33504B /* DMSans-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "DMSans-Medium.ttf"; sourceTree = "<group>"; };
 		52420F36177A3E0B1C256DAF /* SymphonyOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SymphonyOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		527B3D33FF88A9A84A5DD5F8 /* Household.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Household.swift; sourceTree = "<group>"; };
@@ -326,6 +329,7 @@
 		9BB546AEA1DD397A0999083E /* ContactListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactListView.swift; sourceTree = "<group>"; };
 		9C9A6ACB7B9E46F44B52B56F /* PaperFoldTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaperFoldTests.swift; sourceTree = "<group>"; };
 		9CB3AEE2C54522D3756F63C5 /* WalkWordsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkWordsTests.swift; sourceTree = "<group>"; };
+		9CF4F2A50CFDC9B5E80D18AF /* WalkCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkCopy.swift; sourceTree = "<group>"; };
 		9F45CDE5093407A022589D06 /* ListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListsView.swift; sourceTree = "<group>"; };
 		A1D31FA63E65DA22E03392AD /* PlannerComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerComponents.swift; sourceTree = "<group>"; };
 		A48DEE8D67C715E1A3A6D4F5 /* AccountDeletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionTests.swift; sourceTree = "<group>"; };
@@ -767,6 +771,7 @@
 				C4E6747A78170172B1525262 /* TimelineEnrichmentTests.swift */,
 				BB29FF05A2D7D279DC175F6A /* TodayLayoutTests.swift */,
 				C158967C47A0AB76A11DCAD0 /* WalkClassifierTests.swift */,
+				4FED05BB7B5F3E143C3086DF /* WalkCopyTests.swift */,
 				20E8E58E265506F189EADDEE /* WalkLoadTests.swift */,
 				891666939A8FC92F36CE9644 /* WalkPeriodsTests.swift */,
 				C9446B555371801002DA2D25 /* WalkStepsTests.swift */,
@@ -876,6 +881,7 @@
 			isa = PBXGroup;
 			children = (
 				D349620293CBF9CE126ECA7D /* WalkClassifier.swift */,
+				9CF4F2A50CFDC9B5E80D18AF /* WalkCopy.swift */,
 				7090D3ED9CC051D67543EED2 /* WalkPeriods.swift */,
 				C4D4754E1CB6E482DC14096B /* WalkState.swift */,
 				9A62F7A67123AF40218075F3 /* WalkTypes.swift */,
@@ -1072,6 +1078,7 @@
 				F90FEBB07169AAE26DA4DC6F /* TimelineEnrichmentTests.swift in Sources */,
 				A558EB89256A9A88556E2464 /* TodayLayoutTests.swift in Sources */,
 				F0115C80484E86958FFACD0F /* WalkClassifierTests.swift in Sources */,
+				D5C683AA1A8D4CC32DAAAE40 /* WalkCopyTests.swift in Sources */,
 				095EB0D565A667604C269A43 /* WalkLoadTests.swift in Sources */,
 				D8D3DD0112C5FFB01AE063EA /* WalkPeriodsTests.swift in Sources */,
 				DB862C0E3FA5ECCE82711887 /* WalkStepsTests.swift in Sources */,
@@ -1200,6 +1207,7 @@
 				30D02C1243BC999F654F3957 /* UserProfile.swift in Sources */,
 				7726C3A546FB6B4FE09495A9 /* View+Extensions.swift in Sources */,
 				F43839CC6571F712B5D5D175 /* WalkClassifier.swift in Sources */,
+				18A64F27A6883A49F7579FEE /* WalkCopy.swift in Sources */,
 				F3E521D498496E982353B3BE /* WalkEnding.swift in Sources */,
 				EE599002146DDAF319E7E450 /* WalkLoad.swift in Sources */,
 				1F88DB610A36225ABB6A4B8B /* WalkPeriods.swift in Sources */,
