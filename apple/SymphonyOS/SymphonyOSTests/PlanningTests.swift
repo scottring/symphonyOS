@@ -459,6 +459,7 @@ struct PlanWriterTests {
                                  "created_at", "updated_at", "strategy", "domain_slug", "layer_id", "context",
                                  "scope", "carried_from"]
         #expect(Set(insert.keys).isSubset(of: prod))
+        #expect(insert["area_id"] == nil)   // an ordinary goal never sends a life area
         #expect(insert["scope"]?.stringValue == "compound")
         #expect(pending(ctx).contains { $0.tableName == "goals" && $0.changeType == "insert" })
 

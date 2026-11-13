@@ -115,6 +115,12 @@ final class AppState {
     /// Stops sync and waits for it to finish; set by `ContentView` so the
     /// delete-account flow can wipe without the engine re-inserting rows.
     var stopSync: (() async -> Void)?
+    /// The signed-in account's first pull has finished: households, life
+    /// areas, tasks and goals all came back from the server. Until then an
+    /// empty store means nothing (a new phone, or offline). Set by
+    /// `ContentView`; false again on sign-out. Demo mode sets it at once: its
+    /// seeded store is all there is.
+    var initialSyncFinished = false
 
     // MARK: - Date Navigation
 

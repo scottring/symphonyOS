@@ -45,8 +45,10 @@ actor SyncEngine {
 
     // MARK: - Public API
 
-    /// Start sync for the given user. Call after login.
-    func start(userId: UUID) async {
+    /// Start sync for the given user. Call after login. Returns true when the
+    /// first pull really ran (see `performInitialSync`).
+    @discardableResult
+    func start(userId: UUID) async -> Bool {
         self.userId = userId
         // Diagnostic + safeguard: force the auth session to load so PostgREST
         // requests carry the user's JWT (anon requests return 0 rows under RLS).
@@ -57,9 +59,10 @@ actor SyncEngine {
             Self.syncLog.error("auth at sync: NO SESSION (\(error.localizedDescription, privacy: .public)) — requests will be anon")
         }
         startNetworkMonitoring()
-        await performInitialSync()
+        let pulled = await performInitialSync()
         await subscribeToRealtime()
         startPushLoop()
+        return pulled
     }
 
     /// Re-sync after the app returns to the foreground.
@@ -73,11 +76,14 @@ actor SyncEngine {
     ///
     /// Push first so local edits are on the server before the pull reconciles
     /// against it, then re-establish the socket so live changes flow again.
-    func resync() async {
-        guard userId != nil, isOnline, !isSyncing else { return }
+    /// Returns true when the pull really ran (see `performInitialSync`).
+    @discardableResult
+    func resync() async -> Bool {
+        guard userId != nil, isOnline, !isSyncing else { return false }
         await pushPendingChanges()
-        await performInitialSync()
+        let pulled = await performInitialSync()
         await resubscribeToRealtime()
+        return pulled
     }
 
     /// Tear the channels down and re-subscribe. A socket that was suspended can
@@ -145,10 +151,61 @@ actor SyncEngine {
 
         do {
             let pendingChanges = try context.fetch(descriptor)
+            // Parents go up before children. The queue is oldest first, so a
+            // parent queued before its child already leads — but each change is
+            // pushed on its own, and a child tried after its parent's insert
+            // failed is refused by the foreign key (an update that fails ten
+            // times is dropped, silently losing the link). Only links the phone
+            // set (linksDirty / areaDirty) name a parent, so a clean row never
+            // waits: a queue without walk-made links runs exactly as before.
+            var unpushedInserts = Set(pendingChanges.filter { $0.changeType == "insert" }.map(\.recordId))
             for change in pendingChanges {
+                if change.changeType != "delete" {
+                    let parents = Self.parentIds(table: change.tableName, id: change.recordId, context: context)
+                    // Skipped for this pass without counting an attempt; it goes
+                    // once its parent's insert lands (inserts are never dropped).
+                    if Self.mustWait(parents: parents, unpushedInserts: unpushedInserts) { continue }
+                    // Likewise an update to a row whose own insert has not landed:
+                    // it would "succeed" on zero rows and clear the link flag, and
+                    // the insert would then go up without the links. Only for a
+                    // row that sends links, so no other queue changes.
+                    if change.changeType == "update", unpushedInserts.contains(change.recordId),
+                       Self.linkStamp(table: change.tableName, id: change.recordId, context: context) != nil { continue }
+                    // A parent with no insert waiting and no row on this phone is
+                    // gone for good (deleted elsewhere and pulled away, or taken
+                    // back): unlink it and send the null, never wait on it.
+                    if !parents.isEmpty {
+                        let lost = Self.lostParents(parents, unpushedInserts: unpushedInserts, known: Self.knownIds(context: context))
+                        if !lost.isEmpty {
+                            for parent in lost {
+                                Self.syncLog.error("push \(change.tableName, privacy: .public) \(change.recordId.uuidString, privacy: .public): link to \(parent.uuidString, privacy: .public) is gone; sending null")
+                            }
+                            Self.clearLinks(to: lost, table: change.tableName, id: change.recordId, context: context)
+                            try? context.save()
+                        }
+                    }
+                }
+                // The links this push sends, to compare with the row after the
+                // network await (a Move or Pull up can re-link it meanwhile).
+                let sentLinks = Self.linkStamp(table: change.tableName, id: change.recordId, context: context)
                 do {
                     try await pushChange(change, context: context)
-                    context.delete(change)
+                    if change.changeType == "insert" { unpushedInserts.remove(change.recordId) }
+                    // Read the row as saved now, in a fresh context (this one's
+                    // copy was read before the await). Re-linked meanwhile: the
+                    // new links were never sent, so keep the flag and keep a
+                    // change queued — which also shields the row from the next
+                    // pull — and the next pass sends them.
+                    let linksNow = Self.linkStamp(table: change.tableName, id: change.recordId,
+                                                  context: ModelContext(modelContainer))
+                    let linksSettled = Self.linksSettled(sent: sentLinks, now: linksNow)
+                    if linksSettled {
+                        context.delete(change)
+                    } else if change.changeType != "update" {
+                        // The insert landed; the new links follow as an update.
+                        context.queueSync(table: change.tableName, recordId: change.recordId, type: "update")
+                        context.delete(change)
+                    }   // an update stays queued as it is and is sent again
                     // The phone's locally-derived scope just pushed — stop
                     // sending it on the next UPDATE until another edit
                     // recomputes it (SyncEngine.taskRow gates on this flag).
@@ -159,11 +216,9 @@ actor SyncEngine {
                         task.completedAtDirty = false
                         task.dismissedAtDirty = false
                         task.sortOrderDirty = false
-                        task.linksDirty = false
                     }
-                    if change.tableName == "goals",
-                       let goal = (try? context.fetch(FetchDescriptor<Goal>()))?.first(where: { $0.id == change.recordId }) {
-                        goal.areaDirty = false
+                    if linksSettled {
+                        Self.clearLinkFlags(table: change.tableName, id: change.recordId, context: context)
                     }
                     if change.tableName == "routines",
                        let routine = (try? context.fetch(FetchDescriptor<Routine>()))?.first(where: { $0.id == change.recordId }) {
@@ -185,6 +240,10 @@ actor SyncEngine {
                     if change.attempts >= 10 && change.changeType != "insert" {
                         Self.syncLog.error("DROPPING \(change.tableName, privacy: .public) \(change.changeType, privacy: .public) after 10 failed attempts")
                         context.delete(change)
+                        // Given up on: a later unrelated edit must not re-send
+                        // these stale local links (the next pull restores the
+                        // server's, now that no change shields the row).
+                        Self.clearLinkFlags(table: change.tableName, id: change.recordId, context: context)
                     }
                 }
             }
@@ -196,14 +255,22 @@ actor SyncEngine {
 
     // MARK: - Initial Sync
 
-    private func performInitialSync() async {
-        guard let userId, isOnline else { return }
+    /// True only when it was online, signed in, and the `households`,
+    /// `goal_areas`, `tasks` and `goals` pulls all succeeded: only then does an
+    /// empty store mean the account really has no plan (the walk decides
+    /// whether to start on it). Every other table still pulls as before.
+    @discardableResult
+    private func performInitialSync() async -> Bool {
+        guard let userId, isOnline else { return false }
         isSyncing = true
         defer { isSyncing = false }
+        // Without a session the requests go out anonymous, and RLS answers
+        // every table with zero rows and no error: that is not "no plan".
+        let signedIn = (try? await supabase.auth.session) != nil
 
         // Each table pulls + saves independently, so one bad row/table can't
         // roll back the entire sync (the previous single-shared-context save did).
-        await pullTable("households", as: Household.self, userId: userId)
+        let households = await pullTable("households", as: Household.self, userId: userId)
         adoptHouseholdWeekStart()
         await pullTable("user_profiles", as: UserProfile.self, userId: userId)
         await pullTable("family_members", as: FamilyMember.self, userId: userId)
@@ -212,7 +279,7 @@ actor SyncEngine {
         // Life areas before the tasks and goals filed under them. Includes a
         // partner's Family areas (readable by RLS); the phone never edits one
         // whose userId is not the signed-in person.
-        await pullTable("goal_areas", as: GoalArea.self, userId: userId)
+        let areas = await pullTable("goal_areas", as: GoalArea.self, userId: userId)
         // Tasks reconcile like every other table. They used to be exempt, to protect
         // locally-created rows that hadn't pushed yet — but `pendingIds` in
         // `pullTable` already does exactly that, so the exemption bought nothing and
@@ -220,7 +287,7 @@ actor SyncEngine {
         // closed was never removed, because realtime only delivers deletes to a
         // RUNNING app. Scott's phone showed nine carried-over rows on 2026-08-08 of
         // which six no longer existed in the database at all.
-        await pullTable("tasks", as: SymphonyTask.self, userId: userId)
+        let tasks = await pullTable("tasks", as: SymphonyTask.self, userId: userId)
         await pullTable("routines", as: Routine.self, userId: userId)
         // Lists before their items, so a pull never leaves items pointing at a
         // list that isn't there yet.
@@ -233,12 +300,15 @@ actor SyncEngine {
         // chose what for which day, and the year's goals.
         await pullTable("task_commitments", as: TaskCommitment.self, userId: userId)
         await pullTable("task_focus", as: TaskFocus.self, userId: userId)
-        await pullTable("goals", as: Goal.self, userId: userId)
+        let goals = await pullTable("goals", as: Goal.self, userId: userId)
+        return signedIn && households && areas && tasks && goals
     }
 
     // MARK: - Pull
 
-    private func pullTable<T: PersistentModel & HasUUID>(_ table: String, as type: T.Type, userId: UUID, reconcile: Bool = true) async {
+    /// Returns whether the fetch and both saves succeeded.
+    @discardableResult
+    private func pullTable<T: PersistentModel & HasUUID>(_ table: String, as type: T.Type, userId: UUID, reconcile: Bool = true) async -> Bool {
         let context = ModelContext(modelContainer)
         do {
             // PostgREST caps a bare select at the project's `max_rows` (1000 here).
@@ -311,8 +381,10 @@ actor SyncEngine {
             try context.save()
 
             Self.syncLog.info("pull \(table, privacy: .public): fetched \(rows.count) inserted \(inserted) deleted \(deleted)")
+            return true
         } catch {
             Self.syncLog.error("pull \(table, privacy: .public) FAILED: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 
@@ -941,6 +1013,112 @@ actor SyncEngine {
 
     private func setOnline(_ value: Bool) {
         isOnline = value
+    }
+}
+
+// MARK: - Push order: parents before children
+
+extension SyncEngine {
+    private static func task(_ id: UUID, in context: ModelContext) -> SymphonyTask? {
+        var descriptor = FetchDescriptor<SymphonyTask>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return (try? context.fetch(descriptor))?.first
+    }
+
+    private static func goal(_ id: UUID, in context: ModelContext) -> Goal? {
+        var descriptor = FetchDescriptor<Goal>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return (try? context.fetch(descriptor))?.first
+    }
+
+    /// The rows this one's SENT links point at: a task's goalId, sourceId, areaId when `linksDirty`;
+    /// a goal's areaId when `areaDirty`; otherwise none (a clean row sends no link, so it has nothing to wait for).
+    /// A row never names itself (it would wait on its own insert forever).
+    static func parentIds(table: String, id: UUID, context: ModelContext) -> [UUID] {
+        let links: [UUID?]
+        switch table {
+        case "tasks":
+            guard let t = task(id, in: context), t.linksDirty else { return [] }
+            links = [t.goalId, t.sourceId, t.areaId]
+        case "goals":
+            guard let g = goal(id, in: context), g.areaDirty else { return [] }
+            links = [g.areaId]
+        default:
+            return []
+        }
+        return links.compactMap { $0 }.filter { $0 != id }
+    }
+
+    static func mustWait(parents: [UUID], unpushedInserts: Set<UUID>) -> Bool {
+        parents.contains { unpushedInserts.contains($0) }
+    }
+
+    /// The ids of every goal, task and life area on this phone.
+    static func knownIds(context: ModelContext) -> Set<UUID> {
+        let tasks = (try? context.fetch(FetchDescriptor<SymphonyTask>()))?.map(\.id) ?? []
+        let goals = (try? context.fetch(FetchDescriptor<Goal>()))?.map(\.id) ?? []
+        let areas = (try? context.fetch(FetchDescriptor<GoalArea>()))?.map(\.id) ?? []
+        return Set(tasks + goals + areas)
+    }
+
+    /// Parents that will never arrive: no insert waiting and no row on this phone.
+    static func lostParents(_ parents: [UUID], unpushedInserts: Set<UUID>, known: Set<UUID>) -> [UUID] {
+        parents.filter { !unpushedInserts.contains($0) && !known.contains($0) }
+    }
+
+    /// Sets the row's links to `lost` to nil and leaves its dirty flag set, so the null is what gets sent.
+    static func clearLinks(to lost: [UUID], table: String, id: UUID, context: ModelContext) {
+        let lost = Set(lost)
+        switch table {
+        case "tasks":
+            guard let t = task(id, in: context) else { return }
+            if let g = t.goalId, lost.contains(g) { t.goalId = nil }
+            if let s = t.sourceId, lost.contains(s) { t.sourceId = nil }
+            if let a = t.areaId, lost.contains(a) { t.areaId = nil }
+        case "goals":
+            guard let g = goal(id, in: context) else { return }
+            if let a = g.areaId, lost.contains(a) { g.areaId = nil }
+        default:
+            return
+        }
+    }
+
+    /// The link values a push of this row sends, or nil when it sends none
+    /// (its links are not dirty, the table has none, or the row is gone).
+    struct LinkStamp: Equatable {
+        var goalId: UUID?
+        var sourceId: UUID?
+        var areaId: UUID?
+    }
+
+    static func linkStamp(table: String, id: UUID, context: ModelContext) -> LinkStamp? {
+        switch table {
+        case "tasks":
+            guard let t = task(id, in: context), t.linksDirty else { return nil }
+            return LinkStamp(goalId: t.goalId, sourceId: t.sourceId, areaId: t.areaId)
+        case "goals":
+            guard let g = goal(id, in: context), g.areaDirty else { return nil }
+            return LinkStamp(goalId: nil, sourceId: nil, areaId: g.areaId)
+        default:
+            return nil
+        }
+    }
+
+    /// After a push returns: true when the link flag may be cleared, because
+    /// the row now sends nothing or still holds exactly what was sent. False
+    /// when it was re-linked (or linked for the first time) during the push:
+    /// those links never went up.
+    static func linksSettled(sent: LinkStamp?, now: LinkStamp?) -> Bool {
+        now == nil || now == sent
+    }
+
+    /// Clears `linksDirty` / `areaDirty` only; every other flag is the caller's.
+    static func clearLinkFlags(table: String, id: UUID, context: ModelContext) {
+        switch table {
+        case "tasks": task(id, in: context)?.linksDirty = false
+        case "goals": goal(id, in: context)?.areaDirty = false
+        default: break
+        }
     }
 }
 

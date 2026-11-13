@@ -131,6 +131,14 @@ struct SyncSerializationTests {
         // Non-capture tasks must NOT send capture_meta — a null would wipe the
         // server-side capture state written by the analyze-capture edge function.
         #expect(row["capture_meta"] == nil)
+
+        // Links the phone set go up too: the three live link columns, no more.
+        task.linksDirty = true
+        try context.save()
+        let linkedProdColumns = prodColumns.union(["goal_id", "source_id", "area_id"])
+        let linked = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        #expect(Set(linked.keys).isSubset(of: linkedProdColumns))
+        #expect(linked["goal_id"] != nil && linked["source_id"] != nil && linked["area_id"] != nil)
     }
 
     @Test func captureTaskRowRoundTripsCaptureMeta() throws {
@@ -466,6 +474,27 @@ struct SyncSerializationTests {
         #expect(area.createdAt == Date.fromISO("2026-11-01T09:30:00Z"))
         #expect(area.syncStatus == .synced)
         #expect(area.lastSyncedAt != nil)
+
+        // A legacy row with a null context, and one missing sort_order and created_at.
+        let legacy = try #require(RowMapper.toModel(GoalArea.self, from: [
+            "id": .string(UUID().uuidString.lowercased()),
+            "user_id": .string(user.uuidString.lowercased()),
+            "name": .string("Garden"),
+            "sort_order": .integer(1),
+            "context": .null,
+            "created_at": .string("2026-11-01T09:30:00Z"),
+        ]))
+        #expect(legacy.context == nil)
+        #expect(legacy.name == "Garden")
+        let before = Date()
+        let sparse = try #require(RowMapper.toModel(GoalArea.self, from: [
+            "id": .string(UUID().uuidString.lowercased()),
+            "user_id": .string(user.uuidString.lowercased()),
+            "name": .string("Reading"),
+        ]))
+        #expect(sparse.sortOrder == 0)
+        #expect(sparse.context == nil)
+        #expect(sparse.createdAt >= before)
 
         let nameless = RowMapper.toModel(GoalArea.self, from: [
             "id": .string(UUID().uuidString.lowercased()),

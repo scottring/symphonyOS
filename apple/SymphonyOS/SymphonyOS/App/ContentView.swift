@@ -38,7 +38,11 @@ struct ContentView: View {
         // done elsewhere while we were suspended — realtime does not replay.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, let engine = syncEngine else { return }
-            Task { await engine.resync() }
+            Task {
+                // A first pull that failed (offline at launch) can finish
+                // here; a failed resync never takes a finished one back.
+                if await engine.resync() { markFirstPullFinished(by: engine) }
+            }
         }
         .task {
             #if DEBUG
@@ -55,12 +59,19 @@ struct ContentView: View {
 
     private func startSync(userId: UUID) {
         #if DEBUG
-        if DemoMode.isOn { return }   // demo data is local-only; never sync it
+        if DemoMode.isOn {
+            // Demo data is local-only; never sync it. The seeded store is all
+            // there is, so there is no pull to wait for.
+            appState.initialSyncFinished = true
+            return
+        }
         #endif
         // Both call sites run on the main actor, so claiming the id synchronously
         // here is what makes the second call a no-op.
         guard syncedUserId != userId else { return }
         syncedUserId = userId
+        // A new account (or someone else signing in) has not pulled yet.
+        appState.initialSyncFinished = false
 
         let previous = syncEngine
         let container = modelContext.container
@@ -70,15 +81,24 @@ struct ContentView: View {
         appState.stopSync = { [weak engine] in await engine?.stop() }
         Task {
             await previous?.stop()   // never leave two engines on one socket
-            await engine.start(userId: userId)
+            if await engine.start(userId: userId) { markFirstPullFinished(by: engine) }
         }
         #if os(iOS)
         PushTokens.register()   // no-op until the Push capability is added
         #endif
     }
 
+    /// Only the engine still running counts: one stopped by a sign-out (or
+    /// replaced by someone else's sign-in) may finish its pull afterwards.
+    @MainActor
+    private func markFirstPullFinished(by engine: SyncEngine) {
+        guard syncEngine === engine else { return }
+        appState.initialSyncFinished = true
+    }
+
     private func stopSync() {
         syncedUserId = nil
+        appState.initialSyncFinished = false
         if let engine = syncEngine {
             Task {
                 await engine.stop()
