@@ -1515,7 +1515,7 @@ export function TodayView({
         // Wide page: the subline is the day's one sentence alone; weather and
         // dinner stand at the right under the controls (board A, 2026-11-11).
         // The week's dates are on the week's own page beside it.
-        subline={foldedControls
+        subline={journalHead
           ? headerLine ?? undefined
           : dinnerLink ? <>{headerLine}{headerLine && ' '}<span className="today-sentence-meta">{dinnerLink}</span></> : headerLine ?? undefined}
         // Domain chooser + assistant toggle, in the card's corner.
@@ -1532,14 +1532,14 @@ export function TodayView({
         // showing today's sky over Saturday. With the controls folded into
         // the masthead it sits in the subline beside the week, next to the day
         // it describes (2026-10-06; it had moved to the top bar 2026-09-30).
-        aside={data.isToday && !foldedControls ? <WeatherChip now={nowForDisplay} /> : undefined}
+        aside={data.isToday && !journalHead ? <WeatherChip now={nowForDisplay} /> : undefined}
         // Shell desktop controls live in the page navigation; standalone
         // mounts retain the footer controls as a fallback.
         // Standalone mounts keep their controls along the foot; in the Shell
         // there is no foot row at all (it was an empty ruled row, 2026-09-23).
         // Wide page: the day's details on one line under the title — the
         // specials and other all-day things, the weather, dinner.
-        footer={foldedControls
+        footer={journalHead
           ? (journal.allDayEvents.length > 0 || data.isToday || dinnerLink) && (
             <div className="today-mast-meta">
               {allDayBlock}
@@ -1794,7 +1794,7 @@ export function TodayView({
                 </div>
               )}
             </div>
-            {!foldedControls && allDayBlock}
+            {!journalHead && allDayBlock}
             {/* No school on the calendar: the school routines are off, and
                 the page says so — a fact, with the way back (noSchool.ts). */}
             {data.schoolOff && (
