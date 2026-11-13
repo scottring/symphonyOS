@@ -709,7 +709,7 @@ export function SettingsPage({
             <section>
               <SectionHeading>Founding households</SectionHeading>
               <p className="text-sm text-neutral-500 mb-6">
-                Signups are gated on an approved waitlist row. Approve one to let that email create an account.
+                Signup is open to everyone. These are the people who asked for an invite before it opened.
               </p>
               {/* An approve that the database refused. Without this the row
                   simply stayed un-approved and nothing said why — an admin
