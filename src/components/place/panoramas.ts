@@ -175,7 +175,7 @@ export const PRINTS: Record<SceneryPrintId, Panorama> = {
   // skyline with its bridge (its blue sky keyed out). The heading shows each
   // whole.
   'subway': { src: subway, veil: subway_veil, skyline: 0.1423, headingSrc: subway_heading, headingFocus: 'center 52%' },
-  'skyline': { src: skyline, veil: skyline_veil, skyline: 0.1645, headingSrc: skyline_heading, headingFocus: 'center 45%' },
+  'skyline': { src: skyline, veil: skyline_veil, skyline: 0.1574, headingSrc: skyline_heading, headingFocus: 'center 45%' },
 }
 
 /** The art for the chosen background. */
