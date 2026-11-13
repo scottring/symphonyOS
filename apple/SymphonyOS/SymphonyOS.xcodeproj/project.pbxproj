@@ -78,6 +78,7 @@
 		743C95E78E714C2063B750E2 /* CrimsonPro-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3E40DA63B5495F9F9971B614 /* CrimsonPro-Italic.ttf */; };
 		75911C7EFF2EDFEED273E4B5 /* Planning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AAB2B6E9FC48131AEE8F13F /* Planning.swift */; };
 		75940016428E88F3EEF2EBF1 /* PageReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5472D887E316ADEF911E0AF /* PageReviewSheet.swift */; };
+		7628D998245B64D55D27C1B5 /* AppleCalendarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A599D6B5D4173901A63E21 /* AppleCalendarTests.swift */; };
 		7726C3A546FB6B4FE09495A9 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D19E4BEB2CD68FA6F5256F36 /* View+Extensions.swift */; };
 		7A33D62ACF6AB04220E0F62D /* Dinner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47FCCB2BAC393252D399DB7 /* Dinner.swift */; };
 		7B3914ADD95F6F5B95EA377F /* GoogleCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 692BB44DC5FA145FA412DB96 /* GoogleCalendarService.swift */; };
@@ -150,6 +151,7 @@
 		F13311D96ED0C89151D9A8B7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F95E01EADA6CAD09DF1A9B0A /* SettingsView.swift */; };
 		F6622C0BA431BC0127286CC5 /* SymphonyOSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */; };
 		F6867823613D7C736CEE671D /* RoutineOccurrenceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1383EE5C83DE0489DE695E0 /* RoutineOccurrenceSheet.swift */; };
+		F886798113D26346BE9A08B3 /* AppleCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D38EDCE2DD84715A97BA245 /* AppleCalendar.swift */; };
 		F90FEBB07169AAE26DA4DC6F /* TimelineEnrichmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E6747A78170172B1525262 /* TimelineEnrichmentTests.swift */; };
 		F9A19E455568DEDDF7B3CCCA /* NotesHTMLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B165E6B770010DB9EC2731C /* NotesHTMLTests.swift */; };
 		F9EB7BF519EDB9C1BC2FAC56 /* CrimsonPro-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2A262D445DAE6081A4A96C82 /* CrimsonPro-SemiBold.ttf */; };
@@ -255,6 +257,7 @@
 		6BD95A959DE58FFA206B8F70 /* NextUpCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextUpCard.swift; sourceTree = "<group>"; };
 		6C272C7DF4B6BF8AA2ED024E /* DockLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockLayoutTests.swift; sourceTree = "<group>"; };
 		6D0E0B44FF0171B957F8A6E8 /* PageIngest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageIngest.swift; sourceTree = "<group>"; };
+		6D38EDCE2DD84715A97BA245 /* AppleCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleCalendar.swift; sourceTree = "<group>"; };
 		6E0C9C5D59DC16582C09AD07 /* Edition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Edition.swift; sourceTree = "<group>"; };
 		6E12BCB3F98A56A73FBB104A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6F4404B5A49F9ACA4F69DEFA /* SkinScreenshotsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkinScreenshotsUITests.swift; sourceTree = "<group>"; };
@@ -269,6 +272,7 @@
 		7FC8B5C1B3F02A4A0A6605A4 /* NextUpAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextUpAttributes.swift; sourceTree = "<group>"; };
 		813059185BE971ADE0DC6388 /* DuoJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoJournal.swift; sourceTree = "<group>"; };
 		81E58F1162C67DF3D96052F8 /* Date+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Extensions.swift"; sourceTree = "<group>"; };
+		84A599D6B5D4173901A63E21 /* AppleCalendarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleCalendarTests.swift; sourceTree = "<group>"; };
 		886E6A44F4EAF512A2F1DC39 /* CookSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookSession.swift; sourceTree = "<group>"; };
 		88E6C889C84E9A5D285AB75E /* OpenedItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenedItemSheet.swift; sourceTree = "<group>"; };
 		8BA72DC60A9EA66D9743639A /* RoutineOccurrenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineOccurrenceTests.swift; sourceTree = "<group>"; };
@@ -449,6 +453,7 @@
 			children = (
 				6340F25ABCF75EBC70087F8E /* Planning */,
 				BFF85C9DB0CF7505AD653FAD /* SyncEngine */,
+				6D38EDCE2DD84715A97BA245 /* AppleCalendar.swift */,
 				B9226E1CF4B413ACEF22DDCA /* AuthService.swift */,
 				3FCECAA1BF7A02A85614C2D0 /* DinnerService.swift */,
 				2D25CC3400D409DAF4D6E68C /* DocumentIngest.swift */,
@@ -666,6 +671,7 @@
 		D2B0F106883B7CE27ADDB25B /* SymphonyOSTests */ = {
 			isa = PBXGroup;
 			children = (
+				84A599D6B5D4173901A63E21 /* AppleCalendarTests.swift */,
 				A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */,
 				D32F0BBA293AAE16EF7CCA0C /* CarriedRoutinesTests.swift */,
 				169FC19A952F954EECF671DF /* DayGlanceTests.swift */,
@@ -947,6 +953,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7628D998245B64D55D27C1B5 /* AppleCalendarTests.swift in Sources */,
 				3BD45BCD6DC5749F4AA19BC0 /* CarriedOverTests.swift in Sources */,
 				83E6A0E1DACEF68A62C34134 /* CarriedRoutinesTests.swift in Sources */,
 				9AF8FDD2B1C9DBB74ABCE747 /* DayGlanceTests.swift in Sources */,
@@ -989,6 +996,7 @@
 			files = (
 				EF989D585C3EFDBF3B9F28AC /* ActionableInstance.swift in Sources */,
 				C32F7D0A51A46659926AD3F6 /* AppState.swift in Sources */,
+				F886798113D26346BE9A08B3 /* AppleCalendar.swift in Sources */,
 				CD119D61EA774D4915017DF0 /* AuthService.swift in Sources */,
 				BAC9271B1175D9367F5C5D30 /* AuthView.swift in Sources */,
 				A04D19140224352F7967DA60 /* CalendarSettingsView.swift in Sources */,

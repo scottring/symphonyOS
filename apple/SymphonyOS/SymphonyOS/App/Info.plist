@@ -33,6 +33,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Show your calendar on Today, beside your to-dos. Symphony only reads it.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Tell Symphony what changed by speaking instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
