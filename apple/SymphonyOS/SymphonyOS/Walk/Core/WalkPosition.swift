@@ -1,0 +1,136 @@
+import Foundation
+
+/// Where the walk stands, saved per signed-in person so it can be resumed after a
+/// relaunch: the step and depth, the areas and focus, what the walk itself planted
+/// (it decides which flags may later be moved or pulled up), and the periods it was
+/// asked in. The undo stack is deliberately not saved.
+struct WalkPosition: Codable, Equatable {
+    var version = 1
+    var status: WalkStatus; var depth: WalkDepth; var step: Int; var ground: Bool
+    var areas: [WalkArea]; var kept: [UUID]; var focusArea: UUID?
+    var focus: [String: UUID]                              // key = String(WalkLevel.rawValue)
+    var tour: [UUID]; var planted: [UUID]; var firstThing: UUID?
+    var year: Int; var seasonStart: String; var monthStart: String; var weekStart: String; var day: String   // YYYY-MM-DD
+    var savedAt: Date
+
+    init(_ state: WalkState, status: WalkStatus, planted: Set<UUID>, periods: WalkPeriods, now: Date) {
+        self.status = status
+        depth = state.depth; step = state.step; ground = state.ground
+        areas = state.areas; kept = state.kept; focusArea = state.focusArea
+        focus = Dictionary(uniqueKeysWithValues: state.focus.map { (String($0.key.rawValue), $0.value) })
+        tour = state.tour
+        self.planted = planted.sorted { $0.uuidString < $1.uuidString }
+        firstThing = state.firstThing
+        year = periods.year
+        seasonStart = Self.dayString(periods.season.start)
+        monthStart = Self.dayString(periods.monthStart)
+        weekStart = Self.dayString(periods.weekStart)
+        day = Self.dayString(periods.today)
+        savedAt = now
+    }
+
+    /// Reopens for today's periods. A period that has moved on is asked again (the
+    /// step steps back to it); anything naming a row that no longer exists is dropped.
+    /// Kept areas and the planted set stay as they were.
+    func restored(for periods: WalkPeriods, existing: Set<UUID>) -> WalkPosition {
+        var out = self
+        var newStep = step
+        if year != periods.year { newStep = min(newStep, 1) }
+        if seasonStart != Self.dayString(periods.season.start) { newStep = min(newStep, 2) }
+        if monthStart != Self.dayString(periods.monthStart) { newStep = min(newStep, 3) }
+        if weekStart != Self.dayString(periods.weekStart) { newStep = min(newStep, 4) }
+        if day != Self.dayString(periods.today) {
+            newStep = min(newStep, 5)
+            out.firstThing = nil
+        }
+        out.year = periods.year
+        out.seasonStart = Self.dayString(periods.season.start)
+        out.monthStart = Self.dayString(periods.monthStart)
+        out.weekStart = Self.dayString(periods.weekStart)
+        out.day = Self.dayString(periods.today)
+
+        let stepChanged = newStep != step
+        out.step = newStep
+        out.focus = focus.filter { key, id in
+            guard let level = Int(key), level <= newStep else { return false }
+            return existing.contains(id)
+        }
+        // The Year tour's stops are kept areas (which have no row until used); later tours name goals.
+        out.tour = stepChanged ? [] : tour.filter { newStep == 1 ? kept.contains($0) : existing.contains($0) }
+        if let thing = out.firstThing, !existing.contains(thing) { out.firstThing = nil }
+        return out
+    }
+
+    /// Puts the saved place into a state. Undo is left empty by design.
+    func apply(to state: inout WalkState) {
+        state.depth = depth; state.step = step; state.ground = ground
+        state.areas = areas; state.kept = kept; state.focusArea = focusArea
+        state.focus = Dictionary(uniqueKeysWithValues: focus.compactMap { key, id in
+            Int(key).flatMap(WalkLevel.init(rawValue:)).map { ($0, id) }
+        })
+        state.tour = tour
+        state.firstThing = firstThing
+        state.undo = []
+        state.undoShowing = false
+    }
+
+    private static func dayString(_ date: Date) -> String {
+        let c = PlanCalendar.calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+}
+
+extension JSONEncoder {
+    static var walk: JSONEncoder {
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .iso8601
+        e.outputFormatting = [.sortedKeys]
+        return e
+    }
+}
+
+extension JSONDecoder {
+    static var walk: JSONDecoder {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }
+}
+
+/// One saved position per signed-in person, in `UserDefaults`.
+struct WalkPositionStore {
+    var defaults: UserDefaults = .standard
+
+    static func key(_ userId: UUID) -> String { "walk.position.\(userId.uuidString.lowercased())" }
+
+    /// Nil when nothing is saved, the data does not decode, or it is another version.
+    func load(for userId: UUID?) -> WalkPosition? {
+        guard let userId, let data = defaults.data(forKey: Self.key(userId)),
+              let position = try? JSONDecoder.walk.decode(WalkPosition.self, from: data),
+              position.version == 1 else { return nil }
+        return position
+    }
+
+    func save(_ position: WalkPosition, for userId: UUID?) {
+        guard let userId, let data = try? JSONEncoder.walk.encode(position) else { return }
+        defaults.set(data, forKey: Self.key(userId))
+    }
+
+    func forget(for userId: UUID?) {
+        guard let userId else { return }
+        defaults.removeObject(forKey: Self.key(userId))
+    }
+}
+
+/// Whether the walk starts by itself, resumes, or stays out of the way.
+enum WalkEntry: Equatable {
+    case none, start, resume
+
+    static func decide(replay: Bool, demoWalk: Bool, position: WalkPosition?, householdEditions: [String?],
+                       initialSyncFinished: Bool, goalCount: Int) -> WalkEntry {
+        if replay || demoWalk { return .start }
+        if let position { return position.status == .inProgress ? .resume : .none }
+        let onlyLight = !householdEditions.isEmpty && householdEditions.allSatisfy { $0 == "light" }
+        return onlyLight && initialSyncFinished && goalCount == 0 ? .start : .none
+    }
+}

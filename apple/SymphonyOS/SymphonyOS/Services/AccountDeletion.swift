@@ -100,6 +100,7 @@ enum AccountDeletion {
     /// `forgetSession()`; device preferences (sound, layouts) stay.
     static func clearDeviceLeftovers(userId: UUID?, defaults: UserDefaults = .standard, spoolBase: URL? = nil) {
         EditionMemory(defaults: defaults).forget(for: userId)
+        WalkPositionStore(defaults: defaults).forget(for: userId)
         defaults.removeObject(forKey: MedTokenStore.key)
         defaults.removeObject(forKey: PlanCalendar.weekStartsOnKey)
         PhotoCaptureService.deleteSpool(base: spoolBase)

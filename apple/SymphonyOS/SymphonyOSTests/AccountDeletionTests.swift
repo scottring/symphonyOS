@@ -74,11 +74,15 @@ struct AccountDeletionTests {
         let defaults = UserDefaults(suiteName: "AccountDeletionTests.\(UUID())")!
         let uid = UUID()
         EditionMemory(defaults: defaults).remember(.light, for: uid)
+        let walk = WalkPositionStore(defaults: defaults)
+        walk.save(WalkPosition(WalkState(), status: .inProgress, planted: [], periods: WalkPeriods.pick(now: Date()), now: Date()), for: uid)
+        #expect(walk.load(for: uid) != nil)
         defaults.set("tok", forKey: MedTokenStore.key)
         defaults.set(1, forKey: PlanCalendar.weekStartsOnKey)
         defaults.set(false, forKey: "planner.paperSound")
         AccountDeletion.clearDeviceLeftovers(userId: uid, defaults: defaults, spoolBase: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         #expect(EditionMemory(defaults: defaults).lastKnown(for: uid) == nil)
+        #expect(walk.load(for: uid) == nil)
         #expect(defaults.string(forKey: MedTokenStore.key) == nil)
         #expect(defaults.object(forKey: PlanCalendar.weekStartsOnKey) == nil)
         #expect(defaults.object(forKey: "planner.paperSound") != nil)   // device preference stays
