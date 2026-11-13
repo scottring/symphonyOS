@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Walk down the mountain</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400&amp;family=DM+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+@keyframes wkRise{from{transform:translateY(100%)}to{transform:none}}
+@keyframes wkFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes wkPlant{0%{opacity:0;transform:translateY(-46px) scale(.7)}70%{opacity:1;transform:translateY(3px) scale(1.03)}100%{opacity:1;transform:none}}
+@keyframes wkUnfurl{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes wkPole{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes orbBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes haloBreathe{0%,100%{opacity:.65;transform:scale(.94)}50%{opacity:1;transform:scale(1.1)}}
+@keyframes orbRipple{from{opacity:.75;transform:scale(1)}to{opacity:0;transform:scale(2.1)}}
+@keyframes flutter{0%,100%{transform:skewY(0deg)}50%{transform:skewY(-2.5deg)}}
+@keyframes caret{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes petalIn{from{opacity:0;transform:translate(-50%,-50%) scale(.4)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes ghostBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.wk-q{animation:wkFade 700ms 500ms both ease-out}
+.wk-sheet{animation:wkRise 900ms both cubic-bezier(.2,.8,.2,1)}
+.wk-plant{display:block;position:absolute;inset:0;animation:wkPlant 800ms both cubic-bezier(.2,.8,.2,1)}
+.wk-plant2{animation:wkPlant 700ms both cubic-bezier(.2,.8,.2,1)}
+.wk-cloth{animation:wkUnfurl 500ms 300ms both ease-out}
+.wk-flutter{display:block;animation:flutter 3.2s ease-in-out infinite}
+.wk-pole{transform-origin:bottom center;animation:wkPole 380ms both ease-out}
+.wk-caret{display:inline-block;width:2px;height:14px;margin-left:2px;background:#ffffff;vertical-align:-2px;animation:caret 1s steps(1) infinite}
+.wk-orb{animation:orbBreathe 4.5s ease-in-out infinite}
+.wk-orb .wk-halo{animation:haloBreathe 4.5s ease-in-out infinite}
+.wk-orb-on{animation:orbBreathe 1.1s ease-in-out infinite}
+.wk-orb-on .wk-halo{animation:haloBreathe 1.1s ease-in-out infinite}
+.wk-ripple{position:absolute;inset:0;border-radius:999px;border:2px solid rgba(255,230,180,.9);animation:orbRipple 1.6s ease-out infinite;pointer-events:none}
+.wk-petal{animation:petalIn 260ms both cubic-bezier(.2,.9,.3,1.2)}
+.wk-ghost-flag{animation:ghostBob 3s ease-in-out infinite}
+.wk-row{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;box-sizing:border-box;padding:8px 16px;background:transparent;border:0;border-top:1px solid #e6e0d6;text-align:left;font-family:inherit;color:#1f2a2b;cursor:pointer}
+.wk-glow{color:#ffffff !important;text-shadow:0 1px 14px rgba(0,14,70,.75),0 0 3px rgba(0,14,70,.6)}
+.wk-link{background:transparent;border:0;font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:600;color:#1f2a2b;cursor:pointer;min-height:44px;padding:0 6px}
+a{color:#32664d}a:hover{color:#244b38}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: 'DM Sans', system-ui, sans-serif; color: #1f2a2b; background: linear-gradient(180deg, #00106e 0%, #0a2a7a 60%, #142430 100%); user-select: none; -webkit-user-select: none;">
+
+  <div style="{{worldStyle}}">
+    <img src="/_blob/419f44defc7d22d2f438fa86a0458ec3" alt="" draggable="false" style="position: absolute; left: 0; top: 420px; width: 1300px; height: 1300px;">
+    <sc-for list="{{areaLabels}}" as="al" hint-placeholder-count="0">
+      <button onClick="{{al.tap}}" aria-pressed="{{al.pressed}}" aria-label="{{al.name}}" style="{{al.style}}">
+        <span style="{{al.mark}}"></span>
+        <span style="{{al.text}}">{{al.name}}</span>
+      </button>
+    </sc-for>
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="0">
+      <div style="{{g.style}}">
+        <span style="{{g.pole}}"></span>
+        <span style="{{g.shadow}}"></span>
+        <sc-for list="{{g.items}}" as="pn" hint-placeholder-count="1">
+          <button class="wk-plant2" onClick="{{pn.tap}}" aria-label="{{pn.label}}" aria-pressed="{{pn.pressed}}" style="{{pn.wrap}}">
+            <span class="wk-flutter" style="{{pn.cloth}}">
+              <span style="{{pn.textStyle}}">{{pn.text}}</span>
+              <sc-if value="{{pn.hasTag}}" hint-placeholder-val="{{false}}">
+                <span style="{{pn.tagStyle}}">{{pn.tag}}</span>
+              </sc-if>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-for>
+    <sc-for list="{{flags}}" as="f" hint-placeholder-count="0">
+      <button onClick="{{f.tap}}" aria-label="{{f.label}}" aria-pressed="{{f.pressed}}" style="{{f.outer}}">
+        <span class="{{f.plantClass}}" style="display: block; position: absolute; inset: 0;">
+          <span style="{{f.shadow}}"></span>
+          <span style="{{f.pole}}"></span>
+          <span style="{{f.clothWrap}}">
+            <span class="wk-cloth" style="{{f.clothOrigin}}">
+              <span class="wk-flutter" style="{{f.cloth}}">
+                <span style="{{f.textStyle}}">{{f.text}}</span>
+                <sc-if value="{{f.hasDay}}" hint-placeholder-val="{{false}}">
+                  <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.85); margin-top: 2px;">{{f.day}}</span>
+                </sc-if>
+              </span>
+            </span>
+          </span>
+        </span>
+      </button>
+    </sc-for>
+  </div>
+
+  <div style="{{mistStyle}}"></div>
+
+  <sc-if value="{{isWelcome}}" hint-placeholder-val="{{true}}">
+    <div style="position: absolute; left: 0; right: 0; top: 140px; padding: 0 32px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; z-index: 4;">
+      <div class="wk-q" style="font-family: 'Crimson Pro', Georgia, serif; font-size: 22px; letter-spacing: 0.04em; color: #f6dfa6;">Symphony</div>
+      <h1 class="wk-q wk-glow" style="margin: 0; font-family: 'Crimson Pro', Georgia, serif; font-size: 42px; line-height: 46px; font-weight: 500;">Let's start up high and walk down to today.</h1>
+      <p class="wk-q wk-glow" style="margin: 0; font-size: 17px; line-height: 25px; color: #2f3a38;">Plant a flag for what matters, then follow it down.</p>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isAsking}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; left: 0; right: 0; top: 64px; padding: 0 28px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; z-index: 4;">
+      <div class="wk-q wk-glow" style="font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #2f3a38;">{{eyebrow}}</div>
+      <h1 class="wk-glow" style="margin: 0; font-family: 'Crimson Pro', Georgia, serif; font-size: 32px; line-height: 36px; font-weight: 500;">{{question}}</h1>
+      <p class="wk-q wk-glow" style="margin: 0; font-size: 15px; line-height: 21px; color: #2f3a38;">{{why}}</p>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{showDial}}" hint-placeholder-val="{{true}}">
+    <div style="position: absolute; left: 45px; top: 528px; width: 300px; height: 300px; z-index: 6; pointer-events: none;">
+      <div aria-hidden="true" style="{{dialBack}}"></div>
+
+      <svg width="300" height="300" viewBox="0 0 300 300" aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none;">
+        <circle cx="150" cy="150" r="66" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1"></circle>
+        <path d="M150 80v8M150 212v8M80 150h8M212 150h8" stroke="rgba(255,255,255,0.8)" stroke-width="1.5" stroke-linecap="round"></path>
+        <path d="{{needle}}" fill="{{needleColor}}" style="transition: fill 400ms;"></path>
+      </svg>
+
+      <sc-if value="{{showLive}}" hint-placeholder-val="{{false}}">
+        <div aria-live="polite" style="position: absolute; left: 150px; top: 18px; width: 0; height: 86px;">
+          <span class="wk-pole" style="position: absolute; left: -1.5px; bottom: 0; width: 3px; height: 86px; border-radius: 2px; background: linear-gradient(90deg, #4a3a2c, #2c2219);"></span>
+          <span style="position: absolute; left: 2px; top: 2px; display: block; filter: drop-shadow(0 0 10px rgba(255,226,160,0.9));">
+            <span class="wk-cloth" style="display: block; transform-origin: left center;">
+              <span style="{{liveCloth}}">
+                <span style="font-size: 14px; line-height: 17px; font-weight: 600; color: #ffffff;">{{live}}</span><span class="wk-caret"></span>
+              </span>
+            </span>
+          </span>
+        </div>
+      </sc-if>
+
+      <button class="{{orbClass}}" onPointerDown="{{od}}" onContextMenu="{{noMenu}}" aria-label="{{orbLabel}}" style="{{orbStyle}}">
+        <span class="wk-halo" aria-hidden="true" style="position: absolute; inset: -38px; border-radius: 999px; pointer-events: none; background: radial-gradient(circle, rgba(255,238,196,0.75) 0%, rgba(255,226,170,0.3) 42%, rgba(255,226,170,0) 70%);"></span>
+        <sc-if value="{{speaking}}" hint-placeholder-val="{{false}}">
+          <span class="wk-ripple" aria-hidden="true"></span>
+          <span class="wk-ripple" aria-hidden="true" style="animation-delay: 0.8s;"></span>
+        </sc-if>
+        <span aria-hidden="true" style="position: absolute; inset: 0; border-radius: 999px; pointer-events: none; background: radial-gradient(circle at 38% 30%, #ffffff 0%, #fff7e0 20%, #f8e2ad 48%, #ebbf72 76%, #dda152 100%); box-shadow: 0 0 36px rgba(255,214,140,0.85), 0 0 90px rgba(255,214,140,0.5), inset 0 -10px 20px rgba(185,118,40,0.3), inset 0 4px 10px rgba(255,255,255,0.8);"></span>
+        <span aria-hidden="true" style="position: absolute; left: 20px; top: 13px; width: 32px; height: 18px; border-radius: 999px; pointer-events: none; background: rgba(255,255,255,0.8); filter: blur(5px);"></span>
+      </button>
+
+      <sc-for list="{{petals}}" as="p" hint-placeholder-count="0">
+        <button class="wk-petal" onClick="{{p.act}}" aria-label="{{p.label}}" style="{{p.style}}">
+          <span style="{{p.disc}}">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1f2a2b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{p.icon}}"></path></svg>
+          </span>
+          <span class="wk-glow" style="{{p.labelStyle}}">{{p.label}}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="position: absolute; left: 10px; right: 10px; bottom: 8px; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 10px; z-index: 7;">
+      <sc-if value="{{showMoveRow}}" hint-placeholder-val="{{false}}">
+        <div style="display: flex; gap: 6px; overflow-x: auto; max-width: 100%; scrollbar-width: none; padding: 2px;">
+          <span class="wk-glow" style="flex: none; align-self: center; font-size: 12px; font-weight: 700;">Move to</span>
+          <sc-for list="{{moveChips}}" as="mc" hint-placeholder-count="3">
+            <button onClick="{{mc.act}}" style="{{mc.style}}">{{mc.label}}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{showHintRow}}" hint-placeholder-val="{{true}}">
+        <span class="wk-glow" style="font-size: 13px; font-weight: 600; pointer-events: none; text-align: center;">{{hint}}</span>
+        <sc-if value="{{showUndo}}" hint-placeholder-val="{{false}}">
+          <button onClick="{{undo}}" style="flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.55); background: rgba(0,22,96,0.6); color: #ffffff; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4L3.5 7.5 7 11"></path><path d="M4 7.5h7.5a4.5 4.5 0 0 1 0 9H8"></path></svg>Undo</button>
+        </sc-if>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isToday}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; left: 0; right: 0; top: 54px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; z-index: 4;">
+      <div class="wk-q wk-glow" style="font-family: 'Crimson Pro', Georgia, serif; font-size: 24px; font-weight: 500;">{{todayTitle}}</div>
+      <button class="wk-link wk-glow" onClick="{{restart}}" style="white-space: nowrap;">Walk it again</button>
+    </div>
+    <div class="wk-sheet" style="{{sheetStyle}}">
+      <button onClick="{{toggleSheet}}" aria-expanded="{{sheetOpenAttr}}" style="display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; padding: 8px 0 4px; border: 0; background: transparent; font-family: inherit; font-size: 13px; font-weight: 600; color: #3f4b49; cursor: pointer;">
+        <span style="width: 40px; height: 5px; border-radius: 999px; background: #d4cdc0;" aria-hidden="true"></span>
+        {{sheetHandle}}
+      </button>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 0 4px;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 3px;">
+          <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #56625f;">Today</div>
+          <div style="font-family: 'Crimson Pro', Georgia, serif; font-size: 28px; line-height: 32px; font-weight: 500;">Friday, 13 November</div>
+        </div>
+        <div role="img" aria-label="{{ringLabel}}" style="position: relative; width: 64px; height: 64px; flex: none;">
+          <svg width="64" height="64" viewBox="0 0 72 72" aria-hidden="true">
+            <circle cx="36" cy="36" r="29" fill="none" stroke="#e2dccf" stroke-width="8"></circle>
+            <circle cx="36" cy="36" r="29" fill="none" stroke="#32664d" stroke-width="8" stroke-linecap="round" stroke-dasharray="{{dash}}" transform="rotate(-90 36 36)" style="transition: stroke-dasharray 500ms ease-out;"></circle>
+          </svg>
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;">{{count}}</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; background: #fbebe3; border: 1px solid #f0cdbd;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+          <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9a3d1f;">Next · 2:30 pm</div>
+          <div style="font-size: 17px; font-weight: 600;">Dentist</div>
+        </div>
+        <div style="font-size: 14px; color: #6a4a3e;">in 3 hours</div>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e6e0d6; border-radius: 16px; overflow: hidden;">
+        <sc-for list="{{items}}" as="item" hint-placeholder-count="4">
+          <button class="wk-row" onClick="{{item.toggle}}" aria-pressed="{{item.pressed}}" style="{{item.rowStyle}}">
+            <span style="{{item.check}}" aria-hidden="true">
+              <sc-if value="{{item.done}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8"></path></svg></sc-if>
+            </span>
+            <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+              <span style="{{item.titleStyle}}">{{item.title}}</span>
+              <span style="font-size: 13px; color: #4a5654;">for <span style="font-family: 'Crimson Pro', Georgia, serif; font-size: 15px; color: #32664d;">{{item.why}}</span></span>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+      <button onClick="{{walkAnother}}" style="display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; box-sizing: border-box; padding: 10px 16px; border-radius: 14px; border: 1.5px dashed #9cbca8; background: #f3f8f4; text-align: left; font-family: inherit; color: #1f2a2b; cursor: pointer;">
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; font-weight: 600;">Walk another one down</span><span style="font-size: 13px; color: #3f4b49;">Next flag: <span style="font-family: 'Crimson Pro', Georgia, serif; font-size: 15px; color: #244b38;">{{anotherName}}</span></span></span>
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#32664d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4v12M5 11l5 5 5-5"></path></svg>
+      </button>
+      <sc-if value="{{allDone}}" hint-placeholder-val="{{false}}">
+        <div style="text-align: center; font-family: 'Crimson Pro', Georgia, serif; font-size: 22px; color: #244b38;">That's the day. Well done.</div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"step":{"editor":"enum","options":["0","1","2","3","4","5","6"],"default":"0"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  script() {
+    return {
+      1: [{ t: 'Feel strong again', a: 'Health' }, { t: 'Finish the bathroom', a: 'Home' }, { t: 'More slow weekends together', a: 'People' }],
+      2: [{ t: 'Bathroom done by February', a: 'Home' }, { t: 'Lift twice a week', a: 'Health' }],
+      3: [{ t: 'Pick the tile and pay the deposit', a: 'Home' }],
+      4: [{ t: 'Send the contractor the deposit', d: 'Today', a: 'Home' }, { t: 'Choose the tile', d: 'Saturday', a: 'Home' }],
+      5: [{ t: 'Send the contractor the deposit', d: 'First thing', a: 'Home' }]
+    };
+  }
+  constructor(props) {
+    super(props);
+    const start = parseInt(props.step, 10) || 0;
+    const S = this.script();
+    const said = {};
+    for (let s = 1; s <= Math.min(start, 5); s++) said[s] = S[s].slice();
+    const focus = {};
+    if (start >= 2 && start <= 5) focus[start] = start === 2 ? 1 : 0;
+    this.state = { step: start, said: said, focus: focus, focusArea: null, ground: false, kept: start >= 1 ? ['Health', 'Home', 'People'] : [], custom: [], ex: {}, sheetOpen: false, mode: 'quick', holding: false, petalsOpen: false, hover: null, speaking: false, live: '' };
+  }
+  componentWillUnmount() { this.stopTimers(); this.unlisten(); if (this.ac) { try { this.ac.close(); } catch (e) {} } }
+
+  /* ---------- Sound: synthesized, subtle ---------- */
+  audio() {
+    try {
+      if (!this.ac) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        this.ac = new AC();
+        this.master = this.ac.createGain();
+        this.master.gain.value = 0.6;
+        this.master.connect(this.ac.destination);
+        const len = this.ac.sampleRate;
+        this.noise = this.ac.createBuffer(1, len, this.ac.sampleRate);
+        const d = this.noise.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (this.ac.state === 'suspended') this.ac.resume();
+      return this.ac;
+    } catch (e) { return null; }
+  }
+  burst(t, dur, type, freq, q, gain, attack, freqEnd) {
+    const ac = this.ac; if (!ac) return;
+    const src = ac.createBufferSource(); src.buffer = this.noise;
+    const f = ac.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+    if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + (attack || 0.005));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.05);
+  }
+  tone(t, f0, f1, dur, gain, type) {
+    const ac = this.ac; if (!ac) return;
+    const o = ac.createOscillator(); o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  sfxBag() {
+    const ac = this.audio(); if (!ac) return; const t = ac.currentTime + 0.01;
+    for (let i = 0; i < 6; i++) {
+      const at = t + i * 0.05 + Math.random() * 0.03;
+      this.burst(at, 0.07 + Math.random() * 0.06, 'highpass', 2600 + Math.random() * 2200, 0.7, 0.07 + Math.random() * 0.05, 0.01);
+    }
+    this.burst(t + 0.05, 0.28, 'bandpass', 900, 0.8, 0.05, 0.06, 1800);
+  }
+  sfxRattle() {
+    const ac = this.audio(); if (!ac) return; const t = ac.currentTime + 0.12;
+    let at = t;
+    for (let i = 0; i < 5; i++) {
+      at += 0.035 + Math.random() * 0.06;
+      const f = 900 + Math.random() * 600;
+      this.tone(at, f, f * 0.92, 0.07, 0.05 + Math.random() * 0.03, 'triangle');
+      this.burst(at, 0.035, 'bandpass', 2200 + Math.random() * 600, 6, 0.09);
+    }
+  }
+  sfxUnfurl() {
+    const ac = this.audio(); if (!ac) return; const t = ac.currentTime + 0.01;
+    this.burst(t, 0.2, 'bandpass', 450, 1.2, 0.16, 0.03, 1900);
+    this.burst(t + 0.17, 0.12, 'bandpass', 700, 1.4, 0.08, 0.02, 1600);
+    this.burst(t + 0.27, 0.09, 'bandpass', 900, 1.6, 0.05, 0.02, 1400);
+  }
+  sfxPlant() {
+    const ac = this.audio(); if (!ac) return; const t = ac.currentTime + 0.01;
+    this.burst(t, 0.14, 'bandpass', 600, 0.9, 0.05, 0.05, 1500);
+    const hit = t + 0.13;
+    this.tone(hit, 120, 42, 0.22, 0.42, 'sine');
+    this.burst(hit, 0.12, 'lowpass', 380, 0.7, 0.3, 0.003);
+    for (let i = 0; i < 4; i++) this.burst(hit + 0.01 + i * 0.022, 0.03, 'highpass', 1800 + Math.random() * 1500, 0.8, 0.05);
+    this.tone(hit + 0.02, 1100, 980, 0.12, 0.025, 'triangle');
+  }
+  sfxTick() {
+    const ac = this.audio(); if (!ac) return; const t = ac.currentTime + 0.005;
+    this.tone(t, 2300, 2100, 0.035, 0.03, 'sine');
+  }
+
+  /* ---------- The orb: hold, slide, let go ---------- */
+  unlisten() {
+    if (this.onMove) { window.removeEventListener('pointermove', this.onMove); window.removeEventListener('pointerup', this.onUp); window.removeEventListener('pointercancel', this.onCancel); }
+    this.onMove = null; this.onUp = null; this.onCancel = null;
+  }
+  orbDown(e) {
+    if (this.state.speaking) return;
+    if (e.preventDefault) e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    this.c = { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 };
+    this.t0 = Date.now();
+    this.wasOpen = this.state.petalsOpen;
+    this.setState({ holding: true, hover: null });
+    this.unlisten();
+    this.onMove = (ev) => this.orbMove(ev);
+    this.onUp = (ev) => this.orbUp(ev);
+    this.onCancel = () => this.orbCancel();
+    window.addEventListener('pointermove', this.onMove);
+    window.addEventListener('pointerup', this.onUp);
+    window.addEventListener('pointercancel', this.onCancel);
+    if (this.state.step >= 1 && this.state.step <= 5) {
+      this.sfxBag();
+      this.sfxRattle();
+      this.holdT = setTimeout(() => {
+        if (this.state.holding && !this.state.hover) this.startWriting(55, false);
+      }, 420);
+    } else {
+      this.audio();
+    }
+  }
+  orbMove(e) {
+    if (!this.c || !this.state.holding) return;
+    const dx = e.clientX - this.c.x, dy = e.clientY - this.c.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) / this.c.r;
+    if (dist < 1.4) { if (this.state.hover) this.setState({ hover: null }); return; }
+    if (this.state.speaking) { this.stopTimers(); this.target = null; this.setState({ speaking: false, live: '' }); }
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    let best = null, bestD = 999;
+    (this.petalDefs || []).forEach((p) => {
+      let dd = Math.abs(ang - this.POS[p.pos][2]);
+      if (dd > 180) dd = 360 - dd;
+      if (dd < bestD) { bestD = dd; best = p.id; }
+    });
+    const h = bestD < 32 ? best : null;
+    if (h !== this.state.hover) { if (h) this.sfxTick(); this.setState({ hover: h }); }
+  }
+  orbUp() {
+    this.unlisten();
+    const dt = Date.now() - (this.t0 || 0);
+    const hover = this.state.hover;
+    if (this.holdT) { clearTimeout(this.holdT); this.holdT = null; }
+    this.c = null;
+    if (hover) { this.act(hover); return; }
+    if (this.state.speaking) { this.setState({ holding: false }); this.plant(); return; }
+    if (dt < 420) { this.setState({ holding: false, petalsOpen: !this.wasOpen }); return; }
+    this.setState({ holding: false, petalsOpen: this.state.step === 0 });
+  }
+  orbCancel() {
+    this.unlisten(); this.stopTimers(); this.c = null;
+    this.setState({ holding: false, hover: null, speaking: false, live: '' });
+  }
+  stopTimers() {
+    if (this.iv) clearInterval(this.iv);
+    if (this.holdT) clearTimeout(this.holdT);
+    if (this.plantT) clearTimeout(this.plantT);
+    if (this.unfurlT) clearTimeout(this.unfurlT);
+    this.iv = null; this.holdT = null; this.plantT = null; this.unfurlT = null;
+  }
+  nextLine(s) {
+    if (s === 1 && this.state.ground) {
+      const pool = ['Creative work', 'Faith', 'Learning'].filter((n) => (this.state.custom || []).indexOf(n) < 0);
+      return pool.length ? { t: pool[0], area: true } : null;
+    }
+    const have = (this.state.said || {})[s] || [];
+    if (have.length >= 3) return null;
+    const left = (this.script()[s] || []).filter((x) => !have.some((h) => h.t === x.t));
+    if (s === 1 && this.state.focusArea) { const m = left.find((x) => x.a === this.state.focusArea); if (m) return m; }
+    return left[0] || null;
+  }
+  startWriting(speed, autoPlant) {
+    const s = this.state.step;
+    const line = this.nextLine(s);
+    this.target = line;
+    this.setState({ speaking: true, live: '', petalsOpen: false, hover: null });
+    if (!line) { this.setState({ live: 'That’s all I have here' }); return; }
+    let i = 0;
+    this.unfurlT = setTimeout(() => this.sfxUnfurl(), 280);
+    this.iv = setInterval(() => {
+      i += 1;
+      this.setState({ live: line.t.slice(0, i) });
+      if (i >= line.t.length) {
+        clearInterval(this.iv); this.iv = null;
+        if (autoPlant) this.plantT = setTimeout(() => this.plant(), 650);
+      }
+    }, speed);
+  }
+  plant() {
+    const s = this.state.step;
+    const line = this.target;
+    this.stopTimers();
+    this.target = null;
+    if (!line || s < 1 || s > 5) { this.setState({ speaking: false, live: '' }); return; }
+    this.sfxPlant();
+    if (line.area) {
+      this.setState({ speaking: false, live: '', custom: (this.state.custom || []).concat([line.t]), kept: (this.state.kept || []).concat([line.t]) });
+      return;
+    }
+    let item = line;
+    if (s === 1) {
+      const kept = this.state.kept || [];
+      const a = line.a && kept.indexOf(line.a) >= 0 ? line.a : (this.state.focusArea || null);
+      item = { t: line.t, a: a };
+      if (this.state.focusArea && a && a !== this.state.focusArea) {
+        if (this.noteT) clearTimeout(this.noteT);
+        this.setState({ note: 'That sounded like ' + a.toLowerCase() + ', so it went on the ' + a + ' peak' });
+        this.noteT = setTimeout(() => this.setState({ note: '' }), 3200);
+      }
+    }
+    if (s >= 2) {
+      const pf = (this.state.focus || {})[s];
+      const parent = pf != null ? ((this.state.said || {})[s - 1] || [])[pf] : null;
+      item = { t: line.t, d: line.d, a: parent && parent.a ? parent.a : (line.a || null) };
+    }
+    const now = (this.state.said || {})[s] || [];
+    if (this.undoT) clearTimeout(this.undoT);
+    this.undoT = setTimeout(() => this.setState({ lastPlant: null }), 7000);
+    this.setState({ speaking: false, live: '', lastPlant: { s: s, j: now.length }, said: Object.assign({}, this.state.said, { [s]: now.concat([item]) }) });
+  }
+  renderVals() {
+    const SCRIPT = this.script();
+    const ASK = {
+      1: ['The year ahead', 'What would make the year ahead a good one?', 'Something that would feel true twelve months from now.'],
+      2: ['This season · to Feb 28', 'And this winter? What’s it about?', 'A season is a few months. What is this stretch really for?'],
+      3: ['November', 'What’s one thing for the rest of November?', 'Small enough to finish by the 30th.'],
+      4: ['This week · to Sun 15', 'What would move that forward this week?', 'Say the day for each: “the deposit, today.”'],
+      5: ['Friday, 13 November', 'What’s the first thing you’ll do today?', 'Just one. The rest of today can wait its turn.']
+    };
+    const FOCUSQ = {
+      2: (t) => 'For “' + t + '”, what’s this winter’s piece?',
+      3: (t) => 'For “' + t + '”, what’s November’s piece?',
+      4: (t) => 'For “' + t + '”, what happens this week?',
+      5: (t) => 'Start the day with “' + t + '”?'
+    };
+    const EXAMPLES = {
+      1: ['Run a 5K', 'Read a book a month', 'Pay off the car'],
+      2: ['Clear out the garage', 'Get outside every weekend'],
+      3: ['Book the plumber', 'Two early nights a week'],
+      4: ['Call the tile shop', 'Gym on Tuesday']
+    };
+    const AREA_NAMES = ['Health', 'Home', 'People', 'Work', 'Money', 'Fun'];
+    const PHRASE = { Health: 'your health', Home: 'home', People: 'the people in your life', Work: 'work', Money: 'money', Fun: 'fun' };
+    const VIEW = { 0: [0, -1093, 0.30], 1: [186, -553, 0.42], 2: [217, -294, 0.45], 3: [244, -67, 0.48], 4: [260, 110, 0.5], 5: [275, 253, 0.52], 6: [186, 15, 0.42] };
+    const MIST = { 0: '214,228,236', 1: '222,232,236', 2: '230,234,233', 3: '237,236,230', 4: '242,238,229', 5: '244,239,229', 6: '244,239,229' };
+    const SLOTS = [{ x: 22, y: 500, side: 'r' }, { x: 370, y: 484, side: 'l' }, { x: 196, y: 536, side: 'r' }];
+    const GHOSTS = [{ x: 24, y: 420, side: 'r' }, { x: 368, y: 404, side: 'l' }, { x: 368, y: 560, side: 'l' }];
+    const LEVEL = {
+      1: { color: '#a8452c', pole: 46, w: 150, name: 'Year' },
+      2: { color: '#b0701c', pole: 52, w: 158, name: 'Season' },
+      3: { color: '#2f6b52', pole: 56, w: 166, name: 'Month' },
+      4: { color: '#2f5f8a', pole: 60, w: 170, name: 'Week' },
+      5: { color: '#6b4a8c', pole: 60, w: 170, name: 'Today' }
+    };
+    const ICON = {
+      up: 'M5 12.5l5-5 5 5',
+      down: 'M5 7.5l5 5 5-5',
+      type: 'M2.5 5.5h15v9h-15zM5.5 8.5h1M8.5 8.5h1M11.5 8.5h1M14 8.5h.5M6.5 11.5h7',
+      examples: 'M10 2.5a5 5 0 0 0-3 9v1.5h6v-1.5a5 5 0 0 0-3-9zM8 16h4',
+      nudge: 'M10 3a7 7 0 1 0 0 14a7 7 0 1 0 0-14zM12.8 7.2l-1.6 4-4 1.6 1.6-4z',
+      quick: 'M10 3v12M5 10.5l5 5 5-5',
+      full: 'M2 16l5-8 3 4 2.5-3.5L18 16z',
+      today: 'M10 6.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7zM10 2v2M10 16v2M2 10h2M16 10h2M4.4 4.4l1.4 1.4M14.2 14.2l1.4 1.4M4.4 15.6l1.4-1.4M14.2 5.8l1.4-1.4'
+    };
+    const POS = { N: [150, 34, -90], NE: [232, 68, -45], E: [266, 150, 0], SE: [232, 232, 45], S: [150, 266, 90], SW: [68, 232, 135], W: [34, 150, 180], NW: [68, 68, -135] };
+
+    const step = this.state.step;
+    const said = this.state.said || {};
+    const focus = this.state.focus || {};
+    let v = VIEW[step];
+    const set = (patch) => this.setState(patch);
+    const ground = step === 1 && !!this.state.ground;
+    const kept = this.state.kept || [];
+    const allAreas = AREA_NAMES.concat(this.state.custom || []);
+    const shownAreas = ground ? allAreas : allAreas.filter((n) => kept.indexOf(n) >= 0);
+    const BAND = { 1: 780, 2: 950, 3: 1100, 4: 1230, 5: 1330 };
+    const colNames = shownAreas.slice();
+    if (!ground && [1, 2, 3, 4, 5].some((s) => (said[s] || []).some((it) => !it.a || colNames.indexOf(it.a) < 0))) colNames.push('Other');
+    const colX = {};
+    const colIdx = {};
+    const rows = colNames.length > 6 ? 3 : (colNames.length > 3 ? 2 : 1);
+    colNames.forEach((n, i) => { const cnt = colNames.length; const vx = cnt === 1 ? 195 : (ground ? 50 + i * (290 / (cnt - 1)) : 87 + i * (215 / (cnt - 1))); colX[n] = VIEW[1][0] + vx / VIEW[1][2]; colIdx[n] = i; });
+    const spacing = colNames.length > 1 ? 215 / (colNames.length - 1) : 200;
+    const bw = Math.max(70, Math.min(124, Math.round(spacing - 8)));
+    const areaPos = {};
+    shownAreas.forEach((n) => { areaPos[n] = { wx: colX[n], wy: BAND[1] + (colIdx[n] % rows) * 34 / VIEW[1][2], side: 'r' }; });
+    let zoomCol = null;
+    if (step === 1 && !ground && this.state.focusArea && colX[this.state.focusArea] != null) zoomCol = this.state.focusArea;
+    else if (step >= 2 && step <= 5 && focus[step] != null) { const pi = (said[step - 1] || [])[focus[step]]; if (pi && pi.a && colX[pi.a] != null) zoomCol = pi.a; }
+    if (zoomCol) { const zs = 0.8; v = [colX[zoomCol] - 195 / zs, BAND[step] - 520 / zs - ((colIdx[zoomCol] || 0) % rows) * 70 / VIEW[step][2], zs]; }
+    const d1 = Math.max(0, Math.min(step, 6) - 1);
+    const areaLabels = step >= 1 ? shownAreas.map((n) => {
+      const p = areaPos[n];
+      const on = kept.indexOf(n) >= 0;
+      const foc = step === 1 && !ground && this.state.focusArea === n;
+      return {
+        name: n, pressed: (ground ? on : foc) ? 'true' : 'false',
+        style: 'position: absolute; left: ' + (p.wx - 45) + 'px; top: ' + (p.wy + 3 / VIEW[1][2]) + 'px; width: 90px; min-height: 34px; display: flex; flex-direction: column; align-items: center; gap: 1px; border: 0; padding: 0; background: transparent; cursor: ' + (step === 1 ? 'pointer' : 'default') + '; z-index: 9; font-family: inherit; opacity: ' + (ground ? (on ? 1 : 0.62) : Math.max(0.5, 1 - 0.1 * d1)).toFixed(2) + '; transform: scale(' + ((ground ? 1 : Math.max(0.6, 1 - 0.1 * d1)) / v[2]).toFixed(3) + '); transform-origin: 50% 0; transition: opacity 400ms, transform 1400ms cubic-bezier(.45,.05,.2,1), left 700ms ease, top 700ms ease;',
+        mark: 'width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid ' + (on || foc ? '#f6dfa6' : 'rgba(255,255,255,0.85)') + ';',
+        text: 'font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; padding: 4px 9px; border-radius: 999px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); ' + (foc ? 'color: #1f2a2b; background: #f6dfa6; box-shadow: 0 0 18px rgba(255,220,150,0.95);' : (on ? 'color: #f6dfa6; background: rgba(0,22,96,0.72); box-shadow: inset 0 0 0 1.5px #f6dfa6;' : 'color: #ffffff; background: rgba(0,22,96,0.55);')),
+        tap: () => {
+          if (step !== 1) return;
+          if (ground) { this.sfxTick(); set({ kept: on ? kept.filter((k) => k !== n) : kept.concat([n]) }); }
+          else set({ focusArea: foc ? null : n });
+        }
+      };
+    }) : [];
+    const cur = said[step] || [];
+    const exList = EXAMPLES[step] || [];
+    const exOpen = !!(this.state.ex || {})[step];
+
+    const makeFlag = (it, s, slot, wx, wy, opts) => {
+      const L0 = LEVEL[s];
+      const L = Object.assign({}, L0, { w: opts.narrow ? 112 : L0.w, pole: opts.pole || L0.pole });
+      const d = opts.ghost ? 0 : Math.max(0, Math.min(step, 6) - s);
+      const scale = Math.max(0.55, 1 - 0.12 * d);
+      const op = opts.ghost ? 0.78 : Math.max(0.6, 1 - 0.09 * d);
+      const blur = (d * 0.35).toFixed(2);
+      const sat = Math.max(0.55, 1 - 0.1 * d).toFixed(2);
+      const right = slot.side === 'r';
+      const focused = !!opts.focused;
+      return {
+        text: it.t, day: it.d || '', hasDay: !!it.d,
+        plantClass: opts.ghost ? 'wk-ghost-flag' : 'wk-plant',
+        outer: 'position: absolute; left: ' + (right ? wx : wx - L.w) + 'px; top: ' + (wy - L.pole) + 'px; width: ' + L.w + 'px; height: ' + L.pole + 'px; padding: 0; border: 0; background: transparent; cursor: ' + (opts.tap ? 'pointer' : 'default') + '; transform: scale(' + (scale / v[2]).toFixed(3) + '); transform-origin: ' + (right ? '0% 100%' : '100% 100%') + '; opacity: ' + op.toFixed(2) + '; filter: blur(' + blur + 'px) saturate(' + sat + '); transition: transform 1400ms cubic-bezier(.45,.05,.2,1), opacity 1400ms ease, filter 1400ms ease; z-index: ' + (10 + s) + ';',
+        pole: 'position: absolute; bottom: 0; ' + (right ? 'left: 0;' : 'right: 0;') + ' width: 3px; height: ' + L.pole + 'px; border-radius: 2px; background: ' + (opts.ghost ? 'rgba(255,255,255,0.85)' : 'linear-gradient(90deg, #4a3a2c, #2c2219)') + ';',
+        shadow: 'position: absolute; bottom: -3px; ' + (right ? 'left: -6px;' : 'right: -6px;') + ' width: 16px; height: 5px; border-radius: 999px; background: rgba(30,25,20,' + (opts.ghost ? '0.15' : '0.35') + '); filter: blur(1.5px);',
+        clothWrap: 'position: absolute; top: 1px; ' + (right ? 'left: 3px;' : 'right: 3px;') + ' max-width: ' + (L.w - 6) + 'px; display: block; filter: ' + (focused ? 'drop-shadow(0 0 7px rgba(255,226,160,1)) drop-shadow(0 0 14px rgba(255,214,140,0.9))' : 'drop-shadow(0 2px 3px rgba(20,20,20,0.25))') + ';',
+        clothOrigin: 'display: block; transform-origin: ' + (right ? 'left center' : 'right center') + ';',
+        cloth: 'background: ' + (opts.ghost ? 'rgba(255,255,255,0.55)' : L.color) + '; ' + (opts.ghost ? 'outline: 1.5px dashed rgba(255,255,255,0.95); outline-offset: -3px;' : '') + ' text-align: left; padding: 5px ' + (right ? '16px 5px 9px' : '9px 5px 16px') + '; clip-path: ' + (right ? 'polygon(0 0, 100% 0, calc(100% - 9px) 50%, 100% 100%, 0 100%)' : 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 9px 50%)') + ';',
+        textStyle: 'display: block; font-size: 13px; line-height: 16px; font-weight: 600; ' + (opts.ghost ? 'color: #1f2a2b; font-style: italic;' : 'color: #ffffff;'),
+        pressed: focused ? 'true' : 'false',
+        label: opts.label,
+        tap: opts.tap || (() => {})
+      };
+    };
+
+    const flags = [];
+    const placed = [];
+    const k1 = VIEW[1][2];
+    shownAreas.forEach((n) => { const p = areaPos[n]; placed.push({ x1: p.wx - 45 / k1, x2: p.wx + 45 / k1, y1: p.wy + 2 / k1, y2: p.wy + 32 / k1 }); });
+    const place = (fx, fy, side, W0, H, minX, maxX, k) => {
+      const pole = Math.max(46, H + 14);
+      const W = W0 / k, Pw = pole / k, pad = 4 / k;
+      const box = (x, y, sd) => ({ x1: sd === 'r' ? x : x - W, x2: sd === 'r' ? x + W : x, y1: y - Pw, y2: y });
+      const hit = (b) => placed.some((p) => b.x1 < p.x2 + pad && b.x2 > p.x1 - pad && b.y1 < p.y2 + pad && b.y2 > p.y1 - pad);
+      const gap = (H + 10) / k, dx = Math.round(W0 * 0.75) / k;
+      const tries = [[0, 0], [0, -gap], [dx, 0], [-dx, 0], [dx, -gap], [-dx, -gap], [0, -2 * gap], [dx, -2 * gap], [-dx, -2 * gap], [0, gap], [dx, gap], [-dx, gap]];
+      for (const t of tries) {
+        const x = Math.min(maxX, Math.max(minX, fx + t[0]));
+        const y = fy + t[1];
+        let sd = side;
+        if (sd === 'r' && x + W > maxX + 8 / k) sd = 'l';
+        if (sd === 'l' && x - W < minX - 8 / k) sd = 'r';
+        const b = box(x, y, sd);
+        if (!hit(b)) { placed.push(b); return { x: x, y: y, side: sd, pole: pole }; }
+      }
+      placed.push(box(fx, fy, side));
+      return { x: fx, y: fy, side: side, pole: pole };
+    };
+    const estH = (t, W, hasTag) => { const cpl = Math.max(8, Math.floor((W - 30) / 7)); return 10 + Math.ceil(t.length * 1.15 / cpl) * 16 + (hasTag ? 14 : 0); };
+    for (let s = 1; s <= 5; s++) {
+      const list = said[s] || [];
+      for (let j = 0; j < list.length && j < 3; j++) {
+        const ks = VIEW[s][2];
+        let fx = VIEW[s][0] + SLOTS[j].x / ks, fy = VIEW[s][1] + SLOTS[j].y / ks, side = SLOTS[j].side;
+        const ap = s === 1 && list[j].a ? areaPos[list[j].a] : null;
+        if (ap) { fx = ap.wx; fy = ap.wy; side = ap.side; }
+        const W = ap ? 112 : LEVEL[s].w;
+        const tag = list[j].d || list[j].a;
+        const pos = place(fx, fy, side, W, estH(list[j].t, W, !!tag), VIEW[s][0] + 8 / ks, VIEW[s][0] + 382 / ks, ks);
+        const slot = { side: pos.side };
+        const parentLevel = step >= 2 && step <= 5 && s === step - 1;
+        const focused = parentLevel && focus[step] === j;
+        flags.push(makeFlag(Object.assign({}, list[j], { d: tag }), s, slot, pos.x, pos.y, {
+          narrow: !!ap, pole: pos.pole,
+          focused: focused,
+          label: LEVEL[s].name + ' flag: ' + list[j].t + (parentLevel ? ', tap to focus' : ''),
+          tap: parentLevel ? () => set({ focus: Object.assign({}, focus, { [step]: focused ? null : j }) }) : null
+        }));
+      }
+    }
+    if (exOpen && step >= 1 && step <= 4) {
+      exList.slice(0, 3).forEach((t, j) => {
+        if (cur.some((c) => c.t === t)) return;
+        const g = GHOSTS[j];
+        const gp = place(v[0] + g.x / v[2], v[1] + g.y / v[2], g.side, LEVEL[step].w, estH(t, LEVEL[step].w, false), v[0] + 8 / v[2], v[0] + 382 / v[2], v[2]);
+        flags.push(makeFlag({ t: t }, step, { side: gp.side }, gp.x, gp.y, {
+          ghost: true, pole: gp.pole,
+          label: 'Example: ' + t + ', tap to make it yours',
+          tap: () => {
+            const now = (this.state.said || {})[step] || [];
+            if (now.length >= 3) return;
+            this.sfxRattle();
+            setTimeout(() => this.sfxPlant(), 160);
+            set({ said: Object.assign({}, this.state.said, { [step]: now.concat([{ t: t }]) }) });
+          }
+        }));
+      });
+    }
+
+    const sc = v[2];
+    const groups = [];
+    const mkGroup = (x, y, s, items, ghost, mode) => {
+      const d = ghost ? 0 : Math.max(0, Math.min(step, 6) - s);
+      const allTips = mode === 'tip' && items.every((i) => i.isTip);
+      const f = mode === 'full' ? 1 : (mode === 'compact' ? 0.85 : Math.max(0.6, 1 - 0.1 * (d - 1)));
+      const gw = allTips ? 34 : bw;
+      groups.push({
+        style: 'position: absolute; left: ' + x.toFixed(1) + 'px; top: ' + y.toFixed(1) + 'px; width: ' + gw + 'px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 2px 0 18px; transform-origin: 0 0; transform: scale(' + (f / sc).toFixed(3) + ') translate(-50%, -100%); opacity: ' + (ghost ? 0.88 : Math.max(0.6, 1 - 0.09 * d)).toFixed(2) + '; filter: blur(' + (d * 0.3).toFixed(2) + 'px) saturate(' + Math.max(0.55, 1 - 0.1 * d).toFixed(2) + '); transition: transform 1400ms cubic-bezier(.45,.05,.2,1), opacity 1400ms ease, filter 1400ms ease; z-index: ' + (10 + s) + ';',
+        pole: 'position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; border-radius: 2px; background: ' + (ghost ? 'rgba(255,255,255,0.85)' : 'linear-gradient(90deg, #4a3a2c, #2c2219)') + ';',
+        shadow: 'position: absolute; left: 50%; bottom: -3px; width: 18px; margin-left: -9px; height: 5px; border-radius: 999px; background: rgba(30,25,20,0.4); filter: blur(1.5px);',
+        items: items
+      });
+    };
+    const pennant = (it, s, o) => {
+      const L = LEVEL[s];
+      const foc = !!o.focused;
+      const mode = o.mode === 'tip' && foc ? 'compact' : (o.mode || 'full');
+      if (mode === 'tip') {
+        return {
+          isTip: true, text: '', tag: '', hasTag: false,
+          pressed: 'false', label: o.label, tap: o.tap || (() => {}),
+          wrap: 'position: relative; z-index: 1; display: block; width: 100%; height: 17px; border: 0; padding: 0; background: transparent; cursor: ' + (o.tap ? 'pointer' : 'default') + '; filter: drop-shadow(0 1px 2px rgba(20,20,20,0.35));',
+          cloth: 'display: block; width: 22px; height: 15px; margin-left: 18px; background: ' + L.color + '; clip-path: polygon(0 0, 100% 50%, 0 100%);',
+          textStyle: 'display: none;', tagStyle: 'display: none;'
+        };
+      }
+      const compact = mode === 'compact';
+      return {
+        isTip: false, text: it.t, tag: compact ? '' : (o.tag || ''), hasTag: !compact && !!o.tag,
+        pressed: foc ? 'true' : 'false', label: o.label, tap: o.tap || (() => {}),
+        wrap: 'position: relative; z-index: 1; display: block; width: 100%; border: 0; padding: 0; background: transparent; cursor: ' + (o.tap ? 'pointer' : 'default') + '; font: inherit; text-align: center; filter: ' + (foc ? 'drop-shadow(0 0 7px rgba(255,226,160,1)) drop-shadow(0 0 14px rgba(255,214,140,0.9))' : 'drop-shadow(0 2px 3px rgba(20,20,20,0.35))') + ';',
+        cloth: 'display: block; background: ' + (o.ghost ? 'rgba(255,255,255,0.62)' : L.color) + '; padding: ' + (compact ? '4px 6px 9px' : '6px 8px 13px') + '; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - ' + (compact ? 5 : 8) + 'px), 0 100%);' + (o.ghost ? ' outline: 1.5px dashed rgba(255,255,255,0.95); outline-offset: -3px;' : ''),
+        textStyle: compact ? 'display: block; font-size: 11px; line-height: 14px; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' : 'display: block; font-size: 13px; line-height: 16px; font-weight: 600; ' + (o.ghost ? 'color: #1f2a2b; font-style: italic;' : 'color: #ffffff;'),
+        tagStyle: 'display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; color: ' + (o.ghost ? '#3f4b49' : 'rgba(255,255,255,0.85)') + ';'
+      };
+    };
+    for (let s = 1; s <= 5; s++) {
+      const list = said[s] || [];
+      const by = {};
+      list.forEach((it, j) => { const col = it.a && colX[it.a] != null ? it.a : 'Other'; (by[col] = by[col] || []).push({ it: it, j: j }); });
+      Object.keys(by).forEach((col) => {
+        if (colX[col] == null) return;
+        const parentLevel = step >= 2 && step <= 5 && s === step - 1;
+        const mode = step === 6 ? 'compact' : (s === step ? 'full' : 'tip');
+        const items = by[col].map((e) => {
+          const sel = !!this.state.selected && this.state.selected.s === s && this.state.selected.j === e.j;
+          const foc = (parentLevel && focus[step] === e.j) || sel;
+          const own = s === step && step >= 1 && step <= 5;
+          return pennant(e.it, s, { mode: mode, focused: foc, tag: s === 1 ? '' : (e.it.d || ''), label: LEVEL[s].name + ': ' + e.it.t + (parentLevel ? ', tap to focus' : (own ? ', tap to move or pull up' : '')), tap: parentLevel ? () => set({ focus: Object.assign({}, focus, { [step]: foc ? null : e.j }) }) : (own ? () => { this.sfxTick(); set({ selected: sel ? null : { s: s, j: e.j }, lastPlant: null }); } : null) });
+        });
+        mkGroup(colX[col], BAND[s] - ((colIdx[col] || 0) % rows) * (mode === 'full' ? 70 : 26) / VIEW[s][2], s, items, false, mode);
+      });
+    }
+    if (exOpen && step >= 1 && step <= 4) {
+      const pa = step >= 2 && focus[step] != null ? (((said[step - 1] || [])[focus[step]]) || {}).a : (step === 1 ? this.state.focusArea : null);
+      const gi = exList.slice(0, 3).filter((t) => !cur.some((c) => c.t === t)).map((t) => pennant({ t: t }, step, { ghost: true, label: 'Example: ' + t + ', tap to make it yours', tap: () => { const now = (this.state.said || {})[step] || []; if (now.length >= 3) return; this.sfxRattle(); setTimeout(() => this.sfxPlant(), 160); if (this.undoT) clearTimeout(this.undoT); this.undoT = setTimeout(() => this.setState({ lastPlant: null }), 7000); set({ lastPlant: { s: step, j: now.length }, said: Object.assign({}, this.state.said, { [step]: now.concat([{ t: t, a: pa || null }]) }) }); } }));
+      if (gi.length) mkGroup(v[0] + 195 / sc, BAND[step] - 170 / sc, step, gi, true, 'full');
+    }
+    const selx = this.state.selected;
+    const selItem = selx ? ((said[selx.s] || [])[selx.j]) : null;
+    const chipStyle = 'flex: none; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.55); background: rgba(0,22,96,0.62); color: #ffffff; font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);';
+    const moveTo = (n) => { const list = (said[selx.s] || []).slice(); list[selx.j] = Object.assign({}, list[selx.j], { a: n }); this.sfxRattle(); setTimeout(() => this.sfxPlant(), 140); set({ said: Object.assign({}, said, { [selx.s]: list }), selected: null, kept: kept.indexOf(n) >= 0 ? kept : kept.concat([n]) }); };
+    const pullUp = () => { const list = (said[selx.s] || []).slice(); list.splice(selx.j, 1); this.sfxRattle(); set({ said: Object.assign({}, said, { [selx.s]: list }), selected: null, lastPlant: null }); };
+    const moveChips = selItem ? allAreas.filter((n) => n !== selItem.a).map((n) => ({ label: n, act: () => moveTo(n), style: chipStyle })).concat([{ label: 'Pull it up', act: pullUp, style: chipStyle + ' color: #ffd0c0; border-color: rgba(255,180,160,0.7);' }]) : [];
+    const lp = this.state.lastPlant;
+    const showUndo = !!lp && lp.s === step && !this.state.speaking && !selItem;
+    const undo = () => { if (!lp) return; const list = (said[lp.s] || []).slice(); list.splice(lp.j, 1); this.sfxRattle(); set({ said: Object.assign({}, said, { [lp.s]: list }), lastPlant: null }); };
+    const ask = ASK[step] || ['', '', ''];
+    let question = ask[1];
+    if (ground) question = 'First, your ground. Which parts of life matter most this year?';
+    else if (step === 1 && this.state.focusArea) question = 'What about ' + (PHRASE[this.state.focusArea] || this.state.focusArea.toLowerCase()) + ', this year?';
+    else if (step >= 2 && step <= 5 && focus[step] != null && (said[step - 1] || [])[focus[step]]) question = FOCUSQ[step](said[step - 1][focus[step]].t);
+
+    const go = (s) => { this.stopTimers(); set({ step: s, speaking: false, live: '', petalsOpen: false, hover: null, holding: false, selected: null, lastPlant: null }); };
+    const act = (id) => {
+      set({ petalsOpen: false, hover: null, holding: false });
+      if (id === 'quick') { set({ mode: 'quick', ground: true, kept: [], focusArea: null }); go(1); }
+      else if (id === 'full') { set({ mode: 'full', ground: true, kept: [], focusArea: null }); go(1); }
+      else if (id === 'today') { set({ sheetOpen: true }); go(6); }
+      else if (id === 'back') { if (step === 1 && !ground) { set({ ground: true, focusArea: null }); return; } go(Math.max(0, step - 1)); }
+      else if (id === 'next') { if (ground) { set({ ground: false, focusArea: this.state.mode === 'full' ? (kept[0] || null) : null }); return; } set({ focusArea: null, sheetOpen: false }); go(Math.min(6, step + 1)); }
+      else if (id === 'type') this.startWriting(85, true);
+      else if (id === 'examples') set({ ex: Object.assign({}, this.state.ex, { [step]: !exOpen }) });
+      else if (id === 'nudge') {
+        if (step === 1) { if (kept.length) { const i = kept.indexOf(this.state.focusArea); set({ focusArea: kept[(i + 1) % kept.length] }); } }
+        else {
+          const n = (said[step - 1] || []).length;
+          if (n) { const c = focus[step]; set({ focus: Object.assign({}, focus, { [step]: c == null ? 0 : (c + 1) % n }) }); }
+        }
+      }
+    };
+
+    let petalDefs = [];
+    if (step === 0) {
+      petalDefs = [{ id: 'quick', pos: 'S', label: 'Quick start', icon: ICON.quick }, { id: 'full', pos: 'E', label: 'Whole year', icon: ICON.full }, { id: 'today', pos: 'W', label: 'Just today', icon: ICON.today }];
+    } else if (ground) {
+      petalDefs = [{ id: 'back', pos: 'N', label: 'Start', icon: ICON.up }, { id: 'next', pos: 'S', label: kept.length ? 'Plant goals' : 'Skip', icon: ICON.down }, { id: 'type', pos: 'W', label: 'Name your own', icon: ICON.type }];
+    } else if (step >= 1 && step <= 5) {
+      petalDefs = [
+        { id: 'back', pos: 'N', label: step === 1 ? 'Start' : 'Back up', icon: ICON.up },
+        { id: 'next', pos: 'S', label: cur.length > 0 ? 'Walk on' : 'Skip', icon: ICON.down },
+        { id: 'type', pos: 'W', label: 'Type it', icon: ICON.type },
+        { id: 'nudge', pos: 'NE', label: 'Nudge me', icon: ICON.nudge }
+      ];
+      if (exList.length) petalDefs.push({ id: 'examples', pos: 'E', label: exOpen ? 'Hide examples' : 'Examples', icon: ICON.examples });
+    }
+    this.petalDefs = petalDefs;
+    this.act = act;
+    this.POS = POS;
+    const showPetals = (this.state.petalsOpen || (this.state.holding && !this.state.speaking));
+    const petals = showPetals ? petalDefs.map((p) => {
+      const P = POS[p.pos];
+      const hot = this.state.hover === p.id;
+      return {
+        label: p.label, icon: p.icon, act: () => act(p.id),
+        style: 'position: absolute; left: ' + P[0] + 'px; top: ' + P[1] + 'px; transform: translate(-50%,-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; padding: 0; background: transparent; cursor: pointer; pointer-events: auto; font-family: inherit; z-index: 3;',
+        disc: 'width: ' + (hot ? 54 : 46) + 'px; height: ' + (hot ? 54 : 46) + 'px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 40% 35%, rgba(255,255,255,' + (hot ? '1' : '0.92') + ') 0%, rgba(255,246,222,' + (hot ? '0.95' : '0.7') + ') 60%, rgba(255,236,196,0) 100%); box-shadow: 0 0 ' + (hot ? 28 : 16) + 'px rgba(255,226,160,' + (hot ? '0.95' : '0.6') + '); transition: all 160ms ease-out;',
+        labelStyle: 'font-size: 12px; font-weight: 700; color: #1f2a2b; white-space: nowrap;'
+      };
+    }) : [];
+
+    const lvl = LEVEL[Math.min(Math.max(step, 1), 5)];
+    const holding = this.state.holding;
+    let hint = '';
+    if (showPetals) hint = '';
+    else if (this.state.note) hint = this.state.note;
+    else if (step === 0) hint = 'Hold the light to begin';
+    else if (ground && !this.state.speaking && !this.state.hover) hint = 'Tap the peaks that matter';
+    else if (this.state.speaking) hint = 'Let go to plant it';
+    else if (this.state.hover) hint = 'Let go to choose';
+    else if (this.state.petalsOpen) hint = 'Tap a point, or tap the light to close';
+    else if (cur.length > 0) hint = 'Hold to plant another · slide down to walk on';
+    else hint = 'Hold the light and speak · slide to its edge for more';
+    const parentCount = step >= 2 && step <= 5 ? (said[step - 1] || []).length : 0;
+    let why = ground ? 'Tap the peaks to keep them. Hold the light to name your own.' : ask[2];
+    if (parentCount > 0 && focus[step] == null) why = why + ' Tap one of your flags to focus on it.';
+
+    const needleDown = cur.length > 0 || step === 0;
+    const items = [
+      { title: 'Send the contractor the deposit', why: 'Pick the tile and pay the deposit' },
+      { title: 'Measure the bathroom wall', why: 'Finish the bathroom' },
+      { title: 'Lift, 30 minutes', why: 'Feel strong again' },
+      { title: 'Plan Saturday breakfast out', why: 'More slow weekends together' }
+    ].map((b, i) => {
+      const done = this.state.done || { 0: true };
+      const d = !!done[i];
+      return {
+        title: b.title, why: b.why, done: d, pressed: d ? 'true' : 'false',
+        rowStyle: i === 0 ? 'border-top: 0;' : '',
+        check: d ? 'width: 26px; height: 26px; flex: none; border-radius: 999px; background: #32664d; display: flex; align-items: center; justify-content: center;' : 'width: 26px; height: 26px; flex: none; border-radius: 999px; border: 2px solid #857d72; box-sizing: border-box;',
+        titleStyle: d ? 'font-size: 16px; font-weight: 600; color: #6b7472; text-decoration: line-through; text-decoration-color: #a9b0ad;' : 'font-size: 16px; font-weight: 600; color: #1f2a2b;',
+        toggle: () => set({ done: Object.assign({}, done, { [i]: !d }) })
+      };
+    });
+    const k = items.filter((x) => x.done).length;
+    const c = 2 * Math.PI * 29;
+    const sheetOpen = !!this.state.sheetOpen;
+    const anyFlags = groups.length > 0;
+
+    return {
+      worldStyle: 'position: absolute; left: 0; top: 0; width: 1300px; height: 1720px; z-index: 1; background: linear-gradient(180deg, #00106e 0px, #011c8c 424px, #0a2a9a 1720px); transform-origin: 0 0; transform: scale(' + v[2] + ') translate(' + (-v[0]) + 'px, ' + (-v[1]) + 'px); transition: transform 1400ms cubic-bezier(.45,.05,.2,1);',
+      mistStyle: 'position: absolute; left: 0; right: 0; top: 0; height: 260px; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(0,18,96,0.55) 0%, rgba(0,18,96,0.25) 60%, rgba(0,18,96,0) 100%);',
+      flags: [],
+      groups: groups,
+      showMoveRow: !!selItem,
+      showHintRow: !selItem,
+      moveChips: moveChips,
+      showUndo: showUndo,
+      undo: undo,
+      areaLabels: areaLabels,
+      isWelcome: step === 0,
+      isAsking: step >= 1 && step <= 5,
+      isToday: step === 6,
+      showDial: step <= 5,
+      eyebrow: step === 1 && this.state.mode === 'full' ? 'The year ahead · area by area' : ask[0],
+      question: question, why: why,
+      petals: petals,
+      hint: hint,
+      dialBack: 'position: absolute; inset: 0; border-radius: 999px; pointer-events: none; transition: opacity 220ms; opacity: ' + (showPetals ? 1 : 0) + '; background: radial-gradient(circle, rgba(255,250,236,0.55) 0%, rgba(255,250,236,0.35) 45%, rgba(255,250,236,0) 72%);',
+      needle: needleDown ? 'M150 214l-5 -12h10z' : 'M150 86l-5 12h10z',
+      needleColor: needleDown ? 'rgba(168,69,44,0.9)' : 'rgba(255,255,255,0.75)',
+      showLive: this.state.speaking,
+      live: this.state.live,
+      liveCloth: 'display: block; min-width: 40px; max-width: 220px; background: ' + lvl.color + '; padding: 6px 18px 6px 10px; clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 50%, 100% 100%, 0 100%);',
+      speaking: this.state.speaking,
+      orbClass: this.state.speaking || holding ? 'wk-orb-on' : 'wk-orb',
+      orbLabel: step === 0 ? 'Hold to begin' : 'Hold and speak to plant a flag; tap for more',
+      orbStyle: 'position: absolute; left: 102px; top: 102px; width: 96px; height: 96px; border: 0; padding: 0; border-radius: 999px; background: transparent; cursor: pointer; pointer-events: auto; touch-action: none; -webkit-touch-callout: none; z-index: 2; transform: scale(' + (holding ? 1.1 : 1) + '); transition: transform 200ms;',
+      od: (e) => this.orbDown(e),
+      noMenu: (e) => { if (e.preventDefault) e.preventDefault(); },
+      todayTitle: anyFlags && !sheetOpen ? 'Look back up: that’s your plan.' : 'Here’s today.',
+      sheetStyle: 'position: absolute; left: 0; right: 0; top: ' + (sheetOpen || !anyFlags ? 130 : 716) + 'px; bottom: 0; z-index: 5; background: #fbf8f2; border-radius: 28px 28px 0 0; box-shadow: 0 -10px 40px rgba(30,38,40,0.18); padding: 4px 18px 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; overflow: hidden; transition: top 600ms cubic-bezier(.2,.8,.2,1);',
+      sheetHandle: sheetOpen || !anyFlags ? 'Look back up at your plan' : 'Show my day',
+      sheetOpenAttr: sheetOpen ? 'true' : 'false',
+      toggleSheet: () => set({ sheetOpen: !sheetOpen }),
+      anotherName: ((said[1] && said[1].length ? said[1] : SCRIPT[1])[0]).t,
+      walkAnother: () => { const yr = said[1] && said[1].length ? said[1] : SCRIPT[1].slice(); set({ said: Object.assign({}, said, { 1: yr }), focus: { 2: 0 }, focusArea: null, ground: false, sheetOpen: false }); go(2); },
+      restart: () => { this.stopTimers(); set({ step: 0, said: {}, done: { 0: true }, focus: {}, focusArea: null, ground: false, kept: [], custom: [], ex: {}, sheetOpen: false, speaking: false, live: '', petalsOpen: false, hover: null, holding: false }); },
+      items: items,
+      count: k + '/' + items.length,
+      ringLabel: k + ' of ' + items.length + ' done',
+      dash: (c * k / items.length).toFixed(1) + ' ' + c.toFixed(1),
+      allDone: k === items.length
+    };
+  }
+}
+</script>
+</body>
+</html>
