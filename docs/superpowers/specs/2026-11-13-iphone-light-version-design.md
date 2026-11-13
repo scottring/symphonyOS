@@ -65,28 +65,71 @@ web app. No paid subscription at launch.
   Never take away anything free users already have; Plus only adds.
   Say "Symphony Plus is coming" up front.
 - **Routines are hidden** in the light version for now.
-- **The walk is a walk down a mountain**, not a set of form screens (v1 was
-  rejected as form-like):
-  - The scene glides down as you go: the year high in the sky, the season at
-    the peaks, the month at the ridges, the week in the valley, today on the
-    path. Where you are in the picture replaces step labels.
-  - One large question per screen, one big mic ("Tap and tell me"), the
-    keyboard as a small option.
-  - Answers settle into the scene as paper notes. Notes from the level above
-    stay visible at the top ("Higher up").
-  - No Next button. "That's it" (or a swipe down) walks on. "Skip" when
-    nothing has been said yet. A small up-arrow goes back.
-  - It ends with Today rising in as a paper sheet, with a ring that fills as
-    to-dos are done and a quiet "That's the day" when it closes.
+- **The walk is a walk down a mountain**, not a set of form screens. Two
+  earlier versions were rejected: v1 as form-like, and a later one because
+  its buttons "don't commit to the aesthetic." The approved interaction is in
+  the mockup (see "Mockup" below); this section is its contract.
+  - **The scene is the progress.** Welcome shows the whole vista small under
+    a deep sky. Each step zooms in a little and moves lower: Year at the snow
+    peaks, Season and Month past the river valley, Week by the pines and
+    cliff, the first thing today on the rock ledge. No step labels.
+  - **Look:** crisp, saturated woodblock (Scott's tall and square overlook
+    prints, deep blue sky), white Crimson Pro / DM Sans text with a soft dark
+    shadow, a faint dark band at the top for legibility. No pale mist.
+  - **The orb is the only control.** A warm, breathing light at the bottom,
+    with compass ticks and a small needle that points down (toward today)
+    once something is planted.
+    - *Press and hold:* a flag pole rises out of the orb, the cloth unfurls,
+      and the words fill in as the person speaks. Let go and it plants.
+    - *Slide to the edge while holding,* or *tap once,* and compass points
+      open: down = Walk on (or Skip), up = Back up, left = Type it,
+      right = Examples, up-right = Nudge me. Let go on (or tap) a point to
+      choose it.
+    - No other buttons on the walk screens. One line of glowing text under
+      the orb says what holding or sliding will do.
+  - **Sounds, subtle:** a canvas-bag rustle and wooden poles clacking as a
+    pole is drawn out, a cloth flap as it unfurls, a swish and soft earthy
+    thud as it plants, a tiny tick crossing a compass point. Use recorded
+    sounds in the app, not synthesized ones; pair with haptics.
+  - **Areas are the ground.** Year opens with "First, your ground. Which
+    parts of life matter most this year?": the ridgeline is labeled like a
+    map (Health, Home, People, Work, Money, Fun, in staggered rows so labels
+    never overlap). Tap to keep; hold the orb to name your own. Areas are
+    labels on goals, stored the way the web app stores them (life areas;
+    `goal_areas`, `goals.area_id`, `tasks.area_id`), never goals themselves.
+  - **One post per area, a trail down the mountain.** Each kept area is a
+    post at the base of its peak; goals hang on it as stacked banners. Lower
+    levels hang on the same area's post further down the slope, so looking
+    back up shows one column per area. Goals with no area go on an unlabeled
+    post. Flags never overlap or float in the sky.
+  - **Where a goal goes is decided by what it says.** If the words clearly
+    belong to a kept area, it goes there even if another peak is focused, with
+    a quiet line ("That sounded like home, so it went on the Home peak"). A
+    focused peak only catches goals that don't clearly belong elsewhere. Lower
+    levels inherit the area of the focused parent goal.
+  - **Zoom to an area.** Tapping a peak (or a parent flag on lower levels)
+    glides the camera in close to that post; tapping again glides back out to
+    the whole range. Nudge me pans between areas.
+  - **Distance.** Only the level you're on shows full banners. Levels above
+    shrink to small flags on their posts; tap one to focus on it (it opens to
+    a one-line banner and the question becomes about it).
+  - **Undo and fix.** After every plant, a quiet "Undo" sits beside the hint
+    for about seven seconds. Tapping a flag on the current level selects it
+    and shows "Move to" area chips (moving to an area not yet kept adds it)
+    and "Pull it up" (remove). In the app, undo of the last action should be
+    available throughout the walk.
+  - It ends with Today rising in as a sheet, after a "Look back up: that's
+    your plan" view of every area column; a ring fills as to-dos are done,
+    with a quiet "That's the day" when it closes.
 - **Guidance, gentlest first** (the balance Scott approved):
   1. A one-line "why" under every question.
-  2. Memory joggers that don't supply content: life areas on the Year step
-     (Health, Home, People, Work, Money, Fun; tapping one narrows the question
-     to "What about home, this year?"); on lower steps, the person's own notes
-     from higher up (tapping one focuses the question: "For 'Finish the
-     bathroom', what's this winter's piece?").
-  3. "Show me examples" on request only: at most three dashed "e.g." notes,
-     tappable to use and reword. None on the Today step.
+  2. Memory joggers that don't supply content: the area peaks on the Year
+     step ("What about home, this year?"); on lower steps, the person's own
+     flags from the level above ("For 'Finish the bathroom', what's this
+     winter's piece?").
+  3. Examples only on request (the orb's Examples point): at most three
+     pale, dashed ghost flags on the mountain; tap one to make it yours.
+     None on the Today step.
 - **Both depths.** The welcome screen offers "Quick start" (one goal down to
   today) and "Plan my whole year" (every area, every goal). After a quick start,
   Today offers "Walk another one down" for the next year goal, so the full
@@ -134,10 +177,15 @@ web app. No paid subscription at launch.
   then the coming one, and the question names it ("And this winter?"). The
   Month step works the same way. The Year, Season and Month pages must show
   what the walk filed.
-- *(Claude's call)* **Art for launch.** The descent ships with the existing
-  overlook print, faked with pan, zoom and layered crops, as in the mockup. A
-  tall summit-to-doorstep picture per place comes after launch, so new art is
-  not on the critical path.
+- **Art.** The single square overlook (1932 px, upscaled 3x in
+  `~/Pictures/Symphony scenery`) is too soft when zoomed and too short to give
+  each level room; Scott rejected the blur. The app needs one tall,
+  high-resolution painting in the same woodblock style, around 3000 x 9000 px,
+  summit to ledge, so each level has its own band at native sharpness. Until
+  it exists, build against the square overlook with the mockup's zoom-in
+  descent. Per-place versions (ending at a driveway, subway entrance, farm
+  gate, cabin porch) come after launch. Getting this art is Scott's step; it
+  is on the critical path for how the walk feels.
 
 ## Light and full in one app
 
@@ -229,6 +277,44 @@ privacy labels, the existing /privacy page, and a demo account for App Review.
 - The order of work, provided App Store requirements are not left to the end.
 - Mic permission and offline behavior details, following the existing
   TellSheet.
+
+## Mockup
+
+- Live, playable: https://claude.ai/artifact/6qsEdjFMsyg4s415SYk48i (top
+  row, "Play this one: the whole walk"; press and hold the orb, slide to its
+  edge). Private to Scott.
+- Source of the approved walk, for reference (HTML prototype, not app code):
+  `docs/superpowers/specs/2026-11-13-iphone-light-walk-mockup/Walk.dc.html`.
+  Camera stops, bands, banner layout, placement rules and sound recipes are
+  all in its `renderVals()` and `sfx*` methods.
+
+## Not designed yet: mockup and Scott's approval before building
+
+Scott's rule: when a UI preview is needed, show it before implementing.
+
+1. **Today and Week** in the walk's visual language (scenery, the orb as the
+   Tell control, flags as the "for" lineage). The walk currently ends on the
+   older paper sheet. This is half the product goal ("easily manage today and
+   week").
+2. **The Duo layouts:** inside screen opened flat (the journal spread), the
+   outside screen, and tent view, in this style.
+3. **The Year, Season and Month pages** after the walk (where the walk's
+   flags live and grow; "Walk another one down").
+4. **Regular iPhone sideways** and Dynamic Type at large sizes.
+5. **Accessibility:** a VoiceOver / Switch Control path through the walk
+   without gestures.
+
+## Order of work
+
+1. Foundations that don't depend on design (each needs Scott's approval
+   before any database change or deploy): household-level edition and
+   server-side AI gating; open signup with the web holding page for light
+   accounts; in-app account deletion; Apple Calendar via EventKit; hiding
+   non-light features.
+2. The walk, as specified above, against the interim art.
+3. Mockup round for the "Not designed yet" list; build each after approval.
+4. App Store listing, screenshots, Duo product page, review demo account.
+   Submission only with Scott's go-ahead.
 
 ## Calls Claude made (check these)
 
