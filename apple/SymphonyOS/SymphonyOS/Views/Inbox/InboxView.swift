@@ -136,7 +136,8 @@ struct InboxView: View {
     }
 
     private func move(_ tasks: [SymphonyTask], _ destination: PlanWriter.Destination) {
-        triage.request(tasks, to: destination, context: modelContext, userId: userId, members: familyMembers)
+        triage.request(tasks, to: destination, context: modelContext, userId: userId, members: familyMembers,
+                       assumedLifeArea: appState.edition.assumedLifeArea)
         if triage.areaRequest == nil { finishBulk() }
     }
 
@@ -228,6 +229,7 @@ private struct SelectableRow: View {
     let selected: Bool
     let toggle: () -> Void
     @Query private var familyMembers: [FamilyMember]
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         Button(action: toggle) {
@@ -247,8 +249,10 @@ private struct SelectableRow: View {
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if task.context != nil { ContextDot(context: task.context) }
-                AssigneeAvatars(memberIds: task.assignedToAll ?? (task.assignedTo.map { [$0] } ?? []),
-                                members: familyMembers, size: 20)
+                if appState.edition.allows(.people) {
+                    AssigneeAvatars(memberIds: task.assignedToAll ?? (task.assignedTo.map { [$0] } ?? []),
+                                    members: familyMembers, size: 20)
+                }
             }
             .padding(14)
             .frame(minHeight: 52)

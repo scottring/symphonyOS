@@ -105,7 +105,7 @@ struct WeekPlanView: View {
             VStack(alignment: .leading, spacing: 0) {
                 PlannerHeader(title: Self.title(for: weekStart), subtitle: Self.range(weekStart), onTitle: onTitle) {
                     HStack(spacing: 0) {
-                        DomainMenu()
+                        if appState.edition.allows(.spaces) { DomainMenu() }
                         CircleIconButton(systemImage: "chevron.left", label: "Previous week") { appState.step(-1) }
                         CircleIconButton(systemImage: "chevron.right", label: "Next week") { appState.step(1) }
                         if !appState.showsCurrentPeriod() {

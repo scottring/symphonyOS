@@ -6,6 +6,7 @@ struct TaskDetailView: View {
     @Bindable var task: SymphonyTask
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
     @FocusState private var titleFocused: Bool
     @FocusState private var notesFocused: Bool
 
@@ -134,6 +135,7 @@ struct TaskDetailView: View {
                 }
 
                 // Context
+                if appState.edition.allows(.spaces) {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Context", systemImage: "tag")
                         .eyebrowStyle()
@@ -144,9 +146,10 @@ struct TaskDetailView: View {
                         contextChip("Personal", value: "personal", color: .contextPersonal)
                     }
                 }
+                }
 
                 // Assigned to
-                if !familyMembers.isEmpty {
+                if appState.edition.allows(.people), !familyMembers.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Assigned to", systemImage: "person.2")
                             .eyebrowStyle()
@@ -180,7 +183,7 @@ struct TaskDetailView: View {
                 }
 
                 // Project
-                if !projects.isEmpty {
+                if appState.edition.allows(.projects), !projects.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Project", systemImage: "folder")
                             .eyebrowStyle()
@@ -313,7 +316,7 @@ struct TaskDetailView: View {
 
                 // Linked contact (e.g. a place/service provider). The web stores
                 // the place's phone on the contact, not the task — surface it here.
-                if !contacts.isEmpty {
+                if appState.edition.allows(.contacts), !contacts.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Label("Contact", systemImage: "person.crop.circle")
@@ -633,6 +636,7 @@ struct TaskDetailView: View {
     // MARK: - Places autocomplete
 
     private func searchPlaces(_ query: String) {
+        guard appState.edition.allows(.placeSearch) else { return }
         placeSearchTask?.cancel()
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard q.count >= 3 else {

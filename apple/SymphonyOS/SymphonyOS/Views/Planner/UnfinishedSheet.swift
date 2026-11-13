@@ -94,7 +94,8 @@ struct UnfinishedSheet: View {
     }
 
     private func move(_ tasks: [SymphonyTask], _ destination: PlanWriter.Destination) {
-        triage.request(tasks, to: destination, context: modelContext, userId: userId, members: familyMembers)
+        triage.request(tasks, to: destination, context: modelContext, userId: userId, members: familyMembers,
+                       assumedLifeArea: appState.edition.assumedLifeArea)
     }
 
     private func dayLabel(_ d: Date) -> String {

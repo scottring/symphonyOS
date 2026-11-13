@@ -38,11 +38,16 @@ final class TriageController {
 
     /// Ask for missing life areas, or move straight away.
     func request(_ tasks: [SymphonyTask], to destination: PlanWriter.Destination,
-                 context: ModelContext, userId: UUID, members: [FamilyMember]) {
+                 context: ModelContext, userId: UUID, members: [FamilyMember],
+                 assumedLifeArea: String? = nil) {
         guard !tasks.isEmpty else { return }
         let unclassified = tasks.filter(PlanWriter.needsLifeArea)
         if unclassified.isEmpty {
             perform(tasks, to: destination, areas: [:], context: context, userId: userId, members: members)
+        } else if let assumedLifeArea {
+            // The light edition has one life area: no sheet, just that one.
+            let areas = Dictionary(uniqueKeysWithValues: unclassified.map { ($0.id, assumedLifeArea) })
+            perform(tasks, to: destination, areas: areas, context: context, userId: userId, members: members)
         } else {
             areaRequest = AreaRequest(tasks: tasks, unclassified: unclassified, destination: destination)
         }

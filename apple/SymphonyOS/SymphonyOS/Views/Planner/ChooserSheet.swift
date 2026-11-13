@@ -132,7 +132,14 @@ struct ChooserSheet: View {
     private func taskRow(_ task: SymphonyTask, meta: String? = nil) -> some View {
         PlanTaskRow(task: task, meta: meta ?? weekendMeta(task)) {
             AddButton(title: task.title, added: false) {
-                if PlanWriter.needsLifeArea(task) { needsArea = task } else { add(task) }
+                if PlanWriter.needsLifeArea(task) {
+                    if let area = appState.edition.assumedLifeArea {
+                        TaskViewModel(modelContext: modelContext).setContext(task, context: area, members: familyMembers)
+                        add(task)
+                    } else {
+                        needsArea = task
+                    }
+                } else { add(task) }
             }
         }
         .padding(.horizontal, 16)
@@ -168,7 +175,7 @@ struct ChooserSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         let marks = HStack(spacing: 10) {
             if r.context != nil { ContextDot(context: r.context) }
-            AssigneeAvatars(memberIds: r.assignedTo.map { [$0] } ?? [], members: familyMembers, size: 20)
+            if appState.edition.allows(.people) { AssigneeAvatars(memberIds: r.assignedTo.map { [$0] } ?? [], members: familyMembers, size: 20) }
             routineAdd(offer)
         }
         return Group {

@@ -9,6 +9,7 @@ import SwiftUI
 /// Layout comes from `DayScale` (a port of the web's `dayScale.ts`), so the
 /// phone and the web put the same day in the same places.
 struct TodayDayColumn: View {
+    @Environment(AppState.self) private var appState
     /// The day's scheduled things (`TimelineViewModel.schedule`): all-day
     /// events become chips above the column; the rest are placed on it.
     let items: [TimelineItem]
@@ -146,7 +147,7 @@ struct TodayDayColumn: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                AssigneeAvatars(memberIds: item.assignedTo, members: members, size: 18)
+                if appState.edition.allows(.people) { AssigneeAvatars(memberIds: item.assignedTo, members: members, size: 18) }
             }
             .padding(.leading, 10)
             .padding(.trailing, 6)

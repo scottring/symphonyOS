@@ -264,6 +264,7 @@ struct PlanTaskRow<Trailing: View>: View {
     @ViewBuilder var trailing: () -> Trailing
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppState.self) private var appState
     @Query private var familyMembers: [FamilyMember]
     @State private var showDetail = false
 
@@ -330,7 +331,7 @@ struct PlanTaskRow<Trailing: View>: View {
     private var marks: some View {
         if task.captureStatus == "pending" { ProgressView().controlSize(.small) }
         if task.context != nil { ContextDot(context: task.context) }
-        AssigneeAvatars(memberIds: assigned, members: familyMembers, size: 20)
+        if appState.edition.allows(.people) { AssigneeAvatars(memberIds: assigned, members: familyMembers, size: 20) }
     }
 
     private var titleButton: some View {

@@ -113,7 +113,7 @@ struct PeriodPlanView: View {
         VStack(alignment: .leading, spacing: 0) {
             PlannerHeader(title: title, subtitle: subtitle, onTitle: onTitle) {
                 HStack(spacing: 0) {
-                    DomainMenu()
+                    if appState.edition.allows(.spaces) { DomainMenu() }
                     CircleIconButton(systemImage: "chevron.left", label: "Previous \(unit)") { appState.step(-1, seasons: seasons) }
                     CircleIconButton(systemImage: "chevron.right", label: "Next \(unit)") { appState.step(1, seasons: seasons) }
                     if !appState.showsCurrentPeriod(seasons: seasons) {

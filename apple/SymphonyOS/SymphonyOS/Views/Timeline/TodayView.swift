@@ -45,6 +45,7 @@ struct TodayView: View {
     /// The night's planned dinner, when the view includes family (meals are
     /// the household's; a Work or Personal view leaves them out).
     private var dinner: Dinner? {
+        guard appState.edition.allows(.dinner) else { return nil }
         let context = appState.domainFilter.contextValue
         guard context == nil || context == "family" else { return nil }
         return dinners.dinner(on: date)
@@ -126,7 +127,7 @@ struct TodayView: View {
         // then refresh the day in the background.
         .onAppear { rebuildTimeline() }
         .task { await calendar.refresh(date, maxAge: 60) }
-        .task { await dinners.refresh(date) }
+        .task { if appState.edition.allows(.dinner) { await dinners.refresh(date) } }
         #if os(iOS)
         // The widgets carry tomorrow and the day after as well.
         .task {
@@ -139,7 +140,7 @@ struct TodayView: View {
         .onChange(of: appState.selectedDate) { _, _ in
             rebuildTimeline()
             Task { await calendar.refresh(appState.selectedDate, maxAge: 60) }
-            Task { await dinners.refresh(appState.selectedDate) }
+            if appState.edition.allows(.dinner) { Task { await dinners.refresh(appState.selectedDate) } }
         }
         .onChange(of: appState.domainFilter) { _, _ in rebuildTimeline() }
         .onChange(of: tasksRevision) { _, _ in rebuildTimeline() }
@@ -560,7 +561,7 @@ struct TodayView: View {
             onTitle: onTitle
         ) {
             HStack(spacing: 0) {
-                DomainMenu()
+                if appState.edition.allows(.spaces) { DomainMenu() }
                 CircleIconButton(systemImage: "chevron.left", label: "Previous day") {
                     withAnimation(.easeInOut(duration: 0.2)) { appState.goToPreviousDay() }
                 }

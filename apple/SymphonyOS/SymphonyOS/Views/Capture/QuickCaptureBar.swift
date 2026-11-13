@@ -6,6 +6,7 @@ struct QuickCaptureBar: View {
     /// When set (the Today screen), an undated capture schedules for this day.
     var defaultDate: Date? = nil
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppState.self) private var appState
     @State private var title = ""
     @State private var showCamera = false
     @FocusState private var isFocused: Bool
@@ -44,7 +45,7 @@ struct QuickCaptureBar: View {
             #if os(iOS)
             // Photo capture: snap a thing → AI turns it into an enriched inbox
             // task in the background (fire-and-forget).
-            if title.isEmpty {
+            if title.isEmpty, appState.edition.allows(.photoCapture) {
                 Button {
                     showCamera = true
                 } label: {

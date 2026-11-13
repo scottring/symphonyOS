@@ -28,7 +28,7 @@ struct iOSMainView: View {
 
     private var dock: some View {
         @Bindable var state = appState
-        return SymphonyDock(activeTab: $state.activeTab) { showCapture = true }
+        return SymphonyDock(activeTab: $state.activeTab, tabs: AppTab.visible(in: appState.edition)) { showCapture = true }
             // Report the dock's real height (it grows with text size) so the
             // floating capture bar and toolbars sit exactly above it.
             .background(GeometryReader { proxy in
@@ -48,7 +48,7 @@ struct iOSMainView: View {
         if layout.edge != .bottom {
             ZStack(alignment: .topLeading) {
                 Color.clear
-                SymphonyDock(activeTab: $state.activeTab, edge: layout.edge, iconsOnly: layout.iconsOnly) { showCapture = true }
+                SymphonyDock(activeTab: $state.activeTab, tabs: AppTab.visible(in: appState.edition), edge: layout.edge, iconsOnly: layout.iconsOnly) { showCapture = true }
                     .frame(width: layout.frame.width, height: layout.frame.height, alignment: .top)
                     .offset(x: layout.frame.minX, y: layout.frame.minY)
             }
@@ -210,6 +210,8 @@ enum DockMetrics {
 
 private struct SymphonyDock: View {
     @Binding var activeTab: AppTab
+    /// The tabs this edition shows (`AppTab.visible(in:)`), in order.
+    let tabs: [AppTab]
     var edge: DockEdge = .bottom
     /// The outside screen: icons alone, no + (Today's Tell bar has it).
     var iconsOnly = false
@@ -226,10 +228,7 @@ private struct SymphonyDock: View {
                 addButton
                     .padding(.bottom, 10)
             }
-            tab(.planner, icon: AppTab.planner.icon, label: "Planner")
-            tab(.inbox, icon: AppTab.inbox.icon, label: "Inbox")
-            tab(.routines, icon: AppTab.routines.icon, label: "Routines")
-            tab(.more, icon: AppTab.more.icon, label: "More")
+            ForEach(tabs) { t in tab(t, icon: t.icon, label: t.rawValue) }
             Spacer(minLength: 0)
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
@@ -238,11 +237,9 @@ private struct SymphonyDock: View {
 
     private var bottomBar: some View {
         HStack(alignment: .center, spacing: 0) {
-            tab(.planner, icon: AppTab.planner.icon, label: "Planner")
-            tab(.inbox, icon: AppTab.inbox.icon, label: "Inbox")
+            ForEach(tabs.prefix(2)) { t in tab(t, icon: t.icon, label: t.rawValue) }
             addSlot
-            tab(.routines, icon: AppTab.routines.icon, label: "Routines")
-            tab(.more, icon: AppTab.more.icon, label: "More")
+            ForEach(tabs.dropFirst(2)) { t in tab(t, icon: t.icon, label: t.rawValue) }
         }
         // Like the system tab bar: labels stop growing at a readable size and
         // the large-content viewer (long-press) shows them bigger.
@@ -307,6 +304,7 @@ struct CaptureSheet: View {
     let userId: UUID
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
     @Query private var familyMembers: [FamilyMember]
 
     private enum Phase: Equatable {
@@ -339,6 +337,7 @@ struct CaptureSheet: View {
             VStack(spacing: 18) {
                 QuickCaptureBar(userId: userId)
 
+                if appState.edition.allows(.paperCapture) {
                 HStack(spacing: 12) {
                     captureOption(title: "Snap a page", systemImage: "doc.viewfinder") { showScanner = true }
                     captureOption(title: "Choose photo", systemImage: "photo.on.rectangle") { showPhotoPicker = true }
@@ -350,6 +349,7 @@ struct CaptureSheet: View {
                     .foregroundStyle(Color.textTertiary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
+                }
 
                 Spacer(minLength: 0)
             }
@@ -556,30 +556,39 @@ struct MacMainView: View {
 
 struct MoreView: View {
     @Environment(AuthService.self) private var auth
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         List {
+            if [Feature.projects, .lists, .contacts].contains(where: { appState.edition.allows($0) }) {
             Section {
                 // Routines moved to the dock; Projects moved here from it.
+                if appState.edition.allows(.projects) {
                 NavigationLink {
                     ProjectListView()
                 } label: {
                     Label("Projects", systemImage: "folder")
                 }
+                }
 
+                if appState.edition.allows(.lists) {
                 NavigationLink {
                     ListsView()
                 } label: {
                     Label("Lists", systemImage: "checklist")
                 }
+                }
 
+                if appState.edition.allows(.contacts) {
                 NavigationLink {
                     ContactListView()
                 } label: {
                     Label("Contacts", systemImage: "person.2")
                 }
+                }
             }
             .listRowBackground(Color.bgElevated)
+            }
 
             Section {
                 NavigationLink {

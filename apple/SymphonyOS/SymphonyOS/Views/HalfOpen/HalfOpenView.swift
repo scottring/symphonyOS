@@ -33,6 +33,7 @@ struct HalfOpenView: View {
 
     /// Tonight's dinner, when the view includes family (as on Today).
     private var dinner: Dinner? {
+        guard appState.edition.allows(.dinner) else { return nil }
         let context = appState.domainFilter.contextValue
         guard context == nil || context == "family" else { return nil }
         return dinners.dinner(on: today)
@@ -72,7 +73,7 @@ struct HalfOpenView: View {
         }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
         .task { await calendar.refresh(today, maxAge: 60) }
-        .task(id: PlanCalendar.ymd(today)) { await dinners.refresh(today) }
+        .task(id: PlanCalendar.ymd(today)) { if appState.edition.allows(.dinner) { await dinners.refresh(today) } }
         // A new day at midnight.
         .task {
             while !Task.isCancelled {

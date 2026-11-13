@@ -3,6 +3,7 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(AuthService.self) private var auth
+    @Environment(AppState.self) private var appState
     @Query private var familyMembers: [FamilyMember]
 
     var body: some View {
@@ -20,6 +21,7 @@ struct SettingsView: View {
             }
 
             // Integrations
+            if appState.edition.allows(.googleCalendar) {
             Section("Integrations") {
                 NavigationLink {
                     CalendarSettingsView()
@@ -27,8 +29,10 @@ struct SettingsView: View {
                     Label("Google Calendar", systemImage: "calendar")
                 }
             }
+            }
 
             // Family
+            if appState.edition.allows(.people) {
             Section("Family Members") {
                 ForEach(familyMembers, id: \.id) { member in
                     HStack(spacing: 12) {
@@ -52,6 +56,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+            }
             }
 
             // About
