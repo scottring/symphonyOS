@@ -157,7 +157,8 @@ enum DemoMode {
     /// - `ground`: back up from Year onto the ground (the kept peaks).
     /// - `open`: a tap on the light, so the compass points open.
     /// - `hold`: a press held and slid onto the point below (Walk on, or Quick start), hovered.
-    /// - `speak`: a hold that reaches speaking, with words arriving as a listener would send them.
+    /// - `speak`: a hold that reaches speaking; the words come through the model's real
+    ///   listening path from `walkListener`, which hears them as soon as it starts.
     /// - `type`: the Type it point: the one-line field, empty.
     /// - `select`: a tap on the newest flag the walk planted on this step (Today: the first thing).
     /// - `undo`: a flag typed and planted, so the Undo pill shows.
@@ -175,7 +176,6 @@ enum DemoMode {
             case "speak":
                 model.send(.orbDown)
                 model.send(.orbHeld)
-                model.send(.heard("Pick up the tile samples"))
             case "type":
                 model.choose(.type)
             case "select":
@@ -191,6 +191,13 @@ enum DemoMode {
                 break
             }
         }
+    }
+
+    /// With `speak` among the `-SymphonyWalkOrb` steps, the demo walk listens through
+    /// `DemoWalkListener` (nobody can speak to this simulator); otherwise through the
+    /// real `Dictation`.
+    @MainActor static var walkListener: WalkListening? {
+        walkOrb.contains("speak") ? DemoWalkListener(words: "Pick up the tile samples") : nil
     }
     #endif
 
@@ -357,3 +364,18 @@ extension View {
         #endif
     }
 }
+
+#if DEBUG && os(iOS)
+/// Debug demo only: a listener that hears fixed words the moment it starts, so a
+/// screenshot shows them arriving on the rising flag through `WalkModel`'s own path.
+@MainActor final class DemoWalkListener: WalkListening {
+    let words: String
+    var problem: String?
+    var onWords: ((String) -> Void)?
+
+    init(words: String) { self.words = words }
+
+    func start() async { onWords?(words) }
+    func stop() {}
+}
+#endif

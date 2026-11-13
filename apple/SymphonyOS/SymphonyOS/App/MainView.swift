@@ -190,7 +190,8 @@ extension iOSMainView {
         demoWalkOpened = true
         let position = DemoMode.walkStep.flatMap { DemoMode.walkPreview(step: $0, context: modelContext) }
         let model = WalkModel(context: modelContext, userId: DemoMode.userId, entry: position == nil ? .start : .resume,
-                              position: position, edition: appState.edition, store: nil)
+                              position: position, edition: appState.edition, store: nil,
+                              listener: DemoMode.walkListener)
         model.onEnd = { _ in withAnimation(.easeInOut(duration: 0.4)) { walk = nil } }
         DemoMode.showWalk(model, DemoMode.walkOrb)
         walk = model

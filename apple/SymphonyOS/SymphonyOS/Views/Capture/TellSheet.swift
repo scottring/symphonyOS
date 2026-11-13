@@ -88,24 +88,38 @@ struct TellSheet: View {
     }
 }
 
-/// Live speech to text for Tell. Main-actor state; the recognizer's callbacks
-/// hop back to the main actor.
+/// Live speech to text for Tell and the walk. Main-actor state; the
+/// recognizer's callbacks hop back to the main actor. Each `start()` begins
+/// with an empty transcript, and results from an earlier start are dropped.
 @MainActor @Observable
 final class Dictation {
     var transcript = ""
     var isListening = false
     var problem: String?
+    /// The walk sets it: its sounds keep playing while it listens, and after.
+    /// Tell leaves it false (record only, others ducked, the session let go on stop).
+    @ObservationIgnored var playsAlongside = false
+    /// Called on the main actor with each new transcript, the empty one at a start included.
+    @ObservationIgnored var onWords: ((String) -> Void)?
 
     #if os(iOS)
     private let recognizer = SFSpeechRecognizer()
     private let engine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
+    /// Bumped by every start: a result carrying an older number is from an earlier start.
+    @ObservationIgnored private var attempt = 0
+    /// The start still asking for permission; `stop()` clears it so that start does not begin.
+    @ObservationIgnored private var asking: Int?
     #endif
 
     func start() async {
         #if os(iOS)
         guard !isListening else { return }
+        hear("")
+        attempt += 1
+        let mine = attempt
+        asking = mine
         problem = nil
         let speech = await withCheckedContinuation { (c: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
             SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) }
@@ -113,10 +127,18 @@ final class Dictation {
         guard speech == .authorized else { problem = "Allow Speech Recognition in Settings to speak — or type it."; return }
         guard await AVAudioApplication.requestRecordPermission() else { problem = "Allow the microphone in Settings to speak — or type it."; return }
         guard let recognizer, recognizer.isAvailable else { problem = "Speech isn't available right now — type it instead."; return }
+        // Stopped (or started again) while the permission prompts were up: do not begin.
+        guard asking == mine, !isListening else { return }
+        asking = nil
 
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+            if playsAlongside {
+                try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .mixWithOthers])
+                try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
+            } else {
+                try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+            }
             try session.setActive(true, options: .notifyOthersOnDeactivation)
 
             let request = SFSpeechAudioBufferRecognitionRequest()
@@ -131,18 +153,25 @@ final class Dictation {
 
             task = Self.listen(recognizer, to: request) { [weak self] words, done in
                 Task { @MainActor in
-                    guard let self else { return }
-                    if let words { self.transcript = words }
+                    guard let self, self.attempt == mine else { return }
+                    if let words { self.hear(words) }
                     if done { self.stop() }
                 }
             }
         } catch {
             problem = "Couldn't start listening — type it instead."
             stop()
+            if playsAlongside { Self.playAlong() }      // stop() may have found nothing to take down
         }
         #else
+        hear("")
         problem = "Type it here."
         #endif
+    }
+
+    private func hear(_ words: String) {
+        transcript = words
+        onWords?(words)
     }
 
     #if os(iOS)
@@ -162,10 +191,16 @@ final class Dictation {
             update(result?.bestTranscription.formattedString, error != nil || (result?.isFinal ?? false))
         }
     }
+
+    /// Back to the walk's sounds: the session stays on, mixing, so a sound can play straight after.
+    private static func playAlong() {
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: .mixWithOthers)
+    }
     #endif
 
     func stop() {
         #if os(iOS)
+        asking = nil
         guard isListening || task != nil else { return }
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
@@ -174,7 +209,11 @@ final class Dictation {
         request = nil
         task = nil
         isListening = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if playsAlongside {
+            Self.playAlong()
+        } else {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
         #endif
     }
 }

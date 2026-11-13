@@ -20,6 +20,7 @@ private let now = day(2026, 11, 13)
 struct WalkModelTests {
     let me = UUID()
     let scheduler = ManualWalkScheduler()
+    let listener = FakeWalkListener()
 
     private func store() -> WalkPositionStore {
         WalkPositionStore(defaults: UserDefaults(suiteName: "WalkModelTests.\(UUID())")!)
@@ -28,7 +29,7 @@ struct WalkModelTests {
     private func model(_ ctx: ModelContext, entry: WalkEntry = .start, position: WalkPosition? = nil,
                        store: WalkPositionStore? = nil) -> WalkModel {
         WalkModel(context: ctx, userId: me, entry: entry, position: position, edition: .light,
-                  now: now, store: store, scheduler: scheduler)
+                  now: now, store: store, scheduler: scheduler, listener: listener)
     }
 
     private func fetch<T: PersistentModel>(_ ctx: ModelContext, _ type: T.Type) -> [T] {
@@ -166,6 +167,163 @@ struct WalkModelTests {
         #expect(saved.load(for: me)?.planted == [goalId])
         m.send(.undo)
         #expect(saved.load(for: me)?.planted == [])
+    }
+
+    // MARK: Speech
+
+    /// Quick start, keep Health, walk on to Year: the orb can be held to speak.
+    private func toYear(_ m: WalkModel) {
+        m.choose(.quick)
+        m.send(.areaTapped(health(m)))
+        m.choose(.next)
+    }
+
+    /// Press, hold long enough, and let the listener's start run.
+    private func hold(_ m: WalkModel) async {
+        m.send(.orbDown)
+        scheduler.advance(WalkOrb.holdMs)
+        await scheduler.settle()
+    }
+
+    @Test func listeningStartsOnTheHoldNotBefore() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        m.send(.orbDown)
+        await scheduler.settle()
+        #expect(listener.starts == 0)                          // a press is not a hold: no permission asked yet
+        scheduler.advance(WalkOrb.holdMs)
+        await scheduler.settle()
+        #expect(listener.starts == 1)
+    }
+
+    @Test func whatIsHeardFillsTheFlag() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        await hold(m)
+        listener.hear("feel strong")
+        #expect(m.state.orb == .speaking(live: "feel strong"))
+    }
+
+    @Test func aProblemOpensTyping() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        listener.problemOnStart = "no microphone"
+        await hold(m)
+        #expect(m.state.typing == "")
+        #expect(m.state.note == WalkCopy.speechOff)
+        #expect(m.state.orb == .idle)
+    }
+
+    @Test func stopIsCalledOnRelease() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        toYear(m)
+        await hold(m)
+        listener.hear("feel strong")
+        m.send(.orbUp(heldMs: 900))
+        #expect(listener.stops == 1)
+        #expect(fetch(ctx, Goal.self).map(\.name) == ["Feel strong"])
+        #expect(m.state.typing == nil)
+    }
+
+    /// Letting go having heard nothing is speech that did not work: the field
+    /// opens with the plain line, nothing is planted, and the mic is stopped once.
+    @Test func lettingGoHavingHeardNothingOpensTyping() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        toYear(m)
+        await hold(m)
+        m.send(.orbUp(heldMs: 900))
+        #expect(m.state.typing == "")
+        #expect(m.state.note == WalkCopy.speechOff)
+        #expect(m.state.orb == .idle)
+        #expect(fetch(ctx, Goal.self).isEmpty)
+        #expect(listener.stops == 1)
+    }
+
+    /// Sliding out to the points or the system taking the touch stops the mic
+    /// but is not a failure of speech: no field opens.
+    @Test func slidingAwayOrACancelStopsWithoutTyping() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        await hold(m)
+        m.send(.orbMoved(WalkOrb.position(of: .s)))
+        #expect(listener.stops == 1)
+        #expect(m.state.typing == nil)
+        m.send(.orbUp(heldMs: 900))
+        #expect(listener.stops == 1)                           // already stopped
+
+        await hold(m)
+        m.send(.orbCancelled)
+        #expect(listener.stops == 2)
+        #expect(m.state.typing == nil)
+        #expect(m.state.orb == .idle)
+    }
+
+    /// A partial result that lands after letting go never fills the next flag,
+    /// even when it lands after the next hold has begun but before it listens.
+    @Test func wordsFromAnEarlierHoldNeverReachTheNextFlag() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        toYear(m)
+        await hold(m)
+        listener.hear("feel strong")
+        m.send(.orbUp(heldMs: 900))
+        listener.hear("feel strong again")
+        #expect(fetch(ctx, Goal.self).map(\.name) == ["Feel strong"])
+
+        m.send(.orbDown)
+        scheduler.advance(WalkOrb.holdMs)
+        #expect(m.state.orb == .speaking(live: ""))
+        listener.hear("feel strong again")                     // late, before this hold's listening starts
+        #expect(m.state.orb == .speaking(live: ""))
+        await scheduler.settle()
+        #expect(listener.starts == 2)
+        listener.hear("finish the bathroom")
+        #expect(m.state.orb == .speaking(live: "finish the bathroom"))
+    }
+
+    /// The first hold asks for permission; the prompt takes the touch away. Allowed:
+    /// the orb is at rest and the next hold listens. Refused: typing opens.
+    @Test func thePermissionPromptLeavesTheOrbUsable() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        listener.whileStarting = { [m] in m.send(.orbCancelled) }
+        await hold(m)
+        #expect(listener.stops == 1)
+        #expect(m.state.orb == .idle)
+        #expect(m.state.typing == nil)
+
+        listener.whileStarting = nil
+        await hold(m)
+        #expect(listener.starts == 2)
+        listener.hear("feel strong")
+        #expect(m.state.orb == .speaking(live: "feel strong"))
+    }
+
+    @Test func aRefusalWhileThePromptIsUpOpensTyping() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        listener.problemOnStart = "Allow the microphone in Settings to speak — or type it."
+        listener.whileStarting = { [m] in m.send(.orbCancelled) }
+        await hold(m)
+        #expect(m.state.typing == "")
+        #expect(m.state.note == WalkCopy.speechOff)
+        #expect(m.state.orb == .idle)
+    }
+
+    /// A release before the listener's start has even run asks for nothing.
+    @Test func aHoldThatEndsBeforeListeningAsksNothing() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        m.send(.orbDown)
+        scheduler.advance(WalkOrb.holdMs)
+        m.send(.orbUp(heldMs: 500))
+        await scheduler.settle()
+        #expect(listener.starts == 0)
+        #expect(listener.stops == 0)
+        #expect(m.state.typing == nil)
+        #expect(m.state.note == WalkCopy.nothingToPlant)
     }
 
     // MARK: Resuming

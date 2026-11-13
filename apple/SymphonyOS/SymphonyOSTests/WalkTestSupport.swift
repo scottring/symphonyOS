@@ -4,7 +4,8 @@ import SwiftData
 @testable import Symphony
 
 // Fakes shared by the walk's model tests. Task 14 made this file with the
-// scheduler and the in-memory store; later tasks add their fakes here.
+// scheduler and the in-memory store; Task 16 added the listener; later tasks
+// add their fakes here.
 
 /// Time for tests: nothing waits; `advance` moves a pretend clock and runs
 /// what fell due, in time order; `settle` runs the async work handed over.
@@ -49,6 +50,35 @@ import SwiftData
             let work = runs.removeFirst()
             await work()
         }
+    }
+}
+
+/// Speech for tests: nothing is heard until a test says so. `start` counts and
+/// reports `problemOnStart` as its problem; `hear` delivers words as the
+/// recogniser would. `whileStarting` runs inside `start`, before it answers,
+/// as a person's touch would arrive while the permission prompts are up.
+@MainActor final class FakeWalkListener: WalkListening {
+    var problem: String?
+    var onWords: ((String) -> Void)?
+    var problemOnStart: String?
+    var whileStarting: (() -> Void)?
+    private(set) var starts = 0
+    private(set) var stops = 0
+
+    init() {}
+
+    func start() async {
+        starts += 1
+        whileStarting?()
+        problem = problemOnStart
+    }
+
+    func stop() {
+        stops += 1
+    }
+
+    func hear(_ words: String) {
+        onWords?(words)
     }
 }
 
