@@ -411,3 +411,17 @@ describe('a step planned for today without its parent', () => {
     expect(splitCompletedFocus(d.grouped).activeCount).toBe(1)
   })
 })
+
+describe('a done-by date brings a task into To do (Scott, 2026-11-13)', () => {
+  const viewedDate = new Date('2026-05-19T00:00:00')
+  const ids = (d: ReturnType<typeof computeTodayData>) => Object.values(d.grouped).flat().map((i) => i.id)
+  it('three days before, not four; once only', () => {
+    const soon = task({ id: 'soon', title: 'amazon returns', bucket: 'week', createdAt: new Date(2026, 4, 1), dueOn: new Date(2026, 4, 22) })
+    const later = task({ id: 'later', bucket: 'week', createdAt: new Date(2026, 4, 1), dueOn: new Date(2026, 4, 23) })
+    const both = task({ id: 'both', scheduledFor: new Date('2026-05-19T10:00:00'), dueOn: new Date(2026, 4, 20) })
+    const d = computeTodayData(baseInput({ tasks: [soon, later, both], viewedDate }))
+    expect(ids(d)).toContain('task-soon')
+    expect(ids(d)).not.toContain('task-later')
+    expect(ids(d).filter((id) => id === 'task-both')).toHaveLength(1)
+  })
+})

@@ -37,6 +37,7 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu';
+import { DueByControl } from '@/components/plan/DueByControl';
 import { makeTaskAGoal } from '@/components/plan/MakeGoalControl';
 import { goalConversion } from '@/lib/planning/goalConversion';
 import { PartOfGoalControl } from '@/components/plan/PartOfGoalControl';
@@ -337,14 +338,19 @@ function TaskPanelBody({ id }: { id: string }) {
       }}
       // A goal is not scheduled, so it gets no timing control.
       timingControl={task.isGoal ? undefined : (
-        <TaskTimingMenu
-          task={task}
-          onUpdateTask={gated.updateTask}
-          // The task's OWN period, never the clock's: an October step opened
-          // in September must offer October's weeks (the S2-17 class).
-          periodStart={task.weekStart ?? task.monthStart ?? task.scheduledFor ?? new Date()}
-          fallbackWeekStart={task.weekStart ?? weekStartAnchor(task.monthStart ?? task.scheduledFor ?? new Date(), readCadenceConfig().weekStartsOn)}
-        />
+        <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+          <TaskTimingMenu
+            task={task}
+            onUpdateTask={gated.updateTask}
+            // The task's OWN period, never the clock's: an October step opened
+            // in September must offer October's weeks (the S2-17 class).
+            periodStart={task.weekStart ?? task.monthStart ?? task.scheduledFor ?? new Date()}
+            fallbackWeekStart={task.weekStart ?? weekStartAnchor(task.monthStart ?? task.scheduledFor ?? new Date(), readCadenceConfig().weekStartsOn)}
+          />
+          {/* Done by a date ("return by Mon 16"): Today shows it three days
+              before (Scott, 2026-11-13). */}
+          {!task.parentTaskId && <DueByControl task={task} onUpdateTask={gated.updateTask} />}
+        </span>
       )}
       onSchedule={(date, isAllDay) => {
         void (async () => {

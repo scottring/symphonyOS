@@ -150,6 +150,8 @@ export interface DbTask {
   discussion_note: string | null
   // Date-only column: which day this was marked "needed today".
   needed_on: string | null
+  // Date-only column: done by this day (2026-11-13).
+  due_on?: string | null
   // Date-only column: the day this was chosen for Today's main list.
   // Optional: absent until the 2026-09-19 migration is applied.
   planned_on?: string | null
@@ -248,6 +250,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     // as UTC and lands on the 18th in US timezones — the note would show the
     // item a day early.
     neededOn: dbTask.needed_on ? parseLocalYmd(dbTask.needed_on) : undefined,
+    dueOn: dbTask.due_on ? parseLocalYmd(dbTask.due_on) : undefined,
     plannedOn: dbTask.planned_on ? parseLocalYmd(dbTask.planned_on) : undefined,
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
     // A `date` column — parse to LOCAL midnight, never `new Date(str)` (that's UTC).
@@ -2052,6 +2055,8 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
     // `needed_on` is a DATE column — localYmd, not toISOString (see week_start above).
     if ('neededOn' in updates) dbUpdates.needed_on = updates.neededOn ? localYmd(updates.neededOn) : null
+    // A DATE too; `{ dueOn: undefined }` clears it.
+    if ('dueOn' in updates) dbUpdates.due_on = updates.dueOn ? localYmd(updates.dueOn) : null
     // Same `in` rule as needed_on: `{ plannedOn: undefined }` must CLEAR the choice.
     if ('plannedOn' in updates) dbUpdates.planned_on = updates.plannedOn ? localYmd(updates.plannedOn) : null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
@@ -2352,6 +2357,8 @@ export function useSupabaseTasks(supabase = defaultSupabase) {
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
     // `needed_on` is a DATE column — localYmd, not toISOString (see week_start above).
     if ('neededOn' in updates) dbUpdates.needed_on = updates.neededOn ? localYmd(updates.neededOn) : null
+    // A DATE too; `{ dueOn: undefined }` clears it.
+    if ('dueOn' in updates) dbUpdates.due_on = updates.dueOn ? localYmd(updates.dueOn) : null
     // Same `in` rule as needed_on: `{ plannedOn: undefined }` must CLEAR the choice.
     if ('plannedOn' in updates) dbUpdates.planned_on = updates.plannedOn ? localYmd(updates.plannedOn) : null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null

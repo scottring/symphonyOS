@@ -149,6 +149,9 @@ export interface Task {
    * "pin" — `pinned_items` is a different, durable system.
    */
   neededOn?: Date
+  /** Done-by date (tasks.due_on, 2026-11-13): in Today's To do from three
+   *  days before, as "by Mon 16" (lib/today/dueSoon.ts). */
+  dueOn?: Date
   /**
    * The day this task was deliberately CHOSEN for — Today's main list. A date,
    * so it expires like neededOn. Distinct from scheduledFor (the day it is

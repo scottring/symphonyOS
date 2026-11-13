@@ -13,6 +13,7 @@ import { isFocused } from '@/lib/placement/model'
 import { noSchoolReason, schoolRoutinesOff } from './noSchool'
 import type { Task } from '@/types/task'
 import type { TimelineItem } from '@/types/timeline'
+import { isDueSoon } from './dueSoon'
 
 function computeIsToday(viewedDate: Date): boolean {
   const today = new Date()
@@ -67,7 +68,13 @@ export function computeTodayData(given: TodayDataInput): TodayData {
     ...selectTimed(input.tasks, input.viewedDate, match).filter((t) => !dayPlan.offMainTaskIds.has(t.id)),
     ...dayPlan.plannedExtraTasks,
   ]
-  const plannedExtraIds = new Set(dayPlan.plannedExtraTasks.map((t) => t.id))
+  // A done-by date three days out or nearer brings the task in, as if
+  // chosen, with "by Mon 16" on it (dueSoon.ts; Scott, 2026-11-13).
+  const onListIds = new Set([...timedTasks, ...overdueTasks].map((t) => t.id))
+  const dueSoonTasks = input.tasks.filter((t) => !t.parentTaskId && !t.isGoal && !onListIds.has(t.id)
+    && match(t.assignedTo, t.assignedToAll) && isDueSoon(t, input.viewedDate))
+  timedTasks.push(...dueSoonTasks)
+  const plannedExtraIds = new Set([...dayPlan.plannedExtraTasks, ...dueSoonTasks].map((t) => t.id))
 
   // Completed-task linger: a checked-off task stays visible briefly, then
   // drops out of the displayed list (counts below still use the full pools).

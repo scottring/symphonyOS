@@ -1,5 +1,6 @@
 import { KindIcon as KindIconMark } from './KindIcon'
 import { itemIcon } from '@/lib/today/itemIcon'
+import { dueLabel } from '@/lib/today/dueSoon'
 import { memo, useState, useRef, useEffect } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
@@ -762,6 +763,10 @@ export const ScheduleItem = memo(function ScheduleItem({
                 <AlertCircle className="w-3 h-3" aria-hidden />
                 Today
               </button>
+            )}
+            {/* A done-by date: "by Mon 16" (Scott, 2026-11-13). */}
+            {item.originalTask?.dueOn && !item.completed && (
+              <span className="row-due" data-testid="row-due">{dueLabel(item.originalTask.dueOn, viewedDate ?? new Date())}</span>
             )}
             {/* The hover when-chip ("Any time") lived here until Today,
                 trimmed (2026-10-14): day and time change in the item panel. */}

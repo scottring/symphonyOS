@@ -459,3 +459,10 @@
 .today-page .today-focus-card .row-kind-icon { display: inline-flex; flex: none; margin-top: 3px; color: var(--color-neutral-600); }
 .today-page .today-focus-card [data-only-self] { opacity: 0; transition: opacity .15s; }
 .today-page .today-focus-card :is(li, [role='listitem'], .group):is(:hover, :focus-within) [data-only-self] { opacity: 1; }
+
+/* A done-by date on a row: "by Mon 16" (2026-11-13). */
+.row-due {
+  flex: none; padding: 1px 8px; border-radius: 999px; white-space: nowrap;
+  font: 600 12px/1.5 var(--font-family-sans); color: hsl(28 70% 34%); background: hsl(32 80% 93%);
+}
+[data-scenery-lighting='nighttime'] .row-due, .dark .row-due { color: hsl(32 80% 72%); background: hsl(32 30% 20%); }
