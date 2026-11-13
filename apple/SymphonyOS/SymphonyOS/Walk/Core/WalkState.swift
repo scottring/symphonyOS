@@ -25,6 +25,7 @@ struct WalkState: Equatable {
     var firstThing: UUID?; var lastPlanted: [WalkLevel: UUID] = [:]
     var examplesOn: Set<Int> = []; var selected: UUID?; var expanded: WalkPostKey?
     var orb: Orb = .idle; var typing: String?
+    var orbWasOpen = false                 // the points were open when this press began, so a short press closes them
     var note: String?; var undoShowing = false
     var undo: [WalkUndoEntry] = []         // in memory only, by design: never saved, so a relaunch starts with nothing to undo
     var pulledChildren: [UUID: [UUID]] = [:]   // a pulled-up flag → the flags that named it as parent; in memory, for Undo
@@ -58,7 +59,7 @@ struct WalkState: Equatable {
         // The orb, speech and typing (Task 11).
         case .orbDown, .orbHeld, .orbMoved, .orbUp, .orbCancelled,
              .heard, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point:
-            return []
+            return applyOrb(event, env)
         // Planting, examples, undo, move and pull up (WalkState+Plant.swift).
         case .stubTapped(let key): return openStub(key)
         case .exampleTapped(let text): return plantExample(text, env)
@@ -91,8 +92,11 @@ struct WalkState: Equatable {
             return []
         case .undo: return undoLast(env)
         case .startThere: return startThere(env)
-        // Typing (Task 11), the calendar (Task 20).
-        case .type, .calendar:
+        case .type:
+            startTyping()
+            return []
+        // The calendar (Task 20).
+        case .calendar:
             return []
         }
     }
