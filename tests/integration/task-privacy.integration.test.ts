@@ -35,28 +35,16 @@
  *
  * Run it on purpose: `npm run test:integration`.
  */
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { type SupabaseClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { localYmd } from '@/lib/cadence/config'
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL
-const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
-
-/** Without the service key there is no way to provision or clean up. Skip loudly. */
-const canRun = Boolean(SUPABASE_URL && ANON_KEY && SERVICE_KEY)
-
-/** Every account this suite makes starts here, so a crashed run is sweepable. */
-const EMAIL_PREFIX = 'symphony-rlstest-'
-const PASSWORD = 'rls-test-only-not-a-real-account'
-
-interface Person {
-  label: string
-  email: string
-  userId: string
-  /** Signed in with the ANON key — the same client the browser app uses. */
-  client: SupabaseClient
-}
+import {
+  adminClient,
+  canRun,
+  createPerson,
+  sweepStaleAccounts,
+  type Person,
+} from './helpers'
 
 /** Row ids by the name this test knows them by, so assertions read as prose. */
 const rowId: Record<string, string> = {}
@@ -65,46 +53,6 @@ let admin: SupabaseClient
 let scott: Person
 let iris: Person
 let householdId: string
-
-function adminClient(): SupabaseClient {
-  return createClient(SUPABASE_URL!, SERVICE_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-}
-
-/**
- * Delete anything a previous crashed run left behind. Scoped to this suite's
- * own email prefix — it cannot reach a real account.
- */
-async function sweepStaleAccounts(): Promise<void> {
-  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 })
-  if (error) throw error
-  const stale = data.users.filter((u) => (u.email ?? '').startsWith(EMAIL_PREFIX))
-  for (const u of stale) {
-    await admin.from('household_members').delete().eq('user_id', u.id)
-    await admin.from('households').delete().eq('owner_id', u.id)
-    await admin.auth.admin.deleteUser(u.id)
-  }
-}
-
-async function createPerson(label: string, runId: string): Promise<Person> {
-  const email = `${EMAIL_PREFIX}${label}-${runId}@gmail.com`
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password: PASSWORD,
-    email_confirm: true,
-  })
-  if (error) throw new Error(`could not create ${label}: ${error.message}`)
-  const userId = data.user!.id
-
-  const client = createClient(SUPABASE_URL!, ANON_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  const signIn = await client.auth.signInWithPassword({ email, password: PASSWORD })
-  if (signIn.error) throw new Error(`could not sign in ${label}: ${signIn.error.message}`)
-
-  return { label, email, userId, client }
-}
 
 /**
  * Insert as the PERSON, not as the admin — so the insert goes through the same
@@ -152,11 +100,11 @@ const describeIf = canRun ? describe : describe.skip
 describeIf('task privacy across two accounts in one household', () => {
   beforeAll(async () => {
     admin = adminClient()
-    await sweepStaleAccounts()
+    await sweepStaleAccounts(admin)
 
     const runId = Date.now().toString(36)
-    scott = await createPerson('scott', runId)
-    iris = await createPerson('iris', runId)
+    scott = await createPerson(admin, 'scott', runId)
+    iris = await createPerson(admin, 'iris', runId)
 
     // Scott founds the household the way first-run setup does.
     const { data: hid, error: setupError } = await scott.client.rpc('setup_household', {
