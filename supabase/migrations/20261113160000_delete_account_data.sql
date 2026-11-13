@@ -10,17 +10,18 @@
 --    or member (never a display); within it by role (owner, admin, member),
 --    then joined_at nulls last, then user_id. None means no heir.
 -- 2. With an heir, shared things pass to the heir (user_id := heir), one
---    table at a time: a table whose move hits a unique violation is left to be
---    deleted and named in not_moved.
+--    table at a time. A table whose move hits a unique violation is moved row
+--    by row instead: only the clashing rows stay behind (to be deleted), and
+--    the table is named in not_moved.
 --      scope in ('couple','compound'): tasks, notes, goals, contacts,
 --        routines, projects, chat_sessions;
 --      all rows: family_members, meal_plans, recipes, scratchpad_notes,
 --        notices, homes, kid_math_prefs, kid_math_problems;
 --      goal_areas where context = 'family'; captures where household_id is
---        not null; spaces.created_by and assets.created_by.
---    A space or asset the leaver created in someone else's home, still
---    unmoved (no heir, or a conflict), passes to that home's owner instead of
---    being deleted.
+--        not null.
+--    Then spaces and assets the leaver created follow their home's owner
+--    (created_by := homes.user_id where that owner is not the leaver), with
+--    or without an heir.
 -- 3. Detach other people's rows from the leaver's (the three statements at
 --    the top of reset_test_account): subtasks and child routines come loose,
 --    meal plan entries keep the recipe's name. This runs after step 2 so that
@@ -33,11 +34,14 @@
 --    household the leaver owns is deleted and its display user ids returned
 --    for the edge function to delete. (One owned by someone else is never
 --    deleted here: that owner's account still exists.)
--- 5. Every foreign key in public that references auth.users with no delete
---    action (read from pg_constraint at run time; the live database has more
---    than the migrations show): nullable columns are set to null, otherwise
---    the rows go. Repeated while it makes progress, so one such table may
---    reference another.
+-- 5. First, nullable no-action foreign keys between public tables that point
+--    at a row of the leaver's about to go (tasks.assigned_to -> the leaver's
+--    family_members, say) are set to null, so they cannot block. Then every
+--    foreign key in public that references auth.users with no delete action
+--    (read from pg_constraint at run time; the live database has more than
+--    the migrations show): nullable columns are set to null, otherwise the
+--    rows go. Repeated while it makes progress, so one such table may
+--    reference another; with no progress it raises, and nothing is changed.
 -- 6. task_focus rows go (no foreign key). AI spend tables are left alone.
 --
 -- The live schema and the migrations differ, so every table and column named
@@ -82,6 +86,8 @@ declare
   v_progress boolean;
   v_blocked text;
   v_ids uuid[];
+  v_row record;
+  v_left boolean;
 begin
   if p_user is null then
     raise exception 'delete_account_data needs a user id' using errcode = '22004';
@@ -119,9 +125,7 @@ begin
         ('kid_math_prefs', 'user_id', null, null),
         ('kid_math_problems', 'user_id', null, null),
         ('goal_areas', 'user_id', 'context', $c$context = 'family'$c$),
-        ('captures', 'user_id', 'household_id', 'household_id is not null'),
-        ('spaces', 'created_by', null, null),
-        ('assets', 'created_by', null, null)
+        ('captures', 'user_id', 'household_id', 'household_id is not null')
       ) as m(tbl, col, cond_col, cond)
     loop
       continue when not public.delete_account_has_columns(v_move.tbl, array_remove(array[v_move.col, v_move.cond_col], null));
@@ -130,12 +134,27 @@ begin
           || coalesce(' and ' || v_move.cond, '')
           using v_heir, p_user;
       exception when unique_violation then
-        v_not_moved := v_not_moved || v_move.tbl;
+        -- The whole-table move was undone; move row by row so only the clashing rows stay behind.
+        v_left := false;
+        for v_row in execute format('select ctid as rid from public.%I where %I = $1', v_move.tbl, v_move.col)
+                             || coalesce(' and ' || v_move.cond, '') using p_user
+        loop
+          begin
+            execute format('update public.%I set %I = $1 where ctid = $2 and %I = $3', v_move.tbl, v_move.col, v_move.col)
+              using v_heir, v_row.rid, p_user;
+          exception when unique_violation then
+            v_left := true;
+          end;
+        end loop;
+        if v_left then v_not_moved := v_not_moved || v_move.tbl; end if;
       end;
     end loop;
   end if;
 
-  -- What the leaver created in someone else's home stays with that home's owner.
+  -- Spaces and assets the leaver created follow their home's owner, now that
+  -- homes have moved: the leaver's own home's go to the heir with it, and
+  -- those in someone else's home go to that home's owner, heir or not. Rows in
+  -- a home the leaver still owns are left for the sweep.
   for v_move in select unnest(array['spaces', 'assets']) as tbl loop
     if public.delete_account_has_columns(v_move.tbl, array['home_id', 'created_by'])
        and public.delete_account_has_columns('homes', array['id', 'user_id']) then
@@ -144,7 +163,7 @@ begin
                         where x.home_id = h.id and x.created_by = $1 and h.user_id <> $1', v_move.tbl)
           using p_user;
       exception when unique_violation then
-        if not v_move.tbl = any(v_not_moved) then v_not_moved := v_not_moved || v_move.tbl; end if;
+        v_not_moved := v_not_moved || v_move.tbl;
       end;
     end if;
   end loop;
@@ -201,7 +220,43 @@ begin
     end if;
   end loop;
 
-  -- 5. Sweep what would block deleting the auth.users row.
+  -- 5a. Let go of rows that are about to go. A nullable foreign key with no
+  -- delete action between public tables (tasks.assigned_to -> family_members,
+  -- say) is set to null where it points at a row the leaver still owns and
+  -- that will be deleted: its table's user_id references auth.users with
+  -- CASCADE, or with no action and NOT NULL (the sweep below deletes those).
+  -- Rows that stay (ai_spend has no foreign key, a nullable owner is only
+  -- nulled) keep their references. NOT NULL references are left to the
+  -- multi-pass sweep and the cascade.
+  for v_key in
+    select c.relname, a.attname, rc.relname as ref_table, ra.attname as ref_col
+    from pg_catalog.pg_constraint k
+    join pg_catalog.pg_class c on c.oid = k.conrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    join pg_catalog.pg_attribute a on a.attrelid = k.conrelid and a.attnum = k.conkey[1]
+    join pg_catalog.pg_class rc on rc.oid = k.confrelid
+    join pg_catalog.pg_namespace rn on rn.oid = rc.relnamespace
+    join pg_catalog.pg_attribute ra on ra.attrelid = k.confrelid and ra.attnum = k.confkey[1]
+    where k.contype = 'f' and n.nspname = 'public' and rn.nspname = 'public'
+      and k.confdeltype in ('a', 'r') and cardinality(k.conkey) = 1 and not a.attnotnull
+      and exists (
+        select 1
+        from pg_catalog.pg_constraint u
+        join pg_catalog.pg_attribute ua on ua.attrelid = u.conrelid and ua.attnum = u.conkey[1]
+        where u.contype = 'f' and u.conrelid = k.confrelid and u.confrelid = 'auth.users'::regclass
+          and cardinality(u.conkey) = 1 and ua.attname = 'user_id'
+          and (u.confdeltype = 'c' or (u.confdeltype in ('a', 'r') and ua.attnotnull)))
+    order by c.relname, a.attname
+  loop
+    execute format('update public.%I set %I = null where %I in (select %I from public.%I where user_id = $1)',
+      v_key.relname, v_key.attname, v_key.attname, v_key.ref_col, v_key.ref_table) using p_user;
+  end loop;
+
+  -- 5b. Sweep what would block deleting the auth.users row. This removes the
+  -- rows of ANY NOT NULL no-action foreign key to auth.users, not only owner
+  -- columns: a future column that names someone other than the owner (an
+  -- approved_by, say) must be nullable or have a delete action, or this
+  -- deletes another person's row.
   loop
     v_progress := false;
     v_blocked := null;

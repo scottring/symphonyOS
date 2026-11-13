@@ -8,6 +8,7 @@
 --
 -- A owns household H1, B is an active member, AD is H1's display.
 -- C is alone in H2 with display CD. E owns H3, D is a member who leaves.
+-- F owns H4, where G's invitation is still pending: F counts as alone.
 begin;
 
 create temp table ids (k text primary key, v uuid) on commit drop;
@@ -18,6 +19,7 @@ create function pg_temp.id(p_k text) returns uuid language sql stable as $$ sele
 do $$
 declare a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); ad uuid := gen_random_uuid();
   c uuid := gen_random_uuid(); cd uuid := gen_random_uuid(); d uuid := gen_random_uuid(); e uuid := gen_random_uuid();
+  f uuid := gen_random_uuid(); g uuid := gen_random_uuid(); h4 uuid; c_child uuid; a_child uuid;
   h1 uuid; h2 uuid; h3 uuid; t_priv uuid; t_shared uuid; r_priv uuid; home_a uuid; home_e uuid; recipe uuid; mp_b uuid; mp_a uuid;
   cap_b uuid; blk uuid;
 begin
@@ -26,16 +28,21 @@ begin
     (b, 'symphony-107-b@gmail.com', 'authenticated', 'authenticated'),
     (c, 'symphony-107-c@gmail.com', 'authenticated', 'authenticated'),
     (d, 'symphony-107-d@gmail.com', 'authenticated', 'authenticated'),
-    (e, 'symphony-107-e@gmail.com', 'authenticated', 'authenticated');
+    (e, 'symphony-107-e@gmail.com', 'authenticated', 'authenticated'),
+    (f, 'symphony-107-f@gmail.com', 'authenticated', 'authenticated'),
+    (g, 'symphony-107-g@gmail.com', 'authenticated', 'authenticated');
   insert into auth.users (id, aud, role) values (ad, 'authenticated', 'authenticated'), (cd, 'authenticated', 'authenticated');
 
   insert into public.households (owner_id, name) values (a, 'H1') returning id into h1;
   insert into public.households (owner_id, name) values (c, 'H2') returning id into h2;
   insert into public.households (owner_id, name) values (e, 'H3') returning id into h3;
+  insert into public.households (owner_id, name) values (f, 'H4') returning id into h4;
   insert into public.household_members (household_id, user_id, role, status, joined_at) values
     (h1, a, 'owner', 'active', '2026-01-01'), (h1, b, 'member', 'active', '2026-02-01'), (h1, ad, 'display', 'active', '2026-01-15'),
     (h2, c, 'owner', 'active', '2026-03-01'), (h2, cd, 'display', 'active', '2026-03-02'),
-    (h3, e, 'owner', 'active', '2026-04-01'), (h3, d, 'member', 'active', '2026-04-02');
+    (h3, e, 'owner', 'active', '2026-04-01'), (h3, d, 'member', 'active', '2026-04-02'),
+    (h4, f, 'owner', 'active', '2026-05-01');
+  insert into public.household_members (household_id, user_id, role, status) values (h4, g, 'member', 'pending');
   insert into public.household_displays (household_id, user_id) values (h1, ad), (h2, cd);
 
   -- A's tasks: shared, private, and a shared step under the private one.
@@ -50,11 +57,14 @@ begin
   insert into public.routines (user_id, scope, name) values (a, 'individual', '107 A private routine') returning id into r_priv;
   insert into public.routines (user_id, scope, name, parent_routine_id) values (a, 'compound', '107 A shared step routine', r_priv);
   insert into public.notes (user_id, scope, title) values (a, 'individual', '107 A private note'), (a, 'couple', '107 A shared note');
-  insert into public.goal_areas (user_id, name) values (a, '107 A area');
+  insert into public.goal_areas (user_id, context, name) values (a, 'family', '107 A family area'), (a, 'personal', '107 A private area');
   insert into public.goals (user_id, scope, name) values (a, 'couple', '107 A shared goal'), (a, 'individual', '107 A private goal');
   insert into public.contacts (user_id, scope, name) values (a, 'compound', '107 A shared contact');
   insert into public.projects (user_id, scope, name) values (a, 'individual', '107 A private project');
-  insert into public.family_members (user_id, auth_user_id, name) values (a, a, '107 A self'), (a, null, '107 A child');
+  insert into public.family_members (user_id, auth_user_id, name) values (a, a, '107 A self');
+  insert into public.family_members (user_id, auth_user_id, name) values (a, null, '107 A child') returning id into a_child;
+  -- B's own task assigned to A's child.
+  insert into public.tasks (user_id, scope, title, assigned_to) values (b, 'individual', '107 B for A child', a_child);
   insert into public.chat_sessions (user_id, scope, title) values (a, 'individual', '107 A private chat'), (a, 'couple', '107 A shared chat');
   insert into public.evening_reflections (user_id, body) values (a, '107 A reflection');
   insert into public.scratchpad_notes (user_id, body) values (a, '107 A scratch');
@@ -62,10 +72,11 @@ begin
   insert into public.captures (user_id, household_id, body) values (b, h1, '107 B capture') returning id into cap_b;
   insert into public.school_mail_reviews (capture_id, reviewed_by) values (cap_b, a);
 
-  -- Meals: A's recipe moves to B and B's plan keeps it; A's plan clashes with B's week.
+  -- Meals: A's recipe moves to B and B's plan keeps it; A's week of 9 November clashes with B's, 16 November does not.
   insert into public.recipes (user_id, title) values (a, '107 A recipe') returning id into recipe;
   insert into public.meal_plans (user_id, week_start) values (b, '2026-11-09') returning id into mp_b;
   insert into public.meal_plans (user_id, week_start) values (a, '2026-11-09') returning id into mp_a;
+  insert into public.meal_plans (user_id, week_start) values (a, '2026-11-16');
   insert into public.meal_plan_entries (meal_plan_id, recipe_id) values (mp_b, recipe), (mp_a, recipe);
 
   -- Home registry: A's home with a space and an asset A created.
@@ -74,7 +85,7 @@ begin
   insert into public.assets (home_id, space_id, created_by, name) values (home_a, (select id from public.spaces where name = '107 A space'), a, '107 A asset');
   -- C once belonged with E and created a space in E's home; C now has no heir.
   insert into public.homes (user_id, name) values (e, '107 E home') returning id into home_e;
-  insert into public.spaces (home_id, created_by, name) values (home_e, c, '107 C space in E home');
+  insert into public.spaces (home_id, created_by, name) values (home_e, c, '107 C space in E home'), (home_e, a, '107 A space in E home');
 
   -- Two no-action tables, one referencing the other (the sweep needs a second pass).
   insert into public.playbook_blocks (user_id) values (a) returning id into blk;
@@ -85,10 +96,18 @@ begin
   -- C and D.
   insert into public.tasks (user_id, scope, title) values (c, 'couple', '107 C shared'), (d, 'couple', '107 D shared'), (d, 'individual', '107 D private');
   insert into public.family_members (user_id, name) values (c, '107 C self');
+  -- C's child, with things assigned to it (nullable, no delete action) and screen time (NOT NULL, no delete action).
+  insert into public.family_members (user_id, name) values (c, '107 C child') returning id into c_child;
+  insert into public.routines (user_id, scope, name, assigned_to) values (c, 'individual', '107 C routine for child', c_child);
+  insert into public.tasks (user_id, scope, title, assigned_to) values (c, 'individual', '107 C task for child', c_child);
+  insert into public.event_notes (user_id, assigned_to, body) values (c, c_child, '107 C event note');
+  insert into public.actionable_instances (user_id, assigned_to_override) values (c, c_child);
+  insert into public.screen_time_entries (user_id, family_member_id, minutes) values (c, c_child, 30);
+  insert into public.tasks (user_id, scope, title) values (f, 'couple', '107 F shared');
   insert into public.chat_sessions (user_id, scope, title) values (d, 'individual', '107 D chat');
 
   insert into ids values ('a', a), ('b', b), ('ad', ad), ('c', c), ('cd', cd), ('d', d), ('e', e),
-    ('h1', h1), ('h2', h2), ('h3', h3), ('t_priv', t_priv), ('t_shared', t_shared), ('recipe', recipe);
+    ('f', f), ('g', g), ('h1', h1), ('h2', h2), ('h3', h3), ('h4', h4), ('a_child', a_child), ('t_priv', t_priv), ('t_shared', t_shared), ('recipe', recipe);
   insert into ids select 'n_priv', id from public.notes where title = '107 A private note';
   insert into ids select 'r_priv', r_priv;
 end $$;
@@ -118,6 +137,7 @@ do $$ begin
   insert into results values ('c', public.delete_account_data(pg_temp.id('c')));
   insert into results values ('d', public.delete_account_data(pg_temp.id('d')));
   insert into results values ('d2', public.delete_account_data(pg_temp.id('d')));
+  insert into results values ('f', public.delete_account_data(pg_temp.id('f')));
 end $$;
 
 reset role;
@@ -144,12 +164,18 @@ begin
   assert (select role from public.household_members where household_id = pg_temp.id('h3') and user_id = pg_temp.id('e')) = 'owner', '3: E is no longer owner';
   assert (rd2->>'households_handed_on')::int = 0 and (rd2->>'households_deleted')::int = 0 and rd2->'not_moved' = '[]'::jsonb,
     '3: a second call for D changed something: ' || rd2::text;
+
+  assert (select r->>'heir' from results where k = 'f') is null, '3: F''s pending invitee became heir';
+  assert (select (r->>'households_deleted')::int from results where k = 'f') = 1, '3: F''s household (only a pending invitee) was not deleted';
+  assert not exists (select 1 from public.households where id = pg_temp.id('h4')), '3: H4 still exists';
+  assert not exists (select 1 from public.households where owner_id = pg_temp.id('g')), '3: the pending invitee was given a household';
+  assert (select user_id from public.tasks where title = '107 F shared') = pg_temp.id('f'), '3: F''s shared task moved to the pending invitee';
 end $$;
 
 -- 4. Deleting the auth users raises no foreign-key error.
 do $$ begin
   begin
-    delete from auth.users where id in (pg_temp.id('a'), pg_temp.id('c'), pg_temp.id('cd'), pg_temp.id('d'));
+    delete from auth.users where id in (pg_temp.id('a'), pg_temp.id('c'), pg_temp.id('cd'), pg_temp.id('d'), pg_temp.id('f'));
   exception when foreign_key_violation then
     assert false, '4: deleting the auth users was blocked: ' || sqlerrm;
   end;
@@ -172,11 +198,12 @@ begin
   assert not exists (select 1 from public.goals where name = '107 A private goal'), '5: A''s private goal survived';
   assert (select user_id from public.contacts where name = '107 A shared contact') = b, '5: A''s shared contact did not pass to B';
   assert not exists (select 1 from public.projects where name = '107 A private project'), '5: A''s private project survived';
-  -- goal_areas in the stub has no context column, so nothing in it can be told shared: skipped, not moved.
-  assert not exists (select 1 from public.goal_areas where name = '107 A area'), '5: a goal_areas row moved without its context column';
+  assert (select user_id from public.goal_areas where name = '107 A family area') = b, '5: A''s family goal area did not pass to B';
+  assert not exists (select 1 from public.goal_areas where name = '107 A private area'), '5: A''s private goal area survived';
 
   assert (select count(*) from public.family_members where name in ('107 A self', '107 A child') and user_id = b) = 2, '5: A''s family members did not pass to B';
   assert (select auth_user_id from public.family_members where name = '107 A self') is null, '5: A''s family row still links to A';
+  assert (select assigned_to from public.tasks where title = '107 B for A child') = pg_temp.id('a_child'), '5: B''s task lost its assignment to A''s child';
 
   assert not exists (select 1 from public.chat_sessions where title = '107 A private chat'), '5: A''s private chat survived';
   assert (select user_id from public.chat_sessions where title = '107 A shared chat') = b, '5: A''s shared chat did not pass to B';
@@ -190,12 +217,17 @@ begin
   assert (select user_id from public.recipes where id = pg_temp.id('recipe')) = b, '5: A''s recipe did not pass to B';
   assert (select recipe_id from public.meal_plan_entries e join public.meal_plans p on p.id = e.meal_plan_id where p.user_id = b) = pg_temp.id('recipe'),
     '5: B''s meal plan lost A''s recipe';
-  assert (select count(*) from public.meal_plans) = 1, '5: A''s clashing meal plan was not left to go';
+  assert (select user_id from public.meal_plans where week_start = '2026-11-16') = b, '5: A''s non-clashing week did not pass to B';
+  assert (select count(*) from public.meal_plans where week_start = '2026-11-09') = 1, '5: A''s clashing week was not left to go';
 
   assert (select user_id from public.homes where name = '107 A home') = b, '5: A''s home did not pass to B';
   assert (select created_by from public.spaces where name = '107 A space') = b, '5: A''s space did not pass to B';
   assert (select created_by from public.assets where name = '107 A asset') = b, '5: A''s asset did not pass to B';
   assert (select created_by from public.spaces where name = '107 C space in E home') = pg_temp.id('e'), '5: C''s space in E''s home was not kept for E';
+  assert (select created_by from public.spaces where name = '107 A space in E home') = pg_temp.id('e'), '5: A''s space in E''s home did not follow E';
+  assert not exists (select 1 from public.family_members where name in ('107 C self', '107 C child')), '5: C''s family rows survived';
+  assert not exists (select 1 from public.screen_time_entries) and not exists (select 1 from public.event_notes)
+    and not exists (select 1 from public.actionable_instances), '5: C''s child-linked rows survived';
 
   assert not exists (select 1 from public.playbook_blocks where user_id = a) and not exists (select 1 from public.playbook_instances where user_id = a), '5: A''s playbook rows survived';
   assert not exists (select 1 from public.task_focus where user_id = a), '5: A''s task_focus row survived';

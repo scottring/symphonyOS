@@ -12,8 +12,11 @@
 // none and is nullable; tasks.parent_task_id and routines.parent_routine_id
 // cascade (016_subtasks.sql, 2026-06-24_routine_parent_steps.sql);
 // task_focus.user_id has no foreign key. Deliberately absent, to prove the
-// function skips what does not exist: the notices, kid_math_prefs and
-// kid_math_problems tables, and goal_areas.context. The real owner-immutable,
+// function skips what does not exist: the notices and kid_math_problems
+// tables, and kid_math_prefs.user_id. The nullable no-action references to
+// family_members (tasks/routines/event_notes.assigned_to,
+// actionable_instances.assigned_to_override) and the NOT NULL one from
+// screen_time_entries mirror the live database. The real owner-immutable,
 // AI budget, edition and membership-guard migrations are applied on top.
 // Never contacts a remote database.
 import { execFileSync } from 'node:child_process'
@@ -73,7 +76,7 @@ try {
     create table public.routines(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
       scope text not null default 'individual', name text, parent_routine_id uuid references public.routines(id) on delete cascade);
     create table public.notes(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, scope text not null default 'individual', title text);
-    create table public.goal_areas(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, name text);
+    create table public.goal_areas(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, context text, name text);
     create table public.goals(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
       scope text not null default 'individual', name text, area_id uuid references public.goal_areas(id) on delete set null);
     create table public.contacts(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, scope text not null default 'individual', name text);
@@ -95,6 +98,18 @@ try {
       created_by uuid not null references auth.users(id), name text);
     create table public.assets(id uuid primary key default gen_random_uuid(), home_id uuid not null references public.homes(id) on delete cascade,
       space_id uuid references public.spaces(id) on delete set null, created_by uuid not null references auth.users(id), name text);
+
+    -- Live: these point at family_members(id) with no delete action (2026-11-13 read).
+    alter table public.tasks add column assigned_to uuid references public.family_members(id);
+    alter table public.routines add column assigned_to uuid references public.family_members(id);
+    create table public.event_notes(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
+      assigned_to uuid references public.family_members(id), body text);
+    create table public.actionable_instances(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
+      assigned_to_override uuid references public.family_members(id));
+    create table public.screen_time_entries(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id),
+      family_member_id uuid not null references public.family_members(id), minutes int);
+    -- In the move list but without a user_id column here: skipped, not an error.
+    create table public.kid_math_prefs(member_id uuid primary key references public.family_members(id) on delete cascade);
 
     -- Private, no delete action.
     create table public.evening_reflections(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id), body text);
