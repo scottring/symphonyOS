@@ -71,6 +71,9 @@ export interface Panorama {
   /** How far down the art (0–1) its skyline sits under the page's text
    *  column; below it the art stands in front of every row. */
   skyline: number
+  /** Which part of the art shows in Today's heading strip (an
+   *  object-position): the peaks for the overlook, the trains for the yard. */
+  headingFocus?: string
 }
 
 // The low landscape of each approved scene concept, cut out by
@@ -109,7 +112,7 @@ export const PANORAMAS: Record<PlaceId, Record<SceneryLighting, Panorama>> = {
 // the land, with matching veils (skyline: scripts/scenery/woodblock-manifest.json).
 // They stand under the same place-tinted CSS sky as the painted art; keep
 // their transparent padding (the veil and skyline are measured against it).
-const MOUNTAIN_OVERLOOK: Panorama = { src: woodblock_mountain_town_daytime, veil: woodblock_mountain_town_daytime_veil, skyline: 0.3171 }
+const MOUNTAIN_OVERLOOK: Panorama = { src: woodblock_mountain_town_daytime, veil: woodblock_mountain_town_daytime_veil, skyline: 0.3171, headingFocus: 'center 26%' }
 
 export const WOODBLOCK: Record<PlaceId, Record<SceneryLighting, Panorama>> = {
   'urban': {
@@ -157,7 +160,7 @@ export function sceneryArt(style: SceneryStyle, place: PlaceId, lighting: Scener
 // wires — its top feathered into the sky (scripts/scenery/train_yard.py).
 export const PRINTS: Record<SceneryPrintId, Panorama> = {
   'overlook': MOUNTAIN_OVERLOOK,
-  'train-yard': { src: train_yard, veil: train_yard_veil, skyline: TRAIN_YARD_SKYLINE },
+  'train-yard': { src: train_yard, veil: train_yard_veil, skyline: TRAIN_YARD_SKYLINE, headingFocus: 'center 55%' },
 }
 
 /** The art for the chosen background. */

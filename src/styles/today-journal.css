@@ -400,3 +400,36 @@
 }
 .today-carried-skip:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 .today-carried { margin-top: 18px; }
+
+/* ---- The print across the heading (Scott, 2026-11-13) ------------------ */
+/* The chosen print fills the heading edge to edge, faint behind the date and
+   the day's sentence and at full strength on the right, over the place's sky
+   (the overlook's sky is cut away). The heading's own content sits above it;
+   the print takes no pointer and clips itself, so the date picker and other
+   popovers anchored in the heading are never cut off. */
+.daybook-masthead:has(> .heading-print) { isolation: isolate; border-bottom: 0; }
+.heading-print {
+  position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+  border-radius: inherit;
+  background: var(--scenery-sky, linear-gradient(to bottom, hsl(208 30% 80%), hsl(208 22% 92%)));
+  -webkit-mask-image: linear-gradient(90deg, rgb(0 0 0 / .06) 0%, rgb(0 0 0 / .18) 35%, rgb(0 0 0 / .6) 70%, #000 100%);
+  mask-image: linear-gradient(90deg, rgb(0 0 0 / .06) 0%, rgb(0 0 0 / .18) 35%, rgb(0 0 0 / .6) 70%, #000 100%);
+}
+.heading-print img {
+  display: block; width: 100%; height: 100%;
+  object-fit: cover; object-position: var(--heading-print-focus, center 30%);
+  -webkit-user-drag: none; user-select: none;
+}
+.daybook-masthead:has(> .heading-print) .daybook-masthead-inner { padding-left: 24px; padding-right: 24px; padding-bottom: 18px; }
+/* Over the print, the weather line and the controls keep a little paper
+   behind them so they read on the ridge. */
+.daybook-masthead:has(> .heading-print) .today-mast-right { background: color-mix(in srgb, var(--color-bg-elevated) 70%, transparent); border-radius: 999px; padding: 2px; }
+
+/* ---- The stacked date: "13  November 2026 / Friday" -------------------- */
+.journal-heading.is-stacked { align-items: center; }
+.journal-heading.is-stacked > .journal-step { align-self: center; }
+.journal-stack { display: inline-grid; justify-items: start; line-height: 1.1; margin-left: 6px; }
+.journal-heading.is-stacked .journal-title {
+  font: 500 13px/1.2 var(--font-family-sans); letter-spacing: .04em; color: var(--color-neutral-600);
+}
+.journal-heading.is-stacked .journal-tag { margin-left: 0; }

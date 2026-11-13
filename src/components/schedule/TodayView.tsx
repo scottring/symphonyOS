@@ -104,6 +104,7 @@ import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
+import { HeadingPrint } from '@/components/place/HeadingPrint'
 import { GuideAnchor } from '@/components/guide/GuideBar'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
 import { currentStep } from '@/lib/guide/guidedPlan'
@@ -1471,7 +1472,13 @@ export function TodayView({
           prevLabel: 'Previous day', nextLabel: 'Next day',
           // Another day on screen: the way back (Scott, 2026-11-11).
           current: data.isToday ? undefined : { label: 'Today', ariaLabel: 'Go to today', onGo: () => onDateChange(new Date()) },
+          // "November 2026" small over the weekday, beside the big number
+          // (Scott, 2026-11-13).
+          stacked: true,
         } : undefined}
+        // The chosen print across the heading, fading in from the left
+        // (Scott, 2026-11-13); Today's one picture.
+        backdrop={foldedControls ? <HeadingPrint /> : undefined}
         title={foldedControls
           ? journalEyebrow
           : viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}

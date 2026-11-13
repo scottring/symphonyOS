@@ -28,7 +28,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { PageMotif, type MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral, titleNav, help = true, journal }: {
+export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral, titleNav, help = true, journal, backdrop }: {
   eyebrow?: ReactNode
   title: ReactNode
   /** Prev/next arrows either side of the title — "‹ Oct 17 – 23 ›" (Week,
@@ -60,6 +60,8 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
    *  numeral and title: "‹ 11 November, 2026 Wednesday ›". `title` is what
    *  it shows; this carries the rest. */
   journal?: Omit<ComponentProps<typeof JournalHeading>, 'title' | 'titleExtras'>
+  /** Drawn behind the heading, edge to edge (Today's print, HeadingPrint). */
+  backdrop?: ReactNode
 }) {
   const open = variant !== 'card'
   const heading = (
@@ -81,6 +83,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
         : 'relative mx-3 mb-4 rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0'} ${className}`}
     >
       {variant === 'card' && <PlaceWash motif={motif} />}
+      {backdrop}
       <div className={open ? 'daybook-masthead-inner' : 'relative px-4 py-4 md:px-5'}>
         <div className={`daybook-masthead-row flex items-start justify-between gap-4${aside ? ' flex-wrap md:flex-nowrap' : ''}`}>
           {variant === 'daybook' && date && (

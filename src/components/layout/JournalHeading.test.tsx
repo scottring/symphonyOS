@@ -22,3 +22,20 @@ describe('JournalHeading — the way back to now (Scott, 2026-11-11)', () => {
     expect(onGo).toHaveBeenCalledOnce()
   })
 })
+
+describe('JournalHeading — stacked (Today, Scott 2026-11-13)', () => {
+  it('puts the month and year over the weekday, with no comma between them', () => {
+    render(<JournalHeading {...base} numeral="13" tag={<span>Friday</span>} stacked />)
+    const heading = screen.getByTestId('journal-heading')
+    expect(heading).toHaveClass('is-stacked')
+    const stack = heading.querySelector('.journal-stack')!
+    expect(stack).toContainElement(screen.getByRole('heading', { name: 'November 2026' }))
+    expect(stack).toHaveTextContent(/^November 2026Friday$/)
+  })
+
+  it('keeps the one line, comma and all, when not stacked', () => {
+    render(<JournalHeading {...base} numeral="13" tag={<span>Friday</span>} />)
+    expect(screen.getByTestId('journal-heading').querySelector('.journal-stack')).toBeNull()
+    expect(screen.getByTestId('journal-heading')).toHaveTextContent('November 2026,Friday')
+  })
+})

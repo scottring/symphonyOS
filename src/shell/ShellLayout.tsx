@@ -664,7 +664,11 @@ function ShellLayoutInner({ children }: Props) {
         {showScenery && isMobile && <div className="scenery-end-clearance" aria-hidden="true" />}
         {/* The landscape's switch and strength, at the foot on the right (2026-11-11). */}
         {!isMobile && <SceneryDial right={paneWidth} />}
-        <PlaceScenery scroller={pageScroller} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} vivid={location.pathname === HOME_ROUTE} />
+        {/* Today on a wide screen carries the print in its heading instead
+            (HeadingPrint): one picture per page (Scott, 2026-11-13). */}
+        {!(location.pathname === '/today' && !isMobile) && (
+          <PlaceScenery scroller={pageScroller} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} vivid={location.pathname === HOME_ROUTE} />
+        )}
       </div>
 
       {/* QuickCapture FAB — every route */}
