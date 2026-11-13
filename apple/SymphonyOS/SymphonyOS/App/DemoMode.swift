@@ -10,6 +10,17 @@ import Auth
 enum DemoMode {
     static var isOn: Bool { ProcessInfo.processInfo.arguments.contains("-SymphonyDemo") }
 
+    /// `-SymphonyWalk`: open the walk, over a store with nothing seeded.
+    static var isWalk: Bool { ProcessInfo.processInfo.arguments.contains("-SymphonyWalk") }
+
+    /// `-SymphonyWalkStep N` (0…6): open the walk at step N over the mockup's preview.
+    static var walkStep: Int? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-SymphonyWalkStep"), i + 1 < args.count,
+              let step = Int(args[i + 1]), (0...6).contains(step) else { return nil }
+        return step
+    }
+
     static let userId = UUID(uuidString: "00000000-0000-4000-8000-00000000D3E0")!
 
     static var user: User? {
@@ -19,7 +30,7 @@ enum DemoMode {
 
     static func container(for types: [any PersistentModel.Type]) -> ModelContainer {
         let container = try! ModelContainer(for: Schema(types), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-        seed(ModelContext(container))
+        if !isWalk { seed(ModelContext(container)) }
         return container
     }
 
@@ -79,6 +90,56 @@ enum DemoMode {
         default: break
         }
         return out
+    }
+
+    // MARK: The walk's preview
+
+    /// The mockup's preview at `step` (Walk.dc.html:230-244): Health, Home and People
+    /// kept; the script's flags for levels 1…min(step, 5), written as real rows
+    /// through `WalkWriter`; on Season the second year goal focused, on Month to
+    /// Today the first flag one level up. Each flag hangs under the first flag of its
+    /// area one level up. On Today the mockup's first thing repeats the first week
+    /// task, so that task is marked rather than duplicated. Nil at Welcome.
+    @MainActor static func walkPreview(step: Int, context: ModelContext, now: Date = .now) -> WalkPosition? {
+        guard step >= 1 else { return nil }
+        let periods = WalkPeriods.pick(now: now)
+        let writer = WalkWriter(context: context, userId: userId, periods: periods)
+        var s = WalkState()
+        s.step = step
+        s.areas = WalkLoad.areas((try? context.fetch(FetchDescriptor<GoalArea>())) ?? [], me: userId)
+        func area(_ name: String) -> UUID? { s.areas.first { $0.name == name }?.id }
+        s.kept = ["Health", "Home", "People"].compactMap(area)
+
+        let script: [(WalkLevel, String, String)] = [
+            (.year, "Feel strong again", "Health"), (.year, "Finish the bathroom", "Home"),
+            (.year, "More slow weekends together", "People"),
+            (.season, "Bathroom done by February", "Home"), (.season, "Lift twice a week", "Health"),
+            (.month, "Pick the tile and pay the deposit", "Home"),
+            (.week, "Send the contractor the deposit, today", "Home"), (.week, "Choose the tile, Saturday", "Home"),
+        ]
+        var planted = Set<UUID>()
+        for (level, words, areaName) in script where level.rawValue <= min(step, 5) {
+            guard let said = WalkWords.said(words, level: level, today: periods.today) else { continue }
+            let areaId = area(areaName)
+            let parent = s.items.first { $0.level.rawValue == level.rawValue - 1 && $0.areaId == areaId }
+            let item = WalkItem(id: UUID(), level: level, title: said.title, areaId: areaId,
+                                parentId: parent?.id, day: said.day)
+            if let a = s.area(areaId) { writer.ensureArea(a) }
+            writer.create(item, parent: parent)
+            s.items.append(item)
+            s.lastPlanted[level] = item.id
+            planted.insert(item.id)
+        }
+        if step >= 5, let first = s.items(on: .week).first {
+            writer.setFirstThing(first.id, previous: nil)
+            s.firstThing = first.id
+        }
+        if (2...5).contains(step), let level = WalkLevel(rawValue: step), let above = WalkLevel(rawValue: step - 1) {
+            let parents = s.items(on: above)
+            let index = step == 2 ? 1 : 0
+            if parents.indices.contains(index) { s.focus[level] = parents[index].id }
+        }
+        return WalkPosition(s, status: .inProgress, planted: planted, periods: periods, now: now)
     }
 
     // MARK: Seed

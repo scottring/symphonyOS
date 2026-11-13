@@ -26,6 +26,9 @@ struct iOSMainView: View {
     @Query private var households: [Household]
     @State private var showCapture = false
     @State private var hinge: HingeReader.Reading?
+    /// The walk, while it is open. For now only a Debug demo opens it (`-SymphonyWalk`).
+    @State private var walk: WalkModel?
+    @State private var demoWalkOpened = false
 
     private var dock: some View {
         @Bindable var state = appState
@@ -133,6 +136,13 @@ struct iOSMainView: View {
             DockLayoutReader { layout in appState.dockLayout = layout }
             HingeReader { reading in hinge = reading }
         }
+        // The walk covers the dock; the half-open display still covers the walk.
+        .overlay {
+            if let walk {
+                WalkView(model: walk)
+                    .transition(.opacity)
+            }
+        }
         // Set down partly open: the half-open display, over everything.
         .overlay {
             if appState.posture.isHalfOpen {
@@ -142,7 +152,7 @@ struct iOSMainView: View {
         }
         .onChange(of: hinge) { _, _ in updatePosture() }
         .onChange(of: appState.dockLayout) { _, _ in updatePosture() }
-        .onAppear { updatePosture(); applyEdition() }
+        .onAppear { updatePosture(); applyEdition(); openDemoWalk() }
         // MainView is mounted only while signed in; forget the edition when it goes.
         .onDisappear { CalendarFeed.shared.edition = nil }
         .onChange(of: households.map(\.edition)) { _, _ in applyEdition() }
@@ -171,6 +181,20 @@ struct iOSMainView: View {
 }
 
 extension iOSMainView {
+    /// Debug demo only: `-SymphonyDemo -SymphonyWalk [-SymphonyWalkStep N]` opens the
+    /// walk over an empty in-memory store, or over the mockup's preview at step N.
+    private func openDemoWalk() {
+        #if DEBUG
+        guard DemoMode.isOn, DemoMode.isWalk, !demoWalkOpened else { return }
+        demoWalkOpened = true
+        let position = DemoMode.walkStep.flatMap { DemoMode.walkPreview(step: $0, context: modelContext) }
+        let model = WalkModel(context: modelContext, userId: DemoMode.userId, entry: position == nil ? .start : .resume,
+                              position: position, edition: appState.edition, store: nil)
+        model.onEnd = { _ in withAnimation(.easeInOut(duration: 0.4)) { walk = nil } }
+        walk = model
+        #endif
+    }
+
     private func updatePosture() {
         let next: DuoPosture
         if let pinned = HalfOpen.pinned {
