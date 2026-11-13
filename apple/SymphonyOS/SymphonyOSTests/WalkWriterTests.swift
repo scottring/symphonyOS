@@ -553,6 +553,182 @@ struct WalkWriterTests {
         #expect(task(ctx, s.id) != nil)
     }
 
+    // MARK: Only the walk's own rows, only the signed-in person's
+
+    /// A row of the person's own plan that the walk did not make: its own
+    /// commitment, today's focus and an edit still queued.
+    private func plantBystander(_ ctx: ModelContext) throws -> (task: SymphonyTask, commitment: TaskCommitment, focus: TaskFocus) {
+        let t = SymphonyTask(userId: me, title: "Renew the passport", context: "personal", syncStatus: .synced)
+        t.bucket = "week"
+        t.weekStart = day(2026, 11, 8)
+        let c = TaskCommitment(taskId: t.id, level: "week", periodStart: day(2026, 11, 8), createdBy: me, syncStatus: .synced)
+        let f = TaskFocus(taskId: t.id, userId: me, date: periods.today, syncStatus: .synced)
+        ctx.insert(t); ctx.insert(c); ctx.insert(f)
+        ctx.queueSync(table: "tasks", recordId: t.id, type: "update")
+        try ctx.save()
+        return (t, c, f)
+    }
+
+    private func bystanderSurvives(_ ctx: ModelContext, _ b: (task: SymphonyTask, commitment: TaskCommitment, focus: TaskFocus),
+                                   sourceLocation: SourceLocation = #_sourceLocation) {
+        #expect(task(ctx, b.task.id)?.title == "Renew the passport", sourceLocation: sourceLocation)
+        #expect(commitments(ctx, b.task.id).map(\.id) == [b.commitment.id], sourceLocation: sourceLocation)
+        #expect(focus(ctx).filter { $0.taskId == b.task.id }.map(\.id) == [b.focus.id], sourceLocation: sourceLocation)
+        #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == b.task.id && $0.changeType == "update" },
+                sourceLocation: sourceLocation)
+    }
+
+    @Test func pullingUpSparesRowsTheWalkDidNotMake() throws {
+        let ctx = try makeContext()
+        let b = try plantBystander(ctx)
+        let w = writer(ctx)
+        let c = plantChain(w)
+        w.setFirstThing(c.w.id, previous: nil)
+
+        // Unsent walk rows: taken back whole.
+        w.remove(c.w.id, level: .week)
+        bystanderSurvives(ctx, b)
+        w.restore(c.w.id)
+        bystanderSurvives(ctx, b)
+        w.remove(c.y.id, level: .year)
+        bystanderSurvives(ctx, b)
+        w.restore(c.y.id)
+        bystanderSurvives(ctx, b)
+
+        // Sent walk rows: deleted with a queued delete.
+        try pushAll(ctx)
+        ctx.queueSync(table: "tasks", recordId: b.task.id, type: "update")
+        try ctx.save()
+        w.remove(c.s.id, level: .season)
+        bystanderSurvives(ctx, b)
+        w.restore(c.s.id)
+        bystanderSurvives(ctx, b)
+        #expect(!pending(ctx).contains { $0.recordId == b.task.id && $0.changeType == "delete" })
+    }
+
+    private struct TaskLook: Equatable {
+        let title: String, completed: Bool, scheduledFor: Date?, bucket: String?, context: String?
+        let goalId: UUID?, sourceId: UUID?, areaId: UUID?, linksDirty: Bool, placementDirty: Bool
+        let updatedAt: Date, syncStatus: SyncStatus
+        init(_ t: SymphonyTask) {
+            title = t.title; completed = t.completed; scheduledFor = t.scheduledFor; bucket = t.bucket
+            context = t.context; goalId = t.goalId; sourceId = t.sourceId; areaId = t.areaId
+            linksDirty = t.linksDirty; placementDirty = t.placementDirty; updatedAt = t.updatedAt; syncStatus = t.syncStatus
+        }
+    }
+
+    private struct GoalLook: Equatable {
+        let name: String, year: Int, sortOrder: Int, areaId: UUID?, areaDirty: Bool, updatedAt: Date
+        init(_ g: Goal) {
+            name = g.name; year = g.year; sortOrder = g.sortOrder; areaId = g.areaId; areaDirty = g.areaDirty; updatedAt = g.updatedAt
+        }
+    }
+
+    private struct AreaLook: Equatable {
+        let name: String, sortOrder: Int, context: String?, userId: UUID
+        init(_ a: GoalArea) { name = a.name; sortOrder = a.sortOrder; context = a.context; userId = a.userId }
+    }
+
+    @Test func aPartnersRowsAreNeverTouched() throws {
+        let ctx = try makeContext()
+        let partner = UUID()
+        let w = writer(ctx)
+        let c = plantChain(w)
+        try pushAll(ctx)
+
+        let area = GoalArea(userId: partner, name: "Family", sortOrder: 0, context: "family", syncStatus: .synced)
+        let t = SymphonyTask(userId: partner, title: "Pack the school bags", context: "family", syncStatus: .synced)
+        t.bucket = "timed"
+        t.scheduledFor = periods.today
+        t.areaId = area.id
+        // Pointed at a walk row on the web: the server's SET NULL owns that link.
+        t.sourceId = c.m.id
+        t.goalId = c.y.id
+        let g = Goal(id: UUID(), userId: partner, name: "A calmer house", year: 2027)
+        g.context = "family"
+        g.areaId = area.id
+        ctx.insert(area); ctx.insert(t); ctx.insert(g)
+        try ctx.save()
+        let taskBefore = TaskLook(t), goalBefore = GoalLook(g), areaBefore = AreaLook(area)
+
+        func untouched(_ step: String, sourceLocation: SourceLocation = #_sourceLocation) {
+            let tt = task(ctx, t.id), gg = goal(ctx, g.id), aa = areas(ctx).first { $0.id == area.id }
+            #expect(tt.map(TaskLook.init) == taskBefore, "task after \(step)", sourceLocation: sourceLocation)
+            #expect(gg.map(GoalLook.init) == goalBefore, "goal after \(step)", sourceLocation: sourceLocation)
+            #expect(aa.map(AreaLook.init) == areaBefore, "area after \(step)", sourceLocation: sourceLocation)
+            #expect(!pending(ctx).contains { [t.id, g.id, area.id].contains($0.recordId) },
+                    "queue after \(step)", sourceLocation: sourceLocation)
+            #expect(!focus(ctx).contains { $0.taskId == t.id }, "focus after \(step)", sourceLocation: sourceLocation)
+        }
+
+        w.remove(t.id, level: .week); untouched("remove task")
+        w.restore(t.id); untouched("restore task")
+        w.remove(g.id, level: .year); untouched("remove goal")
+        w.restore(g.id); untouched("restore goal")
+        w.setArea(t.id, level: .week, to: c.area.id); untouched("setArea task")
+        w.setArea(g.id, level: .year, to: c.area.id); untouched("setArea goal")
+        w.setFirstThing(t.id, previous: nil); untouched("setFirstThing")
+        w.setFirstThing(nil, previous: t.id); untouched("setFirstThing previous")
+        w.toggleDone(t.id); untouched("toggleDone")
+        w.create(WalkItem(id: t.id, level: .week, title: "Replanted"), parent: nil); untouched("create task id")
+        w.create(WalkItem(id: g.id, level: .year, title: "Replanted"), parent: nil); untouched("create goal id")
+        w.ensureArea(WalkArea(id: area.id, name: "Renamed")); untouched("ensureArea")
+        w.dropAreaIfUnused(area.id); untouched("dropAreaIfUnused")
+        // Pulling up the walk rows it names leaves its links to the server.
+        w.remove(c.m.id, level: .month); untouched("remove the row it names")
+        w.remove(c.y.id, level: .year); untouched("remove the goal it names")
+        w.restore(c.y.id); untouched("restore the goal it names")
+        w.restore(c.m.id); untouched("restore the row it names")
+    }
+
+    @Test func plantingTwiceIsOneRow() throws {
+        let ctx = try makeContext()
+        let w = writer(ctx)
+        let y = WalkItem(id: UUID(), level: .year, title: "Run a half marathon")
+        w.create(WalkItem(id: UUID(), level: .year, title: "Another goal"), parent: nil)
+        w.create(y, parent: nil)
+        let order = try #require(goal(ctx, y.id)).sortOrder
+        w.create(WalkItem(id: y.id, level: .year, title: "Replanted"), parent: nil)
+        let goals = try ctx.fetch(FetchDescriptor<Goal>()).filter { $0.id == y.id }
+        #expect(goals.count == 1)
+        #expect(goals.first?.name == "Run a half marathon")
+        #expect(goals.first?.sortOrder == order)
+
+        let s = WalkItem(id: UUID(), level: .season, title: "Build to ten miles")
+        w.create(s, parent: nil)
+        w.create(WalkItem(id: s.id, level: .season, title: "Replanted"), parent: nil)
+        #expect(tasks(ctx).filter { $0.id == s.id }.map(\.title) == ["Build to ten miles"])
+        #expect(commitments(ctx, s.id).count == 1)
+    }
+
+    @Test func aMissingParentGivesAnUnlinkedRow() throws {
+        let ctx = try makeContext()
+        let w = writer(ctx)
+        let gone = WalkItem(id: UUID(), level: .season, title: "Pulled up elsewhere")
+        let m = WalkItem(id: UUID(), level: .month, title: "Run three times a week", parentId: gone.id)
+        w.create(m, parent: gone)
+        let t = try #require(task(ctx, m.id))
+        #expect(t.goalId == nil)
+        #expect(t.sourceId == nil)
+        #expect(t.linksDirty)
+        #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == m.id && $0.changeType == "insert" })
+    }
+
+    @Test func undoKeepsOnlyLinksWhoseRowsStillExist() throws {
+        let ctx = try makeContext()
+        let w = writer(ctx)
+        let c = plantChain(w)
+        w.remove(c.w.id, level: .week)
+        w.remove(c.m.id, level: .month)
+
+        w.restore(c.w.id)
+        let t = try #require(task(ctx, c.w.id))
+        #expect(t.sourceId == nil)          // its month line is still pulled up
+        #expect(t.goalId == c.y.id)
+        #expect(t.areaId == c.area.id)
+        #expect(t.linksDirty)
+    }
+
     // MARK: Existing callers
 
     @Test func existingCallersAreUnchanged() throws {

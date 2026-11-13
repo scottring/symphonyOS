@@ -17,6 +17,10 @@ import SwiftData
 /// with nothing queued is overwritten by the next pull. The sync engine
 /// holds that update until the insert lands.
 ///
+/// It only ever edits or deletes the signed-in person's own rows: an existing
+/// goal, task or area whose `userId` is someone else's (a partner's shared
+/// row) is left exactly as it is, whatever id it is handed.
+///
 /// A struct over one small reference box, so copies share what was pulled up
 /// (for Undo) and which areas this walk made.
 struct WalkWriter {
@@ -85,7 +89,7 @@ struct WalkWriter {
     /// Takes back an area this walk made once nothing is filed under it. An
     /// area it did not make is never touched.
     func dropAreaIfUnused(_ id: UUID) {
-        guard memory.madeAreas.contains(id), let a = area(id) else { return }
+        guard memory.madeAreas.contains(id), let a = area(id), a.userId == userId else { return }
         let goals = (try? context.fetch(FetchDescriptor<Goal>())) ?? []
         let tasks = (try? context.fetch(FetchDescriptor<SymphonyTask>())) ?? []
         guard !goals.contains(where: { $0.areaId == id }), !tasks.contains(where: { $0.areaId == id }) else { return }
@@ -101,7 +105,10 @@ struct WalkWriter {
 
     // MARK: Planting
 
+    /// Plants a flag. Planting the same item twice (a resumed walk) is one
+    /// row: an id already in the store is left as it is.
     func create(_ item: WalkItem, parent: WalkItem?) {
+        guard goal(item.id) == nil, task(item.id) == nil else { return }
         switch item.level {
         case .year:
             let g = plan.createGoal(name: item.title, notes: nil, context: Self.lifeArea,
@@ -143,7 +150,7 @@ struct WalkWriter {
     func remove(_ id: UUID, level: WalkLevel) {
         let removed: Removed
         if level == .year {
-            guard let g = goal(id) else { return }
+            guard let g = myGoal(id) else { return }
             let fields = GoalFields(g)
             let unlinked = unlinkChildren(of: id)
             if insertQueued(table: "goals", id: id) {
@@ -154,7 +161,7 @@ struct WalkWriter {
             context.delete(g)
             removed = Removed(row: .goal(fields), commitments: [], focusDays: [], unlinked: unlinked)
         } else {
-            guard let t = task(id) else { return }
+            guard let t = myTask(id) else { return }
             let fields = TaskFields(t)
             let commitments = ((try? context.fetch(FetchDescriptor<TaskCommitment>())) ?? []).filter { $0.taskId == id }
             let focusRows = ((try? context.fetch(FetchDescriptor<TaskFocus>())) ?? []).filter { $0.taskId == id }
@@ -236,7 +243,7 @@ struct WalkWriter {
             for day in r.focusDays { focus(id, on: day) }
         }
         for u in r.unlinked {
-            guard let child = task(u.id) else { continue }
+            guard let child = myTask(u.id) else { continue }
             if u.goal, child.goalId == nil { child.goalId = id }
             if u.source, child.sourceId == nil { child.sourceId = id }
             markLinksToSend(child)
@@ -249,11 +256,11 @@ struct WalkWriter {
     /// Files a flag under another area (or none).
     func setArea(_ id: UUID, level: WalkLevel, to areaId: UUID?) {
         if level == .year {
-            guard let g = goal(id) else { return }
+            guard let g = myGoal(id) else { return }
             g.areaId = areaId
             markAreaToSend(g)
         } else {
-            guard let t = task(id) else { return }
+            guard let t = myTask(id) else { return }
             t.areaId = areaId
             markLinksToSend(t)
         }
@@ -267,7 +274,7 @@ struct WalkWriter {
         if let previous, let f = focusRow(TaskFocus.key(taskId: previous, userId: userId, date: today)) {
             unfocus(f)
         }
-        if let id, let t = task(id) {
+        if let id, let t = myTask(id) {
             if !PlanCalendar.sameDay(t.scheduledFor, today) {
                 plan.planTask(t, on: today, focusToday: true)
             }
@@ -278,9 +285,9 @@ struct WalkWriter {
         save()
     }
 
-    /// Ticks or unticks any task, planted by the walk or not.
+    /// Ticks or unticks any of the person's own tasks, planted by the walk or not.
     func toggleDone(_ id: UUID) {
-        guard let t = task(id) else { return }
+        guard let t = myTask(id) else { return }
         plan.complete(t)
     }
 
@@ -353,11 +360,12 @@ struct WalkWriter {
 
     // MARK: Plumbing
 
-    /// Rows that named `id` lose that link, as the server's `SET NULL` does.
+    /// The person's own rows that named `id` lose that link, as the server's
+    /// `SET NULL` does. A partner's row is left to the server.
     private func unlinkChildren(of id: UUID) -> [Unlinked] {
         let tasks = (try? context.fetch(FetchDescriptor<SymphonyTask>())) ?? []
         var unlinked: [Unlinked] = []
-        for t in tasks where t.id != id && (t.goalId == id || t.sourceId == id) {
+        for t in tasks where t.userId == userId && t.id != id && (t.goalId == id || t.sourceId == id) {
             let u = Unlinked(id: t.id, goal: t.goalId == id, source: t.sourceId == id)
             if u.goal { t.goalId = nil }
             if u.source { t.sourceId = nil }
@@ -438,6 +446,15 @@ struct WalkWriter {
         var d = FetchDescriptor<Goal>(predicate: #Predicate { $0.id == id })
         d.fetchLimit = 1
         return (try? context.fetch(d))?.first
+    }
+
+    /// The row only if it is the signed-in person's own.
+    private func myTask(_ id: UUID) -> SymphonyTask? {
+        task(id).flatMap { $0.userId == userId ? $0 : nil }
+    }
+
+    private func myGoal(_ id: UUID) -> Goal? {
+        goal(id).flatMap { $0.userId == userId ? $0 : nil }
     }
 
     private func area(_ id: UUID) -> GoalArea? {
