@@ -141,6 +141,17 @@ web app. No paid subscription at launch.
 
 ## Direction, not yet decided
 
+- **The whole app feels like the walk** (Scott, 2026-11-13): "each day the
+  app is open, it feels like you're getting road signs or signposts
+  suggesting where you go." The walk is not a one-time intro in a different
+  style from the app it leads to; opening Symphony on any day should feel
+  like standing on the same path, with a sign pointing to the next place.
+  *(Claude's reading, to confirm in the mockup round)* A signpost points at
+  the person's own plan (the first thing today, a week with nothing on it
+  yet, a month that is ending, a year goal with no piece this season), in
+  the walk's look (scenery, posts and flags, the orb). It is one quiet sign
+  at a time, never a list of nags, and never an idea Symphony made up. This
+  sets the direction for the Today, Week and horizon designs below.
 - **The walk ends at your own doorstep** (Scott's idea, 2026-11-13): a
   suburban driveway, a subway entrance, a farm gate, a cabin porch, matching
   the person's place theme. Distance becomes time: the far range is the year,
@@ -293,7 +304,8 @@ privacy labels, the existing /privacy page, and a demo account for App Review.
 Scott's rule: when a UI preview is needed, show it before implementing.
 
 1. **Today and Week** in the walk's visual language (scenery, the orb as the
-   Tell control, flags as the "for" lineage). The walk currently ends on the
+   Tell control, flags as the "for" lineage), including the daily signpost
+   (see "The whole app feels like the walk"). The walk currently ends on the
    older paper sheet. This is half the product goal ("easily manage today and
    week").
 2. **The Duo layouts:** inside screen opened flat (the journal spread), the
