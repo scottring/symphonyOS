@@ -27,11 +27,14 @@ enum WalkClassifier {
                 "concert", "dance", "adventure"],
     ]
 
+    /// Little words that never count when they appear in a custom area's own name.
+    static let nameStopWords: Set<String> = ["the", "and", "with", "for", "our", "my", "of", "to", "a", "an", "in", "on", "at"]
+
     /// Distinct whole words in `text` that belong to the area: its list (when it
     /// is one of the defaults) or the words of its own name (three letters or more).
     static func score(_ text: String, areaName: String) -> Int {
-        let own = Set(tokens(areaName).filter { $0.count >= 3 })
-        let listed = defaults.first { $0.caseInsensitiveCompare(areaName.trimmingCharacters(in: .whitespaces)) == .orderedSame }
+        let own = Set(tokens(areaName).filter { $0.count >= 3 && !nameStopWords.contains($0) })
+        let listed = defaults.first { $0.caseInsensitiveCompare(areaName.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame }
             .flatMap { keywords[$0] } ?? []
         let words = own.union(listed)
         return Set(tokens(text)).intersection(words).count
@@ -40,6 +43,7 @@ enum WalkClassifier {
     enum Placement: Equatable { case area(UUID, moved: Bool), unlabeled }
 
     static func place(_ text: String, kept: [WalkArea], focus: UUID?) -> Placement {
+        let focus = focus.flatMap { f in kept.contains(where: { $0.id == f }) ? f : nil }
         let scored = kept.map { ($0, score(text, areaName: $0.name)) }
         if let best = scored.max(by: { $0.1 < $1.1 }), best.1 >= 1,
            scored.filter({ $0.1 == best.1 }).count == 1 {

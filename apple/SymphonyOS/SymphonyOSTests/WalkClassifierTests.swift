@@ -82,4 +82,36 @@ struct WalkClassifierTests {
         #expect(WalkClassifier.place("", kept: kept, focus: nil) == .unlabeled)
         #expect(WalkClassifier.place("Finish the bathroom", kept: [], focus: nil) == .unlabeled)
     }
+
+    @Test func littleWordsInACustomNameDoNotMatch() {
+        let time = area("Time with the kids")
+        #expect(WalkClassifier.score("Fix the fence with Dad", areaName: "Time with the kids") == 0)
+        #expect(WalkClassifier.score("Time for the kids", areaName: "Time with the kids") == 2)
+        // Home's one word (fence) wins; the custom area gets nothing from "the" or "with".
+        #expect(WalkClassifier.place("Fix the fence with Dad", kept: [home, time], focus: nil) == .area(home.id, moved: false))
+        let little = area("To do in my")
+        #expect(WalkClassifier.score("go to my place in the sun", areaName: "To do in my") == 0)
+        #expect(WalkClassifier.place("go to my place", kept: [little], focus: nil) == .unlabeled)
+        #expect(WalkClassifier.place("go to my place", kept: [little, health], focus: health.id) == .area(health.id, moved: false))
+    }
+
+    @Test func aSharedRealWordIsATieNotAClearWin() {
+        let club = area("Kids club")
+        #expect(WalkClassifier.place("Kids", kept: [people, club], focus: nil) == .unlabeled)
+        #expect(WalkClassifier.place("Kids", kept: [people, club, health], focus: health.id) == .area(health.id, moved: false))
+    }
+
+    @Test func twoHitsBeatOne() {
+        #expect(WalkClassifier.place("Run a 5K to the garage", kept: [health, home], focus: nil) == .area(health.id, moved: false))
+        #expect(WalkClassifier.place("Run a 5K to the garage", kept: [health, home], focus: home.id) == .area(health.id, moved: true))
+    }
+
+    @Test func aFocusThatIsNotKeptIsIgnored() {
+        #expect(WalkClassifier.place("Learn the cello", kept: kept, focus: UUID()) == .unlabeled)
+        #expect(WalkClassifier.place("Finish the bathroom", kept: kept, focus: UUID()) == .area(home.id, moved: false))
+    }
+
+    @Test func nameLookupIgnoresNewlines() {
+        #expect(WalkClassifier.score("Finish the bathroom", areaName: "Home\n") == 1)
+    }
 }
