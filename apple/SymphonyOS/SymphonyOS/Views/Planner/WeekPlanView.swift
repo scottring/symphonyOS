@@ -179,6 +179,7 @@ struct WeekPlanView: View {
         #endif
         // Each day's events, from the same cache Today reads.
         .task(id: weekStart) { await calendar.refreshWeek(weekStart) }
+        .onChange(of: calendar.refreshKey) { _, _ in Task { await calendar.refreshWeek(weekStart) } }
         .sheet(isPresented: $showReview) {
             WeekReviewSheet(previousWeek: previous, intoWeek: weekStart)
                 .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])

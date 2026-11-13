@@ -48,10 +48,8 @@ struct CalendarSettingsView: View {
                 switch apple.access {
                 case .notAsked:
                     Button {
-                        Task {
-                            await apple.requestAccess()
-                            await CalendarFeed.shared.refresh(.now)
-                        }
+                        // Granting changes the feed's refreshKey; the views re-read.
+                        Task { await apple.requestAccess() }
                     } label: {
                         Label("Show my calendar", systemImage: "calendar.badge.plus")
                     }

@@ -73,6 +73,7 @@ struct HalfOpenView: View {
         }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
         .task { await calendar.refresh(today, maxAge: 60) }
+        .onChange(of: calendar.refreshKey) { _, _ in Task { await calendar.refresh(today, maxAge: 60) } }
         .task(id: PlanCalendar.ymd(today)) { if appState.edition.allows(.dinner) { await dinners.refresh(today) } }
         // A new day at midnight.
         .task {

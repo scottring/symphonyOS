@@ -127,6 +127,9 @@ struct TodayView: View {
         // then refresh the day in the background.
         .onAppear { rebuildTimeline() }
         .task { await calendar.refresh(date, maxAge: 60) }
+        .onChange(of: calendar.refreshKey) { _, _ in
+            Task { await calendar.refresh(appState.selectedDate, maxAge: 60) }
+        }
         .task { if appState.edition.allows(.dinner) { await dinners.refresh(date) } }
         #if os(iOS)
         // The widgets carry tomorrow and the day after as well.

@@ -10,6 +10,7 @@ struct MainView: View {
         iOSMainView()
         #else
         MacMainView()
+            .onAppear { CalendarFeed.shared.edition = .full }   // the Mac app has no light edition
         #endif
     }
 }
@@ -83,7 +84,7 @@ struct iOSMainView: View {
         }
         let changedToLight = edition == .light && appState.edition != .light
         appState.edition = edition
-        CalendarFeed.shared.edition = edition
+        CalendarFeed.shared.edition = edition   // nil until here: no calendar read goes to the wrong source
         if changedToLight {
             if appState.activeTab == .routines { appState.activeTab = .planner }
             appState.domainFilter = .all
@@ -142,6 +143,8 @@ struct iOSMainView: View {
         .onChange(of: hinge) { _, _ in updatePosture() }
         .onChange(of: appState.dockLayout) { _, _ in updatePosture() }
         .onAppear { updatePosture(); applyEdition() }
+        // MainView is mounted only while signed in; forget the edition when it goes.
+        .onDisappear { CalendarFeed.shared.edition = nil }
         .onChange(of: households.map(\.edition)) { _, _ in applyEdition() }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             appState.keyboardVisible = true
