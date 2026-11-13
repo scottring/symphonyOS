@@ -184,6 +184,79 @@ struct WalkLayoutTests {
         #expect(!week[0].frame.intersects(first[0].frame), "\(week[0].frame) vs \(first[0].frame)")
     }
 
+    @Test func theFlagYouPlantedShowsBeforeTheExamples() {
+        // The reviewer's case: Week zoomed on Health under a risen month flag, one dated "Gym", examples on.
+        let month = flag(.month, "Get back to the gym", in: "Health")
+        let gym = flag(.week, "Gym", in: "Health", parent: month.id, day: day(2026, 11, 17))
+        var s = state(4, kept: ["Health", "Home"], items: [month, gym])
+        s.focus[.week] = month.id
+        s.examplesOn = [4]
+        let layout = WalkLayout.make(s, today: today)
+        let risen = layout.banner(for: month)!
+        let mine = layout.banner(for: gym)
+        #expect(mine?.kind == .full && mine?.more == nil)
+        let ghosts = layout.posts.flatMap(\.banners).filter { $0.kind == .ghost }
+        #expect(ghosts.allSatisfy { $0.frame.minY >= risen.frame.maxY + 4 - 0.01 }, "\(ghosts.map(\.frame))")
+        #expect(layout.banners(on: .week).allSatisfy { !$0.frame.intersects(risen.frame) })
+    }
+
+    @Test func underARisenFlagTheNewestCarriesTheCount() {
+        // Focused on an unlabeled flag: no zoom, so only a little room under the risen flag.
+        for step in 2...4 {
+            let level = WalkLevel(rawValue: step)!, above = WalkLevel(rawValue: step - 1)!
+            let parent = flag(above, "Be kind", in: nil)
+            let older = flag(level, "First one", in: nil, parent: parent.id, day: level == .week ? today : nil)
+            let newer = flag(level, "Second one", in: nil, parent: parent.id, day: level == .week ? today : nil)
+            var s = state(step, kept: ["Health"], items: [parent, older, newer])
+            s.focus[level] = parent.id
+            let layout = WalkLayout.make(s, today: today)
+            #expect(layout.camera == art.stops[step])
+            let post = layout.post(level, nil)!
+            #expect(post.banners.count == 1, "step \(step): \(post.banners.map(\.kind))")
+            #expect(post.banners.first?.itemId == newer.id && post.banners.first?.more == 1 && post.banners.first?.kind == .full)
+            let risen = layout.banner(for: parent)!
+            #expect(risen.glows && !post.banners[0].frame.intersects(risen.frame), "step \(step)")
+            #expect(post.banners[0].label.hasSuffix("1 more, tap to show"))
+        }
+    }
+
+    @Test func aSmallFlagStaysOnItsPole() {
+        // Five columns on Today: the rightmost column stands at x 374.7, so its small flags run past the edge.
+        let kept = Array(names.prefix(5))
+        var items: [WalkItem] = []
+        for name in kept { for lvl in [WalkLevel.year, .season, .month, .week] { items.append(flag(lvl, "\(name) \(lvl)", in: name)) } }
+        var s = state(5, kept: kept, items: items)
+        s.areas = Array(ridge.prefix(5))
+        s.firstThing = items.last!.id
+        let layout = WalkLayout.make(s, today: today)
+        for lvl in [WalkLevel.year, .season, .month, .week] {
+            let post = layout.post(lvl, area(kept[4]).id)!
+            let tip = post.banners.first { $0.kind == .tip }!
+            let scale = tip.frame.height / 20
+            #expect(near(tip.frame.minX, post.base.x - 1.5 * scale, 0.01), "\(lvl): \(tip.frame) at pole \(post.base.x)")
+            #expect(tip.frame.maxX > 386)
+        }
+    }
+
+    @Test func nineColumnsKeepTheirSmallFlags() {
+        // Eight areas and the unlabeled post: small flags still have room on Season and Month.
+        let eight = ridge
+        for step in [2, 3] {
+            var items: [WalkItem] = eight.map { WalkItem(id: UUID(), level: .year, title: "Goal", areaId: $0.id) }
+            items.append(flag(.year, "Loose goal", in: nil))
+            if step == 3 { items += eight.map { WalkItem(id: UUID(), level: .season, title: "Line", areaId: $0.id) } }
+            var s = WalkState()
+            s.areas = eight
+            s.kept = eight.map(\.id)
+            s.step = step
+            s.items = items
+            let layout = WalkLayout.make(s, today: today)
+            #expect(layout.posts(on: .year).count == 9)
+            #expect(layout.banners(on: .year).allSatisfy { $0.kind == .tip }, "step \(step)")
+            if step == 3 { #expect(layout.banners(on: .season).allSatisfy { $0.kind == .tip }) }
+        }
+    }
+
     @Test func lookingBackUpShowsTheWholePlan() {
         // Three areas, two year goals, one season line, one month line and three week tasks each.
         let kept = ["Health", "Home", "People"]
@@ -725,9 +798,9 @@ private enum Invariants {
         // Nothing meets the orb.
         for b in banners where meetsOrb(b.frame) { problems.append("\(b.id) \(b.frame) meets the orb") }
         for l in layout.labels where meetsOrb(l.frame) { problems.append("label \(l.name) meets the orb") }
-        // Unzoomed, everything is on screen across.
+        // Unzoomed, everything but a small flag is on screen across (a small flag stays on its pole; the screen clips it).
         if !zoomed {
-            for f in banners.map(\.frame) + layout.labels.map(\.frame) where f.minX < 0 || f.maxX > 390 {
+            for f in banners.filter({ $0.kind != .tip }).map(\.frame) + layout.labels.map(\.frame) where f.minX < 0 || f.maxX > 390 {
                 problems.append("frame \(f) leaves the screen")
             }
         }
@@ -773,6 +846,21 @@ private enum Invariants {
                         problems.append("\(b.id) holds \(b.lines) lines in \(b.frame)")
                     }
                 }
+            }
+        }
+        // On the step's own level the newest flag of every post is a banner, once; only a post
+        // on a crowded ridge that is not the open one shows a single stub for all its flags.
+        if let level = s.level {
+            let labeled = Set((s.ground ? s.areas : s.areas.filter { s.kept.contains($0.id) }).map(\.id))
+            let onLevel = level == .today ? [s.item(s.firstThing)].compactMap { $0 } : s.items(on: level)
+            let posts = layout.posts(on: level)
+            for post in posts {
+                let mine = onLevel.filter { ($0.areaId.flatMap { labeled.contains($0) ? $0 : nil }) == post.key.column }
+                guard let newest = mine.last else { continue }
+                let shown = post.banners.filter { $0.itemId == newest.id }       // a stub carries no item
+                let crowded = post.banners.count == 1 && post.banners[0].kind == .stub(mine.count)
+                    && posts.contains { $0.id != post.id && $0.banners.contains { b in if case .stub = b.kind { return false }; return true } }
+                if shown.count != 1 && !crowded { problems.append("\(post.id): its newest flag is not a banner") }
             }
         }
         // Every flag on a drawn level is shown or counted in a stub, once.

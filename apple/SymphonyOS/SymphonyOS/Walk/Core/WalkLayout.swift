@@ -173,14 +173,23 @@ private struct Builder {
         }
     }
 
-    /// What a post may cover across, around its pole: every kind it may draw, and the stub it may fold into.
-    func reach(_ kinds: [L.Kind], scale: CGFloat) -> (left: CGFloat, right: CGFloat) {
-        let all = (kinds + [.stub(0)]).map(extent)
-        return ((all.map(\.left).max() ?? 0) * scale, (all.map(\.right).max() ?? 0) * scale)
+    /// Where a kind stands across, for a pole at `x`. `scale` is the post's (small flags and
+    /// their stubs shrink with distance). A small flag stays on its pole, even past the
+    /// screen's edge (the screen clips it); everything else slides back inside.
+    func across(_ kind: L.Kind, at x: CGFloat, scale: CGFloat) -> CGRect {
+        let e = extent(kind)
+        let unit: CGFloat
+        switch kind {
+        case .tip, .stub: unit = scale
+        default: unit = 1
+        }
+        let r = CGRect(x: x - e.left * unit, y: 0, width: (e.left + e.right) * unit, height: 1)
+        return kind == .tip ? r : slid(r)
     }
 
-    func span(at x: CGFloat, _ r: (left: CGFloat, right: CGFloat)) -> CGRect {
-        slid(CGRect(x: x - r.left, y: 0, width: r.left + r.right, height: 1))
+    /// What a post may cover across: every kind it may draw, and the stub it may fold into.
+    func span(at x: CGFloat, _ kinds: [L.Kind], scale: CGFloat) -> CGRect {
+        (kinds + [.stub(0)]).map { across($0, at: x, scale: scale) }.reduce(CGRect.null) { $0.union($1) }
     }
 
     func height(_ kind: L.Kind, lines: Int, tag: String?) -> CGFloat {
@@ -351,7 +360,7 @@ private struct Builder {
         let d = max(0, min(s.step, 6) - lvl.rawValue)
         let tipScale = max(0.6, 1 - 0.1 * CGFloat(d - 1))
         let expandedHere = s.expanded.map { e in e.level == lvl && groups.contains { $0.column == e.column } } ?? false
-        let room = hasRoom(reach([levelKind] + (expandedHere ? [.compact] : []), scale: 1))
+        let room = hasRoom([levelKind] + (expandedHere ? [.compact] : []), scale: levelKind == .tip ? tipScale : 1)
         let open = room ? nil : openIndex(lvl, groups)
         let ceiling = ceiling(lvl)
         let y = stageY(lvl)
@@ -380,12 +389,12 @@ private struct Builder {
             let items = group.items.filter { !risers.contains($0) }
             let scale: CGFloat = drawKind == .tip ? tipScale : 1
             let ghostHere = lvl == level && !ghosts.isEmpty && ghostColumn == group.column
-            let span = span(at: base.x, reach([drawKind], scale: scale))
+            let span = span(at: base.x, [drawKind], scale: scale)
             let reserve = CGFloat(riserSpans.filter { meets($0, span) }.count) * (23 + 4)
             // The step's own flags stop 4 pt under a flag risen from the level above: it is never covered.
             let cap = lvl == level ? risenAbove.filter { meets($0, span) }.map { $0.maxY + 4 }.max() : nil
             let postCeiling = max(ceiling + reserve, cap ?? -.infinity)
-            let hard: CGFloat? = cap ?? (lvl == level ? nil : L.question + reserve)
+            let hard: CGFloat? = lvl == level ? nil : L.question + reserve
             let reals = items.reversed().map { entry($0, on: lvl, kind: drawKind) }
             var banners: [L.Banner]
             if !(room || open == i) {
@@ -406,7 +415,7 @@ private struct Builder {
                           label: WalkCopy.bannerLabel(text, level: lvl, tag: nil, role: .example))
                 } : []
                 banners = stack(id, lvl, base: base, ghosts: ghostEntries, reals: reals,
-                                ceiling: postCeiling, hard: hard, scale: scale, moreOnTop: false)
+                                ceiling: postCeiling, hard: hard, scale: scale, moreOnTop: false, own: lvl == level)
             }
             built.append((group.column, base, banners, risers, ghostHere && group.items.isEmpty))
         }
@@ -442,11 +451,15 @@ private struct Builder {
         return (posts, risen)
     }
 
-    /// Neighbouring columns' reaches, on stage at this camera, stand at least 6 apart,
+    /// Neighbouring columns' flags, on stage at this camera, stand at least 6 apart,
     /// measured after the edges slide a frame back inside (a slid frame closes the gap).
-    func hasRoom(_ r: (left: CGFloat, right: CGFloat)) -> Bool {
-        let spans = columns.map { span(at: stageX($0.worldX), r) }
-        return zip(spans, spans.dropFirst()).allSatisfy { $1.minX - $0.maxX >= 6 }
+    /// Checked at the scale the flags are drawn; a stub folded on top must not meet a neighbour either.
+    func hasRoom(_ kinds: [L.Kind], scale: CGFloat) -> Bool {
+        let xs = columns.map { stageX($0.worldX) }
+        let drawn = xs.map { x in kinds.map { across($0, at: x, scale: scale) }.reduce(CGRect.null) { $0.union($1) } }
+        let folded = xs.map { span(at: $0, kinds, scale: scale) }
+        return zip(drawn, drawn.dropFirst()).allSatisfy { $1.minX - $0.maxX >= 6 }
+            && zip(folded, folded.dropFirst()).allSatisfy { $1.minX - $0.maxX > 0 }
     }
 
     func postId(_ key: WalkPostKey) -> String {
@@ -455,15 +468,19 @@ private struct Builder {
 
     // MARK: The stack
 
-    /// Banners rise from the base, examples first, then the newest. A flag (or an
-    /// example) goes on while it, and a stub if any would remain, stay below the
-    /// ceiling; the rest fold into one stub on top, which never rises above the
-    /// ceiling either (on Look back up, `moreOnTop`: the top banner carries the count
-    /// instead). The newest always shows when it stands alone, cut to one line and
-    /// lower on its pole if it must be; it passes the ceiling only up to `hard`, and
-    /// otherwise a stub takes its place.
+    /// Banners rise from the base, the person's own flags first, newest lowest. A flag
+    /// goes on while it, and a stub if any would remain, stay below the ceiling; the
+    /// rest fold into one stub on top, which never rises above the ceiling either (on
+    /// Look back up, `moreOnTop`: the top banner carries the count instead). Examples
+    /// take only the room that is left; one that does not fit waits.
+    ///
+    /// The newest is cut to one line if it must be. On the step's own level (`own`) it
+    /// is always a banner: when it and a separate stub cannot both fit, it carries the
+    /// count of the others itself, sitting lower on its pole (down to its base) to keep
+    /// under the ceiling. Elsewhere it may pass the ceiling only up to `hard` when it
+    /// stands alone, and otherwise a stub takes its place.
     func stack(_ id: String, _ lvl: WalkLevel, base: CGPoint, ghosts: [Entry], reals: [Entry],
-               ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool) -> [L.Banner] {
+               ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool, own: Bool = false) -> [L.Banner] {
         var placed: [L.Banner] = []
         let gapY = (reals.first?.kind == .tip ? 3 : 4) * scale
         let stubRoom = moreOnTop ? 0 : gapY + 20 * scale
@@ -477,9 +494,9 @@ private struct Builder {
         }
         func place(_ e: Entry, lines: Int, id: String, at b: CGFloat) {
             let unit: CGFloat = e.kind == .tip ? scale : 1
-            let left = extent(e.kind).left * unit, w = width(e.kind) * unit
+            let across = self.across(e.kind, at: base.x, scale: unit)
             let h = height(e.kind, lines: lines, tag: e.tag) * unit
-            placed.append(banner(id: id, e, lvl, frame: slid(CGRect(x: base.x - left, y: b - h, width: w, height: h)),
+            placed.append(banner(id: id, e, lvl, frame: CGRect(x: across.minX, y: b - h, width: across.width, height: h),
                                  lines: lines))
         }
         func naturalLines(_ e: Entry) -> Int {
@@ -487,14 +504,8 @@ private struct Builder {
         }
         func h(_ e: Entry, _ lines: Int) -> CGFloat { height(e.kind, lines: lines, tag: e.tag) * (e.kind == .tip ? scale : 1) }
 
-        for (i, ghost) in ghosts.enumerated() {
-            let remaining = ghosts.count - i - 1 + reals.count
-            let b = bottom(for: ghost.kind), top = b - h(ghost, naturalLines(ghost))
-            guard top >= ceiling, remaining == 0 || top - stubRoom >= ceiling else { break }     // an example that does not fit waits
-            place(ghost, lines: naturalLines(ghost), id: "\(id)-example-\(ghost.text)", at: b)
-        }
-
         var shown = 0
+        var carried = false
         for (j, e) in reals.enumerated() {
             let remaining = reals.count - j - 1
             var b = bottom(for: e.kind)
@@ -507,25 +518,33 @@ private struct Builder {
                 guard j == 0 else { break }
                 if fits(1) {
                     lines = 1
-                } else if remaining == 0, placed.isEmpty {
-                    // Alone: one line, sitting lower on its pole (down to its base) to keep under the ceiling.
+                } else if own || (remaining == 0 && placed.isEmpty) {
+                    // One line, lower on its pole (down to its base) to keep under the ceiling.
                     lines = 1
                     b = min(base.y, max(b, ceiling + h(e, 1)))
-                    guard b - h(e, 1) >= (hard ?? -.infinity) else { break }
+                    if !own { guard b - h(e, 1) >= (hard ?? -.infinity) else { break } }
+                    carried = remaining > 0
                 } else {
                     break                               // a stub takes its place
                 }
             }
             place(e, lines: lines, id: "\(id)-\(e.item?.id.uuidString ?? "\(j)")", at: b)
             shown += 1
+            if carried { break }
         }
         if shown < reals.count {
-            if moreOnTop, let last = placed.indices.last {
+            if moreOnTop || carried, let last = placed.indices.last {
                 placed[last] = carrying(placed[last], more: reals.count - shown)
             } else {
                 placed.append(stub(id, lvl, base: base, count: reals.count - shown, scale: scale,
                                    below: placed.last.map { $0.frame.minY - gapY }))
             }
+        }
+
+        for ghost in ghosts {
+            let b = bottom(for: ghost.kind), top = b - h(ghost, naturalLines(ghost))
+            guard top >= ceiling else { break }         // an example that does not fit waits
+            place(ghost, lines: naturalLines(ghost), id: "\(id)-example-\(ghost.text)", at: b)
         }
         return placed
     }
