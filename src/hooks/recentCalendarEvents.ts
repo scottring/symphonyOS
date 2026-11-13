@@ -12,7 +12,7 @@ import type { CalendarEvent } from './useGoogleCalendar'
 
 export const RECENT_EVENTS_MS = 30_000
 
-type Answer = { events?: CalendarEvent[]; calendarListMissing?: boolean }
+type Answer = { events?: CalendarEvent[]; calendarListMissing?: boolean; providerErrors?: { provider: string; connectionId?: string; needsReconnect: boolean }[] }
 const recent = new Map<string, { at: number; data: Answer }>()
 
 if (typeof window !== 'undefined') onCalendarChanged(() => recent.clear())

@@ -90,4 +90,21 @@ describe('CalendarReconnectBanner (calendar status)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/didn’t sync/)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
+
+  it('names one revoked account when another still works (Scott, 2026-11-13)', () => {
+    const connect = vi.fn()
+    setCalendarState({
+      isConnected: true, connect,
+      accounts: [
+        { id: 'g', provider: 'google', accountEmail: 'me@gmail.com', isPrimary: true },
+        { id: 'm', provider: 'microsoft', accountEmail: 'me@hotmail.com', isPrimary: true },
+      ],
+      reconnectAccountIds: ['g'],
+    })
+    render(<CalendarReconnectBanner />)
+    expect(screen.getByRole('alert')).toHaveTextContent('(me@gmail.com) disconnected')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('hotmail')
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    expect(connect).toHaveBeenCalledWith('google')
+  })
 })

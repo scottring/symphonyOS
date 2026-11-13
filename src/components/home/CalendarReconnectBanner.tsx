@@ -1,5 +1,6 @@
 import { AlertTriangle, CalendarDays } from 'lucide-react'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { providerLabel } from '@/lib/calendarProviders'
 
 /**
  * The calendar's state, said on the planning surfaces (Today and Week).
@@ -11,6 +12,10 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
  *   no connection        quiet line + Connect — events give the day its shape
  *   loading              nothing (no flash during the startup validation)
  *   expired / revoked    the amber alert + Reconnect (unchanged)
+ *   one account revoked  the same alert naming that account — with two
+ *                        accounts connected, one dead one used to be
+ *                        silent and its events simply vanished (Scott's
+ *                        Gmail, 2026-11-13: a meeting missing from Today)
  *   sync failure         amber line + Retry; "connected" never means "synced"
  *   main calendar only   quiet line + Reconnect — Google's consent screen let
  *                        the person untick the calendar-list permission
@@ -22,7 +27,8 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
  * forgotten. The file keeps its old name because the mount does.
  */
 export function CalendarReconnectBanner() {
-  const { isConnected, needsReconnect, isLoading, error, connect, fetchWeekEvents, calendarListMissing } = useGoogleCalendar()
+  const { isConnected, needsReconnect, isLoading, error, connect, fetchWeekEvents, calendarListMissing, accounts = [], reconnectAccountIds = [] } = useGoogleCalendar()
+  const revoked = accounts.filter((a) => reconnectAccountIds.includes(a.id))
 
   if (isLoading) return null
 
@@ -36,6 +42,25 @@ export function CalendarReconnectBanner() {
           Google Calendar disconnected — your events aren’t showing, so availability is unknown.
         </p>
         <button type="button" onClick={() => void connect()}
+          className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700">
+          Reconnect
+        </button>
+      </div>
+    )
+  }
+
+  if (isConnected && revoked.length > 0) {
+    const first = revoked[0]
+    const names = revoked.map((a) => `${providerLabel(a.provider)}${a.accountEmail ? ` (${a.accountEmail})` : ''}`).join(' and ')
+    return (
+      <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100">
+          <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
+        </span>
+        <p className="min-w-[160px] flex-1 text-sm text-amber-900">
+          {names} disconnected — {revoked.length > 1 ? 'their' : 'its'} events aren’t showing.
+        </p>
+        <button type="button" onClick={() => void connect(first.provider)}
           className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700">
           Reconnect
         </button>

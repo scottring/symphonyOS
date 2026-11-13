@@ -11,6 +11,7 @@ import { logger } from '@/lib/logger'
 import { getRecurringBaseId } from './useHiddenCalendarEvents'
 import { filterOutEvent } from './calendarEventCache'
 import { authUrlFunctionFor, functionErrorBody, isCalendarProvider, type CalendarProvider } from '@/lib/calendarProviders'
+import { applyProviderErrors } from '@/lib/calendarProviderErrors'
 
 export type { CalendarProvider }
 
@@ -352,9 +353,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
 
           if (!validateError && !data?.error) {
             validated = true
-            const broken = (data?.providerErrors ?? []) as Array<{ provider: string; connectionId?: string; needsReconnect: boolean }>
-            setReconnectProviders(broken.filter((e) => e.needsReconnect).map((e) => e.provider).filter(isCalendarProvider))
-            setReconnectAccountIds(broken.filter((e) => e.needsReconnect && e.connectionId).map((e) => e.connectionId!))
+            applyProviderErrors(data, setReconnectProviders, setReconnectAccountIds)
             if (typeof data?.calendarListMissing === 'boolean') setCalendarListMissing(data.calendarListMissing)
             break
           }
@@ -534,6 +533,9 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   }, [accounts])
 
   // Fetch events for a date range
+  // Every events answer says which accounts failed, not only the startup
+  // check: with two accounts connected, one revoked mid-session used to be
+  // silent and its events simply vanished from the day (Scott, 2026-11-13).
   const fetchEvents = useCallback(async (startDate: Date, endDate: Date, domainOverride?: string) => {
     if (!isConnected) {
       setEvents([])
@@ -550,6 +552,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       const recent = recentEventsFor(key)
       if (recent && Date.now() - recent.at < RECENT_EVENTS_MS) {
         if (typeof recent.data.calendarListMissing === 'boolean') setCalendarListMissing(recent.data.calendarListMissing)
+        applyProviderErrors(recent.data, setReconnectProviders, setReconnectAccountIds)
         setEvents(recent.data.events || [])
         return recent.data.events || []
       }
@@ -583,6 +586,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       // Domain-filtered answers can return early without the flag; keep the last known.
       if (typeof data?.calendarListMissing === 'boolean') setCalendarListMissing(data.calendarListMissing)
       rememberEvents(key, data)
+      applyProviderErrors(data, setReconnectProviders, setReconnectAccountIds)
       setEvents(data.events || [])
       return data.events || []
     } catch (err) {
