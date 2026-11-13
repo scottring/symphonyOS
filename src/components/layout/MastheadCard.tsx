@@ -28,7 +28,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { PageMotif, type MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral, titleNav, help = true, journal, backdrop }: {
+export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral, titleNav, help = true, helpButton = true, journal, backdrop }: {
   eyebrow?: ReactNode
   title: ReactNode
   /** Prev/next arrows either side of the title — "‹ Oct 17 – 23 ›" (Week,
@@ -36,6 +36,9 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
   titleNav?: { onPrev: () => void; onNext: () => void; prevLabel: string; nextLabel: string; trailing?: ReactNode }
   /** The ? and ▷ beside the title. Week keeps them in its ⋯ menu instead. */
   help?: boolean
+  /** The "?" itself; false where the page's ⋯ menu holds it (Today). The
+   *  short video's ▷ stays: it goes away once watched. */
+  helpButton?: boolean
   /** The page's one primary action, beside the title at every width —
    *  Today's "Add task". `controls` is desktop chrome; this is the verb. */
   action?: ReactNode
@@ -102,7 +105,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
           {numeral && !journal && <div aria-hidden="true" className="masthead-numeral" data-len={numeral.length}>{numeral}</div>}
           {journal ? (
             <div className="daybook-masthead-text min-w-0 flex-1">
-              <JournalHeading {...journal} title={title} titleExtras={help ? <><PageHelpButton /><LearnVideoChip /></> : undefined} />
+              <JournalHeading {...journal} title={title} titleExtras={help ? <>{helpButton && <PageHelpButton />}<LearnVideoChip /></> : undefined} />
               {subline && <div className="journal-subline">{subline}</div>}
             </div>
           ) : (

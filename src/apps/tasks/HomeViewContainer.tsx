@@ -801,6 +801,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onDeleteTask: deleteTask,
       onAddSubtask: addSubtask,
       onSetNeededToday,
+      meId: getCurrentUserMember()?.id ?? null,
       viewedDate,
       onCreateTask: onCreateTaskFromValue,
       onCreateTaskParsed,
@@ -881,7 +882,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, gated, deleteTask, addSubtask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onScheduleListItemAsTask, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
+      toggleTask, toggleWaiting, gated, deleteTask, addSubtask, onSetNeededToday, getCurrentUserMember, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onScheduleListItemAsTask, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventFree, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,

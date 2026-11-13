@@ -27,3 +27,21 @@ describe('RowActionRail — who carries it, always shown', () => {
     expect(whoSlot(container).className).toMatch(/md:opacity-0/)
   })
 })
+
+// Scott, 2026-11-13: on Today, initials only for other people. The rail marks
+// "only you" and today-journal.css keeps it under hover there; every other
+// page still shows your avatar at rest (above).
+describe('RowActionRail — marks an item that is only yours', () => {
+  const renderAs = (meId: string | null, assignedToAll: string[]) => render(
+    <ScheduleActionsProvider value={{ projects: [], contacts: [], familyMembers: members, lists: [], projectsMap: new Map(), meId } as unknown as ScheduleActionsValue}>
+      <RowActionRail item={item} onAssignAll={vi.fn()} familyMembers={members} assignedToAll={assignedToAll} assigned={assignedToAll.length > 0} />
+    </ScheduleActionsProvider>,
+  )
+  it('only you: marked', () => {
+    expect(whoSlot(renderAs('sk', ['sk']).container)).toHaveAttribute('data-only-self', 'true')
+  })
+  it('you and someone else, or someone else alone: not marked', () => {
+    expect(whoSlot(renderAs('sk', ['sk', 'ir']).container)).not.toHaveAttribute('data-only-self')
+    expect(whoSlot(renderAs('sk', ['ir']).container)).not.toHaveAttribute('data-only-self')
+  })
+})

@@ -33,7 +33,7 @@ import { useDomain } from '@/hooks/useDomain'
 import { MobilePlanControls } from '@/components/layout/PlanNavigation'
 import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 
-import { Eye, EyeOff, Printer, GripVertical, ChevronDown, ChevronRight, Plus, Volume2, VolumeX } from 'lucide-react'
+import { Eye, EyeOff, Printer, GripVertical, ChevronDown, ChevronRight, Plus, Volume2, VolumeX, HelpCircle } from 'lucide-react'
 import { usePaperSound } from '@/components/plan/fold/usePaperSound'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
@@ -105,6 +105,8 @@ import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { HeadingPrint } from '@/components/place/HeadingPrint'
+import { usePageHelp } from '@/components/explain/PageHelp'
+import { EXPLAIN_LABEL } from '@/lib/explain/pageGuides'
 import { GuideAnchor } from '@/components/guide/GuideBar'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
 import { currentStep } from '@/lib/guide/guidedPlan'
@@ -118,6 +120,7 @@ import { discussionItems } from '@/lib/discussionItems'
 import { PrintableDayList } from './PrintableDayList'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { daySentence, type DaySentenceItem } from '@/lib/today/daySentence'
+import { displayTitle } from '@/lib/today/displayTitle'
 import { effectiveStartTime, formatTimeLong } from '@/lib/timeUtils'
 import { PlanTalkChip } from './PlanTalkChip'
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
@@ -513,6 +516,7 @@ export function TodayView({
   // In the desktop Shell the control row folds into the masthead; phones and
   // standalone mounts keep it as its own row.
   const foldedControls = !!desktopControls && !isMobile
+  const pageHelp = usePageHelp()
   const poolMatchMine = useMemo(
     () => (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) =>
       !meId || doableBy({ assignedTo: assignedTo ?? undefined, assignedToAll: assignedToAll ? [...assignedToAll] : undefined }, meId),
@@ -664,7 +668,7 @@ export function TodayView({
     const start = item.isSubtask ? null : effectiveStartTime(item)
     if (!start) return []
     const kind = item.type === 'event' ? 'event' : item.type === 'task' ? 'task' : 'routine'
-    return [{ title: item.title, start, end: item.allDay ? null : item.endTime, kind, completed: item.completed || !!item.skipped }]
+    return [{ title: displayTitle(item.title), start, end: item.allDay ? null : item.endTime, kind, completed: item.completed || !!item.skipped }]
   }), [data.grouped])
   const calendarReady = calendarConnected && !calendarError && !calendarLoading && !calendarFetching && layers.size === ALL_LAYERS.size
   const sentence = useMemo(
@@ -1112,6 +1116,18 @@ export function TodayView({
      instance: desktop puts it in the controls strip, phones beside the date. */
   const overflowMenu = (
     <TodayOverflowMenu>
+      {/* "What is this page?" moved here from beside the date on a wide
+          page, where the heading wears its print (Scott, 2026-11-13). */}
+      {foldedControls && pageHelp && (
+        <button
+          type="button"
+          onClick={pageHelp}
+          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+        >
+          <HelpCircle className="w-5 h-5" aria-hidden="true" />
+          <span>{EXPLAIN_LABEL}</span>
+        </button>
+      )}
       <button
         type="button"
         onClick={toggleHideRoutines}
@@ -1225,8 +1241,10 @@ export function TodayView({
         ? item.originalTask?.assignedToAll ?? []
         : item.owners ?? item.originalRoutine?.assigned_to_all ?? []
     const all = [...(item.assignedTo ? [item.assignedTo] : []), ...ids]
-    return [...new Set(all)].flatMap((id) => familyMembers.find((m) => m.id === id) ?? [])
-  }, [ctx.eventNotesMap, familyMembers])
+    // Only other people's initials: your own on most rows said nothing
+    // (Scott, 2026-11-13).
+    return [...new Set(all)].filter((id) => id !== meId).flatMap((id) => familyMembers.find((m) => m.id === id) ?? [])
+  }, [ctx.eventNotesMap, familyMembers, meId])
   const filtersNarrowing = layers.size < ALL_LAYERS.size || (selectedAssignees?.length ?? 0) > 0
   const showEverything = useCallback(() => {
     showAllDomains()
@@ -1479,6 +1497,7 @@ export function TodayView({
         // The chosen print across the heading, fading in from the left
         // (Scott, 2026-11-13); Today's one picture.
         backdrop={foldedControls ? <HeadingPrint /> : undefined}
+        helpButton={!foldedControls}
         title={foldedControls
           ? journalEyebrow
           : viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}

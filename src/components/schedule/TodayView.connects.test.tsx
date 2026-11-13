@@ -155,8 +155,10 @@ describe('#28 Coming up, under Schedule', () => {
   it('lists the next open dated work in order, opens details, and links to its week', () => {
     const { onSelectItem } = renderView({ tasks: [monday, sunday, done, far] })
     const section = screen.getByRole('region', { name: 'Coming up' })
-    const rows = within(section).getAllByRole('listitem').map((li) => li.textContent)
-    expect(rows).toEqual(['Sun, Sep 20 · Pay the sitter', 'Mon, Sep 21 · 11:45 AM · Talk to Tim'])
+    // Calmer (2026-11-13): each day once ("Sun 20"), its rows under it.
+    expect(within(section).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Pay the sitter', 'Talk to Tim · 11:45 AM'])
+    expect(section.querySelectorAll('.today-cu-date')[0]).toHaveTextContent('Sun 20')
+    expect(section.querySelectorAll('.today-cu-date')[1]).toHaveTextContent('Mon 21')
     fireEvent.click(within(section).getByRole('button', { name: /Talk to Tim/ }))
     expect(onSelectItem).toHaveBeenCalledWith('task-mon')
     fireEvent.click(within(section).getByRole('button', { name: 'Open week →' }))
@@ -168,6 +170,17 @@ describe('#28 Coming up, under Schedule', () => {
     const section = screen.getByRole('region', { name: 'Coming up' })
     expect(within(section).getByText(/Iris’s recital/)).toBeInTheDocument()
     expect(within(section).queryByText(/Talk to Tim/)).toBeNull()
+  })
+
+  it('shows a repeated line once and folds the days after the first two (Scott, 2026-11-13)', () => {
+    const slip = (id: string) => createMockTask({ id, title: 'Return audition slip', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 21) })
+    renderView({ tasks: [sunday, slip('s1'), slip('s2'), irisOnly, createMockTask({ id: 'x', title: 'Math test', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 22) })] })
+    const section = screen.getByRole('region', { name: 'Coming up' })
+    expect(within(section).getAllByText('Return audition slip')).toHaveLength(1)
+    const fold = within(section).getByRole('button', { name: /Tue 22 · 2 things/ })
+    expect(within(section).queryByText('Math test')).toBeNull()
+    fireEvent.click(fold)
+    expect(within(section).getByText('Math test')).toBeInTheDocument()
   })
 
   it('is absent when nothing is coming up', () => {

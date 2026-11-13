@@ -191,6 +191,12 @@
 .ag-check > button > span { width: 18px; height: 18px; }
 .ag-check > button > span:not(.bg-primary-500) { border-color: var(--color-neutral-400); }
 .ag-body { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding: 6px 0 14px; }
+/* What kind of thing it is, in ink (2026-11-13); an empty slot keeps the
+   titles in one column. */
+.ag-icon { flex: none; width: 18px; height: 18px; margin-top: 4px; color: var(--color-neutral-600); }
+.ag-row.is-event .ag-icon { margin-top: 6px; }
+.ag-overlap { color: var(--today-overlap, hsl(28 70% 36%)); font-weight: 600; }
+[data-scenery-lighting='nighttime'] .ag-overlap, .dark .ag-overlap { color: hsl(32 80% 68%); }
 .ag-open {
   flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
   padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer;
@@ -433,3 +439,23 @@
   font: 500 13px/1.2 var(--font-family-sans); letter-spacing: .04em; color: var(--color-neutral-600);
 }
 .journal-heading.is-stacked .journal-tag { margin-left: 0; }
+
+/* ---- Coming up, calmer (2026-11-13) ------------------------------------- */
+.today-cu { display: grid; gap: 2px; font-size: 14px; }
+.today-cu-day { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: start; column-gap: 8px; }
+.today-cu-date { padding-top: 5px; font-size: 13px; color: var(--color-neutral-600); }
+.today-cu-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.today-cu-row { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; }
+.today-cu-icon { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--color-neutral-600); }
+.today-cu-fold {
+  grid-column: 1 / -1; display: inline-flex; align-items: center; gap: 6px; justify-self: start;
+  padding: 4px 0; border: 0; background: none; font: inherit; color: var(--color-primary-700); cursor: pointer;
+}
+.today-cu-fold:hover { text-decoration: underline; text-underline-offset: 3px; }
+.today-cu-fold:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; border-radius: 4px; }
+
+/* ---- To do: each row's kind, in ink (2026-11-13) ----------------------- */
+.row-kind-icon { display: none; }
+.today-page .today-focus-card .row-kind-icon { display: inline-flex; flex: none; margin-top: 3px; color: var(--color-neutral-600); }
+.today-page .today-focus-card [data-only-self] { opacity: 0; transition: opacity .15s; }
+.today-page .today-focus-card :is(li, [role='listitem'], .group):is(:hover, :focus-within) [data-only-self] { opacity: 1; }

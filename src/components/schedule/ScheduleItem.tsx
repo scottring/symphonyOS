@@ -1,3 +1,5 @@
+import { KindIcon as KindIconMark } from './KindIcon'
+import { itemIcon } from '@/lib/today/itemIcon'
 import { memo, useState, useRef, useEffect } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
@@ -143,6 +145,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   spineBelow,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
+  const hasKindIcon = !!itemIcon(item.title)
   // Needed-today mark: STATE, so it lives with the title chips. The item
   // panel sets it ("Need today"); the chip here only clears it. A mark
   // expires by ceasing to match the VIEWED day (src/lib/today/neededToday.ts),
@@ -691,6 +694,9 @@ export const ScheduleItem = memo(function ScheduleItem({
           </div>
         )}
 
+        {/* What kind of thing it is: shown only in Today's To do
+            (today-journal.css, 2026-11-13). */}
+        {hasKindIcon && <span className="row-kind-icon" aria-hidden="true"><KindIconMark title={item.title} /></span>}
         {/* Title */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">

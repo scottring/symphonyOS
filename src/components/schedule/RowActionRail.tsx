@@ -137,6 +137,7 @@ export function RowActionRail({
   assigned = true,
 }: RowActionRailProps) {
   const isTask = item.type === 'task'
+  const { meId } = useScheduleActionsContext()
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
   const isLive = !item.completed && !item.skipped
@@ -190,10 +191,14 @@ export function RowActionRail({
   // `who` is the one cell that stays lit: who a thing involves is household
   // INFORMATION, not a control, and it is half the reason to look at the row
   // at all. Everything after it is something you do, not something you read.
-  const cells: Array<{ node: React.ReactNode; className: string; quiet?: boolean }> = [
+  // Assigned to you alone: Today's To do keeps it under hover with the
+  // controls (today-journal.css; Scott, 2026-11-13: initials only for others).
+  const ids = [assignedTo, ...assignedToAll].filter((id): id is string => !!id)
+  const onlySelf = !!meId && ids.length > 0 && ids.every((id) => id === meId)
+  const cells: Array<{ node: React.ReactNode; className: string; quiet?: boolean; onlySelf?: boolean }> = [
     // …unless nobody is assigned: then it is only the picker, a control, and
     // it waits with the others.
-    { node: who, className: WHO_SLOT, quiet: !assigned },
+    { node: who, className: WHO_SLOT, quiet: !assigned, onlySelf },
     { node: context, className: SLOT },
     { node: verb, className: SLOT, quiet: true },
     // Reserved, empty: keeps this rail as wide as RoutineCollectionRow's.
@@ -203,7 +208,7 @@ export function RowActionRail({
   return (
     <div className={RAIL}>
       {cells.map((cell, i) => (
-        <div key={i} data-rail-slot className={`${cell.className}${cell.quiet ? ` ${QUIET}` : ''}`}>
+        <div key={i} data-rail-slot data-only-self={cell.onlySelf || undefined} className={`${cell.className}${cell.quiet ? ` ${QUIET}` : ''}`}>
           {cell.node}
         </div>
       ))}

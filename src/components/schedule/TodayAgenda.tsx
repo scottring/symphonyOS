@@ -8,7 +8,10 @@ import { dragPointerY } from '@/lib/today/dragPointer'
 import { isPlanDrag, readPlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useTravelTime } from '@/hooks/useTravelTime'
 import { formatTimeLong } from '@/lib/timeUtils'
-import { agendaEntries, buildAgenda, nextQuarter, shortClock, type AgendaEntry, type AgendaRow } from '@/lib/today/agenda'
+import { displayTitle, marginClock } from '@/lib/today/displayTitle'
+import { KindIcon } from './KindIcon'
+import { sayClock } from '@/lib/today/daySentence'
+import { agendaEntries, buildAgenda, nextQuarter, type AgendaEntry, type AgendaRow } from '@/lib/today/agenda'
 import type { DayScaleHandle } from './TodayDayScale'
 import type { ProposedRow, RowMark } from './todayPreview'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -37,9 +40,25 @@ function MiniAvatar({ member }: { member: FamilyMember }) {
   )
 }
 
-/** "7:00 AM" in the margin. */
-function marginTime(d: Date): string {
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+/** "7 AM", "7:30 PM" in the margin (2026-11-13). */
+const marginTime = marginClock
+
+/** Two things on the day that overlap: the later one says so ("30 min
+ *  overlap with the bathroom visit", Scott, 2026-11-13). Routines in the
+ *  background and all-day things never count. */
+export function overlapsOf(entries: readonly AgendaEntry[]): Map<string, { minutes: number; with: string }> {
+  const out = new Map<string, { minutes: number; with: string }>()
+  const real = entries
+    .filter((e) => e.hasEnd && !e.item.allDay && !e.item.originalRoutine?.background && e.item.type !== 'routine')
+    .sort((a, b) => a.start.getTime() - b.start.getTime())
+  for (let i = 1; i < real.length; i++) {
+    const cur = real[i]
+    const prev = real.slice(0, i).filter((p) => p.end.getTime() > cur.start.getTime()).at(-1)
+    if (!prev) continue
+    const minutes = Math.round((Math.min(prev.end.getTime(), cur.end.getTime()) - cur.start.getTime()) / 60_000)
+    if (minutes >= 5) out.set(cur.item.id, { minutes, with: displayTitle(prev.item.title) })
+  }
+  return out
 }
 
 interface ItemRowProps {
@@ -51,11 +70,12 @@ interface ItemRowProps {
   refused: boolean
   landing: boolean
   mark?: RowMark
+  overlap?: { minutes: number; with: string }
   onSelect: (id: string) => void
   onToggleDone?: () => void
 }
 
-function AgendaItemRow({ entry, people, selected, upNext, past, refused, landing, mark, onSelect, onToggleDone }: ItemRowProps) {
+function AgendaItemRow({ entry, people, selected, upNext, past, refused, landing, mark, overlap, onSelect, onToggleDone }: ItemRowProps) {
   const { item, start, end, hasEnd } = entry
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: refused })
   const isEvent = item.type === 'event'
@@ -63,7 +83,8 @@ function AgendaItemRow({ entry, people, selected, upNext, past, refused, landing
   const travel = useTravelTime(item, { enabled: isEvent && !item.completed && !past, mode: travelChoice })
   const done = item.completed || !!item.skipped
   const background = !!item.originalRoutine?.background
-  const label = `${item.title}, ${formatTimeLong(start)}${hasEnd ? ` to ${formatTimeLong(end)}` : ''}${done ? ', done' : ''}${upNext ? ', up next' : ''}`
+  const title = displayTitle(item.title)
+  const label = `${title}, ${formatTimeLong(start)}${hasEnd ? ` to ${formatTimeLong(end)}` : ''}${done ? ', done' : ''}${upNext ? ', up next' : ''}`
   return (
     <li
       ref={setNodeRef}
@@ -104,12 +125,14 @@ function AgendaItemRow({ entry, people, selected, upNext, past, refused, landing
         ) : <span className="ag-dot" aria-hidden="true" />}
       </span>
       <div className="ag-body">
+        <span className="ag-icon" aria-hidden="true"><KindIcon title={item.title} /></span>
         <div className="ag-main">
           <button type="button" className="ag-open" aria-label={label} onClick={() => onSelect(item.id)}>
-            <span className="ag-title">{item.title}</span>
-            {(hasEnd || mark?.note) && (
+            <span className="ag-title">{title}</span>
+            {(hasEnd || mark?.note || overlap) && (
               <span className="ag-sub">
-                {hasEnd && <span>Until {shortClock(end)}</span>}
+                {hasEnd && <span>Until {sayClock(end)}</span>}
+                {overlap && <span className="ag-overlap">{overlap.minutes} min overlap with {overlap.with}</span>}
                 {mark?.note && <span className="wc-proposed-note">{mark.note}</span>}
               </span>
             )}
@@ -161,6 +184,7 @@ export function TodayAgenda({
   showOpenTime?: boolean
 }) {
   const entries = useMemo(() => agendaEntries(items), [items])
+  const overlaps = useMemo(() => overlapsOf(entries), [entries])
   const rows: AgendaRow[] = useMemo(() => buildAgenda(entries, {
     day: viewedDate,
     now,
@@ -278,6 +302,7 @@ export function TodayAgenda({
             refused={!!refusalFor(item, isReadOnlyEvent)}
             landing={landing?.key === item.id}
             mark={markOf?.(item)}
+            overlap={overlaps.get(item.id)}
             onSelect={onSelect}
             onToggleDone={onToggleDone && (item.type === 'task' || item.type === 'routine') ? () => onToggleDone(item) : undefined}
           />

@@ -39,6 +39,9 @@ export interface ScheduleActionsValue {
    * day.
    */
   viewedDate?: Date
+  /** The signed-in person's family member, so a row can tell "only you"
+   *  (Today shows other people's initials only, 2026-11-13). */
+  meId?: string | null
   onCreateTask?: (title: string) => void
   onGroupTasks?: (
     taskIds: string[],
