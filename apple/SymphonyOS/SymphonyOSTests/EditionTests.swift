@@ -58,6 +58,15 @@ struct EditionLastKnownTests {
         #expect(state.bottomInset == state.dockHeight)
     }
 
+    /// A Tell still waiting (behind the walk) when the person signs out is dropped, not answered.
+    @MainActor @Test func aWaitingTellGoesWithTheSignedOutPerson() {
+        let state = AppState()
+        state.tellRequested = true
+        state.walkShowing = true
+        state.signedOut()
+        #expect(state.tellRequested == false)
+    }
+
     @MainActor @Test func noDockNoInset() {
         let state = AppState()
         #expect(state.bottomInset == state.dockHeight)

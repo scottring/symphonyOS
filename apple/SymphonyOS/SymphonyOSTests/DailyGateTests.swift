@@ -112,6 +112,22 @@ struct DailyGateTests {
         #expect(Dictation.mayListen(onDeviceOnly: DailyGate.speechOnPhoneOnly(edition: .full), supportsOnDevice: false) == true)
     }
 
+    /// What a Tell from outside does on a light page: nothing unasked; it waits while the walk
+    /// shows, whatever the bar is doing; with no bar the old sheet; otherwise listen, type, or
+    /// leave a listen already going alone. Only waiting (and nothing) keep the request.
+    @Test func aTellWaitsForTheWalkAndThenListensTypesOrLeavesAlone() {
+        for walk in [false, true] { for bar in [false, true] { for off in [false, true] { for on in [false, true] {
+            #expect(DailyGate.tell(asked: false, walkShowing: walk, barShown: bar, speechOff: off, listening: on) == .none)
+            #expect(DailyGate.tell(asked: true, walkShowing: true, barShown: bar, speechOff: off, listening: on) == .wait)
+        } } } }
+        #expect(DailyGate.tell(asked: true, walkShowing: false, barShown: false, speechOff: false, listening: false) == .oldSheet)
+        #expect(DailyGate.tell(asked: true, walkShowing: false, barShown: true, speechOff: false, listening: false) == .listen)
+        #expect(DailyGate.tell(asked: true, walkShowing: false, barShown: true, speechOff: true, listening: false) == .focusField)
+        #expect(DailyGate.tell(asked: true, walkShowing: false, barShown: true, speechOff: false, listening: true) == .leaveAlone)
+        #expect(!DailyGate.Tell.none.takesRequest && !DailyGate.Tell.wait.takesRequest)
+        for taken in [DailyGate.Tell.listen, .focusField, .leaveAlone, .oldSheet] { #expect(taken.takesRequest) }
+    }
+
     @Test func theDockGivesWayOnlyWithTheBarAndToday() {
         #expect(!DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: false, horizons: [.today]))
         #expect(!DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: true, horizons: []))

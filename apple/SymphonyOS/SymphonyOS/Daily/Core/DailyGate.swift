@@ -29,6 +29,35 @@ enum DailyGate {
         edition == .light && built
     }
 
+    /// What a Tell Symphony asked for from outside the app (the Lock Screen control, a
+    /// `symphony://tell` link: `AppState.tellRequested`) does on a light page.
+    enum Tell: Equatable {
+        /// Nothing was asked.
+        case none
+        /// The walk is showing over the page: the request waits, and is answered when the walk
+        /// closes (never under the walk, where a live microphone could not be seen or stopped).
+        case wait
+        /// The bar is idle: it listens, as a tap on its light would.
+        case listen
+        /// The bar types (speech refused or missing): the field takes the keyboard.
+        case focusField
+        /// The bar is already listening: the request is taken and the listen is left alone.
+        case leaveAlone
+        /// No bar on this page: the old Tell sheet, as the old Today opens it.
+        case oldSheet
+
+        /// The request is taken now (cleared, and any sheet over the page closes).
+        var takesRequest: Bool { self != .none && self != .wait }
+    }
+
+    static func tell(asked: Bool, walkShowing: Bool, barShown: Bool, speechOff: Bool, listening: Bool) -> Tell {
+        guard asked else { return .none }
+        if walkShowing { return .wait }
+        guard barShown else { return .oldSheet }
+        if listening { return .leaveAlone }
+        return speechOff ? .focusField : .listen
+    }
+
     /// Speech never leaves the phone in a light household, wherever it is heard.
     static func speechOnPhoneOnly(edition: Edition) -> Bool {
         edition == .light

@@ -105,6 +105,9 @@ final class AppState {
     var dailyHidesDock = false
     /// Inbox or More, opened from beside the light bar, as a sheet over the page.
     var dailyPanel: DailyPanel?
+    /// The walk is showing over everything (set by the main view as it opens and closes it):
+    /// a Tell asked for meanwhile waits until it closes (`DailyGate.tell`).
+    var walkShowing = false
 
     /// Off the light pages (the Planner went away, or the household is no longer light):
     /// the dock comes back and nothing light is left open on top.
@@ -152,9 +155,10 @@ final class AppState {
         activeTab = .planner
     }
 
-    /// The signed-in person is gone: their first pull, any replay or resume they asked
+    /// The signed-in person is gone: their first pull, any replay, resume or Tell they asked
     /// for that is still waiting, and the pause the app was showing go with them.
     func signedOut() {
+        tellRequested = false           // a Tell still waiting (say, behind the walk) is dropped, not answered
         initialSyncFinished = false
         walkReplayRequested = false
         walkPaused = false

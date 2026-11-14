@@ -74,8 +74,10 @@ struct LightTodayView: View {
             readWalk()
             answerTell()
         }
-        // The Lock Screen's Tell Symphony control or a `symphony://tell` link: the bar listens, no sheet.
+        // The Lock Screen's Tell Symphony control or a `symphony://tell` link: the bar listens, no sheet;
+        // asked for while the walk shows, it is answered as the walk closes.
         .onChange(of: appState.tellRequested) { _, _ in answerTell() }
+        .onChange(of: appState.walkShowing) { _, _ in answerTell() }
         // A walk that ends lands on Today (`goToToday`) and says whether one is left waiting.
         .onChange(of: appState.walkPaused) { _, _ in readWalk() }
         .onChange(of: appState.selectedDate) { _, _ in readWalk() }
@@ -236,13 +238,10 @@ struct LightTodayView: View {
         if sign.putAwayWhenFollowed { model.dismiss(sign.kind) }
     }
 
-    /// Tell asked for from outside: any sheet over the page closes, so the listening bar is seen.
+    /// Tell asked for from outside, as the model answers it (`DailyGate.tell`); once taken, a
+    /// row's Details over the page closes too, so the listening bar is seen.
     private func answerTell() {
-        guard appState.tellRequested else { return }
-        appState.tellRequested = false
-        appState.dailyPanel = nil
-        opened = nil
-        model.tellAsked()
+        if model.answerTell(appState) { opened = nil }
     }
 
     private func details(_ row: DailyDay.Row) -> TimelineItem {

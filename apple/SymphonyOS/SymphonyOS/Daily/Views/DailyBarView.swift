@@ -123,7 +123,7 @@ struct DailyBarView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(bar.isListening ? DailyCopy.stopListening : DailyCopy.speakIt)
+        .accessibilityLabel(bar.lightLabel)
         .accessibilityIdentifier("daily.bar.light")
     }
 
@@ -248,11 +248,7 @@ struct DailyLight: View {
     private func orb(at k: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
             Circle()
-                .fill(RadialGradient(stops: [.init(color: .white, location: 0),
-                                             .init(color: Color(hex: 0xFFF7E0), location: 0.2),
-                                             .init(color: Color(hex: 0xF8E2AD), location: 0.48),
-                                             .init(color: Color(hex: 0xEBBF72), location: 0.76),
-                                             .init(color: Color(hex: 0xDDA152), location: 1)],
+                .fill(RadialGradient(stops: DailyPalette.lightStops,
                                      center: UnitPoint(x: 0.38, y: 0.30), startRadius: 0, endRadius: 89.8 * k)
                     .shadow(.inner(color: WalkPalette.orbInnerShade.opacity(0.3), radius: 10 * k, x: 0, y: -10 * k))
                     .shadow(.inner(color: .white.opacity(0.8), radius: 5 * k, x: 0, y: 4 * k)))

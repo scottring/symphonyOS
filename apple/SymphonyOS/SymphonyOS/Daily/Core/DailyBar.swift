@@ -24,6 +24,13 @@ struct DailyBar: Equatable {
     /// width, More and Inbox give way, and the field shows what is heard but takes no typing.
     var isListening: Bool { mic != .idle }
 
+    /// What the light is called to VoiceOver, for what a tap on it does now: listen, add what
+    /// was heard (listening or waiting for the last words), or, with speech off, type.
+    var lightLabel: String {
+        if isListening { return DailyCopy.addWhatYouSaid }
+        return speechOff ? DailyCopy.typeIt : DailyCopy.speakIt
+    }
+
     /// The one line slot above the bar, in this order of need: the listening line while the light
     /// listens; otherwise the note, Undo beside it when both show, either alone, or nothing.
     enum Slot: Equatable { case empty, listening, say(note: String?, undo: Bool) }

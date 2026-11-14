@@ -155,6 +155,19 @@ struct DailyBarTests {
         #expect(finishing.apply(.listenEnded) == [])
     }
 
+    /// The light is called for what a tap on it does now: speak, add what was heard, or type.
+    @Test func theLightSaysWhatATapDoes() {
+        var bar = DailyBar()
+        #expect(bar.lightLabel == DailyCopy.speakIt)
+        _ = bar.apply(.micTapped)
+        #expect(bar.lightLabel == DailyCopy.addWhatYouSaid)
+        _ = bar.apply(.heard("Call the plumber"))
+        _ = bar.apply(.micTapped)                       // waiting for the last words
+        #expect(bar.lightLabel == DailyCopy.addWhatYouSaid)
+        _ = bar.apply(.speechUnavailable)
+        #expect(bar.lightLabel == DailyCopy.typeIt)
+    }
+
     /// "Calls made in this plan": the listening line, a note and Undo share one line slot above
     /// the bar. While the light listens (or waits for the last words) the slot says so and the
     /// field spans the width; otherwise the note, Undo beside it, either alone, or nothing.

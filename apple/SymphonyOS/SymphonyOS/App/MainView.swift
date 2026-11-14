@@ -166,6 +166,7 @@ struct iOSMainView: View {
         // the walk down, when it goes.
         .onDisappear {
             CalendarFeed.shared.edition = nil
+            appState.tellRequested = false      // a Tell waiting behind the walk is dropped, not answered
             closeWalk()
             appState.walkReplayRequested = false
             appState.walkResumeRequested = false
@@ -178,6 +179,7 @@ struct iOSMainView: View {
         // Someone else signed in (or nobody is): the walk up, and a replay still
         // waiting, are not theirs.
         .onChange(of: auth.currentUser?.id) { _, _ in
+            appState.tellRequested = false      // a Tell waiting behind the walk was not theirs
             closeWalk()
             appState.walkReplayRequested = false
             appState.walkResumeRequested = false
@@ -307,6 +309,7 @@ extension iOSMainView {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         showCapture = false
         appState.dailyPanel = nil
+        appState.walkShowing = true             // a Tell asked for now waits until it closes
         withAnimation(animated ? walkFade : nil) { walk = model }
         #if DEBUG
         // Driven once it is up, so a step that ends the walk (`leave`) takes it down as a person's would.
@@ -322,6 +325,7 @@ extension iOSMainView {
         guard let walk else { return }
         walk.close()
         withAnimation(walkFade) { self.walk = nil }
+        appState.walkShowing = false            // a Tell that waited is answered now
     }
 
     private func updatePosture() {

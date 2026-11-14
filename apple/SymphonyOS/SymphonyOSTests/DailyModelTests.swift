@@ -518,17 +518,33 @@ struct DailyModelTests {
         #expect(DailyModel.makeListener().onDeviceOnly == DailyGate.speechOnPhoneOnly(edition: .light))
     }
 
+    /// A Tell asked for from outside (the Lock Screen control, a `symphony://tell` link).
+    private func asked(walkShowing: Bool = false) -> AppState {
+        let app = AppState()
+        app.tellRequested = true
+        app.walkShowing = walkShowing
+        return app
+    }
+
     /// The Lock Screen control or a `symphony://tell` link on light Today: the bar starts
-    /// listening if it is idle, and never finishes or restarts a listen already going.
+    /// listening if it is idle, the request is taken once, and a listen already going is never
+    /// finished or restarted by another.
     @Test func aTellFromOutsideStartsTheBarListeningOnlyWhenIdle() async throws {
         let ctx = try walkTestContext()
         let m = model(ctx)
-        m.tellAsked()
+        let app = asked()
+        app.dailyPanel = .more
+        #expect(m.answerTell(app))
         await scheduler.settle()
         #expect(m.bar.mic == .listening)
         #expect(listener.starts == 1)
-        m.tellAsked()
+        #expect(!app.tellRequested)
+        #expect(app.dailyPanel == nil)                  // nothing left over the listening bar
+
+        app.tellRequested = true                        // asked again while it listens
+        #expect(m.answerTell(app))
         await scheduler.settle()
+        #expect(!app.tellRequested)
         #expect(m.bar.mic == .listening)
         #expect(listener.starts == 1)
         #expect(listener.finishes == 0)
@@ -542,11 +558,35 @@ struct DailyModelTests {
         m.send(.micTapped)
         await scheduler.settle()
         #expect(m.bar.speechOff)
-        let asked = m.bar.fieldAsked
-        m.tellAsked()
+        let fieldAsked = m.bar.fieldAsked
+        #expect(m.answerTell(asked()))
         await scheduler.settle()
-        #expect(m.bar.fieldAsked == asked + 1)
+        #expect(m.bar.fieldAsked == fieldAsked + 1)
         #expect(listener.starts == 1)
+    }
+
+    /// Review finding: a Tell asked for while the walk shows never starts a microphone under it.
+    /// It waits, untouched, and is answered exactly once when the walk closes.
+    @Test func aTellDuringTheWalkWaitsAndIsAnsweredOnceAfterIt() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        let app = asked(walkShowing: true)
+        #expect(!m.answerTell(app))
+        #expect(!m.answerTell(app))                     // asked again by the page: still waiting
+        await scheduler.settle()
+        #expect(app.tellRequested)
+        #expect(m.bar.mic == .idle)
+        #expect(listener.starts == 0)
+
+        app.walkShowing = false                         // the walk closes
+        #expect(m.answerTell(app))
+        await scheduler.settle()
+        #expect(m.bar.mic == .listening)
+        #expect(listener.starts == 1)
+        #expect(!m.answerTell(app))                     // answered once: nothing left to answer
+        await scheduler.settle()
+        #expect(listener.starts == 1)
+        #expect(listener.finishes == 0)
     }
 
     // MARK: The day, the sign, the lit row

@@ -125,12 +125,23 @@ import Observation
         }
     }
 
-    /// Tell Symphony asked for from outside the app (the Lock Screen control, a `symphony://tell`
-    /// link) while light Today is up: a tap on the light, if the bar is idle. A listen already
-    /// going is left alone, never finished or restarted. With speech off it asks for the field.
-    func tellAsked() {
-        guard !bar.isListening else { return }
-        send(.micTapped)
+    /// Answers a Tell Symphony asked for from outside the app (the Lock Screen control, a
+    /// `symphony://tell` link) as `DailyGate.tell` decides: while the walk shows it waits; then
+    /// an idle bar listens, a typing bar asks for the field, a listen already going is left
+    /// alone. A request taken is cleared, once, and Inbox or More over the page closes. True
+    /// when it was taken (the page closes its own sheets then).
+    @discardableResult
+    func answerTell(_ app: AppState) -> Bool {
+        let answer = DailyGate.tell(asked: app.tellRequested, walkShowing: app.walkShowing, barShown: true,
+                                    speechOff: bar.speechOff, listening: bar.isListening)
+        guard answer.takesRequest else { return false }
+        app.tellRequested = false
+        app.dailyPanel = nil
+        switch answer {
+        case .listen, .focusField: send(.micTapped)       // with speech off the reducer asks for the field
+        case .none, .wait, .leaveAlone, .oldSheet: break
+        }
+        return true
     }
 
     /// The model taken down: a pending pull-up is written, listening stops, nothing waiting runs.

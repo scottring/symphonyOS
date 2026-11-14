@@ -35,6 +35,14 @@ enum DailyPalette {
     static let firstFlag = Color(hex: 0xE0A24A)
     static let lineageFlag = Color(hex: 0xA8452C)
     static let navy = Color(red: 0, green: 14 / 255, blue: 70 / 255)
+    /// The walk's light, for the bar's small one ("one control in two sizes"): the gradient stops of
+    /// the light's body in `WalkOrbView` (its private `orbBody`, which the walk does not expose).
+    /// Change both together.
+    static let lightStops: [Gradient.Stop] = [.init(color: .white, location: 0),
+                                              .init(color: Color(hex: 0xFFF7E0), location: 0.2),
+                                              .init(color: Color(hex: 0xF8E2AD), location: 0.48),
+                                              .init(color: Color(hex: 0xEBBF72), location: 0.76),
+                                              .init(color: Color(hex: 0xDDA152), location: 1)]
 
     // The six bundled faces.
     static func crimson(_ size: CGFloat) -> Font { .custom("CrimsonPro-Regular", size: size) }
