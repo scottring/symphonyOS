@@ -13,6 +13,8 @@ struct DailyBarView: View {
     let model: DailyModel
     let metrics: DailyMetrics.Bar
     let placeholder: String
+    /// The placeholder in fewer words, shown where `placeholder` would be cut short (`DailyCopy.fitting`).
+    let shortPlaceholder: String?
     let listening: String
     /// On the mountain pages: a paper field with a plank-ink line, the icons and the line white.
     let night: Bool
@@ -27,12 +29,13 @@ struct DailyBarView: View {
     /// handover's travel ends at once).
     let touched: () -> Void
 
-    init(model: DailyModel, metrics: DailyMetrics.Bar, placeholder: String, listening: String,
-         night: Bool = false, icons: Bool = true, textSize: CGFloat = 16, lightShown: Bool = true,
+    init(model: DailyModel, metrics: DailyMetrics.Bar, placeholder: String, shortPlaceholder: String? = nil,
+         listening: String, night: Bool = false, icons: Bool = true, textSize: CGFloat = 16, lightShown: Bool = true,
          touched: @escaping () -> Void = {}) {
         self.model = model
         self.metrics = metrics
         self.placeholder = placeholder
+        self.shortPlaceholder = shortPlaceholder
         self.listening = listening
         self.night = night
         self.icons = icons
@@ -94,7 +97,7 @@ struct DailyBarView: View {
     private func fieldView(_ bar: DailyBar, frame: CGRect) -> some View {
         HStack(spacing: 0) {
             words(bar)
-                .padding(.leading, 18)
+                .padding(.leading, DailyMetrics.wordsInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
             light(bar)
         }
@@ -109,7 +112,7 @@ struct DailyBarView: View {
     /// While it listens the field shows what is heard, and takes no typing.
     @ViewBuilder private func words(_ bar: DailyBar) -> some View {
         if bar.isListening {
-            Text(bar.draft.isEmpty ? placeholder : bar.draft)
+            Text(bar.draft.isEmpty ? shown : bar.draft)
                 .font(DailyPalette.sans(textSize))
                 .foregroundStyle(bar.draft.isEmpty ? DailyPalette.placeholder : DailyPalette.ink)
                 .lineLimit(1)
@@ -119,7 +122,7 @@ struct DailyBarView: View {
                 .accessibilityIdentifier("daily.bar.field")
         } else {
             TextField("", text: Binding(get: { model.bar.draft }, set: { model.send(.typed($0)) }),
-                      prompt: Text(placeholder).foregroundStyle(DailyPalette.placeholder))
+                      prompt: Text(shown).foregroundStyle(DailyPalette.placeholder))
                 .font(DailyPalette.sans(textSize))
                 .foregroundStyle(DailyPalette.ink)
                 .tint(DailyPalette.green)
@@ -128,6 +131,17 @@ struct DailyBarView: View {
                 .onSubmit { model.send(.submitted) }
                 .frame(height: metrics.field.height)
                 .accessibilityIdentifier("daily.bar.field")
+        }
+    }
+
+    /// The placeholder that fits the field's words' room at the field's text size (measured here,
+    /// chosen by `DailyCopy.fitting`): the full one, else the short one, never cut short.
+    private var shown: String {
+        guard let shortPlaceholder else { return placeholder }
+        let base = UIFont(name: "DMSans-Regular", size: textSize) ?? .systemFont(ofSize: textSize)
+        let font = UIFontMetrics.default.scaledFont(for: base)
+        return DailyCopy.fitting([placeholder, shortPlaceholder], room: metrics.wordsRoom) {
+            ($0 as NSString).size(withAttributes: [.font: font]).width
         }
     }
 

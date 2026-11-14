@@ -684,4 +684,15 @@ struct DailyMetricsTests {
         #expect(up.bar.field == CGRect(x: 64, y: 800, width: 498, height: 48))
         #expect(up.bar.inbox == CGRect(x: 626 - 6 - 56, y: 796, width: 56, height: 56))
     }
+
+    /// The room the field's words have: the typing part less the words' 18-point inset. On the real
+    /// outside screen (382 wide) it is 179; on a 375-point phone 172; on the phone board 195.
+    @Test func theFieldsWordsHaveTheTypingPartLessTheirInset() {
+        let outside = DailyMetrics.today(size: CGSize(width: 382, height: 678), safeTop: 0, safeBottom: 34, shape: .short).bar
+        #expect(outside.field.width == 246)
+        #expect(outside.wordsRoom == CGFloat(246 - 5 - 44 - 18))    // 179
+        #expect(DailyMetrics.today(size: small, safeTop: 20, safeBottom: 0, shape: .short).bar.wordsRoom == 172)
+        #expect(DailyMetrics.today(size: phone, safeTop: 44, safeBottom: 34).bar.wordsRoom == 195)
+        #expect(outside.wordsRoom == outside.typing.width - DailyMetrics.wordsInset)
+    }
 }

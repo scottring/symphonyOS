@@ -82,7 +82,7 @@ struct MountainPageView: View {
     let level: WalkLevel
     let model: DailyModel
     let userId: UUID
-    /// The whole window (the page ignores the safe area); the insets are the window's own.
+    /// The window from top to foot, within its side edges; the top and foot insets are the window's own.
     let size: CGSize
     let safeTop: CGFloat
     let safeBottom: CGFloat
@@ -133,6 +133,7 @@ struct MountainPageView: View {
             MountainHint(model: model, words: DailyCopy.hint(level), bar: m.bar)
                 .accessibilitySortPriority(2)
             DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(horizon, periods: flags.periods),
+                         shortPlaceholder: DailyCopy.shortPlaceholder(horizon),
                          listening: DailyCopy.listening(horizon), night: true)
                 .accessibilitySortPriority(1)
         }

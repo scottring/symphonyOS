@@ -73,6 +73,7 @@ All in points. Phone boards are 390 × 844 with the status area 44 and the home 
 **The handover.** The walk's light (`WalkOrb.centre`, radius 48 on the stage) shrinks and travels to the bar's light (38 across) while Today's sheet rises from 154 lower; then the handover halo and line.
 
 **Duo, outside screen** (466 × 678, status area 22). Picture 500 wide at (−17, −34); band 240. Row of words at y 22. Post at x 70, y 82…212; plank (42, 96) 350 × 60, point 29 deep, text at x 44, eyebrow y 8, title y 24 at 20. Sheet top 190, corners 26, no "Look back up"; header at (22, +26); ring 52; card (16, +90) 434 × 42; rows from +142, 434 × 52. Field (68, 604) 330 × 48; More (8, 600); Inbox (402, 600).
+*As found (Task 17):* the real outside screen (the Duo simulator) has no top inset and a 34-point foot, and the system keeps an 84-point column on the right instead of a 22-point status band; the light page stands left of that column, 382 wide, so these numbers hold only on the board's own window (see "Calls made in this plan").
 
 **Duo, opened flat** (890 × 626). Picture 1000 wide at (−55, −150); band 230; a navy veil 70 high from 0.7. Four words at y 10: Year · Season · Month · "Week and today". Signpost on the right page: post x 520, y 66…196; plank (492, 82) 338 × 60. Month flags on the left: poles x 190 (108…172) and x 352 (96…166). Sheet top 176 across both, corners 26; a 40-wide soft shade down the fold at x 445. Left page: header (24, 198) "THE REST OF THIS WEEK" over the range; list (16, 262) 400 wide, rows at least 44 high with a line above each (day label 50 wide, circle 22, the same type as Week), the past-days line last. Right page: header (476, 198) 392 wide with a 52 ring; card (470, 262) 404 × 40; rows (470, 310) 404 × 50, 5 apart; field (470, 566) 338 × 48. More at (20, 562), Inbox at (814, 562).
 
@@ -938,6 +939,7 @@ Each line is a decision the spec and boards do not settle, with what it costs if
 - **Windows shorter than 760 points use the outside screen's tighter numbers,** and so have no "Look back up".
 - **The handover's travel plays each time a walk ends on light Today; its line shows once per person per phone.** The light starts where the walk's light stood, though the ending screen no longer shows it.
 - **In the Duo's side column nothing of ours is drawn** in light: More and Inbox are beside the bar.
+- **The real Duo outside screen is not the board's window** (found in Task 17 on the Duo simulator). It has no top inset and a 34-point foot, and the system keeps an 84-point column on the right of the 466-wide window, holding its clock and Wi-Fi. Light pages stand inside the window's side edges, 382 wide there, with plain sky behind the system's column; the row of words starts at the top edge and the bar stands 42 above the foot. The sign's plank and the bar's field are proportionally narrower than the board's. Where a placeholder does not fit its field it takes a shorter form ("Add a goal for November" becomes "Add a goal"), as on a 375-point phone, so it is never cut short. If wrong: the side edges are one modifier, and the short form one function.
 - **Completion uses `ItemCompletion`;** calendar events cannot be ticked on the light pages.
 - **A Debug-only branch in `CalendarFeed`** feeds two sample events to light demo screenshots.
 - **The waiting walk's line sits under the sheet's handle and above the date,** and pushes the page down 44 points while it shows. It shows for any stored walk the Settings button would pick back up. If wrong: one frame.
@@ -960,6 +962,7 @@ Each line is a decision the spec and boards do not settle, with what it costs if
 - Sign-up copy is truthful only on the phone's own screen; the web's sign-up and the waitlist page are outside this plan.
 - Routines, dinner, people and life-area switching stay hidden in light (the foundations stage).
 - "Look back up" is missing on short windows and on the Duo's spread and outside screen.
+- The guided walk still fills the whole of the Duo's outside window, under the system's column (the walk is unchanged by this plan).
 - "The full plan is offered again at each new season" is still not built; the "no piece" sign is the nearest thing.
 - Carried from the walk: moving a year goal leaves the flags under it on the old peak; a change made while its push is in flight can be lost.
 

@@ -316,6 +316,21 @@ struct DailyHandoverTests {
         }
     }
 
+    /// Where the walk's light stood, from the page's own size and its side insets: on the Duo's outside
+    /// screen (a 382-wide page with the system's 84-point column on its right, the walk on the whole
+    /// 466-wide window) and on an ordinary phone (no side insets: the stage itself, unscaled).
+    @Test func theStartComesFromThePageAndItsSideInsets() {
+        let outside = DailyHandover.start(page: CGSize(width: 382, height: 678), left: 0, right: 84)
+        let stage = WalkStage(device: CGSize(width: 466, height: 678))
+        #expect(outside.centre == stage.toDevice(WalkOrb.centre))
+        #expect(outside.diameter == 2 * WalkOrb.radius * stage.scale)
+        let mirrored = DailyHandover.start(page: CGSize(width: 382, height: 678), left: 84, right: 0)
+        #expect(mirrored.centre == CGPoint(x: stage.toDevice(WalkOrb.centre).x - 84, y: stage.toDevice(WalkOrb.centre).y))
+        let phone = DailyHandover.start(page: CGSize(width: 390, height: 844), left: 0, right: 0)
+        #expect(phone.centre == WalkOrb.centre)
+        #expect(phone.diameter == 2 * WalkOrb.radius)
+    }
+
     /// The inside screen upright: page and window are one, the stage letterboxed in it; the light lands
     /// on the tall bar at that width.
     @Test func onTheUprightInsideScreenItTravelsFromTheWalksLightToTheBar() {

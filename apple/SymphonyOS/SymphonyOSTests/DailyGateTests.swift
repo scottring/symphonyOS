@@ -281,6 +281,16 @@ struct DailyGateTests {
         }
     }
 
+    /// One page frame for Today and Week (moving between them keeps the bar's Undo, as before); each
+    /// mountain level is a fresh page of its own.
+    @Test func todayAndWeekShareAFrameAndEachMountainIsItsOwn() {
+        #expect(DailyGate.page(.today).identity == nil)
+        #expect(DailyGate.page(.week).identity == nil)
+        #expect(DailyGate.page(.month).identity == .month)
+        #expect(DailyGate.page(.season).identity == .season)
+        #expect(DailyGate.page(.year).identity == .year)
+    }
+
     /// Ruling D14 leftover (a): a row's Details over a light page closes when the half-open display
     /// covers it, so the display's bar never listens behind a sheet; it stays open otherwise.
     @Test func coveringThePageClosesItsDetails() {

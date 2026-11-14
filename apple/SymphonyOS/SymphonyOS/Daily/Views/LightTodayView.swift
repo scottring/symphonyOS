@@ -5,8 +5,9 @@ import SwiftData
 /// Today on the page, for a light household: a band of the mountain, the row of words,
 /// the signpost, and the paper with the date, the ring, the next event and today's rows,
 /// each saying what it is for. Everything it shows is read by `DailyTodayPage` and placed
-/// by `DailyMetrics`; it only draws, and sends what is touched to the model. The page
-/// ignores the safe area: `size` is the whole window and the insets are the window's own.
+/// by `DailyMetrics`; it only draws, and sends what is touched to the model. The page runs from
+/// the window's top to its foot but stands within its side edges (clear of the system's column on
+/// the Duo's outside screen): `size` is that, and the top and foot insets are the window's own.
 struct LightTodayView: View {
     let model: DailyModel
     let userId: UUID
@@ -80,6 +81,7 @@ struct LightTodayView: View {
                 if low == nil {
                     DailyPaperFade(fade: m.bar.fade, size: size)
                     DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.today, periods: model.periods),
+                                 shortPlaceholder: DailyCopy.shortPlaceholder(.today),
                                  listening: DailyCopy.listening(.today), lightShown: travel == nil, touched: { interrupt(.touch) })
                 }
                 if let travel {

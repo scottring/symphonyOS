@@ -197,6 +197,7 @@
 		BFF8FD46589AB3670A904D01 /* WalkState+Plant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D4A6D0E39EF42BBDAF92B3 /* WalkState+Plant.swift */; };
 		C10D6371BA71685E976DC1B5 /* DailyBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FBD3D8159BB25CECEC69C81 /* DailyBar.swift */; };
 		C32F7D0A51A46659926AD3F6 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9595773CA7713C5157B3B01 /* AppState.swift */; };
+		C3ACBBC96DAE99805BC01266 /* DailyMetrics+Duo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A44F96DA8E4B4374F071779 /* DailyMetrics+Duo.swift */; };
 		C5AF72182F53874B1ACB4111 /* HalfOpenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2AF4DCA0960E25B5C75CC9 /* HalfOpenView.swift */; };
 		C6053778DAF553C9B7C3915D /* WalkArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = B51C0BB869FEE85FEC50B9ED /* WalkArt.swift */; };
 		C60C7C51D519800D46023585 /* DailyDemoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B12B1E4BBF3F0C54E4A8D /* DailyDemoTests.swift */; };
@@ -436,6 +437,7 @@
 		886E6A44F4EAF512A2F1DC39 /* CookSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookSession.swift; sourceTree = "<group>"; };
 		88E6C889C84E9A5D285AB75E /* OpenedItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenedItemSheet.swift; sourceTree = "<group>"; };
 		891666939A8FC92F36CE9644 /* WalkPeriodsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkPeriodsTests.swift; sourceTree = "<group>"; };
+		8A44F96DA8E4B4374F071779 /* DailyMetrics+Duo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyMetrics+Duo.swift"; sourceTree = "<group>"; };
 		8BA72DC60A9EA66D9743639A /* RoutineOccurrenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineOccurrenceTests.swift; sourceTree = "<group>"; };
 		8EBED2D101D6AFAD857742E3 /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
 		8EFF346033D25F30F5C9B784 /* SignpostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignpostView.swift; sourceTree = "<group>"; };
@@ -633,6 +635,7 @@
 				ED3073060F0267E2A652763E /* DailyHandover.swift */,
 				1AF866B31454818D1326657C /* DailyLookBack.swift */,
 				53A425F590C6C0947C2B2BC6 /* DailyMetrics.swift */,
+				8A44F96DA8E4B4374F071779 /* DailyMetrics+Duo.swift */,
 				8F5475BF2B0C49BF9B4D88F3 /* DailyMetrics+Tent.swift */,
 				23357705E5BD395EF5894F9F /* DailyTentPage.swift */,
 				AD4E2B82F5C8BDD8FA342452 /* DailyTodayPage.swift */,
@@ -1450,6 +1453,7 @@
 				1A8460DBC609E73C9821B013 /* DailyGate.swift in Sources */,
 				A77EE112A22F4E464F39730B /* DailyHandover.swift in Sources */,
 				FD5F9DB17E725D148CB374DF /* DailyLookBack.swift in Sources */,
+				C3ACBBC96DAE99805BC01266 /* DailyMetrics+Duo.swift in Sources */,
 				AC12E66743A4E713474768C8 /* DailyMetrics+Tent.swift in Sources */,
 				B84B580A2ED0E7D542A6CABE /* DailyMetrics.swift in Sources */,
 				7B28BA87945803F09D0E83CA /* DailyModel.swift in Sources */,

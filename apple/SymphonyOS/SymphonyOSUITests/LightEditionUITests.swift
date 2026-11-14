@@ -322,28 +322,43 @@ final class LightEditionUITests: XCTestCase {
                        "the display's bar did not listen")
         XCTAssertTrue(any["daily.halfOpen"].exists)
         assertThePageUnderTheDisplayIsOutOfReach(app)
-        // The page kept under the display took no part in the Tell: its own light is not listening.
+        // The page kept under the display took no part in the Tell: its own light is there, not listening.
         let pageLight = any["daily.today"].descendants(matching: .any)["daily.bar.light"]
-        if pageLight.exists { XCTAssertEqual(pageLight.label, "Speak it", "the page under the display listened") }
+        XCTAssertTrue(pageLight.exists, "light Today's bar is not kept under the display")
+        XCTAssertEqual(pageLight.label, "Speak it", "the page under the display listened")
     }
 
-    /// Ruling D14 as XCUITest can see it: at most one light page lies under the display, kept (the
-    /// Debug marker `daily.coveredPage`), and nothing of it can be touched: its bar's light, Inbox
-    /// and More are not hittable, the display's light is the one that is, and there is no dock.
-    /// (XCUITest lists elements SwiftUI hides from VoiceOver, even under a constant
-    /// `accessibilityHidden(true)`, so whether VoiceOver skips the page is not asserted here.)
+    /// The light page's controls under the display.
+    private let pageControls = ["daily.bar.light", "daily.bar.inbox", "daily.bar.more", "daily.lookBack", "daily.nav.week"]
+
+    /// Ruling D14 as XCUITest can see it: nothing of a page under the display can be touched (each of
+    /// its controls is out of reach: missing, or there and not hittable), the display's light is the one
+    /// that can, and there is no dock. (XCUITest lists elements SwiftUI hides from VoiceOver, even under
+    /// a constant `accessibilityHidden(true)`, so whether VoiceOver skips the page is not asserted here.)
     private func assertThePageUnderTheDisplayIsOutOfReach(_ app: XCUIApplication, file: StaticString = #filePath,
                                                           line: UInt = #line) {
         let any = app.descendants(matching: .any)
         let display = any["daily.halfOpen"].descendants(matching: .any)
         XCTAssertTrue(display["daily.bar.light"].isHittable, "the display's light cannot be touched", file: file, line: line)
         let page = any["daily.today"].descendants(matching: .any)
-        for id in ["daily.bar.light", "daily.bar.inbox", "daily.bar.more", "daily.lookBack", "daily.nav.week"] {
-            let element = page[id]
-            if element.exists { XCTAssertFalse(element.isHittable, "\(id) on the page under the display", file: file, line: line) }
-        }
+        for id in pageControls { assertOutOfReach(page[id], id, file: file, line: line) }
         XCTAssertFalse(app.buttons["Planner"].exists, "the dock under the display", file: file, line: line)
         XCTAssertFalse(app.buttons["Routines"].exists, file: file, line: line)
+    }
+
+    /// Out of reach: missing from the screen, or there and not hittable. Either passes, on purpose;
+    /// where a test means "there but inert" it asserts `exists` as well (`assertThereButInert`).
+    private func assertOutOfReach(_ element: XCUIElement, _ what: String, file: StaticString = #filePath,
+                                  line: UInt = #line) {
+        XCTAssertTrue(!element.exists || !element.isHittable, "\(what) can be touched under the display",
+                      file: file, line: line)
+    }
+
+    /// There but inert: present on the screen and not hittable.
+    private func assertThereButInert(_ element: XCUIElement, _ what: String, file: StaticString = #filePath,
+                                     line: UInt = #line) {
+        XCTAssertTrue(element.exists, "\(what) is not there", file: file, line: line)
+        XCTAssertFalse(element.isHittable, "\(what) can be touched under the display", file: file, line: line)
     }
 
     /// The inside screen held upright (626 × 890) is a light window now: set down half open, light
@@ -359,6 +374,9 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertEqual(kept.value as? String, "today")
         XCTAssertTrue(any["daily.today"].exists, "light Today is not the page under the display")
         assertThePageUnderTheDisplayIsOutOfReach(app)
+        // Kept, not dropped: each of its controls is there, and inert.
+        let page = any["daily.today"].descendants(matching: .any)
+        for id in pageControls { assertThereButInert(page[id], id) }
     }
 
     /// A full household set down half open keeps the old display, dinner and all.

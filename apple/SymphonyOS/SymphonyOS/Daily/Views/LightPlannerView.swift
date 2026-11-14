@@ -54,10 +54,8 @@ struct LightPlannerView<Full: View>: View {
         ZStack {
             if DailyGate.dropsPage(covered: covered, lightPage: showsLight) {
                 DailyPalette.sky.ignoresSafeArea()
-            } else if showsLight, case .mountain(let level) = DailyGate.page(appState.horizon) {
-                mountain(level)
             } else if showsLight {
-                light
+                light(DailyGate.page(appState.horizon))
             } else {
                 full()
             }
@@ -115,61 +113,31 @@ struct LightPlannerView<Full: View>: View {
         }
     }
 
-    @ViewBuilder private var light: some View {
+    /// The light page for `page`, drawn in the one place every light page is: Today and Week share a
+    /// page frame, each mountain level is a fresh one (`DailyGate.Page.identity`).
+    @ViewBuilder private func light(_ page: DailyGate.Page) -> some View {
         if let model, let userId = auth.currentUser?.id {
             GeometryReader { proxy in
-                let page = TodayView.pinnedSize ?? proxy.size
-                switch DailyGate.page(appState.horizon) {
+                let size = TodayView.pinnedSize ?? proxy.size
+                switch page {
                 case .today:
-                    LightTodayView(model: model, userId: userId, seasons: seasons, size: page,
+                    LightTodayView(model: model, userId: userId, seasons: seasons, size: size,
                                    safeTop: insets.top, safeBottom: insets.bottom, layout: layout,
-                                   handoverFrom: handoverFrom(page: page), go: go, open: open)
-                        .frame(width: page.width, height: page.height)
+                                   handoverFrom: DailyHandover.start(page: size, left: insets.left, right: insets.right),
+                                   go: go, open: open)
+                        .frame(width: size.width, height: size.height)
                 case .week:
-                    LightWeekView(model: model, userId: userId, seasons: seasons, size: page,
+                    LightWeekView(model: model, userId: userId, seasons: seasons, size: size,
                                   safeTop: insets.top, safeBottom: insets.bottom, layout: layout, go: go)
-                        .frame(width: page.width, height: page.height)
-                case .mountain:
-                    EmptyView()     // never: the body draws a mountain page with `mountain(_:)`
+                        .frame(width: size.width, height: size.height)
+                case .mountain(let level):
+                    MountainPageView(level: level, model: model, userId: userId, size: size, safeTop: insets.top,
+                                     safeBottom: insets.bottom, layout: layout, go: go)
+                        .frame(width: size.width, height: size.height)
                 }
             }
-            #if DEBUG
-            .modifier(PinnedFit())
-            #endif
-            .ignoresSafeArea(edges: .vertical)
-            .background(DailyPalette.sky.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
-            .onDisappear { model.send(.left) }
-        } else {
-            DailyPalette.sky.ignoresSafeArea()
-        }
-    }
-
-    /// Where the walk's light stood as a walk ends onto Today: the walk fills the whole window, while
-    /// the page stands within the window's side edges (clear of the system's column on the Duo's
-    /// outside screen), its top-left `insets.left` in from the window's.
-    private func handoverFrom(page: CGSize) -> (centre: CGPoint, diameter: CGFloat) {
-        DailyHandover.start(window: CGSize(width: page.width + insets.left + insets.right, height: page.height),
-                            page: CGPoint(x: insets.left, y: 0))
-    }
-
-    /// Month, Season and Year: the mountain at that level, a fresh page for each.
-    @ViewBuilder private func mountain(_ level: WalkLevel) -> some View {
-        if let model, let userId = auth.currentUser?.id {
-            GeometryReader { proxy in
-                let page = TodayView.pinnedSize ?? proxy.size
-                MountainPageView(level: level, model: model, userId: userId, size: page, safeTop: insets.top,
-                                 safeBottom: insets.bottom, layout: layout, go: go)
-                    .frame(width: page.width, height: page.height)
-            }
-            #if DEBUG
-            .modifier(PinnedFit())
-            #endif
-            .ignoresSafeArea(edges: .vertical)
-            .background(DailyPalette.sky.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
-            .onDisappear { model.send(.left) }
-            .id(level)
+            .modifier(LightPageFrame(model: model))
+            .id(page.identity)
         } else {
             DailyPalette.sky.ignoresSafeArea()
         }
@@ -218,6 +186,24 @@ struct LightPlannerView<Full: View>: View {
         demoPageOpened = true
         go(page)
         #endif
+    }
+}
+
+/// What every light page stands in: the window from top to foot but within its side edges (where the
+/// system keeps a column of its own, the Duo's outside screen, only the plain sky is behind it), no
+/// navigation bar, and the page went away (`.left`) when it goes.
+private struct LightPageFrame: ViewModifier {
+    let model: DailyModel
+
+    func body(content: Content) -> some View {
+        content
+            #if DEBUG
+            .modifier(PinnedFit())
+            #endif
+            .ignoresSafeArea(edges: .vertical)
+            .background(DailyPalette.sky.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .onDisappear { model.send(.left) }
     }
 }
 

@@ -122,7 +122,15 @@ enum DailyGate {
     /// What the light Planner draws for a page the gate shows. Every horizon has one, so a page
     /// the gate lists is never the full Planner under a hidden dock (`LightPlannerView` switches on
     /// this, with no other case).
-    enum Page: Equatable { case today, week, mountain(WalkLevel) }
+    enum Page: Equatable {
+        case today, week, mountain(WalkLevel)
+
+        /// Which page frame it is drawn in: Today and Week share one (moving between them keeps the
+        /// bar's Undo); each mountain level is a fresh page of its own.
+        var identity: WalkLevel? {
+            if case .mountain(let level) = self { level } else { nil }
+        }
+    }
 
     static func page(_ horizon: Horizon) -> Page {
         switch horizon {

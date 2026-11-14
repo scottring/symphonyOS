@@ -8,7 +8,8 @@ import SwiftData
 /// A task's circle ticks it; a tap on its words chooses it and raises the Move to panel, whose
 /// chips move it or pull it up; every move and pull-up offers Undo. Everything it shows is read
 /// by `DailyWeek` and placed by `DailyMetrics`; it only draws, and sends what is touched to the
-/// model. The page ignores the safe area: `size` is the whole window, the insets its own.
+/// model. The page runs from the window's top to its foot within its side edges: `size` is that, the
+/// top and foot insets the window's own.
 struct LightWeekView: View {
     let model: DailyModel
     let userId: UUID
@@ -88,6 +89,7 @@ struct LightWeekView: View {
                 DailyPaperFade(fade: m.bar.fade, size: size)
                 if let chosen { movePanel(chosen, m) }
                 DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.week, periods: model.periods),
+                             shortPlaceholder: DailyCopy.shortPlaceholder(.week),
                              listening: DailyCopy.listening(.week))
             }
             #if DEBUG

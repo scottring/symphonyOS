@@ -60,6 +60,23 @@ enum DailyCopy {
         }
     }
 
+    /// The bar's empty field in fewer words, for a field too narrow for `placeholder` (the Duo's
+    /// outside screen, a 375-point phone): "Add a goal" on Month, Season and Year; Today's and
+    /// Week's are short already.
+    static func shortPlaceholder(_ h: Horizon) -> String {
+        switch h {
+        case .today: "Add to today"
+        case .week: "Add to this week"
+        case .month, .season, .year: "Add a goal"
+        }
+    }
+
+    /// The first of `forms` whose width (as `width` measures it, in points) fits `room`; the last,
+    /// the shortest, when none does. So the bar's words are never cut short where a form fits.
+    static func fitting(_ forms: [String], room: CGFloat, width: (String) -> CGFloat) -> String {
+        forms.first { width($0) <= room } ?? forms.last ?? ""
+    }
+
     /// The bar's line while it listens.
     static func listening(_ h: Horizon) -> String {
         switch h {

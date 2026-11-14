@@ -78,6 +78,28 @@ struct DailyCopyTests {
         #expect(DailyCopy.placeholder(.year, periods: periods) == "Add a goal for 2027")
     }
 
+    /// A goal page's placeholder has a shorter form for a narrow field; Today's and Week's are short already.
+    @Test func shortPlaceholders() {
+        #expect(DailyCopy.shortPlaceholder(.month) == "Add a goal")
+        #expect(DailyCopy.shortPlaceholder(.season) == "Add a goal")
+        #expect(DailyCopy.shortPlaceholder(.year) == "Add a goal")
+        #expect(DailyCopy.shortPlaceholder(.today) == DailyCopy.placeholder(.today, periods: periods))
+        #expect(DailyCopy.shortPlaceholder(.week) == DailyCopy.placeholder(.week, periods: periods))
+    }
+
+    /// The bar's words are never cut short: the first form that fits the field's room, as the view
+    /// measures it, else the last (the shortest). The widths here stand in for the view's measure.
+    @Test func thePlaceholderThatFitsIsChosen() {
+        let width: (String) -> CGFloat = { CGFloat($0.count) * 8 }    // 8 points a letter
+        let month = DailyCopy.placeholder(.month, periods: periods)    // "Add a goal for November": 23 letters, 184
+        let forms = [month, DailyCopy.shortPlaceholder(.month)]
+        #expect(DailyCopy.fitting(forms, room: 184, width: width) == month)          // just fits
+        #expect(DailyCopy.fitting(forms, room: 183.9, width: width) == "Add a goal")
+        #expect(DailyCopy.fitting(forms, room: 10, width: width) == "Add a goal")    // nothing fits: the shortest
+        #expect(DailyCopy.fitting(["Add to today"], room: 10, width: width) == "Add to today")
+        #expect(DailyCopy.fitting([], room: 100, width: width) == "")
+    }
+
     @Test func listeningAndHints() {
         #expect(DailyCopy.listening(.today) == "Listening. Say a day and it goes there.")
         #expect(DailyCopy.listening(.week) == "Listening. Say a day and it goes there.")

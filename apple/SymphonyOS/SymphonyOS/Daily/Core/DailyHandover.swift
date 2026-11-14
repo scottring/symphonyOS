@@ -90,6 +90,14 @@ enum DailyHandover {
         return (CGPoint(x: centre.x - page.x, y: centre.y - page.y), 2 * WalkOrb.radius * stage.scale)
     }
 
+    /// Where the walk's light stood, in the page's own points, from the page's size and the window's
+    /// side insets: the walk fills the whole window (the page widened by both insets), and the page
+    /// stands `left` in from the window's left edge (the Duo's outside screen: a 382-wide page, the
+    /// system's 84-point column on its right; a phone upright: no side insets).
+    static func start(page: CGSize, left: CGFloat, right: CGFloat) -> (centre: CGPoint, diameter: CGFloat) {
+        start(window: CGSize(width: page.width + left + right, height: page.height), page: CGPoint(x: left, y: 0))
+    }
+
     /// Where the bar's light stands (its diameter, at the field's right end, `lightInset` in).
     static func end(bar: DailyMetrics.Bar) -> (centre: CGPoint, diameter: CGFloat) {
         (CGPoint(x: bar.field.maxX - DailyMetrics.lightInset - bar.light / 2, y: bar.field.midY), bar.light)
