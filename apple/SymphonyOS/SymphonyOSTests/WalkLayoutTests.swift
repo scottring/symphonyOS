@@ -665,6 +665,52 @@ struct WalkLayoutTests {
         #expect(WalkLayout.make(state(3, kept: ["Home"]), today: today).labels.first?.hint == nil)
     }
 
+    /// VoiceOver reads a flag that does nothing on a tap as plain text, and a peak as
+    /// selected when it is kept (on the ground) or focused (on Year).
+    @Test func voiceOverKnowsWhatTakesATapAndWhatIsSelected() {
+        let mine = flag(.year, "Run a 5K", in: "Home")
+        let theirs = flag(.year, "Read more", in: "Health", mine: false)
+        var s = state(1, kept: ["Health", "Home"], items: [mine, theirs])
+        var layout = WalkLayout.make(s, today: today)
+        #expect(layout.banner(for: mine)?.taps == true)
+        #expect(layout.banner(for: theirs)?.taps == false)
+        #expect(layout.labels.allSatisfy { !$0.selected })
+        s.focusArea = area("Home").id
+        layout = WalkLayout.make(s, today: today)
+        #expect(layout.labels.filter(\.selected).map(\.name) == ["Home"])
+
+        s.step = 2
+        #expect(WalkLayout.make(s, today: today).banner(for: theirs)?.taps == true)      // tap to focus
+
+        var ground = state(1, kept: ["Home"])
+        ground.ground = true
+        let peaks = WalkLayout.make(ground, today: today).labels
+        #expect(peaks.filter(\.selected).map(\.name) == ["Home"])
+
+        var ex = state(1)
+        ex.examplesOn = [1]
+        #expect(WalkLayout.make(ex, today: today).posts.flatMap(\.banners).first { $0.kind == .ghost }?.taps == true)
+
+        let crowd = (1...8).map { flag(.year, "Goal \($0)", in: "Home") }
+        let stub = WalkLayout.make(state(1, kept: ["Health", "Home", "People"], items: crowd), today: today)
+            .posts.flatMap(\.banners).first { $0.kind == .stub(2) }
+        #expect(stub?.taps == true)
+
+        // Look back up: a lone flag is only read; one carrying "+n" opens its post.
+        let lone = flag(.year, "Run a 5K", in: "Home")
+        let pair = [flag(.year, "Swim", in: "Health"), flag(.year, "Cycle", in: "Health")]
+        let back = WalkLayout.make(state(6, kept: ["Health", "Home"], items: [lone] + pair), today: today)
+        #expect(back.banner(for: lone)?.taps == false)
+        #expect(back.banners(on: .year).first { $0.more != nil }?.taps == true)
+
+        let week = flag(.week, "Send the deposit", in: "Home", day: today)
+        var t = state(5, kept: ["Home"], items: [week])
+        t.firstThing = week.id
+        #expect(WalkLayout.make(t, today: today).banners(on: .today).first?.taps == true)
+        t.items[0].mine = false
+        #expect(WalkLayout.make(t, today: today).banners(on: .today).first?.taps == false)
+    }
+
     @Test func theFirstThingSaysItCanBePulledUp() {
         let week = flag(.week, "Send the deposit", in: "Home", day: today)
         var s = state(5, kept: ["Home"], items: [week])

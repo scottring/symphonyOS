@@ -24,7 +24,7 @@ Weeks start on **Sunday**, as the database triggers do.
 - **No day** (the Week list's Day menu, 2026-11-07): `bucket='week'`, `scheduled_for` cleared, `week_start`, and an open `week` commitment for that week.
 - **This week**: `bucket='week'`, `week_start`, and an open `week` commitment.
 - **Someday** (Inbox triage): every open commitment → `removed`, then `bucket='someday'`.
-- **The write line** on Month, Season and Week ("Write a November goal", "Write a task for this week"): a new task with the level's `bucket` and period stamp, scope from the life-area lens, and one open commitment. No `goal_task_id`, no `source_id`. On Year it writes a `goals` row.
+- **The write line** on Month, Season and Week ("Write a November goal", "Write a task for this week"): a new task with the level's `bucket` and period stamp, scope from the life-area lens, and one open commitment. No `goal_task_id`, no `source_id`. On Year it writes a `goals` row. The write line still makes no `source_id`; the walk (below) is the one writer that does.
 - **Review** (last week's leftovers):
   - Next week: old commitment → `carried`, plus a new open commitment.
   - Someday: that week's commitment → `removed`; `bucket='someday'` (period stamps cleared) only if no other open commitment holds the task.
@@ -37,6 +37,51 @@ Nothing moves an item from one list above the week onto another (paper-style hor
 - **Choose a routine occurrence**: `planned_on` on that day's instance. For a flexible weekly routine it also sets `deferred_to` to local noon. The routine row is never written.
 
 Period stamps are pushed only after a placement change (`placementDirty`). So an ordinary edit never nulls a placement made on the web.
+
+## The walk (`Walk/`, the light edition's first run)
+
+A walk down the mountain from the year to the first thing today. The core (`Walk/Core`) is pure and tested; the views only draw `WalkLayout` and send events to `WalkModel`.
+
+**What it writes** (`Walk/Data/WalkWriter.swift`), all `context = "personal"`, through `PlanWriter` and the sync queue:
+- Year: a `goals` row with its life area (`area_id`).
+- Season: a plain task, bucket `quarter`, `season_start`; `goal_id` → the year goal.
+- Month: a plain task, bucket `month`, `month_start`; `source_id` → the season task, `goal_id` copied from it.
+- Week: a task on its day, or on the week; `source_id` → the month task, `goal_id` copied.
+- First thing today: a `task_focus` row.
+- A life area is a `goal_areas` row, saved only once something is planted on it; an existing personal area with the same name is reused.
+- Never sent: `is_goal`, `goal_task_id`, `supports_goal_task_id`.
+
+**The three link columns** `goal_id`, `source_id` and `area_id` are sent only when the phone set them: a task sends all three (nulls included) when `linksDirty`, a goal sends `area_id` when `areaDirty`. Rows pulled from the server have both flags off, so an ordinary edit never overwrites a link made on the web.
+
+**Parents first.** A row whose sent links name a parent whose insert is still queued waits for it; a `task_focus` row waits for its task the same way. A child stops waiting once the parent's insert has failed 10 times. A parent is lost only when the server refuses the child with a foreign-key error (23503) and the parent is neither on the phone nor queued: that link is cleared and the null is sent.
+
+**When it opens.** By itself only in a household that is light only, with no goals, after the first sync has finished. A saved walk in progress resumes at once, and "Walk the mountain again" (Settings) opens at once when the household row is already on the phone; neither waits for the sync. It never starts by itself in a full household. A replay starts with nothing counted as planted.
+
+**Saved position.** In `UserDefaults` under `walk.position.<user id>` (`WalkPositionStore`), saved from the moment a depth is chosen. Undo lives in memory only and does not survive a relaunch.
+
+**Behaviour a change must keep:**
+- Letting go while speaking waits for the last words: the orb is `finishing` until the recogniser ends or `WalkOrb.finishMs` (1 s) passes.
+- The walk listens on the phone only. Where on-device recognition is missing, holding opens typing.
+- A first empty hold shows a quiet note; a second in a row opens typing. Refused or unavailable speech opens typing, and every hold for the rest of that walk types instead.
+- "Walk another one down" (`.walkAnother`) starts clean: no undo, examples, note, selection or open post carried over.
+- The Year camera stop is −495 (`WalkArt`), not the mockup's −553, so the peak labels clear the orb.
+- When examples are short of room, your own flags on that post fold to one line carrying "+n"; at least one example always shows.
+- On a crowded ridge (six or more columns) one post is open at a time, and its banners narrow to the gap between its neighbours (never below 44 pt).
+- Sounds are synthesized placeholders until the recordings land in `Resources/WalkSounds`. They are silent while the walk's own listening holds the audio session; haptics always play, sound off or not.
+- The ending's rows are today's own personal tasks (planted by the walk or not) and exist only on step 6.
+
+**Accessibility.** The light is one VoiceOver button (`walk.orb`): a double-tap opens or closes the points, and each compass point is a custom action, so "Type it" plants without a press and hold. Flags and peaks that take no tap read as text (`Banner.taps`, `Label.selected`). The scene is hidden from VoiceOver under the raised ending sheet. With Reduce Motion the camera cross-fades in 0.25 s instead of gliding 1.4 s, banners do not flutter, and the light does not breathe.
+
+**Other screens.** The 390 × 844 stage scales to fit and letterboxes in `#00106e`; there is no Duo or landscape layout. With `-HalfOpen laptop` the half-open display covers the walk.
+
+**Launch arguments** (Debug, with `-SymphonyDemo`; add `-SymphonyLight` for the light edition):
+- `-SymphonyWalk`: open the walk over an empty store.
+- `-SymphonyWalkStep N` (0…6): open at step N over the mockup's preview plan.
+- `-SymphonyWalkOrb a,b,…`: drive the orb after opening: `ground`, `open`, `hold`, `speak` (a stand-in listener says "Pick up the tile samples"), `type`, `select`, `undo`, `next`.
+- `-SymphonyWalkExamples`: examples on for the step.
+- `-SymphonyWalkSheet up`: on step 6, the ending sheet raised.
+
+`SymphonyOSUITests/WalkUITests` taps through a quick start and a replay; nothing is typed or spoken.
 
 ## Reviewing on the simulator
 

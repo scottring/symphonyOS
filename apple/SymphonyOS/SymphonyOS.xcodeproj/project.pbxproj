@@ -136,6 +136,7 @@
 		A7ABA23EF22EC5A279C4FF3C /* PaperFoldTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C9A6ACB7B9E46F44B52B56F /* PaperFoldTests.swift */; };
 		A7F04047BD0C22C56A11120D /* WalkLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E218D4C9E8496B79A7A214 /* WalkLayoutTests.swift */; };
 		A936C12D2B64DE7CFB1471C6 /* SlideRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09BD930B3AFC90435DE5E822 /* SlideRow.swift */; };
+		A9CBDFDF613331A67E7947A2 /* WalkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4E6B5AB5FB68D06D3D308B /* WalkUITests.swift */; };
 		AB341F3096AC1FFB5BD3B539 /* PlannerComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D31FA63E65DA22E03392AD /* PlannerComponents.swift */; };
 		AEA84EBE5503B7AEC8B9D5A0 /* CrimsonPro-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2A262D445DAE6081A4A96C82 /* CrimsonPro-SemiBold.ttf */; };
 		AFC5FC71DC80A3B9E6718CA6 /* WeeklyTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C0823D3F322CA3D99EC0A4 /* WeeklyTemplate.swift */; };
@@ -341,6 +342,7 @@
 		777FA26749C1A4208B9DDC94 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
 		779DC68DE6348BF47C96A130 /* PendingChange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingChange.swift; sourceTree = "<group>"; };
 		79154EC8C219862BC8DE0004 /* DeleteAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountView.swift; sourceTree = "<group>"; };
+		7A4E6B5AB5FB68D06D3D308B /* WalkUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkUITests.swift; sourceTree = "<group>"; };
 		7C0DDF026CD23250BDF7AB83 /* ProjectListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectListView.swift; sourceTree = "<group>"; };
 		7F3522449230AFDDBFBBAA95 /* DateNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateNavigator.swift; sourceTree = "<group>"; };
 		7FC8B5C1B3F02A4A0A6605A4 /* NextUpAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextUpAttributes.swift; sourceTree = "<group>"; };
@@ -960,6 +962,7 @@
 				3DAE563BB5ACD767A6B02809 /* PlannerScreensUITests.swift */,
 				6F4404B5A49F9ACA4F69DEFA /* SkinScreenshotsUITests.swift */,
 				718E56D8B02093D599728E35 /* SymphonyOSUITests.swift */,
+				7A4E6B5AB5FB68D06D3D308B /* WalkUITests.swift */,
 			);
 			path = SymphonyOSUITests;
 			sourceTree = "<group>";
@@ -1365,6 +1368,7 @@
 				4DE34ED9DDD20F324D83BFBB /* PlannerScreensUITests.swift in Sources */,
 				6AFA1C9974CFBC759404624E /* SkinScreenshotsUITests.swift in Sources */,
 				B243747A711245915530C319 /* SymphonyOSUITests.swift in Sources */,
+				A9CBDFDF613331A67E7947A2 /* WalkUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

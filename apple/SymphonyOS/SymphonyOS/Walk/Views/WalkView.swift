@@ -22,15 +22,21 @@ struct WalkView: View {
             let stage = WalkStage(device: geo.size, stage: model.art.stage)
             ZStack(alignment: .topLeading) {
                 WalkPalette.ground
+                // VoiceOver reads the scene (the words, then the peaks and flags), then the light, then the hint row.
                 ZStack(alignment: .topLeading) {
                     WalkSceneView(model: model)
+                        // Under the raised sheet the mountain is covered: VoiceOver skips it too.
+                        .accessibilityHidden(model.state.step > 5 && model.state.sheetRaised)
+                        .accessibilitySortPriority(2)
                     if model.state.step <= 5 {
                         WalkOrbView(model: model)
+                            .accessibilitySortPriority(1)
                         WalkHintRow(model: model)
                     } else {
                         WalkEndingView(model: model)        // Look back up, and Today as a sheet
                     }
                 }
+                .accessibilityElement(children: .contain)
                 .frame(width: model.art.stage.width, height: model.art.stage.height, alignment: .topLeading)
                 .scaleEffect(stage.scale, anchor: .topLeading)
                 .offset(x: stage.origin.x, y: stage.origin.y)

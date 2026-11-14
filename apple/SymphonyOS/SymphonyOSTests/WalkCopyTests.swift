@@ -228,6 +228,25 @@ struct WalkCopyTests {
         #expect(WalkCopy.rowLabel("Lift, 30 minutes", forGoal: nil) == "Lift, 30 minutes")
     }
 
+    /// Only a banner whose label says what a tap does takes a tap; the rest are read as plain text.
+    @Test func aBannerTakesATapOnlyWhenItsLabelSaysSo() {
+        let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focusable, .focused, .firstThing, .firstThingMine, .example, .stub(2)]
+        for role in roles {
+            let label = WalkCopy.bannerLabel("Gym", level: .week, tag: nil, role: role)
+            #expect(role.taps == label.contains("tap to"), "\(role)")
+        }
+        #expect(!WalkCopy.BannerRole.plain.taps)
+        #expect(!WalkCopy.BannerRole.firstThing.taps)
+    }
+
+    /// The light's VoiceOver label: "Hold to begin" on Welcome, the general one on every other step.
+    @Test func theLightSaysWhatItDoes() {
+        #expect(WalkCopy.orbAccessibilityLabel(state(step: 0)) == "Hold to begin")
+        for step in 1...5 {
+            #expect(WalkCopy.orbAccessibilityLabel(state(step: step)) == "Hold and speak to plant a flag; tap for more")
+        }
+    }
+
     /// The ending's date and the next event's time, in the walk's own calendar and words.
     @Test func theEndingsDateAndTimeReadAsTheWalksOwn() {
         #expect(WalkCopy.endingDate(nov13) == "Friday, 13 November")

@@ -16,11 +16,15 @@ struct WalkLayout: Equatable {
     struct Banner: Equatable, Identifiable { let id: String; let itemId: UUID?; let level: WalkLevel; let kind: Kind
         let frame: CGRect; let lines: Int; let text: String; let tag: String?; let glows: Bool; let label: String
         /// Look back up: a banner that also stands for this many older flags ("+n"); a tap opens its post as a stub's does.
-        var more: Int? = nil }
+        var more: Int? = nil
+        /// A tap does something (its label says what); VoiceOver reads one that does not as plain text.
+        var taps: Bool = true }
     struct Post: Equatable, Identifiable { let id: String; let key: WalkPostKey; let base: CGPoint; let top: CGFloat
         let opacity: Double; let saturation: Double; let pale: Bool; let banners: [Banner] }
     struct Label: Equatable, Identifiable { let id: UUID; let name: String; let frame: CGRect
-        let kept: Bool; let focused: Bool; let opacity: Double; let tappable: Bool; let hint: String? }
+        let kept: Bool; let focused: Bool; let opacity: Double; let tappable: Bool; let hint: String?
+        /// For VoiceOver: kept, on the ground; focused, off it.
+        var selected: Bool = false }
     let camera: Camera; let labels: [Label]; let posts: [Post]; let needleDown: Bool
 
     // MARK: Stage numbers (the art's numbers live in `WalkArt`)
@@ -56,7 +60,8 @@ private struct Builder {
     struct Column { let id: UUID?; let area: WalkArea?; let worldX: CGFloat }
 
     /// One flag (or example) waiting to be stacked.
-    struct Entry { let kind: L.Kind; let item: WalkItem?; let text: String; let tag: String?; let glows: Bool; let label: String }
+    struct Entry { let kind: L.Kind; let item: WalkItem?; let text: String; let tag: String?; let glows: Bool; let label: String
+        var taps: Bool = true }
 
     /// The art's stop for a step; an art with too few stops falls back to its last one.
     static func stop(_ art: WalkArt, _ step: Int) -> L.Camera {
@@ -264,7 +269,8 @@ private struct Builder {
                                     width: width * scale, height: 30 * scale))
             return L.Label(id: area.id, name: area.name, frame: frame, kept: kept, focused: focused,
                            opacity: Double(opacity), tappable: tappable,
-                           hint: tappable ? WalkCopy.areaHint(ground: s.ground, kept: kept, focused: focused) : nil)
+                           hint: tappable ? WalkCopy.areaHint(ground: s.ground, kept: kept, focused: focused) : nil,
+                           selected: s.ground ? kept : focused)
         }
     }
 
@@ -344,8 +350,9 @@ private struct Builder {
         let glows = kind != .tip
             && (s.selected == item.id || (kind == .compact && s.step < 6 && lvl != level && isFocused(item))
                 || (todayBand && s.step < 6 && isFocused(item)))
+        let r = role(item, todayBand: todayBand)
         return Entry(kind: kind, item: item, text: item.title, tag: tag, glows: glows,
-                     label: WalkCopy.bannerLabel(item.title, level: lvl, tag: tag, role: role(item, todayBand: todayBand)))
+                     label: WalkCopy.bannerLabel(item.title, level: lvl, tag: tag, role: r), taps: r.taps)
     }
 
     /// The flag the step is focused on (one level up).
@@ -532,7 +539,7 @@ private struct Builder {
         var b = base.y - L.pole
         if let newest = reals.first, let ownKind {
             let e = Entry(kind: ownKind, item: newest.item, text: newest.text, tag: newest.tag, glows: newest.glows,
-                          label: newest.label)
+                          label: newest.label, taps: newest.taps)
             let h = height(ownKind, lines: 1, tag: e.tag)
             b = min(base.y, max(b, ceiling + firstHeight + gapY + h))
             let x = across(ownKind, at: base.x, scale: 1)
@@ -654,7 +661,7 @@ private struct Builder {
         L.Banner(id: b.id, itemId: b.itemId, level: b.level, kind: b.kind, frame: b.frame, lines: b.lines,
                         text: b.text, tag: b.tag, glows: b.glows,
                         label: b.label + ", " + WalkCopy.bannerLabel("", level: b.level, tag: nil, role: .stub(more)),
-                        more: more)
+                        more: more, taps: true)
     }
 
     func stub(_ id: String, _ lvl: WalkLevel, base: CGPoint, count: Int, scale: CGFloat, below: CGFloat?) -> L.Banner {
@@ -667,6 +674,6 @@ private struct Builder {
 
     func banner(id: String, _ e: Entry, _ lvl: WalkLevel, frame: CGRect, lines: Int) -> L.Banner {
         L.Banner(id: id, itemId: e.item?.id, level: lvl, kind: e.kind, frame: frame, lines: lines,
-                 text: e.text, tag: e.tag, glows: e.glows, label: e.label)
+                 text: e.text, tag: e.tag, glows: e.glows, label: e.label, taps: e.taps)
     }
 }

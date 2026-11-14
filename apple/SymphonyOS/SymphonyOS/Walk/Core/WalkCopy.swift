@@ -223,7 +223,16 @@ enum WalkCopy {
         }
     }
 
-    enum BannerRole: Equatable { case mine, plain, focusable, focused, firstThing, firstThingMine, example, stub(Int) }
+    enum BannerRole: Equatable {
+        case mine, plain, focusable, focused, firstThing, firstThingMine, example, stub(Int)
+        /// A tap does something: the label says what. A plain flag, or someone else's first thing, is only read.
+        var taps: Bool {
+            switch self {
+            case .plain, .firstThing: return false
+            case .mine, .focusable, .focused, .firstThingMine, .example, .stub: return true
+            }
+        }
+    }
 
     static func bannerLabel(_ text: String, level: WalkLevel, tag: String?, role: BannerRole) -> String {
         let head = "\(levelName(level)): \(text)"
@@ -247,6 +256,11 @@ enum WalkCopy {
 
     static func rowLabel(_ title: String, forGoal: String?) -> String {
         forGoal.map { "\(title), for \($0)" } ?? title
+    }
+
+    /// The light's label: `orbLabelWelcome` on Welcome, `orbLabel` on every other step.
+    static func orbAccessibilityLabel(_ s: WalkState) -> String {
+        s.step == 0 ? orbLabelWelcome : orbLabel
     }
 
     // MARK: Helpers

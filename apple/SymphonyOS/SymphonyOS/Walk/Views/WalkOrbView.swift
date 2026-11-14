@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import UIKit
 
 /// The walk's one control, drawn on the stage (contract §7): the 300 × 300 dial
 /// at (45, 528) with its wash, ring, ticks and needle; the breathing light at
@@ -14,6 +15,7 @@ struct WalkOrbView: View {
     @State private var pressOnLight = false
     /// True while a press is down; it falls back on its own when the system cancels the gesture.
     @GestureState private var pressing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static let dial = CGRect(x: 45, y: 528, width: 300, height: 300)
 
@@ -40,6 +42,7 @@ struct WalkOrbView: View {
             light(active: isActive(s.orb), speaking: isSpeaking(s.orb))
                 .position(WalkOrb.centre)
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
 
             Circle()
                 .fill(.clear)
@@ -47,7 +50,12 @@ struct WalkOrbView: View {
                 .contentShape(Circle())
                 .position(WalkOrb.centre)
                 .gesture(press)
-                .accessibilityIdentifier("walk.orb")
+                .accessibilityHidden(true)
+
+            // What VoiceOver finds in the light's place: a separate element that takes no touch,
+            // so its label and hint can change during a press without disturbing the press.
+            orbForVoiceOver(s, points)
+                .position(WalkOrb.centre)
 
             if showsPoints {
                 ForEach(points, id: \.at) { point in
@@ -55,8 +63,9 @@ struct WalkOrbView: View {
                         model.send(.point(point.at))
                     }
                     .position(WalkOrb.position(of: point.at))
-                    .transition(.scale(scale: 0.4).combined(with: .opacity)
-                        .animation(.timingCurve(0.2, 0.9, 0.3, 1.2, duration: 0.26)))
+                    .transition(reduceMotion ? .opacity
+                        : .scale(scale: 0.4).combined(with: .opacity)
+                            .animation(.timingCurve(0.2, 0.9, 0.3, 1.2, duration: 0.26)))
                 }
             }
         }
@@ -73,6 +82,45 @@ struct WalkOrbView: View {
             guard !down, pressStart != nil else { return }
             pressStart = nil
             if pressOnLight { model.send(.orbCancelled) }
+        }
+        .onChange(of: liveWords(s.orb)) { _, words in
+            // The live flag's words, spoken politely: after whatever VoiceOver is saying.
+            guard let words, !words.isEmpty else { return }
+            let announcement = NSAttributedString(string: words,
+                                                  attributes: [.accessibilitySpeechAnnouncementPriority: UIAccessibilityPriority.low])
+            UIAccessibility.post(notification: .announcement, argument: announcement)
+        }
+    }
+
+    // MARK: VoiceOver
+
+    /// The light as one button: a double-tap is a tap (it opens the points, or closes them),
+    /// and each compass point is one of its actions, so nothing needs a press and hold.
+    private func orbForVoiceOver(_ s: WalkState, _ points: [WalkCopy.Point]) -> some View {
+        Button {
+            model.send(.orbDown)
+            model.send(.orbUp(heldMs: 0))
+        } label: {
+            Color.clear
+                .frame(width: 2 * WalkOrb.touchRadius, height: 2 * WalkOrb.touchRadius)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .allowsHitTesting(false)
+        .accessibilityIdentifier("walk.orb")
+        .accessibilityLabel(WalkCopy.orbAccessibilityLabel(s))
+        .walkAccessibilityHint(WalkCopy.hint(s))
+        .accessibilityActions {
+            ForEach(points, id: \.at) { point in
+                Button(point.label) {
+                    // With the points out, choosing one is a tap on it, which also puts them away.
+                    if model.state.orb == .open {
+                        model.send(.point(point.at))
+                    } else {
+                        model.choose(point.action)
+                    }
+                }
+            }
         }
     }
 
@@ -151,11 +199,12 @@ struct WalkOrbView: View {
 
     /// The halo, the ripples while speaking, the body and its highlight; it breathes
     /// slowly at rest and quickly while held, and grows to 1.1 while held.
+    /// With Reduce Motion it holds still at the middle of a breath, with no ripples.
     private func light(active: Bool, speaking: Bool) -> some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: nil, paused: reduceMotion)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             let period = active ? 1.1 : 4.5
-            let breath = 0.5 - 0.5 * cos(2 * .pi * t / period)          // 0 → 1 → 0, ease in and out
+            let breath = reduceMotion ? 0.5 : 0.5 - 0.5 * cos(2 * .pi * t / period)      // 0 → 1 → 0, ease in and out
             ZStack {
                 Circle()
                     .fill(RadialGradient(stops: [.init(color: WalkPalette.haloInner.opacity(0.75), location: 0),
@@ -165,7 +214,7 @@ struct WalkOrbView: View {
                     .frame(width: 172, height: 172)
                     .scaleEffect(0.94 + 0.16 * breath)
                     .opacity(0.65 + 0.35 * breath)
-                if speaking {
+                if speaking && !reduceMotion {
                     ripple(t, delay: 0)
                     ripple(t, delay: 0.8)
                 }
@@ -301,7 +350,11 @@ struct WalkLiveFlag: View {
                 .frame(width: 3, height: 86)
                 .scaleEffect(x: 1, y: poleUp ? 1 : 0, anchor: .bottom)
                 .offset(x: -1.5)
+                .accessibilityHidden(true)
             cloth
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(text)
+                .accessibilityAddTraits(.updatesFrequently)
                 .scaleEffect(x: clothOut ? 1 : 0, y: 1, anchor: .leading)
                 .shadow(color: WalkPalette.warmGlow.opacity(0.9), radius: 5)
                 .offset(x: 2, y: 2)

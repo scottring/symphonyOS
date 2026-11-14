@@ -81,12 +81,14 @@ struct WalkPennant: Shape {
 
 /// One banner of any kind, at its layout frame's size in stage points. A banner
 /// that arrives after the scene is up drops in, as a flag being planted does.
+/// With Reduce Motion it does not flutter, and it fades in where it stands.
 struct WalkBannerView: View {
     let banner: WalkLayout.Banner
     /// The stage x of the post's pole; a small flag hangs from it.
     let poleX: CGFloat
     @State private var fluttering = false
     @State private var landed: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(banner: WalkLayout.Banner, poleX: CGFloat, dropsIn: Bool) {
         self.banner = banner
@@ -100,12 +102,12 @@ struct WalkBannerView: View {
         cloth
             .frame(width: banner.frame.width, height: banner.frame.height, alignment: .topLeading)
             .modifier(WalkFlutter(degrees: flutters && fluttering ? -2.5 : 0))
-            .modifier(WalkDropIn(progress: landed ? 1 : 0))
+            .modifier(WalkDropIn(progress: landed ? 1 : 0, still: reduceMotion))
             .onAppear {
                 if !landed {
-                    withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.7)) { landed = true }
+                    withAnimation(reduceMotion ? WalkSceneView.crossFade : .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.7)) { landed = true }
                 }
-                guard flutters else { return }
+                guard flutters, !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { fluttering = true }
             }
     }
@@ -260,8 +262,10 @@ struct WalkFlutter: GeometryEffect {
 }
 
 /// Planting: the flag drops in from above, overshoots a little and settles (contract §5).
+/// `still` (Reduce Motion): it only fades in.
 struct WalkDropIn: ViewModifier, Animatable {
     var progress: Double
+    var still = false
     nonisolated var animatableData: Double {
         get { progress }
         set { progress = newValue }
@@ -269,6 +273,7 @@ struct WalkDropIn: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         let p = min(max(progress, 0), 1)
+        if still { return content.opacity(p).scaleEffect(1).offset(y: 0) }
         let opacity: Double, y: Double, scale: Double
         if p < 0.7 {
             let t = p / 0.7

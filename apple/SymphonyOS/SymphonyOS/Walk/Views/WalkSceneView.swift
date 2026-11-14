@@ -14,8 +14,11 @@ struct WalkSceneView: View {
     let model: WalkModel
     /// Banners present when the scene first draws stand still; later ones drop in.
     @State private var arrived = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static let glide = Animation.timingCurve(0.45, 0.05, 0.2, 1, duration: 1.4)
+    /// With Reduce Motion the camera does not glide: the whole view cross-fades to its new framing.
+    static let crossFade = Animation.easeInOut(duration: 0.25)
 
     var body: some View {
         let layout = model.layout
@@ -25,13 +28,25 @@ struct WalkSceneView: View {
                                    .init(color: Color(hex: 0x0A2A7A), location: 0.6),
                                    .init(color: Color(hex: 0x142430), location: 1)],
                            startPoint: .top, endPoint: .bottom)
-            world(layout, art)
-                .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
+            Group {
+                if reduceMotion {
+                    // A new framing is a new view, faded in over the old one.
+                    world(layout, art)
+                        .id([layout.camera.x, layout.camera.y, layout.camera.k])
+                        .transition(.opacity)
+                } else {
+                    world(layout, art)
+                }
+            }
+            .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
+            .animation(reduceMotion ? Self.crossFade : nil, value: layout.camera)
             band
             words
+                .accessibilitySortPriority(1)       // read before the peaks and flags
         }
         .frame(width: art.stage.width, height: art.stage.height)
         .clipped()
+        .accessibilityElement(children: .contain)
         .onAppear { arrived = true }
     }
 
@@ -63,8 +78,9 @@ struct WalkSceneView: View {
                     .buttonStyle(.plain)
                     .allowsHitTesting(label.tappable)
                     .accessibilityLabel(label.name)
-                    .accessibilityHint(label.hint ?? "")
-                    .accessibilityAddTraits(label.kept || label.focused ? .isSelected : [])
+                    .walkAccessibilityHint(label.hint)
+                    .walkReadOnly(!label.tappable)
+                    .accessibilityAddTraits(label.selected ? .isSelected : [])
                     .walkPlaced(label.frame, camera)
             }
 
@@ -81,6 +97,7 @@ struct WalkSceneView: View {
                         .saturation(post.saturation)
                         .opacity(post.opacity)
                         .accessibilityLabel(banner.label)
+                        .walkReadOnly(!banner.taps)
                         .walkPlaced(banner.frame, camera)
                 }
             }
@@ -88,7 +105,7 @@ struct WalkSceneView: View {
         .frame(width: art.world.width, height: art.world.height, alignment: .topLeading)
         .scaleEffect(camera.k, anchor: .topLeading)
         .offset(x: -camera.x * camera.k, y: -camera.y * camera.k)
-        .animation(Self.glide, value: camera)
+        .animation(reduceMotion ? nil : Self.glide, value: camera)
     }
 
     private func tap(_ banner: WalkLayout.Banner, on post: WalkLayout.Post) {
@@ -174,14 +191,33 @@ struct WalkSceneView: View {
 }
 
 /// The words arrive: they fade in and rise 8 points, after a moment (`.wk-q`).
+/// With Reduce Motion they only fade in.
 struct WalkEntrance: ViewModifier {
     @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
             .opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : 8)
+            .offset(y: shown || reduceMotion ? 0 : 8)
             .onAppear { withAnimation(.easeOut(duration: 0.7).delay(0.5)) { shown = true } }
+    }
+}
+
+extension View {
+    /// A hint for VoiceOver only when there is one: an empty hint is no hint.
+    @ViewBuilder func walkAccessibilityHint(_ hint: String?) -> some View {
+        if let hint, !hint.isEmpty {
+            accessibilityHint(hint)
+        } else {
+            self
+        }
+    }
+
+    /// A control that does nothing on a tap here is read as text, not offered as a button.
+    func walkReadOnly(_ readOnly: Bool) -> some View {
+        accessibilityRemoveTraits(readOnly ? .isButton : [])
+            .accessibilityAddTraits(readOnly ? .isStaticText : [])
     }
 }
 

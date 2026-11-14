@@ -57,6 +57,7 @@ struct WalkHintRow: View {
                 }
                 .buttonStyle(.plain)
                 .fixedSize()
+                .accessibilityLabel(WalkCopy.undo)
             }
         }
     }
@@ -110,6 +111,7 @@ struct WalkHintRow: View {
         }
         .buttonStyle(.plain)
         .fixedSize()
+        .accessibilityLabel(label)          // drawn in capitals, read as written
     }
 
     // MARK: Type it
