@@ -121,6 +121,9 @@ enum DailyCopy {
     /// "Tomorrow: Choose the tile"
     static func tomorrow(_ title: String) -> String { "Tomorrow: \(title)" }
 
+    /// "November": the name of the month holding `d`.
+    static func monthName(_ d: Date) -> String { format(d, "LLLL") }
+
     /// "November ends on Monday"
     static func periodEnds(_ name: String, lastDay: Date) -> String { "\(name) ends on \(weekday(lastDay))" }
 
