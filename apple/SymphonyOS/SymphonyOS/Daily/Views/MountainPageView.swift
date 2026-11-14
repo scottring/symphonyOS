@@ -101,6 +101,8 @@ struct MountainPageView: View {
     @State private var areas: [WalkArea] = []
     @State private var position: WalkPosition?
     @State private var keyboardUp = false
+    /// The page's top-left on the screen, so the fold the screen reports is read in the page's space.
+    @State private var origin: CGPoint = .zero
     #if DEBUG
     @State private var demoStatesApplied = false
     #endif
@@ -117,9 +119,12 @@ struct MountainPageView: View {
             stage
                 .accessibilitySortPriority(4)
             scrim(m)
-            // Opened flat, the spread's four words, so the last ("Week and today") leads back to it.
+            // Opened flat, the spread's four words, so the last ("Week and today") leads back to it,
+            // split at the fold as the spread's are, so none crosses it.
             DailyNavRow(current: horizon, gap: m.navGap, words: DailySpread.navWords(on: layout),
-                        label: DailySpread.navLabel(on: layout), go: go)
+                        label: DailySpread.navLabel(on: layout),
+                        split: DailySpread.navSplit(on: layout, fold: DailyFold.reported(appState, origin: origin, size: size)),
+                        go: go)
                 .frame(width: size.width)
                 .offset(y: m.navTop)
                 .accessibilitySortPriority(6)
@@ -143,6 +148,7 @@ struct MountainPageView: View {
         .background(WalkPalette.ground)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("daily.mountain.\(horizon.rawValue)")
+        .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { origin = $0 }
         .onAppear { appear() }
         .onChange(of: flags) { _, flags in
             page?.read(flags, areas: areas, saved: position?.kept ?? [], savedAreas: position?.areas ?? [])

@@ -139,7 +139,7 @@ struct LightWeekView: View {
     // MARK: The sheet
 
     private func header(_ week: DailyWeek.Week, at frame: CGRect) -> some View {
-        DailyPageHeader(eyebrow: week.eyebrow, title: week.range, frame: frame)
+        DailyPageHeader(eyebrow: week.eyebrow, title: week.range, ringColumn: false, frame: frame)
     }
 
     /// The list scrolls in its own space from its top to the page's foot, and can be scrolled clear

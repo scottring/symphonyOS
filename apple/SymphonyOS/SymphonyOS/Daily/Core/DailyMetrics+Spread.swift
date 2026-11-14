@@ -89,6 +89,53 @@ struct DailySpread: Equatable {
     /// On the spread the first three words stand left of the fold and the last right of it, the
     /// gap between them on the fold, so no word sits across it.
     static let navLeft = 3
+
+    /// How the row of words splits on this window (`DailyNavRow.split`): opened flat, the first
+    /// `navLeft` words right-aligned to the fold and the rest from it, on every page there (the
+    /// spread, and Month, Season and Year); nil elsewhere, where the words stand centred.
+    static func navSplit(on layout: TodayLayout, fold: CGFloat) -> (at: CGFloat, after: Int)? {
+        layout == .journal ? (fold, navLeft) : nil
+    }
+
+    /// Where the pages meet on a window `width` wide, from the split the screen reports
+    /// (`HalfOpen.split`; nil: none): one farther than `spreadFoldRange` from the middle is not the
+    /// Duo opened flat, and is taken as the middle.
+    static func fold(_ reported: CGFloat?, width: CGFloat) -> CGFloat {
+        let middle = (width / 2).rounded()
+        return reported.flatMap { abs($0 - middle) <= DailyMetrics.spreadFoldRange ? $0 : nil } ?? middle
+    }
+
+    // MARK: The left page
+
+    /// The week the left page shows: the selected date's, exactly as the phone's Week page
+    /// follows `AppState.selectedDate`. The right page is always today.
+    static func weekStart(selected: Date) -> Date {
+        PlanCalendar.weekStart(selected)
+    }
+
+    /// What the left page shows of `week`: for the week holding today, "The rest of this week" and
+    /// the days after today (`DailyWeek.rest`), then the fold; for any other week, the heading the
+    /// Week page gives it ("Next week", …) and every day.
+    struct Left: Equatable {
+        let eyebrow: String
+        let range: String
+        let days: [DailyWeek.Day]
+        let past: DailyWeek.Past?
+    }
+
+    static func left(_ week: DailyWeek.Week, today: Date) -> Left {
+        let holdsToday = PlanCalendar.weekDays(week.start).contains { PlanCalendar.sameDay($0, today) }
+        return Left(eyebrow: holdsToday ? DailyCopy.restOfWeek : week.eyebrow, range: week.range,
+                    days: DailyWeek.rest(week), past: week.past)
+    }
+
+    /// The date a word in the row of words opens its page on, where this window decides it: opened
+    /// flat, the last word ("Week and today") brings the selected date back to today, so a left page
+    /// showing another week returns to this one. Nil: the Planner's own rule
+    /// (`WalkPeriods.switcherDate`).
+    static func navDate(_ horizon: Horizon, on layout: TodayLayout, today: Date) -> Date? {
+        layout == .journal && horizon == .week ? PlanCalendar.day(today) : nil
+    }
 }
 
 extension DailyMetrics {
@@ -101,8 +148,7 @@ extension DailyMetrics {
     /// under the row of words, and goes if its plank would then meet the sheet.
     static func spread(size: CGSize, safeTop: CGFloat, safeBottom: CGFloat, fold: CGFloat?,
                        waiting: Bool = false) -> DailySpread {
-        let middle = (size.width / 2).rounded()
-        let f = fold.flatMap { abs($0 - middle) <= spreadFoldRange ? $0 : nil } ?? middle
+        let f = DailySpread.fold(fold, width: size.width)
         let navTop = safeTop
         let width = size.width
 

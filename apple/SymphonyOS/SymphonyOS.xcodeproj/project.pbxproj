@@ -64,6 +64,7 @@
 		35F21F6A8EF1704BD98B3FF5 /* Routine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3E9139010E51C7040394A0 /* Routine.swift */; };
 		362B11DE188D47915394215C /* AccountDeletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48DEE8D67C715E1A3A6D4F5 /* AccountDeletionTests.swift */; };
 		3641A8E852B7D7F7979163DC /* HingeReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B6B9CC39AA73C9E5C18E58A /* HingeReader.swift */; };
+		36468B278B817405B2CC24EF /* LightSpreadUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD94E09AB9B75AC2DC251E35 /* LightSpreadUITests.swift */; };
 		37D5E7D0D96BDC30C23984C2 /* DailyModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EEAD798BB3703D90FF1A7FF /* DailyModelTests.swift */; };
 		386379CF5A08540EE1B036D4 /* CarriedOverUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */; };
 		38A50C4687C8342D2B6F0DE0 /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B89F2EB3CAD8F9EF5A476A8 /* Contact.swift */; };
@@ -231,6 +232,7 @@
 		DC508038463D97A603EAE64A /* LightHalfOpenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE72A0AF34318CB9DD73D915 /* LightHalfOpenView.swift */; };
 		DDE8C94DBDC1189E1D3C66B0 /* TaskAttachmentsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC121327DD5EAA34D4F0F0CA /* TaskAttachmentsSection.swift */; };
 		DE263911995624CC151A0039 /* DailyNavRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0682017A511AD69FB19A969B /* DailyNavRow.swift */; };
+		E0500F469D59813CC96582AC /* DailySpreadPinned.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183C1F7296D4AD7FEE25F068 /* DailySpreadPinned.swift */; };
 		E0B9D195877BF64C575CC6B0 /* CardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C9B2674A0AE5DFA973DAF0 /* CardStyle.swift */; };
 		E24EA588A32B70D1CC9CAE96 /* MountainPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74D46EFFA138731D79B29998 /* MountainPageTests.swift */; };
 		E277EAFC489C2030937E9E4B /* DailyHandoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C53670A5CE6F1FEB0B691E /* DailyHandoverTests.swift */; };
@@ -331,6 +333,7 @@
 		15D4A6D0E39EF42BBDAF92B3 /* WalkState+Plant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WalkState+Plant.swift"; sourceTree = "<group>"; };
 		169FC19A952F954EECF671DF /* DayGlanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayGlanceTests.swift; sourceTree = "<group>"; };
 		1819AEB94BF4C55147945909 /* SymphonyWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyWidgets.swift; sourceTree = "<group>"; };
+		183C1F7296D4AD7FEE25F068 /* DailySpreadPinned.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailySpreadPinned.swift; sourceTree = "<group>"; };
 		187DEF77B7597EB968E30562 /* PeriodPlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodPlanView.swift; sourceTree = "<group>"; };
 		191780CDF86B2023BD7D3525 /* DailyAdd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAdd.swift; sourceTree = "<group>"; };
 		1A3E9139010E51C7040394A0 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
@@ -524,6 +527,7 @@
 		CBBB488F79A3F4EA90C13F96 /* WalkLoad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkLoad.swift; sourceTree = "<group>"; };
 		CBF0FC1CF6088ADE5D739EB5 /* EventNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventNote.swift; sourceTree = "<group>"; };
 		CCA7DCDE1B3C18FAAD465BDB /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		CD94E09AB9B75AC2DC251E35 /* LightSpreadUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightSpreadUITests.swift; sourceTree = "<group>"; };
 		CE8500148F5BD97291AF8393 /* LightPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightPlannerView.swift; sourceTree = "<group>"; };
 		CF475C4AF30EC00DCE982A8C /* ActionableInstance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionableInstance.swift; sourceTree = "<group>"; };
 		D1383EE5C83DE0489DE695E0 /* RoutineOccurrenceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineOccurrenceSheet.swift; sourceTree = "<group>"; };
@@ -895,6 +899,7 @@
 				721AEC455BE4ADC539A2F13C /* DailyPalette.swift */,
 				30B0FDFB0075F54C25F0A9F7 /* DailyRows.swift */,
 				51C827470C2D3F7299DD2706 /* DailySheet.swift */,
+				183C1F7296D4AD7FEE25F068 /* DailySpreadPinned.swift */,
 				91E7DB757E79521EF9D28609 /* DailyWeekList.swift */,
 				9D4A57FB94C4F9D058A7654B /* HandoverLight.swift */,
 				BE72A0AF34318CB9DD73D915 /* LightHalfOpenView.swift */,
@@ -1158,6 +1163,7 @@
 			children = (
 				0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */,
 				E8E81530D37318E5E8C758EA /* LightEditionUITests.swift */,
+				CD94E09AB9B75AC2DC251E35 /* LightSpreadUITests.swift */,
 				3DAE563BB5ACD767A6B02809 /* PlannerScreensUITests.swift */,
 				6F4404B5A49F9ACA4F69DEFA /* SkinScreenshotsUITests.swift */,
 				718E56D8B02093D599728E35 /* SymphonyOSUITests.swift */,
@@ -1479,6 +1485,7 @@
 				E39B1F05A5721F697FC92147 /* DailyPalette.swift in Sources */,
 				5B071DA5B5EE6E15078973ED /* DailyRows.swift in Sources */,
 				D4C14729B9966599A6A23CC1 /* DailySheet.swift in Sources */,
+				E0500F469D59813CC96582AC /* DailySpreadPinned.swift in Sources */,
 				FA314B5C8A1C6D9BC925963A /* DailyTentPage.swift in Sources */,
 				9DB8451476C58CE43F275F05 /* DailyTodayPage.swift in Sources */,
 				5C6FD5D0A1E5526059625ACA /* DailyWalkDown.swift in Sources */,
@@ -1621,6 +1628,7 @@
 			files = (
 				386379CF5A08540EE1B036D4 /* CarriedOverUITests.swift in Sources */,
 				4368E0DCEC662C3E25FA39DE /* LightEditionUITests.swift in Sources */,
+				36468B278B817405B2CC24EF /* LightSpreadUITests.swift in Sources */,
 				4DE34ED9DDD20F324D83BFBB /* PlannerScreensUITests.swift in Sources */,
 				6AFA1C9974CFBC759404624E /* SkinScreenshotsUITests.swift in Sources */,
 				B243747A711245915530C319 /* SymphonyOSUITests.swift in Sources */,

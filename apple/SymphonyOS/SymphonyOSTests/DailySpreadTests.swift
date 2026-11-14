@@ -203,6 +203,74 @@ extension DailyMetricsTests {
     }
 }
 
+extension DailyMetricsTests {
+    // MARK: Fix round 1
+
+    /// Opened flat, the row of words splits at the fold on every page (the spread, and Month,
+    /// Season and Year): the first three words end at the fold, "Week and today" starts there, so
+    /// none crosses it, for folds a little off centre as for the board's. Elsewhere the words stand centred.
+    @Test func theRowOfWordsSplitsAtTheFoldOnEveryPageOpenedFlat() throws {
+        for reported in stride(from: CGFloat(435), through: 455, by: 1) {
+            let fold = DailySpread.fold(reported, width: 890)
+            #expect(fold == reported)
+            let split = try #require(DailySpread.navSplit(on: .journal, fold: fold))
+            #expect(split.at == fold && split.after == 3)
+            let words = DailySpread.navWords(on: .journal)
+            #expect(Array(words.prefix(split.after)) == [.year, .season, .month])
+            #expect(Array(words.dropFirst(split.after)) == [.week])
+            // The spread's own fold is the same one.
+            #expect(spread(fold: reported).fold == fold)
+        }
+        #expect(DailySpread.fold(nil, width: 890) == 445)
+        #expect(DailySpread.fold(300, width: 890) == 445)
+        for l in [TodayLayout.oneColumn, .glance, .glanceWide, .dayPage] {
+            #expect(DailySpread.navSplit(on: l, fold: 445) == nil)
+        }
+    }
+
+    /// The left page follows the week of the selected date, as the phone's Week page does; the right
+    /// page is always today. On the week's last day "That's the day" (`Signpost` target
+    /// `.week(tomorrow)`) opens next week on the left page; the last word brings it back to today.
+    @Test func theLeftPageFollowsTheSelectedWeek() {
+        func day(_ m: Int, _ d: Int) -> Date { PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: m, day: d))! }
+        func left(selected: Date, today: Date) -> DailySpread.Left {
+            let start = DailySpread.weekStart(selected: selected)
+            let week = DailyWeek.make(tasks: [], goals: [], commitments: [], focus: [], events: { _ in [] },
+                                      weekStart: start, today: today, me: UUID())
+            return DailySpread.left(week, today: today)
+        }
+
+        // This week: the rest of it, after today.
+        let tuesday = day(11, 10)
+        let thisWeek = PlanCalendar.weekDays(PlanCalendar.weekStart(tuesday))
+        let now = left(selected: tuesday, today: tuesday)
+        #expect(now.eyebrow == DailyCopy.restOfWeek)
+        #expect(now.range == DailyCopy.weekRange(PlanCalendar.weekStart(tuesday)))
+        #expect(now.days.compactMap(\.date) == thisWeek.filter { $0 > tuesday })
+
+        // The week's last day, the sign followed to tomorrow: next week, every day, as Week heads it.
+        let last = thisWeek.last!
+        let tomorrow = PlanCalendar.addDays(last, 1)
+        let next = left(selected: tomorrow, today: last)
+        let nextStart = PlanCalendar.weekStart(tomorrow)
+        #expect(nextStart > last)
+        #expect(next.eyebrow == DailyCopy.weekEyebrow(nextStart, today: last))
+        #expect(next.range == DailyCopy.weekRange(nextStart))
+        #expect(next.days.compactMap(\.date) == PlanCalendar.weekDays(nextStart))
+        #expect(next.past == nil)
+        // The right page stays on today whatever is selected: it is read for `model.today` only.
+
+        // "Week and today" brings the selected date back to today, and with it this week.
+        let back = DailySpread.navDate(.week, on: .journal, today: last)
+        #expect(back == PlanCalendar.day(last))
+        #expect(DailySpread.weekStart(selected: back!) == PlanCalendar.weekStart(last))
+        #expect(left(selected: back!, today: last).eyebrow == DailyCopy.restOfWeek)
+        // Only the last word, only opened flat.
+        for h in [Horizon.year, .season, .month, .today] { #expect(DailySpread.navDate(h, on: .journal, today: last) == nil) }
+        #expect(DailySpread.navDate(.week, on: .oneColumn, today: last) == nil)
+    }
+}
+
 extension DailyGateTests {
     /// Opened flat (Task 18, pre-flight finding 3): every horizon a light household can reach on this
     /// window is drawn light, so the dock is never hidden over a full page: Today and Week as the

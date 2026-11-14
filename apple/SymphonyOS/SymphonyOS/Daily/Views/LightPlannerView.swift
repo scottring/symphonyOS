@@ -183,6 +183,8 @@ struct LightPlannerView<Full: View>: View {
 
     /// A word in the row of words: the date the walk's period for it opens on, then the page.
     private func go(_ horizon: Horizon) {
+        // Opened flat, "Week and today" brings the selected date back to today (`DailySpread.navDate`).
+        if let today = DailySpread.navDate(horizon, on: layout, today: DailyClock.now()) { return open(horizon, today) }
         if let date = WalkPeriods.switcherDate(for: horizon, viewing: appState.horizon, edition: appState.edition,
                                                now: DailyClock.now(), seasons: seasons) {
             appState.selectedDate = date

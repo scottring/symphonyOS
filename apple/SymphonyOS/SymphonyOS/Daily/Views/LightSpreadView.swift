@@ -6,8 +6,10 @@ import SwiftData
 /// One band of the mountain across both pages with the row of words (Year · Season · Month ·
 /// "Week and today"), the signpost over the right page and up to two of this month's goals as
 /// flags over the left; one sheet across both, with a soft shade down the fold. The left page is
-/// the rest of this week (`DailyWeek.rest`), then the days behind folded to one line: a task's
-/// circle ticks it, a tap on its words chooses it and the Move to panel stands over the left page.
+/// the week of the selected date, as the phone's Week page (`DailySpread.left`: for this week the
+/// rest of it, after today, then the days behind folded to one line); the right page is always
+/// today. On the left page a task's circle ticks it, a tap on its words chooses it and the Move to
+/// panel stands over the left page.
 /// The right page is Today as on the phone (the date and the ring, the next event, today's rows)
 /// with the one bar: More at the left page's foot, Inbox at the right's. One model for both pages
 /// (the Planner's): one bar, one Undo, one listening state. Everything it shows is read by
@@ -51,21 +53,21 @@ struct LightSpreadView: View {
     @State private var demoStatesApplied = false
     #endif
 
-    /// The left page is always this week, the one holding today.
-    private var weekStart: Date { PlanCalendar.weekStart(model.today) }
+    /// The left page's week: the selected date's, as the phone's Week page follows it.
+    private var weekStart: Date { DailySpread.weekStart(selected: appState.selectedDate) }
 
     var body: some View {
         // Read again each minute, so an event that has started gives way to the next.
         TimelineView(.everyMinute) { _ in
             let page = read(now: DailyClock.now())
             let week = readWeek()
-            let line = walkLine
+            let line = DailyTodayHooks.walkLine(walkPosition, goalCount: goals.count, edition: appState.edition)
             let s = metrics(waiting: line != nil)
             ZStack(alignment: .topLeading) {
                 DailyBand(picture: s.picture, height: s.band.height)
                 DailyTopShade(solid: s.shadeSolid, height: s.shade)
                 DailyNavRow(current: .week, gap: s.navGap, words: DailySpread.navWords(on: layout),
-                            label: DailySpread.navLabel(on: layout), split: (at: s.fold, after: DailySpread.navLeft),
+                            label: DailySpread.navLabel(on: layout), split: DailySpread.navSplit(on: layout, fold: s.fold),
                             go: go)
                     .frame(width: size.width)
                     .offset(y: s.navTop)
@@ -109,20 +111,17 @@ struct LightSpreadView: View {
         .sheet(item: $opened) { item in OpenedItemSheet(item: item, date: model.today, userId: userId) }
         .task(id: calendar.readKey(for: model.today)) { await calendar.refresh(model.today, maxAge: 60) }
         .task(id: calendar.readKey(for: weekStart)) { await calendar.refreshWeek(weekStart) }
-        .onAppear {
-            model.page = .today         // the one bar adds to today, as Today's does
-            readWalk()
-            answerTell()
-            startHandover()
-        }
+        // The bar adds to today; the stored walk is read, and a Tell from outside makes the one bar
+        // listen (never the old sheet), as on Today; then the handover, if a walk just ended here.
+        .modifier(DailyTodayHooks(model: model, userId: userId, walkPosition: $walkPosition, goalCount: goals.count,
+                                  tellTaken: { opened = nil }, appeared: startHandover))
         // An ordinary walk just finished onto this page (`DailyHandover.plays`): the bar's light takes the halo.
         .onChange(of: appState.handover) { _, _ in startHandover() }
-        // The Lock Screen's Tell Symphony control or a `symphony://tell` link: the one bar listens, no sheet;
-        // asked for while the walk shows, it is answered as the walk closes.
-        .onChange(of: appState.tellRequested) { _, _ in answerTell() }
-        .onChange(of: appState.walkShowing) { _, _ in answerTell() }
-        .onChange(of: appState.walkPaused) { _, _ in readWalk() }
-        .onChange(of: goals.count) { _, _ in readWalk() }
+        // Another week on the left page: nothing chosen or unfolded carries over from the last one.
+        .onChange(of: weekStart) { _, _ in
+            chosen = nil
+            unfolded = false
+        }
     }
 
     // MARK: Reading
@@ -146,37 +145,22 @@ struct LightSpreadView: View {
                             pulledUp: model.pulledUp)
     }
 
-    private var walkLine: DailyGate.WalkLine? {
-        #if DEBUG
-        if DemoMode.isOn, DemoMode.dailyStates.contains("waiting") { return .waiting }
-        #endif
-        return DailyGate.walkLine(walkPosition, goalCount: goals.count, edition: appState.edition)
-    }
-
-    /// Where the walk is saved, as the main view reads it (the demo keeps its own store).
-    private var walkStore: WalkPositionStore {
-        #if DEBUG
-        if DemoMode.isOn { return DemoMode.walkStore }
-        #endif
-        return WalkPositionStore()
-    }
-
-    private func readWalk() { walkPosition = walkStore.load(for: userId) }
-
     /// The spread on this window, the pages meeting where the screen reports its fold.
     private func metrics(waiting: Bool) -> DailySpread {
-        let fold = HalfOpen.split(fold: appState.dockLayout.fold, origin: origin, size: size, across: false)
+        let fold = DailyFold.reported(appState, origin: origin, size: size)
         return DailyMetrics.spread(size: size, safeTop: safeTop, safeBottom: safeBottom, fold: fold, waiting: waiting)
     }
 
     // MARK: The pages
 
-    /// The left page: "The rest of this week" over the range, then the days after today and Any day,
-    /// then the days behind folded to one line.
+    /// The left page (`DailySpread.left`): for this week "The rest of this week" over the range, the
+    /// days after today and Any day, then the days behind folded to one line; for another week the
+    /// Week page's heading and every day.
     private func leftPage(_ week: DailyWeek.Week, _ s: DailySpread) -> some View {
-        ZStack(alignment: .topLeading) {
-            DailyPageHeader(eyebrow: DailyCopy.restOfWeek, title: week.range, frame: s.weekHeaderFrame)
-            DailyWeekList(model: model, weekStart: weekStart, days: DailyWeek.rest(week), past: week.past,
+        let left = DailySpread.left(week, today: model.today)
+        return ZStack(alignment: .topLeading) {
+            DailyPageHeader(eyebrow: left.eyebrow, title: left.range, ringColumn: false, frame: s.weekHeaderFrame)
+            DailyWeekList(model: model, weekStart: weekStart, days: left.days, past: left.past,
                           look: .spread, frame: s.weekScroll, inset: DailyMetrics.spreadHalo, rowHeight: s.weekRow,
                           rowGap: 0, clearOf: s.bar.fade.minY, panelTop: panelTop,
                           chosen: $chosen, unfolded: $unfolded)
@@ -231,12 +215,6 @@ struct LightSpreadView: View {
                           walkPosition: walkPosition, seasons: seasons, userId: userId, open: open).follow(sign)
     }
 
-    /// Tell asked for from outside, as the model answers it (`DailyGate.tell`): the one bar listens,
-    /// visibly; once taken, a row's Details over the page closes too, so the listening bar is seen.
-    private func answerTell() {
-        if model.answerTell(appState) { opened = nil }
-    }
-
     /// The handover, as `DailyHandover.play` decides it on this window: the light does not travel
     /// here (`DailyHandover.travels`), so the bar's light takes the halo and the line shows the
     /// first time; with a sheet over the page nothing plays (and the line is not spent).
@@ -253,7 +231,7 @@ struct LightSpreadView: View {
     }
 
     /// Anything over the page that hides the bar: Inbox, More, a row's details, the half-open display.
-    private var sheetOver: Bool { opened != nil || appState.dailyPanel != nil || appState.posture.isHalfOpen }
+    private var sheetOver: Bool { DailyTodayHooks.sheetOver(detailsOpen: opened != nil, appState) }
 
     #if DEBUG
     /// The demo's states, as on Today and Week: `point`, `speak`, `undo`, `more`, `inbox`, `handover`
@@ -268,7 +246,7 @@ struct LightSpreadView: View {
         if states.contains("unfold") { unfolded = true }
         if DemoMode.handoverHold != nil { model.handoverArrived() }
         let rest = DailyWeek.Week(start: week.start, eyebrow: week.eyebrow, range: week.range, past: week.past,
-                                  days: DailyWeek.rest(week))
+                                  days: DailySpread.left(week, today: model.today).days)
         if states.contains("select"), let pick = DemoMode.weekChoice(rest) {
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(600))
