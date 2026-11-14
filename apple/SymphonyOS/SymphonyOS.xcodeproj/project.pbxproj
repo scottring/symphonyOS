@@ -171,6 +171,7 @@
 		BD1C632779C103B02CA58E49 /* PlanSelectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E9788163FF0C909D5FD21E /* PlanSelectors.swift */; };
 		BD3079E109CD5F885473EFC7 /* PlanCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAEC2212D6BF83452FC75F4B /* PlanCalendar.swift */; };
 		BD782E62D9ADFC3814E41900 /* MonthlyPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 217B2A6BEE77F0C6CE19306F /* MonthlyPositionTests.swift */; };
+		BDFDF4A88723C140479BD494 /* DailyWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5C11E5DD5788D8642159D64 /* DailyWriter.swift */; };
 		BF10BB1DF753FAED453DB947 /* NextUpActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F97EA2155A9D1F178034EBAB /* NextUpActivity.swift */; };
 		BF88A69DE3576ADBEA6AC909 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A8120C9CE4FA0B9EF5ED68 /* InboxView.swift */; };
 		BFF8FD46589AB3670A904D01 /* WalkState+Plant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D4A6D0E39EF42BBDAF92B3 /* WalkState+Plant.swift */; };
@@ -222,6 +223,7 @@
 		F6867823613D7C736CEE671D /* RoutineOccurrenceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1383EE5C83DE0489DE695E0 /* RoutineOccurrenceSheet.swift */; };
 		F886798113D26346BE9A08B3 /* AppleCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D38EDCE2DD84715A97BA245 /* AppleCalendar.swift */; };
 		F90FEBB07169AAE26DA4DC6F /* TimelineEnrichmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E6747A78170172B1525262 /* TimelineEnrichmentTests.swift */; };
+		F973FA9C0CAC0DEE2A9479E9 /* DailyWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46E90F5C80823E0A3861209B /* DailyWriterTests.swift */; };
 		F9A19E455568DEDDF7B3CCCA /* NotesHTMLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B165E6B770010DB9EC2731C /* NotesHTMLTests.swift */; };
 		F9EB7BF519EDB9C1BC2FAC56 /* CrimsonPro-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2A262D445DAE6081A4A96C82 /* CrimsonPro-SemiBold.ttf */; };
 		FAFD767BFF267AA59D716420 /* DinnerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FCECAA1BF7A02A85614C2D0 /* DinnerService.swift */; };
@@ -332,6 +334,7 @@
 		3E40DA63B5495F9F9971B614 /* CrimsonPro-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CrimsonPro-Italic.ttf"; sourceTree = "<group>"; };
 		3FCECAA1BF7A02A85614C2D0 /* DinnerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DinnerService.swift; sourceTree = "<group>"; };
 		4639DAB84CA71AE3E1BF1431 /* ChooserSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChooserSheet.swift; sourceTree = "<group>"; };
+		46E90F5C80823E0A3861209B /* DailyWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyWriterTests.swift; sourceTree = "<group>"; };
 		47467C50B3938A1EF1D27023 /* walk-tick.PLACEHOLDER.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "walk-tick.PLACEHOLDER.wav"; sourceTree = "<group>"; };
 		47BBD0F267EDEE37831CD019 /* DocumentScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentScanner.swift; sourceTree = "<group>"; };
 		4990741A74AC21CB7B92A74A /* SymphonyTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyTask.swift; sourceTree = "<group>"; };
@@ -425,6 +428,7 @@
 		B51C0BB869FEE85FEC50B9ED /* WalkArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkArt.swift; sourceTree = "<group>"; };
 		B5319C584A439CFC6C34F0EC /* WalkStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkStage.swift; sourceTree = "<group>"; };
 		B55EEBF75CF09F5235D227D4 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
+		B5C11E5DD5788D8642159D64 /* DailyWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyWriter.swift; sourceTree = "<group>"; };
 		B5F58C1D241835418FB0DB47 /* TimelineRevision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineRevision.swift; sourceTree = "<group>"; };
 		B78D16284B67024E3C00F636 /* TodayLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayLayout.swift; sourceTree = "<group>"; };
 		B9226E1CF4B413ACEF22DDCA /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
@@ -510,6 +514,7 @@
 			isa = PBXGroup;
 			children = (
 				253F923C92C9A14C494A1E15 /* Core */,
+				9CE079CEC93F1798892317D1 /* Data */,
 			);
 			path = Daily;
 			sourceTree = "<group>";
@@ -831,6 +836,14 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		9CE079CEC93F1798892317D1 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				B5C11E5DD5788D8642159D64 /* DailyWriter.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
 		A08820DD317B79610F544428 /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
@@ -892,6 +905,7 @@
 				D7978C63C97BAA9E1FC41791 /* DailyDayTests.swift */,
 				39CC4B0224C6FC309282FD25 /* DailyGateTests.swift */,
 				5E4FEA0962AF770E825ED7D9 /* DailyWeekTests.swift */,
+				46E90F5C80823E0A3861209B /* DailyWriterTests.swift */,
 				169FC19A952F954EECF671DF /* DayGlanceTests.swift */,
 				056F5BF746D2B10ED8954A53 /* DayScaleTests.swift */,
 				FDA21FA32A236A44EDB99EE6 /* DesignSystemTests.swift */,
@@ -1243,6 +1257,7 @@
 				EEF38F323061F5AA94B025CF /* DailyDayTests.swift in Sources */,
 				08FAC3B23154783D2E60D88E /* DailyGateTests.swift in Sources */,
 				00C9BECD6FC4AD842F6FFDB5 /* DailyWeekTests.swift in Sources */,
+				F973FA9C0CAC0DEE2A9479E9 /* DailyWriterTests.swift in Sources */,
 				9AF8FDD2B1C9DBB74ABCE747 /* DayGlanceTests.swift in Sources */,
 				9629B1BFE3138DBA463C6A9C /* DayScaleTests.swift in Sources */,
 				6FA7A8C0F8DCA3F3F9D2293F /* DesignSystemTests.swift in Sources */,
@@ -1325,6 +1340,7 @@
 				FDDCF7DABEBF1BCA94649B26 /* DailyDay.swift in Sources */,
 				1A8460DBC609E73C9821B013 /* DailyGate.swift in Sources */,
 				8B9B944F2BE32DF4693C843E /* DailyWeek.swift in Sources */,
+				BDFDF4A88723C140479BD494 /* DailyWriter.swift in Sources */,
 				1A4329534E810EBF6BF16103 /* Date+Extensions.swift in Sources */,
 				53CDAD91081EB2442A2A0010 /* DateNavigator.swift in Sources */,
 				4E48550B7C5BA7A5FDA362F5 /* DayScale.swift in Sources */,
