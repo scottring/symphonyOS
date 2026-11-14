@@ -428,14 +428,14 @@ struct WalkOrbTests {
         #expect(s.orb == .speaking(live: ""))
     }
 
-    /// This one time a tap on the light types (the lesson's second line says so); after it, a tap opens the points.
-    @Test func aTapOnTheLightPutsTheLessonAwayAndTypes() {
+    /// During the lesson a tap on the light only puts it away, as a tap anywhere does: no typing,
+    /// no choices. After it, a tap opens the other choices (the light means one thing: hold to speak).
+    @Test func aTapOnTheLightOnlyPutsTheLessonAway() {
         var s = onTheGround()
         _ = s.act(.next, env)
         _ = s.apply(.orbDown, env)
         _ = s.apply(.orbUp(heldMs: 80), env)
-        #expect(!s.teaching && s.typing == "" && s.orb == .idle)
-        _ = s.apply(.typeDismissed, env)
+        #expect(!s.teaching && s.typing == nil && s.orb == .idle)
         _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
         #expect(s.orb == .open && s.typing == nil)
     }
@@ -492,8 +492,13 @@ struct WalkOrbTests {
         _ = s.act(.next, env)
         #expect(s.teaching)
         #expect(WalkCopy.teaching(s) == [WalkCopy.teachSpeechOff])
+        // The tap that puts the lesson away does only that; the next tap types, as it always does with speech off.
         _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
-        #expect(!s.teaching && s.typing == "")
+        #expect(!s.teaching && s.typing == nil)
+        _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
+        #expect(s.typing == "")
+        #expect(s.lightSymbol == "keyboard")
+        #expect(WalkCopy.hint({ var t = s; t.typing = nil; return t }()) == "Tap the light and type.")
     }
 
     /// What the light carries: a microphone at rest, a keyboard once speech is off, a walking figure
@@ -509,6 +514,24 @@ struct WalkOrbTests {
         #expect(s.lightSymbol == "keyboard")
         #expect(WalkState().lightSymbol == "figure.walk")      // Welcome: the light is the quick start
         #expect(state(step: 6).lightSymbol == nil)
+        var ground = state(step: 1); ground.ground = true
+        #expect(ground.lightSymbol == nil)                     // the ground: quiet until the light is taught
+        ground.speechIsOff = true
+        #expect(ground.lightSymbol == nil)
+    }
+
+    /// On Welcome a slide let go where there is no choice leaves the choices as they are: it does not begin the quick start.
+    @Test func onWelcomeASlideToNothingChoosesNothing() {
+        var s = WalkState()
+        _ = s.apply(.orbDown, env)
+        _ = s.apply(.orbMoved(polar(90, 100)), env)           // straight down: no choice there
+        #expect(s.orb == .holding(hover: nil))
+        let up = s.apply(.orbUp(heldMs: 900), env)
+        #expect(up == [.timer(.hold, ms: nil)])
+        #expect(s.step == 0 && s.orb == .idle && s.showsPoints && !s.ended)
+        // The next tap on the light still begins it.
+        _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
+        #expect(s.step == 1 && s.depth == .quick)
     }
 
     @Test func onWelcomeAHoldNeverSpeaks() {

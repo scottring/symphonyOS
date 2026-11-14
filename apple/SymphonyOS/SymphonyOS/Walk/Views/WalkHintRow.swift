@@ -104,8 +104,10 @@ struct WalkHintRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(line.detail.map { "\(line.text). \($0)" } ?? line.text)
+        .accessibilityLabel(line.text)
         .accessibilityIdentifier("walk.next")
+        // On Welcome the light itself reads the quick start (`WalkCopy.orbLabelWelcome`): the line is not read twice.
+        .accessibilityHidden(model.state.step == 0)
     }
 
     /// "More": the other choices, as a tap on the light opens them. Words and a symbol, no box.

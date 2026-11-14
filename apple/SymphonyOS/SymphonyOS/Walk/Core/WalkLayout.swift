@@ -88,14 +88,15 @@ struct WalkLayout: Equatable {
         made.undoPill = undoFrame(state)
         made.lesson = teachFrame(state)
         made.more = moreFrame(state)
+        if state.step >= 6 { made = headings(made) }
         return made
     }
 
     /// Looking back up: how many lines (one or two) a one-line flag's words take at its width, leaving
-    /// room for a "+n more" (11 pt, by estimate).
-    static func compactLines(for text: String, width: CGFloat) -> Int {
+    /// room for a "+n more" when it carries one (11 pt, by estimate).
+    static func compactLines(for text: String, width: CGFloat, carriesMore: Bool) -> Int {
         let perLine = max(1, floor((width - 12) / 5.9))
-        return CGFloat(text.count + 8) <= perLine ? 1 : 2
+        return CGFloat(text.count + (carriesMore ? 8 : 0)) <= perLine ? 1 : 2
     }
 
     /// How many lines a title takes at a banner width: a character estimate, so the core needs no fonts.
@@ -873,7 +874,7 @@ private struct Builder {
             } else if lookBack {
                 // Look back up: the newest, carrying the count of the others.
                 banners = stack(id, lvl, base: base, ghosts: [], reals: Array(reals.prefix(1)), ceiling: postCeiling,
-                                hard: nil, scale: scale, moreOnTop: true, avoid: stubs)
+                                hard: nil, scale: scale, moreOnTop: true, avoid: stubs, carriesMore: reals.count > 1)
                 if reals.count > 1, let last = banners.indices.last { banners[last] = carrying(banners[last], more: reals.count - 1) }
             } else {
                 let ghostEntries = ghostHere ? ghosts.map { text in
@@ -1044,9 +1045,9 @@ private struct Builder {
     /// stands alone, and otherwise a stub takes its place.
     func stack(_ id: String, _ lvl: WalkLevel, base: CGPoint, ghosts: [Entry], reals: [Entry],
                ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool, own: Bool = false,
-               avoid: [CGRect] = []) -> [L.Banner] {
+               avoid: [CGRect] = [], carriesMore: Bool = false) -> [L.Banner] {
         let plain = flagsThenExamples(id, lvl, base: base, ghosts: ghosts, reals: reals, ceiling: ceiling, hard: hard,
-                                      scale: scale, moreOnTop: moreOnTop, own: own, avoid: avoid)
+                                      scale: scale, moreOnTop: moreOnTop, own: own, avoid: avoid, carriesMore: carriesMore)
         guard !ghosts.isEmpty, !plain.contains(where: { $0.kind == .ghost }) else { return plain }
         // Examples are on but none found room: the person's flags fold to their newest, then give way,
         // in this order, until the first example fits. Nothing covers a risen flag or crosses the question.
@@ -1100,7 +1101,7 @@ private struct Builder {
     /// The flags as `stack` describes them, then the examples in the room left.
     func flagsThenExamples(_ id: String, _ lvl: WalkLevel, base: CGPoint, ghosts: [Entry], reals: [Entry],
                            ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool, own: Bool,
-                           avoid: [CGRect]) -> [L.Banner] {
+                           avoid: [CGRect], carriesMore: Bool = false) -> [L.Banner] {
         var placed: [L.Banner] = []
         let gapY = (reals.first?.kind == .tip ? 3 : 4) * scale
         let stubRoom = moreOnTop ? 0 : gapY + 20 * scale
@@ -1123,7 +1124,9 @@ private struct Builder {
         // Looking back up, a post's one shown flag may take two lines (its words and any "+n more").
         let twoOnLookBack = s.step >= 6 && reals.count == 1
         func naturalLines(_ e: Entry) -> Int {
-            if e.kind == .compact, twoOnLookBack { return WalkLayout.compactLines(for: e.text, width: width(.compact)) }
+            if e.kind == .compact, twoOnLookBack {
+                return WalkLayout.compactLines(for: e.text, width: width(.compact), carriesMore: carriesMore)
+            }
             return e.kind == .full || e.kind == .ghost ? WalkLayout.lines(for: e.text, width: bw) : 1
         }
         func h(_ e: Entry, _ lines: Int) -> CGFloat { height(e.kind, lines: lines, tag: e.tag) * (e.kind == .tip ? scale : 1) }
@@ -1139,10 +1142,20 @@ private struct Builder {
             }
             var lines = naturalLines(e)
             // Two lines on Look back up: lower on the pole (down to its base) if that keeps it under the
-            // ceiling; otherwise one line, as before.
-            if lines == 2, e.kind == .compact, twoOnLookBack, !fits(2) {
-                let lowered = min(base.y, max(b, ceiling + h(e, 2)))
-                if lowered - h(e, 2) >= ceiling - L.fitTolerance { b = lowered } else { lines = 1 }
+            // ceiling and off its column's peak label where that label stands; otherwise one line, as before.
+            if lines == 2, e.kind == .compact, twoOnLookBack {
+                // A second line never reaches onto a peak's label (its own or a neighbour's, on a crowded ridge).
+                let cloth = across(.compact, at: base.x, scale: 1)
+                let slots = labelSlots().values.map { $0.frame.insetBy(dx: -2, dy: -2) }
+                let onLabel = { (bottom: CGFloat) in
+                    slots.contains { $0.intersects(CGRect(x: cloth.minX, y: bottom - h(e, 2), width: cloth.width, height: h(e, 2))) }
+                }
+                if fits(2) {
+                    if onLabel(b) { lines = 1 }
+                } else {
+                    let lowered = min(base.y, max(b, ceiling + h(e, 2)))
+                    if lowered - h(e, 2) >= ceiling - L.fitTolerance, !onLabel(lowered) { b = lowered } else { lines = 1 }
+                }
             }
             if !fits(lines) {
                 guard j == 0 else { break }
@@ -1399,5 +1412,44 @@ extension WalkLayout {
             placed = lines(at: x, pressed: false)
         }
         return placed
+    }
+
+    // MARK: Look back up: the peaks as column headings
+
+    /// The bottom of the Look back up header line ("Look back up: that’s your plan."): nothing stands above it.
+    static let lookBackHeader: CGFloat = 92
+
+    /// Looking back up, each peak's label stands just above its column's top flag, as the column's
+    /// heading, clear of every flag, every other label and the header line (on a crowded ridge, as
+    /// near above as is clear of a neighbour's flags). A column with no flag keeps its label where it
+    /// stands, and no flag's second line was let onto it (`flagsThenExamples`).
+    /// Done after the layout is planted, on what is drawn, so the hand never moves a heading.
+    static func headings(_ made: WalkLayout) -> WalkLayout {
+        let drawn = made.posts.flatMap { p in p.banners.map { (column: p.key.column, frame: $0.drawn) } }
+        var labels = made.labels
+        for i in labels.indices {
+            let label = labels[i]
+            guard let top = drawn.filter({ $0.column == label.id }).map(\.frame.minY).min() else { continue }
+            let others = labels.indices.filter { $0 != i }.map { labels[$0].frame }
+            // Just above the column's top flag; on a crowded ridge, where a neighbour's flag stands
+            // there, as near above it as is clear.
+            var y = top - 4 - label.frame.height
+            var found: CGRect?
+            while y >= lookBackHeader {
+                let frame = CGRect(x: label.frame.minX, y: y, width: label.frame.width, height: label.frame.height)
+                if !drawn.contains(where: { $0.frame.intersects(frame) }), !others.contains(where: { $0.intersects(frame) }) {
+                    found = frame
+                    break
+                }
+                y -= 2
+            }
+            guard let frame = found else { continue }
+            labels[i] = Label(id: label.id, name: label.name, frame: frame, kept: label.kept, focused: label.focused,
+                              opacity: label.opacity, tappable: label.tappable, hint: label.hint,
+                              selected: label.selected, footing: label.footing, ground: label.ground)
+        }
+        return WalkLayout(camera: made.camera, labels: labels, posts: made.posts, needleDown: made.needleDown,
+                          nextLine: made.nextLine, hintLine: made.hintLine, undoPill: made.undoPill,
+                          lesson: made.lesson, more: made.more)
     }
 }

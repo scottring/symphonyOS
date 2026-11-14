@@ -32,7 +32,8 @@ struct WalkState: Equatable {
     /// The light is being taught (once per walk, on the first step where holding it answers),
     /// and it has been: `taught` is saved with the position, so a resume does not teach it again.
     var teaching = false; var taught = false
-    var orbWasTeaching = false             // this press began while the light was taught: a short press types
+    var orbWasTeaching = false             // this press began while the light was taught: a short press only puts it away
+    var pressWentOut = false               // this press slid out of the light (on Welcome, letting go there chooses nothing)
     var note: String?; var undoShowing = false
     var undo: [WalkUndoEntry] = []         // in memory only, by design: never saved, so a relaunch starts with nothing to undo
     var pulledChildren: [UUID: [UUID]] = [:]   // a pulled-up flag → the flags that named it as parent; in memory, for Undo

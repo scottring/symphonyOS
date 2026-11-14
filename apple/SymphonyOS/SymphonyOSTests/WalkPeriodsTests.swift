@@ -15,9 +15,10 @@ struct WalkPeriodsTests {
         #expect(p.season.lastDay == day(2027, 2, 28))
         #expect(!p.seasonIsCurrent)
         #expect(p.seasonWord == "winter")
-        #expect(p.monthName == "November")
-        #expect(p.monthIsCurrent)
-        #expect(p.monthLastDay == 30)
+        // Planning the coming winter, the month is winter's first: December, not November.
+        #expect(p.monthName == "December")
+        #expect(!p.monthIsCurrent)
+        #expect(p.monthLastDay == 31)
         #expect(p.weekStart == day(2026, 11, 8))
         #expect(p.weekLastDay == day(2026, 11, 14))
     }
@@ -31,14 +32,40 @@ struct WalkPeriodsTests {
         #expect(!b.seasonIsCurrent)
     }
 
+    /// Inside a season that is still the current one: a week left keeps this month, less moves on.
     @Test func aWeekLeftStaysInTheMonth() {
-        let a = WalkPeriods.pick(now: day(2026, 11, 24), weekStartsOn: 0)
-        #expect(a.monthName == "November")
+        let a = WalkPeriods.pick(now: day(2026, 10, 25), weekStartsOn: 0)
+        #expect(a.season.name == "Fall" && a.seasonIsCurrent)
+        #expect(a.monthName == "October")
         #expect(a.monthIsCurrent)
-        let b = WalkPeriods.pick(now: day(2026, 11, 25), weekStartsOn: 0)
-        #expect(b.monthName == "December")
+        let b = WalkPeriods.pick(now: day(2026, 10, 26), weekStartsOn: 0)
+        #expect(b.monthName == "November")
         #expect(!b.monthIsCurrent)
-        #expect(b.monthLastDay == 31)
+        #expect(b.monthLastDay == 30)
+    }
+
+    /// The month the walk plans always lies inside the season it plans: the coming season's first
+    /// month when the season is the coming one; otherwise the month rule as before.
+    @Test func theMonthLiesInsideTheSeason() {
+        func check(_ y: Int, _ m: Int, _ d: Int, _ season: String, _ month: String) {
+            let p = WalkPeriods.pick(now: day(y, m, d), weekStartsOn: 0)
+            #expect(p.season.name == season && p.monthName == month, "\(y)-\(m)-\(d): \(p.season.name), \(p.monthName)")
+            #expect(p.monthStart >= PlanCalendar.monthStart(p.season.start) && p.monthStart <= p.season.lastDay)
+        }
+        check(2026, 11, 10, "Fall", "November")          // three weeks of fall left: fall, this month
+        check(2026, 11, 14, "Winter", "December")        // under three weeks: the coming winter, its first month
+        check(2027, 2, 20, "Spring", "March")            // winter nearly over: spring, March
+        check(2026, 12, 15, "Winter", "December")        // inside winter: this month
+        // Inside winter with four days of December left: the month rule moves on to January
+        // (fewer than seven days left), and January is inside winter.
+        check(2026, 12, 28, "Winter", "January")
+        // Every day of two years: never a month outside the season.
+        var date = day(2026, 1, 1)
+        while date < day(2028, 1, 1) {
+            let p = WalkPeriods.pick(now: date, weekStartsOn: 0)
+            #expect(p.monthStart >= PlanCalendar.monthStart(p.season.start) && p.monthStart <= p.season.lastDay, "\(date)")
+            date = PlanCalendar.addDays(date, 1)
+        }
     }
 
     @Test func octoberEndPlansNovemberButThisYear() {
@@ -98,7 +125,7 @@ struct WalkPeriodsTests {
         #expect(p.pageDate(for: .season) == day(2026, 12, 1))
         let m = p.pageDate(for: .month)
         #expect(PlanCalendar.year(of: m) == 2026)
-        #expect(PlanCalendar.calendar.component(.month, from: m) == 11)
+        #expect(PlanCalendar.calendar.component(.month, from: m) == 12)    // winter's first month, as the walk files it
         #expect(p.pageDate(for: .week) == now)
         #expect(p.pageDate(for: .today) == now)
     }
@@ -118,7 +145,7 @@ struct WalkPeriodsTests {
         }
         #expect(opens(.today, viewing: .year, .light) == day(2026, 11, 13))
         #expect(opens(.week, viewing: .year, .light) == day(2026, 11, 13))     // back on this week
-        #expect(opens(.month, viewing: .today, .light) == day(2026, 11, 1))
+        #expect(opens(.month, viewing: .today, .light) == day(2026, 12, 1))     // the month inside the coming winter
         #expect(opens(.season, viewing: .today, .light) == day(2026, 12, 1))
         #expect(opens(.year, viewing: .today, .light) == day(2027, 1, 1))
         // The page on screen stays put, except Today, which always comes back to today.

@@ -905,8 +905,8 @@ struct WalkLayoutTests {
     }
 
     /// Looking back up, a post's shown flag takes two lines where its words need them, with
-    /// its "+n more"; every guarantee holds (the generated sweep). With one to four areas, long
-    /// titles are seen on two lines at every level that has room for them.
+    /// its "+n more"; every guarantee holds (the generated sweep). With one to eight areas, long
+    /// titles are seen on two lines (at least one flag each time), on both footings.
     @Test func lookingBackUpTheShownFlagTakesTwoLines() {
         for keptCount in 1...WalkLoad.maxAreas {
             var s = WalkState()
@@ -1247,8 +1247,15 @@ enum Invariants {
             }
             if !left.isEmpty, !banners.contains(where: { $0.kind == .ghost }) { problems.append("examples on, none shows") }
         }
-        // No label sits in the question.
-        for l in layout.labels where l.frame.minY < 250 - 0.01 { problems.append("label \(l.name) at \(l.frame.minY)") }
+        // No label sits in the question; looking back up, where a label may head its column, none above the header line.
+        let labelTop = s.step >= 6 ? WalkLayout.lookBackHeader : 250
+        for l in layout.labels where l.frame.minY < labelTop - 0.01 { problems.append("label \(l.name) at \(l.frame.minY)") }
+        // Looking back up, no flag's cloth meets a peak's label: the label heads its column, or stays and nothing is lowered onto it.
+        if s.step >= 6 {
+            for l in layout.labels { for b in banners where overlap(l.frame, b.drawn) {
+                problems.append("\(b.id) \(b.drawn) covers the label \(l.name) \(l.frame) looking back up")
+            } }
+        }
         // Nothing meets the orb.
         for b in banners where meetsOrb(b.drawn) { problems.append("\(b.id) \(b.drawn) meets the orb") }
         for l in layout.labels where meetsOrb(l.frame) { problems.append("label \(l.name) meets the orb") }

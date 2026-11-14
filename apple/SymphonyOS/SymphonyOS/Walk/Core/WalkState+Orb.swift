@@ -46,6 +46,7 @@ extension WalkState {
             orb = .idle
             orbWasOpen = false
             orbWasTeaching = false
+            pressWentOut = false
             return [.listen(false), .timer(.hold, ms: nil), .timer(.finish, ms: nil)]
         case .heard(let text):
             switch orb {
@@ -112,6 +113,7 @@ extension WalkState {
         // Pressing the light puts the lesson away in the same gesture: held, it listens; a tap types.
         orbWasTeaching = teaching
         teaching = false
+        pressWentOut = false
         if typing != nil { return planted }
         if case .speaking = orb { return [] }
         orbWasOpen = orb == .open
@@ -133,6 +135,7 @@ extension WalkState {
 
     private mutating func orbMoved(_ location: CGPoint, _ env: WalkEnv) -> [WalkEffect] {
         let hover = WalkOrb.point(at: location, among: WalkCopy.points(self, env.periods).map(\.at))
+        if WalkOrb.isOut(location), case .holding = orb { pressWentOut = true }
         switch orb {
         case .speaking:
             guard WalkOrb.isOut(location) else { return [] }
@@ -150,9 +153,10 @@ extension WalkState {
 
     private mutating func orbUp(heldMs: Int, _ env: WalkEnv) -> [WalkEffect] {
         let release: [WalkEffect] = [.timer(.hold, ms: nil)]
-        let wasOpen = orbWasOpen, wasTeaching = orbWasTeaching
+        let wasOpen = orbWasOpen, wasTeaching = orbWasTeaching, wentOut = pressWentOut
         orbWasOpen = false
         orbWasTeaching = false
+        pressWentOut = false
         switch orb {
         case .holding(let hover?):
             guard let chosen = WalkCopy.points(self, env.periods).first(where: { $0.at == hover }) else {
@@ -168,21 +172,26 @@ extension WalkState {
             orb = .finishing(live: live)
             return release + [.timer(.finish, ms: WalkOrb.finishMs), .finishListening]
         case .holding(nil):
-            // On Welcome the light is the quick start: a tap or a hold begins it.
+            // On Welcome the light is the quick start: a tap or a hold begins it. A slide let go
+            // where there is no choice leaves the choices as they are.
             if step == 0 {
                 orb = .idle
-                return act(.quick, env) + release
+                return wentOut ? release : act(.quick, env) + release
             }
             if heldMs < WalkOrb.holdMs {
-                // With speech off a tap types straight away (the light shows a keyboard), and so
-                // does the one tap that puts the lesson away (its second line says so).
-                if (speechIsOff || wasTeaching), !wasOpen, (1...5).contains(step) {
+                // A tap that puts the lesson away does only that, as a tap anywhere does.
+                if wasTeaching {
+                    orb = .idle
+                    return release
+                }
+                // With speech off a tap types straight away (the light shows a keyboard).
+                if speechIsOff, !wasOpen, (1...5).contains(step) {
                     startTyping()
                     return release
                 }
                 orb = wasOpen ? .idle : .open
             } else {
-                orb = step == 0 || speechIsOff ? .open : .idle
+                orb = speechIsOff ? .open : .idle
             }
             return release
         case .idle, .open, .finishing:
@@ -239,13 +248,14 @@ extension WalkState {
 
     /// What the light carries at its centre: a microphone while holding it would listen, a
     /// keyboard once speech is off for this walk (a tap types), a walking figure on Welcome (the
-    /// light is the quick start), nothing while it is pressed, listening or a flag is rising.
+    /// light is the quick start), nothing on the ground (the light is not taught there yet) or
+    /// while it is pressed, listening or a flag is rising.
     var lightSymbol: String? {
         if step == 0 {
             if case .holding = orb { return nil }
             return "figure.walk"                // Welcome: the light begins the quick start
         }
-        guard (1...5).contains(step) else { return nil }
+        guard (1...5).contains(step), !ground else { return nil }     // the ground: quiet until the light is taught
         switch orb {
         case .idle, .open: return speechIsOff ? "keyboard" : "mic"
         case .holding, .speaking, .finishing: return nil

@@ -158,10 +158,11 @@ private struct Saved {
 
     @Test func aNewMonthAsksTheMonthAgain() {
         let saved = Saved()
-        let position = saved.position(step: 4, on: periods(2026, 11, 20))
-        let restored = position.restored(for: periods(2026, 11, 26), existing: saved.everything)
+        // Inside a current season (fall, in October), so the month moves by the month rule alone.
+        let position = saved.position(step: 4, on: periods(2026, 10, 20))
+        let restored = position.restored(for: periods(2026, 10, 26), existing: saved.everything)
         #expect(restored.step == 3)
-        #expect(restored.monthStart == "2026-12-01")
+        #expect(restored.monthStart == "2026-11-01")
     }
 
     @Test func aNewSeasonAsksTheSeasonAgain() {
@@ -213,8 +214,8 @@ private struct Saved {
 
     @Test func focusForAStepNowAheadIsDropped() {
         let saved = Saved()
-        let position = saved.position(step: 5, on: periods(2026, 11, 13))
-        let restored = position.restored(for: periods(2026, 11, 26), existing: saved.everything)   // new month
+        let position = saved.position(step: 5, on: periods(2026, 10, 13))
+        let restored = position.restored(for: periods(2026, 10, 26), existing: saved.everything)   // new month
         #expect(restored.step == 3)
         #expect(restored.focus[String(WalkLevel.week.rawValue)] == nil)
         #expect(restored.focus[String(WalkLevel.today.rawValue)] == nil)

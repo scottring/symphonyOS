@@ -151,7 +151,7 @@ struct WalkWriterTests {
 
         let m = try #require(task(ctx, c.m.id))
         #expect(m.bucket == "month")
-        #expect(m.monthStart == day(2026, 11, 1))
+        #expect(m.monthStart == day(2026, 12, 1))       // the coming winter's first month (the month lies inside the season)
         #expect(m.sourceId == s.id)
         #expect(m.goalId == c.y.id)
 

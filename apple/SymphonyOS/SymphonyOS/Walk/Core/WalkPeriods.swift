@@ -2,7 +2,8 @@ import Foundation
 
 /// Which year, season, month and week the walk files a person's answers into.
 /// Near the end of a period the walk looks ahead to the next one (spec
-/// "Periods near a boundary", D6). Boundaries come from `PlanCalendar`.
+/// "Periods near a boundary", D6), and the month always lies inside the season.
+/// Boundaries come from `PlanCalendar`.
 struct WalkPeriods: Equatable {
     let today: Date
     let year: Int
@@ -35,17 +36,22 @@ struct WalkPeriods: Equatable {
             ? current
             : PlanCalendar.season(containing: current.end, boundaries: seasons)
 
+        // The month always lies inside the season the walk plans: planning the coming season,
+        // it is that season's first month; in the current one, this month, or the next once
+        // fewer than a week of this one is left (which, with three weeks of the season left,
+        // is still inside it).
         let thisMonth = PlanCalendar.monthStart(today)
         let nextMonth = PlanCalendar.nextMonthStart(today)
         let monthDaysLeft = cal.dateComponents([.day], from: today, to: nextMonth).day ?? 0
-        let monthIsCurrent = monthDaysLeft >= monthMinDaysLeft
+        let monthIsCurrent = seasonIsCurrent && monthDaysLeft >= monthMinDaysLeft
+        let monthStart = !seasonIsCurrent ? PlanCalendar.monthStart(season.start) : (monthIsCurrent ? thisMonth : nextMonth)
 
         return WalkPeriods(
             today: today,
             year: year,
             season: season,
             seasonIsCurrent: seasonIsCurrent,
-            monthStart: monthIsCurrent ? thisMonth : nextMonth,
+            monthStart: monthStart,
             monthIsCurrent: monthIsCurrent,
             weekStart: PlanCalendar.weekStart(today, startsOn: weekStartsOn)
         )

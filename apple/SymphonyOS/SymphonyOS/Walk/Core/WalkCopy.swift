@@ -93,7 +93,7 @@ enum WalkCopy {
     }
 
     /// Welcome: the light itself is the quick start.
-    static let hintChoose = "Tap the light to begin"
+    static let hintChoose = "Tap the light for a quick start"
     static let hintOpen = "Tap one, or tap the light to close"
     static let hintFirst = "Hold the light and speak."
     static let hintAnother = "Hold to add another, or tap Next."
@@ -112,8 +112,8 @@ enum WalkCopy {
 
     /// The light taught once per walk, on the first step where holding it answers (`WalkState.teaching`).
     static let teachHold = "Press and hold the light, and say it out loud."
-    static let teachLetGo = "Let go when you’re done. Or tap the light to type."
-    static let teachSpeechOff = "Tap the light and type it."
+    static let teachLetGo = "Let go when you’re done. To type, tap More."
+    static let teachSpeechOff = "Tap More and choose Type it."
     /// The lines that teach the light: the 20-point line, then the 15-point line if there is one.
     static func teaching(_ s: WalkState) -> [String] { s.speechIsOff ? [teachSpeechOff] : [teachHold, teachLetGo] }
 
@@ -209,7 +209,7 @@ enum WalkCopy {
         if s.ground {
             out.append(Point(at: .w, label: "Type your own", action: .type, symbol: "keyboard"))
         } else {
-            out.append(Point(at: .ne, label: level == .year ? "Ask about another area" : "Ask about another goal",
+            out.append(Point(at: .ne, label: level == .year ? "Switch to another area" : "Switch to another goal",
                              action: .nudge, symbol: "arrow.left.arrow.right"))
             if level == .today {
                 if s.calendarOffer {
@@ -338,6 +338,8 @@ enum WalkCopy {
     static let orbLabelWelcome = "Quick start. One goal, down to today. About 3 minutes."; static let orbLabel = "Hold and speak to add a goal. Double tap for other choices."
     /// Speech off for this walk: a double tap types.
     static let orbLabelSpeechOff = "Double tap to type it. The other choices are in the actions."
+    /// The ground: the light is not taught yet, so its label says nothing about holding it.
+    static let orbLabelGround = "Double tap for other choices."
     static let rowDone = "Done"; static let rowOpen = "Not done"
 
     static func levelName(_ level: WalkLevel) -> String {
@@ -393,7 +395,8 @@ enum WalkCopy {
     /// The light's label: `orbLabelWelcome` on Welcome, `orbLabel` on every other step (`orbLabelSpeechOff` once speech is off).
     static func orbAccessibilityLabel(_ s: WalkState) -> String {
         if s.step == 0 { return orbLabelWelcome }
-        return s.speechIsOff ? orbLabelSpeechOff : orbLabel
+        if s.speechIsOff { return orbLabelSpeechOff }
+        return s.ground ? orbLabelGround : orbLabel
     }
 
     /// The one-line field's label, read once it holds words (the placeholder says how to use it).
