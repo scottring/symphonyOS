@@ -353,34 +353,76 @@ struct DailyWriterTests {
         #expect(commitments(ctx, t.id).contains { $0.level == "week" && $0.status == "open" })
     }
 
-    /// A task still open from an earlier week, sent to Any day from Week's fold, comes onto this
-    /// week's list with no day; it does not go back onto the week it was left on.
-    @Test func anEarlierTaskSentToAnyDayComesOntoThisWeek() throws {
-        let ctx = try walkTestContext()
-        let now = WalkPeriods.pick(now: Date())                 // the week the app is in
-        let w = writer(ctx, periods: now)
+    /// Ruling D13: a move from a light page writes the page's own week (the writer's `periods`, never
+    /// the wall clock) and never adds to `deferCount`. The periods here are pinned to a week that is
+    /// not the real clock's, so a write through `Date()` would land somewhere else.
+    private let away = WalkPeriods.pick(now: day(2027, 3, 10))
+
+    /// An open task left on a day of an earlier week, as Week's fold shows it.
+    private func leftBehind(_ ctx: ModelContext, on periods: WalkPeriods) throws -> SymphonyTask {
         let left = SymphonyTask(userId: me, title: "Send the deposit",
-                                scheduledFor: PlanCalendar.addDays(now.weekStart, -4), context: "personal")
+                                scheduledFor: PlanCalendar.addDays(periods.weekStart, -4), context: "personal")
         left.bucket = "timed"
         left.isAllDay = true
+        left.weekStart = PlanCalendar.weekStart(PlanCalendar.addDays(periods.weekStart, -4))
+        left.deferCount = 2
         ctx.insert(left)
         try ctx.save()
+        return left
+    }
+
+    private struct Placed: Equatable {
+        let scheduledFor: Date?, weekStart: Date?, bucket: String?, deferCount: Int, commitments: Int
+    }
+
+    private func placed(_ ctx: ModelContext, _ id: UUID) -> Placed {
+        let t = task(ctx, id)!
+        return Placed(scheduledFor: t.scheduledFor, weekStart: t.weekStart, bucket: t.bucket, deferCount: t.deferCount,
+                      commitments: commitments(ctx, id).count)
+    }
+
+    /// Sent to Any day from the fold, it comes onto the page's week with no day: not back onto the
+    /// week it was left on, not onto the wall clock's week, and nothing counts the carry.
+    @Test func anEarlierTaskSentToAnyDayComesOntoThePagesWeek() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx, periods: away)
+        let left = try leftBehind(ctx, on: away)
+        let before = placed(ctx, left.id)
 
         let snap = try #require(w.move(left.id, to: nil))
         let t = try #require(task(ctx, left.id))
         #expect(t.scheduledFor == nil)
-        #expect(t.weekStart.map { PlanCalendar.sameDay($0, now.weekStart) } == true)
+        #expect(t.weekStart.map { PlanCalendar.sameDay($0, away.weekStart) } == true)
+        #expect(t.deferCount == 2)
         #expect(commitments(ctx, t.id).contains { $0.level == "week" && $0.status == "open"
-                                                  && PlanCalendar.sameDay($0.periodStart, now.weekStart) })
+                                                  && PlanCalendar.sameDay($0.periodStart, away.weekStart) })
         let week = DailyWeek.make(tasks: tasks(ctx), goals: [], commitments: (try? ctx.fetch(FetchDescriptor<TaskCommitment>())) ?? [],
-                                  focus: [], events: { _ in [] }, weekStart: now.weekStart, today: now.today, me: me)
+                                  focus: [], events: { _ in [] }, weekStart: away.weekStart, today: away.today, me: me)
         #expect(week.days.last?.date == nil)
         #expect(week.days.last?.lines.contains { $0.id == "task:\(left.id.uuidString.lowercased())" } == true)
         #expect(week.past?.earlier.contains { $0.id == left.id } != true)
 
-        // Undo puts it back where it was.
+        // Undo puts back every field the move touched, and leaves no commitment behind.
         w.undoMove(snap)
-        #expect(PlanCalendar.sameDay(task(ctx, left.id)?.scheduledFor, PlanCalendar.addDays(now.weekStart, -4)))
+        #expect(placed(ctx, left.id) == before)
+    }
+
+    /// Sent to a day of the page's week from the fold: on that day, its week the page's, nothing counted.
+    @Test func anEarlierTaskSentToADayStaysOnThePagesWeek() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx, periods: away)
+        let left = try leftBehind(ctx, on: away)
+        let before = placed(ctx, left.id)
+        let thursday = PlanCalendar.addDays(away.weekStart, 4)
+
+        let snap = try #require(w.move(left.id, to: thursday))
+        let t = try #require(task(ctx, left.id))
+        #expect(PlanCalendar.sameDay(t.scheduledFor, thursday))
+        #expect(t.weekStart.map { PlanCalendar.sameDay($0, away.weekStart) } == true)
+        #expect(t.deferCount == 2)
+
+        w.undoMove(snap)
+        #expect(placed(ctx, left.id) == before)
     }
 
     // MARK: Ticking, area, first thing

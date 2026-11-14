@@ -86,15 +86,17 @@ struct LightPlannerView<Full: View>: View {
             GeometryReader { proxy in
                 let page = TodayView.pinnedSize ?? proxy.size
                 switch appState.horizon {
+                case .today:
+                    LightTodayView(model: model, userId: userId, seasons: seasons, size: page,
+                                   safeTop: insets.top, safeBottom: insets.bottom, layout: layout,
+                                   go: go, open: open)
+                        .frame(width: page.width, height: page.height)
                 case .week:
                     LightWeekView(model: model, userId: userId, seasons: seasons, size: page,
                                   safeTop: insets.top, safeBottom: insets.bottom, layout: layout, go: go)
                         .frame(width: page.width, height: page.height)
                 default:
-                    LightTodayView(model: model, userId: userId, seasons: seasons, size: page,
-                                   safeTop: insets.top, safeBottom: insets.bottom, layout: layout,
-                                   go: go, open: open)
-                        .frame(width: page.width, height: page.height)
+                    full()      // a page the gate lists but this switch does not draw yet: the Planner every household has
                 }
             }
             .ignoresSafeArea()

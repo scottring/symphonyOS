@@ -38,7 +38,16 @@ enum DailyWeek {
         /// not shown, and a day that held nothing is left out (no lone "open" in the fold).
         let days: [Day]
         /// Still open from before this week: dated before it, or left on an earlier week with no day.
-        let earlier: [DailyDay.Row]
+        let earlier: [Earlier]
+    }
+
+    /// A row still open from before this week, with the day it was left on (nil: left on an
+    /// earlier week with no day), which its Move to chips start from.
+    struct Earlier: Equatable, Identifiable {
+        let row: DailyDay.Row
+        let day: Date?
+        var id: UUID { row.id }
+        var title: String { row.title }
     }
 
     struct Week: Equatable {
@@ -115,7 +124,7 @@ enum DailyWeek {
         var past: Past?
         if holdsToday {
             let behind = dates.filter { $0 < today }
-            let earlier = earlierOpen(plan, work: work, before: start).map(row)
+            let earlier = earlierOpen(plan, work: work, before: start).map { Earlier(row: row($0), day: $0.scheduledFor) }
             let doneBehind = work.filter { t in t.completed && behind.contains { plan.isDated(t, on: $0) } }.count
             let openBehind = work.contains { t in !t.completed && behind.contains { plan.isDated(t, on: $0) } }
             if doneBehind > 0 || openBehind || !earlier.isEmpty {
@@ -149,11 +158,12 @@ enum DailyWeek {
     /// Two at most of the walk's open month goals (`WalkLoad.items` over
     /// `WalkPeriods.pick(now: today)`, so late in a season they can be next month's): those
     /// this week's tasks serve most first, then the walk's own order. A week's task is one on
-    /// its list or dated in it, done or not; it serves the goal it links up to directly.
+    /// its list or dated in it, done or not; it serves the goal it links up to directly. A task
+    /// being pulled up (`pulledUp`, its Undo still open) counts for nothing.
     static func bandGoals(tasks: [SymphonyTask], goals: [Goal], commitments: [TaskCommitment], focus: [TaskFocus],
                           weekStart: Date, today: Date, me: UUID,
-                          seasons: [SeasonBoundary]? = nil) -> [Signpost.Named] {
-        let mine = DailyDay.mine(tasks, me: me)
+                          seasons: [SeasonBoundary]? = nil, pulledUp: UUID? = nil) -> [Signpost.Named] {
+        let mine = DailyDay.mine(tasks.filter { $0.id != pulledUp }, me: me)
         let plan = PlanSnapshot(tasks: mine, commitments: commitments, focus: focus, routines: [], instances: [],
                                 userId: me, domain: nil)
         let start = PlanCalendar.day(weekStart)

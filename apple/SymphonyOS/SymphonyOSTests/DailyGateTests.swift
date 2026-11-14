@@ -88,7 +88,7 @@ struct DailyGateTests {
         #expect(DailyGate.walkLine(position(.left, step: 0), goalCount: 0, edition: .full) == nil)
     }
 
-    @Test func todayIsTheLightPageBuilt() {
+    @Test func todayAndWeekAreLightPagesBuilt() {
         #expect(DailyGate.horizons.isSuperset(of: [.today, .week]))
         #expect(DailyGate.shows(.today, edition: .light, layout: .oneColumn))
         #expect(!DailyGate.shows(.today, edition: .full, layout: .oneColumn))

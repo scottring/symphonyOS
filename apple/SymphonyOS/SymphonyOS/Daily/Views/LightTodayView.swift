@@ -54,7 +54,7 @@ struct LightTodayView: View {
                     SignpostView(sign: sign, metrics: m.sign, tap: { follow(sign) },
                                  putAway: { model.dismiss(sign.kind) })
                 }
-                DailySheet(top: m.sheetTop, radius: m.sheetRadius, lookBack: m.lookBack,
+                DailySheet(top: m.sheetTop, radius: m.sheetRadius, grabber: m.grabber, lookBack: m.lookBack,
                            onLookBack: {}) {    // Task 15 wires the whole plan
                     sheet(page, m, line: line)
                 }

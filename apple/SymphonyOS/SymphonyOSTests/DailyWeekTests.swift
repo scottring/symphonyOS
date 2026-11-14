@@ -338,6 +338,19 @@ struct DailyWeekTests {
         #expect(week.days.last?.number == "day")
     }
 
+    /// The fold's earlier rows carry the day each was left on (nil: left on an earlier week with
+    /// no day), so a row's chips come from the core, not from the page looking the task up.
+    @Test func earlierRowsCarryTheDayTheyWereLeftOn() {
+        let friday = day(2026, 11, 6)
+        let dated = task("Send the deposit", on: friday)
+        let loose = task("Measure the bathroom window")
+        let week = make([dated, loose], commitments: [held(loose, on: day(2026, 11, 1))])
+        let earlier = week.past?.earlier ?? []
+        #expect(earlier.first { $0.id == dated.id }?.day.map { PlanCalendar.sameDay($0, friday) } == true)
+        #expect(earlier.first { $0.id == loose.id }.map { $0.day == nil } == true)
+        #expect(earlier.first { $0.id == dated.id }?.row.title == "Send the deposit")
+    }
+
     @Test func aPastDayThatHeldNothingIsNotInTheFold() {
         let mon = task("Book the plumber", on: day(2026, 11, 9), done: true)
         let week = make([mon])
@@ -399,6 +412,23 @@ struct DailyWeekTests {
                                        weekStart: sunday, today: today, me: me)
         #expect(busy.map(\.title) == ["Clear the garage", "Book the plumber"])
         #expect(busy.first?.id == c.id)
+    }
+
+    /// A task being pulled up (its Undo still open) does not count toward the band's order.
+    @Test func aTaskBeingPulledUpDoesNotCountForTheBand() {
+        let periods = WalkPeriods.pick(now: today)
+        let b = monthGoal("Book the plumber", periods, order: 1)
+        let c = monthGoal("Clear the garage", periods, order: 2)
+        let c1 = serving(c, "Empty the shelves", on: day(2026, 11, 11))
+        let c2 = serving(c, "Book the skip", on: day(2026, 11, 12))
+        let b1 = serving(b, "Call two plumbers", on: day(2026, 11, 13))
+        let all = [b, c, c1, c2, b1]
+        func band(_ pulledUp: UUID?) -> [String] {
+            DailyWeek.bandGoals(tasks: all, goals: [], commitments: [], focus: [], weekStart: sunday, today: today,
+                                me: me, pulledUp: pulledUp).map(\.title)
+        }
+        #expect(band(nil) == ["Clear the garage", "Book the plumber"])
+        #expect(band(c1.id) == ["Book the plumber", "Clear the garage"])        // 1 each: the walk's order
     }
 
     @Test func theBandBreaksATieInTheWalksOrder() {

@@ -270,6 +270,9 @@ struct DailyMetrics: Equatable {
             row: 46, rowGap: 5, inset: 16)
     }
 
+    /// The sheet's grabber: 44 × 5, 9 below the sheet's top, centred on the window.
+    var grabber: CGRect { CGRect(x: size.width / 2 - 22, y: sheetTop + 9, width: 44, height: 5) }
+
     // MARK: Keeping a row in sight
 
     /// The unit anchor (a `UnitPoint`'s y) that scrolls `row` into sight in a scroll view standing

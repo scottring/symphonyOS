@@ -34,7 +34,9 @@ struct DailyBand: View {
                     .frame(height: min(height, Self.veilDepth))
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        // minWidth 0: the picture is wider than the window, and must not make the band (and so
+        // the page's stack, and every flexible piece in it, such as the sheet) wider than the window.
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
         .frame(height: height, alignment: .topLeading)
         .clipped()
         .accessibilityHidden(true)
@@ -84,6 +86,7 @@ struct DailyBandFlags: View {
         .buttonStyle(.plain)
         .offset(x: flag.cloth.midX - touch.width / 2 + dx, y: flag.cloth.midY - touch.height / 2 + dy)
         .accessibilityLabel(flag.title)
+        .accessibilityHint(DailyCopy.flagOpensMonth)
         .accessibilityIdentifier("daily.week.flag")
     }
 }

@@ -61,7 +61,7 @@ struct LightWeekView: View {
             DailyNavRow(current: .week, gap: m.navGap, go: go)
                 .frame(width: size.width)
                 .offset(y: m.navTop)
-            DailySheet(top: m.sheetTop, radius: m.sheetRadius, lookBack: m.lookBack,
+            DailySheet(top: m.sheetTop, radius: m.sheetRadius, grabber: m.grabber, lookBack: m.lookBack,
                        onLookBack: {}) {    // Task 15 wires the whole plan
                 header(week, m)
                 list(week, m)
@@ -97,7 +97,8 @@ struct LightWeekView: View {
 
     private var bandGoals: [Signpost.Named] {
         DailyWeek.bandGoals(tasks: tasks, goals: goals, commitments: commitments, focus: focus,
-                            weekStart: weekStart, today: model.today, me: userId, seasons: seasons)
+                            weekStart: weekStart, today: model.today, me: userId, seasons: seasons,
+                            pulledUp: model.pulledUp)
     }
 
     private var metrics: DailyMetrics {
@@ -161,8 +162,13 @@ struct LightWeekView: View {
                 guard let reveal else { return }
                 frames.keepInSight(reveal.id, above: m.bar.fade.minY, proxy: proxy, animated: !reduceMotion)
             }
+            // The chosen row is kept clear of the panel as the panel comes up, and as another row is chosen.
             .onChange(of: panelTop) { _, top in
                 guard let top, let chosen else { return }
+                frames.keepInSight(chosen.id, above: top - 6, proxy: proxy, animated: !reduceMotion)
+            }
+            .onChange(of: chosen) { _, chosen in
+                guard let chosen, let top = panelTop else { return }
                 frames.keepInSight(chosen.id, above: top - 6, proxy: proxy, animated: !reduceMotion)
             }
         }
@@ -191,8 +197,9 @@ struct LightWeekView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(past.label)
-        .accessibilityValue(past.doneLine ?? "")
-        .accessibilityAddTraits(unfolded ? .isSelected : [])
+        .accessibilityValue([past.doneLine, unfolded ? DailyCopy.foldOpen : DailyCopy.foldClosed]
+            .compactMap { $0 }.joined(separator: ", "))
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("daily.week.fold")
     }
 
@@ -214,12 +221,12 @@ struct LightWeekView: View {
 
     /// The rows still open from before this week, under the days behind: the same circle and words,
     /// with no day beside them.
-    private func earlierGroup(_ rows: [DailyDay.Row], rule: Bool, _ m: DailyMetrics) -> some View {
+    private func earlierGroup(_ rows: [DailyWeek.Earlier], rule: Bool, _ m: DailyMetrics) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(rows) { row in
+            ForEach(rows) { earlier in
                 HStack(spacing: Self.labelGap) {
                     Color.clear.frame(width: Self.labelWidth, height: 1)
-                    taskCard(row, day: tasks.first { $0.id == row.id }?.scheduledFor, m)
+                    taskCard(earlier.row, day: earlier.day, m)
                 }
             }
         }

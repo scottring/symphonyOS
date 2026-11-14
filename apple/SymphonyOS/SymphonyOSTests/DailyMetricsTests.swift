@@ -349,6 +349,23 @@ struct DailyMetricsTests {
         #expect(DailyMetrics.reveal(row(680), in: view, above: 320) == 0)
     }
 
+    /// The sheet's grabber, 44 × 5, 9 below the sheet's top, centred on the window on every page and shape.
+    @Test func theGrabberIsCentredOnTheWindow() {
+        let windows: [(CGSize, CGFloat, CGFloat, DailyMetrics.Shape)] = [
+            (phone, 44, 34, .tall), (bigger, 62, 34, .tall), (small, 20, 0, .short), (outside, 22, 0, .short),
+            (CGSize(width: 320, height: 568), 59, 34, .short)]
+        for (size, top, bottom, shape) in windows {
+            for m in [DailyMetrics.today(size: size, safeTop: top, safeBottom: bottom, shape: shape),
+                      DailyMetrics.today(size: size, safeTop: top, safeBottom: bottom, shape: shape, waiting: true),
+                      DailyMetrics.week(size: size, safeTop: top, safeBottom: bottom, shape: shape)] {
+                #expect(m.grabber.size == CGSize(width: 44, height: 5))
+                #expect(m.grabber.midX == size.width / 2)
+                #expect(m.grabber.minY == m.sheetTop + 9)
+            }
+        }
+        #expect(DailyMetrics.week(size: phone, safeTop: 44, safeBottom: 34).grabber == CGRect(x: 173, y: 213, width: 44, height: 5))
+    }
+
     @Test func bandFlagsAreHandPlantedAndTwoAtMost() {
         let goals = [Signpost.Named(id: UUID(), title: "Pick the tile and pay the deposit"),
                      Signpost.Named(id: UUID(), title: "Find a gym that fits"),

@@ -140,8 +140,14 @@ struct PlanWriter {
     /// keeps its week, with an open week commitment for that week.
     @discardableResult
     func clearDay(_ task: SymphonyTask) -> Snapshot {
+        clearDay(task, weekStart: PlanCalendar.weekStart(task.scheduledFor ?? Date()))
+    }
+
+    /// The same, onto the week starting `weekStart` (the light pages: the page's own week, read
+    /// from their periods, never the wall clock). Like the one above, it counts no deferral.
+    @discardableResult
+    func clearDay(_ task: SymphonyTask, weekStart ws: Date) -> Snapshot {
         var snap = Snapshot(tasks: [capture(task)])
-        let ws = PlanCalendar.weekStart(task.scheduledFor ?? Date())
         task.bucket = "week"
         task.scheduledFor = nil
         task.isAllDay = false

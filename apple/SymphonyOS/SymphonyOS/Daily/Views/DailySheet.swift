@@ -8,6 +8,8 @@ import SwiftUI
 struct DailySheet<Content: View>: View {
     let top: CGFloat
     let radius: CGFloat
+    /// The grabber's frame on the page (`DailyMetrics.grabber`), centred on the window.
+    let grabber: CGRect
     /// The handle's touch shape; nil draws no words (short windows).
     let lookBack: CGRect?
     let onLookBack: () -> Void
@@ -22,9 +24,8 @@ struct DailySheet<Content: View>: View {
                 .accessibilityHidden(true)
             Capsule()
                 .fill(DailyPalette.grabber)
-                .frame(width: 44, height: 5)
-                .frame(maxWidth: .infinity)
-                .offset(y: top + 9)
+                .frame(width: grabber.width, height: grabber.height)
+                .offset(x: grabber.minX, y: grabber.minY)
                 .accessibilityHidden(true)
             if let lookBack { handle(lookBack) }
             content()

@@ -28,6 +28,10 @@ enum DailyCopy {
     static let walkWhenReady = "Walk down from the year when you’re ready."
     static let restOfWeek = "The rest of this week", toDoToday = "To do today", moveTo = "Move to", anyDay = "Any day"
     static let firstToday = "First today", notFirst = "Not first today", details = "Details"
+    /// The week's fold, read aloud: its state ("Open" / "Folded"), after what was done.
+    static let foldOpen = "Open", foldClosed = "Folded"
+    /// What a tap on a month flag on Week's band does, for VoiceOver.
+    static let flagOpensMonth = "Opens the month’s page."
 
     // MARK: The bar
 

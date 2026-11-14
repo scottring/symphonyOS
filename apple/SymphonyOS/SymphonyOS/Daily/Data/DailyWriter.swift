@@ -101,14 +101,15 @@ import SwiftData
     // MARK: Moving
 
     /// Onto a day (all day, never the first thing), or with `day` nil onto the
-    /// week with no day. Its week stays open either way. A task dated before this
-    /// week (Week's fold) comes onto this week's list, not back onto its old week.
-    /// nil when the task is not mine.
+    /// week with no day. Its week stays open either way. With no day it keeps the
+    /// week of the day it was on, but a task from before this writer's week (Week's
+    /// fold) comes onto this week (`periods.weekStart`): the page's own week, never
+    /// the wall clock's. No move counts a deferral (ruling D13). nil when the task is not mine.
     func move(_ taskId: UUID, to day: Date?) -> PlanWriter.Snapshot? {
         guard let t = myTask(taskId) else { return nil }
         guard let day else {
-            if let was = t.scheduledFor, PlanCalendar.day(was) < periods.weekStart { return plan.move(t, to: .thisWeek) }
-            return plan.clearDay(t)
+            let own = t.scheduledFor.map { PlanCalendar.weekStart($0) } ?? periods.weekStart
+            return plan.clearDay(t, weekStart: max(own, periods.weekStart))
         }
         return plan.planTask(t, on: day, focusToday: false)
     }

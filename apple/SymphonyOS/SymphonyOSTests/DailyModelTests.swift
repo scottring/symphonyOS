@@ -258,6 +258,20 @@ struct DailyModelTests {
         #expect(m.reveal == nil)
     }
 
+    /// The page sets where the bar adds: on Week a task goes onto the week with no day; back on
+    /// Today (which sets `.today` as it appears) the next one is today's again.
+    @Test func theBarAddsToTodayAgainAfterAVisitToWeek() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.page = .week
+        type(m, "Measure the window")
+        let onWeek = try #require(task(ctx, titled: "Measure the window"))
+        #expect(onWeek.scheduledFor == nil)
+        m.page = .today
+        type(m, "Buy milk")
+        #expect(PlanCalendar.sameDay(task(ctx, titled: "Buy milk")?.scheduledFor, today))
+    }
+
     // MARK: Pulling up: nothing is written while its Undo can be used
 
     private func pending(_ ctx: ModelContext) -> [PendingChange] {
