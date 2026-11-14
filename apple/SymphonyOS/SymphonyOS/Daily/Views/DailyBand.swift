@@ -41,6 +41,53 @@ struct DailyBand: View {
     }
 }
 
+/// Week's band flags: up to two of this month's goals, each the person's own title on a small
+/// cloth on the walk's pole, standing as `DailyMetrics.bandFlags` plants them (never ruled: each
+/// pole leans about its foot, its cloth tilts the other way and rides on the pole's top). The cloth
+/// is 32 high; its touch shape is at least 44 × 44. A tap on one opens Month (`open`).
+struct DailyBandFlags: View {
+    let flags: [DailyMetrics.BandFlag]
+    let open: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(flags) { flag in
+                WalkPoleView(height: flag.pole.height, pale: false)
+                    .rotationEffect(.degrees(flag.lean), anchor: .bottom)
+                    .offset(x: flag.pole.midX - 9, y: flag.pole.minY)
+                    .accessibilityHidden(true)
+                cloth(flag)
+            }
+        }
+    }
+
+    private func cloth(_ flag: DailyMetrics.BandFlag) -> some View {
+        let touch = CGSize(width: max(flag.cloth.width, DailyMetrics.minTouch), height: max(flag.cloth.height, DailyMetrics.minTouch))
+        // The pole's top, moved by its lean: the cloth stays on it.
+        let r = flag.lean * .pi / 180
+        let dx = flag.pole.height * CGFloat(sin(r)), dy = flag.pole.height * CGFloat(1 - cos(r))
+        return Button(action: open) {
+            Text(flag.title)
+                .font(DailyPalette.sansMedium(12.5))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .padding(.horizontal, 9)
+                .frame(width: flag.cloth.width, height: flag.cloth.height - 6)
+                .frame(width: flag.cloth.width, height: flag.cloth.height, alignment: .top)
+                .background(WalkNotchedCloth(notch: 5).fill(WalkPalette.level(.month)))
+                .walkBannerShadow(glows: false)
+                .rotationEffect(.degrees(flag.tilt))
+                .frame(width: touch.width, height: touch.height)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .offset(x: flag.cloth.midX - touch.width / 2 + dx, y: flag.cloth.midY - touch.height / 2 + dy)
+        .accessibilityLabel(flag.title)
+        .accessibilityIdentifier("daily.week.flag")
+    }
+}
+
 /// The walk's top shade behind the row of words: its ground colour at `DailyMetrics.shadeOpacity`
 /// from the page's top to `solid` (the row's foot), fading to clear by `height`, on every shape.
 struct DailyTopShade: View {

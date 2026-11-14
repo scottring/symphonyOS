@@ -235,6 +235,29 @@ struct DailyModelTests {
         #expect(task(ctx, titled: "Buy milk")?.areaId == health.id)
     }
 
+    /// The row the Undo on show would change, for the page to keep in sight above the bar: an added
+    /// row and a moved one (named again when moved again), never a row being pulled up (hidden).
+    @Test func undoNamesTheRowItWouldChange() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        #expect(m.reveal == nil)
+        type(m, "Buy milk")
+        let id = try #require(task(ctx, titled: "Buy milk")).id
+        #expect(m.reveal?.id == id)
+        let added = m.reveal
+
+        m.move(id, to: day(2026, 11, 12))
+        #expect(m.reveal?.id == id)
+        let moved = m.reveal
+        #expect(moved != added)
+        m.move(id, to: day(2026, 11, 13))
+        #expect(m.reveal?.id == id)
+        #expect(m.reveal != moved)
+
+        m.pullUp(id, level: .week)
+        #expect(m.reveal == nil)
+    }
+
     // MARK: Pulling up: nothing is written while its Undo can be used
 
     private func pending(_ ctx: ModelContext) -> [PendingChange] {

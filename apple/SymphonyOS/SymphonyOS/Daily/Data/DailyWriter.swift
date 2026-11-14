@@ -101,10 +101,15 @@ import SwiftData
     // MARK: Moving
 
     /// Onto a day (all day, never the first thing), or with `day` nil onto the
-    /// week with no day. Its week stays open either way. nil when the task is not mine.
+    /// week with no day. Its week stays open either way. A task dated before this
+    /// week (Week's fold) comes onto this week's list, not back onto its old week.
+    /// nil when the task is not mine.
     func move(_ taskId: UUID, to day: Date?) -> PlanWriter.Snapshot? {
         guard let t = myTask(taskId) else { return nil }
-        guard let day else { return plan.clearDay(t) }
+        guard let day else {
+            if let was = t.scheduledFor, PlanCalendar.day(was) < periods.weekStart { return plan.move(t, to: .thisWeek) }
+            return plan.clearDay(t)
+        }
         return plan.planTask(t, on: day, focusToday: false)
     }
 

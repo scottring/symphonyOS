@@ -89,10 +89,11 @@ struct DailyGateTests {
     }
 
     @Test func todayIsTheLightPageBuilt() {
-        #expect(DailyGate.horizons == [.today])
+        #expect(DailyGate.horizons.isSuperset(of: [.today, .week]))
         #expect(DailyGate.shows(.today, edition: .light, layout: .oneColumn))
         #expect(!DailyGate.shows(.today, edition: .full, layout: .oneColumn))
-        #expect(!DailyGate.shows(.week, edition: .light, layout: .oneColumn))
+        #expect(DailyGate.shows(.week, edition: .light, layout: .oneColumn))
+        #expect(!DailyGate.shows(.week, edition: .full, layout: .oneColumn))
     }
 
     /// The bar is built: a light household's phone, upright, has the bar and no dock.

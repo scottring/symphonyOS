@@ -31,6 +31,9 @@ struct LightTodayView: View {
     @State private var walkPosition: WalkPosition?
     /// A row's Details, open in the task's own screen.
     @State private var opened: TimelineItem?
+    /// Where the rows stand, so the row an Undo would change is kept clear of it.
+    @State private var frames = DailyRowFrames()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if DEBUG
     @State private var demoStatesApplied = false
     #endif
@@ -55,7 +58,7 @@ struct LightTodayView: View {
                            onLookBack: {}) {    // Task 15 wires the whole plan
                     sheet(page, m, line: line)
                 }
-                fade(m)
+                DailyPaperFade(fade: m.bar.fade, size: size)
                 DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.today, periods: model.periods),
                              listening: DailyCopy.listening(.today))
                 #if DEBUG
@@ -65,12 +68,14 @@ struct LightTodayView: View {
             }
             .frame(width: size.width, height: size.height, alignment: .topLeading)
             .background(DailyPalette.sky)
+            .coordinateSpace(.named(DailyRowFrames.space))
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("daily.today")
         .sheet(item: $opened) { item in OpenedItemSheet(item: item, date: model.today, userId: userId) }
         .task(id: calendar.readKey(for: model.today)) { await calendar.refresh(model.today, maxAge: 60) }
         .onAppear {
+            model.page = .today         // the bar adds to today (Week sets its own)
             readWalk()
             answerTell()
         }
@@ -162,28 +167,38 @@ struct LightTodayView: View {
     }
 
     /// The rows scroll in their own space from their top to the page's foot, and can be
-    /// scrolled clear of the fade; the 4 points above leave room for a lit row's halo.
+    /// scrolled clear of the fade; the 4 points above leave room for a lit row's halo. A row
+    /// added with Undo showing is scrolled clear of the fade and the Undo, if they cover it.
     private func rows(_ page: DailyTodayPage, _ m: DailyMetrics, top: CGFloat) -> some View {
         let halo: CGFloat = 4
-        return ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: m.rowGap) {
-                ForEach(page.rows) { row in
-                    DailyRow(row: row, height: m.row, lit: model.lit == row.id,
-                             toggle: { model.toggle(row) },
-                             setFirst: {
-                                 let mark = page.firstMark(toggling: row)
-                                 model.setFirst(mark.id, previous: mark.previous)
-                             },
-                             details: { opened = details(row) },
-                             pullUp: { model.pullUp(row.id, level: .week) })
+        let scroll = CGRect(x: 0, y: top - halo, width: size.width, height: size.height - top + halo)
+        return ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: m.rowGap) {
+                    ForEach(page.rows) { row in
+                        DailyRow(row: row, height: m.row, lit: model.lit == row.id,
+                                 toggle: { model.toggle(row) },
+                                 setFirst: {
+                                     let mark = page.firstMark(toggling: row)
+                                     model.setFirst(mark.id, previous: mark.previous)
+                                 },
+                                 details: { opened = details(row) },
+                                 pullUp: { model.pullUp(row.id, level: .week) })
+                            .dailyRowFrame(row.id, in: frames)
+                    }
                 }
+                .padding(.horizontal, m.inset)
+                .padding(.top, halo)
+                .padding(.bottom, size.height - m.bar.fade.minY + halo)
             }
-            .padding(.horizontal, m.inset)
-            .padding(.top, halo)
-            .padding(.bottom, size.height - m.bar.fade.minY + halo)
+            .dailyListFrame(frames)
+            .onChange(of: model.reveal) { _, reveal in
+                guard let reveal else { return }
+                frames.keepInSight(reveal.id, above: m.bar.fade.minY, proxy: proxy, animated: !reduceMotion)
+            }
         }
-        .frame(width: size.width, height: size.height - top + halo)
-        .offset(y: top - halo)
+        .frame(width: scroll.width, height: scroll.height)
+        .offset(y: scroll.minY)
     }
 
     private func walkButton(_ line: DailyGate.WalkLine, _ frame: CGRect) -> some View {
@@ -205,19 +220,6 @@ struct LightTodayView: View {
         .buttonStyle(.plain)
         .offset(x: frame.minX, y: frame.minY)
         .accessibilityIdentifier("daily.walkWaiting")
-    }
-
-    /// The paper fades in over the rows where the bar stands, and stays paper to the foot.
-    private func fade(_ m: DailyMetrics) -> some View {
-        VStack(spacing: 0) {
-            LinearGradient(colors: [DailyPalette.paper.opacity(0), DailyPalette.paper], startPoint: .top, endPoint: .bottom)
-                .frame(height: m.bar.fade.height)
-            DailyPalette.paper
-        }
-        .frame(width: size.width, height: max(0, size.height - m.bar.fade.minY))
-        .offset(y: m.bar.fade.minY)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 
     // MARK: Touches

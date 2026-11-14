@@ -5,7 +5,7 @@ import Foundation
 /// screen it has today; a light household gets a light page only once it is built.
 enum DailyGate {
     /// Light pages that are built. Tasks 11 and 14 add theirs.
-    static let horizons: Set<Horizon> = [.today]
+    static let horizons: Set<Horizon> = [.today, .week]
     /// Window shapes the light pages are built for. Tasks 17 and 18 add theirs; never
     /// `.glanceWide`, where a phone on its side keeps the old screens.
     static let layouts: Set<TodayLayout> = [.oneColumn]

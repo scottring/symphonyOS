@@ -85,10 +85,17 @@ struct LightPlannerView<Full: View>: View {
         if let model, let userId = auth.currentUser?.id {
             GeometryReader { proxy in
                 let page = TodayView.pinnedSize ?? proxy.size
-                LightTodayView(model: model, userId: userId, seasons: seasons, size: page,
-                               safeTop: insets.top, safeBottom: insets.bottom, layout: layout,
-                               go: go, open: open)
-                    .frame(width: page.width, height: page.height)
+                switch appState.horizon {
+                case .week:
+                    LightWeekView(model: model, userId: userId, seasons: seasons, size: page,
+                                  safeTop: insets.top, safeBottom: insets.bottom, layout: layout, go: go)
+                        .frame(width: page.width, height: page.height)
+                default:
+                    LightTodayView(model: model, userId: userId, seasons: seasons, size: page,
+                                   safeTop: insets.top, safeBottom: insets.bottom, layout: layout,
+                                   go: go, open: open)
+                        .frame(width: page.width, height: page.height)
+                }
             }
             .ignoresSafeArea()
             .toolbar(.hidden, for: .navigationBar)

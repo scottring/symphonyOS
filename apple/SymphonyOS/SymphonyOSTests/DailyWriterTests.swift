@@ -353,6 +353,36 @@ struct DailyWriterTests {
         #expect(commitments(ctx, t.id).contains { $0.level == "week" && $0.status == "open" })
     }
 
+    /// A task still open from an earlier week, sent to Any day from Week's fold, comes onto this
+    /// week's list with no day; it does not go back onto the week it was left on.
+    @Test func anEarlierTaskSentToAnyDayComesOntoThisWeek() throws {
+        let ctx = try walkTestContext()
+        let now = WalkPeriods.pick(now: Date())                 // the week the app is in
+        let w = writer(ctx, periods: now)
+        let left = SymphonyTask(userId: me, title: "Send the deposit",
+                                scheduledFor: PlanCalendar.addDays(now.weekStart, -4), context: "personal")
+        left.bucket = "timed"
+        left.isAllDay = true
+        ctx.insert(left)
+        try ctx.save()
+
+        let snap = try #require(w.move(left.id, to: nil))
+        let t = try #require(task(ctx, left.id))
+        #expect(t.scheduledFor == nil)
+        #expect(t.weekStart.map { PlanCalendar.sameDay($0, now.weekStart) } == true)
+        #expect(commitments(ctx, t.id).contains { $0.level == "week" && $0.status == "open"
+                                                  && PlanCalendar.sameDay($0.periodStart, now.weekStart) })
+        let week = DailyWeek.make(tasks: tasks(ctx), goals: [], commitments: (try? ctx.fetch(FetchDescriptor<TaskCommitment>())) ?? [],
+                                  focus: [], events: { _ in [] }, weekStart: now.weekStart, today: now.today, me: me)
+        #expect(week.days.last?.date == nil)
+        #expect(week.days.last?.lines.contains { $0.id == "task:\(left.id.uuidString.lowercased())" } == true)
+        #expect(week.past?.earlier.contains { $0.id == left.id } != true)
+
+        // Undo puts it back where it was.
+        w.undoMove(snap)
+        #expect(PlanCalendar.sameDay(task(ctx, left.id)?.scheduledFor, PlanCalendar.addDays(now.weekStart, -4)))
+    }
+
     // MARK: Ticking, area, first thing
 
     @Test func tickingGoesThroughTheAppsOwnPath() throws {

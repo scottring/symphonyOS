@@ -31,16 +31,14 @@ enum DailyWeek {
 
     struct Past: Equatable {
         let label: String
-        /// Tasks done on the folded days. The earlier rows are never counted.
-        let done: Int
-        /// The days behind today, their tasks only: a past day's calendar events are not shown.
+        /// The fold's count, the only one it gives: "3 done" (tasks done on the folded days, never
+        /// the earlier rows), or nil when nothing was done, so it never reads as a tally of what was missed.
+        let doneLine: String?
+        /// The days behind today that held a task, their tasks only: a past day's calendar events are
+        /// not shown, and a day that held nothing is left out (no lone "open" in the fold).
         let days: [Day]
         /// Still open from before this week: dated before it, or left on an earlier week with no day.
         let earlier: [DailyDay.Row]
-
-        /// The fold's count, the only one it draws: "3 done", or nothing when nothing was done,
-        /// so it never reads as a tally of what was missed.
-        var doneLine: String? { done > 0 ? DailyCopy.done(done) : nil }
     }
 
     struct Week: Equatable {
@@ -65,10 +63,12 @@ enum DailyWeek {
     /// Sunday. A day holds its events by start time, then the tasks dated on it (`isDated`) in
     /// the list's own order, done ones in place; with neither it is `.open`. Any day is the
     /// week's list (`weekList`) with no day, done ones in place. A folded past day holds its
-    /// tasks only; events are read only for today onward.
+    /// tasks only; events are read only for today onward. A task being pulled up (`pulledUp`, its
+    /// Undo still open: `DailyModel.pulledUp`) is left out of every day, the fold and Any day.
     static func make(tasks: [SymphonyTask], goals: [Goal], commitments: [TaskCommitment], focus: [TaskFocus],
-                     events: (Date) -> [TimelineItem], weekStart: Date, today: Date, me: UUID) -> Week {
-        let mine = DailyDay.mine(tasks, me: me)
+                     events: (Date) -> [TimelineItem], weekStart: Date, today: Date, me: UUID,
+                     pulledUp: UUID? = nil) -> Week {
+        let mine = DailyDay.mine(tasks.filter { $0.id != pulledUp }, me: me)
         let plan = PlanSnapshot(tasks: mine, commitments: commitments, focus: focus, routines: [], instances: [],
                                 userId: me, domain: nil)
         let today = PlanCalendar.day(today)
@@ -119,8 +119,9 @@ enum DailyWeek {
             let doneBehind = work.filter { t in t.completed && behind.contains { plan.isDated(t, on: $0) } }.count
             let openBehind = work.contains { t in !t.completed && behind.contains { plan.isDated(t, on: $0) } }
             if doneBehind > 0 || openBehind || !earlier.isEmpty {
-                past = Past(label: DailyCopy.pastDays(behind), done: doneBehind, days: behind.map { day($0, withEvents: false) },
-                            earlier: earlier)
+                let held = behind.map { day($0, withEvents: false) }.filter { $0.lines != [.open] }
+                past = Past(label: DailyCopy.pastDays(behind), doneLine: doneBehind > 0 ? DailyCopy.done(doneBehind) : nil,
+                            days: held, earlier: earlier)
             }
         }
 

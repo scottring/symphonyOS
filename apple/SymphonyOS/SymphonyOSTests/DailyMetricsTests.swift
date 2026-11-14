@@ -302,6 +302,53 @@ struct DailyMetricsTests {
         }
     }
 
+    /// Week, as Today: on every window from 320 × 568 up, with any safe insets, the list's first three
+    /// rows (the first day's 8 above, three 46 cards, 5 between) end at or above the fade. Where the
+    /// board would put them lower, the sheet rises and the band gives that height up; the bar stays.
+    @Test func theWeekKeepsThreeRowsClearOfTheBar() {
+        let widths: [CGFloat] = [320, 375, 390, 402, 430, 466]
+        let heights = Array(stride(from: CGFloat(568), through: 960, by: 6))
+        let tops: [CGFloat] = [20, 44, 47, 50, 59, 62], bottoms: [CGFloat] = [0, 21, 34]
+        var failures: [String] = []
+        for w in widths { for h in heights { for top in tops { for bottom in bottoms {
+            let size = CGSize(width: w, height: h)
+            let shape = DailyMetrics.shape(for: .oneColumn, height: h, safeTop: top, safeBottom: bottom, waiting: false)
+            let m = DailyMetrics.week(size: size, safeTop: top, safeBottom: bottom, shape: shape)
+            let at = "\(Int(w))×\(Int(h)) \(Int(top))/\(Int(bottom)) \(shape)"
+            if m.rowsTop + 8 + 3 * m.row + 2 * m.rowGap > m.bar.fade.minY { failures.append("\(at): three rows end below the fade") }
+            if m.sheetTop < top { failures.append("\(at): sheet in the top inset") }
+            for r in m.touchTargets where r.width < touch || r.height < touch { failures.append("\(at): \(r) under 44") }
+        } } } }
+        #expect(failures.isEmpty, "\(failures.count) failures, first: \(failures.prefix(5))")
+
+        // The board itself does not move; a 320 × 568 window with a 59 top rises, the band shortening by as much.
+        #expect(DailyMetrics.week(size: phone, safeTop: 44, safeBottom: 34).sheetTop == 204)
+        let tiny = DailyMetrics.week(size: CGSize(width: 320, height: 568), safeTop: 59, safeBottom: 34, shape: .short)
+        let unrisen: CGFloat = 59 + 168
+        #expect(tiny.sheetTop < unrisen)
+        #expect(tiny.band.height == 59 + 218 - (unrisen - tiny.sheetTop))
+        #expect(tiny.rowsTop + 8 + 3 * tiny.row + 2 * tiny.rowGap == tiny.bar.fade.minY)
+        // The bar stands where Today's does on the same window.
+        #expect(tiny.bar == DailyMetrics.today(size: CGSize(width: 320, height: 568), safeTop: 59, safeBottom: 34,
+                                               shape: .short).bar)
+    }
+
+    /// A row is scrolled into sight only when something covers it: the unit anchor that brings it
+    /// just above `bottom` (the fade, or the Move to panel), or to the top when it is above the view.
+    @Test func aRowIsScrolledIntoSightOnlyWhenCovered() {
+        let view = CGRect(x: 0, y: 300, width: 390, height: 544)
+        func row(_ y: CGFloat) -> CGRect { CGRect(x: 16, y: y, width: 358, height: 46) }
+        #expect(DailyMetrics.reveal(row(400), in: view, above: 696) == nil)          // seen whole
+        #expect(DailyMetrics.reveal(row(650), in: view, above: 696) == nil)          // ends right at it
+        let below = DailyMetrics.reveal(row(680), in: view, above: 696) ?? -1
+        #expect(abs(below - (696 - 46 - 300) / (544 - 46)) < 1e-9)
+        let far = DailyMetrics.reveal(row(1400), in: view, above: 696) ?? -1                   // far below: the same place
+        #expect(abs(far - (696 - 46 - 300) / (544 - 46)) < 1e-9)
+        #expect(DailyMetrics.reveal(row(280), in: view, above: 696) == 0)            // above the view: to its top
+        // A bottom at or above the view's top leaves nowhere to bring it: the top.
+        #expect(DailyMetrics.reveal(row(680), in: view, above: 320) == 0)
+    }
+
     @Test func bandFlagsAreHandPlantedAndTwoAtMost() {
         let goals = [Signpost.Named(id: UUID(), title: "Pick the tile and pay the deposit"),
                      Signpost.Named(id: UUID(), title: "Find a gym that fits"),

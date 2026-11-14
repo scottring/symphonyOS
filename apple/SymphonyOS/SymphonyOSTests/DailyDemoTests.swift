@@ -105,6 +105,25 @@ struct DailyDemoTests {
         #expect(DemoMode.dailyStates(in: ["app"]).isEmpty)
     }
 
+    /// `-SymphonyDailyState select`: Week shows today's first task chosen, its Move to panel up;
+    /// `unfold`: the fold open. Both are read from the states like the others.
+    @Test func theWeeksDemoStates() throws {
+        #expect(DemoMode.dailyStates(in: ["app", "-SymphonyDailyState", "select,unfold"]) == ["select", "unfold"])
+        let today = day(2026, 11, 10)
+        let ctx = try seeded("morning", on: today)
+        let week = DailyWeek.make(tasks: try ctx.fetch(FetchDescriptor<SymphonyTask>()),
+                                  goals: try ctx.fetch(FetchDescriptor<Goal>()),
+                                  commitments: try ctx.fetch(FetchDescriptor<TaskCommitment>()),
+                                  focus: try ctx.fetch(FetchDescriptor<TaskFocus>()), events: { _ in [] },
+                                  weekStart: PlanCalendar.weekStart(today), today: today, me: me)
+        let chosen = try #require(DemoMode.weekChoice(week))
+        #expect(chosen.row.title == "Send the contractor the deposit")
+        #expect(chosen.day.map { PlanCalendar.sameDay($0, today) } == true)
+        #expect(week.past?.doneLine == DailyCopy.done(3))                  // the board's "3 done"
+        #expect(DemoMode.weekChoice(DailyWeek.make(tasks: [], goals: [], commitments: [], focus: [], events: { _ in [] },
+                                                   weekStart: PlanCalendar.weekStart(today), today: today, me: me))?.row == nil)
+    }
+
     /// `-SymphonyDailyState speak`: the bar listens through a stand-in that hears the board's
     /// words (nobody can speak to the simulator); `undo`: one task added, Undo showing.
     @Test func theBarsDemoStates() async throws {

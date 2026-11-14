@@ -20,7 +20,8 @@ extension DemoMode {
 
     /// `-SymphonyDailyState a,b,…`: states a page is driven into once it is up
     /// (`point`: the sign's row lit; `waiting`: the waiting walk's line, as the demo keeps no stored walk;
-    /// `speak` and `undo`: the bar, see `showDaily`; `more` and `inbox`: that sheet, `dailyPanel`).
+    /// `speak` and `undo`: the bar, see `showDaily`; `more` and `inbox`: that sheet, `dailyPanel`;
+    /// on Week, `select`: a task chosen with its Move to panel up, see `weekChoice`; `unfold`: the fold open).
     static var dailyStates: [String] { dailyStates(in: ProcessInfo.processInfo.arguments) }
 
     static func dailySeed(in arguments: [String]) -> String {
@@ -80,6 +81,15 @@ extension DemoMode {
                 break
             }
         }
+    }
+
+    /// `select` on Week: the first task on the first day that holds one (on the board's day, the
+    /// first thing today), as a tap on its words would choose it; nil when the week holds none.
+    static func weekChoice(_ week: DailyWeek.Week) -> (row: DailyDay.Row, day: Date?)? {
+        for day in week.days {
+            for case .task(let row) in day.lines { return (row, day.date) }
+        }
+        return nil
     }
 
     private static func value(after flag: String, in arguments: [String]) -> String? {

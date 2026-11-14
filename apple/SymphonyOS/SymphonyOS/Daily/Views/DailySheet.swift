@@ -49,4 +49,62 @@ struct DailySheet<Content: View>: View {
         .accessibilityIdentifier("daily.lookBack")
     }
 }
+
+/// The paper fading in over the rows where the bar stands (`DailyMetrics.Bar.fade`), and paper
+/// from there to the page's foot. It takes no touches.
+struct DailyPaperFade: View {
+    let fade: CGRect
+    let size: CGSize
+
+    var body: some View {
+        VStack(spacing: 0) {
+            LinearGradient(colors: [DailyPalette.paper.opacity(0), DailyPalette.paper], startPoint: .top, endPoint: .bottom)
+                .frame(height: fade.height)
+            DailyPalette.paper
+        }
+        .frame(width: size.width, height: max(0, size.height - fade.minY))
+        .offset(y: fade.minY)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Where a light page's rows and its list stand, in the page's own space (`space`), kept without
+/// redrawing the page as they scroll, so the row a change touched can be scrolled into sight: clear
+/// of the fade and the Undo above the bar, or of Week's Move to panel (`DailyMetrics.reveal`).
+@MainActor final class DailyRowFrames {
+    static let space = "daily.page"
+    private var frames: [UUID: CGRect] = [:]
+    /// The list's scroll view, as laid out now.
+    private var list: CGRect?
+
+    func set(_ id: UUID, _ frame: CGRect) { frames[id] = frame }
+    func setList(_ frame: CGRect) { list = frame }
+
+    /// A moment later (once the change is laid out), scrolls row `id` (its view carries `.id(id)`)
+    /// so it stands whole between the list's top and `bottom`; nothing when it already does.
+    func keepInSight(_ id: UUID, above bottom: CGFloat, proxy: ScrollViewProxy, animated: Bool) {
+        Task { @MainActor [self] in
+            try? await Task.sleep(for: .milliseconds(60))
+            guard let frame = frames[id], let list,
+                  let y = DailyMetrics.reveal(frame, in: list, above: bottom) else { return }
+            withAnimation(animated ? .easeOut(duration: 0.25) : nil) {
+                proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: y))
+            }
+        }
+    }
+}
+
+extension View {
+    /// Reports this row's frame in the page's space to `frames`, and names it for `scrollTo`.
+    func dailyRowFrame(_ id: UUID, in frames: DailyRowFrames) -> some View {
+        self.id(id)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(DailyRowFrames.space)) } action: { frames.set(id, $0) }
+    }
+
+    /// Reports the list's scroll view frame in the page's space to `frames`.
+    func dailyListFrame(_ frames: DailyRowFrames) -> some View {
+        onGeometryChange(for: CGRect.self) { $0.frame(in: .named(DailyRowFrames.space)) } action: { frames.setList($0) }
+    }
+}
 #endif

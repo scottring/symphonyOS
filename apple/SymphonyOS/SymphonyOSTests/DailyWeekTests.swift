@@ -80,7 +80,6 @@ struct DailyWeekTests {
         let week = make([a, b, c, open, todayDone])
 
         #expect(week.past?.label == "Sunday and Monday")
-        #expect(week.past?.done == 3)
         #expect(week.past?.doneLine == DailyCopy.done(3))
         #expect(week.past?.days.map(\.label) == ["SUN", "MON"])
         #expect(titles(week.past?.days.last) == ["Book the plumber", "Measure the window", "Call the tiler"])
@@ -107,7 +106,7 @@ struct DailyWeekTests {
         #expect(earlier.contains("Measure the bathroom window"))
         #expect(!earlier.contains("Pick up the parcel"))
         #expect(!earlier.contains("Order the grout"))
-        #expect(week.past?.done == 1)                                   // the earlier rows are never counted
+        #expect(week.past?.doneLine == DailyCopy.done(1))               // the earlier rows are never counted
         #expect(week.past?.label == "Sunday and Monday")
         #expect(week.days.last.map(titles) == ["Order the grout"])
 
@@ -115,7 +114,6 @@ struct DailyWeekTests {
         let first = make(tasks, commitments: commitments, today: sunday)
         #expect(first.past?.label == "Earlier")
         #expect(first.past?.days.isEmpty == true)
-        #expect(first.past?.done == 0)
         #expect(first.past?.doneLine == nil)
         #expect(Set(first.past?.earlier.map(\.title) ?? []) == ["Send the deposit", "Measure the bathroom window"])
         #expect(first.days.first?.isToday == true)
@@ -292,6 +290,7 @@ struct DailyWeekTests {
         let earlier = make([wed, friday], today: monday)
         #expect(earlier.past?.earlier.map(\.title) == ["Send the deposit"])
         #expect(earlier.past?.doneLine == nil)
+        #expect(earlier.past?.days.isEmpty == true)                     // Sunday held nothing: not drawn
 
         // Two done: the line says so.
         let a = task("Book the plumber", on: sunday, done: true)
@@ -327,6 +326,45 @@ struct DailyWeekTests {
         let sunTask = task("Return the library books", on: sunday, done: true)
         let withPast = make([sunTask], events: { d in [self.event("Event \(PlanCalendar.ymd(d))", at: d)] })
         #expect(withPast.past?.days.flatMap(titles).contains { $0.hasPrefix("event:") } == false)
+    }
+
+    @Test func everyDayLabelIsInCapitalsAnyDayToo() {
+        let loose = task("Measure the bathroom window")
+        let mon = task("Book the plumber", on: day(2026, 11, 9), done: true)
+        let week = make([loose, mon], commitments: [held(loose, on: sunday)])
+        let labels = week.days.map(\.label) + (week.past?.days.map(\.label) ?? [])
+        #expect(labels == ["TUE", "WED", "THU", "FRI", "SAT", "ANY", "MON"])
+        #expect(labels.allSatisfy { $0 == $0.uppercased() })
+        #expect(week.days.last?.number == "day")
+    }
+
+    @Test func aPastDayThatHeldNothingIsNotInTheFold() {
+        let mon = task("Book the plumber", on: day(2026, 11, 9), done: true)
+        let week = make([mon])
+        #expect(week.past?.label == "Sunday and Monday")                // the line still names the days behind
+        #expect(week.past?.days.map(\.label) == ["MON"])               // Sunday's lone "open" is not drawn
+        #expect(week.past?.days.allSatisfy { !$0.lines.contains(.open) } == true)
+    }
+
+    @Test func aTaskBeingPulledUpIsLeftOutEverywhere() {
+        let tue = task("Call the tiler", on: today)
+        let mon = task("Book the plumber", on: day(2026, 11, 9))
+        let friday = task("Send the deposit", on: day(2026, 11, 6))
+        let loose = task("Measure the bathroom window")
+        let all = [tue, mon, friday, loose]
+        let commitments = [held(loose, on: sunday)]
+        func shown(_ w: DailyWeek.Week) -> [String] {
+            w.days.flatMap(titles) + (w.past?.days.flatMap(titles) ?? []) + (w.past?.earlier.map(\.title) ?? [])
+        }
+        for t in all {
+            let week = DailyWeek.make(tasks: all, goals: [], commitments: commitments, focus: [], events: { _ in [] },
+                                      weekStart: sunday, today: today, me: me, pulledUp: t.id)
+            #expect(!shown(week).contains(t.title), "\(t.title) still shows while its Undo can be used")
+            #expect(shown(week).filter { $0 != "open" }.count == 3)
+        }
+        let gone = DailyWeek.make(tasks: all, goals: [], commitments: commitments, focus: [], events: { _ in [] },
+                                  weekStart: sunday, today: today, me: me, pulledUp: tue.id)
+        #expect(gone.days.first?.lines == [.open])
     }
 
     // MARK: The band's month goals

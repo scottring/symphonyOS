@@ -24,7 +24,16 @@ import Observation
     /// The row pulled up whose Undo is still open. Nothing is written yet: the pages
     /// leave it out of the rows, the ring, the signpost's facts and the week's days.
     private(set) var pulledUp: UUID?
+    /// The row the Undo on show would change (one added or moved), for the page to keep in
+    /// sight above the bar; `n` counts, so the same row moved again is named again. nil for a
+    /// pull-up (its row is hidden) and for a change with no row on the page.
+    private(set) var reveal: Reveal?
     var page: DailyAdd.Page = .today
+
+    struct Reveal: Equatable {
+        let id: UUID
+        let n: Int
+    }
     /// Set by a mountain page: where a goal added from the bar hangs.
     var hanging: (kept: [WalkArea], focusArea: UUID?, parent: WalkItem?, periods: WalkPeriods)?
 
@@ -40,6 +49,8 @@ import Observation
     @ObservationIgnored private var writer: DailyWriter
     /// The one change Undo takes back.
     @ObservationIgnored private var last: Change?
+    /// Counts the changes that offered Undo, for `reveal`.
+    @ObservationIgnored private var changes = 0
     @ObservationIgnored private var queue: [DailyBar.Event] = []
     @ObservationIgnored private var draining = false
     /// Counts the taps that asked to listen; each session's callbacks carry their tap's number.
@@ -164,7 +175,7 @@ import Observation
     /// Onto a day, or with `day` nil onto the week with no day; Undo puts it back.
     func move(_ taskId: UUID, to day: Date?) {
         guard let snapshot = writer.move(taskId, to: day) else { return }
-        offerUndo(.moved(snapshot), note: nil)
+        offerUndo(.moved(snapshot), note: nil, row: taskId)
     }
 
     /// Hidden at once and written only when its Undo can no longer be used.
@@ -258,13 +269,16 @@ import Observation
         } else {
             note = nil
         }
-        offerUndo(.added(added), note: note)
+        offerUndo(.added(added), note: note, row: added.id)
     }
 
-    /// A new change takes the Undo: one replaced pull-up is written now.
-    private func offerUndo(_ change: Change, note: String?) {
+    /// A new change takes the Undo: one replaced pull-up is written now. `row` is the row it
+    /// changed that stays on the page (`reveal`).
+    private func offerUndo(_ change: Change, note: String?, row: UUID? = nil) {
         commitPullUp()
         last = change
+        changes += 1
+        reveal = row.map { Reveal(id: $0, n: changes) }
         send(.did(note: note))
     }
 

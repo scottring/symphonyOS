@@ -91,6 +91,7 @@
 		556A8CF9AE258CE2EABE69D5 /* DailyDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD1CB6CDC837D9675C30916 /* DailyDemo.swift */; };
 		5B071DA5B5EE6E15078973ED /* DailyRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B0FDFB0075F54C25F0A9F7 /* DailyRows.swift */; };
 		5C17CC50C06C21FE279844E9 /* CalendarFeedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA3F6E2C9518EE578D16841 /* CalendarFeedTests.swift */; };
+		5E30F5EBF25CC8589EED80FF /* LightWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF9B40A2619B07F7F1703C8 /* LightWeekView.swift */; };
 		61710E3386CF139725EF739E /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 7E9B499A191F0220599C23CC /* Supabase */; };
 		61EBDB3A7C44135DE1B7F406 /* SymphonyList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EFF39D03A032DEB889523B4 /* SymphonyList.swift */; };
 		643E1691CD4A09CF3180B1D7 /* QuickCaptureBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */; };
@@ -336,6 +337,7 @@
 		2D0143577802D4C6E5B36D3C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2D25CC3400D409DAF4D6E68C /* DocumentIngest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentIngest.swift; sourceTree = "<group>"; };
 		2DA3F6E2C9518EE578D16841 /* CalendarFeedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarFeedTests.swift; sourceTree = "<group>"; };
+		2EF9B40A2619B07F7F1703C8 /* LightWeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightWeekView.swift; sourceTree = "<group>"; };
 		30642091C5E45B47ECA3FA0C /* SymphonyOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SymphonyOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		30B0FDFB0075F54C25F0A9F7 /* DailyRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyRows.swift; sourceTree = "<group>"; };
 		34D062F44681ECA79ADFED80 /* GoalArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalArea.swift; sourceTree = "<group>"; };
@@ -855,6 +857,7 @@
 				51C827470C2D3F7299DD2706 /* DailySheet.swift */,
 				CE8500148F5BD97291AF8393 /* LightPlannerView.swift */,
 				0E00B6B122231FE56C3CC126 /* LightTodayView.swift */,
+				2EF9B40A2619B07F7F1703C8 /* LightWeekView.swift */,
 				8EFF346033D25F30F5C9B784 /* SignpostView.swift */,
 			);
 			path = Views;
@@ -1451,6 +1454,7 @@
 				B6A3F79EF2C00858CB49FA78 /* KeyboardShortcuts.swift in Sources */,
 				3360A1E6621562988155AD32 /* LightPlannerView.swift in Sources */,
 				CACC740DB2C1ADF10C1EDF3E /* LightTodayView.swift in Sources */,
+				5E30F5EBF25CC8589EED80FF /* LightWeekView.swift in Sources */,
 				E63350EC1724E4A07675CEDE /* ListsView.swift in Sources */,
 				D4B40B6C5DF437E57BA45693 /* LogMedicationIntent.swift in Sources */,
 				4AE3289D3236007A5F98C6C0 /* MainView.swift in Sources */,

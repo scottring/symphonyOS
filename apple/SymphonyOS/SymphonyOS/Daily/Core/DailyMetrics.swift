@@ -237,10 +237,20 @@ struct DailyMetrics: Equatable {
 
     // MARK: Week
 
+    /// Above each day in the week's list (the board's 8).
+    static let weekDayTop: CGFloat = 8
+
     /// The week has no signpost, no ring and no card; its band carries up to two month-goal
     /// flags (`bandFlags`). Short (pre-flight finding 13): the sheet at `navTop + 168` and
-    /// the outside screen's bar, as Today's short shape.
+    /// the outside screen's bar, as Today's short shape. As on Today, the list's first three
+    /// rows always end above the fade: where the board would put them lower, the sheet and
+    /// everything on it rise by the shortfall and the band gives that height up.
     static func week(size: CGSize, safeTop: CGFloat, safeBottom: CGFloat, shape: Shape = .tall) -> DailyMetrics {
+        let m = weekBoard(size: size, safeTop: safeTop, safeBottom: safeBottom, shape: shape)
+        return m.risen(by: max(0, m.rowsTop + weekDayTop + 3 * m.row + 2 * m.rowGap - m.bar.fade.minY))
+    }
+
+    private static func weekBoard(size: CGSize, safeTop: CGFloat, safeBottom: CGFloat, shape: Shape) -> DailyMetrics {
         let navTop = safeTop
         let tall = shape == .tall
         let sheetTop = navTop + (tall ? 160 : 168)
@@ -258,6 +268,18 @@ struct DailyMetrics: Equatable {
             header: header, ring: 0,
             card: .zero, rowsTop: rowsTop, rowsTopNoCard: rowsTop,
             row: 46, rowGap: 5, inset: 16)
+    }
+
+    // MARK: Keeping a row in sight
+
+    /// The unit anchor (a `UnitPoint`'s y) that scrolls `row` into sight in a scroll view standing
+    /// at `scroll` (page points), so that it ends just above `bottom` (the fade, or the Move to
+    /// panel's top), or stands at the view's top when it is above it; nil when it is seen whole.
+    static func reveal(_ row: CGRect, in scroll: CGRect, above bottom: CGFloat) -> CGFloat? {
+        let room = scroll.height - row.height
+        guard room > 0, row.minY >= scroll.minY else { return 0 }
+        guard row.maxY > bottom else { return nil }
+        return min(1, max(0, (bottom - row.height - scroll.minY) / room))
     }
 
     // MARK: Touch
