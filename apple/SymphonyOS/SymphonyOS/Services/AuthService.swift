@@ -153,6 +153,10 @@ final class AuthService {
             await MainActor.run {
                 currentUser = nil
                 isAuthenticated = false
+                #if os(iOS)
+                // Nothing of this account stays on the Home Screen.
+                WidgetFeed.clear()
+                #endif
             }
         } catch {
             await MainActor.run {

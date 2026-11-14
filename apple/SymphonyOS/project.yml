@@ -56,9 +56,11 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
         # The entitlements file holds macOS App Sandbox keys, which are invalid on
-        # iOS and break device signing. Apply them only for the macOS SDK; iOS uses
-        # the default entitlements from its provisioning profile.
+        # iOS and break device signing. Apply them only for the macOS SDK.
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": SymphonyOS/App/SymphonyOS.entitlements
+        # iOS: the App Group the Home Screen widgets read Today from
+        # (WidgetStore). The widget extension carries the same group.
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphone*]": SymphonyOS/App/SymphonyOS-iOS.entitlements
       configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
@@ -67,7 +69,8 @@ targets:
     dependencies:
       - package: Supabase
         product: Supabase
-      # The Lock Screen's next-up Live Activity and the Tell Symphony control.
+      # The Home Screen widgets, the Lock Screen's next-up Live Activity and
+      # the Tell Symphony control.
       - target: SymphonyWidgets
         embed: true
         platformFilters: [iOS]
@@ -79,6 +82,9 @@ targets:
     sources:
       - path: SymphonyWidgets
       - path: SymphonyOS/LiveActivity/NextUpAttributes.swift
+      # The widgets' days and faces, shared with the app (which writes the
+      # days, and whose tests draw the faces).
+      - path: SymphonyOS/Shared
       - path: SymphonyOS/Resources/Fonts
         buildPhase: resources
     info:
@@ -87,7 +93,12 @@ targets:
         CFBundleDisplayName: Symphony
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        UIAppFonts: [CrimsonPro-Regular.ttf]
+        UIAppFonts:
+          - CrimsonPro-Regular.ttf
+          - CrimsonPro-Italic.ttf
+          - DMSans-Regular.ttf
+          - DMSans-Medium.ttf
+          - DMSans-SemiBold.ttf
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
@@ -100,6 +111,7 @@ targets:
         CURRENT_PROJECT_VERSION: "1201"
         DEVELOPMENT_TEAM: XT33G7U496
         SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: SymphonyWidgets/SymphonyWidgets.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
 

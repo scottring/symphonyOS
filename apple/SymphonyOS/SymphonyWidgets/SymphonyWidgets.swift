@@ -6,11 +6,15 @@ import WidgetKit
 // Symphony's widget extension (Scott, 2026-11-11, the iPhone Duo boards):
 // the "next up" Live Activity for the Lock Screen — the Duo's outside screen
 // when it's closed — and a Tell Symphony control for the Lock Screen,
-// Control Center or the Action button.
+// Control Center or the Action button. The Home Screen widgets (Next up,
+// To do, Today) are in DayWidgets.swift.
 
 @main
 struct SymphonyWidgets: WidgetBundle {
     var body: some Widget {
+        NextUpWidget()
+        ToDoWidget()
+        TodayWidget()
         NextUpLiveActivity()
         TellSymphonyControl()
     }

@@ -127,6 +127,15 @@ struct TodayView: View {
         .onAppear { rebuildTimeline() }
         .task { await calendar.refresh(date, maxAge: 60) }
         .task { await dinners.refresh(date) }
+        #if os(iOS)
+        // The widgets carry tomorrow and the day after as well.
+        .task {
+            for offset in 1..<WidgetFeed.dayCount {
+                await calendar.refresh(PlanCalendar.addDays(.now, offset), maxAge: 600)
+            }
+            publishWidgetDays()
+        }
+        #endif
         .onChange(of: appState.selectedDate) { _, _ in
             rebuildTimeline()
             Task { await calendar.refresh(appState.selectedDate, maxAge: 60) }
@@ -678,8 +687,30 @@ struct TodayView: View {
         #if os(iOS)
         // The Lock Screen's next up follows today's schedule.
         NextUpActivity.sync(items: viewModel.schedule, isToday: appState.isToday)
+        publishWidgetDays()
         #endif
     }
+
+    #if os(iOS)
+    /// The Home Screen widgets' days: today and the two after it, every
+    /// domain (the widgets are the whole day, whatever this view is filtered
+    /// to). Only from today's page, so paging through other days never
+    /// rewrites them.
+    private func publishWidgetDays() {
+        guard appState.isToday else { return }
+        let scratch = TimelineViewModel()
+        let days = (0..<WidgetFeed.dayCount).map { offset in
+            let day = PlanCalendar.addDays(appState.selectedDate, offset)
+            let events = calendar.items(for: day)
+            scratch.buildTimeline(tasks: allTasks, routines: routines, instances: instances, date: day,
+                                  domainFilter: .all, eventItems: events ?? [], eventNotes: eventNotes,
+                                  focus: focusRows, userId: auth.currentUser?.id)
+            return WidgetFeed.day(date: day, schedule: scratch.schedule, forToday: scratch.forToday,
+                                  dinner: dinners.dinner(on: day)?.title, eventsLoaded: events != nil)
+        }
+        WidgetFeed.publish(days)
+    }
+    #endif
 }
 
 // MARK: - Local notifications
