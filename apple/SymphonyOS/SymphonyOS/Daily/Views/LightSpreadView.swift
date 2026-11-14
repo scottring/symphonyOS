@@ -66,7 +66,7 @@ struct LightSpreadView: View {
             let line = DailyTodayHooks.walkLine(walkPosition, goalCount: goals.count, edition: appState.edition)
             let s = metrics(waiting: line != nil)
             ZStack(alignment: .topLeading) {
-                DailyBand(picture: s.picture, height: s.band.height)
+                DailyBand(picture: s.picture, cut: .week, height: s.band.height)
                 DailyTopShade(solid: s.shadeSolid, height: s.shade)
                 DailyNavRow(current: .week, gap: s.navGap, words: DailySpread.navWords(on: layout),
                             label: DailySpread.navLabel(on: layout), split: DailySpread.navSplit(on: layout, fold: s.fold),

@@ -1,16 +1,18 @@
 #if os(iOS)
 import SwiftUI
 
-/// The band of scenery at the top of Today and Week: the walk's square overlook painting
-/// at `picture` (page points) on the sky, cut off at `height`. `veil` darkens it from the
-/// top with navy (Week's band carries its flags' words on it); 0 draws none.
+/// The band of scenery at the top of Today and Week: the page's own square cut of the tall
+/// overlook painting (`cut`) at `picture` (page points) on the sky, cut off at `height`.
+/// `veil` darkens it from the top with navy (Week's band carries its flags' words on it); 0 draws none.
 struct DailyBand: View {
     let picture: CGRect
+    let cut: WalkArt.Cut
     let height: CGFloat
     var veil: Double = 0
 
-    init(picture: CGRect, height: CGFloat, veil: Double = 0) {
+    init(picture: CGRect, cut: WalkArt.Cut, height: CGFloat, veil: Double = 0) {
         self.picture = picture
+        self.cut = cut
         self.height = height
         self.veil = veil
     }
@@ -21,7 +23,7 @@ struct DailyBand: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             DailyPalette.sky
-            Image(WalkArt.overlookSquare.imageName)
+            Image(cut.imageName)
                 .resizable()
                 .interpolation(.high)
                 .frame(width: picture.width, height: picture.height)

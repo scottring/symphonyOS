@@ -81,7 +81,7 @@ struct WalkOrbView: View {
                 }
             }
         }
-        .frame(width: WalkArt.overlookSquare.stage.width, height: WalkArt.overlookSquare.stage.height,
+        .frame(width: WalkArt.stageSize.width, height: WalkArt.stageSize.height,
                alignment: .topLeading)
         .onDisappear {
             // Gone mid-press: the release will never come, so the hold must not start listening.

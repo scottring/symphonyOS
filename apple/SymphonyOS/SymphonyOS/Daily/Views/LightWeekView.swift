@@ -53,7 +53,7 @@ struct LightWeekView: View {
                 DailyWholePlan(lookBack: $lookBack, goals: goals, tasks: tasks, periods: model.periods,
                                today: model.today, me: userId, size: size)
             } else {
-                DailyBand(picture: m.picture, height: m.band.height, veil: 0.97)
+                DailyBand(picture: m.picture, cut: .week, height: m.band.height, veil: 0.97)
             }
             DailyTopShade(solid: m.shadeSolid, height: m.shade)
             if low == nil {

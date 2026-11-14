@@ -7,7 +7,7 @@ import CoreGraphics
 struct WalkStage: Equatable {
     let scale: CGFloat; let origin: CGPoint                // the stage's top-left corner on the device
 
-    init(device: CGSize, stage: CGSize = WalkArt.overlookSquare.stage) {
+    init(device: CGSize, stage: CGSize = WalkArt.stageSize) {
         let scale = min(device.width / stage.width, device.height / stage.height)
         self.scale = scale
         origin = CGPoint(x: (device.width - stage.width * scale) / 2, y: (device.height - stage.height * scale) / 2)

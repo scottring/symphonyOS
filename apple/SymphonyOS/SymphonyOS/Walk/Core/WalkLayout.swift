@@ -1370,7 +1370,7 @@ extension WalkLayout {
         let top = WalkOrb.wordsAbove(p.at) ? disc.y - WalkOrb.pointDisc / 2 - wordsGap - height
                                            : disc.y + WalkOrb.pointDisc / 2 + wordsGap
         let blockWidth = rows.map(\.width).max() ?? 0
-        let stage = WalkArt.overlookSquare.stage.width
+        let stage = WalkArt.stageSize.width
         let lowest = wordsMargin, highest = stage - wordsMargin - blockWidth
         let outward: CGFloat = disc.x < WalkOrb.centre.x - 1 ? -1 : (disc.x > WalkOrb.centre.x + 1 ? 1 : 0)
         var discs = offered.filter { $0 != p.at }.map { at -> CGRect in

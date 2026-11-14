@@ -62,7 +62,7 @@ struct LightTodayView: View {
                     DailyWholePlan(lookBack: $lookBack, goals: goals, tasks: tasks, periods: model.periods,
                                    today: model.today, me: userId, size: size)
                 } else {
-                    DailyBand(picture: m.picture, height: m.band.height + sheetDrop)
+                    DailyBand(picture: m.picture, cut: m.todayCut, height: m.band.height + sheetDrop)
                 }
                 DailyTopShade(solid: m.shadeSolid, height: m.shade)
                 DailyNavRow(current: .today, gap: m.navGap, go: go)

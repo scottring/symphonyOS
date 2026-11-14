@@ -156,7 +156,7 @@ struct LightHalfOpenView: View {
         ZStack(alignment: .topLeading) {
             DailyPalette.sky
             ZStack(alignment: .topLeading) {
-                Image(WalkArt.overlookSquare.imageName)
+                Image(WalkArt.Cut.halfOpen(across: across).imageName)
                     .resizable()
                     .interpolation(.high)
                     .frame(width: tent.picture.width, height: tent.picture.height)

@@ -23,7 +23,7 @@ struct WalkHintRow: View {
     var body: some View {
         let s = model.state
         let layout = model.layout
-        let stage = WalkArt.overlookSquare.stage
+        let stage = WalkArt.stageSize
         ZStack(alignment: .topLeading) {
             // The lesson: two lines above the light, on the veil (any tap puts it away; they take none).
             if let frame = layout.lesson {
@@ -67,7 +67,7 @@ struct WalkHintRow: View {
             .frame(maxWidth: .infinity, minHeight: 38)
             .padding(.horizontal, 10)
             .padding(.bottom, 8 + lift)
-            .frame(width: WalkArt.overlookSquare.stage.width, height: WalkArt.overlookSquare.stage.height,
+            .frame(width: WalkArt.stageSize.width, height: WalkArt.stageSize.height,
                    alignment: .bottom)
     }
 
@@ -198,7 +198,7 @@ struct WalkHintRow: View {
                 chip(WalkCopy.pullUp, colour: WalkPalette.pullUp, border: WalkPalette.pullUpBorder) { model.send(.pullUp) }
             }
             .padding(2)
-            .frame(minWidth: WalkArt.overlookSquare.stage.width - 20)       // centred while it fits
+            .frame(minWidth: WalkArt.stageSize.width - 20)       // centred while it fits
         }
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
@@ -276,7 +276,7 @@ struct WalkUnderlay: View {
 
     var body: some View {
         let layout = model.layout
-        let stage = WalkArt.overlookSquare.stage
+        let stage = WalkArt.stageSize
         ZStack(alignment: .topLeading) {
             LinearGradient(colors: [WalkPalette.ground.opacity(0), WalkPalette.ground.opacity(0.8)],
                            startPoint: .top, endPoint: .bottom)
@@ -317,7 +317,7 @@ struct WalkUnderlay: View {
                                .init(color: WalkPalette.ground.opacity(0.8), location: 0.7),
                                .init(color: WalkPalette.ground.opacity(0), location: 1)],
                        startPoint: .top, endPoint: .bottom)
-            .frame(width: WalkArt.overlookSquare.stage.width, height: height)
+            .frame(width: WalkArt.stageSize.width, height: height)
     }
 }
 

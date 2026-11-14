@@ -69,7 +69,7 @@ struct WalkView: View {
 
 extension EnvironmentValues {
     /// The stage on this device, for turning touches into stage points.
-    @Entry var walkStage = WalkStage(device: WalkArt.overlookSquare.stage)
+    @Entry var walkStage = WalkStage(device: WalkArt.stageSize)
     /// Stage points the bottom row rises to stay above the keyboard.
     @Entry var walkKeyboardLift: CGFloat = 0
 }
