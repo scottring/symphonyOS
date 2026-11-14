@@ -440,7 +440,9 @@
 .journal-heading.is-stacked { align-items: center; }
 .journal-heading.is-stacked > .journal-step { align-self: center; }
 .journal-stack { display: inline-grid; justify-items: start; line-height: 1.1; margin-left: 6px; }
-.journal-heading.is-stacked .journal-title {
+/* Small only when something stands under it (Today's weekday, Week's days);
+   alone ("November 2026") the year keeps the heading's own size. */
+.journal-heading.is-stacked .journal-stack:has(> .journal-tag) > .journal-title {
   font: 500 13px/1.2 var(--font-family-sans); letter-spacing: .04em; color: var(--color-neutral-600);
 }
 .journal-heading.is-stacked .journal-tag { margin-left: 0; }
@@ -516,3 +518,29 @@
 .today-page .today-focus-card .row-source:not([aria-label="From Amazon"]) { text-transform: none; }
 .today-page .today-focus-card .row-source.has-image { box-shadow: inset 0 0 0 1px var(--color-neutral-200); padding: 2px; }
 .today-page .today-focus-card .row-source.has-image img { width: 100%; height: 100%; display: block; }
+
+/* ---- Today's heading on every horizon (Scott, 2026-11-14) --------------- */
+/* Month, Season, Year: the print behind the period heading, as on Today. */
+.plan-head:has(> .heading-print) { position: relative; isolation: isolate; padding-bottom: 18px; }
+.plan-head > .heading-print { z-index: -1; }
+/* The period is a word ("November", "Fall"), not a day's number: a size
+   down so it sits beside its year and dates on one line. */
+.plan-head .journal-num { font-size: 60px; }
+@media (max-width: 767px) {
+  .plan-head .journal-num { font-size: 44px; }
+  .wl-sheet .wl-masthead .journal-num { font-size: 52px; }
+}
+
+/* Week's rows speak Today's row language (Scott, 2026-11-14): the kind's
+   ink icon, where it came from, a done-by date. */
+.wl-sheet .row-kind-icon { display: inline-flex; flex: none; align-self: flex-start; margin: 3px 6px 0 0; color: var(--color-neutral-600); }
+.cw-badges { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; vertical-align: 1px; }
+.cw-badges .row-source {
+  display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 4px;
+  font: 700 11px/1 var(--font-family-sans); color: #fff;
+}
+.cw-badges .row-source.has-image { box-shadow: inset 0 0 0 1px var(--color-neutral-200); padding: 2px; }
+.cw-badges .row-source.has-image img { width: 100%; height: 100%; display: block; }
+.jc-what .jc-icon { display: inline-flex; vertical-align: -2px; margin-right: 6px; color: var(--color-neutral-600); }
+/* Year's heading is the number alone: no gap where the words would stand. */
+.journal-heading.is-stacked .journal-stack:has(> .journal-title > [aria-hidden='true']:empty) { margin-left: -10px; }

@@ -88,6 +88,7 @@ import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { createPortal } from 'react-dom'
 import { useMobile } from '@/hooks/useMobile'
 import { JournalHeading } from '@/components/layout/JournalHeading'
+import { HeadingPrint } from '@/components/place/HeadingPrint'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { describeTriageWhen } from '@/lib/triage/applyWhen'
 import { compareSortOrder, nextTaskSortOrder, reorderTasksToIndex, type OrderWrite } from '@/lib/today/taskOrdering'
@@ -1064,9 +1065,17 @@ function Inner() {
   // Today's and Week's do; on a phone, above it.
   const head = (
     <header className="plan-head">
+      {/* Today's heading on every horizon (Scott, 2026-11-14): the print
+          across the top of the sheet, the period big and its year small
+          beside it — "November 2026", "Fall 2026", "2026". The dates
+          stay off it (calm pass 2026-10-18: a month's go without saying, a
+          season's are its fact line). */}
+      <HeadingPrint />
       <div className="plan-head-main">
         <div className="plan-period is-journal" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
-          <JournalHeading title={periodTitle}
+          <JournalHeading stacked numeral={level === 0 ? String(year) : periodWord}
+            title={level === 0 ? '' : (periodTitle.match(/\d{4}$/)?.[0] ?? periodTitle)}
+            srTitle={periodTitle}
             onPrev={() => setStart(bounds.prev)} onNext={() => setStart(bounds.next)}
             prevLabel={`Previous ${PERIODS[level]}`} nextLabel={`Next ${PERIODS[level]}`}
             // Another period on screen: the way back (Scott, 2026-11-11).

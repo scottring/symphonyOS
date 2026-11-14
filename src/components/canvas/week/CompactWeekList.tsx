@@ -96,6 +96,10 @@ export interface CompactWeekRowProps<T> {
   trailing?: ReactNode
   /** Before the + button (a shelf row's ⋯ menu). */
   extra?: ReactNode
+  /** Before the title: what kind of thing it is (Today's ink icon). */
+  lead?: ReactNode
+  /** Beside the title: where it came from, its done-by date (as on Today). */
+  badges?: ReactNode
   /** Under the title, after its muted line (a week day's people). */
   under?: ReactNode
   /** Drawn inside the row, after it (a picker). */
@@ -107,7 +111,7 @@ export interface CompactWeekRowProps<T> {
 }
 
 /** One compact row: check, wrapping title, small meta, and + (or a menu). */
-export function CompactWeekRow<T>({ row, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, extra, under, children, className, liProps }: CompactWeekRowProps<T>) {
+export function CompactWeekRow<T>({ row, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, extra, under, lead, badges, children, className, liProps }: CompactWeekRowProps<T>) {
   const arrived = useArrived(row.id)
   const done = !!row.completed
   const movable = !!onDragStart && !row.readOnly && !row.onDay && !done && !disabled
@@ -124,10 +128,12 @@ export function CompactWeekRow<T>({ row, onAdd, addExpanded, onComplete, onOpen,
             <span className="cw-check-ring" aria-hidden="true"><Check size={11} strokeWidth={3} /></span>
           </button>
         )}
+      {lead}
       <span className="canvas-item-title">
         {onOpen
           ? <button type="button" className="cw-title" onClick={() => onOpen(row.item)}>{row.title}</button>
           : <span className="cw-title">{row.title}</span>}
+        {badges && <span className="cw-badges">{badges}</span>}
         {/* One muted line under the title: its notes. The title gets the
             row's width; this line never wraps. */}
         {(row.meta || row.context) && (

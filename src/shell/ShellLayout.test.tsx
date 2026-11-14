@@ -357,18 +357,20 @@ describe('Place scenery', () => {
   afterEach(() => { mobileState.isMobile = false })
 
   for (const phone of [false, true]) {
-    it(`Today has no landscape at its foot: the print is in its heading (Scott, 2026-11-13; ${phone ? 'phone' : 'desktop'})`, () => {
-      mobileState.isMobile = phone
-      renderAt('/today')
-      expect(document.querySelector('[data-place-scenery]')).toBeNull()
-    })
+    for (const path of ['/today', '/week', '/month', '/season', '/year']) {
+      it(`${path} has no landscape at its foot: the print is in its heading (Scott, 2026-11-13/14; ${phone ? 'phone' : 'desktop'})`, () => {
+        mobileState.isMobile = phone
+        renderAt(path)
+        expect(document.querySelector('[data-place-scenery]')).toBeNull()
+      })
+    }
   }
 
   for (const phone of [false, true]) {
     it(`stands in the scroller, outside the page, hidden from assistive tech (${phone ? 'phone' : 'desktop'})`, () => {
       mobileState.isMobile = phone
-      // Today on a desktop carries its print in the heading instead (below).
-      renderAt('/week')
+      // Today and the horizons carry their print in the heading instead (above).
+      renderAt('/routines')
       const scenery = document.querySelector('[data-place-scenery]') as HTMLElement
       const page = screen.getByTestId('app-content')
       expect(scenery).toHaveAttribute('aria-hidden', 'true')

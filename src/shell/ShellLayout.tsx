@@ -150,6 +150,11 @@ export function deriveActiveView(pathname: string): ViewType {
  * fell through to 'today' and silently lost the domain switcher, even though
  * Someday filters by it.
  */
+/** Pages that carry the print in their heading (HeadingPrint) and so show
+ * no landscape at their foot: one picture per page (Scott, 2026-11-13 for
+ * Today, 2026-11-14 for every horizon). */
+const PRINT_IN_HEADING_PATHS = ['/today', '/week', '/month', '/season', '/year']
+const printInHeading = (pathname: string) => PRINT_IN_HEADING_PATHS.includes(pathname)
 const OWN_CHROME_PATHS = ['/', '/today', '/week', '/month', '/season', '/year', '/inbox', '/discussions', '/tasks-new'];
 export function pageOwnsFilterChrome(pathname: string): boolean {
   return OWN_CHROME_PATHS.some((p) => pathname === p || (p !== '/' && pathname.startsWith(`${p}/`)))
@@ -661,12 +666,12 @@ function ShellLayoutInner({ children }: Props) {
           </div>
           </>
         )}
-        {showScenery && isMobile && location.pathname !== '/today' && <div className="scenery-end-clearance" aria-hidden="true" />}
+        {showScenery && isMobile && !printInHeading(location.pathname) && <div className="scenery-end-clearance" aria-hidden="true" />}
         {/* The landscape's switch and strength, at the foot on the right (2026-11-11). */}
         {!isMobile && <SceneryDial right={paneWidth} />}
-        {/* Today carries the print in its heading instead (HeadingPrint):
-            one picture per page (Scott, 2026-11-13). */}
-        {location.pathname !== '/today' && (
+        {/* Today and the horizons carry the print in their heading instead
+            (HeadingPrint): one picture per page (Scott, 2026-11-13/14). */}
+        {!printInHeading(location.pathname) && (
           <PlaceScenery scroller={pageScroller} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} vivid={location.pathname === HOME_ROUTE} />
         )}
       </div>

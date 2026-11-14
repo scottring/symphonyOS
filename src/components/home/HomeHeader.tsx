@@ -10,6 +10,11 @@ import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard
 import { ShelvesButton } from '@/components/reference/ShelvesButton'
 import { planV2Enabled } from '@/lib/planning/v2/planV2'
 import { monthsTitle } from '@/lib/planning/journalHeading'
+import { HeadingPrint } from '@/components/place/HeadingPrint'
+
+const weekdayName = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long' })
+/** "Saturday – Friday": the week's own first and last days. */
+const weekdaySpan = (start: Date, end: Date) => `${weekdayName(start)} – ${weekdayName(end)}`
 
 interface HomeHeaderProps {
   currentView: HomeViewType
@@ -279,7 +284,12 @@ export function HomeHeader(props: HomeHeaderProps) {
       return (
         <MastheadCard
           variant="page"
+          // Today's heading (Scott, 2026-11-14): the print across the top of
+          // the sheet; "7–13" big, the month small over the weekdays.
+          backdrop={<HeadingPrint />}
           journal={{
+            stacked: true,
+            tag: weekdaySpan(weekStart, rangeEnd),
             numeral: `${weekStart.getDate()}–${rangeEnd.getDate()}`,
             onPrev, onNext, prevLabel, nextLabel,
             trailing: menu,
@@ -303,6 +313,8 @@ export function HomeHeader(props: HomeHeaderProps) {
     return (
       <MastheadCard
         variant="page"
+        // The print behind Week's heading on a phone too (Scott, 2026-11-14).
+        backdrop={<HeadingPrint />}
         // The run's name sits after the arrows, outside the heading: the
         // heading is the dates.
         titleNav={{ onPrev, onNext, prevLabel, nextLabel, trailing: <>{runName}{menu}</> }}

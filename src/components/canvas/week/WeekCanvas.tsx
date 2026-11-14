@@ -72,6 +72,11 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { PlanMastheadSlotsContext, WeekMastheadHostContext } from '@/components/plan/v2/planMastheadSlots'
 import { likelyDuplicates, weekSentence } from '@/lib/planning/weekJournal'
 import { CompactWeekRow, type CompactRow, type CompactWeekRowProps } from './CompactWeekList'
+import { KindIcon } from '@/components/schedule/KindIcon'
+import { itemIcon } from '@/lib/today/itemIcon'
+import { displayTitle, marginClock } from '@/lib/today/displayTitle'
+import { sourceMark } from '@/lib/today/sourceMark'
+import { dueLabel } from '@/lib/today/dueSoon'
 import { GiveItADay } from './GiveItADay'
 import { dayChipLabel } from './compactWeek'
 import type { ShelfGroup } from './weekShelf'
@@ -982,9 +987,18 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
           onDelete={writers.deleteTask ? () => { setWhenOpen(null); writers.deleteTask!(t) } : undefined} />
       )
+      // Today's row language on Week too (Scott, 2026-11-14): a quiet
+      // title for a shouted one, the kind's icon, where it came from, and a
+      // done-by date.
+      const src = sourceMark(t)
       return (
         <CompactWeekRow key={key}
-          row={{ key, id: t.id, title: t.title, item: t, completed: t.completed, meta: [day ? dayMark(day) : shelfMeta.get(t.id), dupOf.has(t.id) ? `Looks like “${dupOf.get(t.id)}”` : null].filter(Boolean).join(' · ') || undefined }}
+          lead={itemIcon(t.title) ? <span className="row-kind-icon" aria-hidden="true"><KindIcon title={t.title} size={16} /></span> : undefined}
+          badges={(src || (t.dueOn && !t.completed)) ? <>
+            {src && <span className={`row-source${src.image ? ' has-image' : ''}`} title={`From ${src.label}`} aria-label={`From ${src.label}`} style={{ background: src.color }}>{src.image ? <img src={src.image} alt="" /> : src.letter}</span>}
+            {t.dueOn && !t.completed && <span className="row-due" data-testid="row-due">{dueLabel(t.dueOn, new Date(nowMs))}</span>}
+          </> : undefined}
+          row={{ key, id: t.id, title: displayTitle(t.title), item: t, completed: t.completed, meta: [day ? dayMark(day) : shelfMeta.get(t.id), dupOf.has(t.id) ? `Looks like “${dupOf.get(t.id)}”` : null].filter(Boolean).join(' · ') || undefined }}
           className={`wc-dayrow wc-weekrow wl-row${day ? ' has-day' : ''}${day?.key === todayKey ? ' is-today' : ''}${pointedTask(t.id) ? ' is-pointed' : ''}${whenOpen === key || picker?.key === key ? ' is-when-open' : ''}${fresh.has(t.id) || dayFresh.has(`${day?.key}:task-${t.id}`) ? ' is-new' : ''}${order?.liProps.className ? ` ${order.liProps.className}` : ''}`}
           liProps={{ ...order?.liProps, className: undefined, 'data-testid': `week-row-${t.id}` }}
           onDragStart={order?.onDragStart ? (_, ev) => order.onDragStart!(ev) : undefined}
@@ -1030,7 +1044,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         </CompactWeekRow>
       )
     }
-    const timeOf = (it: CanvasDayItem) => (it.time ? formatTimeCompact(it.time) : 'All day')
+    // Today's clock in the margin: "7 AM", "7:30 PM" (2026-11-14).
+    const timeOf = (it: CanvasDayItem) => (it.time ? marginClock(it.time) : 'All day')
     const calendar = (
       <CalendarSheet kicker="Calendar" title="The days">
         {spans.length > 0 && (
@@ -1064,7 +1079,10 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
                 const evRow = (ev: CanvasDayItem) => (
                   <li key={ev.id} className={`jc-row${ev.time ? ' is-timed' : ''}`}>
                     <span className="jc-time">{timeOf(ev)}</span><span className="jc-dot" aria-hidden="true" />
-                    <button type="button" className="jc-what" onClick={() => writers.open(ev.id)}>{ev.title}</button>
+                    <button type="button" className="jc-what" onClick={() => writers.open(ev.id)}>
+                      {itemIcon(ev.title) && <span className="jc-icon" aria-hidden="true"><KindIcon title={ev.title} size={15} /></span>}
+                      {displayTitle(ev.title)}
+                    </button>
                   </li>
                 )
                 return (
