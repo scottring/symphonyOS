@@ -23,6 +23,7 @@ struct iOSMainView: View {
     @Environment(AuthService.self) private var auth
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var households: [Household]
     @State private var showCapture = false
     @State private var hinge: HingeReader.Reading?
@@ -142,6 +143,7 @@ struct iOSMainView: View {
         .overlay {
             if let walk {
                 WalkView(model: walk)
+                    .id(ObjectIdentifier(walk))     // a new walk (a new day) starts with fresh view state
                     .transition(.opacity)
             }
         }
@@ -157,14 +159,20 @@ struct iOSMainView: View {
         .onAppear { updatePosture(); applyEdition(); considerWalk() }
         // MainView is mounted only while signed in; forget the edition, and take
         // the walk down, when it goes.
-        .onDisappear { CalendarFeed.shared.edition = nil; closeWalk() }
+        .onDisappear {
+            CalendarFeed.shared.edition = nil
+            closeWalk()
+            appState.walkReplayRequested = false
+        }
         .onChange(of: households.map(\.edition)) { _, _ in applyEdition() }
         .onChange(of: appState.initialSyncFinished) { _, _ in considerWalk() }
         .onChange(of: appState.edition) { _, _ in considerWalk() }
         .onChange(of: appState.walkReplayRequested) { _, _ in considerWalk() }
-        // Someone else signed in (or nobody is): the walk up is not theirs.
+        // Someone else signed in (or nobody is): the walk up, and a replay still
+        // waiting, are not theirs.
         .onChange(of: auth.currentUser?.id) { _, _ in
             closeWalk()
+            appState.walkReplayRequested = false
             considerWalk()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
@@ -201,7 +209,8 @@ extension iOSMainView {
     /// Opens the walk when `WalkEntry.decide` says so: by itself for a new person in a
     /// light household, resumed where it was left, or replayed from Settings. Called on
     /// appear and whenever the first pull finishes, the edition changes, a replay is asked
-    /// for or someone else signs in; it does nothing while a walk is up. The households and
+    /// for or someone else signs in; it does nothing while a walk is up, and before the first
+    /// pull only a resume or a replay may open (`WalkEntry.mayDecide`). The households and
     /// goals are counted from the store as it is now, not from a `@Query` that may lag.
     ///
     /// Debug demo: `-SymphonyDemo -SymphonyWalk [-SymphonyWalkStep N] [-SymphonyWalkOrb …]`
@@ -209,11 +218,6 @@ extension iOSMainView {
     /// then drives it into a state for a screenshot. A demo never reads or saves a position.
     private func considerWalk() {
         let userId = auth.currentUser?.id
-        guard WalkEntry.mayDecide(walkUp: walk != nil, signedIn: auth.isAuthenticated && userId != nil,
-                                  initialSyncFinished: appState.initialSyncFinished),
-              let userId else { return }
-        let replay = appState.walkReplayRequested
-        if replay { appState.walkReplayRequested = false }
         #if DEBUG
         let demo = DemoMode.isOn
         let demoWalk = demo && DemoMode.isWalk && !demoWalkOpened
@@ -222,8 +226,15 @@ extension iOSMainView {
         let demoWalk = false
         #endif
         let store: WalkPositionStore? = demo ? nil : WalkPositionStore()
-        let position = store?.load(for: userId)
-        let householdRows = (try? modelContext.fetch(FetchDescriptor<Household>())) ?? []
+        let position = userId.flatMap { store?.load(for: $0) }
+        // Oldest first, as sync picks the household whose settings the phone follows.
+        let householdRows = (try? modelContext.fetch(FetchDescriptor<Household>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+        let replay = appState.walkReplayRequested
+        guard WalkEntry.mayDecide(walkUp: walk != nil, signedIn: auth.isAuthenticated && userId != nil,
+                                  initialSyncFinished: appState.initialSyncFinished, position: position,
+                                  replay: replay, householdCount: householdRows.count),
+              let userId else { return }
+        if replay { appState.walkReplayRequested = false }
         let goalCount = (try? modelContext.fetchCount(FetchDescriptor<Goal>())) ?? 0
         let entry = WalkEntry.decide(replay: replay, demoWalk: demoWalk, position: position,
                                      householdEditions: householdRows.map(\.edition),
@@ -241,8 +252,11 @@ extension iOSMainView {
         #else
         opening = (entry, position, nil)
         #endif
+        // The edition from the same rows the decision read (the demo's is its launch argument).
+        let edition = demo ? appState.edition
+            : Edition.resolve(householdRows.map(\.edition), lastKnown: EditionMemory().lastKnown(for: userId))
         let model = WalkModel(context: modelContext, userId: userId, entry: opening.entry, position: opening.position,
-                              edition: appState.edition, seasons: householdRows.first?.seasons,
+                              edition: edition, seasons: householdRows.first?.seasons,
                               store: store, listener: opening.listener)
         model.onEnd = { _ in
             closeWalk()
@@ -253,15 +267,17 @@ extension iOSMainView {
         #if DEBUG
         if demoWalk { DemoMode.showWalk(model, DemoMode.walkOrb) }
         #endif
-        walk = model
+        withAnimation(walkFade) { walk = model }
     }
+
+    private var walkFade: Animation { .easeInOut(duration: reduceMotion ? 0.15 : 0.4) }
 
     /// Takes the walk down: listening is cancelled and its timers stop. What it planted
     /// is already saved, rows and position both.
     private func closeWalk() {
         guard let walk else { return }
         walk.close()
-        withAnimation(.easeInOut(duration: 0.4)) { self.walk = nil }
+        withAnimation(walkFade) { self.walk = nil }
     }
 
     private func updatePosture() {

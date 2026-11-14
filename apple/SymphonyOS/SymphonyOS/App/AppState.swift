@@ -126,6 +126,13 @@ final class AppState {
     /// and sets this back to false.
     var walkReplayRequested = false
 
+    /// The signed-in person is gone: their first pull, and any replay they asked
+    /// for that is still waiting, go with them.
+    func signedOut() {
+        initialSyncFinished = false
+        walkReplayRequested = false
+    }
+
     // MARK: - Date Navigation
 
     func goToToday() {

@@ -5,7 +5,8 @@ import SwiftData
 /// Year — switched from the serif title rather than a row of tabs.
 struct PlannerView: View {
     @Environment(AppState.self) private var appState
-    @Query private var households: [Household]
+    /// Oldest first, as sync and the walk pick the household whose settings the phone follows.
+    @Query(sort: \Household.createdAt) private var households: [Household]
     @State private var showHorizons = false
     /// The horizon on screen, a step behind `appState.horizon` so the slide
     /// knows its direction (Scott, 2026-11-07): going down a level (Month to
@@ -65,21 +66,20 @@ struct PlannerView: View {
     private func openSwitcher() { showHorizons = true }
     private func close() { showHorizons = false }
 
-    /// In the light edition, Month, Season and Year open on the period the walk
-    /// files into (the walk's own `WalkPeriods`), so they show what it filed; the
-    /// steppers move on from there. Nil where the page keeps `selectedDate`.
-    private func walkPageDate(_ h: Horizon) -> Date? {
-        guard appState.edition == .light, [.month, .season, .year].contains(h) else { return nil }
-        return WalkPeriods.pick(now: .now, seasons: seasons).pageDate(for: h)
+    /// Where a row opens (`WalkPeriods.switcherDate`): in light, every row but the
+    /// page on screen opens on the walk's period, so the pages show what it filed.
+    private func opensOn(_ h: Horizon) -> Date? {
+        WalkPeriods.switcherDate(for: h, viewing: appState.horizon, edition: appState.edition,
+                                 now: .now, seasons: seasons)
     }
 
     private var switcher: some View {
-        let date = appState.selectedDate
-        let week = PlanCalendar.weekStart(date)
         // Each row names the period it opens on.
-        let month = walkPageDate(.month) ?? date
-        let season = PlanCalendar.season(containing: walkPageDate(.season) ?? date, boundaries: seasons)
-        let year = walkPageDate(.year) ?? date
+        func date(_ h: Horizon) -> Date { opensOn(h) ?? appState.selectedDate }
+        let week = PlanCalendar.weekStart(date(.week))
+        let month = date(.month)
+        let season = PlanCalendar.season(containing: date(.season), boundaries: seasons)
+        let year = date(.year)
         return VStack(spacing: 2) {
             option(.today, "Today", Date().formatted(.dateTime.weekday(.wide).month(.wide).day()))
             option(.week, WeekPlanView.title(for: week), WeekPlanView.range(week))
@@ -99,8 +99,7 @@ struct PlannerView: View {
     private func option(_ h: Horizon, _ name: String, _ sub: String) -> some View {
         let selected = appState.horizon == h
         return Button {
-            if h == .today { appState.goToToday() }
-            if let opensOn = walkPageDate(h) { appState.selectedDate = opensOn }
+            if let date = opensOn(h) { appState.selectedDate = date }
             appState.horizon = h
             close()
         } label: {

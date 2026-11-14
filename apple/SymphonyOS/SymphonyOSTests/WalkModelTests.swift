@@ -510,6 +510,37 @@ struct WalkModelTests {
         #expect(AppState().walkReplayRequested == false)
     }
 
+    /// A replay asked for and still waiting never outlives the person who asked.
+    @Test func signingOutForgetsAWaitingReplay() {
+        let app = AppState()
+        app.walkReplayRequested = true
+        app.initialSyncFinished = true
+        app.signedOut()
+        #expect(app.walkReplayRequested == false)
+        #expect(app.initialSyncFinished == false)
+    }
+
+    /// Closed while the permission prompts are up: when `start()` comes back, with or
+    /// without a problem, nothing reaches the state.
+    @Test(arguments: [nil, "Speech is off"])
+    func closingWhileThePromptIsUpLetsNothingThrough(problem: String?) async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        listener.problemOnStart = problem
+        var before: WalkState?
+        listener.whileStarting = {
+            before = m.state
+            m.close()
+        }
+        await hold(m)
+        #expect(listener.starts == 1)
+        #expect(listener.stops == 1)
+        #expect(before != nil)
+        #expect(m.state == before)
+        scheduler.advance(WalkState.noteMs + WalkOrb.finishMs)
+        #expect(m.state == before)
+    }
+
     @Test func aLeftWalkIsRememberedAndAReplayStartsFresh() throws {
         let saved = store()
         let ctx = try walkTestContext()

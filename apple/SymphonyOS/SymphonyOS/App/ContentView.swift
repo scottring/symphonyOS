@@ -98,7 +98,7 @@ struct ContentView: View {
 
     private func stopSync() {
         syncedUserId = nil
-        appState.initialSyncFinished = false
+        appState.signedOut()
         if let engine = syncEngine {
             Task {
                 await engine.stop()

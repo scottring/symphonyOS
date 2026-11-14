@@ -102,4 +102,26 @@ struct WalkPeriodsTests {
         #expect(p.pageDate(for: .week) == now)
         #expect(p.pageDate(for: .today) == now)
     }
+
+    /// Where a Planner switcher row opens. Full: only Today moves the date, to now. Light:
+    /// every row but the one on screen opens on the walk's period (Week and Today on today);
+    /// the row on screen leaves the date where the steppers put it.
+    @Test func switcherRowsOpenOnTheWalksPeriodsInLightOnly() {
+        let now = PlanCalendar.calendar.date(bySettingHour: 15, minute: 0, second: 0, of: day(2026, 11, 13))!
+        func opens(_ h: Horizon, viewing: Horizon, _ edition: Edition) -> Date? {
+            WalkPeriods.switcherDate(for: h, viewing: viewing, edition: edition, now: now, seasons: nil)
+        }
+        #expect(opens(.today, viewing: .month, .full) == now)
+        for h in [Horizon.week, .month, .season, .year] {
+            #expect(opens(h, viewing: .today, .full) == nil)
+        }
+        #expect(opens(.today, viewing: .year, .light) == day(2026, 11, 13))
+        #expect(opens(.week, viewing: .year, .light) == day(2026, 11, 13))     // back on this week
+        #expect(opens(.month, viewing: .today, .light) == day(2026, 11, 1))
+        #expect(opens(.season, viewing: .today, .light) == day(2026, 12, 1))
+        #expect(opens(.year, viewing: .today, .light) == day(2027, 1, 1))
+        for h in Horizon.allCases {
+            #expect(opens(h, viewing: h, .light) == nil)                        // the page on screen stays put
+        }
+    }
 }

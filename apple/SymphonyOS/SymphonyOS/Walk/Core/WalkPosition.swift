@@ -177,15 +177,21 @@ enum WalkEntry: Equatable {
         return onlyLight && initialSyncFinished && goalCount == 0 ? .start : .none
     }
 
-    /// Whether `decide` is asked at all: never while a walk is up, never with nobody signed
-    /// in, and never before the first pull has finished (a replay asked for meanwhile waits).
-    static func mayDecide(walkUp: Bool, signedIn: Bool, initialSyncFinished: Bool) -> Bool {
-        !walkUp && signedIn && initialSyncFinished
+    /// Whether `decide` is asked at all: never while a walk is up or with nobody signed in.
+    /// Before the first pull has finished, a saved walk in progress opens at once (it and
+    /// every row it planted are on this phone), and so does a replay over a household
+    /// already on this phone; a replay on a brand-new sign-in waits (still asked for), and
+    /// the automatic first start waits as `decide` says.
+    static func mayDecide(walkUp: Bool, signedIn: Bool, initialSyncFinished: Bool,
+                          position: WalkPosition?, replay: Bool, householdCount: Int) -> Bool {
+        guard !walkUp, signedIn else { return false }
+        if initialSyncFinished || position?.status == .inProgress { return true }
+        return replay && householdCount > 0
     }
 
     /// A walk still up on a later day than the one it opened on is taken down and decided
     /// again, so it resumes from its saved place with that day's periods.
-    static func dayHasTurned(walkDay: Date, now: Date) -> Bool {
-        !PlanCalendar.calendar.isDate(walkDay, inSameDayAs: now)
+    static func dayHasTurned(walkDay: Date, now: Date, calendar: Calendar = PlanCalendar.calendar) -> Bool {
+        !calendar.isDate(walkDay, inSameDayAs: now)
     }
 }

@@ -255,15 +255,32 @@ private struct Saved {
         #expect(decide(false, false, nil, ["light", "full"], true, 0) == .none)
     }
 
-    /// `decide` is asked only with nobody's walk up, someone signed in and the first pull finished.
-    @Test func nothingIsDecidedOverAWalkTheSignInOrAnUnfinishedSync() {
-        #expect(WalkEntry.mayDecide(walkUp: false, signedIn: true, initialSyncFinished: true))
-        #expect(!WalkEntry.mayDecide(walkUp: true, signedIn: true, initialSyncFinished: true))
-        #expect(!WalkEntry.mayDecide(walkUp: false, signedIn: false, initialSyncFinished: true))
-        #expect(!WalkEntry.mayDecide(walkUp: false, signedIn: true, initialSyncFinished: false))
+    /// `decide` is asked only with no walk up and someone signed in. Before the first pull has
+    /// finished only a saved walk in progress, or a replay over a household already on this
+    /// phone, may open; the automatic first start waits (and `decide` keeps its own guard).
+    @Test func whatMayOpenBeforeTheFirstPull() {
+        let p = periods(2026, 11, 13)
+        func pos(_ status: WalkStatus) -> WalkPosition {
+            WalkPosition(WalkState(), status: status, planted: [], periods: p, now: p.today)
+        }
+        func may(walkUp: Bool = false, signedIn: Bool = true, synced: Bool, position: WalkPosition? = nil,
+                 replay: Bool = false, households: Int = 0) -> Bool {
+            WalkEntry.mayDecide(walkUp: walkUp, signedIn: signedIn, initialSyncFinished: synced,
+                                position: position, replay: replay, householdCount: households)
+        }
+        #expect(may(synced: true))
+        #expect(may(synced: false, position: pos(.inProgress)))                 // resume before sync
+        #expect(may(synced: false, replay: true, households: 1))                // replay over a household on the phone
+        #expect(!may(synced: false, replay: true, households: 0))               // a brand-new sign-in still pulling
+        #expect(!may(synced: false, households: 1))                             // the automatic start
+        #expect(!may(synced: false, position: pos(.left), households: 1))       // a left walk is not a resume
+        #expect(!may(synced: false, position: pos(.finished), households: 1))
+        #expect(!may(signedIn: false, synced: true, position: pos(.inProgress), replay: true, households: 1))
+        #expect(!may(walkUp: true, synced: true, position: pos(.inProgress), replay: true, households: 1))
     }
 
-    /// A walk still up after midnight is taken down and decided again with the new day's periods.
+    /// A walk still up on a later day is taken down and decided again with the new day's periods.
+    /// The day is the given calendar's: a 25- or 23-hour night still turns once, at midnight.
     @Test func aNewDayTakesTheWalkDown() {
         let cal = PlanCalendar.calendar
         let walkDay = day(2026, 11, 13)
@@ -272,6 +289,27 @@ private struct Saved {
         #expect(!WalkEntry.dayHasTurned(walkDay: walkDay, now: lateThatNight))
         #expect(WalkEntry.dayHasTurned(walkDay: walkDay, now: justAfterMidnight))
         #expect(WalkEntry.dayHasTurned(walkDay: walkDay, now: day(2026, 12, 13)))
+
+        var newYork = Calendar(identifier: .gregorian)
+        newYork.timeZone = TimeZone(identifier: "America/New_York")!
+        func at(_ c: Calendar, _ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int = 0) -> Date {
+            c.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
+        }
+        for (m, d) in [(11, 1), (3, 8)] {                                       // clocks back, clocks forward
+            let start = newYork.startOfDay(for: at(newYork, 2026, m, d, 12))
+            #expect(!WalkEntry.dayHasTurned(walkDay: start, now: at(newYork, 2026, m, d, 23, 30), calendar: newYork))
+            #expect(WalkEntry.dayHasTurned(walkDay: start, now: at(newYork, 2026, m, d + 1, 0, 30), calendar: newYork))
+        }
+
+        // The same two moments, read in two time zones: the calendar given decides, not the device.
+        var auckland = Calendar(identifier: .gregorian)
+        auckland.timeZone = TimeZone(identifier: "Pacific/Auckland")!
+        var losAngeles = Calendar(identifier: .gregorian)
+        losAngeles.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let aucklandDay = auckland.startOfDay(for: at(auckland, 2026, 11, 13, 12))
+        let later = aucklandDay.addingTimeInterval(22 * 3600)                    // 22:00 there, 01:00 the next day in LA
+        #expect(!WalkEntry.dayHasTurned(walkDay: aucklandDay, now: later, calendar: auckland))
+        #expect(WalkEntry.dayHasTurned(walkDay: aucklandDay, now: later, calendar: losAngeles))
     }
 
     // MARK: Fix round 1
