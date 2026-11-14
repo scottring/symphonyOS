@@ -83,13 +83,18 @@ struct WalkOrbView: View {
             pressStart = nil
             if pressOnLight { model.send(.orbCancelled) }
         }
-        .onChange(of: liveWords(s.orb)) { _, words in
-            // The live flag's words, spoken politely: after whatever VoiceOver is saying.
-            guard let words, !words.isEmpty else { return }
+        .onChange(of: s.orb) { old, new in
+            // The flag's words, spoken once, politely, as the person lets go: never the partial words.
+            guard case .finishing(let words) = new, !isFinishing(old), !words.isEmpty else { return }
             let announcement = NSAttributedString(string: words,
                                                   attributes: [.accessibilitySpeechAnnouncementPriority: UIAccessibilityPriority.low])
             UIAccessibility.post(notification: .announcement, argument: announcement)
         }
+    }
+
+    private func isFinishing(_ orb: WalkState.Orb) -> Bool {
+        if case .finishing = orb { return true }
+        return false
     }
 
     // MARK: VoiceOver
@@ -338,6 +343,7 @@ struct WalkLiveFlag: View {
     let colour: Color
     @State private var poleUp = false
     @State private var clothOut = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 186, not the contract's 220: from x 197 a 220-wide cloth would run off the stage's right edge.
     static let maxClothWidth: CGFloat = 186
@@ -354,15 +360,15 @@ struct WalkLiveFlag: View {
             cloth
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(text)
-                .accessibilityAddTraits(.updatesFrequently)
                 .scaleEffect(x: clothOut ? 1 : 0, y: 1, anchor: .leading)
                 .shadow(color: WalkPalette.warmGlow.opacity(0.9), radius: 5)
                 .offset(x: 2, y: 2)
         }
         .frame(width: 0, height: 86, alignment: .topLeading)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.38)) { poleUp = true }
-            withAnimation(.easeOut(duration: 0.5).delay(0.3)) { clothOut = true }
+            // With Reduce Motion both arrive together in the cross-fade's time.
+            withAnimation(reduceMotion ? WalkSceneView.crossFade : .easeOut(duration: 0.38)) { poleUp = true }
+            withAnimation(reduceMotion ? WalkSceneView.crossFade : .easeOut(duration: 0.5).delay(0.3)) { clothOut = true }
         }
     }
 

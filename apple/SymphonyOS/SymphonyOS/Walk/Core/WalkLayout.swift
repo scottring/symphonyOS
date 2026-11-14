@@ -50,6 +50,17 @@ struct WalkLayout: Equatable {
         let perLine = max(1, floor((width - 16) / 6.6))
         return min(3, max(1, Int(ceil(CGFloat(text.count) / perLine))))
     }
+
+    /// What a tap on a banner sends: a banner carrying "+n", or a stub, opens its post;
+    /// an example plants its words; any other flag is tapped by its id.
+    static func tapEvent(_ banner: Banner, on post: Post) -> WalkEvent? {
+        if banner.more != nil { return .stubTapped(post.key) }
+        switch banner.kind {
+        case .stub: return .stubTapped(post.key)
+        case .ghost: return .exampleTapped(banner.text)
+        case .full, .compact, .tip: return banner.itemId.map { .bannerTapped($0) }
+        }
+    }
 }
 
 // MARK: - The pass
@@ -270,7 +281,7 @@ private struct Builder {
             return L.Label(id: area.id, name: area.name, frame: frame, kept: kept, focused: focused,
                            opacity: Double(opacity), tappable: tappable,
                            hint: tappable ? WalkCopy.areaHint(ground: s.ground, kept: kept, focused: focused) : nil,
-                           selected: s.ground ? kept : focused)
+                           selected: tappable && (s.ground ? kept : focused))
         }
     }
 
@@ -335,7 +346,13 @@ private struct Builder {
     }
 
     func role(_ item: WalkItem, todayBand: Bool) -> WalkCopy.BannerRole {
-        if todayBand { return s.step == 5 && item.mine ? .firstThingMine : .firstThing }
+        if todayBand {
+            guard s.step == 5 else { return .firstThing }
+            if item.mine { return .firstThingMine }
+            // Not planted by this walk: a flag one level up is focused by a tap, as any week flag on Today.
+            guard item.level.rawValue == WalkLevel.today.rawValue - 1 else { return .firstThing }
+            return s.focus[.today] == item.id ? .firstThingFocused : .firstThingFocusable
+        }
         guard s.step < 6, !s.ground, let level else { return .plain }
         if item.level == level { return item.mine ? .mine : .plain }
         if item.level.rawValue == level.rawValue - 1 { return s.focus[level] == item.id ? .focused : .focusable }

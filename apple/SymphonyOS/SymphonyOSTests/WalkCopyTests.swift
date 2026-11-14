@@ -218,6 +218,10 @@ struct WalkCopyTests {
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThing) == "Today: Gym induction, first thing")
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingMine)
                 == "Today: Gym induction, first thing, tap to pull up")
+        #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingFocusable)
+                == "Today: Gym induction, first thing, tap to focus")       // not planted by the walk
+        #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingFocused)
+                == "Today: Gym induction, first thing, focused, tap to let go")
         #expect(b("Run a 5K", .year, nil, .example) == "Example: Run a 5K, tap to make it yours")
         #expect(b("", .year, nil, .stub(3)) == "3 more, tap to show")
         #expect(WalkCopy.areaHint(ground: true, kept: false, focused: false) == "Tap to keep")
@@ -226,11 +230,13 @@ struct WalkCopyTests {
         #expect(WalkCopy.areaHint(ground: false, kept: true, focused: true) == "Tap to step back")
         #expect(WalkCopy.rowLabel("Lift, 30 minutes", forGoal: "Feel strong again") == "Lift, 30 minutes, for Feel strong again")
         #expect(WalkCopy.rowLabel("Lift, 30 minutes", forGoal: nil) == "Lift, 30 minutes")
+        #expect(WalkCopy.typeFieldLabel == "Your words")         // the one-line field, once it holds text
     }
 
     /// Only a banner whose label says what a tap does takes a tap; the rest are read as plain text.
     @Test func aBannerTakesATapOnlyWhenItsLabelSaysSo() {
-        let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focusable, .focused, .firstThing, .firstThingMine, .example, .stub(2)]
+        let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focusable, .focused, .firstThing, .firstThingMine,
+                                            .firstThingFocusable, .firstThingFocused, .example, .stub(2)]
         for role in roles {
             let label = WalkCopy.bannerLabel("Gym", level: .week, tag: nil, role: role)
             #expect(role.taps == label.contains("tap to"), "\(role)")

@@ -109,17 +109,7 @@ struct WalkSceneView: View {
     }
 
     private func tap(_ banner: WalkLayout.Banner, on post: WalkLayout.Post) {
-        // A banner that also stands for older flags ("+n") opens its post, as a stub does.
-        if banner.more != nil {
-            model.send(.stubTapped(post.key))
-            return
-        }
-        switch banner.kind {
-        case .stub: model.send(.stubTapped(post.key))
-        case .ghost: model.send(.exampleTapped(banner.text))
-        case .full, .compact, .tip:
-            if let id = banner.itemId { model.send(.bannerTapped(id)) }
-        }
+        if let event = WalkLayout.tapEvent(banner, on: post) { model.send(event) }
     }
 
     // MARK: The band and the words

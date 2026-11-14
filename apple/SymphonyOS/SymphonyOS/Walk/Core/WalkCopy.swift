@@ -225,11 +225,14 @@ enum WalkCopy {
 
     enum BannerRole: Equatable {
         case mine, plain, focusable, focused, firstThing, firstThingMine, example, stub(Int)
+        /// Today's first thing, not planted by this walk, on the Today step: a tap focuses it.
+        case firstThingFocusable, firstThingFocused
         /// A tap does something: the label says what. A plain flag, or someone else's first thing, is only read.
         var taps: Bool {
             switch self {
             case .plain, .firstThing: return false
-            case .mine, .focusable, .focused, .firstThingMine, .example, .stub: return true
+            case .mine, .focusable, .focused, .firstThingMine, .firstThingFocusable, .firstThingFocused, .example, .stub:
+                return true
             }
         }
     }
@@ -244,6 +247,8 @@ enum WalkCopy {
         case .focused: return "\(withTag), focused, tap to let go"
         case .firstThing: return "Today: \(text), first thing"
         case .firstThingMine: return "Today: \(text), first thing, tap to pull up"   // planted by the walk
+        case .firstThingFocusable: return "Today: \(text), first thing, tap to focus"
+        case .firstThingFocused: return "Today: \(text), first thing, focused, tap to let go"
         case .example: return "Example: \(text), tap to make it yours"
         case .stub(let n): return "\(n) more, tap to show"
         }
@@ -262,6 +267,9 @@ enum WalkCopy {
     static func orbAccessibilityLabel(_ s: WalkState) -> String {
         s.step == 0 ? orbLabelWelcome : orbLabel
     }
+
+    /// The one-line field's label, read once it holds words (the placeholder says how to use it).
+    static let typeFieldLabel = "Your words"
 
     // MARK: Helpers
 

@@ -70,9 +70,14 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 - Sounds are synthesized placeholders until the recordings land in `Resources/WalkSounds`. They are silent while the walk's own listening holds the audio session; haptics always play, sound off or not.
 - The ending's rows are today's own personal tasks (planted by the walk or not) and exist only on step 6.
 
-**Accessibility.** The light is one VoiceOver button (`walk.orb`): a double-tap opens or closes the points, and each compass point is a custom action, so "Type it" plants without a press and hold. Flags and peaks that take no tap read as text (`Banner.taps`, `Label.selected`). The scene is hidden from VoiceOver under the raised ending sheet. With Reduce Motion the camera cross-fades in 0.25 s instead of gliding 1.4 s, banners do not flutter, and the light does not breathe.
+**Accessibility.** The light is one VoiceOver button (`walk.orb`): a double-tap opens or closes the points, and each compass point is a custom action, so "Type it" plants without a press and hold. Flags that take no tap (`Banner.taps`, which agrees with the reducer) and peaks that take none (`Label.tappable`) read as text; a peak that is kept (ground) or focused (Year) carries the selected trait (`Label.selected`). The flag's words are announced once, as the person lets go. The scene is hidden from VoiceOver under the raised ending sheet; with it down the heading is read first. With Reduce Motion the camera cross-fades in 0.25 s instead of gliding 1.4 s, banners do not flutter, the light does not breathe, and the live flag and the ending sheet arrive in the same 0.25 s.
 
-**Other screens.** The 390 × 844 stage scales to fit and letterboxes in `#00106e`; there is no Duo or landscape layout. With `-HalfOpen laptop` the half-open display covers the walk.
+**Other screens.** The 390 × 844 stage scales to fit and letterboxes in `#00106e`; there is no Duo or landscape layout. With `-HalfOpen laptop` the half-open display covers the walk. The picture's pale edge margins (left and bottom) are painted over by `scripts/repair-walk-overlook-edges.swift`; run it again on any new picture.
+
+Not designed yet:
+- On the Duo's inside screen the stage is letterboxed with navy bars, which show seams beside the stage's lighter sky and its rocks.
+- There the system status column overlaps the raised ending sheet's top-right corner.
+- The walk stays reachable by VoiceOver under the half-open display.
 
 **Launch arguments** (Debug, with `-SymphonyDemo`; add `-SymphonyLight` for the light edition):
 - `-SymphonyWalk`: open the walk over an empty store.

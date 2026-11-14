@@ -681,6 +681,10 @@ struct WalkLayoutTests {
 
         s.step = 2
         #expect(WalkLayout.make(s, today: today).banner(for: theirs)?.taps == true)      // tap to focus
+        // Below Year the peaks take no tap, so none is offered as selected, focused or not.
+        let faded = WalkLayout.make(s, today: today).labels
+        #expect(faded.contains { $0.focused && !$0.tappable })
+        #expect(faded.allSatisfy { !$0.selected })
 
         var ground = state(1, kept: ["Home"])
         ground.ground = true
@@ -708,7 +712,34 @@ struct WalkLayoutTests {
         t.firstThing = week.id
         #expect(WalkLayout.make(t, today: today).banners(on: .today).first?.taps == true)
         t.items[0].mine = false
+        #expect(WalkLayout.make(t, today: today).banners(on: .today).first?.taps == true)       // tap to focus
+        t.step = 6
         #expect(WalkLayout.make(t, today: today).banners(on: .today).first?.taps == false)
+    }
+
+    /// VoiceOver offers a flag as a button exactly when the reducer does something with
+    /// the tap the scene would send for it, in every generated state.
+    @Test func aBannerTakesATapExactlyWhenTheReducerActsOnIt() {
+        let env = WalkEnv(periods: WalkPeriods.pick(now: today, weekStartsOn: 0), now: today)
+        var disagreements: [String] = []
+        for s in Generated.states() {
+            let layout = WalkLayout.make(s, today: today)
+            for post in layout.posts {
+                for banner in post.banners {
+                    guard let event = WalkLayout.tapEvent(banner, on: post) else {
+                        if banner.taps { disagreements.append("\(Generated.describe(s)): \(banner.label) sends nothing") }
+                        continue
+                    }
+                    var after = s
+                    let effects = after.apply(event, env)
+                    let acts = after != s || !effects.isEmpty
+                    if acts != banner.taps {
+                        disagreements.append("\(Generated.describe(s)): \(banner.label) taps \(banner.taps), reducer acts \(acts)")
+                    }
+                }
+            }
+        }
+        #expect(disagreements.isEmpty, "\(disagreements.count): \(Set(disagreements.map { $0.components(separatedBy: ": ").dropFirst().joined(separator: ": ") }).sorted().prefix(12))")
     }
 
     @Test func theFirstThingSaysItCanBePulledUp() {
@@ -717,9 +748,17 @@ struct WalkLayoutTests {
         s.firstThing = week.id
         let label = WalkLayout.make(s, today: today).banners(on: .today).first?.label
         #expect(label == WalkCopy.bannerLabel(week.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThingMine))
+        // Not planted by this walk: a tap focuses it, as it would any week flag on Today.
         s.items[0].mine = false
-        let plain = WalkLayout.make(s, today: today).banners(on: .today).first?.label
-        #expect(plain == WalkCopy.bannerLabel(week.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThing))
+        let theirs = WalkLayout.make(s, today: today).banners(on: .today).first?.label
+        #expect(theirs == WalkCopy.bannerLabel(week.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThingFocusable))
+        s.focus[.today] = week.id
+        let focused = WalkLayout.make(s, today: today).banners(on: .today).first?.label
+        #expect(focused == WalkCopy.bannerLabel(week.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThingFocused))
+        // Looking back up, it is only read.
+        s.step = 6
+        let back = WalkLayout.make(s, today: today).banners(on: .today).first?.label
+        #expect(back == WalkCopy.bannerLabel(week.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThing))
     }
 
     // MARK: Words in a banner

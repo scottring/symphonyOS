@@ -131,6 +131,7 @@ struct WalkHintRow: View {
                 .tint(WalkPalette.gold)
                 .submitLabel(.done)
                 .focused($fieldFocused)
+                .accessibilityLabel(WalkCopy.typeFieldLabel)
                 .onSubmit {
                     submitted = true
                     model.send(.typeSubmitted)

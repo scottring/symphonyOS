@@ -13,6 +13,7 @@ struct WalkEndingView: View {
     @Environment(\.walkStage) private var device
     /// The sheet rises from below the screen the first time it appears.
     @State private var risen = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static let peekTop: CGFloat = 716
     static let raisedTop: CGFloat = 130
@@ -38,14 +39,15 @@ struct WalkEndingView: View {
                 .offset(y: 54)
                 .allowsHitTesting(false)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilitySortPriority(3)       // read before the flags behind it
             WalkEndingSheet(model: model, raised: s.sheetRaised, bleed: bleed)
                 .frame(width: stage.width, height: stage.height - top, alignment: .top)
                 .offset(y: top)
                 .offset(y: risen ? 0 : stage.height - top + bleed.height)
-                .animation(Self.move, value: top)
+                .animation(reduceMotion ? WalkSceneView.crossFade : Self.move, value: top)
         }
         .frame(width: stage.width, height: stage.height, alignment: .topLeading)
-        .onAppear { withAnimation(Self.rise) { risen = true } }
+        .onAppear { withAnimation(reduceMotion ? WalkSceneView.crossFade : Self.rise) { risen = true } }
     }
 }
 
@@ -56,6 +58,7 @@ struct WalkEndingSheet: View {
     let raised: Bool
     /// How far the paper runs past the stage's sides and bottom, in stage points.
     var bleed: CGSize = .zero
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -84,7 +87,9 @@ struct WalkEndingSheet: View {
                 .onChange(of: raised) { _, up in
                     // Lowered, the peek shows the date and the ring again, not the middle of the list.
                     guard !up else { return }
-                    withAnimation(WalkEndingView.move) { scroller.scrollTo(Self.top, anchor: .top) }
+                    withAnimation(reduceMotion ? WalkSceneView.crossFade : WalkEndingView.move) {
+                        scroller.scrollTo(Self.top, anchor: .top)
+                    }
                 }
             }
         }

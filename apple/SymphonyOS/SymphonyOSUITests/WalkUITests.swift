@@ -12,7 +12,7 @@ final class WalkUITests: XCTestCase {
     }
 
     /// Waits for the element, then taps it.
-    private func tap(_ element: XCUIElement, _ name: String, timeout: TimeInterval = 15,
+    @MainActor private func tap(_ element: XCUIElement, _ name: String, timeout: TimeInterval = 15,
                      file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(element.waitForExistence(timeout: timeout), "never found \(name)", file: file, line: line)
         element.tap()
@@ -47,7 +47,7 @@ final class WalkUITests: XCTestCase {
         app.launch()
         let today = app.buttons["Today. Switch horizon"]
         XCTAssertTrue(today.waitForExistence(timeout: 60), "never reached Today")
-        XCTAssertFalse(app.staticTexts[welcome].exists, "the walk started by itself in a full household")
+        XCTAssertFalse(app.staticTexts[welcome].waitForExistence(timeout: 5), "the walk started by itself in a full household")
 
         tap(app.buttons["More"], "More")
         tap(app.buttons["Settings"], "Settings")

@@ -107,9 +107,18 @@ struct WalkBannerView: View {
                 if !landed {
                     withAnimation(reduceMotion ? WalkSceneView.crossFade : .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.7)) { landed = true }
                 }
-                guard flutters, !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { fluttering = true }
+                flutter(!reduceMotion)
             }
+            .onChange(of: reduceMotion) { _, still in flutter(!still) }
+    }
+
+    /// Starts the slow flutter, or stops it where it stands (Reduce Motion turned on mid-walk).
+    private func flutter(_ on: Bool) {
+        guard flutters, on else {
+            withTransaction(Transaction(animation: nil)) { fluttering = false }
+            return
+        }
+        withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { fluttering = true }
     }
 
     private var flutters: Bool {
