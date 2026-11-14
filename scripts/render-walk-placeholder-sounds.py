@@ -6,7 +6,14 @@ iPhone walk ships these stand-ins, synthesized from the approved prototype's
 recipes (docs/superpowers/specs/2026-11-13-iphone-light-walk-mockup/
 mockup-contract.md, section 12): filtered noise bursts through an RBJ biquad
 (what Web Audio's BiquadFilterNode is) and tones with exponential glides and
-envelopes, under a master gain of 0.6.
+envelopes, mixed with the recipes' own relative gains.
+
+Each sound is then normalised to a target peak (PEAKS), so the stand-ins are
+heard on a phone speaker: white noise through a narrow 0 dB-peak band-pass
+keeps little of its energy, and the recipes' absolute levels came out at -26
+to -34 dBFS. The app's player adds one global volume of 0.6 on top. A file
+is as long as its recipe says, or longer when a voice would run past the end,
+so nothing is cut.
 
 Plain Python 3, standard library only, seeded, so every run writes the same
 bytes. Output: mono, 44.1 kHz, 16-bit WAV, named walk-<name>.PLACEHOLDER.wav.
@@ -26,10 +33,12 @@ import sys
 import wave
 
 RATE = 44_100
-MASTER = 0.6
 FLOOR = 0.0001          # Web Audio's exponential ramps start and end here
 
 rng = random.Random(13)
+
+# Target peak per sound, in dBFS, before the player's volume of 0.6.
+PEAKS = {"bag": -12.0, "poles": -12.0, "unfurl": -12.0, "plant": -9.0, "tick": -18.0}
 
 # One second of white noise, read from a random offset by every burst.
 NOISE = [rng.uniform(-1.0, 1.0) for _ in range(RATE)]
@@ -41,6 +50,12 @@ def frames(seconds):
 
 def rand(lo, hi):
     return lo + rng.random() * (hi - lo)
+
+
+def room(out, end):
+    """Grow the buffer so a voice ending at frame `end` is never cut."""
+    if end > len(out):
+        out.extend([0.0] * (end - len(out)))
 
 
 # MARK: Filter
@@ -101,7 +116,8 @@ def burst(out, start, kind, f0, dur, gain, q=1.0, f1=None, attack=0.005):
     flt = Biquad()
     offset = frames(rand(0, 0.5))
     first = frames(start)
-    for i in range(first, min(len(out), first + frames(dur))):
+    room(out, first + frames(dur))
+    for i in range(first, first + frames(dur)):
         t = (i - first) / RATE
         if (i - first) % 16 == 0:
             flt.set(kind, f0 if f1 is None else glide(f0, f1, t, dur), q)
@@ -112,7 +128,8 @@ def tone(out, start, wave_kind, f0, f1, dur, gain, attack=0.004):
     """An oscillator gliding f0 -> f1 over dur, 4 ms attack, exponential decay."""
     phase = 0.0
     first = frames(start)
-    for i in range(first, min(len(out), first + frames(dur))):
+    room(out, first + frames(dur))
+    for i in range(first, first + frames(dur)):
         t = (i - first) / RATE
         phase = (phase + glide(f0, f1, t, dur) / RATE) % 1.0
         if wave_kind == "sine":
@@ -175,13 +192,15 @@ SOUNDS = [("bag", bag), ("poles", poles), ("unfurl", unfurl), ("plant", plant), 
 
 # MARK: Writing
 
-def write(path, samples):
-    # A 5 ms fade at the end, so a voice cut at the file's length never clicks.
+def write(path, samples, peak_db):
+    # Normalised to the target peak, with a 5 ms fade at the end so the last
+    # envelope's tail never clicks.
+    gain = 10 ** (peak_db / 20) / max(abs(s) for s in samples)
     fade = frames(0.005)
     n = len(samples)
     data = bytearray()
     for i, s in enumerate(samples):
-        v = s * MASTER
+        v = s * gain
         if i >= n - fade:
             v *= (n - 1 - i) / fade
         v = max(-1.0, min(1.0, v))
@@ -201,9 +220,8 @@ def main():
     for name, render in SOUNDS:
         samples = render()
         path = os.path.join(folder, f"walk-{name}.PLACEHOLDER.wav")
-        write(path, samples)
-        peak = max(abs(s) for s in samples) * MASTER
-        print(f"{path}  {len(samples) / RATE:.2f} s  peak {peak:.3f}")
+        write(path, samples, PEAKS[name])
+        print(f"{path}  {len(samples) / RATE:.3f} s  peak {PEAKS[name]:.0f} dBFS")
 
 
 if __name__ == "__main__":

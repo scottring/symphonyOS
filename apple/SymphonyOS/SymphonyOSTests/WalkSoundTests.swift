@@ -48,41 +48,31 @@ struct WalkSoundTests {
 
     // MARK: When a sound is heard
 
-    /// Sound plays only with the setting on and the session as the walk leaves it
-    /// between holds (ambient, or the app's untouched solo ambient). While speech
-    /// holds the session (play and record, or record) nothing plays.
-    @Test func speechHoldingTheSessionSilencesTheWalk() {
-        let table: [(AVAudioSession.Category, Bool)] = [
-            (.ambient, true), (.soloAmbient, true),
-            (.playAndRecord, false), (.record, false),
-            (.playback, false), (.multiRoute, false),
-        ]
-        for (category, plays) in table {
-            #expect(WalkSound.mayPlay(soundOn: true, category: category) == plays, "\(category.rawValue)")
-            #expect(!WalkSound.mayPlay(soundOn: false, category: category), "\(category.rawValue)")
+    /// Sound plays only with the setting on and the walk's own listening not
+    /// holding the audio session.
+    @Test func ownListeningSilencesTheWalk() {
+        #expect(WalkSound.mayPlay(soundOn: true, ownListening: false))
+        #expect(!WalkSound.mayPlay(soundOn: true, ownListening: true))
+        #expect(!WalkSound.mayPlay(soundOn: false, ownListening: false))
+        #expect(!WalkSound.mayPlay(soundOn: false, ownListening: true))
+    }
+
+    /// When a sound may play, any category but ambient is made ambient first,
+    /// a `.record` left behind by Tell included.
+    @Test func anythingButAmbientIsMadeAmbient() {
+        #expect(!WalkSound.setsAmbient(over: .ambient))
+        for category in [AVAudioSession.Category.soloAmbient, .record, .playAndRecord, .playback, .multiRoute] {
+            #expect(WalkSound.setsAmbient(over: category), "\(category.rawValue)")
         }
     }
 
     @Test func everySoundHasItsHaptic() {
-        #expect(WalkSound.haptic(for: .bag) == .impact(.soft, intensity: 0.5, afterMs: 0))
-        #expect(WalkSound.haptic(for: .poles) == .impact(.rigid, intensity: 0.6, afterMs: 0))
-        #expect(WalkSound.haptic(for: .unfurl) == .impact(.light, intensity: 0.7, afterMs: 0))
-        #expect(WalkSound.haptic(for: .plant) == .impact(.medium, intensity: 1.0, afterMs: 130))
+        #expect(WalkSound.haptic(for: .bag) == .impact(.soft, intensity: 0.5))
+        #expect(WalkSound.haptic(for: .poles) == .impact(.rigid, intensity: 0.6))
+        #expect(WalkSound.haptic(for: .unfurl) == .impact(.light, intensity: 0.7))
+        #expect(WalkSound.haptic(for: .plant) == .impact(.medium, intensity: 1.0))
         #expect(WalkSound.haptic(for: .tick) == .selection)
-    }
-
-    /// The path `play` takes: with the setting off, or speech holding the session,
-    /// nothing is heard but the haptic still goes.
-    @Test func withSoundOffTheHapticStillGoes() {
-        for name in WalkSoundName.allCases {
-            let off = WalkSound.decide(name, soundOn: false, category: .ambient)
-            #expect(!off.plays)
-            #expect(off.haptic == WalkSound.haptic(for: name))
-            let listening = WalkSound.decide(name, soundOn: true, category: .playAndRecord)
-            #expect(!listening.plays)
-            #expect(listening.haptic == WalkSound.haptic(for: name))
-            #expect(WalkSound.decide(name, soundOn: true, category: .ambient).plays)
-        }
+        #expect(WalkSoundName.allCases.map(WalkSound.hapticDelayMs) == [0, 0, 0, 130, 0])
     }
 
     // MARK: The model
@@ -128,6 +118,61 @@ struct WalkSoundTests {
         #expect(sound.played == [.bag, .poles])
         scheduler.advance(1)
         #expect(sound.played == [.bag, .poles, .unfurl])
+    }
+
+    // MARK: Listening and haptics through the model
+
+    /// While the walk listens its sounds are asked for silent; once the session
+    /// has ended the next one (the plant) plays.
+    @Test func afterListeningEndsTheNextSoundPlays() async throws {
+        let listener = FakeWalkListener()
+        let m = WalkModel(context: try walkTestContext(), userId: me, entry: .start, position: nil, edition: .light,
+                          now: now, store: nil, scheduler: scheduler, listener: listener, sound: sound)
+        m.choose(.quick)
+        m.choose(.next)
+        m.send(.orbDown)
+        scheduler.advance(WalkOrb.holdMs)                 // the hold asks to listen
+        await scheduler.settle()
+        scheduler.advance(280)                            // the unfurl, while listening
+        listener.hear("feel strong again")
+        m.send(.orbUp(heldMs: 900))
+        #expect(sound.played == [.bag, .poles, .unfurl])
+        #expect(sound.whileListening == [false, false, true])
+        listener.end()                                    // the session ends: the flag is planted
+        #expect(sound.played == [.bag, .poles, .unfurl, .plant])
+        #expect(sound.whileListening == [false, false, true, false])
+    }
+
+    /// Every sound is felt, heard or not; the plant's thud 130 ms after its sound.
+    @Test func everySoundIsFeltAndThePlantWithItsHit() throws {
+        let m = try model()
+        m.choose(.quick)
+        m.choose(.next)
+        m.send(.orbDown)
+        scheduler.advance(120)
+        #expect(sound.felt == [.bag, .poles])
+        m.send(.orbUp(heldMs: 120))
+        m.choose(.type)
+        m.send(.typeChanged("feel strong again"))
+        m.send(.typeSubmitted)
+        #expect(sound.played.last == .plant)
+        scheduler.advance(129)
+        #expect(sound.felt == [.bag, .poles])
+        scheduler.advance(1)
+        #expect(sound.felt == [.bag, .poles, .plant])
+    }
+
+    @Test func closingBeforeTheThudLeavesNoHapticDue() throws {
+        let m = try model()
+        m.choose(.quick)
+        m.choose(.next)
+        m.choose(.type)
+        m.send(.typeChanged("feel strong again"))
+        m.send(.typeSubmitted)
+        #expect(sound.played == [.plant])
+        m.close()
+        scheduler.advance(1_000)
+        #expect(sound.felt.isEmpty)
     }
 }
 #endif

@@ -96,15 +96,23 @@ import SwiftData
     }
 }
 
-/// Sounds for tests: nothing is heard and no haptic is felt; each sound asked
-/// for is noted, in order, at the moment the model plays it.
+/// Sounds for tests: nothing is heard and no haptic is felt. Each sound and
+/// each haptic asked for is noted, in order, at the moment the model asks.
 @MainActor final class FakeWalkSound: WalkSoundPlaying {
     private(set) var played: [WalkSoundName] = []
+    /// One per `played`: whether the walk's own listening held the session then.
+    private(set) var whileListening: [Bool] = []
+    private(set) var felt: [WalkSoundName] = []
 
     init() {}
 
-    func play(_ name: WalkSoundName) {
+    func play(_ name: WalkSoundName, listening: Bool) {
         played.append(name)
+        whileListening.append(listening)
+    }
+
+    func feel(_ name: WalkSoundName) {
+        felt.append(name)
     }
 }
 

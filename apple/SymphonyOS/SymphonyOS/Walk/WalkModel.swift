@@ -119,7 +119,10 @@ extension Dictation: WalkListening {}
     func close() {
         cancelListening()
         for timer in [WalkTimer.hold, .undo, .note, .finish] { scheduler.cancel(key: Self.key(timer)) }
-        for name in WalkSoundName.allCases { scheduler.cancel(key: Self.key(name)) }
+        for name in WalkSoundName.allCases {
+            scheduler.cancel(key: Self.soundKey(name))
+            scheduler.cancel(key: Self.hapticKey(name))
+        }
         closed = true
     }
 
@@ -251,15 +254,41 @@ extension Dictation: WalkListening {}
     }
 
     /// At once, or through the scheduler under a key of that sound's own, so
-    /// `close()` can take back a sound still waiting.
+    /// `close()` can take back a sound still waiting. One key per sound: the same
+    /// sound asked for again before the first is due replaces it, so two plants
+    /// within 160 ms (two quick example taps) are heard once.
     private func play(_ name: WalkSoundName, after ms: Int) {
         guard ms > 0 else {
-            sound.play(name)
+            playNow(name)
             return
         }
-        scheduler.after(ms, key: Self.key(name)) { [weak self] in
+        scheduler.after(ms, key: Self.soundKey(name)) { [weak self] in
             guard let self, !self.closed else { return }
-            self.sound.play(name)
+            self.playNow(name)
+        }
+    }
+
+    /// The sound, silent while the walk's own listening holds the audio session,
+    /// and its haptic always: at once, or (the plant's thud) through the scheduler.
+    private func playNow(_ name: WalkSoundName) {
+        sound.play(name, listening: ownListening)
+        let delay = WalkSound.hapticDelayMs(for: name)
+        guard delay > 0 else {
+            sound.feel(name)
+            return
+        }
+        scheduler.after(delay, key: Self.hapticKey(name)) { [weak self] in
+            guard let self, !self.closed else { return }
+            self.sound.feel(name)
+        }
+    }
+
+    /// Whether the walk's own listening holds the audio session: from asking the
+    /// listener to start until asking it to stop, or the end of a finished session.
+    private var ownListening: Bool {
+        switch session {
+        case .waiting, .starting, .live, .finishing: true
+        case .none, .cancelledWhileStarting: false
         }
     }
 
@@ -276,7 +305,8 @@ extension Dictation: WalkListening {}
         }
     }
 
-    private static func key(_ sound: WalkSoundName) -> String { "sound.\(sound.rawValue)" }
+    private static func soundKey(_ sound: WalkSoundName) -> String { "sound.\(sound.rawValue)" }
+    private static func hapticKey(_ sound: WalkSoundName) -> String { "haptic.\(sound.rawValue)" }
 
     private func wait(_ timer: WalkTimer, _ ms: Int?) {
         let key = Self.key(timer)
