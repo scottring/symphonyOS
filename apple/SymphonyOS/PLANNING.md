@@ -56,11 +56,11 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 
 **Parents first.** A row whose sent links name a parent whose insert is still queued waits for it; a `task_focus` row waits for its task the same way. A child stops waiting once the parent's insert has failed 10 times. A parent is lost only when the server refuses the child with a foreign-key error (23503) and the parent is neither on the phone nor queued: that link is cleared and the null is sent.
 
-**When it opens.** By itself only in a household that is light only, with no goals, after the first sync has finished. The first pull is reported (`SyncEngine.start` / `resync`, `onFirstPull`) as soon as it is in, before the realtime channels join, so the walk does not wait on them. A saved walk in progress resumes at launch in a light household only, at once, without waiting for the sync; in a full (or mixed, or not yet known) household it is left. "Walk the mountain again" (Settings) opens at once when the household row is already on the phone, and starts from the top. It never starts by itself in a full household. A replay starts with nothing counted as planted. A walk left with Leave for now (`WalkStatus.paused`) never reopens by itself, in any household; "Pick the walk back up" (Settings, above "Walk the mountain again", and one quiet line at the top of the light edition's Today, in `TodayView.topControls`) reopens it at the step it was on (`AppState.walkPaused`, `AppState.resumeWalk()`, `WalkEntry.decide(resume:)`); from then on it is a walk in progress again. "Walk the mountain again" over a paused walk starts from the top and clears the pause (`WalkEntry.clearsPause`). Sign-out forgets the pause the app was showing and any resume asked for, as it does a replay. When it opens, the keyboard is dismissed and the dock's capture sheet closes; Today's Tell and Add sheets, and the half-open display's Tell sheet, can still sit above it.
+**When it opens.** By itself only in a household that is light only, with no goals, after the first sync has finished. The first pull is reported (`SyncEngine.start` / `resync`, `onFirstPull`) as soon as it is in, before the realtime channels join, so the walk does not wait on them. A saved walk in progress resumes at launch in a light household only, at once, without waiting for the sync; in a full (or mixed, or not yet known) household it is never reopened by itself, but it counts as waiting (`WalkEntry.isWaiting`): Settings offers "Pick the walk back up" for it, as for a paused walk (a replay, or a picked-up walk, that the day turned on or the app was closed under keeps its way back). "Walk the mountain again" (Settings) opens at once when the household row is already on the phone, and starts from the top. It never starts by itself in a full household. A replay starts with nothing counted as planted. A walk left with Leave for now (`WalkStatus.paused`) never reopens by itself, in any household; "Pick the walk back up" (Settings, above "Walk the mountain again", and one quiet line at the top of the light edition's Today, in `TodayView.topControls`) reopens it at the step it was on (`AppState.walkPaused`, `AppState.resumeWalk()`, `WalkEntry.decide(resume:)`); from then on it is a walk in progress again. "Walk the mountain again" over a paused walk starts from the top and clears the pause (`WalkEntry.clearsPause`). Sign-out forgets the pause the app was showing and any resume asked for, as it does a replay; a replay or resume asked for while a walk is up is dropped (`WalkEntry.dropsRequests`). When it opens, the keyboard is dismissed and the dock's capture sheet closes; Today's Tell and Add sheets, and the half-open display's Tell sheet, can still sit above it.
 
-**Leaving it.** "Not now" on Welcome, "Open Today" at the end, or, on every step after Welcome, "Leave for now" (the compass's upper-left point, "Your place is kept."): the walk closes onto Today with everything added kept; only the position is saved, as paused.
+**Leaving it.** "Not now" on Welcome, "Open Today" at the end, or, on every step after Welcome, "Leave for now" (the compass's upper-left point, "Your place is kept.", said only where it is: never in a walk-down, `WalkState.placeKept`): the walk closes onto Today with everything added kept; only the position is saved, as paused.
 
-**Periods.** `WalkPeriods.pick`: the year from November on is next year; with fewer than three weeks of a season left the walk plans the coming season, and the month always lies inside the season it plans (the coming season's first month; in the current season this month, or the next once fewer than seven days are left). On 14 November: winter, December. The writer and the everyday screens read the same periods.
+**Periods.** `WalkPeriods.pick`: the year from November on is next year; with fewer than three weeks of a season left the walk plans the coming season, and the month always lies inside the season it plans (the coming season's first month; in the current season this month, or the next once fewer than seven days are left). On 14 November: winter, December. The walk's writer files into these. The everyday pages open where the person is when they have goals there (see "The everyday screens", "Which period a page opens on"); a walk-down from a page showing the period that holds today plans inside it (`DailyPeriods.walking`, `WalkModel(periods:)`).
 
 **Saved position.** In `UserDefaults` under `walk.position.<user id>` (`WalkPositionStore`), saved from the moment a depth is chosen. Undo lives in memory only and does not survive a relaunch. A Debug demo saves only to `DemoMode.walkStore`, emptied at launch.
 
@@ -77,7 +77,11 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 
 **Behaviour a change must keep:**
 - Letting go while speaking waits for the last words: the orb is `finishing` until the recogniser ends or `WalkOrb.finishMs` (1 s) passes. Anything the person does in that second (a tap on a flag or a peak, Undo, a compass point through VoiceOver) plants the flag first, under the parent shown when they let go, then takes effect (`WalkEvent.leavesAWaitingFlag`).
-- The walk listens on the phone only. Where on-device recognition is missing, holding opens typing.
+- The walk listens on the phone only. Where on-device recognition is missing, this is known before anything is asked (`Dictation.cannotListenHere`): the walk begins with speech off (its lesson teaches typing), and no permission prompt is ever shown.
+- The stage's words stop growing at extra large (`.dynamicTypeSize(...xLarge)` on the stage): its layout is fixed stage points.
+- A peak's label offers its text the pill's width and no more: a long custom area name scales down, then truncates, inside its pill.
+- The top shade is drawn between the painting and the world: it darkens the painting behind the words and never dims a flag or a label.
+- A state the layout's hand cannot settle (one the generated sweep missed) is logged as a fault (`WalkLayout.log`), never a crash.
 - A first empty hold shows a quiet note; a second in a row opens typing. Refused or unavailable speech opens typing; for the rest of that walk a tap on the light types and a hold opens the other choices (and leaves them open).
 - The lesson is put away by any touch before it does anything else; only the press that began on it may type on a tap (`orbWasTeaching`). A session that dies mid-hold with nothing heard opens typing with "Nothing came through" and does not switch speech off: the next hold listens again.
 - A typed flag carries its words with return (`.typeSubmitted(text)`), so it is planted whether return or the field losing focus reaches the walk first.
@@ -92,7 +96,7 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 - Sounds are synthesized placeholders until the recordings land in `Resources/WalkSounds`. They are silent while the walk's own listening holds the audio session; haptics always play, sound off or not.
 - The ending's rows are today's own personal tasks (planted by the walk or not) and exist only on step 6.
 
-**Accessibility.** The light is one VoiceOver button (`walk.orb`, "Hold and speak to add a goal. Double tap for other choices."): a double-tap opens or closes the points, and each compass point is a custom action, so "Type it" plants without a press and hold. A point's second line is its hint. The Next line is its own button (`walk.next`). Flags that take no tap (`Banner.taps`, which agrees with the reducer) and peaks that take none (`Label.tappable`) read as text; a peak that is kept (ground) or focused (Year) carries the selected trait (`Label.selected`). The flag's words are announced once (`WalkCopy.announcement`): as the person lets go, or when they arrive after an empty let-go, or as the flag is planted when the session had ended first. The scene is hidden from VoiceOver under the raised ending sheet; with it down the heading is read first. With Reduce Motion the camera cross-fades in 0.25 s instead of gliding 1.4 s, banners do not flutter, the light does not breathe, and the live flag and the ending sheet arrive in the same 0.25 s.
+**Accessibility.** The light is one VoiceOver button (`walk.orb`, "Hold and speak to add a goal. Double tap for other choices."; "… add a task …" on Week and Today; with the `.startsMediaSession` trait wherever holding listens, `WalkState.holdListens`, so VoiceOver stays quiet as it is activated): a double-tap opens or closes the points, and each compass point is a custom action, so "Type it" plants without a press and hold. A point's second line is its hint. The Next line is its own button (`walk.next`). Flags that take no tap (`Banner.taps`, which agrees with the reducer) and peaks that take none (`Label.tappable`) read as text; a peak that is kept (ground) or focused (Year) carries the selected trait (`Label.selected`). The flag's words are announced once (`WalkCopy.announcement`): as the person lets go, or when they arrive after an empty let-go, or as the flag is planted when the session had ended first. The scene is hidden from VoiceOver under the raised ending sheet; with it down the heading is read first. With Reduce Motion the camera cross-fades in 0.25 s instead of gliding 1.4 s, banners do not flutter, the light does not breathe, and the live flag and the ending sheet arrive in the same 0.25 s.
 
 **Other screens.** The 390 × 844 stage scales to fit and letterboxes in `#00106e`; there is no Duo or landscape layout. With `-HalfOpen laptop` the half-open display covers the walk. The square print's pale edge margins were painted over by `scripts/repair-walk-overlook-edges.swift` (the tall painting has none); re-run the layout's generated-state sweep (`WalkLayoutTests`) whenever a new picture (`WalkArt`) is added.
 
@@ -113,12 +117,12 @@ Not designed yet:
 - There the system status column overlaps the raised ending sheet's top-right corner.
 - The walk stays reachable by VoiceOver under the half-open display.
 
-**Speech is shared with Tell.** `Dictation` (`Views/Capture/TellSheet.swift`) serves both. What Tell must keep: its record-only session (others ducked, the session let go on stop), `stop()` as a cancel, and recognition that may use the server when on-device is unsupported. The walk's instance sets `playsAlongside` (its sounds play while it listens) and `onDeviceOnly` (never a server: no on-device recogniser opens typing), and uses `finish()` and `onEnd`.
+**Speech is shared with Tell.** `Dictation` (`Views/Capture/TellSheet.swift`) serves both. What Tell must keep: its record-only session (others ducked, the session let go on stop), `stop()` as a cancel, and recognition that may use the server when on-device is unsupported. The walk's instance sets `playsAlongside` (its sounds play while it listens) and `onDeviceOnly` (never a server: no on-device recogniser opens typing), and uses `finish()` and `onEnd`. With `onDeviceOnly` and no on-device recogniser for the phone's language, `start()` reports speech unavailable before either permission is asked (`cannotListenHere`); with `onDeviceOnly` false (Tell in a full household) that check is never true and its start is exactly as before.
 
 **Launch arguments** (Debug, with `-SymphonyDemo`; add `-SymphonyLight` for the light edition):
 - `-SymphonyWalk`: open the walk over an empty store.
 - `-SymphonyWalkStep N` (0…6): open at step N over the mockup's preview plan.
-- `-SymphonyWalkOrb a,b,…`: drive the orb after opening: `ground`, `open`, `hold`, `speak` (a stand-in listener says "Pick up the tile samples"), `type`, `select`, `undo`, `next`, `leave` (Leave for now: onto Today with its waiting line), `quick` (Quick start; `quick,next` shows the lesson on Year).
+- `-SymphonyWalkOrb a,b,…`: drive the orb after opening: `ground`, `open`, `hold`, `speak` (a stand-in listener says "Pick up the tile samples"), `type`, `select`, `undo`, `next`, `leave` (Leave for now: onto Today with its waiting line), `quick` (Quick start; `quick,next` shows the lesson on Year), `name:<words>` (types those words, on the ground an area of one's own; lowercased).
 - `-SymphonyWalkExamples`: examples on for the step.
 - `-SymphonyWalkSheet up`: on step 6, the ending sheet raised.
 
@@ -133,6 +137,14 @@ one observable model (`Daily/DailyModel`), and views that draw. The rules live i
 exceptions the ledger keeps as deferred (for one, the bar's keyboard-rise condition is decided in
 `DailyBarView`). Plan:
 `docs/superpowers/plans/2026-11-14-iphone-light-daily.md` (its "As built" records every ruling).
+
+**The edition, before the first pull.** `AppState.edition` comes from `Edition.current`: until this
+sign-in's first pull has finished, only what was remembered for this person (`EditionMemory`), and with
+nothing remembered it is full; nothing is remembered before the pull; `applyEdition` runs again when the
+pull finishes. So a fresh install, or another account's household row left on the phone (sign-out keeps the
+store), never shows a light page. Sign-out (`AppState.signedOut`) resets the page, the date, the edition,
+Inbox or More and the dock flag; a waiting Tell is dropped in a light household and kept in a full one
+(as before the light edition: a Tell asked while signed out opens after sign-in).
 
 **The gate.** `DailyGate.shows` is the one test: a light household (`Edition.light`), on a phone (ruling
 D17: an iPad keeps the old pages and the dock), on a built window shape (`layouts`: one column, the Duo's
@@ -162,14 +174,32 @@ brings the dock back and leaves nothing light open or waiting.
   the days behind folded to one line with anything still open from earlier weeks) and
   `DailyWeek.bandGoals` (at most two month goals on the band).
 - *Month, Season, Year* read `MountainPage.flags`: the page's period from the selected date, each flag's
-  real parent by its links, and the walk's current upper flags; drawn by `WalkLayout.make(…, footing: .natural)`.
+  real parent by its links, and the upper flags of the periods it walks down in (`DailyPeriods.walking`); drawn by `WalkLayout.make(…, footing: .natural)`.
+- *Which period a page opens on* (the owner's "Where I am, if it has goals", 2026-11-14): for Month, Season
+  and Year, `here` is the period holding today and `ahead` the walk's (`WalkPeriods.pick`). The same period:
+  that one. Two periods: the page opens on `here` when the person has a goal of their own on that level in
+  it, else on `ahead`, and its heading is a button with a quiet line ("December ›"; VoiceOver "November. Shows
+  December next.") that switches to the other and back, for this visit only (`DailyPeriods.opening`,
+  `DailyPeriods.other`). The row of words opens a page by the rule. Week's band and the signposts read the
+  current month and season first (`DailyPeriods.current`), the walk's only when the current one holds
+  nothing of the person's; "Walk it down" from a page showing `here` plans inside it (a fall goal into
+  November, a November goal into this week). Nothing is stored; the walk's own periods are unchanged.
 - *Writes* all go through `DailyWriter`, which calls only `WalkWriter`, `PlanWriter` and `ItemCompletion`,
   on the person's own rows, `context = "personal"`: the bar adds a week task (on the day said, at the
-  time said, never the first thing) or a goal on a mountain page (filed into that page's periods, under
-  the focused flag); a tick completes; Move to sets a day or Any day; "Remove" (`WalkCopy.pullUp`) takes
-  a row out of the plan; Move to on a mountain flag changes its area; a row's press-and-hold menu (or
+  time said, never the first thing; with no day, into the week the page shows, so on next week's Week it is
+  filed there and the field reads "Add to next week") or a goal on a mountain page (filed into that page's
+  periods, under the focused flag); a tick completes; Move to sets a day or Any day; "Remove" (`WalkCopy.pullUp`) is a
+  permanent delete of the task or goal row (rows that named it are unlinked, never removed), written once its
+  Undo can no longer be used; Move to on a mountain flag changes its area; a row's press-and-hold menu (or
   VoiceOver's actions) sets or clears the first thing. Every add, move, area change and Remove offers Undo.
 - *The half-open display* reads Today's page through `DailyTentPage`; a tick there offers Undo.
+
+**The bar's words.** Read by `DailyAdd` over the app's `CaptureParser`: a found day lands the task there; a
+found time is kept as a time even where the parser does not mark one ("at 3 tomorrow": 3 pm; "at noon":
+noon, its leftover "at" going too); where nothing of a matched phrase is kept (a date still past), every
+word stays in the title. What the real parser does with seven phrases is pinned in
+`DailyAddRealParserTests` ("dentist at 3" is not matched at all and stays whole). Typed words are kept when
+the light is tapped, and what is heard follows them (D22).
 
 **The signpost.** Six kinds in a fixed order; the first true one not put away today shows
 (`Signpost.Kind`: That's the day, First today, Today is open, A new week, ‹Month› ends, No piece). Every
@@ -192,8 +222,10 @@ Welcome by someone with no goals reads "Walk down from the year when you’re re
 top. Never in a full household.
 
 **The first thing.** The oldest open "chosen for today" mark (`TaskFocus`) of the person's own that is dated
-today (`DailyDay.firstThing`); yesterday's mark is not today's. Sending an Inbox item to Today makes that
-mark too.
+today (`DailyDay.firstThing`); yesterday's mark is not today's. In the light edition sending an Inbox item to
+Today does not make it the first thing and counts no deferral (`TriageController.lightMove`, reached only
+with an assumed life area; a full household's triage is unchanged). Marking a row first leaves exactly one
+of my marks for today (`DailyWriter.setFirst`).
 
 **Unfinished tasks.** Nothing is counted or marked late. Yesterday's open tasks wait in Week's folded past
 days, with anything still open from earlier weeks; Move to brings one back. The fold says only what was
@@ -241,13 +273,23 @@ two (`DailyMetrics.quietLines`).
 - A Tell never makes a bar listen where it cannot be seen: during a walk it waits, while the whole plan shows the sheet rises first, under the half-open display only the display's bar takes it.
 - After the second tap on its light the bar waits up to 1 s for the last words (`WalkOrb.finishMs`), as the walk does; nothing empty is ever added.
 - `AppState.dailyLastDay` and a pending handover are cleared on sign-out and by `leaveDaily()`.
+- Before this sign-in's first pull the edition is only this person's memory, else full (`Edition.current`); nothing is remembered before the pull.
+- A task with no day said on Week is filed into the week the page shows (`DailyAdd.otherWeek`).
+- Undo of an add, and a Remove, queue a delete (`DailyWriter.queueDeleteAfterRemove`): the insert may already be on the wire. Never in `WalkWriter.remove`, whose `restore` reads a queued delete as "reached the server".
+- A Tell's tap goes through the scheduler (`DailyModel.answerTell`), so a same-update `.left` from the page that goes lands first; Details (`sheetOpening`), an inactive scene (except while a listen is starting: the permission prompts make it inactive) and a change of page send `.left`.
+- On the Duo's inside screens a size change that is only the keyboard is ignored (`DailyGate.plannerSize`); only a real Duo can confirm it.
+- The bar's light carries `.startsMediaSession` while a tap would start listening (`DailyBar.tapStartsListening`); the bands' painting is `Image(decorative:)`.
+- A Tell asked during a walk-down is answered only if it returns to Today (`DailyWalkDown.keepsTell`); otherwise it is dropped.
+- "‹Month› ends" shows only when that month holds a goal of mine; "It’s on …" names the month when it is not this one.
+- Every write (`add`, `move`, `setFirst`, `toggle`) reads the day first; the model is made again when the household's seasons change.
+- Month, Season and Year open where the person is when they have goals there, else on the walk's period, and the heading switches between the two (`DailyPeriods`); Week's band and the signposts read the current month first. The walk's own periods are unchanged.
 
 **Debug launch arguments** (with `-SymphonyDemo -SymphonyLight`):
 - `-SymphonyDaily`: the light pages' demo seed in place of the family one, with two sample calendar events.
 - `-SymphonyDailyNow YYYY-MM-DD`: pins the light pages' clock (`DailyClock`) to noon that day. The walk keeps the real clock.
-- `-SymphonyDailySeed morning|done|open|newweek|quiet|nopiece|empty` (`morning` by default).
+- `-SymphonyDailySeed morning|done|open|newweek|quiet|nopiece|empty|both` (`morning` by default; `quiet` files its two long goals into the calendar's month, so on the 28th November holds something and "November ends" shows; `both` adds goals in the calendar's own year, season and month beside the walk's).
 - `-SymphonyDailyPage today|week|month|season|year`: the page the demo opens on.
-- `-SymphonyDailyState a,b,…`: `point`, `waiting`, `speak`, `hear`, `refused`, `undo`, `more`, `inbox`, `lookback`, `handover`, `travel`; on Week `select`, `unfold`; on a mountain page `select`, `move`, `zoom`, `walkdown` (see `DailyDemo.swift`).
+- `-SymphonyDailyState a,b,…`: `point`, `waiting`, `speak`, `hear`, `refused`, `undo`, `more`, `inbox`, `lookback`, `handover`, `travel`; `details` (with `speak`: the first row's Details over a listening bar); on Week `select`, `unfold`, `nextweek` (with `undo`: a task added there with no day); on a mountain page `select`, `move`, `zoom`, `walkdown`, `switch` (the heading tapped once) (see `DailyDemo.swift`).
 - Also: `-TodaySize WxH` and `-HalfOpen laptop|book` (Duo sizes on a phone), `-HalfOpenSplit N`, `-SpreadFold N`, `-SymphonyHandoverRemembers`.
 
 `SymphonyOSUITests/LightDailyUITests`, `LightEditionUITests`, `LightSpreadUITests` and
