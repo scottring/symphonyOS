@@ -20,9 +20,16 @@ struct DailyBarView: View {
     let icons: Bool
     /// The field's words (the half-open display's taller field reads larger).
     let textSize: CGFloat
+    /// The handover: false while the walk's light travels down to stand here, so only one light
+    /// is ever seen; the button still takes a touch.
+    let lightShown: Bool
+    /// A tap on the light, or the field taking the keyboard, before it does what it asks (the
+    /// handover's travel ends at once).
+    let touched: () -> Void
 
     init(model: DailyModel, metrics: DailyMetrics.Bar, placeholder: String, listening: String,
-         night: Bool = false, icons: Bool = true, textSize: CGFloat = 16) {
+         night: Bool = false, icons: Bool = true, textSize: CGFloat = 16, lightShown: Bool = true,
+         touched: @escaping () -> Void = {}) {
         self.model = model
         self.metrics = metrics
         self.placeholder = placeholder
@@ -30,6 +37,8 @@ struct DailyBarView: View {
         self.night = night
         self.icons = icons
         self.textSize = textSize
+        self.lightShown = lightShown
+        self.touched = touched
     }
 
     @Environment(AppState.self) private var appState
@@ -64,6 +73,11 @@ struct DailyBarView: View {
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: bar.isListening)
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { pageTop = $0 }
         .onChange(of: bar.fieldAsked) { _, _ in typing = true }
+        .onChange(of: typing) { _, on in if on { touched() } }
+        // The handover's line is heard once, as it shows.
+        .onChange(of: bar.slot == .handover) { _, on in
+            if on { AccessibilityNotification.Announcement(DailyCopy.handover).post() }
+        }
         // Listening takes the keyboard down: the field shows what is heard.
         .onChange(of: bar.isListening) { _, on in if on { typing = false } }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
@@ -120,8 +134,13 @@ struct DailyBarView: View {
     /// The light's drawing is 38 across, at the field's right end; its touch shape is 44 wide
     /// and the field's full height, ending where the light ends (`DailyMetrics.Bar.lightTouch`).
     private func light(_ bar: DailyBar) -> some View {
-        Button { model.send(.micTapped) } label: {
-            DailyLight(diameter: metrics.light, listening: bar.isListening)
+        Button {
+            touched()
+            model.send(.micTapped)
+        } label: {
+            DailyLight(diameter: metrics.light, listening: bar.isListening, halo: model.handoverHalo)
+                .opacity(lightShown ? 1 : 0)
+                .animation(.easeInOut(duration: 0.25), value: model.handoverHalo)
                 .frame(width: metrics.lightTouch.width, height: metrics.lightTouch.height, alignment: .trailing)
                 .contentShape(Rectangle())
         }
@@ -144,6 +163,10 @@ struct DailyBarView: View {
             case .say(let note, let undo):
                 if let note { line(note) }
                 if undo { undoButton }
+            case .handover:
+                line(DailyCopy.handover)
+                    .transition(.opacity)
+                    .accessibilityIdentifier("daily.handover")
             }
         }
         .frame(width: max(0, metrics.fade.width - 32), height: DailyMetrics.minTouch)
@@ -221,9 +244,13 @@ struct DailyBarView: View {
 /// glow and highlight (`WalkOrbView`'s body at 96 across) scaled to `diameter`, with the board's
 /// thin warm ring and a microphone in plank ink. Listening, it turns rust with a white
 /// microphone and a soft rust ring. It does not breathe: on the bar it is a button, at rest.
+/// Just handed over from the walk it wears the board's halo (`halo`); travelling down it is
+/// drawn without its microphone (`mic` false), as the walk's light has none.
 struct DailyLight: View {
     let diameter: CGFloat
     let listening: Bool
+    var halo = false
+    var mic = true
 
     /// The walk's light is 96 across; everything below is its number times this.
     private var k: CGFloat { diameter / 96 }
@@ -238,14 +265,32 @@ struct DailyLight: View {
                     .fill(DailyPalette.rust)
                     .frame(width: diameter, height: diameter)
             } else {
+                if halo { handoverHalo }
                 orb(at: k)
             }
-            Image(systemName: "mic")
-                .font(.system(size: 20 * diameter / 38, weight: .regular))
-                .foregroundStyle(listening ? Color.white : DailyPalette.plankInk)
+            if mic {
+                Image(systemName: "mic")
+                    .font(.system(size: 20 * diameter / 38, weight: .regular))
+                    .foregroundStyle(listening ? Color.white : DailyPalette.plankInk)
+            }
         }
         .frame(width: diameter, height: diameter)
         .accessibilityHidden(true)
+    }
+
+    /// The board's handover halo: a 7 pt ring `rgba(246,223,166,.6)` and a glow of radius 26
+    /// `rgba(255,214,140,.95)` spread 10 beyond the light.
+    private var handoverHalo: some View {
+        ZStack {
+            Circle()
+                .fill(DailyPalette.handoverGlow.opacity(0.95))
+                .frame(width: diameter + 20, height: diameter + 20)
+                .blur(radius: 13)
+            Circle()
+                .fill(DailyPalette.gold.opacity(0.6))
+                .frame(width: diameter + 14, height: diameter + 14)
+        }
+        .transition(.opacity)
     }
 
     private func orb(at k: CGFloat) -> some View {

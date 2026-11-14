@@ -111,6 +111,9 @@ final class AppState {
     /// A walk down from a light page or sign (`DailyWalkDown`), asked for: the main view opens
     /// it ahead of any other walk, never stored, and sets this back to nil.
     var walkDown: DailyWalkDown?
+    /// An ordinary walk just finished onto light Today (`DailyHandover.plays`, set by the main view):
+    /// light Today plays the handover and clears it.
+    var handover = false
 
     /// Off the light pages (the Planner went away, or the household is no longer light):
     /// the dock comes back and nothing light is left open on top.
@@ -167,6 +170,7 @@ final class AppState {
         walkPaused = false
         walkResumeRequested = false
         walkDown = nil
+        handover = false
     }
 
     // MARK: - Date Navigation

@@ -159,11 +159,14 @@ struct LightPlannerView<Full: View>: View {
         let listener = DemoMode.isOn ? DemoMode.dailyListener : nil    // `-SymphonyDailyState speak`
         // A demo forgets the signs put away on earlier launches, as it forgets the walk.
         let memory = DemoMode.isOn ? DemoMode.signMemory : SignpostMemory()
+        let handoverMemory = DemoMode.isOn ? DemoMode.handoverMemory : HandoverMemory()
         #else
         let listener: WalkListening? = nil
         let memory = SignpostMemory()
+        let handoverMemory = HandoverMemory()
         #endif
-        model = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener, memory: memory)
+        model = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener, memory: memory,
+                           handoverMemory: handoverMemory)
         if covered { model?.cover() }
     }
 

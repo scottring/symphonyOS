@@ -335,4 +335,52 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertTrue(tonight.waitForExistence(timeout: 60), "the old display's dinner is not there")
         XCTAssertFalse(app.descendants(matching: .any)["daily.halfOpen"].exists)
     }
+
+    // MARK: The handover
+
+    /// The walk on its last step with Today's sheet raised; `remembers` keeps the demo's memory of
+    /// the handover's line from the launch before (`-SymphonyHandoverRemembers`).
+    private func finishTheWalk(light: Bool, remembers: Bool = false) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo"] + (light ? ["-SymphonyLight"] : [])
+            + ["-SymphonyWalk", "-SymphonyWalkStep", "6", "-SymphonyWalkSheet", "up"]
+            + (remembers ? ["-SymphonyHandoverRemembers"] : [])
+        app.launch()
+        // The ending's last control (`WalkCopy.goToToday`).
+        let openToday = app.descendants(matching: .any)["Open Today"]
+        XCTAssertTrue(openToday.waitForExistence(timeout: 60), "the walk's ending never showed")
+        openToday.tap()
+        XCTAssertTrue(app.buttons["walk.orb"].waitForNonExistence(timeout: 30), "the walk did not close")
+        return app
+    }
+
+    /// Finishing the walk in a light household lands on light Today with the handover's line; a
+    /// second launch that finishes again as the same person lands there with no line.
+    @MainActor func testFinishingTheWalkHandsTheLightToTheBarOnce() throws {
+        let line = "daily.handover"
+        let first = finishTheWalk(light: true)
+        let any = first.descendants(matching: .any)
+        XCTAssertTrue(any["daily.today"].waitForExistence(timeout: 30), "not on light Today")
+        XCTAssertTrue(any[line].waitForExistence(timeout: 10), "no handover line the first time")
+        XCTAssertEqual(any[line].label, "The light lives here now. Type, or tap it to speak.")
+        XCTAssertTrue(any["daily.bar.light"].exists, "no light on the bar")
+        XCTAssertTrue(any[line].waitForNonExistence(timeout: 15), "the line never went")
+        first.terminate()
+
+        let again = finishTheWalk(light: true, remembers: true)
+        let anyAgain = again.descendants(matching: .any)
+        XCTAssertTrue(anyAgain["daily.today"].waitForExistence(timeout: 30), "not on light Today the second time")
+        XCTAssertTrue(anyAgain["daily.bar.light"].waitForExistence(timeout: 10), "no light on the bar")
+        XCTAssertFalse(anyAgain[line].waitForExistence(timeout: 5), "the line showed a second time")
+    }
+
+    /// A full household's walk ends on the Today it always had: no light page, no light, no line.
+    @MainActor func testAFullHouseholdFinishesOnTheOldToday() throws {
+        let app = finishTheWalk(light: false)
+        let any = app.descendants(matching: .any)
+        XCTAssertTrue(app.buttons["Today. Switch horizon"].waitForExistence(timeout: 30), "not on the old Today")
+        XCTAssertFalse(any["daily.today"].exists, "a light page in a full household")
+        XCTAssertFalse(any["daily.bar.light"].exists, "a light on a full household's Today")
+        XCTAssertFalse(any["daily.handover"].waitForExistence(timeout: 3), "the handover's line in a full household")
+    }
 }

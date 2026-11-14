@@ -136,6 +136,32 @@ extension DemoMode {
         return SignpostMemory(defaults: defaults)
     }()
 
+    // MARK: The handover
+
+    /// Where a demo remembers that the handover's line was seen: a store of its own, emptied once
+    /// per launch so UI test runs do not depend on each other, unless the launch says
+    /// `-SymphonyHandoverRemembers` (a second launch finishing the walk again as the same person).
+    @MainActor static let handoverMemory = handoverMemory(in: ProcessInfo.processInfo.arguments,
+                                                          suite: "com.scottkaufman.symphonyos.demo-handover")
+
+    static func handoverMemory(in arguments: [String], suite: String) -> HandoverMemory {
+        let defaults = UserDefaults(suiteName: suite) ?? .standard
+        if !arguments.contains("-SymphonyHandoverRemembers") { defaults.removePersistentDomain(forName: suite) }
+        return HandoverMemory(defaults: defaults)
+    }
+
+    /// A handover held for a screenshot: `handover`, settled (the halo and the line, the board's
+    /// third frame); `travel`, the light halfway down with the sheet still low (its second frame).
+    enum HandoverHold: Equatable { case settled, travel(Double) }
+
+    static var handoverHold: HandoverHold? { handoverHold(in: ProcessInfo.processInfo.arguments) }
+
+    static func handoverHold(in arguments: [String]) -> HandoverHold? {
+        let states = dailyStates(in: arguments)
+        if states.contains("travel") { return .travel(0.5) }
+        return states.contains("handover") ? .settled : nil
+    }
+
     // MARK: The seed
 
     /// Writes a seed as real rows through `WalkWriter`, as `walkPreview` writes the walk's:

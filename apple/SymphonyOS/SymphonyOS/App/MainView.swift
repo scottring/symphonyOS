@@ -255,11 +255,13 @@ extension iOSMainView {
         case .open(let down):
             appState.walkDown = nil
             let model = down.model(context: modelContext)
-            model.onEnd = { _ in
+            model.onEnd = { status in
                 closeWalk()
                 appState.activeTab = .planner
                 appState.horizon = down.returnsTo.horizon
                 appState.selectedDate = down.returnsTo.date
+                if DailyHandover.plays(.walkDown, status: status, edition: appState.edition,
+                                       lightToday: appState.dailyHidesDock) { appState.handover = true }
             }
             show(model, animated: animated)
             return
@@ -320,13 +322,16 @@ extension iOSMainView {
         let model = WalkModel(context: modelContext, userId: userId, entry: opening.entry, position: opening.position,
                               edition: edition, seasons: householdRows.first?.seasons,
                               store: store, listener: opening.listener)
-        model.onEnd = { _ in
+        model.onEnd = { status in
             closeWalk()
             // Leave for now: Today, with the walk waiting to be picked up.
             appState.walkPaused = store?.hasPausedWalk(for: userId) ?? false
             appState.activeTab = .planner
             appState.horizon = .today
             appState.goToToday()
+            // Finished onto light Today: its light comes down to the bar (`DailyHandover`).
+            if DailyHandover.plays(.walk, status: status, edition: edition,
+                                   lightToday: appState.dailyHidesDock) { appState.handover = true }
         }
         show(model, animated: animated)
         #if DEBUG

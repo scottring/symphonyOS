@@ -222,5 +222,25 @@ struct DailyDemoTests {
         DemoMode.showMountain(&bare, ["select", "move", "zoom"])
         #expect(bare.selected == nil && bare.focus == nil && !bare.moving)
     }
+
+    /// The demo's handover memory is its own and empty at launch, so UI test runs do not depend on
+    /// each other; `-SymphonyHandoverRemembers` keeps what an earlier launch remembered, for a
+    /// second launch that finishes the walk again as the same person.
+    @Test func theDemosHandoverMemoryStartsEmptyUnlessAskedToRemember() {
+        let suite = "DailyDemoTests.handover.\(UUID())"
+        let first = DemoMode.handoverMemory(in: [], suite: suite)
+        #expect(first.seen(for: me) == false)
+        first.markSeen(for: me)
+        #expect(DemoMode.handoverMemory(in: ["-SymphonyHandoverRemembers"], suite: suite).seen(for: me))
+        #expect(DemoMode.handoverMemory(in: [], suite: suite).seen(for: me) == false)
+    }
+
+    /// `-SymphonyDailyState handover` settles it; `travel` holds the light halfway with the sheet still low.
+    @Test func theHandoverStatesAreNamed() {
+        #expect(DemoMode.handoverHold(in: ["-SymphonyDailyState", "handover"]) == .settled)
+        #expect(DemoMode.handoverHold(in: ["-SymphonyDailyState", "travel"]) == .travel(0.5))
+        #expect(DemoMode.handoverHold(in: ["-SymphonyDailyState", "speak"]) == nil)
+        #expect(DemoMode.handoverHold(in: []) == nil)
+    }
 }
 #endif

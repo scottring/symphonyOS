@@ -28,6 +28,8 @@ import Observation
     /// sight above the bar; `n` counts, so the same row moved again is named again. nil for a
     /// pull-up (its row is hidden) and for a change with no row on the page.
     private(set) var reveal: Reveal?
+    /// The bar's light wears the handover's halo: from the walk's light arriving for `DailyHandover.lineMs`.
+    private(set) var handoverHalo = false
     var page: DailyAdd.Page = .today
     /// The light half-open display is over the page (`cover()`): the page stays as it was, but its
     /// bar cannot start or add and it takes no Tell.
@@ -47,6 +49,7 @@ import Observation
     @ObservationIgnored private let scheduler: WalkScheduling
     @ObservationIgnored private let listener: WalkListening
     @ObservationIgnored private let memory: SignpostMemory
+    @ObservationIgnored private let handoverMemory: HandoverMemory
     @ObservationIgnored private let parse: (String) -> CaptureParser.Result
     /// Rebuilt on a new day, so the first thing and the walk's periods are today's.
     @ObservationIgnored private var writer: DailyWriter
@@ -83,7 +86,8 @@ import Observation
     init(context: ModelContext, userId: UUID, seasons: [SeasonBoundary]? = nil,
          clock: @escaping @MainActor () -> Date = DailyClock.now, scheduler: WalkScheduling? = nil,
          listener: WalkListening? = nil, memory: SignpostMemory = SignpostMemory(),
-         parse: @escaping (String) -> CaptureParser.Result = CaptureParser.parse) {
+         parse: @escaping (String) -> CaptureParser.Result = CaptureParser.parse,
+         handoverMemory: HandoverMemory = HandoverMemory()) {
         let now = clock()
         let periods = WalkPeriods.pick(now: now, seasons: seasons)
         self.today = PlanCalendar.day(now)
@@ -97,6 +101,7 @@ import Observation
         // Nothing is asked here: permission comes with the first tap on the light.
         self.listener = listener ?? Self.makeListener()
         self.memory = memory
+        self.handoverMemory = handoverMemory
         self.parse = parse
         self.writer = DailyWriter(context: context, userId: userId, periods: periods)
     }
@@ -202,7 +207,21 @@ import Observation
     func close() {
         commitPullUp()
         cancelListening()
-        for timer in [DailyBar.Timer.undo, .note, .finish] { scheduler.cancel(key: Self.key(timer)) }
+        for timer in [DailyBar.Timer.undo, .note, .finish, .handover] { scheduler.cancel(key: Self.key(timer)) }
+        scheduler.cancel(key: Self.haloKey)
+    }
+
+    // MARK: The handover
+
+    /// The walk's light has arrived on the bar (or snapped home at a touch): the light wears the
+    /// halo for `DailyHandover.lineMs`, and the first time for this person on this phone the line
+    /// asks for the slot. It is remembered as seen only if it actually showed.
+    func handoverArrived() {
+        handoverHalo = true
+        scheduler.after(DailyHandover.lineMs, key: Self.haloKey) { [weak self] in self?.handoverHalo = false }
+        guard !handoverMemory.seen(for: userId) else { return }
+        send(.handoverLine)
+        if bar.slot == .handover { handoverMemory.markSeen(for: userId) }
     }
 
     // MARK: Rows
@@ -456,8 +475,11 @@ import Observation
         case .undo: "daily.undo"
         case .note: "daily.note"
         case .finish: "daily.finish"
+        case .handover: "daily.handover"
         }
     }
+
+    private static let haloKey = "daily.handover.halo"
 
     private func wait(_ timer: DailyBar.Timer, _ ms: Int?) {
         let key = Self.key(timer)
@@ -470,6 +492,7 @@ import Observation
         case .undo: event = .undoExpired
         case .note: event = .noteExpired
         case .finish: event = .finishExpired
+        case .handover: event = .handoverExpired
         }
         scheduler.after(ms, key: key) { [weak self] in self?.send(event) }
     }

@@ -17,6 +17,8 @@ struct DailyBar: Equatable {
     /// The one plain line above the bar (where an add went, why it types).
     var note: String?
     var undoShowing = false
+    /// The handover's one quiet line (`DailyCopy.handover`) is in the slot, lowest of all.
+    var handoverLine = false
     /// Bumped when the field should take the keyboard.
     var fieldAsked = 0
 
@@ -32,21 +34,24 @@ struct DailyBar: Equatable {
     }
 
     /// The one line slot above the bar, in this order of need: the listening line while the light
-    /// listens; otherwise the note, Undo beside it when both show, either alone, or nothing.
-    enum Slot: Equatable { case empty, listening, say(note: String?, undo: Bool) }
+    /// listens; otherwise the note, Undo beside it when both show, either alone; otherwise the
+    /// handover's line; or nothing.
+    enum Slot: Equatable { case empty, listening, say(note: String?, undo: Bool), handover }
 
     var slot: Slot {
         if isListening { return .listening }
-        if note == nil && !undoShowing { return .empty }
-        return .say(note: note, undo: undoShowing)
+        if note != nil || undoShowing { return .say(note: note, undo: undoShowing) }
+        return handoverLine ? .handover : .empty
     }
 
     enum Event: Equatable {
         case typed(String), submitted, micTapped, heard(String), speechUnavailable,
-             listenEnded, finishExpired, did(note: String?), undoTapped, undoExpired, noteExpired, left
+             listenEnded, finishExpired, did(note: String?), undoTapped, undoExpired, noteExpired, left,
+             /// The handover's line asks for the slot; `handoverExpired` is its six seconds ending.
+             handoverLine, handoverExpired
     }
 
-    enum Timer: Equatable { case undo, note, finish }
+    enum Timer: Equatable { case undo, note, finish, handover }
 
     enum Effect: Equatable {
         case add(String), listen(Bool), finishListening, undo
@@ -54,7 +59,27 @@ struct DailyBar: Equatable {
         case timer(Timer, ms: Int?)
     }
 
+    /// The handover's line shows only in an empty slot, for `DailyHandover.lineMs`; listening, a
+    /// note or Undo taking the slot meanwhile ends it, and it does not come back after them.
     mutating func apply(_ event: Event) -> [Effect] {
+        switch event {
+        case .handoverLine:
+            guard slot == .empty else { return [] }
+            handoverLine = true
+            return [.timer(.handover, ms: DailyHandover.lineMs)]
+        case .handoverExpired:
+            handoverLine = false
+            return []
+        default:
+            break
+        }
+        let effects = step(event)
+        guard handoverLine, slot != .handover else { return effects }
+        handoverLine = false
+        return effects + [.timer(.handover, ms: nil)]
+    }
+
+    private mutating func step(_ event: Event) -> [Effect] {
         switch event {
         case .typed(let words):
             guard mic == .idle else { return [] }
@@ -132,6 +157,9 @@ struct DailyBar: Equatable {
         case .left:
             mic = .idle
             return [.listen(false), .timer(.finish, ms: nil)]
+
+        case .handoverLine, .handoverExpired:
+            return []                                   // taken in `apply`
         }
     }
 

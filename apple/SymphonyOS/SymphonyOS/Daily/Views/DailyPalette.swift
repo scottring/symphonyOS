@@ -35,6 +35,8 @@ enum DailyPalette {
     static let firstFlag = Color(hex: 0xE0A24A)
     static let lineageFlag = Color(hex: 0xA8452C)
     static let navy = Color(red: 0, green: 14 / 255, blue: 70 / 255)
+    /// The handover halo's glow, `rgba(255,214,140,.95)` (its ring is `gold` at 0.6).
+    static let handoverGlow = Color(hex: 0xFFD68C)
     /// The walk's light, for the bar's small one ("one control in two sizes"): the gradient stops of
     /// the light's body in `WalkOrbView` (its private `orbBody`, which the walk does not expose).
     /// Change both together.
