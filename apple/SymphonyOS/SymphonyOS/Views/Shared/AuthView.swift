@@ -58,8 +58,8 @@ struct AuthView: View {
                                 .multilineTextAlignment(.center)
                         }
 
-                        // The invite gate is not a fault to retry — offer the
-                        // waitlist instead of a dead end.
+                        // Shown only when the sign-up gate itself answered no (sign-up
+                        // closed to this address); a fault says try again, with no link.
                         if auth.inviteOnly, let url = URL(string: "https://www.symphony-os.com/#waitlist") {
                             Link("Request an invite", destination: url)
                                 .font(.bodySmall)

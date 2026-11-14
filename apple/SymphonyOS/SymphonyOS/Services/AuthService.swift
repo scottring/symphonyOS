@@ -114,13 +114,27 @@ final class AuthService {
             || lowered.contains("signups are currently restricted")
     }
 
+    static let signUpFaultMessage = "Symphony couldn’t create your account just now. Please try again in a moment."
+
+    /// What a failed sign-up says. `gate`: what `signup_allowed` answered (nil: it could not be asked).
+    /// `message`: the failure's own text (nil: the gate said no before anything was tried).
+    /// Only a gate that answered no is "invite-only"; a generic database failure after
+    /// a yes (or no answer) is a fault, so nobody is told to request an invite untruthfully.
+    static func signUpFailure(gate: Bool?, message: String?) -> (text: String, inviteOnly: Bool) {
+        if gate == false { return (inviteOnlyMessage, true) }
+        guard let message, !isInviteGateFailure(message) else { return (signUpFaultMessage, false) }
+        return (message, false)
+    }
+
     func signUp(email: String, password: String) async {
         await MainActor.run { error = nil; inviteOnly = false; isLoading = true }
 
-        if await isSignUpAllowed(email: email) == false {
+        let gate = await isSignUpAllowed(email: email)
+        if gate == false {
+            let failure = AuthService.signUpFailure(gate: gate, message: nil)
             await MainActor.run {
-                self.error = AuthService.inviteOnlyMessage
-                self.inviteOnly = true
+                self.error = failure.text
+                self.inviteOnly = failure.inviteOnly
                 self.isLoading = false
             }
             return
@@ -134,12 +148,10 @@ final class AuthService {
                 isLoading = false
             }
         } catch {
-            // Belt and braces: the gate may have raced, or been unreachable.
-            let message = error.localizedDescription
-            let wasGate = AuthService.isInviteGateFailure(message)
+            let failure = AuthService.signUpFailure(gate: gate, message: error.localizedDescription)
             await MainActor.run {
-                self.error = wasGate ? AuthService.inviteOnlyMessage : message
-                self.inviteOnly = wasGate
+                self.error = failure.text
+                self.inviteOnly = failure.inviteOnly
                 self.isLoading = false
             }
         }
