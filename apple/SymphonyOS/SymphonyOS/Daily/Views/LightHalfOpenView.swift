@@ -156,11 +156,12 @@ struct LightHalfOpenView: View {
         ZStack(alignment: .topLeading) {
             DailyPalette.sky
             ZStack(alignment: .topLeading) {
-                Image(WalkArt.Cut.halfOpen(across: across).imageName)
+                let cut = WalkArt.Cut.halfOpen(across: across), drawn = cut.drawn(in: tent.picture)
+                Image(cut.imageName)
                     .resizable()
                     .interpolation(.high)
-                    .frame(width: tent.picture.width, height: tent.picture.height)
-                    .offset(x: tent.picture.minX - tent.look.minX, y: tent.picture.minY - tent.look.minY)
+                    .frame(width: drawn.width, height: drawn.height)
+                    .offset(x: drawn.minX - tent.look.minX, y: drawn.minY - tent.look.minY)
                     .accessibilityHidden(true)
                 DailyTopShade(solid: tent.veil.solid, height: tent.veil.length)
                 time(tent, model: model, now: now)

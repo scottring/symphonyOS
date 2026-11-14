@@ -109,6 +109,8 @@ struct DailyMetrics: Equatable {
     let rowGap: CGFloat
     /// The rows' left and right inset.
     let inset: CGFloat
+    /// The shape the board was stretched from.
+    var shape: Shape = .tall
 
     // MARK: Fixed numbers
 
@@ -201,7 +203,7 @@ struct DailyMetrics: Equatable {
             sign: sign, bar: bar, lookBack: lookBack, waiting: waiting.map(up),
             header: up(header), ring: ring, card: card == .zero ? card : up(card),
             rowsTop: rowsTop - rise, rowsTopNoCard: rowsTopNoCard - rise,
-            row: row, rowGap: rowGap, inset: inset)
+            row: row, rowGap: rowGap, inset: inset, shape: shape)
     }
 
     /// The board's numbers on this window, before any rise.
@@ -235,7 +237,7 @@ struct DailyMetrics: Equatable {
             lookBack: lookBack, waiting: waitingLine,
             header: header, ring: ring,
             card: card, rowsTop: card.maxY + 10, rowsTopNoCard: card.minY,
-            row: tall ? 54 : 52, rowGap: 6, inset: inset)
+            row: tall ? 54 : 52, rowGap: 6, inset: inset, shape: shape)
     }
 
     // MARK: Week
@@ -270,7 +272,7 @@ struct DailyMetrics: Equatable {
             lookBack: tall ? handle(width: size.width, sheetTop: sheetTop) : nil, waiting: nil,
             header: header, ring: 0,
             card: .zero, rowsTop: rowsTop, rowsTopNoCard: rowsTop,
-            row: 46, rowGap: 5, inset: 16)
+            row: 46, rowGap: 5, inset: 16, shape: shape)
     }
 
     /// The sheet's grabber: 44 × 5, 9 below the sheet's top, centred on the window.

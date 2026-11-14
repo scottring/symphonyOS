@@ -23,11 +23,12 @@ struct DailyBand: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             DailyPalette.sky
+            let drawn = cut.drawn(in: picture)
             Image(cut.imageName)
                 .resizable()
                 .interpolation(.high)
-                .frame(width: picture.width, height: picture.height)
-                .offset(x: picture.minX, y: picture.minY)
+                .frame(width: drawn.width, height: drawn.height)
+                .offset(x: drawn.minX, y: drawn.minY)
             if veil > 0 {
                 LinearGradient(stops: [.init(color: DailyPalette.navy.opacity(veil), location: 0),
                                        .init(color: DailyPalette.navy.opacity(veil), location: 0.22),
