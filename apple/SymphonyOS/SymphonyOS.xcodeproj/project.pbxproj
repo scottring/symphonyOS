@@ -144,6 +144,7 @@
 		A7ABA23EF22EC5A279C4FF3C /* PaperFoldTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C9A6ACB7B9E46F44B52B56F /* PaperFoldTests.swift */; };
 		A7F04047BD0C22C56A11120D /* WalkLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E218D4C9E8496B79A7A214 /* WalkLayoutTests.swift */; };
 		A936C12D2B64DE7CFB1471C6 /* SlideRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09BD930B3AFC90435DE5E822 /* SlideRow.swift */; };
+		A9717E7380F94E0AF4B7DE0A /* MountainPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54257F64F2AB9F0D4C966D50 /* MountainPage.swift */; };
 		A9CBDFDF613331A67E7947A2 /* WalkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4E6B5AB5FB68D06D3D308B /* WalkUITests.swift */; };
 		AB341F3096AC1FFB5BD3B539 /* PlannerComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D31FA63E65DA22E03392AD /* PlannerComponents.swift */; };
 		AEA84EBE5503B7AEC8B9D5A0 /* CrimsonPro-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2A262D445DAE6081A4A96C82 /* CrimsonPro-SemiBold.ttf */; };
@@ -193,6 +194,7 @@
 		DBF0E56D0DDD4CD37C3C3E91 /* TodayLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B78D16284B67024E3C00F636 /* TodayLayout.swift */; };
 		DDE8C94DBDC1189E1D3C66B0 /* TaskAttachmentsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC121327DD5EAA34D4F0F0CA /* TaskAttachmentsSection.swift */; };
 		E0B9D195877BF64C575CC6B0 /* CardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C9B2674A0AE5DFA973DAF0 /* CardStyle.swift */; };
+		E24EA588A32B70D1CC9CAE96 /* MountainPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74D46EFFA138731D79B29998 /* MountainPageTests.swift */; };
 		E37FD1B1732BE60FE7357D84 /* PageIngest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D0E0B44FF0171B957F8A6E8 /* PageIngest.swift */; };
 		E54556A265B7BAD27E15FEC7 /* WalkState+Orb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 298482E97F5E1153139815AC /* WalkState+Orb.swift */; };
 		E57C504F359B868F330F8AD7 /* PageIngestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E835A0EB2F2BE8C29B990F52 /* PageIngestTests.swift */; };
@@ -331,6 +333,7 @@
 		51E807DEDAD9A55C7D33504B /* DMSans-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "DMSans-Medium.ttf"; sourceTree = "<group>"; };
 		52420F36177A3E0B1C256DAF /* SymphonyOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SymphonyOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		527B3D33FF88A9A84A5DD5F8 /* Household.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Household.swift; sourceTree = "<group>"; };
+		54257F64F2AB9F0D4C966D50 /* MountainPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MountainPage.swift; sourceTree = "<group>"; };
 		5446B4F26A3BBFDB7B254A4E /* SignUpCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpCopyTests.swift; sourceTree = "<group>"; };
 		5618B899980DE85C6DE0BA61 /* OutsideGlance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutsideGlance.swift; sourceTree = "<group>"; };
 		5A49D0D02CF868490292308C /* CameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPicker.swift; sourceTree = "<group>"; };
@@ -355,6 +358,7 @@
 		70C0823D3F322CA3D99EC0A4 /* WeeklyTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTemplate.swift; sourceTree = "<group>"; };
 		718E56D8B02093D599728E35 /* SymphonyOSUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyOSUITests.swift; sourceTree = "<group>"; };
 		729A9989150DA6C5BAC4922C /* WalkWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkWords.swift; sourceTree = "<group>"; };
+		74D46EFFA138731D79B29998 /* MountainPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MountainPageTests.swift; sourceTree = "<group>"; };
 		762879785174DAA48771110A /* PlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerView.swift; sourceTree = "<group>"; };
 		76C2953FF3E1846C8971CA4D /* CarriedRoutines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedRoutines.swift; sourceTree = "<group>"; };
 		777FA26749C1A4208B9DDC94 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
@@ -544,6 +548,7 @@
 				14CE7964034D05C26EAF67D9 /* DailyCopy.swift */,
 				3994EC645C219CD7FA8A66EE /* DailyDay.swift */,
 				5101CD59CB4E178453578D81 /* DailyGate.swift */,
+				54257F64F2AB9F0D4C966D50 /* MountainPage.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -879,6 +884,7 @@
 				A932C77F9DCE9A3582897E6A /* GlanceToDoTests.swift */,
 				61E19EB4F8AFB3B2057038A2 /* HalfOpenTests.swift */,
 				217B2A6BEE77F0C6CE19306F /* MonthlyPositionTests.swift */,
+				74D46EFFA138731D79B29998 /* MountainPageTests.swift */,
 				6B165E6B770010DB9EC2731C /* NotesHTMLTests.swift */,
 				E835A0EB2F2BE8C29B990F52 /* PageIngestTests.swift */,
 				2B66CBCA35142878EF0695A6 /* PageParseTests.swift */,
@@ -1226,6 +1232,7 @@
 				2702FA26DA66FC30F7E2998C /* GlanceToDoTests.swift in Sources */,
 				B1DF56CB774764CFCF0C4D0A /* HalfOpenTests.swift in Sources */,
 				BD782E62D9ADFC3814E41900 /* MonthlyPositionTests.swift in Sources */,
+				E24EA588A32B70D1CC9CAE96 /* MountainPageTests.swift in Sources */,
 				F9A19E455568DEDDF7B3CCCA /* NotesHTMLTests.swift in Sources */,
 				E57C504F359B868F330F8AD7 /* PageIngestTests.swift in Sources */,
 				03A332C11095EAD4D374B404 /* PageParseTests.swift in Sources */,
@@ -1326,6 +1333,7 @@
 				D4B40B6C5DF437E57BA45693 /* LogMedicationIntent.swift in Sources */,
 				4AE3289D3236007A5F98C6C0 /* MainView.swift in Sources */,
 				ED73ECCD14D5BD8905977FBC /* MedTokenStore.swift in Sources */,
+				A9717E7380F94E0AF4B7DE0A /* MountainPage.swift in Sources */,
 				BF10BB1DF753FAED453DB947 /* NextUpActivity.swift in Sources */,
 				7DCE89EE7B3BC6737A9B3186 /* NextUpAttributes.swift in Sources */,
 				41AE4C762EAFD3902E7DF083 /* NextUpCard.swift in Sources */,
