@@ -28,7 +28,7 @@ struct WalkArt: Equatable {
                .week: 0.59...0.66, .today: 0.685...0.74],
         stops: [
             WalkLayout.Camera(x: 0, y: -1093, k: 0.30),     // Welcome
-            WalkLayout.Camera(x: 186, y: -553, k: 0.42),    // Year
+            WalkLayout.Camera(x: 186, y: -495, k: 0.42),    // Year: its band at stage y 535.5, labels clear of the light
             WalkLayout.Camera(x: 217, y: -294, k: 0.45),    // Season
             WalkLayout.Camera(x: 244, y: -67, k: 0.48),     // Month
             WalkLayout.Camera(x: 260, y: 110, k: 0.50),     // Week

@@ -244,9 +244,16 @@ private struct Builder {
         let scale = s.ground ? 1 : max(0.6, 1 - 0.1 * d)
         let tappable = s.ground || s.step == 1
         let yearY = stageY(.year)
+        // When labels stagger, the one nearest the stage's centre stays on the upper row, clear of the light.
+        let labeledXs = columns.enumerated().filter { $0.element.area != nil }.map { ($0.offset, stageX($0.element.worldX)) }
+        // Equally near (within 0.01 pt), the leftmost wins, so rounding never picks.
+        let centre = labeledXs.min { a, b in
+            let da = abs(a.1 - L.centreX), db = abs(b.1 - L.centreX)
+            return abs(da - db) < 0.01 ? a.0 < b.0 : da < db
+        }?.0 ?? 0
         return columns.enumerated().compactMap { i, column -> L.Label? in
             guard let area = column.area else { return nil }
-            let top = yearY + 3 + CGFloat(rows ? i % 2 : 0) * 34
+            let top = yearY + 3 + CGFloat(rows ? abs(i - centre) % 2 : 0) * 34
             guard top >= L.question else { return nil }        // zoomed low, the peaks are in the question
             let kept = s.kept.contains(area.id)
             let focused = !s.ground && s.focusArea == area.id
@@ -472,7 +479,9 @@ private struct Builder {
     /// goes on while it, and a stub if any would remain, stay below the ceiling; the
     /// rest fold into one stub on top, which never rises above the ceiling either (on
     /// Look back up, `moreOnTop`: the top banner carries the count instead). Examples
-    /// take only the room that is left; one that does not fit waits.
+    /// take only the room that is left; one that does not fit waits. If none would
+    /// fit, the flags fold to their newest (one line, then compact) and the first
+    /// example is cut to one line, until one shows.
     ///
     /// The newest is cut to one line if it must be. On the step's own level (`own`) it
     /// is always a banner: when it and a separate stub cannot both fit, it carries the
@@ -481,6 +490,59 @@ private struct Builder {
     /// stands alone, and otherwise a stub takes its place.
     func stack(_ id: String, _ lvl: WalkLevel, base: CGPoint, ghosts: [Entry], reals: [Entry],
                ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool, own: Bool = false) -> [L.Banner] {
+        let plain = flagsThenExamples(id, lvl, base: base, ghosts: ghosts, reals: reals, ceiling: ceiling, hard: hard,
+                                      scale: scale, moreOnTop: moreOnTop, own: own)
+        guard !ghosts.isEmpty, !plain.contains(where: { $0.kind == .ghost }) else { return plain }
+        // Examples are on but none found room: the person's flags fold to their newest, then give way,
+        // in this order, until the first example fits. Nothing covers a risen flag or crosses the question.
+        let tiers: [(own: L.Kind?, firstLines: Int?)] = reals.isEmpty
+            ? [(nil, 1)]
+            : [(.full, nil), (.compact, nil), (.compact, 1)]
+        for tier in tiers {
+            let folded = foldedWithExamples(id, lvl, base: base, ghosts: ghosts, reals: reals, ceiling: ceiling,
+                                            ownKind: tier.own, firstLines: tier.firstLines)
+            if folded.contains(where: { $0.kind == .ghost }) { return folded }
+        }
+        return plain
+    }
+
+    /// The person's newest flag on one line (as `ownKind`), carrying the count of the others and
+    /// sitting lower on its pole (down to its base) as far as the first example needs; then the
+    /// examples in order, the first cut to `firstLines` if given, while they fit under the ceiling.
+    func foldedWithExamples(_ id: String, _ lvl: WalkLevel, base: CGPoint, ghosts: [Entry], reals: [Entry],
+                            ceiling: CGFloat, ownKind: L.Kind?, firstLines: Int?) -> [L.Banner] {
+        var placed: [L.Banner] = []
+        let gapY: CGFloat = 4
+        let natural = { (e: Entry) in WalkLayout.lines(for: e.text, width: self.bw) }
+        let firstHeight = height(.ghost, lines: firstLines ?? ghosts.first.map(natural) ?? 1, tag: nil)
+        var b = base.y - L.pole
+        if let newest = reals.first, let ownKind {
+            let e = Entry(kind: ownKind, item: newest.item, text: newest.text, tag: newest.tag, glows: newest.glows,
+                          label: newest.label)
+            let h = height(ownKind, lines: 1, tag: e.tag)
+            b = min(base.y, max(b, ceiling + firstHeight + gapY + h))
+            let x = across(ownKind, at: base.x, scale: 1)
+            var own = banner(id: "\(id)-\(newest.item?.id.uuidString ?? "0")", e, lvl,
+                             frame: CGRect(x: x.minX, y: b - h, width: x.width, height: h), lines: 1)
+            if reals.count > 1 { own = carrying(own, more: reals.count - 1) }
+            placed.append(own)
+            b = own.frame.minY - gapY
+        }
+        for (i, ghost) in ghosts.enumerated() {
+            let lines = i == 0 ? (firstLines ?? natural(ghost)) : natural(ghost)
+            let h = height(.ghost, lines: lines, tag: nil)
+            guard b - h >= ceiling else { break }       // an example that does not fit waits
+            let x = across(.ghost, at: base.x, scale: 1)
+            placed.append(banner(id: "\(id)-example-\(ghost.text)", ghost, lvl,
+                                 frame: CGRect(x: x.minX, y: b - h, width: x.width, height: h), lines: lines))
+            b -= h + gapY
+        }
+        return placed
+    }
+
+    /// The flags as `stack` describes them, then the examples in the room left.
+    func flagsThenExamples(_ id: String, _ lvl: WalkLevel, base: CGPoint, ghosts: [Entry], reals: [Entry],
+                           ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool, own: Bool) -> [L.Banner] {
         var placed: [L.Banner] = []
         let gapY = (reals.first?.kind == .tip ? 3 : 4) * scale
         let stubRoom = moreOnTop ? 0 : gapY + 20 * scale

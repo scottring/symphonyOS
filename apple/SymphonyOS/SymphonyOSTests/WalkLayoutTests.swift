@@ -50,7 +50,8 @@ struct WalkLayoutTests {
 
     // MARK: Bands, columns, zoom
 
-    @Test func everyBandLandsAt560OnItsOwnStep() {
+    @Test func everyBandLandsOnItsStepsLine() {
+        // Year stands at 535.5 (clear of the light below its labels); Season to Today at 560.
         let year = flag(.year, "Run a 5K", in: "Home")
         let season = flag(.season, "Lift twice a week", in: "Home")
         let month = flag(.month, "Book the plumber", in: "Home")
@@ -61,7 +62,7 @@ struct WalkLayoutTests {
             s.firstThing = week.id
             let layout = WalkLayout.make(s, today: today)
             let base = layout.posts(on: levels[step - 1]).first?.base
-            #expect(base.map { near($0.y, 560) } == true, "step \(step): \(String(describing: base))")
+            #expect(base.map { near($0.y, step == 1 ? 535.5 : 560) } == true, "step \(step): \(String(describing: base))")
         }
         var s = state(6, kept: ["Home"], items: [year, season, month, week])
         s.firstThing = week.id
@@ -255,6 +256,110 @@ struct WalkLayoutTests {
             #expect(layout.banners(on: .year).allSatisfy { $0.kind == .tip }, "step \(step)")
             if step == 3 { #expect(layout.banners(on: .season).allSatisfy { $0.kind == .tip }) }
         }
+    }
+
+    // MARK: Examples under a risen flag
+
+    /// Zoomed on Health at `step`, its parent flag focused (so it rises), `own` flags of the step's level under it.
+    private func underTheParent(_ step: Int, own: [String], examples: Bool = true) -> (WalkState, WalkItem, [WalkItem]) {
+        let level = WalkLevel(rawValue: step)!, above = WalkLevel(rawValue: step - 1)!
+        let parent = flag(above, "Feel strong again", in: "Health")
+        let mine = own.map { flag(level, $0, in: "Health", parent: parent.id, day: level == .week ? today : nil) }
+        var s = state(step, kept: ["Health", "Home"], items: [parent] + mine)
+        s.focus[level] = parent.id
+        if examples { s.examplesOn = [step] }
+        return (s, parent, mine)
+    }
+
+    @Test func examplesShowUnderARisenFlag() {
+        let long = String(repeating: "Walk more every day. ", count: 10)
+        for step in 2...4 {
+            let level = WalkLevel(rawValue: step)!
+            for own in [[], [long], ["One", "Two", long]] {
+                let (s, parent, mine) = underTheParent(step, own: own)
+                let layout = WalkLayout.make(s, today: today)
+                #expect(layout.camera.k == 0.8)
+                let risen = layout.banner(for: parent)!.frame
+                let post = layout.post(level, area("Health").id)!
+                let ghosts = post.banners.filter { $0.kind == .ghost }
+                #expect(!ghosts.isEmpty, "step \(step) own \(own.count)")
+                for g in ghosts {
+                    #expect(g.frame.minY >= risen.maxY + 4 - 0.01 && g.frame.maxY <= post.base.y + 0.01, "\(g.frame)")
+                    #expect(g.text == WalkCopy.examples(level).first { $0 == g.text })
+                }
+                let frames = post.banners.map(\.frame)
+                for i in frames.indices { for j in frames.indices where j > i {
+                    #expect(!Invariants.overlap(frames[i], frames[j]), "\(frames[i]) meets \(frames[j])")
+                } }
+                if let newest = mine.last {
+                    let b = layout.banner(for: newest)!
+                    #expect(b.lines == 1 && (b.kind == .full || b.kind == .compact), "step \(step): \(b.kind)")
+                    #expect(b.more == (mine.count > 1 ? mine.count - 1 : nil))
+                    #expect(post.banners.filter { $0.itemId != nil }.count == 1)
+                }
+                // Examples off again: no examples, and the flags as they stood before.
+                var off = s
+                off.examplesOn = []
+                let plain = WalkLayout.make(off, today: today)
+                #expect(plain.posts.flatMap(\.banners).allSatisfy { $0.kind != .ghost })
+            }
+        }
+    }
+
+    @Test func examplesOffIsTheLayoutBeforeThem() {
+        for step in 2...4 {
+            let (s, _, _) = underTheParent(step, own: ["One", "Two"], examples: false)
+            var on = s
+            on.examplesOn = [step]
+            var off = on
+            off.examplesOn = []
+            #expect(WalkLayout.make(off, today: today) == WalkLayout.make(s, today: today))
+            #expect(WalkLayout.make(on, today: today) != WalkLayout.make(s, today: today))
+        }
+    }
+
+    @Test func aQuickStartFindsRoomForAnExample() {
+        // No areas, a focused Year flag with no area (no zoom), one Season flag, examples on.
+        let year = flag(.year, "Feel strong again")
+        let season = flag(.season, "Lift twice a week", parent: year.id)
+        var s = state(2, items: [year, season])
+        s.focus[.season] = year.id
+        s.examplesOn = [2]
+        let layout = WalkLayout.make(s, today: today)
+        #expect(layout.camera == art.stops[2])
+        let risen = layout.banner(for: year)!.frame
+        let post = layout.post(.season, nil)!
+        let ghosts = post.banners.filter { $0.kind == .ghost }
+        #expect(ghosts.first?.text == "Clear out the garage")
+        #expect(post.banners.allSatisfy { !$0.frame.intersects(risen) || $0.frame.minY >= risen.maxY })
+        #expect(layout.banner(for: season)?.kind == .compact)
+        #expect(ghosts.first?.lines == 1 || ghosts.first?.lines == 2)
+    }
+
+    @Test func labelsKeepOffTheLight() {
+        // Year, three kept areas and examples (the unlabeled post makes four columns).
+        var s = state(1, kept: ["Health", "Home", "People"])
+        s.examplesOn = [1]
+        let layout = WalkLayout.make(s, today: today)
+        #expect(layout.labels.count == 3)
+        for l in layout.labels { #expect(Invariants.orbDistance(l.frame) >= 74, "\(l.name) \(l.frame)") }
+        let nearest = layout.labels.min { abs($0.frame.midX - 195) < abs($1.frame.midX - 195) }!
+        #expect(near(nearest.frame.minY, layout.labels.map(\.frame.minY).min()!, 0.01))
+        // The ground, six labels: People (x 166) and Work (x 224) are equally near the centre; the leftmost stays up.
+        var ground = state(1)
+        ground.ground = true
+        let labels = WalkLayout.make(ground, today: today).labels
+        for l in labels { #expect(Invariants.orbDistance(l.frame) >= 74, "\(l.name)") }
+        let upper = labels.map(\.frame.minY).min()!
+        #expect(labels.filter { near($0.frame.minY, upper, 0.01) }.map(\.name) == ["Health", "People", "Money"])
+    }
+
+    @Test func thePictureStillFillsTheStageOnYear() {
+        let year = art.stops[1]
+        let bottomWorld = year.y + art.stage.height / year.k, rightWorld = year.x + art.stage.width / year.k
+        #expect(year.y == -495)
+        #expect(bottomWorld <= art.image.maxY && year.x >= art.image.minX && rightWorld <= art.image.maxX)
+        #expect(near((art.bandY(.year) - year.y) * year.k, 535.5))
     }
 
     @Test func lookingBackUpShowsTheWholePlan() {
@@ -452,7 +557,7 @@ struct WalkLayoutTests {
         #expect(layout.posts.count == 1)
         let post = layout.posts[0]
         #expect(post.pale && post.key == WalkPostKey(level: .year, column: nil))
-        #expect(near(post.base.y, 560))
+        #expect(near(post.base.y, 535.5))
         #expect(post.banners.filter { $0.kind == .ghost }.map(\.text) == WalkCopy.examples(.year))
 
         s.items = [flag(.year, "Run a 5K")]
@@ -736,6 +841,12 @@ private enum Invariants {
         return a.minX < b.maxX - e && b.minX < a.maxX - e && a.minY < b.maxY - e && b.minY < a.maxY - e
     }
 
+    static func orbDistance(_ r: CGRect) -> CGFloat {
+        let c = WalkOrb.centre
+        let x = min(max(c.x, r.minX), r.maxX), y = min(max(c.y, r.minY), r.maxY)
+        return hypot(c.x - x, c.y - y)
+    }
+
     static func meetsOrb(_ r: CGRect) -> Bool {
         let c = WalkOrb.centre
         let x = min(max(c.x, r.minX), r.maxX), y = min(max(c.y, r.minY), r.maxY)
@@ -792,6 +903,18 @@ private enum Invariants {
                 if case .stub = $0.kind { return true }; return false }) {
                 problems.append("\(post.id) has a stub beside its banners")
             }
+        }
+        // Where the light shows, no label comes within its ring and ticks plus 4 pt.
+        if s.step <= 5 {
+            for l in layout.labels where orbDistance(l.frame) < 74 { problems.append("label \(l.name) \(l.frame) on the light") }
+        }
+        // Examples on for a step that has some not yet planted: at least one shows.
+        if let level = s.level, !s.ground, (1...4).contains(s.step), s.examplesOn.contains(s.step) {
+            let titles = s.items(on: level).map { $0.title.lowercased() }
+            let left = WalkCopy.examples(level).filter { e in
+                !titles.contains((WalkWords.said(e, level: level, today: today, detect: { _ in nil })?.title ?? e).lowercased())
+            }
+            if !left.isEmpty, !banners.contains(where: { $0.kind == .ghost }) { problems.append("examples on, none shows") }
         }
         // No label sits in the question.
         for l in layout.labels where l.frame.minY < 250 - 0.01 { problems.append("label \(l.name) at \(l.frame.minY)") }
