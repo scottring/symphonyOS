@@ -130,6 +130,41 @@ struct DailyHandoverTests {
                                     lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: .glanceWide)) == false)
     }
 
+    // MARK: Behind the half-open display
+
+    /// A walk that finishes while the light half-open display covers the page asks for no
+    /// handover: nothing is left pending to play when the phone is opened flat.
+    @Test func aWalkFinishedBehindTheHalfOpenDisplayDoesNotHandOver() {
+        let covered = DailyGate.coversPage(edition: .light, halfOpen: true)
+        #expect(DailyHandover.plays(.walk, status: .finished, edition: .light, lightToday: true, covered: covered) == false)
+        #expect(DailyHandover.plays(.walk, status: .finished, edition: .light, lightToday: true,
+                                    covered: DailyGate.coversPage(edition: .light, halfOpen: false)))
+    }
+
+    /// Set down half open with a handover asked for and not yet played (the page under the display
+    /// may not be drawn to play it): it is dropped. Uncovered, it is kept; nothing asked stays nothing.
+    @Test func coveringDropsAHandoverNotYetPlayed() {
+        #expect(DailyHandover.keeps(pending: true, covered: true) == false)
+        #expect(DailyHandover.keeps(pending: true, covered: false))
+        #expect(DailyHandover.keeps(pending: false, covered: false) == false)
+        #expect(DailyHandover.keeps(pending: false, covered: true) == false)
+    }
+
+    /// Set down half open during the travel: it ends with no arrival, so no halo and no line, and
+    /// the line is not spent.
+    @Test func coveringDuringTheTravelEndsItWithNoLine() {
+        #expect(DailyHandover.interrupt(.covered) == (ends: true, arrives: false))
+    }
+
+    /// A covered page still drawn (inert) under the display: the handover is skipped as for any
+    /// sheet over the page, and so is an arrival there.
+    @Test func aCoveredPageSkipsTheHandover() {
+        let covered = DailyGate.coversPage(edition: .light, halfOpen: true)
+        for reduceMotion in [false, true] {
+            #expect(DailyHandover.play(lowered: false, sheetOver: covered, reduceMotion: reduceMotion) == .skip)
+        }
+    }
+
     // MARK: How it plays
 
     @Test func itTravelsWhereTheBarIsDrawn() {

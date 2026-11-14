@@ -30,8 +30,18 @@ enum DailyHandover {
     /// window draws (`lightToday`: `AppState.dailyHidesDock`, which the light Planner sets from
     /// `DailyGate.hidesDock` for the window it measured). Not now, Leave for now, a walk down,
     /// a sign-out or the day turning never hand over; a full household ends as it always has.
-    static func plays(_ ending: Ending, status: WalkStatus, edition: Edition, lightToday: Bool) -> Bool {
-        ending == .walk && status == .finished && edition == .light && lightToday
+    /// Nor does a walk that finishes while the light half-open display covers the page (`covered`:
+    /// `DailyGate.coversPage`): nothing is left pending to play when the phone is opened flat.
+    static func plays(_ ending: Ending, status: WalkStatus, edition: Edition, lightToday: Bool,
+                      covered: Bool = false) -> Bool {
+        ending == .walk && status == .finished && edition == .light && lightToday && !covered
+    }
+
+    /// Whether a handover asked for and not yet played survives the page being covered or not:
+    /// set down half open, it is dropped (the page under the display may not be drawn to play it,
+    /// and must not play it later), and its line is not spent.
+    static func keeps(pending: Bool, covered: Bool) -> Bool {
+        pending && !covered
     }
 
     /// How the handover plays on the page, once it arrives there.
@@ -55,18 +65,19 @@ enum DailyHandover {
     }
 
     /// What can happen while the light travels: a touch on the bar (its light or its field), the
-    /// line slot changing, or the handle lowering the sheet over the whole plan.
-    enum Interruption: Equatable { case touch, slot(DailyBar.Slot), handle }
+    /// line slot changing, the handle lowering the sheet over the whole plan, or the half-open
+    /// display covering the page.
+    enum Interruption: Equatable { case touch, slot(DailyBar.Slot), handle, covered }
 
     /// Whether it ends the travel (the light snaps home at once), and whether the light then arrives
     /// (the halo, and the line if the slot is free). A touch, and listening, a note or Undo taking the
-    /// slot, end it and arrive; the slot emptying does nothing; the handle takes the bar away, so it
-    /// ends with no arrival and the line is not spent.
+    /// slot, end it and arrive; the slot emptying does nothing; the handle and the half-open
+    /// display take the bar away, so they end it with no arrival and the line is not spent.
     static func interrupt(_ interruption: Interruption) -> (ends: Bool, arrives: Bool) {
         switch interruption {
         case .touch: (true, true)
         case .slot(let slot): slot == .empty ? (false, false) : (true, true)
-        case .handle: (true, false)
+        case .handle, .covered: (true, false)
         }
     }
 

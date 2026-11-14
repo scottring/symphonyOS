@@ -107,6 +107,8 @@ struct LightTodayView: View {
         .onChange(of: appState.handover) { _, _ in startHandover() }
         // Listening, a note or Undo taking the line slot ends the travel at once.
         .onChange(of: model.bar.slot) { _, slot in interrupt(.slot(slot)) }
+        // Set down half open (the display covers this page, drawn or not): the travel ends with no line.
+        .onChange(of: covered) { _, covered in if covered { interrupt(.covered) } }
         // The Lock Screen's Tell Symphony control or a `symphony://tell` link: the bar listens, no sheet;
         // asked for while the walk shows, it is answered as the walk closes.
         .onChange(of: appState.tellRequested) { _, _ in answerTell() }
@@ -323,6 +325,9 @@ struct LightTodayView: View {
 
     /// Anything over the page that hides the bar: Inbox, More, a row's details, the half-open display.
     private var sheetOver: Bool { opened != nil || appState.dailyPanel != nil || appState.posture.isHalfOpen }
+
+    /// The light half-open display covers this page (`DailyGate.coversPage`).
+    private var covered: Bool { DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen) }
 
     /// Whether the bar is still on screen as the light lands (asked again: a sheet may have opened).
     private var barShown: Bool {

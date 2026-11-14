@@ -215,6 +215,10 @@ struct iOSMainView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
+        // Set down half open with a handover not yet played: it is dropped, never played later (`DailyHandover`).
+        .onChange(of: pageCovered) { _, covered in
+            if !DailyHandover.keeps(pending: appState.handover, covered: covered) { appState.handover = false }
+        }
         .onChange(of: appState.posture) { _, posture in
             // Opening the phone flat after the last step leaves nothing to come back to.
             if posture == .flat, let cook = appState.cook, cook.isLast, cook.timer == nil { appState.cook = nil }
@@ -261,7 +265,7 @@ extension iOSMainView {
                 appState.horizon = down.returnsTo.horizon
                 appState.selectedDate = down.returnsTo.date
                 if DailyHandover.plays(.walkDown, status: status, edition: appState.edition,
-                                       lightToday: appState.dailyHidesDock) { appState.handover = true }
+                                       lightToday: appState.dailyHidesDock, covered: pageCovered) { appState.handover = true }
             }
             show(model, animated: animated)
             return
@@ -331,7 +335,7 @@ extension iOSMainView {
             appState.goToToday()
             // Finished onto light Today: its light comes down to the bar (`DailyHandover`).
             if DailyHandover.plays(.walk, status: status, edition: edition,
-                                   lightToday: appState.dailyHidesDock) { appState.handover = true }
+                                   lightToday: appState.dailyHidesDock, covered: pageCovered) { appState.handover = true }
         }
         show(model, animated: animated)
         #if DEBUG
@@ -351,6 +355,9 @@ extension iOSMainView {
         appState.walkShowing = true             // a Tell asked for now waits until it closes
         withAnimation(animated ? walkFade : nil) { walk = model }
     }
+
+    /// The light half-open display covers the page (`DailyGate.coversPage`).
+    private var pageCovered: Bool { DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen) }
 
     private var walkFade: Animation { .easeInOut(duration: reduceMotion ? 0.15 : 0.4) }
 
