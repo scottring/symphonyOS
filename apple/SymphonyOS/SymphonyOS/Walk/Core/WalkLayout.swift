@@ -43,8 +43,11 @@ struct WalkLayout: Equatable {
         var footing: CGFloat = 0
         var lean: Double = 0
         var pole: CGFloat = WalkLayout.pole
-        /// The hand was reduced here (no room for it, or no room to stand apart from a neighbour).
-        var squeezed: Bool = false }
+        /// The standing hand (footing, pole) was reduced here: no room for it, or no room to stand
+        /// apart from a neighbour. A lean damped to keep clear of other flags does not squeeze a post.
+        var squeezed: Bool = false
+        /// How much of its turning hand (lean, cloth tilt, shift) the post kept: 1, ½, ¼ or 0.
+        var turning: CGFloat = 1 }
     struct Label: Equatable, Identifiable { let id: UUID; let name: String; let frame: CGRect
         let kept: Bool; let focused: Bool; let opacity: Double; let tappable: Bool; let hint: String?
         /// For VoiceOver: kept, on the ground; focused, off it.
@@ -135,8 +138,11 @@ private struct Builder {
     let bw: CGFloat
     let compactWidth: CGFloat
     let footing: WalkFooting
-    /// How much of its hand each post keeps (1 when absent); a label goes with its column's Year post.
+    /// How much of its hand each post keeps (1 when absent), in two shares: what stands (footing,
+    /// pole length; a label goes with its column's Year post) and what turns (lean, cloth tilt, shift).
     var damp: [WalkPostKey: CGFloat] = [:]
+    var turnDamp: [WalkPostKey: CGFloat] = [:]
+    var poleDamp: [WalkPostKey: CGFloat] = [:]
 
     init(_ s: WalkState, today: Date, art: WalkArt, footing: WalkFooting) {
         self.footing = footing
@@ -292,8 +298,11 @@ private struct Builder {
         } else {
             needle = false
         }
+        let clear = footing == .natural ? clearances(stacked) : (rise: [:], sink: [:])
         let feet = Dictionary(uniqueKeysWithValues: Set(stacked.map(\.key.level)).union([.year]).map { lvl in
-            (lvl, footings(lvl, drawn: Set(stacked.filter { $0.key.level == lvl }.map(\.key.column))))
+            (lvl, footings(lvl, drawn: Set(stacked.filter { $0.key.level == lvl }.map(\.key.column)),
+                           rise: clear.rise.filter { $0.key.level == lvl }.reduce(into: [:]) { $0[$1.key.column] = $1.value },
+                           sink: clear.sink.filter { $0.key.level == lvl }.reduce(into: [:]) { $0[$1.key.column] = $1.value }))
         })
         func planted(_ b: Builder) -> WalkLayout {
             WalkLayout(camera: camera, labels: b.labels(feet[.year]!), posts: stacked.map { b.plant($0, feet[$0.key.level]!) },
@@ -304,19 +313,31 @@ private struct Builder {
         flat.damp = Dictionary(uniqueKeysWithValues: columns.flatMap { c in
             WalkLevel.allCases.map { (WalkPostKey(level: $0, column: c.id), CGFloat(0)) }
         })
+        flat.turnDamp = flat.damp
+        flat.poleDamp = flat.damp
         let ruled = planted(flat)
-        // Every round lowers at least one post's or label's share of its hand a step (1, ½, ¼, 0),
-        // so the rounds end within three per key; only the keys in conflict ever lose any.
+        // A key in conflict first turns less (its lean, tilt and shift: 1, ½, ¼, 0); only with no turn
+        // left does it stand nearer the line (footing and pole: 1, ½, ¼, 0). Every round lowers at least
+        // one share a step, so the rounds end within six per key; only keys in conflict ever lose any.
         let keys = Set(stacked.map(\.key)).union(columns.map { WalkPostKey(level: .year, column: $0.id) })
+        let lower = { (share: CGFloat) -> CGFloat in share > 0.5 ? 0.5 : (share > 0.25 ? 0.25 : 0) }
         var builder = self
         var made = planted(builder)
-        for _ in 0...(3 * keys.count) {
+        for _ in 0...(9 * keys.count) {
             let found = builder.conflicts(made, ruled: ruled)
             if found.isEmpty { return made }
-            let squeeze = found.filter { builder.sigma($0) > 0 }
+            let squeeze = found.filter { builder.turning($0) > 0 || builder.poleShare($0) > 0 || builder.sigma($0) > 0 }
             // Unreachable: a conflict with no hand left in it is one the ruled layout has itself.
             guard !squeeze.isEmpty else { break }
-            for key in squeeze { builder.damp[key] = builder.sigma(key) > 0.5 ? 0.5 : (builder.sigma(key) > 0.25 ? 0.25 : 0) }
+            for key in squeeze {
+                if builder.turning(key) > 0 {
+                    builder.turnDamp[key] = lower(builder.turning(key))
+                } else if builder.poleShare(key) > 0 {
+                    builder.poleDamp[key] = lower(builder.poleShare(key))
+                } else {
+                    builder.damp[key] = lower(builder.sigma(key))
+                }
+            }
             made = planted(builder)
         }
         // Not reached (asserted in DEBUG). If it ever is, the conflicting posts already have no hand
@@ -386,8 +407,13 @@ private struct Builder {
 
     // MARK: The hand
 
-    /// How much of its hand a post keeps: none when level, else all unless there was no room.
+    /// How much of its standing hand (footing, pole length) a post keeps: none when level, else all
+    /// unless there was no room even with its turn gone.
     func sigma(_ key: WalkPostKey) -> CGFloat { footing == .level ? 0 : damp[key] ?? 1 }
+    /// How much of its turning hand (lean, cloth tilt, sideways shift) a post keeps.
+    func turning(_ key: WalkPostKey) -> CGFloat { footing == .level ? 0 : turnDamp[key] ?? 1 }
+    /// How much of its pole's length a post keeps (damped after the turn, before the footing).
+    func poleShare(_ key: WalkPostKey) -> CGFloat { footing == .level ? 0 : poleDamp[key] ?? 1 }
 
     /// The scale a level's posts are drawn at (a distant level's small flags shrink).
     func tipScale(_ lvl: WalkLevel) -> CGFloat {
@@ -420,7 +446,8 @@ private struct Builder {
     /// a label keeps clear of the light and the question; where peaks take taps on a crowded ridge,
     /// a lower-row post's stub and the upper neighbour's label split their 1.5 pt (a real lack of
     /// room, reported `apart` false where it squeezes two neighbours together).
-    func footings(_ lvl: WalkLevel, drawn: Set<UUID?>) -> [(value: CGFloat, apart: Bool)] {
+    func footings(_ lvl: WalkLevel, drawn: Set<UUID?>, rise: [UUID?: CGFloat] = [:], sink: [UUID?: CGFloat] = [:])
+        -> [(value: CGFloat, apart: Bool)] {
         let k = drawnScale(lvl)
         let reach = WalkFooting.ground * k, gapY = WalkFooting.apart * k
         let slots = lvl == .year ? labelSlots() : [:]
@@ -443,6 +470,12 @@ private struct Builder {
                     if mine.row == 1 { hi[i] = min(hi[i], half) } else { lo[i] = max(lo[i], -half) }
                 }
             }
+            if lo[i] > hi[i] { lo[i] = (lo[i] + hi[i]) / 2; hi[i] = lo[i] }
+        }
+        // The flags of other levels above and below a post: it rises or sinks only as far as they leave it.
+        for i in 0..<n {
+            if let up = rise[columns[i].id] { lo[i] = min(0, max(lo[i], -up)) }
+            if let room = sink[columns[i].id] { hi[i] = max(0, min(hi[i], room)) }
             if lo[i] > hi[i] { lo[i] = (lo[i] + hi[i]) / 2; hi[i] = lo[i] }
         }
         // Staggered labels that overlap across: an upper label may sink only as far as the lower one
@@ -472,6 +505,7 @@ private struct Builder {
         let m = order.count
         var value = (0..<n).map { (-1.5 + 3 * own[$0]) * k }                // a label with no post: near the line
         var apart = [Bool](repeating: true, count: n)
+        var runOf = [Int](repeating: 2, count: max(0, m - 1))     // the length of the run each neighbour pair lies in
         if m == 1 {
             value[order[0]] = (-reach + 2 * reach * own[order[0]])
         } else if m > 1 {
@@ -481,19 +515,42 @@ private struct Builder {
             for t in 1..<(m - 1) where down[t - 1] != down[t] { ends.append(t) }
             ends.append(m - 1)
             var longest = [Int](repeating: 2, count: m)
-            for (a, b) in zip(ends, ends.dropFirst()) {
+            let runs = Array(zip(ends, ends.dropFirst()))
+            for (a, b) in runs {
                 let length = b - a + 1
+                for t in a..<b { runOf[t] = length }
                 longest[a] = max(longest[a], length)
                 longest[b] = max(longest[b], length)
-                guard length > 2 else { continue }
-                // The run's ends stand at least `least` from the line (less only where their room holds them).
-                let least: CGFloat = (length >= 4 ? 9 : 7.5) * k
+            }
+            let sinks = { (t: Int) in t == 0 ? !down[0] : down[t - 1] }
+            // An extreme stands at least `least` from the line: 3, 7.5 or 9 by the longest run it closes.
+            var least = ends.reduce(into: [Int: CGFloat]()) { out, t in
+                out[t] = max(rows ? 6 : 0, longest[t] >= 4 ? 9 : (longest[t] == 3 ? 7.5 : 3)) * k
+            }
+            // Where its room holds one end of a run near the line, the other end stands far enough off
+            // to leave the run its steps: 6 apart (4.5 in a run of five).
+            let near = { (t: Int) in sinks(t) ? clamp(order[t], least[t]!) : clamp(order[t], -least[t]!) }
+            let held = ends.reduce(into: [Int: CGFloat]()) { $0[$1] = near($1) }
+            for (a, b) in runs {
+                let length = b - a + 1
+                let span = (length == 5 ? 4.5 : gapY / k) * k * CGFloat(length - 1)
+                for (e, f) in [(a, b), (b, a)] {
+                    least[e] = min(reach, max(least[e]!, sinks(e) ? held[f]! + span : -(held[f]! - span)))
+                }
+            }
+            for t in ends {
+                let magnitude = least[t]! + (reach - least[t]!) * own[order[t]]
+                value[order[t]] = clamp(order[t], sinks(t) ? magnitude : -magnitude)
+            }
+            // Inside a run, between its two ends as they stand.
+            for (a, b) in runs where b - a > 1 {
+                let length = b - a + 1
                 let (raised, sunk) = down[a] ? (order[a], order[b]) : (order[b], order[a])
-                let top = clamp(raised, -least), bottom = clamp(sunk, least)
+                let top = value[raised], bottom = value[sunk]
                 for t in (a + 1)..<b {
                     let j = CGFloat(down[a] ? t - a : b - t)                // steps from the raised end
                     if length == 3 {
-                        // Anywhere at least 6 from both ends, by its own hand: about 0 ± 1.5.
+                        // Anywhere at least 6 from both ends, by its own hand: about 0 ± 1.5 when nothing holds them.
                         let from = top + gapY, to = bottom - gapY
                         value[order[t]] = from <= to ? from + (to - from) * own[order[t]] : (from + to) / 2
                     } else {
@@ -501,12 +558,6 @@ private struct Builder {
                     }
                     if length >= 6 { apart[order[t]] = false }
                 }
-            }
-            for t in ends {
-                let sinks = t == 0 ? !down[0] : down[t - 1]
-                let least: CGFloat = max(rows ? 6 : 0, longest[t] >= 4 ? 9 : (longest[t] == 3 ? 7.5 : 3))
-                let magnitude = least + (10 - least) * own[order[t]]
-                value[order[t]] = (sinks ? magnitude : -magnitude) * k
             }
         }
         // A label with no post: within what its drawn neighbours' labels in the other row leave it.
@@ -525,11 +576,41 @@ private struct Builder {
             }
         }
         var out = (0..<n).map { (value: clamp($0, value[$0]), apart: apart[$0]) }
-        for (a, b) in zip(order, order.dropFirst()) where abs(out[a].value - out[b].value) < gapY - 0.0001 {
-            let inFive = m == 5 && abs(out[a].value - out[b].value) >= 4.5 * k - 0.0001
+        for t in 0..<max(0, m - 1) {
+            let (a, b) = (order[t], order[t + 1])
+            guard abs(out[a].value - out[b].value) < gapY - 0.0001 else { continue }
+            // Only a genuine monotone run of five stands 4.5 apart by design.
+            let inFive = runOf[t] == 5 && abs(out[a].value - out[b].value) >= 4.5 * k - 0.0001
             if !inFive { out[a].apart = false; out[b].apart = false }
         }
         return out
+    }
+
+    /// How far each stacked post may rise and sink (its footing, with its pole's length) before one of its
+    /// flags would meet a flag of another level that the ruled layout keeps clear of it: half the gap to
+    /// the flags above and below (the other half is theirs).
+    func clearances(_ stacked: [L.Post]) -> (rise: [WalkPostKey: CGFloat], sink: [WalkPostKey: CGFloat]) {
+        let margin: CGFloat = 0.5, side: CGFloat = 4                // what a little turn may add (more is damped)
+        let all = stacked.flatMap { p in p.banners.map { (key: p.key, frame: $0.frame) } }
+        var rise: [WalkPostKey: CGFloat] = [:], sink: [WalkPostKey: CGFloat] = [:]
+        for p in stacked {
+            var up = CGFloat.infinity, down = CGFloat.infinity
+            for b in p.banners {
+                for o in all where o.key.level != p.key.level
+                    && o.frame.minX < b.frame.maxX + side && b.frame.minX < o.frame.maxX + side {
+                    // The gap between them is shared: the one below may rise half of it, the one above sink half.
+                    if o.frame.maxY <= b.frame.minY + L.fitTolerance {
+                        up = min(up, (b.frame.minY - o.frame.maxY) / 2)
+                    } else if o.frame.minY >= b.frame.maxY - L.fitTolerance {
+                        down = min(down, (o.frame.minY - b.frame.maxY) / 2)
+                    }
+                }
+            }
+            // (A longer pole lifts a stack too; where that would meet the flags above, the pole gives way first.)
+            if up < .infinity { rise[p.key] = max(0, up - margin) }
+            if down < .infinity { sink[p.key] = max(0, down - margin) }
+        }
+        return (rise, sink)
     }
 
     /// How far a label may sink and stay clear of the light (its ring and ticks plus 4 pt while it shows).
@@ -545,7 +626,7 @@ private struct Builder {
     func pole(_ key: WalkPostKey) -> CGFloat {
         let u = (CGFloat(WalkFooting.hand(postId(key), "pole")) + 1) / 2
         let raw = WalkFooting.pole.lowerBound + u * (WalkFooting.pole.upperBound - WalkFooting.pole.lowerBound)
-        return L.pole + (raw - L.pole) * sigma(key)
+        return L.pole + (raw - L.pole) * poleShare(key)
     }
 
     /// A stacked post, planted: its base a little above or below the band line (`feet`, by column),
@@ -553,7 +634,8 @@ private struct Builder {
     /// stubs stand on the base itself), the post leaning about its base, each cloth hanging askew
     /// and a little off the pole line. Frames move with the post as one piece, so a stack stays a
     /// stack; each banner is turned about where it meets its pole. A small flag does not shift off
-    /// its pole. With no hand left (`sigma` 0) the post is exactly as stacked.
+    /// its pole. With no hand left (both shares 0) the post is exactly as stacked. `squeezed`: its
+    /// standing share was reduced, or it could not stand `apart` from a neighbour.
     func plant(_ post: L.Post, _ feet: [(value: CGFloat, apart: Bool)]) -> L.Post {
         let key = post.key, sigma = sigma(key)
         let foot = feet[columns.firstIndex { $0.id == key.column }!]
@@ -577,7 +659,7 @@ private struct Builder {
 
     /// The post's lean and each cloth's tilt and shift (see `plant`).
     func dress(_ post: L.Post, scale: CGFloat) -> L.Post {
-        let sigma = sigma(post.key)
+        let sigma = turning(post.key)
         let lean = WalkFooting.hand(post.id, "lean") * WalkFooting.lean * Double(sigma)
         let banners = post.banners.map { b -> L.Banner in
             var b = b
@@ -610,6 +692,7 @@ private struct Builder {
         dressed.lean = lean
         dressed.pole = post.pole
         dressed.squeezed = post.squeezed
+        dressed.turning = sigma
         return dressed
     }
 
@@ -833,7 +916,7 @@ private struct Builder {
     /// the question (but the step's own newest alone) or a stub above its ceiling. (Whether an
     /// example shows is the stacking's, which the hand never changes.) And, measured against
     /// `ruled` (the hand never piles one thing onto another):
-    /// two posts' flags of one level meet that it keeps apart, or a flag (not the step's own) covers more of a label than it does.
+    /// two posts' flags (any levels) meet that it keeps apart, or a flag (not the step's own) covers more of a label than it does.
     ///
     /// Both posts (or post and label) of a conflicting pair are returned, so both are damped: the
     /// layout cannot tell which one's hand caused it, and damping both always ends it, since with
@@ -880,9 +963,9 @@ private struct Builder {
                 } else {
                     meet = false
                 }
-                // Whatever the rules allow, the hand does not make two posts' flags of one level meet that the ruled
-                // layout keeps apart. (A step's own flags may pass in front of the small flags above, as ruled ones do.)
-                let piled = !meet && a.post.id != b.post.id && a.banner.level == b.banner.level && overlap(a.drawn, b.drawn)
+                // Whatever the rules allow, the hand does not make two posts' flags meet, on one level or across
+                // levels, that the ruled layout keeps apart.
+                let piled = !meet && a.post.id != b.post.id && overlap(a.drawn, b.drawn)
                     && ruledFrames[a.banner.id].map { r in ruledFrames[b.banner.id].map { !overlap(r, $0) } ?? false } == true
                 if meet || piled { bad.insert(a.post.key); bad.insert(b.post.key) }
             }

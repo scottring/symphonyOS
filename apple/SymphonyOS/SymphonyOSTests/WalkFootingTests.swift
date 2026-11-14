@@ -36,12 +36,12 @@ private func walk(step: Int, areas count: Int, perPost: Int = 1, ground: Bool = 
 
 /// `areas` kept in this order, one flag on each on every level to `step` except the levels each
 /// area skips; ids depend only on the area and the level, so adding an area changes no other id.
-private func ridgeWalk(step: Int, areas: [WalkArea], skip: [UUID: Set<WalkLevel>] = [:]) -> WalkState {
+private func ridgeWalk(step: Int, areas: [WalkArea], skip: [UUID: Set<WalkLevel>] = [:], from: Int = 1) -> WalkState {
     var s = WalkState()
     s.areas = areas
     s.kept = areas.map(\.id)
     s.step = step
-    for raw in 1...min(step, 4) {
+    for raw in from...min(step, 4) {
         let level = WalkLevel(rawValue: raw)!
         for a in areas where !(skip[a.id]?.contains(level) ?? false) {
             let n = Int(a.id.uuidString.suffix(4), radix: 16)! * 10 + raw
@@ -151,7 +151,9 @@ struct WalkFootingTests {
 
     /// An arrival moves only the posts of the monotone runs it touches: those the newcomer stands in
     /// now, and the one its two new neighbours shared before (a footing depends on the ranks within
-    /// its own run, an extreme on the two runs it closes). Every other post keeps its footing.
+    /// its own run, an extreme on the two runs it closes). Every other post keeps its footing. Only the
+    /// step's own flags stand here: the room the flags of another level leave above a post is room,
+    /// and it moves with the columns when an area arrives (as the ruled layout's columns do).
     @Test func anArrivingAreaMovesOnlyItsRuns() {
         let newcomer = ridge[7]
         var compared = 0
@@ -161,9 +163,9 @@ struct WalkFootingTests {
                     let before = Array(ridge.prefix(count))
                     var after = before
                     after.insert(newcomer, at: at)
-                    let a = WalkLayout.make(ridgeWalk(step: step, areas: before), today: today)
-                    let b = WalkLayout.make(ridgeWalk(step: step, areas: after), today: today)
-                    for raw in 2...step {
+                    let a = WalkLayout.make(ridgeWalk(step: step, areas: before, from: step), today: today)
+                    let b = WalkLayout.make(ridgeWalk(step: step, areas: after, from: step), today: today)
+                    for raw in step...step {
                         let level = WalkLevel(rawValue: raw)!
                         let drawnB = b.posts.filter { $0.key.level == level }.sorted { $0.base.x < $1.base.x }
                         let drawnA = a.posts.filter { $0.key.level == level }.sorted { $0.base.x < $1.base.x }
@@ -190,39 +192,61 @@ struct WalkFootingTests {
     }
 
     /// For any ids, 2 to 5 drawn posts on a level stand at least 6 pt from each drawn neighbour,
-    /// nobody squeezed, all within ±10: on Year (step 1) and on Season (step 2), with and without an
-    /// empty column between two of them. The one exception is five posts whose hands rank in one
+    /// nobody squeezed, all within ±10: on the ground, Year (step 1), Season (step 2), Month (step 3)
+    /// and Week (step 4), each with flags on every level above, with and without an empty column
+    /// between two of them. (Where a lean would meet the small flags above, the turn is damped first and
+    /// the footing stands; a post rises only half the gap to the flags above, so nobody is squeezed for it.)
+    ///
+    /// Month and Week fall short for a real reason of room: the small flags of the level above leave a
+    /// Month post 5.9 pt to rise and a Week post 2.5 (half the gap, less 0.5), so between −5.9 and +10
+    /// (−2.5 and +10) a run of four posts in one rising order cannot take three 6 pt steps (it needs 18).
+    /// Smallest example: Month, four posts ranked in one order, footings −5.88, −0.59, 4.71, 10.00. There,
+    /// and only where four or more neighbours stand in one order, the run is spaced evenly, reported
+    /// squeezed, and the weaker thing that always holds is asserted: never within 3 pt of a neighbour. The one exception is five posts whose hands rank in one
     /// rising (or falling) run: ±10 cannot hold four 6 pt steps, so they stand 4.5 pt apart, evenly.
     @Test func neighboursStandApartWhateverTheirIds() {
         var rng = SeededIds(seed: 0x5EED_F007)
-        var checked = 0
+        var checked = 0, limited = 0
         for set in 0..<2000 {
             let count = 2 + set % 4
             let gap: Int? = set % 3 == 0 && count <= 4 ? 1 + Int(rng.next() % UInt64(count - 1)) : nil
             let columns = count + (gap == nil ? 0 : 1)
             let areas = (0..<columns).map { WalkArea(id: rng.uuid(), name: "Area \($0)") }
-            for step in [1, 2] {
-                let level = WalkLevel(rawValue: step)!
+            for step in 0...4 {                                         // 0: the ground
+                let level = WalkLevel(rawValue: max(1, step))!
                 var s = WalkState()
                 s.areas = areas
                 s.kept = areas.map(\.id)
-                s.step = step
+                s.step = max(1, step)
+                s.ground = step == 0
                 for (i, a) in areas.enumerated() {
-                    if step == 2 || i != gap { s.items.append(WalkItem(id: rng.uuid(), level: .year, title: "Goal", areaId: a.id)) }
-                    if step == 2, i != gap { s.items.append(WalkItem(id: rng.uuid(), level: .season, title: "Line", areaId: a.id)) }
+                    for raw in 1...max(1, step) where raw < level.rawValue || i != gap {
+                        s.items.append(WalkItem(id: rng.uuid(), level: WalkLevel(rawValue: raw)!, title: "Flag", areaId: a.id))
+                    }
                 }
                 let layout = WalkLayout.make(s, today: today)
                 let posts = layout.posts.filter { $0.key.level == level }.sorted { $0.base.x < $1.base.x }
                 let what = "set \(set), \(level), \(count) posts, gap \(String(describing: gap)): \(posts.map { String(format: "%.2f", $0.footing) })"
                 #expect(posts.count == count, "\(what)")
-                #expect(posts.allSatisfy { !$0.squeezed && abs($0.footing) <= WalkFooting.ground + 0.0001 }, "\(what)")
+                #expect(posts.allSatisfy { abs($0.footing) <= WalkFooting.ground + 0.0001 }, "\(what)")
+                #expect(step >= 3 || posts.allSatisfy { !$0.squeezed }, "\(what)")
                 let steps = zip(posts, posts.dropFirst()).map { $1.footing - $0.footing }
                 let oneRun = count == 5 && (steps.allSatisfy { $0 > 0 } || steps.allSatisfy { $0 < 0 })
+                let runOfFour = steps.count >= 3 && (0...(steps.count - 3)).contains { i in
+                    (steps[i] > 0) == (steps[i + 1] > 0) && (steps[i + 1] > 0) == (steps[i + 2] > 0)
+                }
+                if step >= 3 && runOfFour {
+                    #expect(steps.allSatisfy { abs($0) >= 3 - 0.0001 }, "\(what)")
+                    limited += 1
+                    checked += 1
+                    continue
+                }
                 #expect(steps.allSatisfy { abs($0) >= (oneRun ? 4.5 : WalkFooting.apart) - 0.0001 }, "\(what)")
                 checked += 1
             }
         }
-        #expect(checked == 4000)
+        #expect(checked == 10_000)
+        #expect(limited < 600, "\(limited) Month and Week levels with a run of four or more")
     }
 
     /// Year, appending an area at the right end: only the post that was last can move (it gains a
@@ -352,14 +376,12 @@ struct WalkFootingTests {
                     let problems = Invariants.check(layout, s)
                     #expect(problems.isEmpty, "\(count) areas, step \(step), \(perPost) each: \(problems.prefix(3))")
                     for p in layout.posts {
+                        // A lean is reduced only by its own turning share, and never past its hand.
                         let hand = WalkFooting.hand(p.id, "lean") * WalkFooting.lean
-                        if p.squeezed {
-                            #expect(abs(p.lean) <= abs(hand) + 0.0001, "\(p.id)")
-                        } else {
-                            #expect(abs(p.lean - hand) < 0.0001, "\(p.id)")
-                        }
+                        #expect(abs(p.lean - hand * Double(p.turning)) < 0.0001 && abs(p.lean) <= abs(hand) + 0.0001, "\(p.id)")
                     }
                     #expect(layout.posts.contains { !$0.squeezed || $0.lean != 0 }, "\(count) areas, step \(step): no hand left")
+                    #expect(layout.posts.allSatisfy { [0, 0.25, 0.5, 1].contains($0.turning) })
                 }
             }
         }
@@ -382,7 +404,7 @@ struct WalkFootingTests {
         }
     }
 
-    /// Whatever the rules allow, the hand never makes two posts' flags of one level meet that the ruled layout
+    /// Whatever the rules allow, the hand never makes two posts' flags (one level or two) meet that the ruled layout
     /// keeps apart, nor (but for the step's own flags, in front of the peaks by design) covers more
     /// of a label than it does (4 pt² forgiven).
     @Test func theHandNeverPilesOneThingOnAnother() {
@@ -394,7 +416,7 @@ struct WalkFootingTests {
             let natural = WalkLayout.make(s, today: today), level = WalkLayout.make(s, today: today, footing: .level)
             let drawn = natural.posts.flatMap { p in p.banners.map { (p.id, $0) } }
             let ruled = Dictionary(level.posts.flatMap(\.banners).map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
-            for (i, a) in drawn.enumerated() { for b in drawn[(i + 1)...] where a.0 != b.0 && a.1.level == b.1.level && area(a.1.drawn, b.1.drawn) > 0 {
+            for (i, a) in drawn.enumerated() { for b in drawn[(i + 1)...] where a.0 != b.0 && area(a.1.drawn, b.1.drawn) > 0 {
                 guard let ra = ruled[a.1.id], let rb = ruled[b.1.id], area(ra, rb) == 0 else { continue }
                 Issue.record("\(Generated.describe(s)): \(a.1.id) piled on \(b.1.id)")
                 return
@@ -407,6 +429,26 @@ struct WalkFootingTests {
                 }
             }
         }
+    }
+
+    /// Steps 1 to 5: no drawn cloth lies over another post's cloth on another level unless the ruled
+    /// layout of the same state already lays that same pair over each other (a leaning flag never
+    /// touches the small flags above it).
+    @Test func aLeaningFlagNeverTouchesTheFlagsAbove() {
+        var pairs = 0
+        for s in Generated.states() where (1...5).contains(s.step) && !s.ground {
+            let natural = WalkLayout.make(s, today: today), level = WalkLayout.make(s, today: today, footing: .level)
+            let ruled = Dictionary(level.posts.flatMap(\.banners).map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
+            let drawn = natural.posts.flatMap { p in p.banners.map { (p.id, $0) } }
+            for (i, a) in drawn.enumerated() { for b in drawn[(i + 1)...] where a.0 != b.0 && a.1.level != b.1.level {
+                pairs += 1
+                guard Invariants.overlap(a.1.drawn, b.1.drawn), let ra = ruled[a.1.id], let rb = ruled[b.1.id],
+                      !Invariants.overlap(ra, rb) else { continue }
+                Issue.record("\(Generated.describe(s)): \(a.1.id) \(a.1.drawn) over \(b.1.id) \(b.1.drawn)")
+                return
+            } }
+        }
+        #expect(pairs > 10_000)
     }
 
     @Test func turnedOutlinesMeetOnlyWhenTheyOverlap() {
