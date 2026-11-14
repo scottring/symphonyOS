@@ -373,4 +373,45 @@ struct WalkOrbTests {
         var held = state(step: 1); speak(&held)
         _ = held.apply(.speechReady, env); #expect(held.note == nil)
     }
+
+    // MARK: A cancel or an end takes back the finish wait
+
+    @Test func aCancelWhileFinishingStopsTheFinishWait() {
+        var s = state(step: 1)
+        speak(&s, "finish the bathroom")
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        #expect(s.orb == .finishing(live: "finish the bathroom"))
+        let cancel = s.apply(.orbCancelled, env)
+        #expect(cancel.contains(.timer(.finish, ms: nil)))
+        #expect(s.orb == .idle)
+        #expect(s.apply(.finishExpired, env) == [])            // a late expiry plants nothing
+        #expect(s.items.isEmpty)
+    }
+
+    @Test func endingTheWalkStopsTheFinishWaitAndNothingAfterPlantsOrSaves() {
+        // Not now on Welcome, and Go to Today at the ending, with a flag still waiting for its words.
+        var welcome = state(step: 0)
+        welcome.orb = .finishing(live: "something")
+        #expect(welcome.act(.notNow, env) == [.timer(.finish, ms: nil), .end(.left)])
+        #expect(welcome.orb == .idle)
+
+        var s = state(step: 6, planted: true)
+        s.orb = .finishing(live: "feel strong again")
+        #expect(s.apply(.goToToday, env) == [.timer(.finish, ms: nil), .end(.finished)])
+        #expect(s.orb == .idle)
+
+        for ended in [welcome, s] {
+            var t = ended
+            let items = t.items
+            for event: WalkEvent in [.finishExpired, .listenEnded, .orbDown, .orbHeld, .orbUp(heldMs: 900),
+                                     .typeSubmitted, .sheetHandle, .walkAnother, .goToToday, .undo, .calendarAnswered] {
+                #expect(t.apply(event, env) == [])
+            }
+            for action: WalkAction in [.next, .back, .quick, .notNow, .undo, .calendar] {
+                #expect(t.act(action, env) == [])
+            }
+            #expect(t.items == items)
+            #expect(t.orb == .idle)
+        }
+    }
 }

@@ -26,9 +26,10 @@ extension WalkState {
         case .orbMoved(let location): return orbMoved(location)
         case .orbUp(let heldMs): return orbUp(heldMs: heldMs, env)
         case .orbCancelled:
+            // A cancel while waiting for the last words lets them go: the finish wait is taken back.
             orb = .idle
             orbWasOpen = false
-            return [.listen(false), .timer(.hold, ms: nil)]
+            return [.listen(false), .timer(.hold, ms: nil), .timer(.finish, ms: nil)]
         case .heard(let text):
             switch orb {
             case .speaking: orb = .speaking(live: text)

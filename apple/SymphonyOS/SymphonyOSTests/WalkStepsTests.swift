@@ -91,7 +91,7 @@ struct WalkStepsTests {
 
     @Test func notNowLeaves() {
         var s = m.welcome()
-        #expect(s.act(.notNow, m.env) == [.end(.left)])
+        #expect(s.act(.notNow, m.env) == [.timer(.finish, ms: nil), .end(.left)])
     }
 
     @Test func keepingIsATapAndCanBeTakenBack() {
@@ -582,6 +582,70 @@ struct WalkStepsTests {
         var early = m.at(3)
         _ = early.act(.next, env)
         #expect(early.calendarOffer == false)
+    }
+
+    @Test func theCalendarOfferIsAQuietLineAndOnePoint() {
+        var env = m.env
+        env.canAskCalendar = true
+        var s = m.at(4)
+        let effects = s.act(.next, env)
+        #expect(s.note == WalkCopy.calendarLine)
+        #expect(effects == [.timer(.note, ms: WalkState.calendarNoteMs), .save])
+
+        var plain = m.at(4)
+        #expect(plain.act(.next, m.env) == [.save])
+        #expect(plain.note == nil)
+
+        // Leaving Today takes the line with it.
+        _ = s.act(.back, m.env)
+        #expect(s.note == nil && s.step == 4)
+        _ = s.act(.next, env)
+
+        // The point asks once; the answer takes the offer and its line away.
+        #expect(s.act(.calendar, env) == [.askCalendar])
+        #expect(!s.calendarOffer)
+        #expect(s.act(.calendar, env) == [])
+        s.calendarOffer = true
+        #expect(s.apply(.calendarAnswered, m.env) == [])
+        #expect(!s.calendarOffer && s.note == nil)
+
+        // Not on Today, or not offered: nothing.
+        var week = m.at(4)
+        week.calendarOffer = true
+        #expect(week.act(.calendar, env) == [])
+        var today = m.at(5)
+        #expect(today.act(.calendar, env) == [])
+    }
+
+    @Test func theHandleRaisesAndLowersTheSheetOnlyAtTheEnding() {
+        var s = m.at(6)
+        #expect(!s.sheetOpen && !s.sheetRaised)
+        #expect(s.endingTitle == WalkCopy.lookBack && s.sheetHandleLabel == WalkCopy.showMyDay)
+        #expect(s.apply(.sheetHandle, m.env) == [])
+        #expect(s.sheetOpen && s.sheetRaised)
+        #expect(s.endingTitle == WalkCopy.heresToday && s.sheetHandleLabel == WalkCopy.lookBackHandle)
+        _ = s.apply(.sheetHandle, m.env)
+        #expect(!s.sheetOpen)
+
+        // Nothing planted to look back at: the sheet stands up, with no handle to lower it.
+        var bare = m.welcome()
+        bare.step = 6
+        #expect(bare.sheetRaised && bare.endingTitle == WalkCopy.heresToday && bare.sheetHandleLabel == nil)
+        _ = bare.apply(.sheetHandle, m.env)
+        #expect(!bare.sheetOpen)
+
+        var today = m.at(5)
+        _ = today.apply(.sheetHandle, m.env)
+        #expect(!today.sheetOpen)
+    }
+
+    @Test func goToTodayEndsTheWalkFinishedFromTheEndingOnly() {
+        var s = m.at(6)
+        s.sheetOpen = true
+        #expect(s.apply(.goToToday, m.env) == [.timer(.finish, ms: nil), .end(.finished)])
+        var today = m.at(5)
+        #expect(today.apply(.goToToday, m.env) == [])
+        #expect(today.step == 5)
     }
 
     // MARK: Readings

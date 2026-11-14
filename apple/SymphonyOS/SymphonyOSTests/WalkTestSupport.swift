@@ -5,7 +5,7 @@ import SwiftData
 
 // Fakes shared by the walk's model tests. Task 14 made this file with the
 // scheduler and the in-memory store; Task 16 added the listener; Task 19 the
-// sound; later tasks add their fakes here.
+// sound; Task 20 the calendar.
 
 /// Time for tests: nothing waits; `advance` moves a pretend clock and runs
 /// what fell due, in time order; `settle` runs the async work handed over.
@@ -113,6 +113,23 @@ import SwiftData
 
     func feel(_ name: WalkSoundName) {
         felt.append(name)
+    }
+}
+
+/// The phone's calendar permission for tests: nothing touches EventKit. `access`
+/// is what the system says now; `request()` is the system prompt, counted, and
+/// leaves `access` at `answer`. Passed to the model as
+/// `calendarAccess: { fake.access }` and `requestCalendar: { await fake.request() }`.
+@MainActor final class FakeWalkCalendar {
+    var access: AppleCalendarAccess = .notAsked
+    var answer: AppleCalendarAccess = .allowed
+    private(set) var asks = 0
+
+    init() {}
+
+    func request() async {
+        asks += 1
+        access = answer
     }
 }
 

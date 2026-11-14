@@ -4,7 +4,8 @@ import UIKit
 
 /// The walk, full screen: the 390 × 844 stage scaled to fit the device and
 /// centred on the deep sky colour, over the safe areas (D21). The orb and the
-/// hint row sit on the stage, over the scene, on every step but Look back up.
+/// hint row sit on the stage, over the scene, on every step but Look back up,
+/// where the header and the ending sheet take their place.
 /// The full-bleed root is the `"walk.device"` coordinate space every touch is
 /// measured in before `WalkStage` turns it into stage points.
 struct WalkView: View {
@@ -26,6 +27,8 @@ struct WalkView: View {
                     if model.state.step <= 5 {
                         WalkOrbView(model: model)
                         WalkHintRow(model: model)
+                    } else {
+                        WalkEndingView(model: model)        // Look back up, and Today as a sheet
                     }
                 }
                 .frame(width: model.art.stage.width, height: model.art.stage.height, alignment: .topLeading)

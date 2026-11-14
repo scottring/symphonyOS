@@ -51,6 +51,16 @@ extension Dictation: WalkListening {}
     /// Set by `close()`: nothing more reaches the state.
     @ObservationIgnored private var closed = false
 
+    // The calendar ask and the ending (Task 20).
+    /// Today's tasks for the ending sheet, each with what it is for: read from the store
+    /// after every event and point while the walk is on Look back up.
+    private(set) var endingRows: [WalkEnding.Row] = []
+    @ObservationIgnored private let context: ModelContext
+    @ObservationIgnored private let calendarAccess: @MainActor () -> AppleCalendarAccess
+    @ObservationIgnored private let requestCalendar: @MainActor () async -> Void
+    /// The Calendar point was chosen in this walk: it is never offered again, whatever the answer.
+    @ObservationIgnored private var calendarAsked = false
+
     /// Where the listener is for the latest hold. Words and an end are taken only
     /// from the hold they belong to, and only while it is starting, live or finishing.
     private enum Session: Equatable {
@@ -64,7 +74,9 @@ extension Dictation: WalkListening {}
 
     init(context: ModelContext, userId: UUID, entry: WalkEntry, position: WalkPosition?, edition: Edition,
          now: Date = .now, seasons: [SeasonBoundary]? = nil, store: WalkPositionStore? = WalkPositionStore(),
-         scheduler: WalkScheduling? = nil, listener: WalkListening? = nil, sound: WalkSoundPlaying? = nil) {
+         scheduler: WalkScheduling? = nil, listener: WalkListening? = nil, sound: WalkSoundPlaying? = nil,
+         calendarAccess: @escaping @MainActor () -> AppleCalendarAccess = { AppleCalendarService.shared.access },
+         requestCalendar: @escaping @MainActor () async -> Void = { await AppleCalendarService.shared.requestAccess() }) {
         let periods = WalkPeriods.pick(now: now, seasons: seasons)
         let resuming = entry == .resume ? position : nil
         let planted = Set(resuming?.planted ?? [])
@@ -98,18 +110,24 @@ extension Dictation: WalkListening {}
             return dictation
         }()
         self.sound = sound ?? WalkSound.shared
+        self.context = context
+        self.calendarAccess = calendarAccess
+        self.requestCalendar = requestCalendar
+        readEnding()
     }
 
-    private var env: WalkEnv { WalkEnv(periods: periods, now: now) }
+    private var env: WalkEnv { WalkEnv(periods: periods, now: now, canAskCalendar: canAskCalendar) }
 
     func send(_ event: WalkEvent) {
         guard !closed else { return }
         carryOut(state.apply(event, env))
+        readEnding()
     }
 
     func choose(_ action: WalkAction) {
         guard !closed else { return }
         carryOut(state.act(action, env))
+        readEnding()
     }
 
     /// The walk taken down from outside (it ended, a sign-out, another person, a new
@@ -141,8 +159,7 @@ extension Dictation: WalkListening {}
             case .listen(let on): listen(on)
             case .finishListening: finishListening()
             case .sound(let name, let ms): play(name, after: ms)
-            case .askCalendar:
-                break                       // Task 20
+            case .askCalendar: askCalendar()
             }
         }
     }
@@ -294,6 +311,69 @@ extension Dictation: WalkListening {}
 
     private func save(_ status: WalkStatus) {
         store?.save(WalkPosition(state, status: status, planted: planted, periods: periods, now: now), for: userId)
+    }
+
+    // MARK: The calendar ask and the ending (Task 20)
+
+    /// The calendar may be offered on Today: the light edition only, never once the Calendar
+    /// point was chosen in this walk, and only while the system has never asked this person
+    /// (any answer, here or elsewhere, ends the offer for good). It is read only from Week and
+    /// from Look back up, the steps a point can bring the walk onto Today from, so no other
+    /// step reads the system's permission.
+    private var canAskCalendar: Bool {
+        guard edition == .light, !calendarAsked, state.step == 4 || state.step == 6 else { return false }
+        return calendarAccess() == .notAsked
+    }
+
+    /// The system's own prompt, through the scheduler; the answer, whatever it is, ends the offer.
+    private func askCalendar() {
+        calendarAsked = true
+        scheduler.run { [weak self] in
+            guard let self, !self.closed else { return }
+            await self.requestCalendar()
+            self.send(.calendarAnswered)
+        }
+    }
+
+    /// Done and total of today's rows, for the ring.
+    var ring: (done: Int, total: Int) { (endingRows.filter(\.done).count, endingRows.count) }
+
+    /// Today's next calendar event after this moment, if the calendar feed has one: none
+    /// without calendar access, in a full household with no connected calendar, or in a demo.
+    var nextUp: (title: String, start: Date)? {
+        Self.nextEvent(in: CalendarFeed.shared.items(for: periods.today), after: .now)
+    }
+
+    /// The first timed event that starts after `moment`.
+    static func nextEvent(in items: [TimelineItem]?, after moment: Date) -> (title: String, start: Date)? {
+        (items ?? [])
+            .compactMap { item -> (title: String, start: Date)? in
+                guard item.type == .event, !item.isAllDay, let start = item.startTime, start > moment else { return nil }
+                return (item.title, start)
+            }
+            .min { $0.start < $1.start }
+    }
+
+    /// The sheet's closing line: "That’s the day." once every one of today's rows is done,
+    /// "Nothing planted for today yet." with none, otherwise nothing.
+    var dayLine: String? {
+        if endingRows.isEmpty { return WalkCopy.nothingToday }
+        return endingRows.allSatisfy(\.done) ? WalkCopy.thatsTheDay : nil
+    }
+
+    /// The year goal "Walk another one down" would go under, if one is left to walk.
+    var nextToWalk: String? { WalkEnding.nextToWalk(state.items)?.title }
+
+    /// Today's rows from the store, re-read after the walk's own writes; empty off the ending.
+    private func readEnding() {
+        guard state.step == 6 else {
+            if !endingRows.isEmpty { endingRows = [] }
+            return
+        }
+        let rows = WalkEnding.rows(tasks: (try? context.fetch(FetchDescriptor<SymphonyTask>())) ?? [],
+                                   goals: (try? context.fetch(FetchDescriptor<Goal>())) ?? [],
+                                   today: periods.today, me: userId, firstThing: state.firstThing)
+        if rows != endingRows { endingRows = rows }
     }
 
     private static func key(_ timer: WalkTimer) -> String {

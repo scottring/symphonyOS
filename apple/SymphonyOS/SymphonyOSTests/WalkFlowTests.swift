@@ -21,6 +21,7 @@ final class WalkFlowTests {
     let me = UUID()
     let scheduler = ManualWalkScheduler()
     let listener = FakeWalkListener()
+    let calendar = FakeWalkCalendar()
     let suite = "WalkFlowTests.\(UUID())"
     let store: WalkPositionStore
 
@@ -32,9 +33,10 @@ final class WalkFlowTests {
         UserDefaults().removePersistentDomain(forName: suite)
     }
 
-    private func model(_ ctx: ModelContext, entry: WalkEntry = .start) -> WalkModel {
+    private func model(_ ctx: ModelContext, entry: WalkEntry = .start, edition: Edition = .light) -> WalkModel {
         WalkModel(context: ctx, userId: me, entry: entry, position: entry == .resume ? store.load(for: me) : nil,
-                  edition: .light, now: now, store: store, scheduler: scheduler, listener: listener, sound: FakeWalkSound())
+                  edition: edition, now: now, store: store, scheduler: scheduler, listener: listener, sound: FakeWalkSound(),
+                  calendarAccess: { [calendar] in calendar.access }, requestCalendar: { [calendar] in await calendar.request() })
     }
 
     private func fetch<T: PersistentModel>(_ ctx: ModelContext, _ type: T.Type) -> [T] {
@@ -320,12 +322,14 @@ final class WalkFlowTests {
         m.choose(.startThere)
         m.choose(.next)
         #expect(m.state.step == 6)
+        m.send(.sheetHandle)                                   // walked from inside the raised sheet
+        #expect(m.state.sheetOpen)
 
         m.send(.walkAnother)
         #expect(m.state.step == 2)
         #expect(m.state.depth == .quick)
         #expect(m.state.focus[.season] == bathroom.id)
-        #expect(!m.state.sheetOpen)                            // never open here: Task 20 opens the sheet and pins this again
+        #expect(!m.state.sheetOpen)                            // the sheet is put away for the walk down
         #expect(store.load(for: me)?.step == 2)
 
         // The second goal's chain links to its own lines, not the first's.
@@ -374,6 +378,166 @@ final class WalkFlowTests {
         #expect(tiler.sourceId == nil)
         #expect(tiler.goalId != strong.id)
         #expect(try childrenAheadOfParents(ctx) == [])
+    }
+
+    // MARK: The calendar ask and the ending
+
+    /// A quick start with nothing kept, every step skipped down to Today.
+    private func downToToday(_ m: WalkModel) {
+        m.choose(.quick)
+        for _ in 0..<5 { m.choose(.next) }
+    }
+
+    private func offersCalendar(_ m: WalkModel) -> Bool {
+        WalkCopy.points(m.state).contains { $0.action == .calendar }
+    }
+
+    @Test func theCalendarIsOfferedOnceInLightOnly() async throws {
+        let m = model(try walkTestContext())
+        downToToday(m)
+        #expect(m.state.step == 5)
+        #expect(m.state.calendarOffer)
+        #expect(m.state.note == WalkCopy.calendarLine)
+        #expect(offersCalendar(m))
+
+        // The line was ignored: back up and down again, and it is offered again.
+        m.choose(.back)
+        #expect(m.state.note != WalkCopy.calendarLine)          // the line belongs to Today
+        m.choose(.next)
+        #expect(m.state.calendarOffer && m.state.note == WalkCopy.calendarLine)
+        #expect(calendar.asks == 0)
+
+        m.choose(.calendar)
+        await scheduler.settle()
+        #expect(calendar.asks == 1)
+        #expect(!m.state.calendarOffer)
+        #expect(m.state.note != WalkCopy.calendarLine)
+
+        m.choose(.back)
+        m.choose(.next)
+        #expect(m.state.step == 5)
+        #expect(!m.state.calendarOffer && !offersCalendar(m))
+        #expect(m.state.note != WalkCopy.calendarLine)
+        m.choose(.calendar)
+        await scheduler.settle()
+        #expect(calendar.asks == 1)
+
+        // A full household is never asked, even with the calendar never asked for.
+        let fullCalendar = FakeWalkCalendar()
+        let full = WalkModel(context: try walkTestContext(), userId: me, entry: .start, position: nil, edition: .full,
+                             now: now, store: nil, scheduler: scheduler, listener: listener, sound: FakeWalkSound(),
+                             calendarAccess: { fullCalendar.access }, requestCalendar: { await fullCalendar.request() })
+        downToToday(full)
+        #expect(full.state.step == 5)
+        #expect(!full.state.calendarOffer && !offersCalendar(full) && full.state.note == nil)
+        full.choose(.calendar)
+        await scheduler.settle()
+        #expect(fullCalendar.asks == 0)
+
+        // Light, but the person already said no to the calendar elsewhere.
+        let denied = FakeWalkCalendar()
+        denied.access = .denied
+        let light = WalkModel(context: try walkTestContext(), userId: me, entry: .start, position: nil, edition: .light,
+                              now: now, store: nil, scheduler: scheduler, listener: listener, sound: FakeWalkSound(),
+                              calendarAccess: { denied.access }, requestCalendar: { await denied.request() })
+        downToToday(light)
+        #expect(!light.state.calendarOffer && !offersCalendar(light) && light.state.note == nil)
+        #expect(denied.asks == 0)
+    }
+
+    @Test func theCalendarLineStaysItsOwnTime() throws {
+        let m = model(try walkTestContext())
+        downToToday(m)
+        #expect(m.state.note == WalkCopy.calendarLine)
+        scheduler.advance(WalkState.noteMs)
+        #expect(m.state.note == WalkCopy.calendarLine)
+        scheduler.advance(WalkState.calendarNoteMs - WalkState.noteMs)
+        #expect(m.state.note == nil)
+    }
+
+    @Test func theSheetStartsDown() async throws {
+        let m = model(try walkTestContext())
+        quickStart(m, keeping: ["Health"])
+        await say(m, "feel strong again")
+        for _ in 0..<5 { m.choose(.next) }
+        #expect(m.state.step == 6)
+        #expect(!m.state.sheetOpen)
+        #expect(m.nextToWalk == m.state.items(on: .year).first?.title)   // its season piece not walked yet
+        m.send(.sheetHandle)
+        #expect(m.state.sheetOpen)
+        m.send(.sheetHandle)
+        #expect(!m.state.sheetOpen)
+    }
+
+    @Test func tickingARowCompletesTheTaskWhoeverPlantedIt() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        quickStart(m, keeping: ["Health"])
+        for _ in 0..<4 { m.choose(.next) }
+        #expect(m.state.step == 5)
+        await say(m, "stretch for ten minutes")
+        let first = try #require(m.state.firstThing)
+        // A task for today the walk did not plant.
+        let other = SymphonyTask(userId: me, title: "Call the dentist", scheduledFor: now, context: "personal",
+                                 syncStatus: .synced)
+        ctx.insert(other)
+        try ctx.save()
+        m.choose(.next)
+        #expect(m.state.step == 6)
+        #expect(m.endingRows.map(\.id) == [first, other.id])
+        #expect(m.ring == (done: 0, total: 2))
+        #expect(m.dayLine == nil)
+
+        m.send(.rowToggled(other.id))
+        #expect(other.completed)
+        #expect(other.completedAt != nil)
+        #expect(m.ring == (done: 1, total: 2))
+        #expect(m.endingRows.first { $0.id == other.id }?.done == true)
+        // As Today ticks a task: the change waits in the sync queue.
+        let queued = fetch(ctx, PendingChange.self).filter { $0.tableName == "tasks" && $0.recordId == other.id }
+        #expect(queued.map(\.changeType) == ["update"])
+
+        m.send(.rowToggled(other.id))
+        #expect(!other.completed)
+        #expect(other.completedAt == nil)
+        #expect(m.ring == (done: 0, total: 2))
+
+        // Every row done: the day's quiet line, and nothing more.
+        m.send(.rowToggled(first))
+        m.send(.rowToggled(other.id))
+        #expect(m.ring == (done: 2, total: 2))
+        #expect(m.dayLine == WalkCopy.thatsTheDay)
+    }
+
+    @Test func closingTheSheetFinishesTheWalk() throws {
+        let m = model(try walkTestContext())
+        var ended: [WalkStatus] = []
+        m.onEnd = { ended.append($0) }
+        m.choose(.quick)
+        for _ in 0..<6 { m.choose(.next) }
+        #expect(m.state.step == 6)
+        #expect(m.endingRows.isEmpty && m.dayLine == WalkCopy.nothingToday && m.nextToWalk == nil)
+        m.send(.sheetHandle)
+        m.send(.sheetHandle)
+        #expect(ended.isEmpty)                                 // the handle only raises and lowers
+        m.send(.goToToday)
+        #expect(ended == [.finished])
+        #expect(store.load(for: me)?.status == .finished)
+    }
+
+    @Test func theNextEventIsTodaysNextTimedOne() {
+        func at(_ hour: Int) -> Date { PlanCalendar.calendar.date(bySettingHour: hour, minute: 0, second: 0, of: now)! }
+        func item(_ title: String, _ start: Date?, type: TimelineItem.ItemType = .event, allDay: Bool = false) -> TimelineItem {
+            TimelineItem(id: title, type: type, title: title, startTime: start, isAllDay: allDay, completed: false,
+                         context: nil, entityId: UUID())
+        }
+        let items = [item("School drop-off", at(8)), item("Picture day", nil, allDay: true),
+                     item("Dentist", at(15)), item("Boxing", at(11)), item("Lunch task", at(12), type: .task)]
+        let next = WalkModel.nextEvent(in: items, after: at(10))
+        #expect(next?.title == "Boxing")
+        #expect(next?.start == at(11))
+        #expect(WalkModel.nextEvent(in: items, after: at(16)) == nil)
+        #expect(WalkModel.nextEvent(in: nil, after: at(10)) == nil)
     }
 }
 #endif

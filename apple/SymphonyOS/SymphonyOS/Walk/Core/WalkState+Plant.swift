@@ -334,6 +334,27 @@ extension WalkState {
         return [.save]
     }
 
+    // MARK: The sheet
+
+    /// The sheet stands raised when the person opened it, or when there is no plan to look back at.
+    var sheetRaised: Bool { sheetOpen || items.isEmpty }
+
+    /// Look back up's one line: the plan while the sheet is down, today once it is up.
+    var endingTitle: String { sheetRaised ? WalkCopy.heresToday : WalkCopy.lookBack }
+
+    /// What the handle says; nil when there is nothing to look back at, so nothing to lower it to.
+    var sheetHandleLabel: String? {
+        guard !items.isEmpty else { return nil }
+        return sheetOpen ? WalkCopy.lookBackHandle : WalkCopy.showMyDay
+    }
+
+    /// The handle raises the sheet and lowers it again; it never ends the walk.
+    mutating func moveSheet() -> [WalkEffect] {
+        guard step == 6, !items.isEmpty else { return [] }
+        sheetOpen.toggle()
+        return []
+    }
+
     // MARK: The ending's rows
 
     /// Ticks any of today's tasks, planted by the walk or not; the writer decides whose rows it may touch.

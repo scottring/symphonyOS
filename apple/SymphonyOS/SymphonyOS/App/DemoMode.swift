@@ -32,6 +32,13 @@ enum DemoMode {
     /// `-SymphonyWalkExamples`: the demo walk opens with the example flags on for its step.
     static var walkExamples: Bool { ProcessInfo.processInfo.arguments.contains("-SymphonyWalkExamples") }
 
+    /// `-SymphonyWalkSheet up`: on Look back up, the ending sheet raised (by its handle's own event).
+    static var walkSheetUp: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-SymphonyWalkSheet"), i + 1 < args.count else { return false }
+        return args[i + 1].lowercased() == "up"
+    }
+
     static let userId = UUID(uuidString: "00000000-0000-4000-8000-00000000D3E0")!
 
     static var user: User? {
@@ -165,7 +172,9 @@ enum DemoMode {
     /// - `type`: the Type it point: the one-line field, empty.
     /// - `select`: a tap on the newest flag the walk planted on this step (Today: the first thing).
     /// - `undo`: a flag typed and planted, so the Undo pill shows.
+    /// - `next`: the Walk on point, so a step is entered as a person arrives on it (Today's calendar line).
     /// With `-SymphonyWalkExamples` the Examples point is chosen first, so the step's example flags show.
+    /// With `-SymphonyWalkSheet up` the ending's handle is tapped last, so the sheet stands raised.
     @MainActor static func showWalk(_ model: WalkModel, _ steps: [String]) {
         if walkExamples { model.choose(.examples) }
         for step in steps {
@@ -192,10 +201,13 @@ enum DemoMode {
                 model.choose(.type)
                 model.send(.typeChanged("Two early nights a week"))
                 model.send(.typeSubmitted)
+            case "next":
+                model.choose(.next)
             default:
                 break
             }
         }
+        if walkSheetUp { model.send(.sheetHandle) }
     }
 
     /// With `speak` among the `-SymphonyWalkOrb` steps, the demo walk listens through

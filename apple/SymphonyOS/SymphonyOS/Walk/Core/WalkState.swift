@@ -34,6 +34,8 @@ struct WalkState: Equatable {
     var pulledChildren: [UUID: [UUID]] = [:]   // a pulled-up flag → the flags that named it as parent; in memory, for Undo
     var dayBeforeFirst: [UUID: Date?] = [:]    // a task the first-thing mark dated today → its day before; in memory
     var sheetOpen = false; var calendarOffer = false
+    /// Set when the walk ends (Not now, Go to Today): no later event or point changes anything.
+    var ended = false
 
     /// `finishing`: let go, waiting (up to `WalkOrb.finishMs`) for the recogniser's last words.
     enum Orb: Equatable { case idle, holding(hover: CompassPoint?), open, speaking(live: String), finishing(live: String) }
@@ -51,6 +53,7 @@ struct WalkState: Equatable {
     // MARK: Events
 
     mutating func apply(_ event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
+        guard !ended else { return [] }
         switch event {
         case .areaTapped(let id): return tapArea(id)
         case .bannerTapped(let id):
@@ -76,19 +79,24 @@ struct WalkState: Equatable {
             return []
         case .rowToggled(let taskId): return toggleRow(taskId)
         case .walkAnother: return walkAnother()
-        // The calendar and the ending (Task 20).
-        case .calendarAnswered, .sheetHandle, .goToToday:
+        // The calendar and the ending.
+        case .calendarAnswered:
+            calendarOffer = false
+            if note == WalkCopy.calendarLine { note = nil }
             return []
+        case .sheetHandle: return moveSheet()
+        case .goToToday: return step == 6 ? end(.finished) : []
         }
     }
 
     // MARK: Actions (the compass points)
 
     mutating func act(_ action: WalkAction, _ env: WalkEnv) -> [WalkEffect] {
+        guard !ended else { return [] }
         switch action {
         case .quick: return choose(.quick)
         case .full: return choose(.full)
-        case .notNow: return step == 0 ? [.end(.left)] : []
+        case .notNow: return step == 0 ? end(.left) : []
         case .next: return walkOn(env)
         case .back: return backUp(env)
         case .nudge: return nudge()
@@ -101,10 +109,22 @@ struct WalkState: Equatable {
         case .type:
             startTyping()
             return []
-        // The calendar (Task 20).
+        // The calendar: the system's own prompt is the only one; asked once from here.
         case .calendar:
-            return []
+            guard level == .today, calendarOffer else { return [] }
+            calendarOffer = false
+            return [.askCalendar]
         }
+    }
+
+    /// Every way the walk ends: a flag still waiting for its last words is let go
+    /// (its finish wait is taken back, so it can never plant after the end), and
+    /// from here on nothing changes the walk or saves it.
+    private mutating func end(_ status: WalkStatus) -> [WalkEffect] {
+        orb = .idle
+        orbWasOpen = false
+        ended = true
+        return [.timer(.finish, ms: nil), .end(status)]
     }
 
     // MARK: Depth
@@ -142,8 +162,7 @@ struct WalkState: Equatable {
             return [.save]
         }
         guard step < 6 else { return [] }
-        enter(step + 1, env)
-        return [.save]
+        return enter(step + 1, env) + [.save]
     }
 
     private mutating func backUp(_ env: WalkEnv) -> [WalkEffect] {
@@ -161,18 +180,20 @@ struct WalkState: Equatable {
             return [.save]
         }
         guard step > 0 else { return [] }
-        enter(step - 1, env)
-        return [.save]
+        return enter(step - 1, env) + [.save]
     }
 
     /// Arrives on a step, from above or below. Focus per step is remembered. Year
     /// entered from below has its tour over: no peak focused, the whole range in view.
-    private mutating func enter(_ newStep: Int, _ env: WalkEnv) {
+    /// Today, while the calendar may be asked for, offers it: one quiet line, held
+    /// longer than a note, and the Calendar point. The line stays on Today.
+    private mutating func enter(_ newStep: Int, _ env: WalkEnv) -> [WalkEffect] {
         step = newStep
         focusArea = nil
         tour = []
         settle()
-        guard let level, level != .year else { return }
+        if note == WalkCopy.calendarLine { note = nil }
+        guard let level, level != .year else { return [] }
         if level == .season, depth == .full {
             resumeSeasonTour()
         } else if focus[level] == nil, let above = WalkLevel(rawValue: level.rawValue - 1),
@@ -180,7 +201,11 @@ struct WalkState: Equatable {
             // The flag planted last on the level above, so the next flag links to it.
             focus[level] = last.id
         }
-        if level == .today, env.canAskCalendar { calendarOffer = true }
+        guard level == .today else { return [] }
+        calendarOffer = env.canAskCalendar
+        guard calendarOffer else { return [] }
+        note = WalkCopy.calendarLine
+        return [.timer(.note, ms: WalkState.calendarNoteMs)]
     }
 
     /// Leaving the ground: in a whole-year walk the Year tour starts at the first
