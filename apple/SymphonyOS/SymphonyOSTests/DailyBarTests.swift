@@ -19,7 +19,6 @@ struct DailyBarTests {
 
     @Test func tappingTheLightListensAndASecondTapFinishes() {
         var bar = DailyBar()
-        bar.draft = "half typed"
         #expect(bar.apply(.micTapped) == [.listen(true)])
         #expect(bar.mic == .listening)
         #expect(bar.draft == "")
@@ -29,6 +28,53 @@ struct DailyBarTests {
         #expect(bar.apply(.micTapped) == [.finishListening, .timer(.finish, ms: WalkOrb.finishMs)])
         #expect(bar.mic == .finishing)
         #expect(bar.apply(.micTapped) == [])           // a third tap while the last words come in does nothing
+    }
+
+    /// Ruling D22: typed words are never thrown away. A tap on the light with words in the field
+    /// listens, and what is heard is added after them.
+    @Test func typedWordsAreKeptAndWhatIsHeardFollowsThem() {
+        var bar = DailyBar()
+        _ = bar.apply(.typed("Buy milk "))
+        #expect(bar.apply(.micTapped) == [.listen(true)])
+        #expect(bar.mic == .listening)
+        #expect(bar.draft == "Buy milk ")                       // still in sight while it listens
+        _ = bar.apply(.heard("and eggs"))
+        #expect(bar.draft == "Buy milk and eggs")
+        _ = bar.apply(.heard("and eggs for Sunday"))           // the listener's words grow; the typed ones stay first
+        #expect(bar.draft == "Buy milk and eggs for Sunday")
+        _ = bar.apply(.micTapped)
+        #expect(adds(bar.apply(.listenEnded)) == ["Buy milk and eggs for Sunday"])
+        #expect(bar.draft == "")
+    }
+
+    /// Nothing heard after typed words: they stay in the field, nothing is added, and the plain line says so.
+    @Test func typedWordsStayWhenNothingIsHeard() {
+        var bar = DailyBar()
+        _ = bar.apply(.typed("Buy milk"))
+        _ = bar.apply(.micTapped)
+        _ = bar.apply(.heard(""))
+        _ = bar.apply(.micTapped)
+        #expect(adds(bar.apply(.listenEnded)).isEmpty)
+        #expect(bar.draft == "Buy milk")
+        #expect(bar.note == WalkCopy.nothingHeard)
+        // The session dying mid-listen keeps them too.
+        _ = bar.apply(.micTapped)
+        #expect(adds(bar.apply(.listenEnded)).isEmpty)
+        #expect(bar.draft == "Buy milk")
+        // And a refused microphone.
+        _ = bar.apply(.micTapped)
+        _ = bar.apply(.speechUnavailable)
+        #expect(bar.draft == "Buy milk")
+    }
+
+    /// The light starts a recording to VoiceOver only when a tap would start listening.
+    @Test func theLightStartsAMediaSessionOnlyWhenATapListens() {
+        var bar = DailyBar()
+        #expect(bar.tapStartsListening)
+        _ = bar.apply(.micTapped)
+        #expect(!bar.tapStartsListening)                       // a tap now adds what was heard
+        _ = bar.apply(.speechUnavailable)
+        #expect(!bar.tapStartsListening)                       // a tap now types
     }
 
     @Test func theLastWordsAreWaitedFor() {

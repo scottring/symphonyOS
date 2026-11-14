@@ -35,6 +35,19 @@ struct DailyWalkDownTests {
                    sound: FakeWalkSound())
     }
 
+    /// Final review (minor): a Tell asked while a walk-down is up is answered only when it returns to
+    /// Today; back on a mountain page (or Week) it is dropped, never left to open the microphone later.
+    @Test func aTellWaitingBehindAWalkDownIsKeptOnlyForToday() throws {
+        let ctx = try walkTestContext()
+        let (fromSign, _) = try yearGoalWalkedDown(ctx)
+        #expect(fromSign.returnsTo.horizon == .today)
+        #expect(fromSign.keepsTell)
+        for page in [Horizon.week, .month, .season, .year] {
+            let down = DailyWalkDown(userId: me, position: fromSign.position, from: page, date: today, seasons: nil)
+            #expect(!down.keepsTell)
+        }
+    }
+
     @Test func itOpensOnTheStepBelowAboutTheGoalWithNoLesson() throws {
         let ctx = try walkTestContext()
         let (down, goal) = try yearGoalWalkedDown(ctx)

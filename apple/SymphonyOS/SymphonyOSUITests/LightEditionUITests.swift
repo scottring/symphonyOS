@@ -328,6 +328,35 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertEqual(pageLight.label, "Speak it", "the page under the display listened")
     }
 
+    /// Final review I2: a Tell (`symphony://tell`, as the Lock Screen's control opens it) while Week or
+    /// Month shows ends on Today with its bar listening, in sight: the page that goes away cannot
+    /// cancel the listen. (`hear`: a stand-in listener, so no permission prompt; nobody speaks.)
+    @MainActor func testATellFromWeekEndsOnTodayListening() throws {
+        try assertATellFrom("week", page: "daily.week")
+    }
+
+    @MainActor func testATellFromMonthEndsOnTodayListening() throws {
+        try assertATellFrom("month", page: "daily.mountain.month")
+    }
+
+    private func assertATellFrom(_ start: String, page: String, file: StaticString = #filePath, line: UInt = #line) throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                               "-SymphonyDailyPage", start, "-SymphonyDailyState", "hear"]
+        app.launchDemo()
+        let any = app.descendants(matching: .any)
+        XCTAssertTrue(any[page].waitForExistence(timeout: 60), "never reached \(start)", file: file, line: line)
+        app.open(try XCTUnwrap(URL(string: "symphony://tell")))
+        let today = any["daily.today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 15), "the Tell did not open Today", file: file, line: line)
+        let light = today.descendants(matching: .any)["daily.bar.light"]
+        XCTAssertTrue(light.waitForExistence(timeout: 10), file: file, line: line)
+        let listening = NSPredicate(format: "label == %@", "Add what you said")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: listening, evaluatedWith: light)], timeout: 10), .completed,
+                       "Today's bar is not listening after a Tell from \(start)", file: file, line: line)
+        XCTAssertFalse(any[page].exists, "\(start) is still up", file: file, line: line)
+    }
+
     /// The light page's controls under the display.
     private let pageControls = ["daily.bar.light", "daily.bar.inbox", "daily.bar.more", "daily.lookBack", "daily.nav.week"]
 

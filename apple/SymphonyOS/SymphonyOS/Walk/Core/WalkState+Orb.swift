@@ -247,6 +247,11 @@ extension WalkState {
         words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Holding the light would listen (a question step, speech not off): to VoiceOver the light is
+    /// then a control that starts recording (`.startsMediaSession`), so VoiceOver stays quiet as it
+    /// is activated and nothing it says is taken down.
+    var holdListens: Bool { (1...5).contains(step) && !speechIsOff }
+
     /// What the light carries at its centre: a microphone while holding it would listen, a
     /// keyboard once speech is off for this walk (a tap types), a walking figure on Welcome (the
     /// light is the quick start), nothing on the ground (the light is not taught there yet) or

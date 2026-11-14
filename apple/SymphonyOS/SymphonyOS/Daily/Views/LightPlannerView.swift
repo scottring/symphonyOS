@@ -83,7 +83,10 @@ struct LightPlannerView<Full: View>: View {
         .accessibilityHidden(covered)
         .background {
             Color.clear
-                .onGeometryChange(for: CGSize.self) { $0.size } action: { size = TodayView.pinnedSize ?? $0 }
+                // The keyboard alone never changes the window the pages are laid out for (`plannerSize`).
+                .onGeometryChange(for: CGSize.self) { $0.size } action: {
+                    size = TodayView.pinnedSize ?? DailyGate.plannerSize(measured: $0, kept: size, keyboardUp: appState.keyboardVisible)
+                }
             WindowInsetsReader { insets = $0 }
             #if DEBUG
             // A demo marker for the UI tests: a light page kept, inert, under the half-open display.
@@ -103,6 +106,9 @@ struct LightPlannerView<Full: View>: View {
             openDemoPage()
         }
         .onChange(of: hidesDock) { _, hides in appState.dailyHidesDock = hides }
+        // Another page: a listen on the one left never carries over to it (Today and Week share a frame,
+        // so nothing else tells the bar Today went away).
+        .onChange(of: appState.horizon) { _, _ in model?.send(.left) }
         // Set down half open: the page stays, inert, and lets go of the keyboard; its bar stops and
         // the display's own bar takes over. Opened flat: the page is as it was, on today's day.
         .onChange(of: covered) { _, covered in

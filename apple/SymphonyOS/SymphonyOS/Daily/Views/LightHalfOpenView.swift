@@ -157,7 +157,7 @@ struct LightHalfOpenView: View {
             DailyPalette.sky
             ZStack(alignment: .topLeading) {
                 let cut = WalkArt.Cut.halfOpen(across: across), drawn = cut.drawn(in: tent.picture)
-                Image(cut.imageName)
+                Image(decorative: cut.imageName)          // a picture, never read
                     .resizable()
                     .interpolation(.high)
                     .frame(width: drawn.width, height: drawn.height)

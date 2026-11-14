@@ -179,6 +179,7 @@ struct DailyBarView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(bar.lightLabel)
         .accessibilityValue(bar.lightValue)
+        .accessibilityAddTraits(bar.tapStartsListening ? .startsMediaSession : [])
         .accessibilityIdentifier("daily.bar.light")
         .background { haloMarker }
     }

@@ -182,7 +182,8 @@ struct DailyTodayList: View {
                                      let mark = page.firstMark(toggling: row)
                                      model.setFirst(mark.id, previous: mark.previous)
                                  },
-                                 details: { details(row) },
+                                 // The bar lets go before the sheet covers it (`sheetOpening`).
+                                 details: { model.sheetOpening(); details(row) },
                                  pullUp: { model.pullUp(row.id, level: .week) })
                             .dailyRowFrame(row.id, in: frames)
                     }

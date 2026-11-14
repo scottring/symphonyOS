@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 /// The one place that decides whether a light page shows. A full household, and a mixed
 /// one (which `Edition.resolve` makes full), keeps every screen it has today; a light
@@ -160,6 +161,16 @@ enum DailyGate {
     /// right date); on an iPad (ruling D17) or in a full household nothing is touched. It mends the
     /// selected date by ruling D18 (`DailyClock.selected`) from the last day it saw, and records the
     /// new one; the first day seen is only recorded.
+    /// The Planner's size to lay the light pages out by (`TodayLayout.decide`), as a new one is
+    /// measured. A change that is only the keyboard (it is up, the width is the same, the height only
+    /// shorter) is not a new window and is ignored: on the Duo's inside screens it would read a short
+    /// wide window (`.glanceWide`), take the light page away with its field, drop the keyboard and
+    /// bring the page back. Any other change (the keyboard down, a turn, a fold) is taken.
+    static func plannerSize(measured: CGSize, kept: CGSize, keyboardUp: Bool) -> CGSize {
+        let onlyTheKeyboard = keyboardUp && kept != .zero && measured.width == kept.width && measured.height < kept.height
+        return onlyTheKeyboard ? kept : measured
+    }
+
     static func dayTurn(selected: Date, lastDay: Date?, today: Date, edition: Edition,
                         phone: Bool) -> (selected: Date, lastDay: Date?) {
         guard phone, edition == .light else { return (selected, lastDay) }

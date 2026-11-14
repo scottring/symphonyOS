@@ -266,6 +266,7 @@ extension iOSMainView {
             let model = down.model(context: modelContext)
             model.onEnd = { status in
                 closeWalk()
+                if !down.keepsTell { appState.tellRequested = false }   // back on a page that takes no Tell
                 appState.activeTab = .planner
                 appState.horizon = down.returnsTo.horizon
                 appState.selectedDate = down.returnsTo.date

@@ -327,4 +327,22 @@ struct DailyGateTests {
         #expect(!DailyGate.staysAwake(halfOpen: false, signedIn: true))
         #expect(!DailyGate.staysAwake(halfOpen: false, signedIn: false))
     }
+
+    /// Final review I5: a size change that is only the keyboard (up, the same width, only shorter) is
+    /// ignored, so the Duo's inside screens never read a short wide window and lose the light page.
+    @Test func aSizeChangeThatIsOnlyTheKeyboardIsIgnored() {
+        let flat = CGSize(width: 890, height: 626), upright = CGSize(width: 626, height: 890)
+        #expect(DailyGate.plannerSize(measured: CGSize(width: 890, height: 300), kept: flat, keyboardUp: true) == flat)
+        #expect(DailyGate.plannerSize(measured: CGSize(width: 626, height: 550), kept: upright, keyboardUp: true) == upright)
+        // So the layout stays a light one: opened flat stays the spread, upright stays the day page.
+        #expect(TodayLayout.decide(width: 890, height: 300, sideBars: false) == .glanceWide)     // what it would have read
+        let kept = DailyGate.plannerSize(measured: CGSize(width: 890, height: 300), kept: flat, keyboardUp: true)
+        #expect(DailyGate.shows(.today, edition: .light,
+                                layout: TodayLayout.decide(width: kept.width, height: kept.height, sideBars: false), phone: true))
+        // Anything else is taken: the keyboard down, a turn, a fold, the first measure.
+        #expect(DailyGate.plannerSize(measured: CGSize(width: 890, height: 300), kept: flat, keyboardUp: false).height == 300)
+        #expect(DailyGate.plannerSize(measured: upright, kept: flat, keyboardUp: true) == upright)
+        #expect(DailyGate.plannerSize(measured: CGSize(width: 890, height: 700), kept: flat, keyboardUp: true).height == 700)
+        #expect(DailyGate.plannerSize(measured: flat, kept: .zero, keyboardUp: true) == flat)
+    }
 }

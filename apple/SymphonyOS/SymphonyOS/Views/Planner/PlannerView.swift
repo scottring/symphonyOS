@@ -66,7 +66,11 @@ struct PlannerView: View {
             }
         }
         .animation(.easeOut(duration: 0.18), value: showHorizons)
-        .onAppear { if shown == nil { shown = appState.horizon } }
+        // Appearing, the page on screen is the horizon's: a light household's full pages come and go
+        // (sideways and back), and the horizon may have moved while they were away. In a full household
+        // this page never goes away under a changing horizon (`onChange` below keeps `shown` equal to it),
+        // so this sets what it already is.
+        .onAppear { shown = appState.horizon }
         .onChange(of: appState.horizon) { old, new in
             goingDown = (Self.order.firstIndex(of: new) ?? 0) < (Self.order.firstIndex(of: old) ?? 0)
             withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.42, dampingFraction: 0.9)) { shown = new }

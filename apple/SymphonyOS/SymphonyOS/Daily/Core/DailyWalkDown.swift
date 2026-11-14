@@ -25,6 +25,11 @@ struct DailyWalkDown: Equatable {
     /// `now`), never to a date the app was last pointed at.
     var returnsTo: (horizon: Horizon, date: Date) { (from, date) }
 
+    /// A Tell asked while it was up (it waited, `DailyGate.tell`) is answered only when it returns to
+    /// Today, whose bar takes it as the walk closes. Returning to Week or a mountain page it is
+    /// dropped there, so it never opens the microphone later, on some other visit to Today.
+    var keepsTell: Bool { from == .today }
+
     /// Asking for it lets the page's bar go at once (`.left`: it stops listening), as lowering
     /// the sheet does, so nothing the bar hears is taken while the walk opens over it.
     var bar: [DailyBar.Event] { [.left] }

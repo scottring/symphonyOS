@@ -125,6 +125,7 @@ struct WalkOrbView: View {
         .allowsHitTesting(false)
         .accessibilityIdentifier("walk.orb")
         .accessibilityLabel(WalkCopy.orbAccessibilityLabel(s))
+        .accessibilityAddTraits(s.holdListens ? .startsMediaSession : [])
         .walkAccessibilityHint(WalkCopy.hint(s))
         .accessibilityActions {
             ForEach(points, id: \.at) { point in

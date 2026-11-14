@@ -12,6 +12,11 @@ struct DailyBar: Equatable {
 
     var draft = ""
     var mic: Mic = .idle
+    /// The words typed in the field when the light was tapped (ruling D22: typed words are never
+    /// thrown away): what is heard is added after them.
+    var typed = ""
+    /// What the listener has heard in this listen, before the typed words are put in front of it.
+    var heard = ""
     /// Speech was refused or is missing: the light asks for the field instead.
     var speechOff = false
     /// The one plain line above the bar (where an add went, why it types).
@@ -36,6 +41,11 @@ struct DailyBar: Equatable {
         if isListening { return DailyCopy.addWhatYouSaid }
         return speechOff ? DailyCopy.typeIt : DailyCopy.speakIt
     }
+
+    /// A tap on the light now starts listening (idle, speech on): the light is then a control that
+    /// starts recording to VoiceOver (`.startsMediaSession`), so VoiceOver says nothing as it is
+    /// activated and the microphone does not take its words down.
+    var tapStartsListening: Bool { mic == .idle && !speechOff }
 
     /// The light's state for VoiceOver: "Listening" while it listens (or waits for the last words),
     /// else nothing. With the label, it is how VoiceOver learns the microphone is open: nothing is
@@ -126,7 +136,8 @@ struct DailyBar: Equatable {
                     return []
                 }
                 mic = .listening
-                draft = ""
+                typed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+                heard = ""
                 return [.listen(true)]
             case .listening:
                 mic = .finishing
@@ -137,7 +148,8 @@ struct DailyBar: Equatable {
 
         case .heard(let words):
             guard mic != .idle else { return [] }
-            draft = words
+            heard = words
+            draft = Self.joined(typed, words)
             return []
 
         case .speechUnavailable:
@@ -152,7 +164,10 @@ struct DailyBar: Equatable {
             case .listening:
                 // The session died with the light still on: the words stay in the field, nothing is added.
                 mic = .idle
-                guard Self.hasWords(draft) else { return say(WalkCopy.nothingHeard) }
+                guard Self.hasWords(heard) else {
+                    draft = typed
+                    return say(WalkCopy.nothingHeard)
+                }
                 fieldAsked += 1
                 return []
             case .idle:
@@ -195,11 +210,22 @@ struct DailyBar: Equatable {
 
     /// The last words are in (the session ended, or the wait for them ran out):
     /// they are added at once, or with nothing said the field is asked for.
+    /// With nothing heard, the words typed before stay in the field and nothing is added.
     private mutating func finish() -> [Effect] {
         mic = .idle
         let done: [Effect] = [.listen(false), .timer(.finish, ms: nil)]
-        guard Self.hasWords(draft) else { return done + say(WalkCopy.nothingHeard) }
+        guard Self.hasWords(heard) else {
+            draft = typed
+            return done + say(WalkCopy.nothingHeard)
+        }
         return done + takeDraft()
+    }
+
+    /// The typed words, then what was heard after them.
+    private static func joined(_ typed: String, _ heard: String) -> String {
+        let words = heard.trimmingCharacters(in: .whitespacesAndNewlines)
+        if typed.isEmpty { return heard }
+        return words.isEmpty ? typed : typed + " " + words
     }
 
     private mutating func takeDraft() -> [Effect] {

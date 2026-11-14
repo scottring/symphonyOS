@@ -931,14 +931,95 @@ struct DailyModelTests {
         let m = model(ctx)
         m.send(.micTapped)
         await scheduler.settle()
-        m.sceneChanged(.inactive)
-        #expect(m.bar.mic == .listening)
         m.sceneChanged(.background)
         #expect(m.bar.mic == .idle)
         #expect(listener.stops == 1)
         clock.now = day(2026, 11, 11, 8)
         m.sceneChanged(.active)
         #expect(m.today == day(2026, 11, 11))
+    }
+
+    /// Final review (minor): Control Centre, the app switcher or a call makes the scene inactive; the
+    /// bar lets go then, as for the background, and nothing it heard is added.
+    @Test func anInactiveSceneLetsTheBarGo() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.send(.micTapped)
+        await scheduler.settle()
+        listener.hear("Call the plumber")
+        m.sceneChanged(.inactive)
+        #expect(m.bar.mic == .idle)
+        #expect(listener.stops == 1)
+        listener.end()
+        scheduler.advance(WalkOrb.finishMs + 1000)
+        #expect(tasks(ctx).isEmpty)
+    }
+
+    /// But not while the listen is starting: the first tap's permission prompts make the scene
+    /// inactive, and the listen they are for goes on once they are answered.
+    @Test func thePermissionPromptsDoNotCancelTheListenTheyAreFor() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        listener.whileStarting = { m.sceneChanged(.inactive) }      // the prompts are up
+        m.send(.micTapped)
+        await scheduler.settle()
+        #expect(m.bar.mic == .listening)
+        #expect(listener.stops == 0)
+        listener.hear("Call the plumber")
+        m.send(.micTapped)
+        listener.end()
+        #expect(task(ctx, titled: "Call the plumber") != nil)
+        #expect(!DailyModel.letsGo(onInactive: true))
+        #expect(DailyModel.letsGo(onInactive: false))
+    }
+
+    // MARK: A Tell while another page goes (final review I2)
+
+    /// The link that asks for a Tell also turns Week (or a mountain page) to Today. Today answers as it
+    /// appears; the page going away sends `.left` in the same update, after it. The listen still
+    /// begins: the tap the Tell stands for runs after the `.left`.
+    @Test func aTellAnsweredAsAnotherPageGoesStillListens() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.page = .week
+        let app = asked()
+        m.page = .today                              // Today appears and answers
+        #expect(m.answerTell(app))
+        m.send(.left)                                // then Week's disappearing lands
+        await scheduler.settle()
+        #expect(m.bar.mic == .listening)
+        #expect(listener.starts == 1)
+        #expect(listener.stops == 0)
+    }
+
+    /// A tap on the light between the Tell's answer and its run is not undone by it.
+    @Test func aTapBeforeTheTellRunsIsNotTurnedIntoASecondTap() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        #expect(m.answerTell(asked()))
+        m.send(.micTapped)                           // the person tapped meanwhile
+        await scheduler.settle()
+        #expect(m.bar.mic == .listening)
+        #expect(listener.finishes == 0)
+    }
+
+    // MARK: Details over the page (final review I4)
+
+    /// Opening a row's Details lets the bar go first: it stops listening, and what it heard is never
+    /// added by a later tap.
+    @Test func detailsOverTheBarStopItListening() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.send(.micTapped)
+        await scheduler.settle()
+        listener.hear("Call the plumber")
+        m.sheetOpening()
+        #expect(m.bar.mic == .idle)
+        #expect(listener.stops == 1)
+        listener.hear("Something said under the sheet")
+        listener.end()
+        m.send(.micTapped)                           // the next tap starts a new listen, adding nothing
+        #expect(tasks(ctx).isEmpty)
     }
 }
 #endif

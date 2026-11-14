@@ -512,6 +512,18 @@ struct WalkOrbTests {
 
     /// What the light carries: a microphone at rest, a keyboard once speech is off, a walking figure
     /// on Welcome (it is the quick start), nothing while it is pressed, listening or waiting for the last words.
+    /// Final wave: the light is a control that starts recording to VoiceOver (`.startsMediaSession`)
+    /// exactly where holding it listens: a question step with speech on.
+    @Test func theLightStartsAMediaSessionWhereHoldingListens() {
+        var s = state(step: 2)
+        #expect(s.holdListens)
+        #expect(state(step: 1).holdListens && state(step: 5).holdListens)
+        s.speechIsOff = true
+        #expect(!s.holdListens)
+        #expect(!WalkState().holdListens)                       // Welcome: the light is the quick start
+        #expect(!state(step: 6).holdListens)
+    }
+
     @Test func theLightShowsWhatHoldingDoes() {
         var s = state(step: 2)
         #expect(s.lightSymbol == "mic")

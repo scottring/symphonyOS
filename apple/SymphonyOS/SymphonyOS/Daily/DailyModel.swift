@@ -85,6 +85,8 @@ import Observation
         case starting(Int)      // start() called and not back: the permission prompts may be up
         case live(Int)
         case finishing(Int)     // the second tap: waiting for the last words and the end
+
+        var isStarting: Bool { if case .starting = self { true } else { false } }
     }
 
     init(context: ModelContext, userId: UUID, seasons: [SeasonBoundary]? = nil,
@@ -156,6 +158,11 @@ import Observation
     /// an idle bar listens, a typing bar asks for the field, a listen already going is left
     /// alone. A request taken is cleared, once, and Inbox or More over the page closes. True
     /// when it was taken (the page closes its own sheets then).
+    ///
+    /// The tap it stands for goes through the scheduler, not at once: the link that asks for a
+    /// Tell also turns the page to Today, and the page going away (Week, a mountain page) sends
+    /// `.left` in that same update, perhaps after Today has appeared and answered. Run first, the
+    /// listen would be cancelled by it before it began; run after, it is the last word.
     @discardableResult
     func answerTell(_ app: AppState) -> Bool {
         let answer = DailyGate.tell(asked: app.tellRequested, walkShowing: app.walkShowing, barShown: true,
@@ -164,10 +171,22 @@ import Observation
         app.tellRequested = false
         app.dailyPanel = nil
         switch answer {
-        case .listen, .focusField: send(.micTapped)       // with speech off the reducer asks for the field
+        case .listen, .focusField:
+            // With speech off the reducer asks for the field. Still idle when it runs: a tap that started
+            // listening meanwhile is not turned into a second tap.
+            scheduler.run { [weak self] in
+                guard let self, !self.bar.isListening else { return }
+                self.send(.micTapped)
+            }
         case .none, .wait, .leaveAlone, .oldSheet, .covered: break
         }
         return true
+    }
+
+    /// A sheet is opening over the page (a row's Details): the bar lets go first (`.left`), so it
+    /// never listens under the sheet and nothing it heard there is added by a later tap.
+    func sheetOpening() {
+        send(.left)
     }
 
     /// Covered by the light half-open display, which draws its own bar (`DailyGate.coversPage`;
@@ -189,15 +208,21 @@ import Observation
     /// Where the app is, as the scene reports it.
     enum Scene { case active, inactive, background }
 
-    /// Back in front: the day is read again. Gone to the background: the bar lets go (`.left`),
-    /// so a pending pull-up is written and nothing listens.
+    /// Back in front: the day is read again. Gone to the background, or inactive (Control Centre,
+    /// the app switcher, a call coming in): the bar lets go (`.left`), so a pending pull-up is written
+    /// and nothing listens. Except while a listen is starting (`letsGo`): the first tap's permission
+    /// prompts make the scene inactive, and letting go then would cancel the listen they are for.
     func sceneChanged(_ scene: Scene) {
         switch scene {
         case .active: refreshDay()
         case .background: send(.left)
-        case .inactive: break
+        case .inactive: if Self.letsGo(onInactive: session.isStarting) { send(.left) }
         }
     }
+
+    /// Whether an inactive scene lets the bar go: always, except while a start is awaited (the system's
+    /// permission prompts, over the app, make it inactive).
+    static func letsGo(onInactive starting: Bool) -> Bool { !starting }
 
     /// The walk shows over the page (`AppState.walkShowing`; the page does not go away under
     /// it): the bar lets go (`.left`), so it never listens under the walk and nothing it heard

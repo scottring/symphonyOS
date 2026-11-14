@@ -24,7 +24,7 @@ struct DailyBand: View {
         ZStack(alignment: .topLeading) {
             DailyPalette.sky
             let drawn = cut.drawn(in: picture)
-            Image(cut.imageName)
+            Image(decorative: cut.imageName)              // a picture, never read
                 .resizable()
                 .interpolation(.high)
                 .frame(width: drawn.width, height: drawn.height)
