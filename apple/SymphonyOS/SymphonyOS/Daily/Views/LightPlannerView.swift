@@ -42,9 +42,14 @@ struct LightPlannerView<Full: View>: View {
     /// The dock gives way to the bar on this window (`DailyGate.hidesDock`).
     private var hidesDock: Bool { DailyGate.hidesDock(edition: appState.edition, layout: layout) }
 
+    /// The light half-open display is up over this Planner (`DailyGate.coversPage`): no page is
+    /// drawn under it, so nothing here can listen, write or answer a Tell (light's or the old
+    /// Today's sheet) while only the display's own bar can be seen.
+    private var covered: Bool { DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen) }
+
     var body: some View {
         ZStack {
-            if showsLight { light } else { full() }
+            if covered { DailyPalette.sky.ignoresSafeArea() } else if showsLight { light } else { full() }
         }
         .background {
             Color.clear
@@ -58,6 +63,9 @@ struct LightPlannerView<Full: View>: View {
             openDemoPage()
         }
         .onChange(of: hidesDock) { _, hides in appState.dailyHidesDock = hides }
+        // Set down half open: the page's bar stops listening and its Undo goes before the display's
+        // own bar takes over (the page itself is no longer drawn).
+        .onChange(of: covered) { _, covered in if covered { model?.cover() } }
         // Gone (another tab, signed out, the household become full): the dock comes back, and the
         // model stops listening and cancels its timers (a pending pull-up is written).
         .onDisappear {

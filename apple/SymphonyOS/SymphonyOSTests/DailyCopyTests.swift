@@ -126,4 +126,9 @@ struct DailyClockTests {
         #expect(DailyClock.pinned(in: ["app", "-SymphonyDailyNow"]) == nil)
         #expect(DailyClock.pinned(in: ["app", "-SymphonyDailyNow", "10 November"]) == nil)
     }
+
+    /// The half-open display's next line: "Next · 3:00", put in capitals by the view.
+    @Test func theHalfOpenNextLine() {
+        #expect(DailyCopy.nextAt(day(2026, 11, 10, 15)) == "Next · 3:00")
+    }
 }

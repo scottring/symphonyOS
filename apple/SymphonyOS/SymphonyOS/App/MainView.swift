@@ -154,8 +154,14 @@ struct iOSMainView: View {
         // Set down partly open: the half-open display, over everything.
         .overlay {
             if appState.posture.isHalfOpen {
-                HalfOpenView(posture: appState.posture)
-                    .transition(.opacity)
+                // A light household gets its own half-open display; every other household the old one.
+                if DailyGate.halfOpen(edition: appState.edition) {
+                    LightHalfOpenView(posture: appState.posture)
+                        .transition(.opacity)
+                } else {
+                    HalfOpenView(posture: appState.posture)
+                        .transition(.opacity)
+                }
             }
         }
         .onChange(of: hinge) { _, _ in updatePosture() }

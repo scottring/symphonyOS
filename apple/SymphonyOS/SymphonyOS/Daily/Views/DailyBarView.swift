@@ -18,15 +18,18 @@ struct DailyBarView: View {
     let night: Bool
     /// More and Inbox beside the field (not where the page has no room for them).
     let icons: Bool
+    /// The field's words (the half-open display's taller field reads larger).
+    let textSize: CGFloat
 
     init(model: DailyModel, metrics: DailyMetrics.Bar, placeholder: String, listening: String,
-         night: Bool = false, icons: Bool = true) {
+         night: Bool = false, icons: Bool = true, textSize: CGFloat = 16) {
         self.model = model
         self.metrics = metrics
         self.placeholder = placeholder
         self.listening = listening
         self.night = night
         self.icons = icons
+        self.textSize = textSize
     }
 
     @Environment(AppState.self) private var appState
@@ -93,7 +96,7 @@ struct DailyBarView: View {
     @ViewBuilder private func words(_ bar: DailyBar) -> some View {
         if bar.isListening {
             Text(bar.draft.isEmpty ? placeholder : bar.draft)
-                .font(DailyPalette.sans(16))
+                .font(DailyPalette.sans(textSize))
                 .foregroundStyle(bar.draft.isEmpty ? DailyPalette.placeholder : DailyPalette.ink)
                 .lineLimit(1)
                 .truncationMode(.head)
@@ -103,7 +106,7 @@ struct DailyBarView: View {
         } else {
             TextField("", text: Binding(get: { model.bar.draft }, set: { model.send(.typed($0)) }),
                       prompt: Text(placeholder).foregroundStyle(DailyPalette.placeholder))
-                .font(DailyPalette.sans(16))
+                .font(DailyPalette.sans(textSize))
                 .foregroundStyle(DailyPalette.ink)
                 .tint(DailyPalette.green)
                 .focused($typing)

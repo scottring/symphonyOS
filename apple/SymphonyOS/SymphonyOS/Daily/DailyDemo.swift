@@ -20,7 +20,7 @@ extension DemoMode {
 
     /// `-SymphonyDailyState a,b,…`: states a page is driven into once it is up
     /// (`point`: the sign's row lit; `waiting`: the waiting walk's line, as the demo keeps no stored walk;
-    /// `speak` and `undo`: the bar, see `showDaily`; `more` and `inbox`: that sheet, `dailyPanel`;
+    /// `speak` and `undo`: the bar, see `showDaily`; `hear`: the bar's stand-in listener, untapped; `more` and `inbox`: that sheet, `dailyPanel`;
     /// on Week, `select`: a task chosen with its Move to panel up, see `weekChoice`; `unfold`: the fold open).
     static var dailyStates: [String] { dailyStates(in: ProcessInfo.processInfo.arguments) }
 
@@ -44,7 +44,8 @@ extension DemoMode {
     static let dailySpoken = "Call the plumber about the leak"
 
     /// With `speak` among the states the bar listens through `DemoWalkListener`, which hears
-    /// `dailySpoken` as soon as it starts (nobody can speak to this simulator); with `refused`
+    /// `dailySpoken` as soon as it starts (nobody can speak to this simulator), and with `hear` the
+    /// same stand-in waits for a tap or a Tell Symphony (no permission prompt); with `refused`
     /// through one that reports the microphone refused; otherwise nil (the bar's own on-phone listener).
     @MainActor static var dailyListener: WalkListening? { dailyListener(in: ProcessInfo.processInfo.arguments) }
 
@@ -55,7 +56,7 @@ extension DemoMode {
             refused.problem = WalkCopy.speechOff        // as `Dictation` reports a refused microphone
             return refused
         }
-        return states.contains("speak") ? DemoWalkListener(words: dailySpoken) : nil
+        return states.contains("speak") || states.contains("hear") ? DemoWalkListener(words: dailySpoken) : nil
     }
 
     /// `more` or `inbox` among the states: that sheet opens over the page, as a tap beside the bar opens it.

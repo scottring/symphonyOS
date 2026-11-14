@@ -134,4 +134,22 @@ struct DailyGateTests {
         #expect(!DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: true, horizons: []))
         #expect(DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: true, horizons: [.today]))
     }
+
+    @Test func halfOpenIsLightOnly() {
+        #expect(DailyGate.halfOpenBuilt)
+        #expect(DailyGate.halfOpen(edition: .light))
+        #expect(!DailyGate.halfOpen(edition: .full))
+        for rows: [String?] in [["light", "full"], [nil], ["plus"]] {
+            #expect(!DailyGate.halfOpen(edition: Edition.resolve(rows)))
+        }
+    }
+
+    /// While the light half-open display is up the page under it is not drawn, so nothing there
+    /// can listen, write or answer a Tell. A full household's page is never touched.
+    @Test func theLightHalfOpenDisplayCoversThePage() {
+        #expect(DailyGate.coversPage(edition: .light, halfOpen: true))
+        #expect(!DailyGate.coversPage(edition: .light, halfOpen: false))
+        #expect(!DailyGate.coversPage(edition: .full, halfOpen: true))
+        #expect(!DailyGate.coversPage(edition: .light, halfOpen: true, built: false))
+    }
 }

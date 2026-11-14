@@ -155,6 +155,14 @@ import Observation
         return true
     }
 
+    /// Covered by the half-open display, which draws its own bar (`DailyGate.coversPage`): the
+    /// page under it stops listening, a pending pull-up is written and its Undo goes, so nothing
+    /// there can hear, or take back a change, while the display is up.
+    func cover() {
+        send(.left)
+        endUndo()
+    }
+
     /// The model taken down: a pending pull-up is written, listening stops, nothing waiting runs.
     func close() {
         commitPullUp()

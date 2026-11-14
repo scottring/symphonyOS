@@ -400,4 +400,119 @@ struct DailyMetricsTests {
         #expect(DailyMetrics.bandFlags([long], width: 390, navTop: 44).first?.cloth.width == 156)
         #expect(DailyMetrics.bandFlags([], width: 390, navTop: 44).isEmpty)
     }
+
+    // MARK: Half open ("Duo, half open": the laptop and the book boards)
+
+    private let laptop = CGSize(width: 626, height: 890)
+    private let book = CGSize(width: 890, height: 626)
+
+    @Test func theLaptopBoard() {
+        let t = DailyMetrics.tent(size: laptop, split: 445, across: true)
+        #expect(t.look == CGRect(x: 0, y: 0, width: 626, height: 445))
+        #expect(t.touch == CGRect(x: 0, y: 445, width: 626, height: 445))
+        #expect(t.picture == CGRect(x: -137, y: -120, width: 900, height: 900))
+        #expect(t.time == CGPoint(x: 40, y: 26)); #expect(t.timeSize == 124); #expect(t.dateSize == 17)
+        #expect(t.next.origin == CGPoint(x: 40, y: 200)); #expect(t.nextSize == 38)
+        #expect(t.sign.post == CGRect(x: 74, y: 310, width: 8, height: 150))
+        #expect(t.sign.plank == CGRect(x: 44, y: 330, width: 470, height: 78))
+        #expect(t.sign.point == 39); #expect(t.sign.nail == 8)
+        #expect(t.sign.eyebrow == CGPoint(x: 50, y: 11)); #expect(t.sign.title == CGPoint(x: 50, y: 31))
+        #expect(t.sign.eyebrowSize == 12.5); #expect(t.sign.titleSize == 27)
+        #expect(t.fold == CGRect(x: 0, y: 445, width: 626, height: 22))
+        #expect(t.header.origin == CGPoint(x: 32, y: 476)); #expect(t.ring == 60)
+        #expect(t.rows.origin == CGPoint(x: 24, y: 548)); #expect(t.rows.width == 578)
+        #expect(t.row == 72); #expect(t.rowGap == 8); #expect(t.titleSize == 22)
+        #expect(t.circle == 34); #expect(t.lineageSize == 15); #expect(t.goalSize == 18)
+        #expect(t.bar.field == CGRect(x: 24, y: 808, width: 578, height: 58)); #expect(t.bar.light == 44)
+        #expect(t.barTextSize == 20)
+    }
+
+    @Test func theBookBoard() {
+        let t = DailyMetrics.tent(size: book, split: 445, across: false)
+        #expect(t.look == CGRect(x: 0, y: 0, width: 445, height: 626))
+        #expect(t.touch == CGRect(x: 445, y: 0, width: 445, height: 626))
+        #expect(t.look.width == 445)
+        #expect(t.picture == CGRect(x: -330, y: -150, width: 1000, height: 1000))
+        #expect(t.time == CGPoint(x: 32, y: 26)); #expect(t.timeSize == 112); #expect(t.dateSize == 16)
+        #expect(t.next.origin == CGPoint(x: 32, y: 196)); #expect(t.nextSize == 34)
+        #expect(t.sign.post == CGRect(x: 56, y: 440, width: 8, height: 200))
+        #expect(t.sign.plank == CGRect(x: 28, y: 462, width: 350, height: 68))
+        #expect(t.sign.point == 34); #expect(t.sign.titleSize == 22); #expect(t.sign.eyebrowSize == 11.5)
+        #expect(t.fold == CGRect(x: 445, y: 0, width: 22, height: 626))
+        #expect(t.header == CGRect(x: 477, y: 30, width: 385, height: 60)); #expect(t.ring == 60)
+        #expect(t.rows.origin == CGPoint(x: 467, y: 106)); #expect(t.rows.width == 405)
+        #expect(t.row == 70); #expect(t.titleSize == 20); #expect(t.circle == 32); #expect(t.goalSize == 17)
+        #expect(t.bar.field == CGRect(x: 467, y: 544, width: 405, height: 58)); #expect(t.bar.light == 44)
+    }
+
+    /// Pre-flight finding 8: the half-open bar has no More or Inbox, does not widen while it
+    /// listens, and its one line slot (Undo, a note, the listening line) stands 24 above the
+    /// field on the half you touch.
+    @Test func theHalfOpenBarIsTheFieldAndItsLineOnTheTouchHalf() {
+        for (size, across) in [(laptop, true), (book, false)] {
+            let t = DailyMetrics.tent(size: size, split: 445, across: across)
+            #expect(t.bar.speaking == t.bar.field)
+            #expect(t.bar.more == .zero && t.bar.inbox == .zero)
+            #expect(t.bar.line == t.bar.field.minY - 24)
+            #expect(t.bar.fade.isEmpty)
+            #expect(t.touch.contains(t.slot) && t.slot.maxY == t.bar.field.minY)
+            #expect(t.slot.minY < t.bar.line - 18)                 // the slot's 44 stand on its paper
+            #expect(t.touch.contains(t.bar.field) && t.touch.contains(t.header) && t.touch.contains(t.rows))
+        }
+    }
+
+    /// The rows scroll in their own space, from under the header to just above the field: three
+    /// at least show whole on both boards, and the bar and the header never move.
+    @Test func threeRowsShowOnBothBoards() {
+        for (size, across) in [(laptop, true), (book, false)] {
+            let t = DailyMetrics.tent(size: size, split: 445, across: across)
+            #expect(t.rows.minY >= t.header.maxY)
+            #expect(t.rows.maxY < t.bar.field.minY)
+            #expect(t.rows.height >= 3 * t.row + 2 * t.rowGap)
+        }
+    }
+
+    /// Nothing of the half you look at stands on the half you touch: the time, the next line and
+    /// the plank (turned as far as a hand turns it) end above the fold, or left of it.
+    @Test func theLookHalfStaysOnItsSide() {
+        for (size, across) in [(laptop, true), (book, false)] {
+            let t = DailyMetrics.tent(size: size, split: 445, across: across)
+            let turn = (t.sign.plank.width + t.sign.point) * CGFloat(sin(largestTurn * .pi / 180))
+            #expect(t.look.contains(t.next))
+            #expect(t.sign.plank.maxY + turn <= t.look.maxY && t.sign.plank.maxX + t.sign.point <= t.look.maxX)
+            #expect(t.sign.plank.minY - turn > t.next.maxY)
+            #expect(t.look.intersection(t.touch).isEmpty)
+        }
+    }
+
+    /// A fold reported low on the laptop leaves the look half short: the sign gives way before
+    /// it would stand over the next line; the time and the next line stay.
+    @Test func aShortLookHalfDropsTheSignRatherThanCoverTheNextLine() {
+        let t = DailyMetrics.tent(size: laptop, split: 300, across: true)
+        #expect(t.sign == .none)
+        #expect(t.next.origin == CGPoint(x: 40, y: 200))
+        #expect(t.touch.minY == 300)
+    }
+
+    /// The light's touch shape and the field's typing part are each at least 44 × 44 and apart;
+    /// a row is at least 44 high.
+    @Test func theHalfOpenControlsAreAtLeast44() {
+        for (size, across) in [(laptop, true), (book, false)] {
+            let t = DailyMetrics.tent(size: size, split: 445, across: across)
+            for r in t.touchTargets { #expect(r.width >= touch && r.height >= touch) }
+            #expect(t.touchTargets.count == 2)
+            #expect(t.bar.typing.intersection(t.bar.lightTouch).width <= 0)
+            #expect(t.row >= touch)
+        }
+    }
+
+    /// The scenery behind the time wears the walk's own top shade, full to the next line's foot.
+    @Test func theTimeAndTheNextLineStandOnTheWalksShade() {
+        for (size, across) in [(laptop, true), (book, false)] {
+            let t = DailyMetrics.tent(size: size, split: 445, across: across)
+            #expect(t.veil.opacity == DailyMetrics.shadeOpacity)
+            #expect(t.veil.solid >= t.next.maxY)
+            #expect(t.veil.length == t.veil.solid + DailyMetrics.shadeFade)
+        }
+    }
 }

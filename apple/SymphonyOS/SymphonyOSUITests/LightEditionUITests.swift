@@ -85,4 +85,72 @@ final class LightEditionUITests: XCTestCase {
         app.buttons["Add"].tap()
         XCTAssertTrue(app.buttons["Snap a page"].waitForExistence(timeout: 5))
     }
+
+    // MARK: Set down half open (Task 19)
+
+    private func launchHalfOpen(_ extra: [String]) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-HalfOpen", "laptop",
+                               "-TodaySize", "626x890"] + extra
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["daily.halfOpen"].waitForExistence(timeout: 60),
+                      "no light half-open display")
+        return app
+    }
+
+    /// A light household set down half open gets its own display, with no page drawn under it. The
+    /// half you look at takes no touch: on the 28th the `quiet` seed's sign ("November ends on
+    /// Monday") would open Month on Today, but here a drag and a tap leave it and the display as
+    /// they were. A tick on the half you touch counts one more done.
+    @MainActor func testHalfOpenSignTakesNoTouchAndATickCounts() throws {
+        let app = launchHalfOpen(["-SymphonyDailyNow", "2026-11-28", "-SymphonyDailySeed", "quiet"])
+        let any = app.descendants(matching: .any)
+        let sign = any["daily.halfOpen.sign"]
+        XCTAssertTrue(sign.waitForExistence(timeout: 15), "no sign on the 28th")
+        XCTAssertTrue(sign.label.contains("November"), "not the month's sign: \(sign.label)")
+        XCTAssertFalse(any["daily.today"].exists, "the page is drawn under the display")
+        XCTAssertEqual(any.matching(identifier: "daily.bar.light").count, 1, "a second bar under the display")
+
+        let start = sign.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+        start.press(forDuration: 0.15, thenDragTo: start.withOffset(CGVector(dx: 160, dy: 0)))
+        sign.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(sign.exists, "a drag or a tap put the sign away")
+        XCTAssertTrue(any["daily.halfOpen"].exists, "a drag or a tap left the display")
+
+        let done = any["daily.halfOpen.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertEqual(done.label, "1 done")
+        any.matching(identifier: "daily.halfOpen.row").firstMatch.tap()
+        let two = NSPredicate(format: "label == %@", "2 done")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: two, evaluatedWith: done)], timeout: 5), .completed,
+                       "a tick did not count")
+    }
+
+    /// The Lock Screen's Tell Symphony (`symphony://tell`) while the display is up: this display's
+    /// bar listens, in sight; no sheet, and no bar under it. (`hear`: a stand-in listener, so no
+    /// permission prompt; nobody speaks to the simulator.)
+    @MainActor func testATellOnTheHalfOpenDisplayListensThere() throws {
+        let app = launchHalfOpen(["-SymphonyDailyNow", "2026-11-10", "-SymphonyDailyState", "hear"])
+        let any = app.descendants(matching: .any)
+        let light = any["daily.bar.light"]
+        XCTAssertTrue(light.waitForExistence(timeout: 15))
+        XCTAssertEqual(light.label, "Speak it")
+        app.open(try XCTUnwrap(URL(string: "symphony://tell")))
+        let listening = NSPredicate(format: "label == %@", "Add what you said")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: listening, evaluatedWith: light)], timeout: 10), .completed,
+                       "the display's bar did not listen")
+        XCTAssertTrue(any["daily.halfOpen"].exists)
+        XCTAssertFalse(any["daily.today"].exists)
+        XCTAssertEqual(any.matching(identifier: "daily.bar.light").count, 1)
+    }
+
+    /// A full household set down half open keeps the old display, dinner and all.
+    @MainActor func testAFullHouseholdKeepsTheOldHalfOpenDisplay() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-HalfOpen", "laptop", "-TodaySize", "626x890"]
+        app.launch()
+        let tonight = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "Tonight")).firstMatch
+        XCTAssertTrue(tonight.waitForExistence(timeout: 60), "the old display's dinner is not there")
+        XCTAssertFalse(app.descendants(matching: .any)["daily.halfOpen"].exists)
+    }
 }

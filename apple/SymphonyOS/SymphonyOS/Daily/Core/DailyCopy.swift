@@ -211,3 +211,10 @@ enum DailyCopy {
         return f.string(from: date)
     }
 }
+
+// MARK: Half open
+
+extension DailyCopy {
+    /// The half-open display's line over the next event: "Next · 3:00" (the view puts it in capitals).
+    static func nextAt(_ start: Date) -> String { "\(next) · \(clock(start))" }
+}

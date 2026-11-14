@@ -687,5 +687,39 @@ struct DailyModelTests {
         #expect(m.lit == nil)
         #expect(task(ctx, titled: "Buy milk")?.completed == true)
     }
+
+    // MARK: Covered by the half-open display
+
+    /// The phone set down half open: the light display draws its own bar, so the page's model
+    /// stops listening and its Undo goes (nothing on the page under it can hear or take back).
+    @Test func beingCoveredStopsListeningAndEndsTheUndo() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        type(m, "Buy milk")
+        #expect(m.bar.undoShowing)
+        m.cover()
+        #expect(!m.bar.undoShowing)
+        m.send(.undoTapped)
+        #expect(task(ctx, titled: "Buy milk") != nil)
+
+        m.send(.micTapped)
+        await scheduler.settle()
+        #expect(listener.starts == 1)
+        m.cover()
+        #expect(listener.stops == 1)
+        #expect(m.bar.mic == .idle)
+    }
+
+    @Test func beingCoveredWritesAPendingPullUp() throws {
+        let ctx = try walkTestContext()
+        let t = try seededTask(ctx)
+        let m = model(ctx)
+        m.pullUp(t.id, level: .week)
+        #expect(m.pulledUp == t.id)
+        m.cover()
+        #expect(deletes(ctx, t.id) == 1)
+        #expect(m.pulledUp == nil)
+        #expect(!m.bar.undoShowing)
+    }
 }
 #endif

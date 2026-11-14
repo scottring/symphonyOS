@@ -124,4 +124,52 @@ struct DailyTodayPageTests {
         #expect(DailyTodayPage.putsSignAway(swipe: 61))
         #expect(DailyTodayPage.putsSignAway(swipe: -61))
     }
+
+    // MARK: Half open
+
+    /// The half you touch: the open rows in order, the done ones as one count, the ring as Today's.
+    @Test func theHalfOpenDisplayShowsTheOpenRowsAndCountsTheDone() {
+        let a = task("Send the contractor the deposit", on: today, created: 1)
+        let b = task("Renew the passport", on: today, created: 2)
+        let c = task("Call Mum about Sunday lunch", on: today, created: 3)
+        c.completed = true
+        let page = DailyTentPage(read([a, b, c]))
+        #expect(page.open.map(\.title) == ["Send the contractor the deposit", "Renew the passport"])
+        #expect(page.done == 1)
+        #expect(page.doneLine == DailyCopy.done(1))
+        #expect(page.ring == .init(done: 1, total: 3))
+        #expect(!page.nothing)
+    }
+
+    @Test func nothingDoneSaysNoCountAndAnEmptyDaySaysSo() {
+        let a = task("Renew the passport", on: today, created: 1)
+        #expect(DailyTentPage(read([a])).doneLine == nil)
+        let empty = DailyTentPage(read([]))
+        #expect(empty.nothing)
+        #expect(empty.ring == nil)
+        #expect(empty.doneLine == nil)
+        // All done: no open rows, the count, and not "nothing today".
+        a.completed = true
+        let done = DailyTentPage(read([a]))
+        #expect(done.open.isEmpty && done.doneLine == DailyCopy.done(1) && !done.nothing)
+    }
+
+    /// The row being pulled up stays hidden here too while its Undo can be used.
+    @Test func theHalfOpenDisplayLeavesAPulledUpRowOut() {
+        let a = task("Send the contractor the deposit", on: today, created: 1)
+        let b = task("Renew the passport", on: today, created: 2)
+        let page = DailyTentPage(read([a, b], pulledUp: a.id))
+        #expect(page.open.map(\.title) == ["Renew the passport"])
+        #expect(page.ring == .init(done: 0, total: 1))
+    }
+
+    /// The sign on the half-open display cannot be touched: VoiceOver reads its words and not what a tap does.
+    @Test func aStillSignIsReadWithoutWhatATapDoes() throws {
+        let a = task("Send the contractor the deposit", on: today, created: 1)
+        let page = DailyTentPage(read([a], focus: [TaskFocus(taskId: a.id, userId: me, date: today)]))
+        let sign = try #require(page.sign)
+        #expect(sign.stillLabel == "First, today. Send the contractor the deposit.")
+        #expect(!sign.stillLabel.contains(DailyCopy.signHint(sign.kind.rawValue)))
+        #expect(sign.label.contains(DailyCopy.signHint(sign.kind.rawValue)))      // Today's own sign still says it
+    }
 }

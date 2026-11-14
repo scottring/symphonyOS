@@ -12,7 +12,7 @@ enum DailyGate {
     /// The add bar is built (Task 9).
     static let barBuilt = true
     /// The light half-open display is built (Task 19).
-    static let halfOpenBuilt = false
+    static let halfOpenBuilt = true
 
     static func shows(_ horizon: Horizon, edition: Edition, layout: TodayLayout,
                       horizons: Set<Horizon> = horizons, layouts: Set<TodayLayout> = layouts) -> Bool {
@@ -27,6 +27,13 @@ enum DailyGate {
 
     static func halfOpen(edition: Edition, built: Bool = halfOpenBuilt) -> Bool {
         edition == .light && built
+    }
+
+    /// The light half-open display is up over the Planner (`halfOpen`: the phone is set down
+    /// partly open): the page under it is not drawn, so only the display's own bar can listen,
+    /// write or answer a Tell. A full household's page is never touched.
+    static func coversPage(edition: Edition, halfOpen: Bool, built: Bool = halfOpenBuilt) -> Bool {
+        halfOpen && self.halfOpen(edition: edition, built: built)
     }
 
     /// What a Tell Symphony asked for from outside the app (the Lock Screen control, a

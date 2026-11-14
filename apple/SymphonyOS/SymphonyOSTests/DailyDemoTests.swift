@@ -133,6 +133,9 @@ struct DailyDemoTests {
         #expect(DemoMode.dailyPanel(in: ["app", "-SymphonyDailyState", "speak"]) == nil)
         let stand = try #require(DemoMode.dailyListener(in: ["app", "-SymphonyDailyState", "speak"]) as? DemoWalkListener)
         #expect(stand.words == DemoMode.dailySpoken)
+        // `hear`: the same stand-in, and nothing tapped (a Tell from outside starts it).
+        let waiting = try #require(DemoMode.dailyListener(in: ["app", "-SymphonyDailyState", "hear"]) as? DemoWalkListener)
+        #expect(waiting.words == DemoMode.dailySpoken)
 
         let ctx = try walkTestContext()
         let scheduler = ManualWalkScheduler()
@@ -146,6 +149,12 @@ struct DailyDemoTests {
 
         let undo = DailyModel(context: ctx, userId: me, clock: { day(2026, 11, 10, 9) }, scheduler: scheduler,
                               listener: FakeWalkListener())
+        let untapped = DailyModel(context: ctx, userId: me, clock: { day(2026, 11, 10, 9) }, scheduler: scheduler,
+                                  listener: waiting)
+        DemoMode.showDaily(untapped, ["hear"])
+        await scheduler.settle()
+        #expect(untapped.bar.mic == .idle)
+
         DemoMode.showDaily(undo, ["undo"])
         #expect(undo.bar.undoShowing)
         #expect(((try? ctx.fetch(FetchDescriptor<SymphonyTask>())) ?? []).map(\.title) == [DemoMode.dailySpoken])
