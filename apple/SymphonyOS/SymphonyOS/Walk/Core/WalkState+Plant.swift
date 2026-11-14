@@ -303,9 +303,12 @@ extension WalkState {
     // MARK: The ending
 
     /// "Walk another one down": back to Season in a quick walk, focused on the
-    /// first year goal with nothing under it yet. The focus left on the steps
-    /// below belonged to the chain just walked, so it goes: walking on picks up
-    /// the flag planted last, as on a first visit. With every goal walked, nothing.
+    /// first year goal with nothing under it yet, as a clean walk down. Nothing
+    /// of the chain just walked steers the next one: no focus or last-planted
+    /// flag below (so a skipped step links to nothing of the first chain), no
+    /// tour, no Undo, no examples, no note, no half-finished hold. The flags,
+    /// the ridge, today's first thing (and the day it replaced) and a refusal
+    /// of speech stay. With every goal walked, or before the ending, nothing.
     mutating func walkAnother() -> [WalkEffect] {
         guard step == 6, let next = WalkEnding.nextToWalk(items) else { return [] }
         depth = .quick
@@ -314,11 +317,19 @@ extension WalkState {
         focusArea = nil
         tour = []
         focus = [.season: next.id]
+        lastPlanted = [:]
+        undo = []
+        undoShowing = false
+        pulledChildren = [:]                // only Undo reads it
+        examplesOn = []
+        note = nil
         selected = nil
         expanded = nil
-        undoShowing = false
         typing = nil
         orb = .idle
+        orbWasOpen = false
+        emptyHolds = 0
+        sessionOver = false
         sheetOpen = false
         return [.save]
     }

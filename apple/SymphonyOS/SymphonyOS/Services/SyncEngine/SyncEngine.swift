@@ -244,9 +244,9 @@ actor SyncEngine {
                     // the flag and the change, and the next pass sends the nulls.
                     // Never decided from local absence alone: a partner's goal or
                     // area is valid on the server but never pulled here.
-                    let rejection: RejectionAction = parents.isEmpty ? .countAttempt
-                        : Self.onPushRejected(code: Self.postgresCode(of: error), parents: parents,
-                                              queuedInserts: Set(queuedInserts.keys), known: Self.knownIds(context: context))
+                    let rejection = Self.onPushRejected(table: change.tableName, code: Self.postgresCode(of: error),
+                                                        parents: parents, queuedInserts: Set(queuedInserts.keys),
+                                                        known: Self.knownIds(context: context))
                     if case .unlink(let lost) = rejection {
                         for parent in lost {
                             Self.syncLog.error("push \(change.tableName, privacy: .public) \(change.recordId.uuidString, privacy: .public): the server has no \(parent.uuidString, privacy: .public); unlinking it")
@@ -1057,6 +1057,12 @@ extension SyncEngine {
         return (try? context.fetch(descriptor))?.first
     }
 
+    private static func focus(_ id: UUID, in context: ModelContext) -> TaskFocus? {
+        var descriptor = FetchDescriptor<TaskFocus>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return (try? context.fetch(descriptor))?.first
+    }
+
     private static func goal(_ id: UUID, in context: ModelContext) -> Goal? {
         var descriptor = FetchDescriptor<Goal>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
@@ -1064,8 +1070,10 @@ extension SyncEngine {
     }
 
     /// The rows this one's SENT links point at: a task's goalId, sourceId, areaId when `linksDirty`;
-    /// a goal's areaId when `areaDirty`; otherwise none (a clean row sends no link, so it has nothing to wait for).
-    /// A row never names itself (it would wait on its own insert forever).
+    /// a goal's areaId when `areaDirty`; a `task_focus` row's task, always (`task_focus.task_id`
+    /// references `tasks(id)`, so a focus pushed before its task's insert is refused); otherwise
+    /// none (a clean row sends no link, so it has nothing to wait for). A row gone from the phone
+    /// names nothing. A row never names itself (it would wait on its own insert forever).
     static func parentIds(table: String, id: UUID, context: ModelContext) -> [UUID] {
         let links: [UUID?]
         switch table {
@@ -1075,6 +1083,9 @@ extension SyncEngine {
         case "goals":
             guard let g = goal(id, in: context), g.areaDirty else { return [] }
             links = [g.areaId]
+        case "task_focus":
+            guard let f = focus(id, in: context) else { return [] }
+            links = [f.taskId]
         default:
             return []
         }
@@ -1120,6 +1131,14 @@ extension SyncEngine {
         guard isForeignKeyRejection(code: code) else { return .countAttempt }
         let lost = lostParents(parents, unpushedInserts: queuedInserts, known: known)
         return lost.isEmpty ? .countAttempt : .unlink(lost)
+    }
+
+    /// As above, for a change on `table`. Only tasks and goals have links to
+    /// unlink; a `task_focus` row names its task only to wait for it (the task
+    /// is its key), so its refusal counts as an ordinary failure, as it always did.
+    static func onPushRejected(table: String, code: String?, parents: [UUID], queuedInserts: Set<UUID>, known: Set<UUID>) -> RejectionAction {
+        guard !parents.isEmpty, table == "tasks" || table == "goals" else { return .countAttempt }
+        return onPushRejected(code: code, parents: parents, queuedInserts: queuedInserts, known: known)
     }
 
     /// What happens to a change once its push has succeeded.

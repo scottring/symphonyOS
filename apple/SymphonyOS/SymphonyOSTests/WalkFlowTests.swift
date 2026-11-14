@@ -15,12 +15,22 @@ private func day(_ y: Int, _ m: Int, _ d: Int) -> Date {
 /// Friday 13 November 2026: the year ahead is 2027, the season this winter, the month November.
 private let now = day(2026, 11, 13)
 
+/// A class so each test's private `UserDefaults` suite is removed when the test is done.
 @MainActor
-struct WalkFlowTests {
+final class WalkFlowTests {
     let me = UUID()
     let scheduler = ManualWalkScheduler()
     let listener = FakeWalkListener()
-    let store = WalkPositionStore(defaults: UserDefaults(suiteName: "WalkFlowTests.\(UUID())")!)
+    let suite = "WalkFlowTests.\(UUID())"
+    let store: WalkPositionStore
+
+    init() {
+        store = WalkPositionStore(defaults: UserDefaults(suiteName: suite)!)
+    }
+
+    deinit {
+        UserDefaults().removePersistentDomain(forName: suite)
+    }
 
     private func model(_ ctx: ModelContext, entry: WalkEntry = .start) -> WalkModel {
         WalkModel(context: ctx, userId: me, entry: entry, position: entry == .resume ? store.load(for: me) : nil,
@@ -122,10 +132,12 @@ struct WalkFlowTests {
 
         let focusToday = fetch(ctx, TaskFocus.self).filter { PlanCalendar.sameDay($0.date, now) }
         #expect(focusToday.map(\.taskId) == [week.id])
+        #expect(focusToday.map(\.userId) == [me])
 
         let tasks = fetch(ctx, SymphonyTask.self)
         #expect(tasks.count == 3)
         #expect(tasks.allSatisfy { !$0.isGoal })
+        #expect(tasks.allSatisfy { $0.goalTaskId == nil })      // the iPhone model has no supports_goal_task_id at all
         #expect(tasks.allSatisfy { $0.context == "personal" })
 
         let rows = WalkEnding.rows(tasks: tasks, goals: goals, today: now, me: me, firstThing: m.state.firstThing)
@@ -135,6 +147,14 @@ struct WalkFlowTests {
         #expect(rows.first?.first == true)
 
         #expect(try childrenAheadOfParents(ctx) == [])
+        // The first thing's focus row is a child of its task: the engine names the
+        // task, and in its order the focus comes after the task's insert.
+        let focusRow = try #require(focusToday.first)
+        #expect(SyncEngine.parentIds(table: "task_focus", id: focusRow.id, context: ctx) == [week.id])
+        let queue = try ctx.fetch(FetchDescriptor<PendingChange>(sortBy: [SortDescriptor(\.createdAt)]))
+        let weekInsert = try #require(queue.firstIndex { $0.tableName == "tasks" && $0.recordId == week.id && $0.changeType == "insert" })
+        let focusInsert = try #require(queue.firstIndex { $0.tableName == "task_focus" && $0.recordId == focusRow.id })
+        #expect(weekInsert < focusInsert)
     }
 
     // MARK: The whole year
@@ -157,6 +177,10 @@ struct WalkFlowTests {
         let goals = m.state.items(on: .year)
         #expect(goals.map(\.title) == ["Feel strong again", "Finish the bathroom", "More slow weekends together"])
         #expect(goals.map(\.areaId) == said.map { area(m, $0.0) })
+        let goalRows = fetch(ctx, Goal.self)
+        for goal in goals {
+            #expect(goalRows.first { $0.id == goal.id }?.areaId == goal.areaId)
+        }
 
         m.choose(.next)
         #expect(m.state.step == 2)
@@ -178,7 +202,7 @@ struct WalkFlowTests {
 
         m.choose(.next)
         #expect(m.state.step == 3)
-        let lastSeason = try #require(seasonItems.last)
+        let lastSeason = try #require(m.state.items(on: .season).first { $0.title == "A weekend away each month" })
         #expect(m.state.focus[.month] == lastSeason.id)
         await say(m, "book the plumber")
         let plumber = try #require(task(ctx, "Book the plumber"))
@@ -208,6 +232,8 @@ struct WalkFlowTests {
         #expect(fetch(ctx, Goal.self).isEmpty)
         #expect(fetch(ctx, SymphonyTask.self).isEmpty)
         #expect(fetch(ctx, GoalArea.self).isEmpty)
+        #expect(fetch(ctx, TaskFocus.self).isEmpty)
+        #expect(fetch(ctx, PendingChange.self).isEmpty)
     }
 
     // MARK: Leaving and coming back
@@ -279,8 +305,12 @@ struct WalkFlowTests {
         m.choose(.next)
         m.send(.bannerTapped(strong.id))                       // the chain goes under the first goal
         #expect(m.state.focus[.season] == strong.id)
+        let focusBefore = m.state.focus
+        let savedBefore = store.load(for: me)
         m.send(.walkAnother)                                   // not at the ending: nothing
         #expect(m.state.step == 2)
+        #expect(m.state.focus == focusBefore)
+        #expect(store.load(for: me) == savedBefore)
         await say(m, "lift twice a week")
         m.choose(.next)
         await say(m, "book the gym induction")
@@ -295,7 +325,7 @@ struct WalkFlowTests {
         #expect(m.state.step == 2)
         #expect(m.state.depth == .quick)
         #expect(m.state.focus[.season] == bathroom.id)
-        #expect(!m.state.sheetOpen)
+        #expect(!m.state.sheetOpen)                            // never open here: Task 20 opens the sheet and pins this again
         #expect(store.load(for: me)?.step == 2)
 
         // The second goal's chain links to its own lines, not the first's.
@@ -310,8 +340,40 @@ struct WalkFlowTests {
         // Every year goal walked: at the ending, nothing more to walk.
         for _ in 0..<3 { m.choose(.next) }
         #expect(m.state.step == 6)
+        let endFocus = m.state.focus
+        let endSaved = store.load(for: me)
         m.send(.walkAnother)
         #expect(m.state.step == 6)
+        #expect(m.state.focus == endFocus)
+        #expect(store.load(for: me) == endSaved)
+    }
+
+    /// A second walk down that skips Season: the Month line is not hung under the
+    /// first chain's season line, nor filed under the first goal.
+    @Test func aSecondWalkDownThatSkipsSeasonLinksToNothingOfTheFirst() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        quickStart(m, keeping: ["Health", "Home"])
+        await say(m, "feel strong again")
+        await say(m, "finish the bathroom")
+        let strong = m.state.items(on: .year)[0]
+        m.choose(.next)
+        m.send(.bannerTapped(strong.id))
+        await say(m, "lift twice a week")
+        m.choose(.next)
+        await say(m, "book the gym induction")
+        for _ in 0..<3 { m.choose(.next) }
+        #expect(m.state.step == 6)
+
+        m.send(.walkAnother)
+        m.choose(.next)                                        // Season skipped
+        #expect(m.state.step == 3)
+        #expect(m.state.focus[.month] == nil)
+        await say(m, "call the tiler")
+        let tiler = try #require(task(ctx, "Call the tiler"))
+        #expect(tiler.sourceId == nil)
+        #expect(tiler.goalId != strong.id)
+        #expect(try childrenAheadOfParents(ctx) == [])
     }
 }
 #endif

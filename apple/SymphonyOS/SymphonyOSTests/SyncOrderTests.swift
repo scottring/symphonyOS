@@ -217,7 +217,9 @@ struct SyncOrderTests {
         var waiting = queue
         var pushed: [UUID] = []
         for change in queue.sorted(by: { $0.createdAt < $1.createdAt }) {
-            let parents = SyncEngine.parentIds(table: change.tableName, id: change.recordId, context: context)
+            // As the loop: a delete never waits.
+            let parents = change.changeType == "delete" ? []
+                : SyncEngine.parentIds(table: change.tableName, id: change.recordId, context: context)
             if SyncEngine.mustWait(parents: parents, unpushedInserts: SyncEngine.insertsWorthWaitingFor(waiting)) { continue }
             pushed.append(change.recordId)
             waiting.removeAll { $0 === change }
@@ -250,6 +252,137 @@ struct SyncOrderTests {
         taskInsert.createdAt = t0
         #expect(pass(inserts, context: context) == [goal.id])
         #expect(pass([taskInsert], context: context) == [season.id])
+    }
+
+    // MARK: A day's first thing waits for its task
+
+    /// `task_focus.task_id` references `tasks(id)` on the server: a focus row is a
+    /// child of its task, whatever flags the task has.
+    private func newTask(_ context: ModelContext, _ title: String) -> SymphonyTask {
+        let task = SymphonyTask(userId: UUID(), title: title)
+        context.insert(task)
+        context.queueSync(table: "tasks", recordId: task.id, type: "insert")
+        return task
+    }
+
+    private func focus(_ task: SymphonyTask, _ context: ModelContext, queued: Bool = true) -> TaskFocus {
+        let f = TaskFocus(taskId: task.id, userId: task.userId, date: Date())
+        context.insert(f)
+        if queued { context.queueSync(table: "task_focus", recordId: f.id, type: "insert") }
+        return f
+    }
+
+    private func change(_ context: ModelContext, _ table: String, _ id: UUID, _ type: String = "insert") throws -> PendingChange {
+        try #require(try context.fetch(FetchDescriptor<PendingChange>())
+            .first { $0.tableName == table && $0.recordId == id && $0.changeType == type })
+    }
+
+    @Test func aFocusRowNamesItsTask() throws {
+        let context = try makeContext()
+        let task = newTask(context, "Book the gym induction")
+        task.linksDirty = false                                  // a clean task: the focus still names it
+        let f = focus(task, context)
+        let commitment = TaskCommitment(taskId: task.id, level: "week", periodStart: Date())
+        context.insert(commitment)
+        try context.save()
+        #expect(SyncEngine.parentIds(table: "task_focus", id: f.id, context: context) == [task.id])
+        #expect(SyncEngine.parentIds(table: "task_commitments", id: commitment.id, context: context) == [])
+        #expect(SyncEngine.parentIds(table: "tasks", id: task.id, context: context) == [])
+
+        context.delete(f)                                        // gone locally (a keyed delete): no parent to name
+        try context.save()
+        #expect(SyncEngine.parentIds(table: "task_focus", id: f.id, context: context) == [])
+    }
+
+    @Test func aFocusRowGoesUpAfterItsTasksInsert() throws {
+        let context = try makeContext()
+        let task = newTask(context, "Gym induction")
+        let f = focus(task, context)
+        try context.save()
+        let taskInsert = try change(context, "tasks", task.id)
+        let focusInsert = try change(context, "task_focus", f.id)
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+
+        taskInsert.createdAt = t0
+        focusInsert.createdAt = t0.addingTimeInterval(1)
+        #expect(pass([taskInsert, focusInsert], context: context) == [task.id, f.id])
+
+        // Queued ahead of its task: it waits this pass and goes on the next.
+        taskInsert.createdAt = t0.addingTimeInterval(1)
+        focusInsert.createdAt = t0
+        #expect(pass([taskInsert, focusInsert], context: context) == [task.id])
+        #expect(pass([focusInsert], context: context) == [f.id])
+    }
+
+    /// The task itself waits on its goal: the focus waits with it, and goes once the
+    /// task has; a task insert that keeps failing stops holding it, as for any child.
+    @Test func aFocusRowWaitsWhileItsTaskIsHeldBack() throws {
+        let context = try makeContext()
+        let goal = PlanWriter(context: context, userId: UUID())
+            .createGoal(name: "Feel strong again", notes: nil, context: "personal", year: 2027)
+        let task = newTask(context, "Gym induction")
+        task.goalId = goal.id
+        task.linksDirty = true
+        let f = focus(task, context)
+        try context.save()
+        let goalInsert = try change(context, "goals", goal.id)
+        let taskInsert = try change(context, "tasks", task.id)
+        let focusInsert = try change(context, "task_focus", f.id)
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        taskInsert.createdAt = t0                                // the task is held back behind its goal
+        goalInsert.createdAt = t0.addingTimeInterval(1)
+        focusInsert.createdAt = t0.addingTimeInterval(2)
+
+        #expect(pass([goalInsert, taskInsert, focusInsert], context: context) == [goal.id])
+        #expect(pass([taskInsert, focusInsert], context: context) == [task.id, f.id])
+
+        taskInsert.attempts = SyncEngine.maxPushAttempts
+        let parents = SyncEngine.parentIds(table: "task_focus", id: f.id, context: context)
+        #expect(!SyncEngine.mustWait(parents: parents, unpushedInserts: SyncEngine.insertsWorthWaitingFor([taskInsert])))
+    }
+
+    @Test func aFocusOnATaskAlreadyOnTheServerGoesAtOnce() throws {
+        let context = try makeContext()
+        let task = SymphonyTask(userId: UUID(), title: "Renew the passport", syncStatus: .synced)
+        context.insert(task)
+        let f = focus(task, context)
+        try context.save()
+        #expect(pass([try change(context, "task_focus", f.id)], context: context) == [f.id])
+    }
+
+    @Test func aKeyedFocusDeleteNeverWaits() throws {
+        let context = try makeContext()
+        let task = newTask(context, "Gym induction")
+        let f = focus(task, context, queued: false)              // as if pulled: already on the server
+        try context.save()
+        context.queueKeyedDelete(table: "task_focus", recordId: f.id, match: [
+            "task_id": task.id.uuidString.lowercased(), "user_id": task.userId.uuidString.lowercased(),
+            "date": PlanCalendar.ymd(f.date),
+        ])
+        try context.save()
+        let taskInsert = try change(context, "tasks", task.id)
+        let focusDelete = try change(context, "task_focus", f.id, "delete")
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        focusDelete.createdAt = t0
+        taskInsert.createdAt = t0.addingTimeInterval(1)
+        // Even with the row still here naming its unpushed task, the delete goes first.
+        #expect(pass([focusDelete, taskInsert], context: context) == [f.id, task.id])
+    }
+
+    /// A focus row's task is its key, not a link: a refusal is counted as it always
+    /// was, never "unlinked" (which would retry it forever without counting).
+    @Test func aRefusedFocusRowCountsAsBefore() {
+        let t = UUID()
+        #expect(SyncEngine.onPushRejected(table: "task_focus", code: "23503", parents: [t],
+                                          queuedInserts: [], known: []) == .countAttempt)
+        #expect(SyncEngine.onPushRejected(table: "tasks", code: "23503", parents: [t],
+                                          queuedInserts: [], known: []) == .unlink([t]))
+        #expect(SyncEngine.onPushRejected(table: "goals", code: "23503", parents: [t],
+                                          queuedInserts: [], known: []) == .unlink([t]))
+        #expect(SyncEngine.onPushRejected(table: "tasks", code: "23503", parents: [],
+                                          queuedInserts: [], known: []) == .countAttempt)
+        #expect(SyncEngine.onPushRejected(table: "tasks", code: nil, parents: [t],
+                                          queuedInserts: [], known: []) == .countAttempt)
     }
 
     // MARK: Links re-set while a push is in flight

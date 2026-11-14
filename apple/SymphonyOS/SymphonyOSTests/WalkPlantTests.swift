@@ -708,6 +708,70 @@ struct WalkPlantTests {
         #expect(s.lastPlanted[.year] == loose.id)
     }
 
+    // MARK: Walk another one down
+
+    /// At the ending, with a year goal not yet walked: Season in a quick walk on that
+    /// goal, and nothing of the chain just walked left to steer the next one.
+    @Test func walkAnotherStartsACleanWalkDown() {
+        let tile = WalkItem(id: UUID(), level: .month, title: "Book the gym induction", areaId: m.health.id,
+                            parentId: m.lift.id)
+        let gym = WalkItem(id: UUID(), level: .week, title: "Gym induction", areaId: m.health.id,
+                           parentId: tile.id, day: m.today)
+        var s = m.on(6, items: [m.strong, m.bathroom, m.lift, tile, gym], depth: .full)
+        s.firstThing = gym.id
+        s.dayBeforeFirst = [gym.id: Date?.none]
+        s.focusArea = m.health.id
+        s.focus = [.season: m.strong.id, .month: m.lift.id, .week: tile.id, .today: gym.id]
+        s.tour = [m.bathroom.id]
+        s.lastPlanted = [.year: m.bathroom.id, .season: m.lift.id, .month: tile.id, .week: gym.id]
+        s.undo = [.plant(tile.id), .firstThing(previous: nil, created: nil)]
+        s.undoShowing = true
+        s.pulledChildren = [UUID(): [gym.id]]
+        s.examplesOn = [2, 3]
+        s.note = WalkCopy.nothingToPlant
+        s.selected = gym.id
+        s.expanded = WalkPostKey(level: .week, column: m.health.id)
+        s.typing = ""
+        s.orbWasOpen = true
+        s.emptyHolds = 1
+        s.sessionOver = true
+        s.speechIsOff = true
+        s.sheetOpen = true
+        s.calendarOffer = true
+
+        #expect(s.apply(.walkAnother, m.env) == [.save])
+        #expect(s.step == 2 && !s.ground && s.depth == .quick)
+        #expect(s.focus == [.season: m.bathroom.id])
+        #expect(s.lastPlanted.isEmpty)
+        #expect(s.focusArea == nil && s.tour.isEmpty)
+        #expect(s.undo.isEmpty && !s.undoShowing && s.pulledChildren.isEmpty)
+        #expect(s.examplesOn.isEmpty && s.note == nil)
+        #expect(s.selected == nil && s.expanded == nil && s.typing == nil)
+        #expect(s.orb == .idle && !s.orbWasOpen && s.emptyHolds == 0 && !s.sessionOver)
+        #expect(!s.sheetOpen)
+        // What belongs to the day, the ridge or the phone stays.
+        #expect(s.items == [m.strong, m.bathroom, m.lift, tile, gym])
+        #expect(s.kept == [m.health.id, m.home.id, m.people.id])
+        #expect(s.firstThing == gym.id && s.dayBeforeFirst == [gym.id: Date?.none])
+        #expect(s.speechIsOff && s.calendarOffer)
+    }
+
+    @Test func walkAnotherWaitsForTheEndingAndAGoalLeftToWalk() {
+        // Every year goal already has a season piece: nothing to walk.
+        var walked = m.on(6, items: [m.strong, m.lift])
+        walked.lastPlanted = [.season: m.lift.id]
+        let before = walked
+        #expect(walked.apply(.walkAnother, m.env) == [])
+        #expect(walked == before)
+
+        // Not at the ending.
+        var today = m.on(5, items: [m.strong, m.bathroom, m.lift])
+        today.focus = [.today: m.lift.id]
+        let earlier = today
+        #expect(today.apply(.walkAnother, m.env) == [])
+        #expect(today == earlier)
+    }
+
     // MARK: The ending's rows
 
     @Test func tickingARowAsksTheWriterWhoeverPlantedIt() {
