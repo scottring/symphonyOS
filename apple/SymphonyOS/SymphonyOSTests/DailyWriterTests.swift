@@ -154,7 +154,56 @@ struct DailyWriterTests {
         #expect(m.areaId == health.id)
         #expect(month.areaId == health.id)
         #expect(m.linksDirty)
+        #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == m.id && $0.changeType == "update" })
         #expect(m.monthStart.map { PlanCalendar.sameDay($0, periods.monthStart) } == true)
+    }
+
+    /// Fix round 1: the parent's area is its stored row's, not what the caller passed.
+    @Test func aParentLendsItsStoredArea() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx)
+        let year = w.add(.goal(title: "Run a marathon", level: .year), kept: [health, home], focusArea: health.id)
+        var told = flag(year, "Run a marathon")
+        told.areaId = home.id
+        let season = w.add(.goal(title: "Build to ten miles", level: .season), kept: [health, home], parent: told)
+        #expect(season.areaId == health.id)
+        #expect(task(ctx, season.id)?.areaId == health.id)
+        #expect(task(ctx, season.id)?.goalId == year.id)
+    }
+
+    /// Fix round 1: a parent that is not mine (anyone else's, or mine in a family
+    /// life area) is no parent: no link to it, and the words alone place the goal.
+    @Test func aParentThatIsNotMineIsNoParent() throws {
+        let ctx = try walkTestContext()
+        let theirs = SymphonyTask(userId: other, title: "Their season goal", scheduledFor: nil, context: "personal")
+        theirs.areaId = health.id
+        ctx.insert(theirs)
+        let family = SymphonyTask(userId: me, title: "Our season goal", scheduledFor: nil, context: "family")
+        family.areaId = health.id
+        ctx.insert(family)
+        try ctx.save()
+        let w = writer(ctx)
+        for parent in [theirs, family] {
+            let flag = WalkItem(id: parent.id, level: .season, title: parent.title, areaId: health.id)
+            let added = w.add(.goal(title: "Fix the garden fence", level: .month), kept: [health, home], parent: flag)
+            let t = try #require(task(ctx, added.id))
+            #expect(t.sourceId == nil)
+            #expect(t.goalId == nil)
+            #expect(added.areaId == home.id)
+        }
+    }
+
+    /// Fix round 1, finding B: a writer made yesterday, used for a time said for the
+    /// real today (past midnight, a time-zone change), still leaves no first-thing mark.
+    @Test func aTimedAddFromYesterdaysWriterIsNotTheFirstThing() throws {
+        let ctx = try walkTestContext()
+        let realToday = PlanCalendar.day(Date())
+        let yesterday = WalkPeriods.pick(now: PlanCalendar.addDays(realToday, -1))
+        let at = try #require(PlanCalendar.calendar.date(bySettingHour: 15, minute: 0, second: 0, of: realToday))
+        let added = writer(ctx, periods: yesterday).add(.task(title: "Dentist", day: realToday, at: at, here: true))
+        #expect(PlanCalendar.sameDay(task(ctx, added.id)?.scheduledFor, realToday))
+        #expect(focus(ctx).isEmpty)
+        #expect(!pending(ctx).contains { $0.tableName == "task_focus" })
     }
 
     @Test func aGoalWithNoParentIsPlacedByItsWordsAlone() throws {
@@ -262,6 +311,35 @@ struct DailyWriterTests {
         let t = try #require(task(ctx, added.id))
         #expect(t.scheduledFor == nil)
         #expect(t.bucket == "week")
+        #expect(t.isAllDay == false)
+        #expect(t.weekStart.map { PlanCalendar.sameDay($0, periods.weekStart) } == true)
+        #expect(commitments(ctx, t.id).filter { $0.level == "week" && $0.status == "open" }.count == 1)
+    }
+
+    @Test func undoMoveRefusesARowNotMine() throws {
+        let ctx = try walkTestContext()
+        let theirs = SymphonyTask(userId: other, title: "Their errand", scheduledFor: periods.today, context: "personal")
+        theirs.bucket = "timed"
+        theirs.isAllDay = true
+        ctx.insert(theirs)
+        try ctx.save()
+        // Their own writer moves it; ours is handed that snapshot.
+        let snap = PlanWriter(context: ctx, userId: other).planTask(theirs, on: day(2026, 11, 12), focusToday: false)
+        try pushAll(ctx)
+        writer(ctx).undoMove(snap)
+        #expect(PlanCalendar.sameDay(task(ctx, theirs.id)?.scheduledFor, day(2026, 11, 12)))
+        #expect(pending(ctx).isEmpty)
+    }
+
+    @Test func takeBackRefusesARowNotMine() throws {
+        let ctx = try walkTestContext()
+        let theirs = SymphonyTask(userId: other, title: "Their errand", scheduledFor: periods.today, context: "personal")
+        ctx.insert(theirs)
+        try ctx.save()
+        try pushAll(ctx)
+        writer(ctx).takeBack(DailyWriter.Added(id: theirs.id, level: .week, areaId: nil, placed: nil))
+        #expect(task(ctx, theirs.id) != nil)
+        #expect(pending(ctx).isEmpty)
     }
 
     @Test func anyDayClearsTheDay() throws {
@@ -287,8 +365,23 @@ struct DailyWriterTests {
         #expect(t.completed)
         #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == t.id && $0.changeType == "update" })
 
+        try pushAll(ctx)
         w.setDone(row(ctx, added.id), false, today: periods.today)
         #expect(task(ctx, added.id)?.completed == false)
+        #expect(task(ctx, added.id)?.completedAt == nil)
+        #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == added.id && $0.changeType == "update" })
+    }
+
+    /// Fix round 1: an id named on the wrong level makes no area and changes nothing.
+    @Test func aChangeOfAreaChecksTheLevelFirst() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx)
+        let added = w.add(.task(title: "Call the vet", day: periods.today, at: nil, here: true))
+        try pushAll(ctx)
+        w.setArea(added.id, level: .year, to: health)
+        #expect(task(ctx, added.id)?.areaId == nil)
+        #expect(areas(ctx).isEmpty)
+        #expect(pending(ctx).isEmpty)
     }
 
     @Test func aChangeOfAreaFilesItElsewhere() throws {
@@ -345,6 +438,42 @@ struct DailyWriterTests {
         #expect(t.bucket == "timed")
         #expect(t.areaId == nil)
         #expect(goal(ctx, theirGoal.id)?.areaId == nil)
+        #expect(focus(ctx).isEmpty)
+        #expect(areas(ctx).isEmpty)
+        #expect(pending(ctx).isEmpty)
+    }
+
+    /// Fix round 1: my own row in a family life area is refused like anyone else's.
+    @Test func myRowInAFamilyAreaIsNeverTouched() throws {
+        let ctx = try walkTestContext()
+        let ours = SymphonyTask(userId: me, title: "Our errand", scheduledFor: periods.today, context: "family")
+        ours.bucket = "timed"
+        ours.isAllDay = true
+        ctx.insert(ours)
+        let ourGoal = Goal(id: UUID(), userId: me, name: "Our goal", year: periods.year)
+        ourGoal.context = "family"
+        ctx.insert(ourGoal)
+        try ctx.save()
+        try pushAll(ctx)
+        let w = writer(ctx)
+
+        w.setDone(DailyDay.Row(id: ours.id, title: ours.title, forGoal: nil, done: false, first: false), true,
+                  today: periods.today)
+        #expect(w.move(ours.id, to: day(2026, 11, 12)) == nil)
+        #expect(w.move(ours.id, to: nil) == nil)
+        w.pullUp(ours.id, level: .week)
+        w.pullUp(ourGoal.id, level: .year)
+        w.setArea(ours.id, level: .week, to: health)
+        w.setArea(ourGoal.id, level: .year, to: health)
+        w.setFirst(ours.id, previous: nil)
+        w.takeBack(DailyWriter.Added(id: ours.id, level: .week, areaId: nil, placed: nil))
+
+        let t = try #require(task(ctx, ours.id))
+        #expect(t.completed == false)
+        #expect(PlanCalendar.sameDay(t.scheduledFor, periods.today))
+        #expect(t.bucket == "timed")
+        #expect(t.areaId == nil)
+        #expect(goal(ctx, ourGoal.id)?.areaId == nil)
         #expect(focus(ctx).isEmpty)
         #expect(areas(ctx).isEmpty)
         #expect(pending(ctx).isEmpty)

@@ -8,7 +8,8 @@ import SwiftData
 ///
 /// A task is the walk's week task; a goal is the walk's flag, filed and linked
 /// as the walk files and links them. Everything is the signed-in person's own
-/// and `context = "personal"`; a row whose `userId` is anyone else's is left
+/// and `context = "personal"`; a row that is not the person's own (anyone else's,
+/// or theirs in a family or other life area, as `DailyDay.mine` reads it) is left
 /// exactly as it is, whatever id it is handed.
 ///
 /// It holds one `WalkWriter` for its whole life, so a pull-up and its put-back
@@ -53,16 +54,19 @@ import SwiftData
             let item = WalkItem(id: UUID(), level: .week, title: title, day: day)
             creator.create(item, parent: nil)
             if let at, let t = myTask(item.id) {
-                // A time said is kept; it never makes the task the first thing.
+                // A time said is kept; it never makes the task the first thing. `move` marks
+                // the clock's today, so exactly the focus rows it made are taken back.
                 let snap = plan.move(t, to: .day(at, allDay: false))
-                if !snap.createdFocus.isEmpty { walk.setFirstThing(nil, previous: item.id) }
+                if !snap.createdFocus.isEmpty { plan.undo(PlanWriter.Snapshot(createdFocus: snap.createdFocus)) }
             }
             return Added(id: item.id, level: .week, areaId: nil, placed: nil)
 
         case .goal(let title, let level):
+            // A parent counts only when its stored row is mine, and lends its stored area.
+            let parent = level == .year ? nil : parent.flatMap(storedParent)
             var areaId: UUID?
             var placed: String?
-            if level != .year, let parent {
+            if let parent {
                 areaId = parent.areaId
             } else if case .area(let id, let moved) = WalkClassifier.place(title, kept: kept,
                                                                            focus: level == .year ? focusArea : nil) {
@@ -116,7 +120,12 @@ import SwiftData
         walk.remove(id, level: level)
     }
 
-    /// Undo of a pull-up: the row comes back with its id and its links.
+    /// Undo of a pull-up: the row comes back with its id and its links, but only with
+    /// what the walk's writer remembers (the walk's own short field list). Right for a
+    /// row the walk planted; an ordinary task would come back without its links, phone
+    /// number, location, capture fields and the rest, so it must never be offered for
+    /// ordinary rows. `DailyModel` does not use it: a pull-up is written only once its
+    /// Undo can no longer be used.
     func putBack(_ id: UUID) {
         walk.restore(id)
     }
@@ -126,8 +135,15 @@ import SwiftData
     /// Files a goal or task under another area (or none). The area is made if it
     /// has no row yet; the one it left goes if this writer made it and nothing else uses it.
     func setArea(_ id: UUID, level: WalkLevel, to area: WalkArea?) {
-        guard owns(id) else { return }
-        let old = level == .year ? myGoal(id)?.areaId : myTask(id)?.areaId
+        // The row must be mine on the level named before any area is made.
+        let old: UUID?
+        if level == .year {
+            guard let g = myGoal(id) else { return }
+            old = g.areaId
+        } else {
+            guard let t = myTask(id) else { return }
+            old = t.areaId
+        }
         if let area { walk.ensureArea(area) }
         walk.setArea(id, level: level, to: area?.id)
         if let old, old != area?.id { walk.dropAreaIfUnused(old) }
@@ -146,15 +162,33 @@ import SwiftData
         myTask(id) != nil || myGoal(id) != nil
     }
 
+    /// Mine as `DailyDay.mine` reads it: my id, and personal or no life area.
+    private func isMine(userId: UUID, context: String?) -> Bool {
+        userId == self.userId && (context == nil || context == "personal")
+    }
+
     private func myTask(_ id: UUID) -> SymphonyTask? {
         var d = FetchDescriptor<SymphonyTask>(predicate: #Predicate { $0.id == id })
         d.fetchLimit = 1
-        return (try? context.fetch(d))?.first.flatMap { $0.userId == userId ? $0 : nil }
+        return (try? context.fetch(d))?.first.flatMap { isMine(userId: $0.userId, context: $0.context) ? $0 : nil }
     }
 
     private func myGoal(_ id: UUID) -> Goal? {
         var d = FetchDescriptor<Goal>(predicate: #Predicate { $0.id == id })
         d.fetchLimit = 1
-        return (try? context.fetch(d))?.first.flatMap { $0.userId == userId ? $0 : nil }
+        return (try? context.fetch(d))?.first.flatMap { isMine(userId: $0.userId, context: $0.context) ? $0 : nil }
+    }
+
+    /// The parent as stored: nil unless its row is mine; its area is the stored row's.
+    private func storedParent(_ parent: WalkItem) -> WalkItem? {
+        var item = parent
+        if let g = myGoal(parent.id) {
+            item.areaId = g.areaId
+        } else if let t = myTask(parent.id) {
+            item.areaId = t.areaId
+        } else {
+            return nil
+        }
+        return item
     }
 }
