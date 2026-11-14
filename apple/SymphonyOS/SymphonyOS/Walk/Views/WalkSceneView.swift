@@ -41,6 +41,17 @@ struct WalkSceneView: View {
             .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
             .animation(reduceMotion ? Self.crossFade : nil, value: layout.camera)
             band
+            // The open compass (and Welcome's choices): the mountain steps back under a navy veil,
+            // so every point reads on an even dark ground; the words above stay bright. A tap on
+            // it closes the compass (on Welcome the choices stay); flags and peaks take no tap.
+            if model.state.showsVeil {
+                WalkPalette.ground.opacity(0.55)
+                    .frame(width: art.stage.width, height: art.stage.height)
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.send(.veilTapped) }
+                    .accessibilityHidden(true)
+                    .transition(.opacity.animation(.easeOut(duration: 0.2)))
+            }
             words
                 .accessibilitySortPriority(1)       // read before the peaks and flags
         }

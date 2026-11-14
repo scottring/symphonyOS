@@ -122,7 +122,7 @@ private struct Saved {
         #expect(fresh.undo.isEmpty)
         #expect(fresh.undoShowing == false)
         #expect(fresh.step == 4)
-        #expect(!WalkCopy.points(fresh).contains { $0.action == .undo })
+        #expect(!WalkCopy.points(fresh, p).contains { $0.action == .undo })
     }
 
     @Test func applyPutsBackWhereYouWere() {
@@ -291,6 +291,54 @@ private struct Saved {
         #expect(!may(synced: false, position: pos(.finished), editions: ["light"]))
         #expect(!may(signedIn: false, synced: true, position: pos(.inProgress), replay: true, editions: ["light"]))
         #expect(!may(walkUp: true, synced: true, position: pos(.inProgress), replay: true, editions: ["light"]))
+    }
+
+    /// Leave for now (`paused`): never reopened by itself at launch, in any household, before or
+    /// after the first pull; picked back up only when asked (`resume`), at the step it was on, in
+    /// any household; a replay over it starts from the top and clears it.
+    @Test func aPausedWalkWaitsToBeAskedFor() {
+        let p = periods(2026, 11, 13)
+        var s = WalkState(); s.step = 3; s.depth = .quick
+        let paused = WalkPosition(s, status: .paused, planted: [], periods: p, now: p.today)
+        func decide(replay: Bool = false, resume: Bool = false, _ position: WalkPosition?, _ editions: [String?],
+                    synced: Bool = true, goals: Int = 0) -> WalkEntry {
+            WalkEntry.decide(replay: replay, resume: resume, demoWalk: false, position: position,
+                             householdEditions: editions, initialSyncFinished: synced, goalCount: goals)
+        }
+        func may(synced: Bool, resume: Bool = false, _ position: WalkPosition?, _ editions: [String?]) -> Bool {
+            WalkEntry.mayDecide(walkUp: false, signedIn: true, initialSyncFinished: synced, position: position,
+                                replay: false, resume: resume, householdEditions: editions)
+        }
+        for editions: [String?] in [["light"], ["full"], ["light", "full"], []] {
+            // Launch: none, whatever the goals (a brand-new person who left on the first step included).
+            #expect(decide(paused, editions) == .none)
+            #expect(decide(paused, editions, goals: 3) == .none)
+            #expect(decide(paused, editions, synced: false) == .none)
+            #expect(!may(synced: false, paused, editions))
+            // Asked for: resumed, before the first pull too.
+            #expect(decide(resume: true, paused, editions) == .resume)
+            #expect(may(synced: false, resume: true, paused, editions))
+            // Walk the mountain again: from the top, and the pause is cleared.
+            #expect(decide(replay: true, paused, editions) == .start)
+            #expect(WalkEntry.clearsPause(.start, position: paused))
+        }
+        // A resume with nothing paused opens nothing; only a paused walk is cleared by a start.
+        let walking = WalkPosition(s, status: .inProgress, planted: [], periods: p, now: p.today)
+        #expect(decide(resume: true, walking, ["light"]) == .none)
+        #expect(decide(resume: true, nil, ["light"]) == .none)
+        #expect(!may(synced: false, resume: true, walking, ["full"]))
+        #expect(!WalkEntry.clearsPause(.start, position: walking))
+        #expect(!WalkEntry.clearsPause(.resume, position: paused))
+        #expect(!WalkEntry.clearsPause(.start, position: nil))
+        // The saved place keeps its step and status, and the store reports the pause.
+        let saved = store(), me = UUID()
+        #expect(!saved.hasPausedWalk(for: me))
+        saved.save(paused, for: me)
+        #expect(saved.hasPausedWalk(for: me))
+        #expect(saved.load(for: me)?.status == .paused && saved.load(for: me)?.step == 3)
+        #expect(!saved.hasPausedWalk(for: UUID()))
+        saved.save(walking, for: me)
+        #expect(!saved.hasPausedWalk(for: me))
     }
 
     /// A walk still up on a later day is taken down and decided again with the new day's periods.

@@ -68,6 +68,10 @@ struct SettingsView: View {
             // The walk (iPhone only): the one place a replay is asked for.
             #if os(iOS)
             Section {
+                // A walk left with Leave for now: picked up at the step it was on.
+                if appState.walkPaused {
+                    Button(WalkCopy.resumeButton) { appState.resumeWalk() }
+                }
                 Button(WalkCopy.replayButton) {
                     appState.walkReplayRequested = true
                     // Leave More (and Settings with it) for the Planner, under the walk.

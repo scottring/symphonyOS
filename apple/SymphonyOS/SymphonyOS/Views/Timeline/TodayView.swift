@@ -438,6 +438,13 @@ struct TodayView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 4)
 
+            // The light edition only, while a walk left with Leave for now is waiting.
+            if appState.edition == .light && appState.walkPaused {
+                walkWaiting
+                    .padding(.horizontal, 20)
+                    .padding(.top, 6)
+            }
+
             if showSearch {
                 searchField
                     .padding(.horizontal, 20)
@@ -445,6 +452,18 @@ struct TodayView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+    }
+
+    /// One quiet line: a tap picks the walk back up where it was left.
+    private var walkWaiting: some View {
+        Button { appState.resumeWalk() } label: {
+            Text(WalkCopy.walkWaiting)
+                .font(.bodyMedium)
+                .foregroundStyle(Color.textSecondary)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     /// For today, the way into this week's shelf, and tonight's dinner.

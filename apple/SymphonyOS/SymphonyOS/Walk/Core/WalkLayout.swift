@@ -50,8 +50,15 @@ struct WalkLayout: Equatable {
         /// For VoiceOver: kept, on the ground; focused, off it.
         var selected: Bool = false
         /// How far the label moved with its peak's Year post (its post's `footing`).
-        var footing: CGFloat = 0 }
+        var footing: CGFloat = 0
+        /// Drawn on the ground, where it is a choice: a plus while not kept, a checkmark once kept.
+        var ground: Bool = false }
     let camera: Camera; let labels: [Label]; let posts: [Post]; let needleDown: Bool
+    /// Under the light: the Next line's frame (nil while it is not shown) and the hint line's
+    /// (nil while it is blank). See "The controls under the light" at the end of this file.
+    var nextLine: CGRect? = nil
+    var hintLine: CGRect? = nil
+    var undoPill: CGRect? = nil
 
     // MARK: Stage numbers (the art's numbers live in `WalkArt`)
 
@@ -70,7 +77,11 @@ struct WalkLayout: Equatable {
     /// `footing`: `.natural` plants the posts by hand (the app); `.level` is the contract's ruled geometry.
     static func make(_ state: WalkState, today: Date, art: WalkArt = .overlookSquare,
                      footing: WalkFooting = .natural) -> WalkLayout {
-        Builder(state, today: today, art: art, footing: footing).layout()
+        var made = Builder(state, today: today, art: art, footing: footing).layout()
+        made.nextLine = nextFrame(state)
+        made.hintLine = hintFrame(state)
+        made.undoPill = undoFrame(state)
+        return made
     }
 
     /// How many lines a title takes at a banner width: a character estimate, so the core needs no fonts.
@@ -328,13 +339,14 @@ private struct Builder {
             guard let area = column.area, let slot = slots[i] else { return nil }
             let kept = s.kept.contains(area.id)
             let focused = !s.ground && s.focusArea == area.id
-            let opacity = s.ground ? (kept ? 1 : 0.62) : max(0.5, 1 - 0.1 * d)
+            // On the ground every area is a choice at full contrast, kept or not.
+            let opacity = s.ground ? 1 : max(0.5, 1 - 0.1 * d)
             // A label stands under its peak's Year post and moves with it.
             let footing = feet[i].value * sigma(WalkPostKey(level: .year, column: area.id))
             return L.Label(id: area.id, name: area.name, frame: footing == 0 ? slot.frame : slot.frame.offsetBy(dx: 0, dy: footing),
                            kept: kept, focused: focused, opacity: Double(opacity), tappable: tappable,
                            hint: tappable ? WalkCopy.areaHint(ground: s.ground, kept: kept, focused: focused) : nil,
-                           selected: tappable && (s.ground ? kept : focused), footing: footing)
+                           selected: tappable && (s.ground ? kept : focused), footing: footing, ground: s.ground)
         }
     }
 
@@ -1033,7 +1045,7 @@ private struct Builder {
     func stub(_ id: String, _ lvl: WalkLevel, base: CGPoint, count: Int, scale: CGFloat, below: CGFloat?) -> L.Banner {
         let w = 26 * scale, h = 20 * scale
         let frame = slid(CGRect(x: base.x - w / 2, y: (below ?? base.y) - h, width: w, height: h))
-        let e = Entry(kind: .stub(count), item: nil, text: WalkCopy.more(count), tag: nil, glows: false,
+        let e = Entry(kind: .stub(count), item: nil, text: WalkCopy.stubCount(count), tag: nil, glows: false,
                       label: WalkCopy.bannerLabel("", level: lvl, tag: nil, role: .stub(count)))
         return banner(id: "\(id)-more", e, lvl, frame: frame, lines: 1)
     }
@@ -1041,5 +1053,61 @@ private struct Builder {
     func banner(id: String, _ e: Entry, _ lvl: WalkLevel, frame: CGRect, lines: Int) -> L.Banner {
         L.Banner(id: id, itemId: e.item?.id, level: lvl, kind: e.kind, frame: frame, lines: lines,
                  text: e.text, tag: e.tag, glows: e.glows, label: e.label, taps: e.taps)
+    }
+}
+
+// MARK: - The controls under the light
+
+/// The Next line and the hint line, in stage points. They are placed from the light alone,
+/// never from the flags: the flags already keep clear of the light's ring and labels of the
+/// ring and its ticks (`orbRoom`), so what sits under the ring meets neither.
+extension WalkLayout {
+    /// The dial's ring around the light (contract §7: 132 across).
+    static let ring: CGFloat = 66
+    /// The home-indicator zone at the foot of the stage: the bottom safe-area inset of a phone
+    /// with a home indicator, kept clear of the Next line and the hint line.
+    static let homeIndicator: CGFloat = 34
+    /// The Next line: a 44-point tap target directly under the ring.
+    static let nextHeight: CGFloat = 44
+    /// One line of the 15-point hint (DM Sans: 1.3 × 15).
+    static let hintLineHeight: CGFloat = 19.5
+    /// The hint's width (the stage less 10 on each side) and, by estimate, the characters that fit on one line.
+    static let hintWidth: CGFloat = 370
+    static let hintCharsPerLine = 48
+    /// The line under the open compass's top point: room for that point's label and second line above its disc.
+    static let openHintGap: CGFloat = 6
+
+    /// How many lines the hint takes: an estimate, so the core needs no fonts (the view allows the same).
+    static func hintLines(_ text: String) -> Int {
+        min(3, max(1, Int((Double(text.count) / Double(hintCharsPerLine)).rounded(.up))))
+    }
+
+    static let nextWidth: CGFloat = 220
+
+    static func nextFrame(_ s: WalkState) -> CGRect? {
+        guard s.showsNextLine else { return nil }
+        return CGRect(x: WalkOrb.centre.x - nextWidth / 2, y: WalkOrb.centre.y + ring + 2, width: nextWidth, height: nextHeight)
+    }
+
+    /// The quiet Undo pill, beside the Next line on the right, while it shows (`showsUndoPill`).
+    static func undoFrame(_ s: WalkState) -> CGRect? {
+        guard s.showsUndoPill, (1...5).contains(s.step) else { return nil }
+        let line = WalkOrb.centre.y + ring + 2
+        return CGRect(x: WalkOrb.centre.x + nextWidth / 2 + 4, y: line + (nextHeight - 34) / 2, width: 76, height: 34)
+    }
+
+    /// Closed: under the Next line's place (taken or not), so it never moves when the line comes and goes.
+    /// Open: above the compass's top point and its words, on the veil.
+    static func hintFrame(_ s: WalkState) -> CGRect? {
+        let text = WalkCopy.hint(s)
+        guard !text.isEmpty else { return nil }
+        let height = CGFloat(hintLines(text)) * hintLineHeight
+        let x = WalkOrb.centre.x - hintWidth / 2
+        if s.showsPoints {
+            let top = WalkOrb.position(of: .n).y - WalkOrb.pointDisc / 2 - WalkOrb.pointWords - openHintGap
+            return CGRect(x: x, y: top - height, width: hintWidth, height: height)
+        }
+        let y = WalkOrb.centre.y + ring + 2 + nextHeight + 0.5
+        return CGRect(x: x, y: y, width: hintWidth, height: height)
     }
 }

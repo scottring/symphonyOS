@@ -158,6 +158,12 @@ struct WalkPositionStore {
         defaults.set(data, forKey: Self.key(userId))
     }
 
+    /// This person left a walk with Leave for now and it is waiting to be picked up
+    /// (`WalkEntry.decide(resume: true, …)` opens it at the step it was on).
+    func hasPausedWalk(for userId: UUID?) -> Bool {
+        load(for: userId)?.status == .paused
+    }
+
     func forget(for userId: UUID?) {
         guard let userId else { return }
         defaults.removeObject(forKey: Self.key(userId))
@@ -176,9 +182,12 @@ enum WalkEntry: Equatable {
     /// The position is local, so a person who left the walk on one phone with no goals is offered it again on another.
     /// A walk left part-way resumes only in a light household; in a full one (or a mixed or
     /// unknown one) it is simply left, and "Walk the mountain again" starts it from the top.
-    static func decide(replay: Bool, demoWalk: Bool, position: WalkPosition?, householdEditions: [String?],
-                       initialSyncFinished: Bool, goalCount: Int) -> WalkEntry {
+    /// A walk left with Leave for now (`paused`) never reopens by itself, in any household:
+    /// only `resume` (Pick the walk back up, in Settings or on Today) opens it, at the step it was on.
+    static func decide(replay: Bool, resume: Bool = false, demoWalk: Bool, position: WalkPosition?,
+                       householdEditions: [String?], initialSyncFinished: Bool, goalCount: Int) -> WalkEntry {
         if replay || demoWalk { return .start }
+        if resume { return position?.status == .paused ? .resume : .none }
         let onlyLight = lightOnly(householdEditions)
         if let position { return position.status == .inProgress && onlyLight ? .resume : .none }
         return onlyLight && initialSyncFinished && goalCount == 0 ? .start : .none
@@ -186,14 +195,22 @@ enum WalkEntry: Equatable {
 
     /// Whether `decide` is asked at all: never while a walk is up or with nobody signed in.
     /// Before the first pull has finished, a saved walk in progress in a light household
-    /// opens at once (it and every row it planted are on this phone), and so does a replay
-    /// over a household already on this phone; a replay on a brand-new sign-in waits (still
-    /// asked for), and the automatic first start waits as `decide` says.
-    static func mayDecide(walkUp: Bool, signedIn: Bool, initialSyncFinished: Bool,
-                          position: WalkPosition?, replay: Bool, householdEditions: [String?]) -> Bool {
+    /// opens at once (it and every row it planted are on this phone), and so does a resume of
+    /// a paused walk and a replay over a household already on this phone; a replay on a
+    /// brand-new sign-in waits (still asked for), and the automatic first start waits as
+    /// `decide` says. A paused walk alone never makes it ask early.
+    static func mayDecide(walkUp: Bool, signedIn: Bool, initialSyncFinished: Bool, position: WalkPosition?,
+                          replay: Bool, resume: Bool = false, householdEditions: [String?]) -> Bool {
         guard !walkUp, signedIn else { return false }
         if initialSyncFinished || (position?.status == .inProgress && lightOnly(householdEditions)) { return true }
+        if resume && position?.status == .paused { return true }
         return replay && !householdEditions.isEmpty
+    }
+
+    /// A walk that starts from the top (a replay) over one left with Leave for now clears the
+    /// pause: the saved place is forgotten, so nothing is left waiting to be picked up.
+    static func clearsPause(_ entry: WalkEntry, position: WalkPosition?) -> Bool {
+        entry == .start && position?.status == .paused
     }
 
     /// A walk still up on a later day than the one it opened on is taken down and decided

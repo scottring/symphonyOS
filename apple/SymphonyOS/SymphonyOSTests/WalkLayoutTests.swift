@@ -639,7 +639,7 @@ struct WalkLayoutTests {
         let theirs = flag(.year, "Run a 5K", in: "Health", mine: false)
         var s = state(1, kept: ["Health", "Home"], items: [mine, theirs])
         var layout = WalkLayout.make(s, today: today, footing: .level)
-        #expect(layout.banner(for: mine)?.label == "Year: Run a 5K, tap to move or pull up")
+        #expect(layout.banner(for: mine)?.label == "Year: Run a 5K, tap to move or remove")
         #expect(layout.banner(for: theirs)?.label == "Year: Run a 5K")
 
         s.step = 2
@@ -814,6 +814,74 @@ struct WalkLayoutTests {
             checked += 1
         }
         #expect(checked >= 3500)
+    }
+
+    /// The controls under the light, in every generated state at rest, with the Undo pill, with
+    /// a note, with speech off, and with the compass open: the Next line, the hint line and the
+    /// Undo pill never meet each other or the light's ring (and so its touch), at rest never a flag
+    /// or a label (open, the hint sits on the veil over the scene, as the points' words do), and stay on the stage; the Next line, the Undo pill and a one-line hint stay above the
+    /// home-indicator zone. Open, the hint sits above the top point and its words, below the question.
+    /// A hint that wraps to two lines reaches into that zone: those are listed, so the gap is in sight.
+    @Test func theControlsUnderTheLightKeepClear() {
+        let c = WalkOrb.centre
+        let insetTop = art.stage.height - WalkLayout.homeIndicator
+        func meetsRing(_ r: CGRect) -> Bool {
+            hypot(c.x - min(max(c.x, r.minX), r.maxX), c.y - min(max(c.y, r.minY), r.maxY)) <= WalkLayout.ring
+        }
+        let north = WalkOrb.position(of: .n)
+        let topPoint = CGRect(x: north.x - 70, y: north.y - WalkOrb.pointDisc / 2 - WalkOrb.pointWords,
+                              width: 140, height: WalkOrb.pointWords + WalkOrb.pointDisc)
+        var twoLine: Set<String> = []
+        var checked = 0
+        for base in Generated.states() where (0...5).contains(base.step) {
+            let layout = WalkLayout.make(base, today: today)
+            let drawn = layout.posts.flatMap(\.banners).map(\.drawn) + layout.labels.map(\.frame)
+            var variants = [base]
+            var undo = base; undo.undo = [.plant(uid(1))]; undo.undoShowing = true; variants.append(undo)
+            var noted = base; noted.note = WalkCopy.nothingToPlant; variants.append(noted)
+            var full = base; full.note = WalkCopy.ridgeFull; variants.append(full)
+            var off = base; off.speechIsOff = true; variants.append(off)
+            var open = base; open.orb = .open; variants.append(open)
+            var speaking = base; speaking.orb = .speaking(live: "x"); variants.append(speaking)
+            for v in variants {
+                let frames = [("next", WalkLayout.nextFrame(v)), ("hint", WalkLayout.hintFrame(v)), ("undo", WalkLayout.undoFrame(v))]
+                    .compactMap { name, f in f.map { (name, $0) } }
+                var problems: [String] = []
+                for (i, a) in frames.enumerated() {
+                    for b in frames[(i + 1)...] where Invariants.overlap(a.1, b.1) { problems.append("\(a.0) meets \(b.0)") }
+                    if meetsRing(a.1) { problems.append("\(a.0) \(a.1) meets the ring") }
+                    // With the compass open the scene is under the veil, the points' words included (rule 5).
+                    if !v.showsPoints {
+                        for d in drawn where Invariants.overlap(a.1, d) { problems.append("\(a.0) \(a.1) meets \(d)") }
+                    }
+                    if a.1.minX < 0 || a.1.maxX > art.stage.width || a.1.minY < WalkLayout.question { problems.append("\(a.0) leaves the stage") }
+                    if a.0 != "hint", a.1.maxY > insetTop + 0.01 { problems.append("\(a.0) in the home-indicator zone") }
+                }
+                if let hint = WalkLayout.hintFrame(v) {
+                    let text = WalkCopy.hint(v)
+                    if v.showsPoints {
+                        if Invariants.overlap(hint, topPoint) { problems.append("the open hint meets the top point") }
+                    } else if WalkLayout.hintLines(text) == 1 {
+                        if hint.maxY > insetTop + 0.01 { problems.append("a one-line hint in the home-indicator zone") }
+                    } else {
+                        twoLine.insert(text)
+                    }
+                }
+                // Shown exactly when the state says.
+                if (WalkLayout.nextFrame(v) != nil) != (WalkCopy.nextLine(v, WalkPeriods.pick(now: today)) != nil) {
+                    problems.append("the Next line's frame and words disagree")
+                }
+                #expect(problems.isEmpty, "\(Generated.describe(v)) orb \(v.orb): \(problems.prefix(3))")
+                if !problems.isEmpty { return }
+                checked += 1
+            }
+        }
+        #expect(checked >= 15_000)
+        // The hints and notes that wrap to two lines at 15 pt; any other would be new and is caught here.
+        let wrapping: Set<String> = [WalkCopy.hintFirst, WalkCopy.hintStartHere, WalkCopy.hintSpeechOff,
+                                     WalkCopy.nothingToPlant, WalkCopy.ridgeFull]
+        #expect(twoLine.isSubset(of: wrapping), "\(twoLine.subtracting(wrapping))")
+        #expect(wrapping.allSatisfy { WalkLayout.hintLines($0) == 2 })
     }
 
     /// A post's band point (its base less its footing) is on its band; the footing stays within its bound.

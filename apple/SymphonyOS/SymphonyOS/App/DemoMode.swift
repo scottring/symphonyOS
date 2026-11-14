@@ -29,6 +29,15 @@ enum DemoMode {
         return args[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
     }
 
+    /// Where a demo walk saves its place: a store of its own, emptied once per launch, so a
+    /// demo never resumes a walk from an earlier run but Leave for now can be picked back up.
+    @MainActor static let walkStore: WalkPositionStore = {
+        let suite = "com.scottkaufman.symphonyos.demo-walk"
+        let defaults = UserDefaults(suiteName: suite) ?? .standard
+        defaults.removePersistentDomain(forName: suite)
+        return WalkPositionStore(defaults: defaults)
+    }()
+
     /// `-SymphonyWalkExamples`: the demo walk opens with the example flags on for its step.
     static var walkExamples: Bool { ProcessInfo.processInfo.arguments.contains("-SymphonyWalkExamples") }
 
@@ -166,13 +175,14 @@ enum DemoMode {
     /// or a compass action, as a person's touch would send:
     /// - `ground`: back up from Year onto the ground (the kept peaks).
     /// - `open`: a tap on the light, so the compass points open.
-    /// - `hold`: a press held and slid onto the point below (Walk on, or Quick start), hovered.
+    /// - `hold`: a press held and slid onto the point below (the Next line's point), hovered.
     /// - `speak`: a hold that reaches speaking; the words come through the model's real
     ///   listening path from `walkListener`, which hears them as soon as it starts.
     /// - `type`: the Type it point: the one-line field, empty.
     /// - `select`: a tap on the newest flag the walk planted on this step (Today: the first thing).
     /// - `undo`: a flag typed and planted, so the Undo pill shows.
-    /// - `next`: the Walk on point, so a step is entered as a person arrives on it (Today's calendar line).
+    /// - `next`: the Next line, so a step is entered as a person arrives on it (Today's calendar line).
+    /// - `leave`: Leave for now: the walk closes onto Today with its waiting line.
     /// With `-SymphonyWalkExamples` the Examples point is chosen first, so the step's example flags show.
     /// With `-SymphonyWalkSheet up` the ending's handle is tapped last, so the sheet stands raised.
     @MainActor static func showWalk(_ model: WalkModel, _ steps: [String]) {
@@ -203,6 +213,8 @@ enum DemoMode {
                 model.send(.typeSubmitted("Two early nights a week"))
             case "next":
                 model.choose(.next)
+            case "leave":
+                model.choose(.leave)
             default:
                 break
             }

@@ -7,13 +7,22 @@ import CoreGraphics
 /// or planted here, only asked for as effects.
 extension WalkState {
 
-    /// The compass points are out: the light is held (before speaking) or open.
+    /// The compass points are out: the light is held (before speaking) or open. On Welcome
+    /// they always are: its three choices are the whole screen.
     var showsPoints: Bool {
+        if step == 0 { return true }
         switch orb {
         case .holding, .open: return true
         case .idle, .speaking, .finishing: return false
         }
     }
+
+    /// The veil behind the open compass (and Welcome's choices): the scene steps back. Not during a
+    /// press, so a hold on its way to speaking does not darken the mountain.
+    var showsVeil: Bool { step == 0 || orb == .open }
+
+    /// The Next line under the light shows on steps 1 to 5 while the light is at rest and nothing is being typed.
+    var showsNextLine: Bool { (1...5).contains(step) && orb == .idle && typing == nil }
 
     /// The quiet Undo pill beside the hint; it gives way while the points show,
     /// where Undo is the up-left point instead.
@@ -23,7 +32,7 @@ extension WalkState {
         switch event {
         case .orbDown: return orbDown(env)
         case .orbHeld: return orbHeld()
-        case .orbMoved(let location): return orbMoved(location)
+        case .orbMoved(let location): return orbMoved(location, env)
         case .orbUp(let heldMs): return orbUp(heldMs: heldMs, env)
         case .orbCancelled:
             // A cancel while waiting for the last words lets them go: the finish wait is taken back.
@@ -78,7 +87,9 @@ extension WalkState {
             typing = nil
             return []
         case .point(let point):
-            guard orb == .open, let chosen = WalkCopy.points(self).first(where: { $0.at == point }) else { return [] }
+            // Welcome's choices take a tap whenever the light is not pressed.
+            guard orb == .open || (step == 0 && orb == .idle),
+                  let chosen = WalkCopy.points(self, env.periods).first(where: { $0.at == point }) else { return [] }
             orb = .idle
             return act(chosen.action, env)
         default:
@@ -101,19 +112,16 @@ extension WalkState {
 
     private mutating func orbHeld() -> [WalkEffect] {
         guard orb == .holding(hover: nil), (1...5).contains(step) else { return [] }
-        if speechIsOff {
-            // Refused earlier in this walk: no flag, no listening, the field at once.
-            startTyping()
-            note = WalkCopy.speechOff
-            return [.timer(.note, ms: WalkState.noteMs)]
-        }
+        // Refused earlier in this walk: no flag, no listening. A tap types; a hold keeps the
+        // other choices out, and they stay open when it lets go.
+        if speechIsOff { return [] }
         orb = .speaking(live: "")
         sessionOver = false
         return [.listen(true), .sound(.unfurl, afterMs: 280)]
     }
 
-    private mutating func orbMoved(_ location: CGPoint) -> [WalkEffect] {
-        let hover = WalkOrb.point(at: location, among: WalkCopy.points(self).map(\.at))
+    private mutating func orbMoved(_ location: CGPoint, _ env: WalkEnv) -> [WalkEffect] {
+        let hover = WalkOrb.point(at: location, among: WalkCopy.points(self, env.periods).map(\.at))
         switch orb {
         case .speaking:
             guard WalkOrb.isOut(location) else { return [] }
@@ -135,7 +143,7 @@ extension WalkState {
         orbWasOpen = false
         switch orb {
         case .holding(let hover?):
-            guard let chosen = WalkCopy.points(self).first(where: { $0.at == hover }) else {
+            guard let chosen = WalkCopy.points(self, env.periods).first(where: { $0.at == hover }) else {
                 orb = .idle
                 return release
             }
@@ -149,9 +157,14 @@ extension WalkState {
             return release + [.timer(.finish, ms: WalkOrb.finishMs), .finishListening]
         case .holding(nil):
             if heldMs < WalkOrb.holdMs {
+                // With speech off a tap types straight away (the light shows a keyboard).
+                if speechIsOff, !wasOpen, (1...5).contains(step) {
+                    startTyping()
+                    return release
+                }
                 orb = wasOpen ? .idle : .open
             } else {
-                orb = step == 0 ? .open : .idle
+                orb = step == 0 || speechIsOff ? .open : .idle
             }
             return release
         case .idle, .open, .finishing:
@@ -206,6 +219,17 @@ extension WalkState {
         words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// What the light carries at its centre: a microphone while holding it would listen, a
+    /// keyboard once speech is off for this walk (a tap types), nothing on Welcome (the choices
+    /// are open) or while it is pressed, listening or a flag is rising.
+    var lightSymbol: String? {
+        guard (1...5).contains(step) else { return nil }
+        switch orb {
+        case .idle, .open: return speechIsOff ? "keyboard" : "mic"
+        case .holding, .speaking, .finishing: return nil
+        }
+    }
+
     /// The Type it point: an empty one-line field, the orb at rest.
     mutating func startTyping() {
         typing = ""
@@ -222,11 +246,11 @@ extension WalkEvent {
     var leavesAWaitingFlag: Bool {
         switch self {
         case .heard, .listenEnded, .finishExpired, .orbHeld, .orbMoved, .orbUp, .orbCancelled,
-             .noteExpired, .undoExpired, .speechReady, .calendarAnswered:
+             .noteExpired, .undoExpired, .speechReady, .calendarAnswered, .veilTapped:
             return true
         case .orbDown, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point,
              .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,
-             .rowToggled, .walkAnother, .sheetHandle, .goToToday:
+             .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped:
             return false
         }
     }

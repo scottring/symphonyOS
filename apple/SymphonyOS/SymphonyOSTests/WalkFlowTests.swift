@@ -293,13 +293,12 @@ final class WalkFlowTests {
 
     // MARK: Speech refused
 
-    /// With speech refused: a hold opens the field (the first by the listener's refusal,
-    /// later ones at once), and the words go in as the field sends them.
+    /// With speech refused (the first hold opened the field by the listener's refusal): a tap on
+    /// the light opens the field at once, and the words go in as the field sends them.
     private func typeIt(_ m: WalkModel, _ words: String) async {
         m.send(.orbDown)
-        scheduler.advance(WalkOrb.holdMs)
+        m.send(.orbUp(heldMs: 80))
         await scheduler.settle()
-        m.send(.orbUp(heldMs: 900))
         #expect(m.state.typing == "")
         m.send(.typeChanged(words))
         m.send(.typeSubmitted(words))
@@ -396,7 +395,7 @@ final class WalkFlowTests {
         let pieces = ["lift twice a week", "bathroom done by february", "a weekend away each month"]
         for (i, (goal, words)) in zip(goals, pieces).enumerated() {
             #expect(m.state.focus[.season] == goal.id)
-            #expect(WalkCopy.question(m.state, m.periods) == "For “\(goal.title)”, what’s this winter’s piece?")
+            #expect(WalkCopy.question(m.state, m.periods) == "What part of “\(goal.title)” belongs to this winter?")
             await say(m, words)
             if i < goals.count - 1 { m.choose(.next) }
         }
@@ -596,7 +595,7 @@ final class WalkFlowTests {
     }
 
     private func offersCalendar(_ m: WalkModel) -> Bool {
-        WalkCopy.points(m.state).contains { $0.action == .calendar }
+        WalkCopy.points(m.state, m.periods).contains { $0.action == .calendar }
     }
 
     @Test func theCalendarIsOfferedOnceInLightOnly() async throws {

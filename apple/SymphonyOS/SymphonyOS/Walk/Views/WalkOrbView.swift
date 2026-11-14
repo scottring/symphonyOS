@@ -3,9 +3,10 @@ import SwiftUI
 import UIKit
 
 /// The walk's one control, drawn on the stage (contract §7): the 300 × 300 dial
-/// at (45, 528) with its wash, ring, ticks and needle; the breathing light at
-/// (195, 678); the compass points while the light is held or open; and the
-/// flag that rises out of it while speaking. Touches go to the model as stage
+/// around the light with its ring, ticks and needle; the breathing light at
+/// (195, 678) with what holding it does at its centre; the compass points while the
+/// light is held or open (the veil behind them is the scene's); and the flag that rises
+/// out of it while speaking. Touches go to the model as stage
 /// points; the reducer decides what they mean.
 struct WalkOrbView: View {
     let model: WalkModel
@@ -17,7 +18,7 @@ struct WalkOrbView: View {
     @GestureState private var pressing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    static let dial = CGRect(x: 45, y: 528, width: 300, height: 300)
+    static let dial = CGRect(x: WalkOrb.centre.x - 150, y: WalkOrb.centre.y - 150, width: 300, height: 300)
 
     init(model: WalkModel) {
         self.model = model
@@ -25,10 +26,10 @@ struct WalkOrbView: View {
 
     var body: some View {
         let s = model.state
-        let points = WalkCopy.points(s)
+        let points = WalkCopy.points(s, model.periods)
         let showsPoints = s.showsPoints
         ZStack(alignment: .topLeading) {
-            dial(needleDown: model.layout.needleDown, wash: showsPoints)
+            dial(needleDown: model.layout.needleDown)
                 .frame(width: Self.dial.width, height: Self.dial.height)
                 .offset(x: Self.dial.minX, y: Self.dial.minY)
                 .allowsHitTesting(false)
@@ -39,7 +40,7 @@ struct WalkOrbView: View {
                     .allowsHitTesting(false)
             }
 
-            light(active: isActive(s.orb), speaking: isSpeaking(s.orb))
+            light(active: isActive(s.orb), speaking: isSpeaking(s.orb), symbol: s.lightSymbol)
                 .position(WalkOrb.centre)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
@@ -168,16 +169,10 @@ struct WalkOrbView: View {
 
     // MARK: The dial
 
-    /// The wash behind the points, the ring, four ticks and the needle, in dial coordinates (centre 150, 150).
-    private func dial(needleDown: Bool, wash: Bool) -> some View {
+    /// The ring, four ticks and the needle, in dial coordinates (centre 150, 150). The open
+    /// compass has the veil behind it (no pale wash, which white words cannot be read on).
+    private func dial(needleDown: Bool) -> some View {
         ZStack {
-            Circle()
-                .fill(RadialGradient(stops: [.init(color: WalkPalette.washLight.opacity(0.55), location: 0),
-                                             .init(color: WalkPalette.washLight.opacity(0.35), location: 0.45),
-                                             .init(color: WalkPalette.washLight.opacity(0), location: 0.72)],
-                                     center: .center, startRadius: 0, endRadius: 150 * 2.squareRoot()))
-                .opacity(wash ? 1 : 0)
-                .animation(.easeOut(duration: 0.22), value: wash)
             Circle()
                 .stroke(.white.opacity(0.55), lineWidth: 1)
                 .frame(width: 132, height: 132)
@@ -200,7 +195,7 @@ struct WalkOrbView: View {
     /// The halo, the ripples while speaking, the body and its highlight; it breathes
     /// slowly at rest and quickly while held, and grows to 1.1 while held.
     /// With Reduce Motion it holds still at the middle of a breath, with no ripples.
-    private func light(active: Bool, speaking: Bool) -> some View {
+    private func light(active: Bool, speaking: Bool, symbol: String?) -> some View {
         TimelineView(.animation(minimumInterval: nil, paused: reduceMotion)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             let period = active ? 1.1 : 4.5
@@ -219,7 +214,15 @@ struct WalkOrbView: View {
                     ripple(t, delay: 0.8)
                 }
                 orbBody(scale: 1 + 0.05 * breath)
+                // What holding does, at the light's centre: a microphone, or a keyboard once speech is off.
+                if let symbol {
+                    Image(systemName: symbol)
+                        .font(.system(size: 26, weight: .regular))
+                        .foregroundStyle(WalkPalette.ink.opacity(0.38))
+                        .transition(.opacity)
+                }
             }
+            .animation(.easeOut(duration: 0.2), value: symbol)
         }
         .scaleEffect(active ? 1.1 : 1)
         .animation(.easeOut(duration: 0.2), value: active)
@@ -292,41 +295,67 @@ struct WalkNeedle: Shape {
     }
 }
 
-/// One compass point: a glowing disc with its symbol, and its label below; the
-/// pair is centred on the point's place, as the mockup's is. The hovered one grows.
+/// One compass point: a glowing disc with its symbol at the point's place, and its words (the
+/// label, and a second line where there is one) under the disc, or above it for the top point.
+/// The hovered one grows.
 struct WalkPointView: View {
     let point: WalkCopy.Point
     let hot: Bool
     let action: () -> Void
 
     var body: some View {
+        let above = WalkOrb.wordsAbove(point.at)
         Button(action: action) {
-            VStack(spacing: 4) {
-                ZStack {
-                    Circle()
-                        .fill(RadialGradient(stops: [.init(color: .white.opacity(hot ? 1 : 0.92), location: 0),
-                                                     .init(color: WalkPalette.discMid.opacity(hot ? 0.95 : 0.7), location: 0.6),
-                                                     .init(color: WalkPalette.discEdge.opacity(0), location: 1)],
-                                             center: UnitPoint(x: 0.4, y: 0.35), startRadius: 0,
-                                             endRadius: (hot ? 54 : 46) * 0.885))
-                        .shadow(color: WalkPalette.warmGlow.opacity(hot ? 0.95 : 0.6), radius: hot ? 14 : 8)
-                    // The mockup's icons are 20 × 20 boxes of thin strokes; a symbol at 18 fills one alike.
-                    Image(systemName: point.symbol)
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(WalkPalette.ink)
-                }
-                .frame(width: hot ? 54 : 46, height: hot ? 54 : 46)
-                Text(point.label)
-                    .font(.custom("DMSans-SemiBold", size: 12))     // the contract's 700: no Bold face is bundled
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .walkGlow()
+            ZStack {
+                Circle()
+                    .fill(RadialGradient(stops: [.init(color: .white.opacity(hot ? 1 : 0.92), location: 0),
+                                                 .init(color: WalkPalette.discMid.opacity(hot ? 0.95 : 0.7), location: 0.6),
+                                                 .init(color: WalkPalette.discEdge.opacity(0), location: 1)],
+                                         center: UnitPoint(x: 0.4, y: 0.35), startRadius: 0,
+                                         endRadius: (hot ? 54 : 46) * 0.885))
+                    .shadow(color: WalkPalette.warmGlow.opacity(hot ? 0.95 : 0.6), radius: hot ? 14 : 8)
+                // The mockup's icons are 20 × 20 boxes of thin strokes; a symbol at 18 fills one alike.
+                Image(systemName: point.symbol)
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(WalkPalette.ink)
             }
+            .frame(width: hot ? 54 : 46, height: hot ? 54 : 46)
+            .frame(width: WalkOrb.pointDisc, height: WalkOrb.pointDisc)
+            .overlay(alignment: above ? .top : .bottom) {
+                words
+                    .alignmentGuide(above ? .top : .bottom) { d in above ? d[.bottom] + 4 : d[.top] - 4 }
+            }
+            .contentShape(Rectangle())
             .animation(.easeOut(duration: 0.16), value: hot)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(point.label)
+        .walkAccessibilityHint(point.detail)
+    }
+
+    private var words: some View {
+        VStack(spacing: 1) {
+            // The bottom point's words sit between the ring and its disc: one line, narrow enough
+            // to pass between the discs on either side.
+            Text(point.label)
+                .font(.custom("DMSans-SemiBold", size: 12))     // the contract's 700: no Bold face is bundled
+                .foregroundStyle(.white)
+                .lineLimit(point.at == .s ? 1 : 2)
+                .minimumScaleFactor(point.at == .s ? 0.85 : 1)
+                .frame(maxWidth: point.at == .s ? 116 : 120)
+            if let detail = point.detail {
+                // A sentence to a line: "Every part of life." over "About 25 minutes."
+                Text(detail.replacingOccurrences(of: ". ", with: ".\n"))
+                    .font(.custom("DMSans-Regular", size: 12.5))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(3)
+                    .frame(maxWidth: 156)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+        .walkGlow()
+        .frame(width: 156)
     }
 }
 

@@ -93,6 +93,14 @@ struct WalkState: Equatable {
             return []
         case .sheetHandle: return moveSheet()
         case .goToToday: return step == 6 ? end(.finished) : []
+        // The line under the light: exactly what its south point does.
+        case .nextTapped:
+            guard let line = WalkCopy.nextLine(self, env.periods) else { return [] }
+            return respond(to: line.action, env)
+        // A tap on the veil around the open compass closes it; on Welcome the choices stay.
+        case .veilTapped:
+            if orb == .open, step != 0 { orb = .idle }
+            return []
         }
     }
 
@@ -110,6 +118,8 @@ struct WalkState: Equatable {
         case .quick: return choose(.quick)
         case .full: return choose(.full)
         case .notNow: return step == 0 ? end(.left) : []
+        // Leave for now: the walk closes where it is; everything added is already saved.
+        case .leave: return (1...5).contains(step) ? end(.paused) : []
         case .next: return walkOn(env)
         case .back: return backUp(env)
         case .nudge: return nudge()
@@ -348,6 +358,8 @@ enum WalkEvent: Equatable {
     case areaTapped(UUID), bannerTapped(UUID), stubTapped(WalkPostKey), exampleTapped(String)
     case moveTo(UUID), pullUp, undo, undoExpired, noteExpired, calendarAnswered
     case sheetHandle, rowToggled(UUID), walkAnother, goToToday             // rowToggled carries a task id
+    /// A tap on the Next line under the light; a tap on the veil behind the open compass.
+    case nextTapped, veilTapped
 }
 
 enum WalkTimer: Equatable { case hold, undo, note, finish }

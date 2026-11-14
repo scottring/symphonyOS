@@ -1,10 +1,11 @@
 #if os(iOS)
 import SwiftUI
 
-/// The row at the foot of the stage (contract §14, §10): the hint line with the
-/// quiet Undo pill beside it; the Move row while a flag is selected; the one-line
-/// field while typing, the hint (a note) kept as a line above it. While the
-/// keyboard is up the row rises to sit just above it.
+/// The foot of the stage (contract §14, §10), on a scrim of the ground colour: the Next
+/// line under the light, the hint line under it (or, with the compass open, above the
+/// compass), and the quiet Undo pill beside the Next line, each where `WalkLayout` puts
+/// it; the Move row while a flag is selected; the one-line field while typing, the hint
+/// (a note) kept as a line above it. While the keyboard is up the field rises to sit just above it.
 struct WalkHintRow: View {
     let model: WalkModel
     @Environment(\.walkKeyboardLift) private var lift
@@ -15,61 +16,122 @@ struct WalkHintRow: View {
     /// walk first (and closed the field there) cannot lose them.
     @State private var text = ""
 
+    /// The scrim's height at the foot of the stage, and its strongest opacity.
+    static let scrimHeight: CGFloat = 120
+
     init(model: WalkModel) {
         self.model = model
     }
 
     var body: some View {
         let s = model.state
+        let layout = model.layout
         let stage = WalkArt.overlookSquare.stage
-        Group {
+        ZStack(alignment: .topLeading) {
+            LinearGradient(colors: [WalkPalette.ground.opacity(0), WalkPalette.ground.opacity(0.8)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(width: stage.width, height: Self.scrimHeight)
+                .offset(y: stage.height - Self.scrimHeight)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+
             if s.typing != nil {
-                typingRow(hint: WalkCopy.hint(s))
-            } else if s.selected != nil {
-                moveRow(s.moveTargets)
+                bottom(typingRow(hint: WalkCopy.hint(s)))
             } else {
-                hintRow(WalkCopy.hint(s), undo: s.showsUndoPill)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 38)
-        .padding(.horizontal, 10)
-        .padding(.bottom, 8 + lift)
-        .frame(width: stage.width, height: stage.height, alignment: .bottom)
-    }
-
-    // MARK: The hint and Undo
-
-    private func hintRow(_ hint: String, undo: Bool) -> some View {
-        HStack(spacing: 10) {
-            if !hint.isEmpty {
-                hintText(hint)
-            }
-            if undo {
-                Button { model.send(.undo) } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "arrow.uturn.backward")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text(WalkCopy.undo)
-                            .font(.custom("DMSans-SemiBold", size: 13))     // the contract's 700: no Bold face is bundled
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 34)
-                    .background(WalkPillBackground(fill: WalkPalette.navy.opacity(0.6), border: .white.opacity(0.55)))
-                    .contentShape(Capsule())
+                if let frame = layout.nextLine, let line = WalkCopy.nextLine(s, model.periods) {
+                    nextLine(line)
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
                 }
-                .buttonStyle(.plain)
-                .fixedSize()
-                .accessibilityLabel(WalkCopy.undo)
+                if s.selected != nil {
+                    bottom(moveRow(s.moveTargets))
+                } else if let frame = layout.hintLine {
+                    // Above the open compass the line sits on the veil, over the mountain: a soft band of
+                    // the ground colour under it keeps the flags beneath from showing through the words.
+                    if s.showsPoints {
+                        LinearGradient(stops: [.init(color: WalkPalette.ground.opacity(0), location: 0),
+                                               .init(color: WalkPalette.ground.opacity(0.8), location: 0.3),
+                                               .init(color: WalkPalette.ground.opacity(0.8), location: 0.7),
+                                               .init(color: WalkPalette.ground.opacity(0), location: 1)],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(width: stage.width, height: frame.height + 28)
+                            .position(x: stage.width / 2, y: frame.midY)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                    hintText(WalkCopy.hint(s), lines: WalkLayout.hintLines(WalkCopy.hint(s)))
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
+                }
+                if let frame = layout.undoPill {
+                    undoPill
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
+                }
             }
         }
+        .frame(width: stage.width, height: stage.height, alignment: .topLeading)
     }
 
-    private func hintText(_ hint: String) -> some View {
+    /// A row anchored at the foot of the stage, lifted above the keyboard.
+    private func bottom(_ row: some View) -> some View {
+        row
+            .frame(maxWidth: .infinity, minHeight: 38)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 8 + lift)
+            .frame(width: WalkArt.overlookSquare.stage.width, height: WalkArt.overlookSquare.stage.height,
+                   alignment: .bottom)
+    }
+
+    // MARK: The Next line, the hint and Undo
+
+    /// Glowing words and a small chevron, never a button's fill or outline; quieter when it skips.
+    private func nextLine(_ line: WalkCopy.NextLine) -> some View {
+        Button { model.send(.nextTapped) } label: {
+            HStack(spacing: 6) {
+                Text(line.text)
+                    .font(.custom("DMSans-SemiBold", size: 16))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundStyle(.white.opacity(line.skip ? 0.7 : 1))
+            .walkGlow()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(line.text)
+        .accessibilityIdentifier("walk.next")
+    }
+
+    private var undoPill: some View {
+        Button { model.send(.undo) } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 14, weight: .semibold))
+                Text(WalkCopy.undo)
+                    .font(.custom("DMSans-SemiBold", size: 13))     // the contract's 700: no Bold face is bundled
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 34)
+            .background(WalkPillBackground(fill: WalkPalette.navy.opacity(0.6), border: .white.opacity(0.55)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityLabel(WalkCopy.undo)
+    }
+
+    private func hintText(_ hint: String, lines: Int = 2) -> some View {
         Text(hint)
-            .font(.custom("DMSans-SemiBold", size: 13))
+            .font(.custom("DMSans-SemiBold", size: 15))
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
+            .lineLimit(lines)
+            .minimumScaleFactor(0.85)
             .walkGlow()
             .allowsHitTesting(false)
     }

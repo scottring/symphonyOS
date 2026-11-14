@@ -24,21 +24,23 @@ final class WalkUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts[welcome].waitForExistence(timeout: 60), "the walk never opened")
 
+        // Welcome's three choices are already showing.
         let orb = app.buttons["walk.orb"]
-        tap(orb, "the light")
         tap(app.buttons["Quick start"], "Quick start")
-        tap(app.buttons["Health"], "the Health peak")
+        tap(app.buttons["Health"], "the Health area")
+        tap(app.buttons["Next: your goals"], "the Next line")
         tap(orb, "the light")
-        tap(app.buttons["Plant goals"], "Plant goals")
-        tap(orb, "the light")
-        tap(app.buttons["Examples"], "Examples")
+        tap(app.buttons["Show examples"], "Show examples")
         tap(app.buttons["Example: Run a 5K, tap to make it yours"], "the Run a 5K example")
 
-        let planted = app.buttons["Year: Run a 5K, tap to move or pull up"]
+        let planted = app.buttons["Year: Run a 5K, tap to move or remove"]
         XCTAssertTrue(planted.waitForExistence(timeout: 15), "the example was not planted")
         XCTAssertTrue(app.buttons["Undo"].exists, "no Undo after planting")
+        // Once something is added the line under the light names where it goes: "Next: this <season>".
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Next: this ")).firstMatch.exists,
+                      "no Next line once something was added")
         planted.tap()
-        XCTAssertTrue(app.buttons["Pull it up"].waitForExistence(timeout: 15), "selecting the flag offered no Pull it up")
+        XCTAssertTrue(app.buttons["Remove"].waitForExistence(timeout: 15), "selecting the flag offered no Remove")
     }
 
     @MainActor func testAFullHouseholdSeesNoWalkUntilItAsks() throws {
@@ -54,11 +56,44 @@ final class WalkUITests: XCTestCase {
         tap(app.buttons["Walk the mountain again"], "Walk the mountain again")
         XCTAssertTrue(app.staticTexts[welcome].waitForExistence(timeout: 30), "the replay did not open the walk")
 
-        tap(app.buttons["walk.orb"], "the light")
         tap(app.buttons["Not now"], "Not now")
         // XCUITest still lists the app under the walk, so the walk's going is checked too.
         XCTAssertTrue(app.buttons["walk.orb"].waitForNonExistence(timeout: 30), "Not now did not leave the walk")
         XCTAssertTrue(today.waitForExistence(timeout: 30), "Today is not back")
+    }
+
+    /// Leave for now on Year: Today, with the quiet line; the walk does not come back by itself;
+    /// Settings picks it back up on Year, with the flag still there.
+    @MainActor func testLeavingForNowAndPickingItBackUp() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts[welcome].waitForExistence(timeout: 60), "the walk never opened")
+        let orb = app.buttons["walk.orb"]
+        tap(app.buttons["Quick start"], "Quick start")
+        tap(app.buttons["Health"], "the Health area")
+        tap(app.buttons["Next: your goals"], "the Next line")
+        tap(orb, "the light")
+        tap(app.buttons["Show examples"], "Show examples")
+        tap(app.buttons["Example: Run a 5K, tap to make it yours"], "the Run a 5K example")
+        XCTAssertTrue(app.buttons["Year: Run a 5K, tap to move or remove"].waitForExistence(timeout: 15))
+
+        tap(orb, "the light")
+        tap(app.buttons["Leave for now"], "Leave for now")
+        XCTAssertTrue(orb.waitForNonExistence(timeout: 30), "Leave for now did not leave the walk")
+        XCTAssertTrue(app.buttons["Today. Switch horizon"].waitForExistence(timeout: 30), "Today is not back")
+        XCTAssertTrue(app.buttons["Your walk is waiting. Pick it back up."].waitForExistence(timeout: 15),
+                      "no line on Today for the waiting walk")
+        XCTAssertFalse(orb.waitForExistence(timeout: 3), "the walk came back by itself")
+
+        tap(app.buttons["More"], "More")
+        tap(app.buttons["Settings"], "Settings")
+        tap(app.buttons["Pick the walk back up"], "Pick the walk back up")
+        XCTAssertTrue(orb.waitForExistence(timeout: 30), "the walk was not picked back up")
+        XCTAssertTrue(app.staticTexts["What would make the year ahead a good one?"].waitForExistence(timeout: 15),
+                      "not back on Year")
+        XCTAssertTrue(app.buttons["Year: Run a 5K, tap to move or remove"].waitForExistence(timeout: 15),
+                      "the flag planted before leaving is gone")
     }
 }
 #endif

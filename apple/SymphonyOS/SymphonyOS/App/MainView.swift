@@ -164,16 +164,19 @@ struct iOSMainView: View {
             CalendarFeed.shared.edition = nil
             closeWalk()
             appState.walkReplayRequested = false
+            appState.walkResumeRequested = false
         }
         .onChange(of: households.map(\.edition)) { _, _ in applyEdition() }
         .onChange(of: appState.initialSyncFinished) { _, _ in considerWalk() }
         .onChange(of: appState.edition) { _, _ in considerWalk() }
         .onChange(of: appState.walkReplayRequested) { _, _ in considerWalk() }
+        .onChange(of: appState.walkResumeRequested) { _, _ in considerWalk() }
         // Someone else signed in (or nobody is): the walk up, and a replay still
         // waiting, are not theirs.
         .onChange(of: auth.currentUser?.id) { _, _ in
             closeWalk()
             appState.walkReplayRequested = false
+            appState.walkResumeRequested = false
             considerWalk()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
@@ -208,16 +211,18 @@ struct iOSMainView: View {
 
 extension iOSMainView {
     /// Opens the walk when `WalkEntry.decide` says so: by itself for a new person in a
-    /// light household, resumed where it was left, or replayed from Settings. Called on
-    /// appear and whenever the first pull finishes, the edition changes, a replay is asked
-    /// for or someone else signs in; it does nothing while a walk is up, and before the first
+    /// light household, resumed where it was left, replayed from Settings, or picked back up
+    /// after Leave for now (`AppState.resumeWalk()`). Called on appear and whenever the first
+    /// pull finishes, the edition changes, a replay or a resume is asked for or someone else
+    /// signs in; each time it first reads whether a paused walk is waiting (`walkPaused`); it does nothing while a walk is up, and before the first
     /// pull only a resume or a replay may open (`WalkEntry.mayDecide`). It fades in, except
     /// on appear (`animated: false`), where it is there from the start. The households and
     /// goals are counted from the store as it is now, not from a `@Query` that may lag.
     ///
     /// Debug demo: `-SymphonyDemo -SymphonyWalk [-SymphonyWalkStep N] [-SymphonyWalkOrb …]`
     /// opens it once, over an empty in-memory store or over the mockup's preview at step N,
-    /// then drives it into a state for a screenshot. A demo never reads or saves a position.
+    /// then drives it into a state for a screenshot. A demo saves its position only in
+    /// `DemoMode.walkStore`, emptied at launch, so Leave for now can be picked back up within one run.
     private func considerWalk(animated: Bool = true) {
         let userId = auth.currentUser?.id
         #if DEBUG
@@ -227,21 +232,33 @@ extension iOSMainView {
         let demo = false
         let demoWalk = false
         #endif
-        let store: WalkPositionStore? = demo ? nil : WalkPositionStore()
+        #if DEBUG
+        let store: WalkPositionStore? = demo ? DemoMode.walkStore : WalkPositionStore()
+        #else
+        let store: WalkPositionStore? = WalkPositionStore()
+        #endif
         let position = userId.flatMap { store?.load(for: $0) }
+        appState.walkPaused = store?.hasPausedWalk(for: userId) ?? false
         // Oldest first, as sync picks the household whose settings the phone follows.
         let householdRows = (try? modelContext.fetch(FetchDescriptor<Household>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
         let replay = appState.walkReplayRequested
+        let resume = appState.walkResumeRequested
         guard WalkEntry.mayDecide(walkUp: walk != nil, signedIn: auth.isAuthenticated && userId != nil,
                                   initialSyncFinished: appState.initialSyncFinished, position: position,
-                                  replay: replay, householdEditions: householdRows.map(\.edition)),
+                                  replay: replay, resume: resume, householdEditions: householdRows.map(\.edition)),
               let userId else { return }
         if replay { appState.walkReplayRequested = false }
+        if resume { appState.walkResumeRequested = false }
         let goalCount = (try? modelContext.fetchCount(FetchDescriptor<Goal>())) ?? 0
-        let entry = WalkEntry.decide(replay: replay, demoWalk: demoWalk, position: position,
+        let entry = WalkEntry.decide(replay: replay, resume: resume, demoWalk: demoWalk, position: position,
                                      householdEditions: householdRows.map(\.edition),
                                      initialSyncFinished: appState.initialSyncFinished, goalCount: goalCount)
         guard entry != .none else { return }
+        // Walking the mountain again over a paused walk starts from the top and clears the pause.
+        if WalkEntry.clearsPause(entry, position: position) {
+            store?.forget(for: userId)
+            appState.walkPaused = false
+        }
         let opening: (entry: WalkEntry, position: WalkPosition?, listener: WalkListening?)
         #if DEBUG
         if demoWalk {
@@ -262,19 +279,22 @@ extension iOSMainView {
                               store: store, listener: opening.listener)
         model.onEnd = { _ in
             closeWalk()
+            // Leave for now: Today, with the walk waiting to be picked up.
+            appState.walkPaused = store?.hasPausedWalk(for: userId) ?? false
             appState.activeTab = .planner
             appState.horizon = .today
             appState.goToToday()
         }
-        #if DEBUG
-        if demoWalk { DemoMode.showWalk(model, DemoMode.walkOrb) }
-        #endif
         // Never under a sheet or behind a keyboard: whatever field has the keyboard lets it
         // go, and the dock's capture sheet closes. (Today's own Tell and Add sheets, and the
         // half-open display's Tell sheet, are kept by those views and can still sit above it.)
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         showCapture = false
         withAnimation(animated ? walkFade : nil) { walk = model }
+        #if DEBUG
+        // Driven once it is up, so a step that ends the walk (`leave`) takes it down as a person's would.
+        if demoWalk { DemoMode.showWalk(model, DemoMode.walkOrb) }
+        #endif
     }
 
     private var walkFade: Animation { .easeInOut(duration: reduceMotion ? 0.15 : 0.4) }

@@ -6,7 +6,7 @@ enum WalkCopy {
     static let shortLength = 40
     static let wordmark = "Symphony"
     static let welcomeTitle = "Let’s start up high and walk down to today."
-    static let welcomeSub = "Plant a flag for what matters, then follow it down."
+    static let welcomeSub = "Name what matters this year, then follow it down to what you’ll do today."
 
     // MARK: Questions
 
@@ -37,10 +37,10 @@ enum WalkCopy {
             if let area = s.area(s.focusArea) { return "What about \(phrase(for: area.name)), this year?" }
             return "What would make the year ahead a good one?"
         case .season:
-            if let t = parent { return "For “\(short(t.title))”, what’s this \(p.seasonWord)’s piece?" }
+            if let t = parent { return "What part of “\(short(t.title))” belongs to this \(p.seasonWord)?" }
             return "And this \(p.seasonWord)? What’s it about?"
         case .month:
-            if let t = parent { return "For “\(short(t.title))”, what’s \(p.monthName)’s piece?" }
+            if let t = parent { return "What part of “\(short(t.title))” belongs to \(p.monthName)?" }
             return p.monthIsCurrent ? "What’s one thing for the rest of \(p.monthName)?" : "What’s one thing for \(p.monthName)?"
         case .week:
             if let t = parent { return "For “\(short(t.title))”, what happens this week?" }
@@ -54,7 +54,7 @@ enum WalkCopy {
     static func why(_ s: WalkState, _ p: WalkPeriods) -> String {
         if s.step == 0 { return welcomeSub }
         guard let level = s.level else { return "" }
-        if level == .year, s.ground { return "Tap the peaks to keep them. Hold the light to name your own." }
+        if level == .year, s.ground { return groundWhy }
         var line: String
         switch level {
         case .year: return "Something that would feel true twelve months from now. Big or small."
@@ -65,75 +65,138 @@ enum WalkCopy {
         }
         if let above = WalkLevel(rawValue: level.rawValue - 1),
            !s.items(on: above).isEmpty, s.focus[level] == nil {
-            line += " Tap one of your flags to focus on it."
+            line += focusAbove
         }
         return line
     }
 
+    /// The line at the foot of the stage: the two things a person can do, said plainly
+    /// (hold the light to speak, tap it for other choices), or what to do now.
     static func hint(_ s: WalkState) -> String {
-        // Blank while the points show (the mockup): the bottom point's label sits on this line.
-        // A note gives way too, and is back once they close if it has not run out.
-        if s.showsPoints { return "" }
-        if case .finishing = s.orb { return "" }      // waiting for the last words after letting go
+        if s.step == 0 { return hintChoose }                // Welcome: the choices are always open
+        if s.orb == .open { return hintOpen }
+        if case .holding = s.orb { return "" }              // a press on its way to speaking, or a slide
+        if case .finishing = s.orb { return "" }            // waiting for the last words after letting go
         if let note = s.note { return note }
-        if s.typing != nil { return "" }
-        if case .speaking = s.orb { return "Let go to plant it" }
-        if s.step == 0 { return "Hold the light to begin" }
-        if s.ground { return "Tap the peaks that matter" }
+        if s.typing != nil { return "" }                    // the field carries its own placeholder
+        if case .speaking = s.orb { return hintSpeaking }
+        if s.ground { return hintGround }
         guard let level = s.level else { return "" }
         if level == .today {
-            if let focused = s.focus[.today], focused != s.firstThing {
-                return "Slide down to start there · hold to say something else"
-            }
-            if s.firstThing != nil { return "That’s your first thing · slide down to walk on" }
+            if let focused = s.focus[.today], focused != s.firstThing { return hintStartHere }
+            if s.firstThing != nil { return hintFirstThing }
         } else if !s.items(on: level).isEmpty {
-            return "Hold to plant another · slide down to walk on"
+            return s.speechIsOff ? hintSpeechOff : hintAnother
         }
-        return "Hold the light and speak · slide to its edge for more"
+        return s.speechIsOff ? hintSpeechOff : hintFirst
+    }
+
+    static let hintChoose = "Choose how to start"
+    static let hintOpen = "Tap one, or tap the light to close"
+    static let hintFirst = "Hold the light and say it. Tap the light for other choices."
+    static let hintAnother = "Hold to add another. Tap Next when you’re done."
+    static let hintGround = "Tap the ones that matter, then tap Next."
+    static let hintStartHere = "Tap Next to start with this one, or hold and say something else."
+    static let hintFirstThing = "That’s your first thing. Tap Finish."
+    static let hintSpeaking = "Let go when you’ve said it"
+    /// Speech is off for this walk: a tap types, a hold opens the other choices.
+    static let hintSpeechOff = "Tap the light to type it. Hold it for other choices."
+
+    /// The line under the light that moves the walk on: the south point's words and action,
+    /// shown whenever the light is at rest and nothing is being typed. `skip` when nothing has
+    /// been added on this step yet (drawn quieter).
+    struct NextLine: Equatable { let text: String; let action: WalkAction; let skip: Bool }
+
+    static func nextLine(_ s: WalkState, _ p: WalkPeriods) -> NextLine? {
+        guard s.showsNextLine, let ahead = forward(s, p) else { return nil }
+        return NextLine(text: ahead.label, action: ahead.action, skip: ahead.label == skipStep)
+    }
+
+    static let skipStep = "Skip this step"; static let finish = "Finish"; static let startWithThis = "Start with this one"
+    static func next(_ place: String) -> String { "Next: \(place)" }
+
+    /// Where moving on goes, in words, and the action that does it (the south point).
+    private static func forward(_ s: WalkState, _ p: WalkPeriods) -> (label: String, action: WalkAction)? {
+        guard let level = s.level else { return nil }
+        if s.ground { return (s.kept.isEmpty ? skipStep : next("your goals"), .next) }
+        if level == .today, let focused = s.focus[.today], focused != s.firstThing { return (startWithThis, .startThere) }
+        let added = level == .today ? s.firstThing != nil : !s.items(on: level).isEmpty
+        guard added else { return (skipStep, .next) }
+        // A whole-year walk goes area by area on Year, and goal by goal on Season, before it moves down.
+        if let stop = s.tour.first {
+            if level == .year, let area = s.area(stop) { return (next(area.name), .next) }
+            if s.item(stop) != nil { return (next("your next goal"), .next) }
+        }
+        switch level {
+        case .year: return (next("this \(p.seasonWord)"), .next)
+        case .season: return (next(p.monthName), .next)
+        case .month: return (next("this week"), .next)
+        case .week: return (next("today"), .next)
+        case .today: return (finish, .next)
+        }
+    }
+
+    /// Where backing up goes, in words (the north point).
+    private static func back(_ s: WalkState, _ p: WalkPeriods) -> String {
+        if s.ground { return "Back to the start" }
+        switch s.level {
+        case .year?: return "Back to your areas"
+        case .season?: return "Back to the year"
+        case .month?: return "Back to this \(p.seasonWord)"
+        case .week?: return "Back to \(p.monthName)"
+        case .today?: return "Back to this week"
+        case nil: return ""
+        }
     }
 
     // MARK: The compass
 
-    struct Point: Equatable { let at: CompassPoint; let label: String; let action: WalkAction; let symbol: String }
+    /// One compass point. `detail` is a second line under the label (Welcome's choices, Leave for now).
+    struct Point: Equatable {
+        let at: CompassPoint; let label: String; let action: WalkAction; let symbol: String; let detail: String?
+        init(at: CompassPoint, label: String, action: WalkAction, symbol: String, detail: String? = nil) {
+            self.at = at; self.label = label; self.action = action; self.symbol = symbol; self.detail = detail
+        }
+    }
 
-    static func points(_ s: WalkState) -> [Point] {
+    static let quickStart = "Quick start", quickDetail = "One goal, down to today. About 3 minutes."
+    static let wholeYear = "Plan my whole year", wholeDetail = "Every part of life. About 25 minutes."
+    static let notNow = "Not now", notNowDetail = "Go straight to Today."
+    static let leaveForNow = "Leave for now", leaveDetail = "Your place is kept."
+
+    /// Each point names what it does or where it goes. Welcome's three sit left, right and
+    /// above the light, with room under each for its second line.
+    static func points(_ s: WalkState, _ p: WalkPeriods) -> [Point] {
         var out: [Point] = []
         if s.step == 0 {
             return [
-                Point(at: .s, label: "Quick start", action: .quick, symbol: "figure.walk"),
-                Point(at: .e, label: "Plan my whole year", action: .full, symbol: "mountain.2"),
-                Point(at: .n, label: "Not now", action: .notNow, symbol: "xmark"),
+                Point(at: .w, label: quickStart, action: .quick, symbol: "figure.walk", detail: quickDetail),
+                Point(at: .e, label: wholeYear, action: .full, symbol: "mountain.2", detail: wholeDetail),
+                Point(at: .n, label: notNow, action: .notNow, symbol: "xmark", detail: notNowDetail),
             ].sorted { order($0.at) < order($1.at) }
         }
-        guard let level = s.level else { return [] }
+        guard let level = s.level, let ahead = forward(s, p) else { return [] }
+        out.append(Point(at: .n, label: back(s, p), action: .back, symbol: "arrow.up"))
+        out.append(Point(at: .s, label: ahead.label, action: ahead.action, symbol: "arrow.down"))
         if s.ground {
-            out = [
-                Point(at: .n, label: "Start", action: .back, symbol: "arrow.up"),
-                Point(at: .s, label: s.kept.isEmpty ? "Skip" : "Plant goals", action: .next, symbol: "arrow.down"),
-                Point(at: .w, label: "Name your own", action: .type, symbol: "keyboard"),
-            ]
+            out.append(Point(at: .w, label: "Type your own", action: .type, symbol: "keyboard"))
         } else {
-            out.append(Point(at: .n, label: level == .year ? "Start" : "Back up", action: .back, symbol: "arrow.up"))
-            out.append(Point(at: .ne, label: "Nudge me", action: .nudge, symbol: "sparkle"))
+            out.append(Point(at: .ne, label: level == .year ? "Ask about another area" : "Ask about another goal",
+                             action: .nudge, symbol: "arrow.triangle.2.circlepath"))
             if level == .today {
                 if s.calendarOffer {
-                    out.append(Point(at: .e, label: "Calendar", action: .calendar, symbol: "calendar"))
+                    out.append(Point(at: .e, label: "Show my calendar on Today", action: .calendar, symbol: "calendar"))
                 }
             } else {
-                out.append(Point(at: .e, label: s.examplesOn.contains(s.step) ? "Hide examples" : "Examples",
+                out.append(Point(at: .e, label: s.examplesOn.contains(s.step) ? "Hide examples" : "Show examples",
                                  action: .examples, symbol: "flag"))
-            }
-            if level == .today, let focused = s.focus[.today], focused != s.firstThing {
-                out.append(Point(at: .s, label: "Start there", action: .startThere, symbol: "arrow.down"))
-            } else {
-                let planted = level == .today ? s.firstThing != nil : !s.items(on: level).isEmpty
-                out.append(Point(at: .s, label: planted ? "Walk on" : "Skip", action: .next, symbol: "arrow.down"))
             }
             out.append(Point(at: .w, label: "Type it", action: .type, symbol: "keyboard"))
         }
         if !s.undo.isEmpty {
-            out.append(Point(at: .nw, label: "Undo", action: .undo, symbol: "arrow.uturn.backward"))
+            out.append(Point(at: .nw, label: undo, action: .undo, symbol: "arrow.uturn.backward"))
         }
+        out.append(Point(at: .se, label: leaveForNow, action: .leave, symbol: "pause", detail: leaveDetail))
         return out.sorted { order($0.at) < order($1.at) }
     }
 
@@ -170,31 +233,42 @@ enum WalkCopy {
     // MARK: Notes
 
     static func placed(_ areaName: String) -> String {
-        "That sounded like \(phrase(for: areaName)), so it went on the \(areaName) peak."
+        "That sounded like \(phrase(for: areaName)), so it went under \(areaName)."
     }
-    static let nothingToPlant = "Nothing to plant yet. Hold and speak, or slide left to type."
+    static let nothingToPlant = "Nothing added yet. Hold the light and say it, or tap it and choose Type it."
     static let speechOff = "Speaking isn’t available here, so type it."
     /// A second hold in a row that heard nothing.
     static let nothingHeard = "Nothing came through. Type it here."
     /// The permission prompts took the touch and speech was allowed.
     static let speakNow = "Now hold the light and speak."
-    static let ridgeFull = "The ridge is full. Tap a peak to let one go first."
+    static let ridgeFull = "That’s as many as fit. Tap one to let it go first."
     static let calendarLine = "See your calendar on Today too"
 
     // MARK: Hint row and banners
 
-    static let undo = "Undo"; static let moveTo = "Move to"; static let pullUp = "Pull it up"
+    static let undo = "Undo"; static let moveTo = "Move to"; static let pullUp = "Remove"
     static let typePlaceholder = "Type it, then return"; static let firstThingTag = "FIRST THING"
-    /// How many flags a stub, or a banner on Look back up, stands for.
-    static func more(_ count: Int) -> String { "+\(count)" }
+    /// How many more flags a banner on Look back up stands for: "+2 more".
+    static func more(_ count: Int) -> String { "+\(count) more" }
+    /// What a folded stub says: the 26-point pennant has room for the count only ("+2").
+    static func stubCount(_ count: Int) -> String { "+\(count)" }
+    /// An example flag's tag, and the shorter one where the flag is too narrow for it.
+    static let exampleTag = "EXAMPLE · TAP TO USE", exampleTagShort = "TAP TO USE"
+    /// The banner width the long tag needs (8.5 pt, by estimate, inside the cloth's padding).
+    static let exampleTagRoom: CGFloat = 116
+    static func exampleTag(forWidth width: CGFloat) -> String { width >= exampleTagRoom ? exampleTag : exampleTagShort }
+    /// The ground's own words while speaking and in the why line.
+    static let groundWhy = "Tap the ones that matter to you. To add your own, hold the light and say it."
+    /// Added to a step's why line while a parent one level up may still be chosen.
+    static let focusAbove = " Tap one above to focus on it."
 
     // MARK: The ending
 
     static let lookBack = "Look back up: that’s your plan."; static let heresToday = "Here’s today."
-    static let showMyDay = "Show my day"; static let lookBackHandle = "Look back up at your plan"
-    static let todayEyebrow = "Today"; static let walkAnother = "Walk another one down"; static let goToToday = "Go to Today"
+    static let showMyDay = "Show my day"; static let lookBackHandle = "See my whole plan"
+    static let todayEyebrow = "Today"; static let walkAnother = "Plan another goal down to today"; static let goToToday = "Go to Today"
     static let thatsTheDay = "That’s the day."; static let nothingToday = "Nothing planted for today yet."
-    static func nextFlag(_ name: String) -> String { "Next flag: \(name)" }
+    static func nextFlag(_ name: String) -> String { "Next: \(name)" }
     static func forGoal(_ name: String) -> String { "for \(name)" }
     static func nextEvent(_ time: String) -> String { "Next · \(time)" }
     static func ringLabel(done: Int, total: Int) -> String { "\(done) of \(total) done" }
@@ -208,7 +282,11 @@ enum WalkCopy {
     // MARK: Settings
 
     static let replayButton = "Walk the mountain again"
-    static let replayFooter = "Start at the top and walk down to today. What you already planned stays. To stop part-way, back up to the start and choose Not now."
+    static let replayFooter = "Start at the top and walk down to today. What you already planned stays. To stop part-way, tap the light and choose Leave for now."
+    /// Shown above `replayButton` while a walk left with Leave for now is waiting.
+    static let resumeButton = "Pick the walk back up"
+    /// The one quiet line on the light edition's Today while a walk is waiting.
+    static let walkWaiting = "Your walk is waiting. Pick it back up."
 
     // MARK: VoiceOver
 
@@ -230,7 +308,7 @@ enum WalkCopy {
         return nil
     }
 
-    static let orbLabelWelcome = "Hold to begin"; static let orbLabel = "Hold and speak to plant a flag; tap for more"
+    static let orbLabelWelcome = "Choose how to start"; static let orbLabel = "Hold and speak to add a goal. Double tap for other choices."
     static let rowDone = "Done"; static let rowOpen = "Not done"
 
     static func levelName(_ level: WalkLevel) -> String {
@@ -261,12 +339,12 @@ enum WalkCopy {
         let head = "\(levelName(level)): \(text)"
         let withTag = tag.map { "\(head), \($0.lowercased().capitalized)" } ?? head
         switch role {
-        case .mine: return "\(withTag), tap to move or pull up"
+        case .mine: return "\(withTag), tap to move or remove"
         case .plain: return withTag
         case .focusable: return "\(withTag), tap to focus"
         case .focused: return "\(withTag), focused, tap to let go"
         case .firstThing: return "Today: \(text), first thing"
-        case .firstThingMine: return "Today: \(text), first thing, tap to pull up"   // planted by the walk
+        case .firstThingMine: return "Today: \(text), first thing, tap to remove"   // planted by the walk
         case .firstThingFocusable: return "Today: \(text), first thing, tap to focus"
         case .firstThingFocused: return "Today: \(text), first thing, focused, tap to let go"
         case .example: return "Example: \(text), tap to make it yours"

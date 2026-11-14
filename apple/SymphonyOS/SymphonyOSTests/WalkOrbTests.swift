@@ -237,6 +237,112 @@ struct WalkOrbTests {
         #expect(t.step == 1 && t.orb == .open)
     }
 
+    /// Welcome opens with its three choices showing (no "hold to begin"), behind them the veil;
+    /// a tap on one chooses it, the light at rest or not, and a tap on the light or the veil keeps them.
+    @Test func welcomeStartsWithItsPointsShowing() {
+        let welcome = WalkState()
+        #expect(welcome.showsPoints && welcome.showsVeil)
+        #expect(WalkCopy.hint(welcome) == WalkCopy.hintChoose)
+        #expect(welcome.lightSymbol == nil)
+        var s = welcome
+        _ = s.apply(.point(.w), env)
+        #expect(s.step == 1 && s.ground && s.depth == .quick)
+        var t = welcome
+        _ = t.apply(.orbDown, env); _ = t.apply(.orbUp(heldMs: 100), env)
+        _ = t.apply(.orbDown, env); _ = t.apply(.orbUp(heldMs: 100), env)
+        #expect(t.showsPoints)
+        _ = t.apply(.veilTapped, env)
+        #expect(t.showsPoints)
+        _ = t.apply(.point(.e), env)
+        #expect(t.step == 1 && t.depth == .full)
+    }
+
+    /// The Next line does exactly what the south point does, in every state where either shows.
+    @Test func theNextLineIsTheSouthPoint() throws {
+        let health = WalkArea(id: UUID(), name: "Health"), home = WalkArea(id: UUID(), name: "Home")
+        let goal = WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: health.id)
+        let week = WalkItem(id: UUID(), level: .week, title: "Gym", areaId: health.id)
+        var states: [WalkState] = []
+        for step in 1...5 {
+            var s = WalkState()
+            s.areas = [health, home]; s.kept = [health.id, home.id]; s.step = step
+            states.append(s)
+            s.items = [goal, week] + (step > 1 && step < 5 ? [WalkItem(id: UUID(), level: WalkLevel(rawValue: step)!, title: "x")] : [])
+            if step == 5 { s.firstThing = week.id }
+            states.append(s)
+            if step == 5 { s.firstThing = nil; s.focus[.today] = week.id; states.append(s) }
+            s.undo = [.plant(goal.id)]; states.append(s)
+        }
+        var ground = WalkState(); ground.areas = [health, home]; ground.step = 1; ground.ground = true
+        states.append(ground); ground.kept = [health.id]; states.append(ground)
+        var tour = WalkState(); tour.areas = [health, home]; tour.kept = [health.id, home.id]; tour.step = 1
+        tour.depth = .full; tour.items = [goal]; tour.focusArea = health.id; tour.tour = [home.id]
+        states.append(tour)
+        for s in states {
+            let line = try #require(WalkCopy.nextLine(s, env.periods))
+            let south = try #require(WalkCopy.points(s, env.periods).first { $0.at == .s })
+            #expect(line.text == south.label && line.action == south.action)
+            var byLine = s
+            var byPoint = s
+            byPoint.orb = .open
+            let lineEffects = byLine.apply(.nextTapped, env)
+            let pointEffects = byPoint.apply(.point(.s), env)
+            #expect(byLine == byPoint, "step \(s.step) ground \(s.ground)")
+            #expect(lineEffects == pointEffects, "step \(s.step) ground \(s.ground)")
+        }
+        // Where the line is not shown (the compass open, typing), a stray tap does nothing.
+        var open = states[1]; open.orb = .open
+        #expect(open.apply(.nextTapped, env) == [] && open.step == states[1].step)
+    }
+
+    /// With the compass open, a tap on the veil closes it and changes nothing else.
+    @Test func aTapOnTheVeilClosesTheCompass() {
+        var s = state(step: 2, planted: true)
+        s.undo = [.plant(UUID())]; s.undoShowing = true; s.note = "A note"
+        s.orb = .open
+        var expected = s
+        expected.orb = .idle
+        #expect(s.apply(.veilTapped, env) == [])
+        #expect(s == expected)
+        // Closed already: nothing.
+        #expect(s.apply(.veilTapped, env) == [] && s == expected)
+    }
+
+    /// Leave for now, on every step after Welcome: the walk ends, paused where it is; nothing
+    /// is written (the position is saved by the end). Not on Welcome or Look back up.
+    @Test func leaveForNowEndsTheWalkPaused() {
+        var ground = state(step: 1); ground.ground = true
+        for var s in [ground] + (1...5).map({ state(step: $0, planted: true) }) {
+            #expect(WalkCopy.points(s, env.periods).contains {
+                $0.at == .se && $0.action == .leave && $0.label == WalkCopy.leaveForNow && $0.detail == WalkCopy.leaveDetail
+            })
+            let step = s.step
+            s.orb = .open
+            #expect(s.apply(.point(.se), env) == [.timer(.finish, ms: nil), .end(.paused)])
+            #expect(s.ended && s.step == step && s.orb == .idle)
+        }
+        for step in [0, 6] {
+            var s = state(step: step)
+            #expect(s.act(.leave, env) == [])
+            #expect(!s.ended)
+        }
+    }
+
+    /// What the light carries: a microphone at rest, a keyboard once speech is off, nothing on
+    /// Welcome or while it is pressed, listening or waiting for the last words.
+    @Test func theLightShowsWhatHoldingDoes() {
+        var s = state(step: 2)
+        #expect(s.lightSymbol == "mic")
+        s.orb = .open; #expect(s.lightSymbol == "mic")
+        for orb: WalkState.Orb in [.holding(hover: nil), .speaking(live: "x"), .finishing(live: "x")] {
+            s.orb = orb; #expect(s.lightSymbol == nil)
+        }
+        s.orb = .idle; s.speechIsOff = true
+        #expect(s.lightSymbol == "keyboard")
+        #expect(WalkState().lightSymbol == nil)
+        #expect(state(step: 6).lightSymbol == nil)
+    }
+
     @Test func onWelcomeAHoldKeepsThePointsOpen() {
         var s = WalkState()
         let down = s.apply(.orbDown, env)
@@ -437,20 +543,32 @@ struct WalkOrbTests {
         #expect(s.items.map(\.title) == ["Feel strong", "Run a 5K"])
     }
 
-    @Test func onceSpeechIsOffAHoldOpensTypingStraightAway() {
+    /// Once speech is off for this walk the light shows a keyboard: a tap opens typing at
+    /// once, and a hold (which cannot listen) opens the other choices and leaves them open.
+    @Test func onceSpeechIsOffATapTypesAndAHoldOpensTheChoices() {
         var s = state(step: 1)
         speak(&s)
         _ = s.apply(.speechUnavailable, env)
         #expect(s.speechIsOff)
         _ = s.apply(.orbUp(heldMs: 900), env)
         _ = s.apply(.typeDismissed, env); _ = s.apply(.noteExpired, env)
+        #expect(s.lightSymbol == "keyboard")
+        // A tap: the field at once, no points.
+        _ = s.apply(.orbDown, env)
+        let tap = s.apply(.orbUp(heldMs: 100), env)
+        #expect(tap == [.timer(.hold, ms: nil)])
+        #expect(s.typing == "" && s.orb == .idle && !s.showsPoints)
+        _ = s.apply(.typeDismissed, env)
+        // A hold: never listens, no flag; the points show and stay open after letting go.
         _ = s.apply(.orbDown, env)
         let held = s.apply(.orbHeld, env)
-        #expect(!held.contains(.listen(true)))
-        #expect(!held.contains(.sound(.unfurl, afterMs: 280)))
-        #expect(s.orb == .idle && s.typing == "" && s.note == WalkCopy.speechOff)
+        #expect(held.isEmpty)
+        #expect(s.orb == .holding(hover: nil) && s.typing == nil && s.showsPoints)
         _ = s.apply(.orbUp(heldMs: 900), env)
-        #expect(s.typing == "" && s.orb == .idle)
+        #expect(s.orb == .open && s.typing == nil)
+        // A tap with the points open closes them, as with speech on.
+        _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 100), env)
+        #expect(s.orb == .idle && s.typing == nil)
     }
 
     /// Speech works here; it just heard nothing that time, so the line says so (not `speechOff`).
@@ -518,10 +636,11 @@ struct WalkOrbTests {
             var t = ended
             let items = t.items
             for event: WalkEvent in [.finishExpired, .listenEnded, .orbDown, .orbHeld, .orbUp(heldMs: 900),
-                                     .typeSubmitted("feel strong again"), .sheetHandle, .walkAnother, .goToToday, .undo, .calendarAnswered] {
+                                     .typeSubmitted("feel strong again"), .sheetHandle, .walkAnother, .goToToday, .undo, .calendarAnswered,
+                                     .nextTapped, .veilTapped] {
                 #expect(t.apply(event, env) == [])
             }
-            for action: WalkAction in [.next, .back, .quick, .notNow, .undo, .calendar] {
+            for action: WalkAction in [.next, .back, .quick, .notNow, .undo, .calendar, .leave] {
                 #expect(t.act(action, env) == [])
             }
             #expect(t.items == items)

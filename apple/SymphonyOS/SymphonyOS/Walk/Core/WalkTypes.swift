@@ -6,7 +6,8 @@ enum WalkLevel: Int, Codable, CaseIterable { case year = 1, season, month, week,
 
 enum WalkDepth: String, Codable { case quick, full }
 
-enum WalkStatus: String, Codable { case inProgress, finished, left }
+/// `left`: Not now on Welcome. `paused`: Leave for now part-way; never reopened by itself, picked up from Settings or Today.
+enum WalkStatus: String, Codable { case inProgress, finished, left, paused }
 
 struct WalkArea: Codable, Equatable, Identifiable {
     let id: UUID
@@ -49,7 +50,7 @@ enum CompassPoint: String, CaseIterable {
 }
 
 enum WalkAction: Equatable {
-    case quick, full, notNow, back, next, type, examples, nudge, undo, calendar, startThere
+    case quick, full, notNow, back, next, type, examples, nudge, undo, calendar, startThere, leave
 }
 
 enum WalkSoundName: String, CaseIterable { case bag, poles, unfurl, plant, tick }

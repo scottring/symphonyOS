@@ -121,6 +121,8 @@ extension Dictation: WalkListening {}
         self.calendarEvents = calendarEvents
         self.clock = clock
         readEnding()
+        // Picked back up after Leave for now: no longer paused, so from here on it resumes as any walk in progress.
+        if resuming?.status == .paused { save(.inProgress) }
     }
 
     private var env: WalkEnv { WalkEnv(periods: periods, now: now, canAskCalendar: canAskCalendar) }

@@ -9,7 +9,6 @@ enum WalkPalette {
     static let ground = Color(hex: 0x00106E)
     static let gold = Color(hex: 0xF6DFA6)
     static let ink = Color(hex: 0x1F2A2B)
-    static let ghostTag = Color(hex: 0x3F4B49)
     static let navy = Color(red: 0 / 255, green: 22 / 255, blue: 96 / 255)
     static let navyBand = Color(red: 0 / 255, green: 18 / 255, blue: 96 / 255)
     static let glowShadow = Color(red: 0 / 255, green: 14 / 255, blue: 70 / 255)
@@ -177,28 +176,32 @@ struct WalkBannerView: View {
         .walkBannerShadow(glows: banner.glows)
     }
 
+    /// An example: pale cloth, ink words, and a small tag that says what it is and what a tap does
+    /// ("EXAMPLE · TAP TO USE", or "TAP TO USE" where the flag is narrow). The tag fits inside the
+    /// frame the layout gives (a shallower notch makes the room), so examples take no more space.
     private var ghost: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 0) {
             Text(banner.text)
                 .font(.custom("DMSans-SemiBold", size: 13).italic())
                 .foregroundStyle(WalkPalette.ink)
                 .lineLimit(banner.lines)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
-            if let tag = banner.tag {
-                Text(tag)
-                    .font(.custom("DMSans-SemiBold", size: 10))
-                    .tracking(0.8)
-                    .foregroundStyle(WalkPalette.ghostTag)
-                    .lineLimit(1)
-            }
+            Text(WalkCopy.exampleTag(forWidth: banner.frame.width))
+                .font(.custom("DMSans-SemiBold", size: 8.5))
+                .tracking(0.3)
+                .foregroundStyle(WalkPalette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(height: 10)
         }
         .multilineTextAlignment(.center)
-        .padding(EdgeInsets(top: 6, leading: 8, bottom: 13, trailing: 8))
+        .padding(EdgeInsets(top: 3, leading: 8, bottom: 6, trailing: 8))
         .frame(width: banner.frame.width, height: banner.frame.height, alignment: .top)
         .background {
-            WalkNotchedCloth(notch: 8).fill(.white.opacity(0.62))
-            WalkNotchedCloth(notch: 8).inset(by: 3)
+            // Opaque enough that the ink words read at 4.5:1 or better over any backdrop.
+            WalkNotchedCloth(notch: 4).fill(.white.opacity(0.72))
+            WalkNotchedCloth(notch: 4).inset(by: 3)
                 .stroke(.white.opacity(0.95), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
         }
         .walkBannerShadow(glows: false)
@@ -332,15 +335,21 @@ struct WalkLabelView: View {
         VStack(spacing: 0) {
             WalkPennant()
                 .rotation(.degrees(-90))
-                .fill(label.kept || label.focused ? WalkPalette.gold : .white.opacity(0.85))
+                .fill(label.kept || label.focused ? WalkPalette.gold : .white)
                 .frame(width: 7, height: 10)
                 .frame(width: 10, height: 7)
-            Text(label.name.uppercased())
-                .font(.custom("DMSans-SemiBold", size: 11))
-                .tracking(1.1)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .foregroundStyle(label.focused ? WalkPalette.ink : (label.kept ? WalkPalette.gold : .white))
+            HStack(spacing: 3) {
+                if let mark {
+                    Image(systemName: mark)
+                        .font(.system(size: 9, weight: .bold))
+                }
+                Text(label.name.uppercased())
+                    .font(.custom("DMSans-SemiBold", size: 11))
+                    .tracking(1.1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+                .foregroundStyle(ink)
                 .padding(.horizontal, 9)
                 .frame(height: 23)
                 .frame(maxWidth: label.frame.width / unit)
@@ -357,14 +366,30 @@ struct WalkLabelView: View {
 
     @ViewBuilder private var pill: some View {
         let shape = Capsule()
-        if label.focused {
+        if label.focused || (label.ground && label.kept) {
             shape.fill(WalkPalette.gold)
         } else if label.kept {
             shape.fill(WalkPalette.navy.opacity(0.72))
                 .overlay(shape.strokeBorder(WalkPalette.gold, lineWidth: 1.5))
+        } else if label.ground {
+            // A choice not yet made: full contrast, outlined, with a plus.
+            shape.fill(WalkPalette.navy.opacity(0.85))
+                .overlay(shape.strokeBorder(.white, lineWidth: 1.5))
         } else {
             shape.fill(WalkPalette.navy.opacity(0.55))
         }
+    }
+
+    /// On the ground: a plus on an area not yet kept, a checkmark on a kept one.
+    private var mark: String? {
+        guard label.ground else { return nil }
+        return label.kept ? "checkmark" : "plus"
+    }
+
+    private var ink: Color {
+        if label.focused || (label.ground && label.kept) { return WalkPalette.ink }
+        if label.ground { return .white }
+        return label.kept ? WalkPalette.gold : .white
     }
 }
 #endif

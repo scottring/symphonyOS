@@ -125,12 +125,28 @@ final class AppState {
     /// asks). The main view starts the walk once the first pull has finished,
     /// and sets this back to false.
     var walkReplayRequested = false
+    /// The signed-in person left a walk with Leave for now and it is waiting to be picked up:
+    /// read from their saved place (`WalkPositionStore.hasPausedWalk`) by the main view each
+    /// time it decides about the walk and when a walk ends. While it is true Settings offers
+    /// "Pick the walk back up" and the light edition's Today shows one quiet line.
+    var walkPaused = false
+    /// "Pick the walk back up" was tapped (`resumeWalk()`): the main view reopens the paused
+    /// walk at the step it was left on, and sets this back to false.
+    var walkResumeRequested = false
 
-    /// The signed-in person is gone: their first pull, and any replay they asked
-    /// for that is still waiting, go with them.
+    /// Picks the paused walk back up, from Settings or Today: the walk reopens over the Planner.
+    func resumeWalk() {
+        walkResumeRequested = true
+        activeTab = .planner
+    }
+
+    /// The signed-in person is gone: their first pull, any replay or resume they asked
+    /// for that is still waiting, and the pause the app was showing go with them.
     func signedOut() {
         initialSyncFinished = false
         walkReplayRequested = false
+        walkPaused = false
+        walkResumeRequested = false
     }
 
     // MARK: - Date Navigation

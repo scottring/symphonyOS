@@ -328,8 +328,9 @@ struct WalkModelTests {
         #expect(listener.stops == 0)
     }
 
-    /// A refusal: typing opens, and later holds open it at the hold without asking again.
-    @Test func afterARefusalAHoldOpensTypingWithoutListening() async throws {
+    /// A refusal: typing opens. Later, without asking again, a tap on the light types and a
+    /// hold opens the other choices; neither listens.
+    @Test func afterARefusalATapTypesAndAHoldNeverListens() async throws {
         let m = model(try walkTestContext())
         toYear(m)
         listener.problemOnStart = "Allow the microphone in Settings to speak — or type it."
@@ -341,8 +342,13 @@ struct WalkModelTests {
 
         m.send(.orbDown)
         scheduler.advance(WalkOrb.holdMs)
-        #expect(m.state.orb == .idle)                          // never speaking: no flag rises
-        #expect(m.state.typing == "" && m.state.note == WalkCopy.speechOff)
+        #expect(m.state.orb == .holding(hover: nil))           // never speaking: no flag rises; the points show
+        m.send(.orbUp(heldMs: 900))
+        #expect(m.state.orb == .open && m.state.typing == nil)
+        m.send(.veilTapped)
+        m.send(.orbDown)
+        m.send(.orbUp(heldMs: 80))
+        #expect(m.state.typing == "")
         await scheduler.settle()
         #expect(listener.starts == 1)
     }
@@ -506,6 +512,53 @@ struct WalkModelTests {
         #expect(saved.load(for: me)?.status == .left)
     }
 
+    /// Leave for now: the walk closes with `.paused`, keeps everything already added, writes no
+    /// row, and its saved place says paused at the step it was on.
+    @Test func leavingForNowPausesAndWritesNothing() throws {
+        let saved = store()
+        let ctx = try walkTestContext()
+        let m = model(ctx, store: saved)
+        plantAGoal(m)
+        m.choose(.next)                                        // on to Season
+        let goals = fetch(ctx, Goal.self).count, tasks = fetch(ctx, SymphonyTask.self).count
+        let areas = fetch(ctx, GoalArea.self).count
+        var ended: WalkStatus?
+        m.onEnd = { ended = $0 }
+        m.send(.orbDown); m.send(.orbUp(heldMs: 0))           // the compass
+        m.send(.point(.se))                                    // Leave for now
+        #expect(ended == .paused)
+        let position = try #require(saved.load(for: me))
+        #expect(position.status == .paused && position.step == 2)
+        #expect(saved.hasPausedWalk(for: me))
+        #expect(fetch(ctx, Goal.self).count == goals && fetch(ctx, SymphonyTask.self).count == tasks)
+        #expect(fetch(ctx, GoalArea.self).count == areas)
+        // Ended: nothing more reaches it.
+        m.choose(.next)
+        #expect(m.state.step == 2)
+    }
+
+    /// Picked back up: the walk opens at the step it was left on, with the flags it planted
+    /// still its own, and from then on it is a walk in progress (a relaunch resumes it).
+    @Test func pickingAPausedWalkBackUpResumesWhereItWas() throws {
+        let saved = store()
+        let ctx = try walkTestContext()
+        let first = model(ctx, store: saved)
+        plantAGoal(first)
+        first.choose(.next)
+        first.choose(.leave)
+        let paused = try #require(saved.load(for: me))
+        #expect(paused.status == .paused)
+        let entry = WalkEntry.decide(replay: false, resume: true, demoWalk: false, position: paused,
+                                     householdEditions: ["light"], initialSyncFinished: true, goalCount: 1)
+        #expect(entry == .resume)
+        let again = model(ctx, entry: entry, position: paused, store: saved)
+        #expect(again.state.step == 2)
+        #expect(again.state.items(on: .year).map(\.title) == ["Feel strong again"])
+        #expect(again.state.items(on: .year).allSatisfy { $0.mine })
+        #expect(saved.load(for: me)?.status == .inProgress)
+        #expect(!saved.hasPausedWalk(for: me))
+    }
+
     // MARK: Appearing, replaying and being taken down
 
     @Test func aFreshAppHasNotAskedForAReplay() {
@@ -522,6 +575,19 @@ struct WalkModelTests {
         app.signedOut()
         #expect(app.walkReplayRequested == false)
         #expect(app.initialSyncFinished == false)
+    }
+
+    /// A pause the app was showing, and a resume asked for and still waiting, go with the person
+    /// as a replay request does. Picking it back up asks for a resume over the Planner.
+    @Test func signingOutForgetsAPause() {
+        let app = AppState()
+        #expect(!app.walkPaused && !app.walkResumeRequested)
+        app.walkPaused = true
+        app.activeTab = .more
+        app.resumeWalk()
+        #expect(app.walkResumeRequested && app.activeTab == .planner)
+        app.signedOut()
+        #expect(!app.walkPaused && !app.walkResumeRequested)
     }
 
     /// Closed while the permission prompts are up: when `start()` comes back, with or
