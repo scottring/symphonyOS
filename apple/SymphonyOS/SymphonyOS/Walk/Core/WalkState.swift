@@ -61,7 +61,7 @@ struct WalkState: Equatable {
     mutating func apply(_ event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
         guard !ended else { return [] }
         // Any touch puts the lesson away (a press on the light does it in `orbDown`, a tap on the veil below).
-        if teaching, !event.leavesAWaitingFlag, event != .orbDown { teaching = false }
+        if teaching, !event.leavesAWaitingFlag, event != .orbDown, event != .moreTapped { teaching = false }
         let planted = event.leavesAWaitingFlag ? [] : plantWaitingFlag(env)
         return planted + respond(to: event, env)
     }
@@ -103,6 +103,15 @@ struct WalkState: Equatable {
         case .nextTapped:
             guard let line = WalkCopy.nextLine(self, env.periods) else { return [] }
             return respond(to: line.action, env)
+        // "More": the compass opens, as a tap on the light opens it (with speech off too, where a tap types).
+        case .moreTapped:
+            if teaching {                       // not shown then; a stray one only puts the lesson away
+                teaching = false
+                return []
+            }
+            guard showsMore else { return [] }
+            orb = .open
+            return []
         // A tap on the veil around the open compass closes it; on Welcome the choices stay.
         case .veilTapped:
             if teaching {
@@ -380,7 +389,7 @@ enum WalkEvent: Equatable {
     case moveTo(UUID), pullUp, undo, undoExpired, noteExpired, calendarAnswered
     case sheetHandle, rowToggled(UUID), walkAnother, goToToday             // rowToggled carries a task id
     /// A tap on the Next line under the light; a tap on the veil behind the open compass.
-    case nextTapped, veilTapped
+    case nextTapped, veilTapped, moreTapped
 }
 
 enum WalkTimer: Equatable { case hold, undo, note, finish }

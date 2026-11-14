@@ -92,20 +92,23 @@ enum WalkCopy {
         return s.speechIsOff ? hintSpeechOff : hintFirst
     }
 
-    static let hintChoose = "Choose how to start"
+    /// Welcome: the light itself is the quick start.
+    static let hintChoose = "Tap the light to begin"
     static let hintOpen = "Tap one, or tap the light to close"
-    static let hintFirst = "Hold the light to speak. Tap it for more."
+    static let hintFirst = "Hold the light and speak."
     static let hintAnother = "Hold to add another, or tap Next."
     static let hintGround = "Tap the ones that matter, then Next."
     /// The ground with nothing kept yet: the Next line says "Skip this step", so the hint does not say Next.
     static let hintGroundNone = "Tap the ones that matter."
     static let hintStartHere = "Tap Next to start here, or hold to speak."
-    static let hintFirstThing = "That’s your first thing. Tap Finish."
+    static let hintFirstThing = "Tap Finish to keep it, or hold to say another."
     static let hintSpeaking = "Let go when you’ve said it"
     /// Speech is off for this walk: a tap types, a hold opens the other choices.
-    static let hintSpeechOff = "Tap the light to type. Hold it for more."
-    /// The longest a hint or note may be: every one fits on one line at 15 pt.
-    static let hintMaxLength = 44
+    static let hintSpeechOff = "Tap the light and type."
+    /// The longest a hint or note may be: every one fits on one line at 15 pt (48 by estimate).
+    static let hintMaxLength = 46
+    /// Beside the Next line while the compass is closed: the way to the other choices, as a tap on the light.
+    static let more = "More", moreLabel = "More choices"
 
     /// The light taught once per walk, on the first step where holding it answers (`WalkState.teaching`).
     static let teachHold = "Press and hold the light, and say it out loud."
@@ -117,10 +120,18 @@ enum WalkCopy {
     /// The line under the light that moves the walk on: the south point's words and action,
     /// shown whenever the light is at rest and nothing is being typed. `skip` when nothing has
     /// been added on this step yet (drawn quieter).
-    struct NextLine: Equatable { let text: String; let action: WalkAction; let skip: Bool }
+    struct NextLine: Equatable {
+        let text: String; let action: WalkAction; let skip: Bool; let detail: String?
+        init(text: String, action: WalkAction, skip: Bool, detail: String? = nil) {
+            self.text = text; self.action = action; self.skip = skip; self.detail = detail
+        }
+    }
 
+    /// On Welcome the line under the light is the quick start, with what it is under it.
     static func nextLine(_ s: WalkState, _ p: WalkPeriods) -> NextLine? {
-        guard s.showsNextLine, let ahead = forward(s, p) else { return nil }
+        guard s.showsNextLine else { return nil }
+        if s.step == 0 { return NextLine(text: quickStart, action: .quick, skip: false, detail: quickDetail) }
+        guard let ahead = forward(s, p) else { return nil }
         return NextLine(text: ahead.label, action: ahead.action, skip: ahead.label == skipStep)
     }
 
@@ -186,10 +197,10 @@ enum WalkCopy {
     static func points(_ s: WalkState, _ p: WalkPeriods) -> [Point] {
         var out: [Point] = []
         if s.step == 0 {
+            // The light itself is the quick start (and the line under it); the other two stand above it.
             return [
-                Point(at: .w, label: quickStart, action: .quick, symbol: "figure.walk", detail: quickDetail),
-                Point(at: .e, label: wholeYear, action: .full, symbol: "mountain.2", detail: wholeDetail),
-                Point(at: .n, label: notNow, action: .notNow, symbol: "xmark", detail: notNowDetail),
+                Point(at: .nw, label: wholeYear, action: .full, symbol: "mountain.2", detail: wholeDetail),
+                Point(at: .ne, label: notNow, action: .notNow, symbol: "xmark", detail: notNowDetail),
             ].sorted { order($0.at) < order($1.at) }
         }
         guard let level = s.level, let ahead = forward(s, p) else { return [] }
@@ -199,14 +210,14 @@ enum WalkCopy {
             out.append(Point(at: .w, label: "Type your own", action: .type, symbol: "keyboard"))
         } else {
             out.append(Point(at: .ne, label: level == .year ? "Ask about another area" : "Ask about another goal",
-                             action: .nudge, symbol: "arrow.triangle.2.circlepath"))
+                             action: .nudge, symbol: "arrow.left.arrow.right"))
             if level == .today {
                 if s.calendarOffer {
                     out.append(Point(at: .e, label: "Show my calendar on Today", action: .calendar, symbol: "calendar"))
                 }
             } else {
                 out.append(Point(at: .e, label: s.examplesOn.contains(s.step) ? "Hide examples" : "Show examples",
-                                 action: .examples, symbol: "flag"))
+                                 action: .examples, symbol: "lightbulb"))
             }
             out.append(Point(at: .w, label: "Type it", action: .type, symbol: "keyboard"))
         }
@@ -274,7 +285,7 @@ enum WalkCopy {
     /// An example flag's tag, and the shorter one where the flag is too narrow for it.
     static let exampleTag = "EXAMPLE · TAP TO USE", exampleTagShort = "TAP TO USE"
     /// The ground's own words while speaking and in the why line.
-    static let groundWhy = "Tap the ones that matter to you. To add your own, hold the light and say it."
+    static let groundWhy = "Tap the ones that matter to you."
     /// Added to a step's why line while a parent one level up may still be chosen.
     static let focusAbove = " Tap one above to focus on it."
 
@@ -282,7 +293,7 @@ enum WalkCopy {
 
     static let lookBack = "Look back up: that’s your plan."; static let heresToday = "Here’s today."
     static let showMyDay = "Show my day"; static let lookBackHandle = "See my whole plan"
-    static let todayEyebrow = "Today"; static let walkAnother = "Plan another goal down to today"; static let goToToday = "Go to Today"
+    static let todayEyebrow = "Today"; static let walkAnother = "Plan another goal down to today"; static let goToToday = "Open Today"
     static let thatsTheDay = "That’s the day."; static let nothingToday = "Nothing for today yet."
     static func nextFlag(_ name: String) -> String { "Next: \(name)" }
     static func forGoal(_ name: String) -> String { "for \(name)" }
@@ -324,7 +335,7 @@ enum WalkCopy {
         return nil
     }
 
-    static let orbLabelWelcome = "Choose how to start"; static let orbLabel = "Hold and speak to add a goal. Double tap for other choices."
+    static let orbLabelWelcome = "Quick start. One goal, down to today. About 3 minutes."; static let orbLabel = "Hold and speak to add a goal. Double tap for other choices."
     /// Speech off for this walk: a double tap types.
     static let orbLabelSpeechOff = "Double tap to type it. The other choices are in the actions."
     static let rowDone = "Done"; static let rowOpen = "Not done"

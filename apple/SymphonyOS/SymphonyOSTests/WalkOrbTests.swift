@@ -237,24 +237,70 @@ struct WalkOrbTests {
         #expect(t.step == 1 && t.orb == .open)
     }
 
-    /// Welcome opens with its three choices showing (no "hold to begin"), behind them the veil;
-    /// a tap on one chooses it, the light at rest or not, and a tap on the light or the veil keeps them.
+    /// Welcome opens with its two other choices showing above the light, behind them the veil;
+    /// a tap on one chooses it, the light at rest or not, and a tap on the veil keeps them.
     @Test func welcomeStartsWithItsPointsShowing() {
         let welcome = WalkState()
         #expect(welcome.showsPoints && welcome.showsVeil)
         #expect(WalkCopy.hint(welcome) == WalkCopy.hintChoose)
-        #expect(welcome.lightSymbol == nil)
+        #expect(welcome.lightSymbol == "figure.walk")
+        #expect(WalkCopy.nextLine(welcome, env.periods)
+                == WalkCopy.NextLine(text: WalkCopy.quickStart, action: .quick, skip: false, detail: WalkCopy.quickDetail))
+        #expect(!welcome.showsMore)
         var s = welcome
-        _ = s.apply(.point(.w), env)
-        #expect(s.step == 1 && s.ground && s.depth == .quick)
+        _ = s.apply(.point(.nw), env)
+        #expect(s.step == 1 && s.ground && s.depth == .full)
         var t = welcome
-        _ = t.apply(.orbDown, env); _ = t.apply(.orbUp(heldMs: 100), env)
-        _ = t.apply(.orbDown, env); _ = t.apply(.orbUp(heldMs: 100), env)
-        #expect(t.showsPoints)
         _ = t.apply(.veilTapped, env)
-        #expect(t.showsPoints)
-        _ = t.apply(.point(.e), env)
-        #expect(t.step == 1 && t.depth == .full)
+        #expect(t.showsPoints && t.step == 0)
+        _ = t.apply(.point(.ne), env)
+        #expect(t.ended)
+    }
+
+    /// On Welcome a tap on the light, a hold on it, and a tap on the line under it each do exactly
+    /// what choosing the quick start does (the old bottom point): the same state and effects (the
+    /// light's press also lets go of its hold timer, as every press does).
+    @Test func onWelcomeTheLightIsTheQuickStart() {
+        var chosen = WalkState()
+        chosen.orb = .open
+        let point = chosen.act(.quick, env)
+        chosen.orb = .idle
+        for heldMs in [80, 900] {
+            var light = WalkState()
+            _ = light.apply(.orbDown, env)
+            if heldMs > WalkOrb.holdMs { _ = light.apply(.orbHeld, env) }
+            let up = light.apply(.orbUp(heldMs: heldMs), env)
+            #expect(light == chosen, "held \(heldMs)")
+            #expect(up.filter { $0 != .timer(.hold, ms: nil) } == point)
+        }
+        var line = WalkState()
+        #expect(line.apply(.nextTapped, env) == point)
+        #expect(line == chosen)
+    }
+
+    /// "More" opens the compass exactly as a tap on the light does (the light's press also
+    /// sounds and times its hold); not on Welcome, while open, typing or being taught.
+    @Test func moreOpensTheCompassAsATapOnTheLight() {
+        var byLight = state(step: 2, planted: true)
+        var byMore = byLight
+        #expect(byMore.showsMore)
+        _ = byLight.apply(.orbDown, env); _ = byLight.apply(.orbUp(heldMs: 80), env)
+        #expect(byMore.apply(.moreTapped, env) == [])
+        #expect(byMore == byLight && byMore.orb == .open)
+        #expect(!byMore.showsMore)
+        // With speech off a tap on the light types; More still opens the choices.
+        var off = state(step: 2); off.speechIsOff = true
+        _ = off.apply(.moreTapped, env)
+        #expect(off.orb == .open && off.typing == nil)
+        for var s in [WalkState(), { var t = state(step: 2); t.typing = ""; return t }()] {
+            let before = s
+            #expect(s.apply(.moreTapped, env) == [] && s == before)
+        }
+        // While the light is taught More is not shown; a stray one only puts the lesson away, as any touch does.
+        var taught = state(step: 2); taught.teaching = true
+        #expect(!taught.showsMore)
+        _ = taught.apply(.moreTapped, env)
+        #expect(!taught.teaching && taught.orb == .idle)
     }
 
     /// The Next line does exactly what the south point does, in every state where either shows.
@@ -450,8 +496,8 @@ struct WalkOrbTests {
         #expect(!s.teaching && s.typing == "")
     }
 
-    /// What the light carries: a microphone at rest, a keyboard once speech is off, nothing on
-    /// Welcome or while it is pressed, listening or waiting for the last words.
+    /// What the light carries: a microphone at rest, a keyboard once speech is off, a walking figure
+    /// on Welcome (it is the quick start), nothing while it is pressed, listening or waiting for the last words.
     @Test func theLightShowsWhatHoldingDoes() {
         var s = state(step: 2)
         #expect(s.lightSymbol == "mic")
@@ -461,18 +507,20 @@ struct WalkOrbTests {
         }
         s.orb = .idle; s.speechIsOff = true
         #expect(s.lightSymbol == "keyboard")
-        #expect(WalkState().lightSymbol == nil)
+        #expect(WalkState().lightSymbol == "figure.walk")      // Welcome: the light is the quick start
         #expect(state(step: 6).lightSymbol == nil)
     }
 
-    @Test func onWelcomeAHoldKeepsThePointsOpen() {
+    @Test func onWelcomeAHoldNeverSpeaks() {
         var s = WalkState()
         let down = s.apply(.orbDown, env)
         #expect(down == [])
-        _ = s.apply(.orbHeld, env)
-        #expect(s.orb == .holding(hover: nil))   // never speaks on Welcome
+        #expect(s.apply(.orbHeld, env) == [])
+        #expect(s.orb == .holding(hover: nil))   // never speaks on Welcome: letting go begins the quick start
+        // Sliding to a choice and letting go there chooses it, as before.
+        _ = s.apply(.orbMoved(WalkOrb.position(of: .nw)), env)
         _ = s.apply(.orbUp(heldMs: 900), env)
-        #expect(s.orb == .open)
+        #expect(s.step == 1 && s.depth == .full)
     }
 
     @Test func aCancelledTouchLeavesNothingListening() {
@@ -757,7 +805,7 @@ struct WalkOrbTests {
         for ended in [welcome, s] {
             var t = ended
             let items = t.items
-            for event: WalkEvent in [.finishExpired, .listenEnded, .orbDown, .orbHeld, .orbUp(heldMs: 900),
+            for event: WalkEvent in [.finishExpired, .listenEnded, .orbDown, .orbHeld, .orbUp(heldMs: 900), .moreTapped,
                                      .typeSubmitted("feel strong again"), .sheetHandle, .walkAnother, .goToToday, .undo, .calendarAnswered,
                                      .nextTapped, .veilTapped] {
                 #expect(t.apply(event, env) == [])

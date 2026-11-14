@@ -63,6 +63,7 @@ struct WalkLayout: Equatable {
     var hintLine: CGRect? = nil
     var undoPill: CGRect? = nil
     var lesson: CGRect? = nil
+    var more: CGRect? = nil
 
     // MARK: Stage numbers (the art's numbers live in `WalkArt`)
 
@@ -86,7 +87,15 @@ struct WalkLayout: Equatable {
         made.hintLine = hintFrame(state)
         made.undoPill = undoFrame(state)
         made.lesson = teachFrame(state)
+        made.more = moreFrame(state)
         return made
+    }
+
+    /// Looking back up: how many lines (one or two) a one-line flag's words take at its width, leaving
+    /// room for a "+n more" (11 pt, by estimate).
+    static func compactLines(for text: String, width: CGFloat) -> Int {
+        let perLine = max(1, floor((width - 12) / 5.9))
+        return CGFloat(text.count + 8) <= perLine ? 1 : 2
     }
 
     /// How many lines a title takes at a banner width: a character estimate, so the core needs no fonts.
@@ -236,7 +245,10 @@ private struct Builder {
     func extent(_ kind: L.Kind) -> (left: CGFloat, right: CGFloat) {
         switch kind {
         case .full, .ghost: return (bw / 2, bw / 2)
-        case .compact: return (compactWidth / 2, compactWidth / 2)
+        // Looking back up, a one-line flag takes its column's whole width (the neighbour gaps stay).
+        case .compact:
+            let w = s.step >= 6 ? max(compactWidth, min(bw, gap - 8)) : compactWidth
+            return (w / 2, w / 2)
         case .tip: return (1.5, 23.5)
         case .stub: return (13, 13)
         }
@@ -264,7 +276,7 @@ private struct Builder {
     func height(_ kind: L.Kind, lines: Int, tag: String?) -> CGFloat {
         switch kind {
         case .full, .ghost: return 19 + 16 * CGFloat(lines) + (tag == nil ? 0 : 12)
-        case .compact: return 23
+        case .compact: return 23 + 13 * CGFloat(lines - 1)     // a second line on Look back up
         case .tip, .stub: return 20
         }
     }
@@ -1108,8 +1120,11 @@ private struct Builder {
             placed.append(banner(id: id, e, lvl, frame: e.kind == .tip ? frame : keepClear(frame, pole: base.x, of: avoid),
                                  lines: lines))
         }
+        // Looking back up, a post's one shown flag may take two lines (its words and any "+n more").
+        let twoOnLookBack = s.step >= 6 && reals.count == 1
         func naturalLines(_ e: Entry) -> Int {
-            e.kind == .full || e.kind == .ghost ? WalkLayout.lines(for: e.text, width: bw) : 1
+            if e.kind == .compact, twoOnLookBack { return WalkLayout.compactLines(for: e.text, width: width(.compact)) }
+            return e.kind == .full || e.kind == .ghost ? WalkLayout.lines(for: e.text, width: bw) : 1
         }
         func h(_ e: Entry, _ lines: Int) -> CGFloat { height(e.kind, lines: lines, tag: e.tag) * (e.kind == .tip ? scale : 1) }
 
@@ -1123,6 +1138,12 @@ private struct Builder {
                 return top >= ceiling && (remaining == 0 || top - stubRoom >= ceiling)
             }
             var lines = naturalLines(e)
+            // Two lines on Look back up: lower on the pole (down to its base) if that keeps it under the
+            // ceiling; otherwise one line, as before.
+            if lines == 2, e.kind == .compact, twoOnLookBack, !fits(2) {
+                let lowered = min(base.y, max(b, ceiling + h(e, 2)))
+                if lowered - h(e, 2) >= ceiling - L.fitTolerance { b = lowered } else { lines = 1 }
+            }
             if !fits(lines) {
                 guard j == 0 else { break }
                 if fits(1) {
@@ -1229,9 +1250,21 @@ extension WalkLayout {
 
     static let nextWidth: CGFloat = 220
 
+    /// Welcome's line (the quick start and what it is) is wider: its second line is a sentence.
+    static let welcomeLineWidth: CGFloat = 300
+
     static func nextFrame(_ s: WalkState) -> CGRect? {
         guard s.showsNextLine else { return nil }
-        return CGRect(x: WalkOrb.centre.x - nextWidth / 2, y: WalkOrb.centre.y + ring + 2, width: nextWidth, height: nextHeight)
+        let width = s.step == 0 ? welcomeLineWidth : nextWidth
+        return CGRect(x: WalkOrb.centre.x - width / 2, y: WalkOrb.centre.y + ring + 2, width: width, height: nextHeight)
+    }
+
+    /// "More", on the Next line's row to the left of it (clear of its words), while the compass is closed.
+    static let moreWidth: CGFloat = 69
+    static func moreFrame(_ s: WalkState) -> CGRect? {
+        guard s.showsMore else { return nil }
+        return CGRect(x: WalkOrb.centre.x - nextWidth / 2 - 4 - moreWidth, y: WalkOrb.centre.y + ring + 2,
+                      width: moreWidth, height: nextHeight)
     }
 
     /// The quiet Undo pill, beside the Next line on the right, while it shows (`showsUndoPill`).
@@ -1241,14 +1274,15 @@ extension WalkLayout {
         return CGRect(x: WalkOrb.centre.x + nextWidth / 2 + 4, y: line + (nextHeight - 34) / 2, width: 76, height: 34)
     }
 
-    /// Closed: under the Next line's place (taken or not), so it never moves when the line comes and goes.
+    /// Closed (and on Welcome, whose choices are the light and the line under it): under the Next
+    /// line's place (taken or not), so it never moves when the line comes and goes.
     /// Open: above the compass's top point and its words (two lines, as Welcome's has), on the veil.
     static func hintFrame(_ s: WalkState) -> CGRect? {
         let text = WalkCopy.hint(s)
         guard !text.isEmpty else { return nil }
         let height = CGFloat(hintLines(text)) * hintLineHeight
         let x = WalkOrb.centre.x - hintWidth / 2
-        if s.showsPoints {
+        if s.showsPoints && s.step != 0 {
             let top = WalkOrb.position(of: .n).y - WalkOrb.pointDisc / 2 - wordsGap - labelLine - detailGap - detailLine - openHintGap
             return CGRect(x: x, y: top - height, width: hintWidth, height: height)
         }

@@ -22,7 +22,14 @@ extension WalkState {
     var showsVeil: Bool { step == 0 || orb == .open || teaching }
 
     /// The Next line under the light shows on steps 1 to 5 while the light is at rest and nothing is being typed.
-    var showsNextLine: Bool { (1...5).contains(step) && orb == .idle && typing == nil && !teaching }
+    /// On Welcome it is the quick start, under the light while it is not pressed.
+    var showsNextLine: Bool {
+        if step == 0 { return orb == .idle || orb == .open }
+        return (1...5).contains(step) && orb == .idle && typing == nil && !teaching
+    }
+
+    /// "More" beside the Next line: the way to the other choices while the compass is closed, after Welcome.
+    var showsMore: Bool { step >= 1 && showsNextLine }
 
     /// The quiet Undo pill beside the hint; it gives way while the points show,
     /// where Undo is the up-left point instead.
@@ -161,6 +168,11 @@ extension WalkState {
             orb = .finishing(live: live)
             return release + [.timer(.finish, ms: WalkOrb.finishMs), .finishListening]
         case .holding(nil):
+            // On Welcome the light is the quick start: a tap or a hold begins it.
+            if step == 0 {
+                orb = .idle
+                return act(.quick, env) + release
+            }
             if heldMs < WalkOrb.holdMs {
                 // With speech off a tap types straight away (the light shows a keyboard), and so
                 // does the one tap that puts the lesson away (its second line says so).
@@ -226,9 +238,13 @@ extension WalkState {
     }
 
     /// What the light carries at its centre: a microphone while holding it would listen, a
-    /// keyboard once speech is off for this walk (a tap types), nothing on Welcome (the choices
-    /// are open) or while it is pressed, listening or a flag is rising.
+    /// keyboard once speech is off for this walk (a tap types), a walking figure on Welcome (the
+    /// light is the quick start), nothing while it is pressed, listening or a flag is rising.
     var lightSymbol: String? {
+        if step == 0 {
+            if case .holding = orb { return nil }
+            return "figure.walk"                // Welcome: the light begins the quick start
+        }
         guard (1...5).contains(step) else { return nil }
         switch orb {
         case .idle, .open: return speechIsOff ? "keyboard" : "mic"
@@ -256,7 +272,7 @@ extension WalkEvent {
             return true
         case .orbDown, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point,
              .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,
-             .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped:
+             .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped, .moreTapped:
             return false
         }
     }

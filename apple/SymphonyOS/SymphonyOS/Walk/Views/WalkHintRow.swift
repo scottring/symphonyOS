@@ -46,6 +46,11 @@ struct WalkHintRow: View {
                         .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)
                 }
+                if let frame = layout.more {
+                    moreButton
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
+                }
                 if let frame = layout.undoPill {
                     undoPill
                         .frame(width: frame.width, height: frame.height)
@@ -69,24 +74,56 @@ struct WalkHintRow: View {
     // MARK: The Next line, the hint and Undo
 
     /// Glowing words and a small chevron, never a button's fill or outline; quieter when it skips.
+    /// Glowing words with the light's gold arrow after them, never a button's fill or outline;
+    /// quieter when it skips. On Welcome a second line under it says what the quick start is.
     private func nextLine(_ line: WalkCopy.NextLine) -> some View {
         Button { model.send(.nextTapped) } label: {
-            HStack(spacing: 6) {
-                Text(line.text)
-                    .font(.custom("DMSans-SemiBold", size: 16))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Image(systemName: "arrow.down")
-                    .font(.system(size: 13, weight: .semibold))
+            VStack(spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(line.text)
+                        .font(.custom("DMSans-SemiBold", size: 16))
+                        .foregroundStyle(.white.opacity(line.skip ? 0.7 : 1))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .walkGlow()
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(WalkPalette.gold)
+                        .shadow(color: WalkPalette.glowShadow.opacity(0.6), radius: 2)
+                }
+                if let detail = line.detail {
+                    Text(detail)
+                        .font(.custom("DMSans-Regular", size: 13))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .walkGlow()
+                }
             }
-            .foregroundStyle(.white.opacity(line.skip ? 0.7 : 1))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(line.detail.map { "\(line.text). \($0)" } ?? line.text)
+        .accessibilityIdentifier("walk.next")
+    }
+
+    /// "More": the other choices, as a tap on the light opens them. Words and a symbol, no box.
+    private var moreButton: some View {
+        Button { model.send(.moreTapped) } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 15, weight: .regular))
+                Text(WalkCopy.more)
+                    .font(.custom("DMSans-SemiBold", size: 14))
+            }
+            .foregroundStyle(.white.opacity(0.9))
             .walkGlow()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(line.text)
-        .accessibilityIdentifier("walk.next")
+        .accessibilityLabel(WalkCopy.moreLabel)
     }
 
     private var undoPill: some View {

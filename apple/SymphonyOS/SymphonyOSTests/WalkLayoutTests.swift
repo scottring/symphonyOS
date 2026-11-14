@@ -839,7 +839,8 @@ struct WalkLayoutTests {
             var taught = base; taught.teaching = (1...5).contains(base.step) && !base.ground; variants.append(taught)
             for v in variants {
                 let frames = [("next", WalkLayout.nextFrame(v)), ("hint", WalkLayout.hintFrame(v)),
-                              ("undo", WalkLayout.undoFrame(v)), ("lesson", WalkLayout.teachFrame(v))]
+                              ("undo", WalkLayout.undoFrame(v)), ("lesson", WalkLayout.teachFrame(v)),
+                              ("more", WalkLayout.moreFrame(v))]
                     .compactMap { name, f in f.map { (name, $0) } }
                 var problems: [String] = []
                 for (i, a) in frames.enumerated() {
@@ -855,6 +856,12 @@ struct WalkLayoutTests {
                 if !hint.isEmpty, WalkLayout.hintLines(hint) != 1 { problems.append("“\(hint)” wraps") }
                 if (WalkLayout.nextFrame(v) != nil) != (WalkCopy.nextLine(v, WalkPeriods.pick(now: today)) != nil) {
                     problems.append("the Next line's frame and words disagree")
+                }
+                // "More" stays clear of the Next line's own words (estimated: 16 pt words and the arrow, centred).
+                if let more = WalkLayout.moreFrame(v), let next = WalkLayout.nextFrame(v),
+                   let line = WalkCopy.nextLine(v, WalkPeriods.pick(now: today)) {
+                    let words = CGFloat(line.text.count) * 8.2 + 26
+                    if more.maxX > next.midX - min(words, next.width) / 2 { problems.append("More meets the Next line's words") }
                 }
                 if v.showsPoints { problems += Self.pointWordsProblems(v, hint: WalkLayout.hintFrame(v)) }
                 #expect(problems.isEmpty, "\(footing) \(Generated.describe(v)) orb \(v.orb): \(problems.prefix(3))")
@@ -897,6 +904,32 @@ struct WalkLayoutTests {
         return problems
     }
 
+    /// Looking back up, a post's shown flag takes two lines where its words need them, with
+    /// its "+n more"; every guarantee holds (the generated sweep). With one to four areas, long
+    /// titles are seen on two lines at every level that has room for them.
+    @Test func lookingBackUpTheShownFlagTakesTwoLines() {
+        for keptCount in 1...WalkLoad.maxAreas {
+            var s = WalkState()
+            s.areas = ridge
+            s.kept = ridge.prefix(keptCount).map(\.id)
+            s.step = 6
+            var n = 0
+            for raw in 1...4 {
+                for a in s.kept { for _ in 0..<2 {
+                    n += 1
+                    s.items.append(WalkItem(id: uid(n), level: WalkLevel(rawValue: raw)!,
+                                            title: "Finish the bathroom before spring comes round", areaId: a))
+                } }
+            }
+            for footing in [WalkFooting.natural, .level] {
+                let layout = WalkLayout.make(s, today: today, footing: footing)
+                #expect(Invariants.check(layout, s).isEmpty, "\(keptCount) areas \(footing)")
+                let two = layout.posts.flatMap(\.banners).filter { $0.kind == .compact && $0.lines == 2 }
+                #expect(!two.isEmpty, "\(keptCount) areas \(footing): no flag on two lines")
+            }
+        }
+    }
+
     /// Welcome, the ground and every step with every point offered (Undo, the calendar, examples):
     /// the words sweep on its own, at today's periods and July's.
     @Test func thePointsWordsKeepClear() {
@@ -915,9 +948,10 @@ struct WalkLayoutTests {
         }
         // Welcome's choices: their words at full width, two lines of description each, off the ring.
         let welcome = WalkCopy.points(WalkState(), WalkPeriods.pick(now: today))
-        for p in welcome where p.at != .n {
-            #expect(WalkLayout.pointWords(p, among: welcome.map(\.at)).filter(\.detail).count == 2, "\(p.label)")
-        }
+        let lines = Dictionary(uniqueKeysWithValues: welcome.map { p in
+            (p.at, WalkLayout.pointWords(p, among: welcome.map(\.at)).filter(\.detail).map(\.text)) })
+        #expect(lines[.nw] == ["Every part of life.", "About 25 minutes."])
+        #expect(lines[.ne] == ["Go straight to Today."])
     }
 
     /// A post's band point (its base less its footing) is on its band; the footing stays within its bound.
@@ -1257,6 +1291,13 @@ enum Invariants {
             for b in post.banners {
                 if case .stub = b.kind, b.drawn.minY < ceiling - 0.01 {
                     problems.append("stub \(b.id) at \(b.drawn.minY) above its ceiling \(ceiling)")
+                }
+                // A one-line flag is one line, except on Look back up, where a post's shown flag may take two.
+                if b.kind == .compact {
+                    let allowed = s.step >= 6 ? 1...2 : 1...1
+                    if !allowed.contains(b.lines) || abs(b.frame.height - (23 + 13 * CGFloat(b.lines - 1))) > 0.01 {
+                        problems.append("\(b.id) compact holds \(b.lines) lines in \(b.frame)")
+                    }
                 }
                 // A full banner is as tall as its lines, and its lines are what its width holds.
                 if b.kind == .full || b.kind == .ghost {

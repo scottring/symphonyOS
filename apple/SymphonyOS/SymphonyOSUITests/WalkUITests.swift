@@ -32,13 +32,14 @@ final class WalkUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts[welcome].waitForExistence(timeout: 60), "the walk never opened")
 
-        // Welcome's three choices are already showing.
+        // Welcome: the light itself is the quick start.
         let orb = app.buttons["walk.orb"]
-        tap(app.buttons["Quick start"], "Quick start")
+        XCTAssertTrue(app.buttons["Plan my whole year"].exists && app.buttons["Not now"].exists, "Welcome's other choices")
+        tap(orb, "the light (Quick start)")
         tap(app.buttons["Health"], "the Health area")
         tap(app.buttons["Next: your goals"], "the Next line")
         dismissTheLesson(app)
-        tap(orb, "the light")
+        tap(app.buttons["More choices"], "More")
         tap(app.buttons["Show examples"], "Show examples")
         tap(app.buttons["Example: Run a 5K, tap to make it yours"], "the Run a 5K example")
 
@@ -79,7 +80,7 @@ final class WalkUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts[welcome].waitForExistence(timeout: 60), "the walk never opened")
         let orb = app.buttons["walk.orb"]
-        tap(app.buttons["Quick start"], "Quick start")
+        tap(orb, "the light (Quick start)")
         tap(app.buttons["Health"], "the Health area")
         tap(app.buttons["Next: your goals"], "the Next line")
         dismissTheLesson(app)

@@ -19,7 +19,7 @@ struct WalkCopyTests {
         let g = { () -> WalkState in var s = state(step: 1); s.ground = true; return s }()
         #expect(WalkCopy.eyebrow(g, p) == "The year ahead")
         #expect(WalkCopy.question(g, p) == "First, your ground. Which parts of life matter most this year?")
-        #expect(WalkCopy.why(g, p) == "Tap the ones that matter to you. To add your own, hold the light and say it.")
+        #expect(WalkCopy.why(g, p) == "Tap the ones that matter to you.")
         let y = state(step: 1)
         #expect(WalkCopy.question(y, p) == "What would make the year ahead a good one?")
         #expect(WalkCopy.why(y, p) == "Something that would feel true twelve months from now. Big or small.")
@@ -106,11 +106,11 @@ struct WalkCopyTests {
     @Test func everyHintLine() {
         // Welcome: its choices are always open.
         var s = state(step: 0)
-        #expect(WalkCopy.hint(s) == "Choose how to start")
-        s.orb = .holding(hover: .w); #expect(WalkCopy.hint(s) == "Choose how to start")
+        #expect(WalkCopy.hint(s) == "Tap the light to begin")
+        s.orb = .holding(hover: .nw); #expect(WalkCopy.hint(s) == "Tap the light to begin")
         // A step: nothing added yet, the two verbs.
         var y = state(step: 1)
-        #expect(WalkCopy.hint(y) == "Hold the light to speak. Tap it for more.")
+        #expect(WalkCopy.hint(y) == "Hold the light and speak.")
         y.note = "A note"; #expect(WalkCopy.hint(y) == "A note")
         // The compass open: what to do with it; a note gives way, and is back once it closes.
         y.orb = .open; #expect(WalkCopy.hint(y) == "Tap one, or tap the light to close")
@@ -128,7 +128,7 @@ struct WalkCopyTests {
         #expect(WalkCopy.hint(g) == "Tap the ones that matter.")              // nothing kept: the line says Skip
         g.kept = [UUID()]
         #expect(WalkCopy.hint(g) == "Tap the ones that matter, then Next.")
-        #expect(WalkCopy.hint(state(step: 2)) == "Hold the light to speak. Tap it for more.")
+        #expect(WalkCopy.hint(state(step: 2)) == "Hold the light and speak.")
         var planted = state(step: 2); planted.items = [item(.season, "Get fit")]
         #expect(WalkCopy.hint(planted) == "Hold to add another, or tap Next.")
         // The light being taught: its own two lines say it, so the hint is blank.
@@ -138,12 +138,12 @@ struct WalkCopyTests {
         var t = state(step: 5); t.items = [wg]; t.focus[.today] = wg.id
         #expect(WalkCopy.hint(t) == "Tap Next to start here, or hold to speak.")
         t.firstThing = wg.id
-        #expect(WalkCopy.hint(t) == "That’s your first thing. Tap Finish.")
+        #expect(WalkCopy.hint(t) == "Tap Finish to keep it, or hold to say another.")
         // Speech off for this walk: a tap types, a hold opens the other choices.
         var off = state(step: 1); off.speechIsOff = true
-        #expect(WalkCopy.hint(off) == "Tap the light to type. Hold it for more.")
+        #expect(WalkCopy.hint(off) == "Tap the light and type.")
         off.items = [item(.year, "Run a 5K")]
-        #expect(WalkCopy.hint(off) == "Tap the light to type. Hold it for more.")
+        #expect(WalkCopy.hint(off) == "Tap the light and type.")
     }
 
     private func labels(_ s: WalkState, _ p: WalkPeriods = nov13) -> [String] { WalkCopy.points(s, p).map(\.label) }
@@ -152,15 +152,15 @@ struct WalkCopyTests {
 
     @Test func welcomePoints() {
         let pts = WalkCopy.points(state(step: 0), nov13)
-        #expect(pts.contains(WalkCopy.Point(at: .w, label: "Quick start", action: .quick, symbol: "figure.walk",
-                                            detail: "One goal, down to today. About 3 minutes.")))
-        #expect(pts.contains(WalkCopy.Point(at: .e, label: "Plan my whole year", action: .full, symbol: "mountain.2",
-                                            detail: "Every part of life. About 25 minutes.")))
-        #expect(pts.contains(WalkCopy.Point(at: .n, label: "Not now", action: .notNow, symbol: "xmark",
-                                            detail: "Go straight to Today.")))
-        #expect(pts.count == 3)
+        // The light is the quick start: no disc for it; the other two stand upper-left and upper-right.
+        #expect(pts == [WalkCopy.Point(at: .ne, label: "Not now", action: .notNow, symbol: "xmark",
+                                       detail: "Go straight to Today."),
+                        WalkCopy.Point(at: .nw, label: "Plan my whole year", action: .full, symbol: "mountain.2",
+                                       detail: "Every part of life. About 25 minutes.")])
+        #expect(WalkCopy.quickStart == "Quick start")
+        #expect(WalkCopy.quickDetail == "One goal, down to today. About 3 minutes.")
         var s = state(step: 0); s.undo = [.keep(UUID())]
-        #expect(WalkCopy.points(s, nov13).count == 3)
+        #expect(WalkCopy.points(s, nov13).count == 2)
     }
 
     @Test func groundPoints() {
@@ -178,7 +178,7 @@ struct WalkCopyTests {
                                    "Type it", "Leave for now"])
         #expect(y.map(\.at) == [.n, .ne, .e, .s, .w, .nw])
         #expect(y.map(\.action) == [.back, .nudge, .examples, .next, .type, .leave])
-        #expect(y.map(\.symbol) == ["arrow.up", "arrow.triangle.2.circlepath", "flag", "arrow.down", "keyboard", "pause"])
+        #expect(y.map(\.symbol) == ["arrow.up", "arrow.left.arrow.right", "lightbulb", "arrow.down", "keyboard", "pause"])
         #expect(y.map(\.detail) == [nil, nil, nil, nil, nil, "Your place is kept."])
         var s = state(step: 3)
         #expect(labels(s) == ["Back to this winter", "Ask about another goal", "Show examples", "Skip this step",
@@ -248,7 +248,8 @@ struct WalkCopyTests {
         #expect(WalkCopy.nextLine(open, p) == nil)
         var typing = added(2); typing.typing = ""
         #expect(WalkCopy.nextLine(typing, p) == nil)
-        #expect(WalkCopy.nextLine(state(step: 0), p) == nil && WalkCopy.nextLine(state(step: 6), p) == nil)
+        #expect(WalkCopy.nextLine(state(step: 0), p)?.text == "Quick start")     // Welcome: the light's own line
+        #expect(WalkCopy.nextLine(state(step: 6), p) == nil)
 
         let backs = [2: "Back to the year", 3: "Back to this winter", 4: "Back to November", 5: "Back to this week"]
         for (step, words) in backs { #expect(north(state(step: step)) == words) }
@@ -327,7 +328,7 @@ struct WalkCopyTests {
                  WalkCopy.hintSpeaking, WalkCopy.hintSpeechOff, WalkCopy.teachHold, WalkCopy.teachLetGo,
                  WalkCopy.teachSpeechOff, WalkCopy.skipStep, WalkCopy.finish, WalkCopy.startWithThis, WalkCopy.nextGoal,
                  WalkCopy.quickStart, WalkCopy.quickDetail, WalkCopy.wholeYear, WalkCopy.wholeDetail, WalkCopy.notNow,
-                 WalkCopy.notNowDetail, WalkCopy.leaveForNow, WalkCopy.leaveDetail,
+                 WalkCopy.notNowDetail, WalkCopy.leaveForNow, WalkCopy.leaveDetail, WalkCopy.more, WalkCopy.moreLabel,
                  WalkCopy.rowLabel("Lift", forGoal: "Run a 5K"), WalkCopy.areaHint(ground: true, kept: false, focused: false),
                  WalkCopy.areaHint(ground: true, kept: true, focused: false), WalkCopy.areaHint(ground: false, kept: true, focused: false),
                  WalkCopy.areaHint(ground: false, kept: true, focused: true)]
@@ -335,6 +336,18 @@ struct WalkCopyTests {
                                             .firstThingFocusable, .firstThingFocused, .example, .stub(2)]
         said += roles.map { WalkCopy.bannerLabel("Run a 5K", level: .week, tag: "TODAY", role: $0) }
         return said
+    }
+
+    /// Nothing on the ground tells anyone to hold the light (it has not been taught yet).
+    @Test func theGroundNeverSaysHold() {
+        for kept in [[], [UUID()]] {
+            for orb: WalkState.Orb in [.idle, .open] {
+                var g = state(step: 1); g.ground = true; g.kept = kept; g.orb = orb
+                let said = [WalkCopy.hint(g), WalkCopy.why(g, nov13), WalkCopy.nextLine(g, nov13)?.text ?? ""]
+                    + WalkCopy.points(g, nov13).flatMap { [$0.label, $0.detail ?? ""] }
+                for line in said { #expect(!line.lowercased().contains("hold"), "“\(line)”") }
+            }
+        }
     }
 
     @Test func instructionsUsePlainWords() {
@@ -353,7 +366,7 @@ struct WalkCopyTests {
 
     /// Every hint and note the walk can show fits on one line: none is longer than `hintMaxLength`.
     @Test func everyHintFitsOnOneLine() {
-        #expect(WalkCopy.hintMaxLength == 44)
+        #expect(WalkCopy.hintMaxLength == 46)
         var hints: Set<String> = []
         let notes = [WalkCopy.nothingToPlant, WalkCopy.speechOff, WalkCopy.nothingHeard, WalkCopy.speakNow,
                      WalkCopy.ridgeFull, WalkCopy.calendarLine] + (WalkLoad.areas([], me: UUID()).map(\.name)
@@ -403,7 +416,8 @@ struct WalkCopyTests {
         #expect(WalkCopy.lookBack == "Look back up: that’s your plan."); #expect(WalkCopy.heresToday == "Here’s today.")
         #expect(WalkCopy.showMyDay == "Show my day"); #expect(WalkCopy.lookBackHandle == "See my whole plan")
         #expect(WalkCopy.todayEyebrow == "Today"); #expect(WalkCopy.walkAnother == "Plan another goal down to today")
-        #expect(WalkCopy.goToToday == "Go to Today")
+        #expect(WalkCopy.goToToday == "Open Today")
+        #expect(WalkCopy.more == "More"); #expect(WalkCopy.moreLabel == "More choices")
         #expect(WalkCopy.thatsTheDay == "That’s the day."); #expect(WalkCopy.nothingToday == "Nothing for today yet.")
         #expect(WalkCopy.nextFlag("Finish the bathroom") == "Next: Finish the bathroom")
         #expect(WalkCopy.forGoal("Feel strong again") == "for Feel strong again")
@@ -414,21 +428,21 @@ struct WalkCopyTests {
         #expect(WalkCopy.replayFooter == "Start at the top and walk down to today. What you already planned stays. To stop part-way, tap the light and choose Leave for now.")
         #expect(WalkCopy.resumeButton == "Pick the walk back up")
         #expect(WalkCopy.walkWaiting == "Your walk is waiting. Pick it back up.")
-        #expect(WalkCopy.orbLabelWelcome == "Choose how to start")
+        #expect(WalkCopy.orbLabelWelcome == "Quick start. One goal, down to today. About 3 minutes.")
         #expect(WalkCopy.orbLabel == "Hold and speak to add a goal. Double tap for other choices.")
-        #expect(WalkCopy.groundWhy == "Tap the ones that matter to you. To add your own, hold the light and say it.")
+        #expect(WalkCopy.groundWhy == "Tap the ones that matter to you.")
         #expect(WalkCopy.leaveForNow == "Leave for now"); #expect(WalkCopy.leaveDetail == "Your place is kept.")
         #expect(WalkCopy.orbLabelSpeechOff == "Double tap to type it. The other choices are in the actions.")
         #expect(WalkCopy.nextGoal == "Next goal")
-        #expect(WalkCopy.hintFirst == "Hold the light to speak. Tap it for more.")
+        #expect(WalkCopy.hintFirst == "Hold the light and speak.")
         #expect(WalkCopy.hintAnother == "Hold to add another, or tap Next.")
         #expect(WalkCopy.hintGround == "Tap the ones that matter, then Next.")
         #expect(WalkCopy.hintGroundNone == "Tap the ones that matter.")
         #expect(WalkCopy.hintStartHere == "Tap Next to start here, or hold to speak.")
-        #expect(WalkCopy.hintFirstThing == "That’s your first thing. Tap Finish.")
+        #expect(WalkCopy.hintFirstThing == "Tap Finish to keep it, or hold to say another.")
         #expect(WalkCopy.hintSpeaking == "Let go when you’ve said it")
         #expect(WalkCopy.hintOpen == "Tap one, or tap the light to close")
-        #expect(WalkCopy.hintSpeechOff == "Tap the light to type. Hold it for more.")
+        #expect(WalkCopy.hintSpeechOff == "Tap the light and type.")
         #expect(WalkCopy.rowDone == "Done"); #expect(WalkCopy.rowOpen == "Not done")
         #expect(WalkLevel.allCases.map(WalkCopy.levelName) == ["Year", "Season", "Month", "Week", "Today"])
     }
@@ -507,7 +521,7 @@ struct WalkCopyTests {
 
     /// The light's VoiceOver label: Welcome's choice, then the two verbs on every other step.
     @Test func theLightSaysWhatItDoes() {
-        #expect(WalkCopy.orbAccessibilityLabel(state(step: 0)) == "Choose how to start")
+        #expect(WalkCopy.orbAccessibilityLabel(state(step: 0)) == "Quick start. One goal, down to today. About 3 minutes.")
         for step in 1...5 {
             #expect(WalkCopy.orbAccessibilityLabel(state(step: step)) == "Hold and speak to add a goal. Double tap for other choices.")
             var off = state(step: step); off.speechIsOff = true

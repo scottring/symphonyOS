@@ -207,14 +207,17 @@ struct WalkBannerView: View {
         .walkBannerShadow(glows: false)
     }
 
-    /// One line. On Look back up it may stand for older flags too: "+n" after the words.
+    /// One line, or on Look back up two (`lines`): the words wrap at word boundaries and are cut
+    /// only after the last line. It may stand for older flags too: "+n more" after the words.
     private var compact: some View {
-        HStack(spacing: 4) {
+        HStack(alignment: .lastTextBaseline, spacing: 4) {
             Text(banner.text)
                 .font(.custom("DMSans-SemiBold", size: 11))
                 .foregroundStyle(.white)
-                .lineLimit(1)
+                .lineLimit(banner.lines)
                 .truncationMode(.tail)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)       // let it take its second line
             if let more = banner.more {
                 Text(WalkCopy.more(more))
                     .font(.custom("DMSans-SemiBold", size: 10))
