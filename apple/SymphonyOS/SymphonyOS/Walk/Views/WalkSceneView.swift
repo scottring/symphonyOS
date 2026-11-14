@@ -14,7 +14,7 @@ struct WalkSceneView: View {
     var body: some View {
         let art = model.art
         ZStack(alignment: .topLeading) {
-            WalkWorldView(layout: model.layout, art: art,
+            WalkWorldView(layout: model.layout, art: art, step: model.state.step,
                           onLabel: { model.send(.areaTapped($0.id)) },
                           onBanner: { banner, post in
                               if let event = WalkLayout.tapEvent(banner, on: post) { model.send(event) }
@@ -97,19 +97,22 @@ struct WalkSceneView: View {
 }
 
 /// The mountain on the 390 × 844 stage, back to front: the stage's sky, the
-/// world (sky, the painting, the peak labels and the posts with their banners)
-/// and the dark band at the top. No words. It draws the layout it is given and
+/// painting (the art's backdrop, by its own camera for the step), the world (the
+/// peak labels and the posts with their banners) and the dark band at the top. No words. It draws the layout it is given and
 /// hands taps to its callbacks, so a page can draw it without the walk's model.
 /// It makes no accessibility container of its own: whoever draws it does
 /// (`WalkSceneView` does), so its peaks and flags sit beside that page's words.
 ///
 /// The layout's frames are in stage space for the current camera. They are
-/// put back into world space and drawn inside the same transformed container
-/// as the painting, so during a camera glide a flag moves with the mountain
-/// it stands on (stage = (world − camera) × k at every moment of the glide).
+/// put back into world space and drawn inside one transformed container, so
+/// during a camera glide the flags move together (stage = (world − camera) × k
+/// at every moment of the glide); the painting glides to its own camera on the
+/// same curve and duration.
 struct WalkWorldView: View {
     let layout: WalkLayout
     let art: WalkArt
+    /// The walk's step: which of the picture's stops (`WalkArt.backdropCamera`) stands behind the layout.
+    let step: Int
     /// Whether banners that arrive after the world first draws drop in; those present at first stand still.
     let dropsIn: Bool
     /// VoiceOver's custom actions on a banner (none by default).
@@ -124,12 +127,13 @@ struct WalkWorldView: View {
     /// With Reduce Motion the camera does not glide: the whole view cross-fades to its new framing.
     static let crossFade = Animation.easeInOut(duration: 0.25)
 
-    init(layout: WalkLayout, art: WalkArt, dropsIn: Bool = true,
+    init(layout: WalkLayout, art: WalkArt, step: Int, dropsIn: Bool = true,
          actions: @escaping (WalkLayout.Banner) -> [(name: String, run: () -> Void)] = { _ in [] },
          onLabel: @escaping (WalkLayout.Label) -> Void,
          onBanner: @escaping (WalkLayout.Banner, WalkLayout.Post) -> Void) {
         self.layout = layout
         self.art = art
+        self.step = step
         self.dropsIn = dropsIn
         self.actions = actions
         self.onLabel = onLabel
@@ -145,11 +149,11 @@ struct WalkWorldView: View {
             Group {
                 if reduceMotion {
                     // A new framing is a new view, faded in over the old one.
-                    world
+                    scene
                         .id([layout.camera.x, layout.camera.y, layout.camera.k])
                         .transition(.opacity)
                 } else {
-                    world
+                    scene
                 }
             }
             .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
@@ -163,27 +167,33 @@ struct WalkWorldView: View {
 
     // MARK: The world
 
-    private var world: some View {
-        let camera = layout.camera
-        return ZStack(alignment: .topLeading) {
-            // The sky's top colour continues above the world, so its top edge
-            // (on stage at y 328 on Welcome) shows no seam against the stage's sky.
-            Color(hex: 0x00106E)
-                .frame(width: art.world.width, height: art.world.height)
-                .offset(y: -art.world.height)
-            LinearGradient(stops: [.init(color: Color(hex: 0x00106E), location: 0),
-                                   .init(color: Color(hex: 0x011C8C), location: 424 / art.world.height),
-                                   .init(color: Color(hex: 0x0A2A9A), location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(width: art.world.width, height: art.world.height)
-            Image(art.imageName)
+    /// The picture behind, then the world of labels and flags over it.
+    private var scene: some View {
+        ZStack(alignment: .topLeading) {
+            picture
+            world
+        }
+    }
+
+    /// The backdrop (`WalkBackdrop`): the tall painting by its own camera, which glides with the layout's.
+    @ViewBuilder private var picture: some View {
+        if let backdrop = art.backdrop, let camera = art.backdropCamera(step: step, layout: layout.camera) {
+            Image(backdrop.imageName)
                 .resizable()
                 .interpolation(.high)
                 .antialiased(true)
-                .frame(width: art.image.width, height: art.image.height)
-                .offset(x: art.image.minX, y: art.image.minY)
+                .frame(width: backdrop.size.width, height: backdrop.size.height)
+                .scaleEffect(camera.k, anchor: .topLeading)
+                .offset(x: -camera.x * camera.k, y: -camera.y * camera.k)
+                .animation(reduceMotion ? nil : Self.glide, value: camera)
+                .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
                 .accessibilityHidden(true)
+        }
+    }
 
+    private var world: some View {
+        let camera = layout.camera
+        return ZStack(alignment: .topLeading) {
             ForEach(layout.labels) { label in
                 Button { onLabel(label) } label: { WalkLabelView(label: label) }
                     .buttonStyle(.plain)
@@ -226,14 +236,25 @@ struct WalkWorldView: View {
 
     // MARK: The band
 
-    /// A faint dark band at the top, so white words read over a pale sky (contract §14).
-    private var band: some View {
-        LinearGradient(stops: [.init(color: WalkPalette.navyBand.opacity(0.55), location: 0),
-                               .init(color: WalkPalette.navyBand.opacity(0.25), location: 0.6),
-                               .init(color: WalkPalette.navyBand.opacity(0), location: 1)],
-                       startPoint: .top, endPoint: .bottom)
-            .frame(height: 260)
-            .allowsHitTesting(false)
+    /// A faint dark band at the top, so white words read over a pale sky (contract §14); where the
+    /// step's painting behind the words is bright, a held shade to the question's foot (`WalkBackdrop.shade`).
+    @ViewBuilder private var band: some View {
+        if let strength = art.topShade(step: step) {
+            let held = WalkLayout.question, length = WalkLayout.question + WalkBackdrop.shadeFade
+            LinearGradient(stops: [.init(color: WalkPalette.navyBand.opacity(strength), location: 0),
+                                   .init(color: WalkPalette.navyBand.opacity(strength), location: held / length),
+                                   .init(color: WalkPalette.navyBand.opacity(0), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: length)
+                .allowsHitTesting(false)
+        } else {
+            LinearGradient(stops: [.init(color: WalkPalette.navyBand.opacity(0.55), location: 0),
+                                   .init(color: WalkPalette.navyBand.opacity(0.25), location: 0.6),
+                                   .init(color: WalkPalette.navyBand.opacity(0), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 260)
+                .allowsHitTesting(false)
+        }
     }
 }
 

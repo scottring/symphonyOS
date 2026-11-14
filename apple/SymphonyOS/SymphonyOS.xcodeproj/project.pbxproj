@@ -86,6 +86,7 @@
 		4D32ABFDA54603F52835573C /* PlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 762879785174DAA48771110A /* PlannerView.swift */; };
 		4DE34ED9DDD20F324D83BFBB /* PlannerScreensUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DAE563BB5ACD767A6B02809 /* PlannerScreensUITests.swift */; };
 		4E48550B7C5BA7A5FDA362F5 /* DayScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99AFE24BF962501389A426A3 /* DayScale.swift */; };
+		4E5C6EEC54DA51F14C15E832 /* WalkBackdropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1017D1F6A2435F12FB26EC9 /* WalkBackdropTests.swift */; };
 		5036DE75E17210B7CF2E299E /* PaperSound.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF25E9E482069019BECD2364 /* PaperSound.swift */; };
 		509F025ABD79CD27B878E1EC /* PeriodPlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 187DEF77B7597EB968E30562 /* PeriodPlanView.swift */; };
 		511DDD802338108B88BEB0FF /* CrimsonPro-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 67A7372203050D025A28D396 /* CrimsonPro-Regular.ttf */; };
@@ -195,6 +196,7 @@
 		B8FCCA25AA5225D0C499716B /* CookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D6F0507BFAF3A740903CCB /* CookView.swift */; };
 		BA95289A567417D281DD5EB7 /* WalkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F965A54FF53FA305FCD38C0B /* WalkView.swift */; };
 		BAC9271B1175D9367F5C5D30 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD1BE1E7E379CBBA6DD1A49 /* AuthView.swift */; };
+		BAF03B85A3C5F74CE4305BAC /* WalkBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B63BD044065A7A85C4BF96 /* WalkBackdrop.swift */; };
 		BC5298F261E976B2336CACF1 /* walk-unfurl.PLACEHOLDER.wav in Resources */ = {isa = PBXBuildFile; fileRef = B9CC493DAADDC8EDB675C5F0 /* walk-unfurl.PLACEHOLDER.wav */; };
 		BD1C632779C103B02CA58E49 /* PlanSelectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E9788163FF0C909D5FD21E /* PlanSelectors.swift */; };
 		BD3079E109CD5F885473EFC7 /* PlanCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAEC2212D6BF83452FC75F4B /* PlanCalendar.swift */; };
@@ -445,6 +447,7 @@
 		777FA26749C1A4208B9DDC94 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
 		779DC68DE6348BF47C96A130 /* PendingChange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingChange.swift; sourceTree = "<group>"; };
 		79154EC8C219862BC8DE0004 /* DeleteAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountView.swift; sourceTree = "<group>"; };
+		79B63BD044065A7A85C4BF96 /* WalkBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkBackdrop.swift; sourceTree = "<group>"; };
 		7A4E6B5AB5FB68D06D3D308B /* WalkUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkUITests.swift; sourceTree = "<group>"; };
 		7C0DDF026CD23250BDF7AB83 /* ProjectListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectListView.swift; sourceTree = "<group>"; };
 		7DB97FCA58882B1058856A6F /* Signpost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Signpost.swift; sourceTree = "<group>"; };
@@ -543,6 +546,7 @@
 		CD94E09AB9B75AC2DC251E35 /* LightSpreadUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightSpreadUITests.swift; sourceTree = "<group>"; };
 		CE8500148F5BD97291AF8393 /* LightPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightPlannerView.swift; sourceTree = "<group>"; };
 		CF475C4AF30EC00DCE982A8C /* ActionableInstance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionableInstance.swift; sourceTree = "<group>"; };
+		D1017D1F6A2435F12FB26EC9 /* WalkBackdropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkBackdropTests.swift; sourceTree = "<group>"; };
 		D1383EE5C83DE0489DE695E0 /* RoutineOccurrenceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineOccurrenceSheet.swift; sourceTree = "<group>"; };
 		D19E4BEB2CD68FA6F5256F36 /* View+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Extensions.swift"; sourceTree = "<group>"; };
 		D221F6CA1BFCFE2656D2828E /* TodayDayColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayDayColumn.swift; sourceTree = "<group>"; };
@@ -1070,6 +1074,7 @@
 				C4E6747A78170172B1525262 /* TimelineEnrichmentTests.swift */,
 				BB29FF05A2D7D279DC175F6A /* TodayLayoutTests.swift */,
 				0520FFEAC5EC0322E443EF0C /* WalkArtCutTests.swift */,
+				D1017D1F6A2435F12FB26EC9 /* WalkBackdropTests.swift */,
 				C158967C47A0AB76A11DCAD0 /* WalkClassifierTests.swift */,
 				4FED05BB7B5F3E143C3086DF /* WalkCopyTests.swift */,
 				AA0D21E362BC0DDEE86F251D /* WalkFlowTests.swift */,
@@ -1209,6 +1214,7 @@
 			children = (
 				B51C0BB869FEE85FEC50B9ED /* WalkArt.swift */,
 				4E2036E1F9C1E71AE48F0A9B /* WalkArt+Tall.swift */,
+				79B63BD044065A7A85C4BF96 /* WalkBackdrop.swift */,
 				D349620293CBF9CE126ECA7D /* WalkClassifier.swift */,
 				9CF4F2A50CFDC9B5E80D18AF /* WalkCopy.swift */,
 				24C040B5436200C01B873086 /* WalkFooting.swift */,
@@ -1436,6 +1442,7 @@
 				F90FEBB07169AAE26DA4DC6F /* TimelineEnrichmentTests.swift in Sources */,
 				A558EB89256A9A88556E2464 /* TodayLayoutTests.swift in Sources */,
 				FB45194E10F3115201274CE3 /* WalkArtCutTests.swift in Sources */,
+				4E5C6EEC54DA51F14C15E832 /* WalkBackdropTests.swift in Sources */,
 				F0115C80484E86958FFACD0F /* WalkClassifierTests.swift in Sources */,
 				D5C683AA1A8D4CC32DAAAE40 /* WalkCopyTests.swift in Sources */,
 				299DDD122DD83DB8423C0B4D /* WalkFlowTests.swift in Sources */,
@@ -1617,6 +1624,7 @@
 				7726C3A546FB6B4FE09495A9 /* View+Extensions.swift in Sources */,
 				4108C223372726FAE454DCE8 /* WalkArt+Tall.swift in Sources */,
 				C6053778DAF553C9B7C3915D /* WalkArt.swift in Sources */,
+				BAF03B85A3C5F74CE4305BAC /* WalkBackdrop.swift in Sources */,
 				924BE76EC6A35003332EAF78 /* WalkBannerViews.swift in Sources */,
 				F43839CC6571F712B5D5D175 /* WalkClassifier.swift in Sources */,
 				18A64F27A6883A49F7579FEE /* WalkCopy.swift in Sources */,

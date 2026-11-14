@@ -41,7 +41,7 @@ struct MountainStage<Over: View>: View {
                 WalkPalette.ground
                     .accessibilityHidden(true)
                 ZStack(alignment: .topLeading) {
-                    WalkWorldView(layout: layout, art: art, actions: actions, onLabel: onLabel, onBanner: onBanner)
+                    WalkWorldView(layout: layout, art: art, step: state.step, actions: actions, onLabel: onLabel, onBanner: onBanner)
                     over
                 }
                 .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)

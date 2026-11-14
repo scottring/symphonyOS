@@ -660,7 +660,9 @@ struct WalkModelTests {
     // MARK: The picture
 
     @Test func theBundledPictureResolves() {
-        #expect(UIImage(named: WalkArt.overlookSquare.imageName)?.cgImage?.width == 3120)
+        // The walk draws the tall painting behind the square print's layout; the print is no longer bundled.
+        #expect(UIImage(named: WalkArt.overlookSquare.backdrop!.imageName)?.cgImage?.width == 2048)
+        #expect(UIImage(named: WalkArt.squarePrint.imageName) == nil)
     }
 }
 #endif

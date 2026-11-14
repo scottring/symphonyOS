@@ -11,6 +11,8 @@ struct WalkArt: Equatable {
     let bands: [WalkLevel: CGFloat]                    // where a level stands, as a fraction of the picture's height
     let land: [WalkLevel: ClosedRange<CGFloat>]        // the fractions that are ground for that level
     let stops: [WalkLayout.Camera]                     // seven, Welcome … Look back up
+    /// The picture drawn behind the layout, by a camera of its own (`WalkBackdrop`); with none, no picture.
+    var backdrop: WalkBackdrop? = nil
 
     /// The walk's stage, the same for every painting: the 390 × 844 the layout's numbers are in.
     static let stageSize = CGSize(width: 390, height: 844)
@@ -20,8 +22,17 @@ struct WalkArt: Equatable {
         image.minY + (bands[level] ?? 0) * image.height
     }
 
-    /// The square overlook print (contract §3): snow peaks, river valley, pines and cliff, the rock ledge.
-    static let overlookSquare = WalkArt(
+    /// The walk's art: the square print's world and numbers for the layout, with the tall
+    /// overlook painting behind it (`WalkBackdrop.tallOverlook`).
+    static let overlookSquare: WalkArt = {
+        var art = squarePrint
+        art.backdrop = .tallOverlook
+        return art
+    }()
+
+    /// The square overlook print (contract §3): snow peaks, river valley, pines and cliff, the rock
+    /// ledge. Its numbers are the layout's world; the print itself is no longer drawn.
+    static let squarePrint = WalkArt(
         imageName: "WalkOverlook",
         stage: stageSize,
         world: CGSize(width: 1300, height: 1720),

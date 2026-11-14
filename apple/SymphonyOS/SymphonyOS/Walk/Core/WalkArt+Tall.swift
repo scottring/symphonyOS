@@ -10,40 +10,6 @@ import CoreGraphics
 /// flat top to 0.93. On the left a cliff (x below 0.33, 0.58 to 0.80) and two pines whose
 /// crowns reach x 0.45 at 0.345 to 0.44 and at 0.52 to 0.60.
 extension WalkArt {
-    /// The tall painting as the walk's art: the world is the picture (it carries its own sky).
-    /// Each level's step puts its band at the stage y the square print's stop puts it at, with
-    /// the columns on the open right two-thirds (every step at k 0.52 and x 402, so the columns
-    /// stand where the Year stop sets them, x 0.44 to 0.76 for up to four). Not yet the walk's:
-    /// the levels stand two to five times further apart than on the square print, more than the
-    /// layout's fixed zoom and its rule that every level above the step is drawn allow (see
-    /// `task-art-report.md`); the everyday screens' cuts (`Cut`) come from it already.
-    static let overlookTall: WalkArt = {
-        let image = CGRect(x: 0, y: 0, width: 1300, height: 3900)
-        let bands: [WalkLevel: CGFloat] = [.year: 0.345, .season: 0.435, .month: 0.52, .week: 0.695, .today: 0.855]
-        let square = WalkArt.overlookSquare
-        let k: CGFloat = 0.52, x: CGFloat = 402
-        /// A level's step: its band where the square print's stop for that step puts its own.
-        func step(_ level: WalkLevel) -> WalkLayout.Camera {
-            let stop = square.stops[level.rawValue]
-            let stageY = (square.bandY(level) - stop.y) * stop.k
-            return WalkLayout.Camera(x: x, y: image.minY + bands[level]! * image.height - stageY / k, k: k)
-        }
-        return WalkArt(
-            imageName: "WalkOverlookTall",
-            stage: stageSize,
-            world: image.size,
-            image: image,
-            bands: bands,
-            land: [.year: 0.335...0.36, .season: 0.425...0.445, .month: 0.51...0.53,
-                   .week: 0.685...0.705, .today: 0.845...0.87],
-            stops: [
-                WalkLayout.Camera(x: 0, y: 0, k: 0.30),            // Welcome: the sky down to the meadow, the whole width
-                step(.year), step(.season), step(.month), step(.week), step(.today),
-                WalkLayout.Camera(x: 0, y: 275, k: 0.30),          // Look back up: Year to Week, as much as the stage holds
-            ]
-        )
-    }()
-
     /// One everyday view's square cut of the tall painting, drawn into that view's square
     /// `picture` frame (`DailyMetrics`, `DailyTent`), whose numbers never change. `region` is in
     /// fractions of the painting's width and height; it is square in pixels (its height is a
