@@ -5,8 +5,8 @@ import SwiftUI
 /// heads on the post's line at the plank's top and bottom edges. The post leans and the
 /// plank tilts by the sign's own hand (`Signpost.hand`), about the post's foot and the
 /// plank's left end. The plank is one button: a tap follows the sign; a sideways swipe of
-/// more than 60 points puts it away for the day (`DailyTodayPage.putsSignAway`), which
-/// VoiceOver offers as an action. Drawn in page points: `metrics.post` and `metrics.plank`
+/// more than 60 points puts it away for the day and only that (`DailyTodayPage.signGesture`),
+/// which VoiceOver offers as an action. Drawn in page points: `metrics.post` and `metrics.plank`
 /// are where they stand on the page, everything else is in the plank's own space.
 struct SignpostView: View {
     let sign: Signpost.Sign
@@ -24,8 +24,9 @@ struct SignpostView: View {
         self.putAway = putAway
     }
 
-    /// How far the plank has been pulled sideways while a finger is on it.
+    /// How far the plank has been pulled sideways while a finger drags it.
     @State private var drag: CGFloat = 0
+    @State private var pressed = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -52,14 +53,16 @@ struct SignpostView: View {
 
     // MARK: The plank
 
+    /// One gesture for the whole plank, so a touch is either a tap or a swipe, never both:
+    /// `DailyTodayPage.signGesture` decides which when the finger lifts.
     private var plankButton: some View {
-        Button(action: tap) { plank }
-            .buttonStyle(PlankPress())
-            .disabled(!tappable)
-            .simultaneousGesture(swipe)
+        plank
+            .brightness(pressed ? -0.04 : 0)
+            .gesture(touch)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(sign.label)
             .accessibilityAddTraits(.isButton)
+            .accessibilityAction { act(DailyTodayPage.signGesture(translation: .zero, endedAsDrag: false, tappable: tappable)) }
             .accessibilityAction(named: DailyCopy.putSignAway, putAway)
             .accessibilityIdentifier("daily.signpost")
     }
@@ -119,13 +122,28 @@ struct SignpostView: View {
             .frame(width: width, alignment: .leading)
     }
 
-    private var swipe: some Gesture {
-        DragGesture(minimumDistance: 12)
-            .onChanged { drag = $0.translation.width }
+    private var touch: some Gesture {
+        // Measured on the screen, not on the plank: the plank follows the finger, so its own
+        // space would move with it and the drag would never seem to go anywhere.
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { value in
+                pressed = true
+                // The plank follows the finger only once the touch has become a drag.
+                drag = DailyTodayPage.isDrag(value.translation) ? value.translation.width : 0
+            }
             .onEnded { value in
-                if DailyTodayPage.putsSignAway(swipe: value.translation.width) { putAway() }
+                act(DailyTodayPage.signGesture(translation: value.translation, endedAsDrag: false, tappable: tappable))
+                pressed = false
                 withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.85)) { drag = 0 }
             }
+    }
+
+    private func act(_ outcome: DailyTodayPage.SignGesture) {
+        switch outcome {
+        case .followed: tap()
+        case .putAway: putAway()
+        case .nothing: break
+        }
     }
 }
 
@@ -161,13 +179,6 @@ private struct NailHead: View {
             .fill(RadialGradient(colors: [DailyPalette.nailLight, DailyPalette.nailDark],
                                  center: UnitPoint(x: 0.35, y: 0.3), startRadius: 0, endRadius: 5))
             .overlay(Circle().strokeBorder(DailyPalette.plankInk, lineWidth: 1))
-    }
-}
-
-/// The plank as it is, a touch darker while pressed; never dimmed.
-private struct PlankPress: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.brightness(configuration.isPressed ? -0.04 : 0)
     }
 }
 #endif

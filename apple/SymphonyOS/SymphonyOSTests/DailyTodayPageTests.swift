@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CoreGraphics
 @testable import Symphony
 
 private func day(_ y: Int, _ m: Int, _ d: Int, _ h: Int = 0) -> Date {
@@ -90,6 +91,31 @@ struct DailyTodayPageTests {
         let none = read([first, other])
         #expect(none.firstMark(toggling: none.rows[1]).id == other.id)
         #expect(none.firstMark(toggling: none.rows[1]).previous == nil)
+    }
+
+    @Test func aGestureOnTheSignDoesExactlyOneThing() {
+        typealias G = DailyTodayPage
+        // A touch that never became a drag follows the sign.
+        #expect(G.signGesture(translation: .zero, endedAsDrag: false) == .followed)
+        #expect(G.signGesture(translation: CGSize(width: 3, height: 2), endedAsDrag: false) == .followed)
+        // A drag past the threshold puts it away; a shorter one does nothing.
+        #expect(G.signGesture(translation: CGSize(width: 61, height: 0), endedAsDrag: true) == .putAway)
+        #expect(G.signGesture(translation: CGSize(width: -90, height: 12), endedAsDrag: true) == .putAway)
+        #expect(G.signGesture(translation: CGSize(width: 40, height: 0), endedAsDrag: true) == .nothing)
+        #expect(G.signGesture(translation: CGSize(width: 0, height: 80), endedAsDrag: true) == .nothing)
+        // Not tappable: a touch does nothing, a swipe still puts it away.
+        #expect(G.signGesture(translation: .zero, endedAsDrag: false, tappable: false) == .nothing)
+        #expect(G.signGesture(translation: CGSize(width: 70, height: 0), endedAsDrag: false, tappable: false) == .putAway)
+        // Any movement past the drag's start is a drag, whatever the gesture reported: never followed.
+        for dx in stride(from: -200.0, through: 200.0, by: 1) {
+            for dy in [-30.0, -G.dragStarts, 0, G.dragStarts, 30] {
+                let t = CGSize(width: dx, height: dy)
+                let moved = (dx * dx + dy * dy).squareRoot() >= G.dragStarts
+                for ended in [false, true] where moved || ended {
+                    #expect(G.signGesture(translation: t, endedAsDrag: ended) != .followed)
+                }
+            }
+        }
     }
 
     @Test func aSwipeOfMoreThanSixtyPointsPutsTheSignAway() {

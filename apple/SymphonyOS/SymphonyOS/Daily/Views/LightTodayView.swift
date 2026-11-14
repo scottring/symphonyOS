@@ -43,6 +43,7 @@ struct LightTodayView: View {
             let m = metrics(waiting: line != nil)
             ZStack(alignment: .topLeading) {
                 DailyBand(picture: m.picture, height: m.band.height)
+                DailyTopShade(solid: m.shadeSolid, height: m.shade)
                 DailyNavRow(current: .today, gap: m.navGap, go: go)
                     .frame(width: size.width)
                     .offset(y: m.navTop)

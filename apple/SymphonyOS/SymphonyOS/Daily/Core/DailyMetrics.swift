@@ -125,6 +125,11 @@ struct DailyMetrics: Equatable {
     static let flagsApart: CGFloat = 4
     /// The row of words from `navTop`: 14 above and below the 11.5 pt words, rounded up to 44.
     static let navHeight: CGFloat = 44
+    /// The top shade behind the row of words: the walk's ground colour at this strength from the
+    /// window's top to the row's foot, so every word reads at 4.5:1 even over white snow, then
+    /// fading to clear over `shadeFade`.
+    static let shadeOpacity: Double = 0.72
+    static let shadeFade: CGFloat = 48
     /// The signpost never stands closer than this to the row of words.
     static let signClearance: CGFloat = 8
     /// The largest turn `Signpost.hand` gives a plank, in degrees (0.7…1.7).
@@ -147,6 +152,11 @@ struct DailyMetrics: Equatable {
                          shape: .tall, waiting: waiting)
         return tall.shortfall > 0 ? .short : .tall
     }
+
+    /// Where the top shade stops being full strength: the row of words' foot.
+    var shadeSolid: CGFloat { navTop + Self.navHeight }
+    /// Where the top shade has faded to clear.
+    var shade: CGFloat { shadeSolid + Self.shadeFade }
 
     // MARK: Today
 

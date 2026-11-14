@@ -77,6 +77,9 @@ enum DailyCopy {
     /// "3:00"
     static func clock(_ d: Date) -> String { format(d, "h:mm") }
 
+    /// The next event read aloud: "Next, 3:00, Bathroom design meeting".
+    static func nextEvent(_ title: String, at start: Date) -> String { "\(next), \(clock(start)), \(title)" }
+
     /// "This week" for the week holding `today`, "Next week" for the one after it, else "Week".
     static func weekEyebrow(_ start: Date, today: Date) -> String {
         if holds(start, today) { return "This week" }

@@ -87,6 +87,15 @@ extension DemoMode {
         return arguments[i + 1]
     }
 
+    /// Where a demo remembers the signs put away: a store of its own, emptied once per launch,
+    /// so a sign swiped away in one run (a UI test) is there again in the next.
+    @MainActor static let signMemory: SignpostMemory = {
+        let suite = "com.scottkaufman.symphonyos.demo-signs"
+        let defaults = UserDefaults(suiteName: suite) ?? .standard
+        defaults.removePersistentDomain(forName: suite)
+        return SignpostMemory(defaults: defaults)
+    }()
+
     // MARK: The seed
 
     /// Writes a seed as real rows through `WalkWriter`, as `walkPreview` writes the walk's:

@@ -103,6 +103,8 @@ struct DailyCopyTests {
 
     @Test func datesAndTimes() {
         #expect(DailyCopy.clock(day(2026, 11, 10, 15)) == "3:00")
+        #expect(DailyCopy.nextEvent("Bathroom design meeting", at: day(2026, 11, 10, 15))
+                == "Next, 3:00, Bathroom design meeting")
         #expect(DailyCopy.date(day(2026, 11, 10)) == "Tuesday, 10 November")
         #expect(DailyCopy.dayLabel(day(2026, 11, 10)) == ("TUE", "10"))
         #expect(DailyCopy.itsOn(day(2026, 11, 20), today: day(2026, 11, 10)) == "It’s on Friday the 20th.")

@@ -40,4 +40,23 @@ struct DailyBand: View {
         .accessibilityHidden(true)
     }
 }
+
+/// The walk's top shade behind the row of words: its ground colour at `DailyMetrics.shadeOpacity`
+/// from the page's top to `solid` (the row's foot), fading to clear by `height`, on every shape.
+struct DailyTopShade: View {
+    let solid: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        let a = DailyMetrics.shadeOpacity
+        LinearGradient(stops: [.init(color: WalkPalette.ground.opacity(a), location: 0),
+                               .init(color: WalkPalette.ground.opacity(a), location: solid / height),
+                               .init(color: WalkPalette.ground.opacity(0), location: 1)],
+                       startPoint: .top, endPoint: .bottom)
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
 #endif

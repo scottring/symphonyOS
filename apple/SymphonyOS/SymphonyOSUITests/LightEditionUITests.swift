@@ -39,6 +39,40 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Contacts"].exists)
     }
 
+    /// A sideways drag on the signpost puts it away and does not follow it. On the 28th the
+    /// `quiet` seed shows one sign, "November ends on Monday", whose tap would open Month's page;
+    /// after the drag the sign is gone and Today is still the page.
+    @MainActor func testASwipeOnlyPutsTheSignAway() throws {
+        let (app, sign) = launchOnTheMonthsLastDays()
+        let any = app.descendants(matching: .any)
+
+        let start = sign.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+        start.press(forDuration: 0.15, thenDragTo: start.withOffset(CGVector(dx: 160, dy: 0)))
+
+        XCTAssertTrue(sign.waitForNonExistence(timeout: 10), "the drag did not put the sign away")
+        XCTAssertTrue(any["daily.today"].exists, "the drag also followed the sign off Today")
+        XCTAssertTrue(any["daily.nav.today"].isSelected, "Today is no longer the page")
+    }
+
+    /// The same sign, tapped, is followed: Today gives way to Month's page.
+    @MainActor func testATapFollowsTheSign() throws {
+        let (app, sign) = launchOnTheMonthsLastDays()
+        sign.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["daily.today"].waitForNonExistence(timeout: 10),
+                      "a tap did not follow the sign")
+    }
+
+    private func launchOnTheMonthsLastDays() -> (XCUIApplication, XCUIElement) {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-28",
+                               "-SymphonyDailySeed", "quiet"]
+        app.launch()
+        let sign = app.descendants(matching: .any)["daily.signpost"]
+        XCTAssertTrue(sign.waitForExistence(timeout: 60), "no sign on the 28th")
+        XCTAssertTrue(sign.label.contains("November"), "not the month's sign: \(sign.label)")
+        return (app, sign)
+    }
+
     @MainActor func testFullDockStillHasRoutines() throws {
         let app = launch(light: false)
         XCTAssertTrue(app.buttons["Routines"].exists)

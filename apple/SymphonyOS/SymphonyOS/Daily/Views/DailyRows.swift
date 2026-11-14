@@ -51,7 +51,7 @@ struct DailyRow: View {
         .contextMenu {
             Button(action: setFirst) { Label(firstWords, systemImage: "flag") }
             Button(action: details) { Label(DailyCopy.details, systemImage: "doc.text") }
-            Button(role: .destructive, action: pullUp) { Label(WalkCopy.pullUp, systemImage: "arrow.up") }
+            Button(action: pullUp) { Label(WalkCopy.pullUp, systemImage: "arrow.up") }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(WalkCopy.rowLabel(row.title, forGoal: row.forGoal))
@@ -163,7 +163,7 @@ struct DailyNextCard: View {
         .background(RoundedRectangle(cornerRadius: 14).fill(DailyPalette.nextFill))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(DailyPalette.nextLine, lineWidth: 1))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(DailyCopy.next), \(DailyCopy.clock(next.start)), \(next.title)")
+        .accessibilityLabel(DailyCopy.nextEvent(next.title, at: next.start))
     }
 }
 

@@ -58,8 +58,13 @@ struct LightPlannerView<Full: View>: View {
             openDemoPage()
         }
         .onChange(of: hidesDock) { _, hides in appState.dailyHidesDock = hides }
-        // Gone (another tab, signed out): the dock comes back.
-        .onDisappear { appState.dailyHidesDock = false }
+        // Gone (another tab, signed out, the household become full): the dock comes back, and the
+        // model stops listening and cancels its timers (a pending pull-up is written).
+        .onDisappear {
+            appState.dailyHidesDock = false
+            model?.close()
+            model = nil
+        }
         .onChange(of: auth.currentUser?.id) { _, _ in makeModel() }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -102,10 +107,13 @@ struct LightPlannerView<Full: View>: View {
         model?.close()
         #if DEBUG
         let listener = DemoMode.isOn ? DemoMode.dailyListener : nil    // `-SymphonyDailyState speak`
+        // A demo forgets the signs put away on earlier launches, as it forgets the walk.
+        let memory = DemoMode.isOn ? DemoMode.signMemory : SignpostMemory()
         #else
         let listener: WalkListening? = nil
+        let memory = SignpostMemory()
         #endif
-        model = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener)
+        model = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener, memory: memory)
     }
 
     /// A word in the row of words: the date the walk's period for it opens on, then the page.

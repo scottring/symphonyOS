@@ -209,6 +209,35 @@ struct DailyMetricsTests {
 
     /// The sign is nailed to its post: the strip is the post seen across the plank, and its
     /// two nail heads sit on that line at the plank's top and bottom edges, never beside the words.
+    /// Relative luminance of an sRGB colour (0…1 channels), and the WCAG contrast of two.
+    private func luminance(_ c: (Double, Double, Double)) -> Double {
+        func lin(_ v: Double) -> Double { v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+        return 0.2126 * lin(c.0) + 0.7152 * lin(c.1) + 0.0722 * lin(c.2)
+    }
+
+    @Test func theRowOfWordsAlwaysStandsOnTheShade() {
+        // Every shape and the safe tops it meets: a 375 × 667 phone, the Duo's outside screen, iPhone 17.
+        let windows: [(CGSize, CGFloat, CGFloat, DailyMetrics.Shape)] = [
+            (CGSize(width: 375, height: 667), 20, 0, .short), (CGSize(width: 466, height: 678), 22, 0, .short),
+            (CGSize(width: 402, height: 874), 62, 34, .tall), (CGSize(width: 390, height: 844), 44, 34, .tall)]
+        for (size, top, bottom, shape) in windows {
+            let m = DailyMetrics.today(size: size, safeTop: top, safeBottom: bottom, shape: shape)
+            #expect(m.shadeSolid >= m.navTop + DailyMetrics.navHeight)     // full strength behind every word
+            #expect(m.shade > m.shadeSolid)                                // then it fades out
+            #expect(m.shade < m.sheetTop)
+            let w = DailyMetrics.week(size: size, safeTop: top, safeBottom: bottom, shape: shape)
+            #expect(w.shadeSolid >= w.navTop + DailyMetrics.navHeight)
+        }
+        // The worst ground behind a word is white snow. The shade (the walk's ground, #00106E) over it,
+        // and the quietest word (white at 0.8) over that, still read at 4.5:1.
+        let a = DailyMetrics.shadeOpacity
+        let ground = (0.0, 16.0 / 255, 110.0 / 255)
+        let behind = (a * ground.0 + (1 - a), a * ground.1 + (1 - a), a * ground.2 + (1 - a))
+        let word = (0.8 + 0.2 * behind.0, 0.8 + 0.2 * behind.1, 0.8 + 0.2 * behind.2)
+        let contrast = (luminance(word) + 0.05) / (luminance(behind) + 0.05)
+        #expect(contrast >= 4.5)
+    }
+
     @Test func theSignIsNailedOnItsPost() {
         for m in [DailyMetrics.today(size: phone, safeTop: 44, safeBottom: 34),
                   DailyMetrics.today(size: outside, safeTop: 22, safeBottom: 0, shape: .short)] {

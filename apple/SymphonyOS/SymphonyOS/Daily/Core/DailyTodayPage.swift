@@ -30,7 +30,8 @@ struct DailyTodayPage: Equatable {
     }
 
     /// Calendar events ticked off (or skipped) on this day, by event key: the rule the walk's
-    /// next event reads (`WalkModel.nextUp`).
+    /// next event reads. Kept word for word with its copy in `WalkModel.nextUp` (the walk's
+    /// own code is left as it is): change one, change the other.
     static func ticked(_ instances: [ActionableInstance], on day: Date) -> Set<String> {
         Set(instances
             .filter { $0.entityType == "calendar_event" && ($0.status == "completed" || $0.status == "skipped")
@@ -43,6 +44,25 @@ struct DailyTodayPage: Equatable {
     func firstMark(toggling row: DailyDay.Row) -> (id: UUID?, previous: UUID?) {
         if row.first { return (nil, row.id) }
         return (row.id, rows.first(where: \.first)?.id)
+    }
+
+    /// What one gesture on the sign does: exactly one of these, never two.
+    enum SignGesture: Equatable { case followed, putAway, nothing }
+
+    /// A finger that moves this far (any way) from where it went down is dragging, not tapping.
+    static let dragStarts: CGFloat = 12
+
+    /// A touch that never became a drag follows the sign (when it can be followed); a drag puts
+    /// it away when it went more than `putAwaySwipe` sideways, and otherwise does nothing. Any
+    /// movement past `dragStarts` is a drag, whatever the gesture reported, so it never follows.
+    static func signGesture(translation: CGSize, endedAsDrag: Bool, tappable: Bool = true) -> SignGesture {
+        if endedAsDrag || isDrag(translation) { return putsSignAway(swipe: translation.width) ? .putAway : .nothing }
+        return tappable ? .followed : .nothing
+    }
+
+    /// The finger has moved `dragStarts` or more from where it went down.
+    static func isDrag(_ translation: CGSize) -> Bool {
+        (translation.width * translation.width + translation.height * translation.height).squareRoot() >= dragStarts
     }
 
     /// A sideways swipe of more than this many points puts the sign away for the day.
