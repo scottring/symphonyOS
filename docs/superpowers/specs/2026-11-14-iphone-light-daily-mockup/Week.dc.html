@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Week</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+a{color:#FFFFFF}a:hover{color:#F6DFA6}
+input::placeholder{color:#5F6966;opacity:1}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #00106E; font-family: 'DM Sans', system-ui, sans-serif; color: #1F2A2B">
+
+  <div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 390px; height: 250px; overflow: hidden">
+    <img src="/_blob/74f18a7a69d11ab4ae0ee82ef04f5e82" alt="" style="position: absolute; left: -150px; top: -330px; width: 700px; height: 700px">
+    <div style="position: absolute; left: 0; top: 0; width: 390px; height: 180px; background: linear-gradient(to bottom, rgba(0,16,110,.97) 22%, rgba(0,16,110,0))"></div>
+  </div>
+
+  <nav aria-label="Where you are" style="position: absolute; left: 0; top: 44px; width: 390px; display: flex; justify-content: center; gap: 18px; font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; text-shadow: 0 1px 6px rgba(0,14,70,.7)">
+    <a href="Year.dc.html" style="padding: 14px 3px; color: rgba(255,255,255,.8); text-decoration: none">Year</a>
+    <span style="padding: 14px 3px; color: rgba(255,255,255,.8)">Season</span>
+    <a href="Month.dc.html" style="padding: 14px 3px; color: rgba(255,255,255,.8); text-decoration: none">Month</a>
+    <span style="padding: 14px 3px 10px; color: #FFFFFF; font-weight: 600; border-bottom: 2px solid #F6DFA6">Week</span>
+    <a href="Main.dc.html" style="padding: 14px 3px; color: rgba(255,255,255,.8); text-decoration: none">Today</a>
+  </nav>
+
+  <div aria-hidden="true" style="position: absolute; left: 95px; top: 128px; width: 3px; height: 62px; border-radius: 2px; background: #2C2219; transform: rotate(-1.5deg); transform-origin: 50% 100%"></div>
+  <div aria-hidden="true" style="position: absolute; left: 88px; top: 187px; width: 17px; height: 5px; border-radius: 50%; background: rgba(0,14,70,.45)"></div>
+  <a href="Month.dc.html" style="position: absolute; left: 30px; top: 118px; width: 156px; height: 32px; box-sizing: border-box; padding: 0 9px; background: #2F6B4F; color: #FFFFFF; font-size: 12.5px; font-weight: 500; line-height: 26px; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 5px), 0 100%); transform: rotate(-1.3deg)">Pick the tile and pay the deposit</a>
+
+  <div aria-hidden="true" style="position: absolute; left: 289px; top: 112px; width: 3px; height: 68px; border-radius: 2px; background: #2C2219; transform: rotate(1.8deg); transform-origin: 50% 100%"></div>
+  <div aria-hidden="true" style="position: absolute; left: 282px; top: 177px; width: 17px; height: 5px; border-radius: 50%; background: rgba(0,14,70,.45)"></div>
+  <a href="Month.dc.html" style="position: absolute; left: 222px; top: 101px; width: 138px; height: 32px; box-sizing: border-box; padding: 0 9px; background: #2F6B4F; color: #FFFFFF; font-size: 12.5px; font-weight: 500; line-height: 26px; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 5px), 0 100%); transform: rotate(1.1deg)">Find a gym that fits</a>
+
+  <div style="position: absolute; left: 0; top: 204px; width: 390px; height: 640px; box-sizing: border-box; background: #FBF8F2; border-radius: 28px 28px 0 0; box-shadow: 0 -8px 26px rgba(0,14,70,.3)">
+    <div aria-hidden="true" style="position: absolute; left: 173px; top: 9px; width: 44px; height: 5px; border-radius: 3px; background: #D4CDC0"></div>
+    <button type="button" style="position: absolute; left: 115px; top: 16px; width: 160px; height: 24px; border: none; background: none; font-family: inherit; font-size: 12px; font-weight: 500; color: #56625F; cursor: pointer">Look back up</button>
+    <div style="position: absolute; left: 22px; top: 44px; width: 346px; display: flex; flex-direction: column; gap: 1px">
+      <span style="font-size: 11px; font-weight: 500; letter-spacing: 1.5px; color: #56625F">THIS WEEK</span>
+      <span style="font-family: 'Crimson Pro', serif; font-size: 27px; line-height: 32px; color: #1F2A2B">8&#8211;14 November</span>
+    </div>
+
+    <div style="position: absolute; left: 16px; top: 104px; width: 358px; display: flex; flex-direction: column">
+      <button type="button" style="height: 34px; padding: 0 6px; display: flex; align-items: center; justify-content: space-between; border: none; border-bottom: 1px solid #E6E0D6; background: none; font-family: inherit; font-size: 13px; color: #56625F; cursor: pointer">
+        <span>Sunday and Monday</span>
+        <span>3 done</span>
+      </button>
+      <sc-for list="{{ rows }}" as="row" hint-placeholder-count="9">
+        <div style="display: flex; align-items: center; gap: 8px; padding-top: {{ row.gap }}; border-top: {{ row.rule }}">
+          <span style="flex: none; width: 44px; display: flex; flex-direction: column; align-items: flex-start; padding-left: 6px; box-sizing: border-box">
+            <span style="font-size: 10.5px; font-weight: 600; letter-spacing: 1.3px; color: {{ row.dayInk }}">{{ row.dayLabel }}</span>
+            <span style="font-family: 'Crimson Pro', serif; font-size: 20px; line-height: 22px; color: {{ row.dayInk }}">{{ row.dayNum }}</span>
+          </span>
+          <sc-if value="{{ row.isEvent }}" hint-placeholder-val="{{ false }}">
+            <span style="flex: 1; height: 30px; display: flex; align-items: center; gap: 10px; padding-left: 10px">
+              <span style="font-family: 'Crimson Pro', serif; font-size: 16px; color: #9A3D1F">{{ row.time }}</span>
+              <span style="font-size: 14.5px; color: #3F4B49">{{ row.title }}</span>
+            </span>
+          </sc-if>
+          <sc-if value="{{ row.isOpen }}" hint-placeholder-val="{{ false }}">
+            <span style="flex: 1; height: 34px; display: flex; align-items: center; padding-left: 10px; font-size: 13px; color: #857D72">open</span>
+          </sc-if>
+          <sc-if value="{{ row.isTask }}" hint-placeholder-val="{{ true }}">
+            <span style="flex: 1; min-width: 0; height: 46px; margin-bottom: 5px; box-sizing: border-box; padding: 0 4px 0 2px; display: flex; align-items: center; gap: 2px; background: #FFFFFF; border: 1px solid #E6E0D6; border-radius: 14px; box-shadow: {{ row.halo }}">
+              <button type="button" onClick="{{ row.toggle }}" aria-label="Done" aria-pressed="{{ row.done }}" style="flex: none; width: 40px; height: 44px; padding: 0; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer">
+                <span aria-hidden="true" style="width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%; border: 2px solid {{ row.ring }}; background: {{ row.fill }}"></span>
+              </button>
+              <button type="button" onClick="{{ row.pick }}" aria-pressed="{{ row.picked }}" style="flex: 1; min-width: 0; height: 44px; padding: 0; border: none; background: none; display: flex; flex-direction: column; justify-content: center; gap: 0; text-align: left; font-family: inherit; cursor: pointer">
+                <span style="font-size: 15.5px; line-height: 19px; font-weight: 500; color: {{ row.ink }}; text-decoration: {{ row.deco }}; text-decoration-color: #A9B0AD; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ row.title }}</span>
+                <sc-if value="{{ row.hasGoal }}" hint-placeholder-val="{{ true }}">
+                  <span style="display: flex; align-items: center; gap: 5px; font-size: 12px; line-height: 15px; color: #4A5654">
+                    <svg viewBox="0 0 12 14" width="9" height="11" aria-hidden="true"><path d="M2 1v12" stroke="#2C2219" stroke-width="1.4" stroke-linecap="round"></path><path d="M2.7 1.6h7.6l-2 2.6 2 2.6H2.7z" fill="#A8452C"></path></svg>
+                    for <span style="font-family: 'Crimson Pro', serif; font-size: 14px; color: #32664D">{{ row.goal }}</span>
+                  </span>
+                </sc-if>
+              </button>
+            </span>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div aria-hidden="true" style="position: absolute; left: 0; top: 696px; width: 390px; height: 44px; background: linear-gradient(to bottom, rgba(251,248,242,0), #FBF8F2); pointer-events: none"></div>
+  <div aria-hidden="true" style="position: absolute; left: 0; top: 740px; width: 390px; height: 104px; background: #FBF8F2"></div>
+
+  <sc-if value="{{ moving }}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 12px; top: 604px; width: 366px; box-sizing: border-box; padding: 10px 12px 12px; background: #FFFFFF; border: 1px solid #E6E0D6; border-radius: 18px; box-shadow: 0 8px 22px rgba(0,14,70,.16); display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 11px; font-weight: 600; letter-spacing: 1.3px; color: #56625F">MOVE TO</span>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+        <sc-for list="{{ chips }}" as="chip" hint-placeholder-count="5">
+          <button type="button" onClick="{{ chip.go }}" style="height: 36px; padding: 0 13px; border: 1px solid #9CBCA8; border-radius: 18px; background: #F3F8F4; font-family: inherit; font-size: 14px; font-weight: 500; color: #244B38; cursor: pointer">{{ chip.label }}</button>
+        </sc-for>
+        <button type="button" onClick="{{ pullUp }}" style="height: 36px; padding: 0 13px; border: 1px solid #F0CDBD; border-radius: 18px; background: #FBEBE3; font-family: inherit; font-size: 14px; font-weight: 500; color: #9A3D1F; cursor: pointer">Pull it up</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="position: absolute; left: 64px; top: 754px; width: 262px; height: 48px; box-sizing: border-box; padding: 0 5px 0 18px; display: flex; align-items: center; gap: 6px; background: #FFFFFF; border: 1.5px solid #CFC8BA; border-radius: 24px">
+    <input type="text" aria-label="Add to this week" placeholder="Add to this week" style="flex: 1; min-width: 0; height: 40px; padding: 0; border: none; outline: none; background: none; font-family: inherit; font-size: 16px; color: #1F2A2B">
+    <button type="button" aria-label="Speak it" style="flex: none; width: 38px; height: 38px; padding: 0; border: none; border-radius: 50%; background: radial-gradient(circle at 42% 36%, #FFFDF4 0%, #FFF0CC 38%, #F7CF83 72%, #E0A24A 100%); box-shadow: 0 0 0 1px rgba(185,118,40,.3); display: flex; align-items: center; justify-content: center; cursor: pointer">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2C2219" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg>
+    </button>
+  </div>
+
+  <button type="button" aria-label="More" style="position: absolute; left: 6px; top: 750px; width: 56px; height: 56px; border: none; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-family: inherit; font-size: 10.5px; color: #56625F; cursor: pointer">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="#56625F" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
+    More
+  </button>
+  <button type="button" aria-label="Inbox" style="position: absolute; left: 328px; top: 750px; width: 56px; height: 56px; border: none; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-family: inherit; font-size: 10.5px; color: #56625F; cursor: pointer">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#56625F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>
+    Inbox
+  </button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  state = {};
+  renderVals() {
+    const s = this.state || {};
+    const days = [
+      { key: 'tue', label: 'TUE', num: '10', chip: 'Today', today: true },
+      { key: 'wed', label: 'WED', num: '11', chip: 'Wed' },
+      { key: 'thu', label: 'THU', num: '12', chip: 'Thu' },
+      { key: 'fri', label: 'FRI', num: '13', chip: 'Fri' },
+      { key: 'sat', label: 'SAT', num: '14', chip: 'Sat' },
+      { key: 'any', label: 'ANY', num: 'day', chip: 'Any day' }
+    ];
+    const tasks = s.tasks ?? [
+      { id: 'w1', title: 'Send the contractor the deposit', goal: 'Finish the bathroom', day: 'tue' },
+      { id: 'w2', title: 'Tour the gym on Main Street', goal: 'Feel strong again', day: 'tue' },
+      { id: 'w3', title: 'Renew the passport', goal: '', day: 'tue' },
+      { id: 'w4', title: 'Choose the tile', goal: 'Finish the bathroom', day: 'wed' },
+      { id: 'w5', title: 'Slow morning, pancakes', goal: 'More slow weekends together', day: 'sat' },
+      { id: 'w6', title: 'Measure the bathroom window', goal: 'Finish the bathroom', day: 'any' }
+    ];
+    const events = [
+      { day: 'tue', time: '3:00', title: 'Bathroom design meeting' },
+      { day: 'thu', time: '9:30', title: 'Dentist' }
+    ];
+    const set = (next, sel) => this.setState({ tasks: next, sel: sel ?? null });
+    const rows = [];
+    days.forEach((d, di) => {
+      const mine = [];
+      events.filter((e) => e.day === d.key).forEach((e) => mine.push({ isEvent: true, time: e.time, title: e.title }));
+      tasks.filter((t) => t.day === d.key).forEach((t) => {
+        const picked = s.sel === t.id;
+        mine.push({
+          isTask: true, title: t.title, goal: t.goal, hasGoal: !!t.goal, done: !!t.done, picked,
+          ink: t.done ? '#6B7472' : '#1F2A2B', deco: t.done ? 'line-through' : 'none',
+          ring: t.done ? '#32664D' : '#857D72', fill: t.done ? '#32664D' : 'transparent',
+          halo: picked ? '0 0 0 3px #F6DFA6' : '0 1px 0 rgba(31,42,43,.04)',
+          toggle: () => set(tasks.map((x) => x.id === t.id ? { ...x, done: !x.done } : x), s.sel),
+          pick: () => this.setState({ sel: picked ? null : t.id })
+        });
+      });
+      if (!mine.length) mine.push({ isOpen: true });
+      mine.forEach((r, i) => rows.push({
+        isEvent: false, isTask: false, isOpen: false, ...r,
+        dayLabel: i === 0 ? d.label : '', dayNum: i === 0 ? d.num : '',
+        dayInk: d.today ? '#9A3D1F' : '#56625F',
+        gap: i === 0 ? '8px' : '0px',
+        rule: i === 0 && di > 0 ? '1px solid #E6E0D6' : '1px solid transparent'
+      }));
+    });
+    const sel = tasks.find((t) => t.id === s.sel);
+    const chips = sel ? days.filter((d) => d.key !== sel.day).map((d) => ({
+      label: d.chip, go: () => set(tasks.map((x) => x.id === sel.id ? { ...x, day: d.key } : x))
+    })) : [];
+    return {
+      rows, chips, moving: !!sel,
+      pullUp: () => set(tasks.filter((x) => !sel || x.id !== sel.id)),
+      hint: sel ? 'Tap a day to move it there' : 'Hold to add · tap a task to move it'
+    };
+  }
+}
+</script>
+</body>
+</html>

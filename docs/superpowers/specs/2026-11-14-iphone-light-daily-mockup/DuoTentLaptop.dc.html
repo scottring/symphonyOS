@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Duo half open, like a laptop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+input::placeholder{color:#5F6966;opacity:1}
+</style>
+</helmet>
+<div style="position: relative; width: 626px; height: 890px; overflow: hidden; background: #FBF8F2; font-family: 'DM Sans', system-ui, sans-serif; color: #1F2A2B">
+
+  <div style="position: absolute; left: 0; top: 0; width: 626px; height: 445px; overflow: hidden; background: #00106E; color: #FFFFFF">
+    <img src="/_blob/74f18a7a69d11ab4ae0ee82ef04f5e82" alt="" style="position: absolute; left: -137px; top: -120px; width: 900px; height: 900px">
+    <div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 626px; height: 300px; background: linear-gradient(to bottom, rgba(0,16,110,.78), rgba(0,16,110,0))"></div>
+    <div style="position: absolute; left: 40px; top: 26px; display: flex; flex-direction: column; text-shadow: 0 2px 12px rgba(0,14,70,.7)">
+      <span style="font-family: 'Crimson Pro', serif; font-size: 124px; line-height: 124px; font-weight: 400">10:42</span>
+      <span style="font-size: 17px; letter-spacing: .3px; color: rgba(255,255,255,.92)">Tuesday, 10 November</span>
+    </div>
+    <div style="position: absolute; left: 40px; top: 200px; width: 546px; display: flex; flex-direction: column; gap: 2px; text-shadow: 0 2px 12px rgba(0,14,70,.8)">
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: 1.8px; color: #F6DFA6">NEXT &#183; 3:00</span>
+      <span style="font-family: 'Crimson Pro', serif; font-size: 38px; line-height: 44px">Bathroom design meeting</span>
+    </div>
+    <div aria-hidden="true" style="position: absolute; left: 74px; top: 310px; width: 8px; height: 150px; border-radius: 3px 3px 0 0; background: linear-gradient(90deg, #5A4735, #2C2219); transform: rotate(1deg); transform-origin: 50% 100%"></div>
+    <div style="position: absolute; left: 44px; top: 330px; width: 470px; height: 78px; box-sizing: border-box; border: 2px solid #2C2219; border-right: none; border-radius: 4px 0 0 4px; background: #F6DFA6; transform: rotate(-1.3deg); filter: drop-shadow(0 5px 6px rgba(0,14,70,.4))">
+      <span aria-hidden="true" style="position: absolute; right: -28px; top: 9px; width: 55px; height: 55px; box-sizing: border-box; background: #F6DFA6; border-top: 2px solid #2C2219; border-right: 2px solid #2C2219; transform: rotate(45deg)"></span>
+      <span aria-hidden="true" style="position: absolute; left: 28px; top: 0; bottom: 0; width: 8px; background: rgba(44,34,25,.14)"></span>
+      <span aria-hidden="true" style="position: absolute; left: 28px; top: 6px; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1px solid #2C2219; background: radial-gradient(circle at 35% 30%, #EFE9DB, #8C8474 72%)"></span>
+      <span aria-hidden="true" style="position: absolute; left: 28px; bottom: 6px; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1px solid #2C2219; background: radial-gradient(circle at 35% 30%, #EFE9DB, #8C8474 72%)"></span>
+      <span style="position: absolute; left: 50px; top: 11px; display: block; font-size: 12.5px; font-weight: 600; letter-spacing: 1.6px; color: #6B4A1F">FIRST, TODAY</span>
+      <span style="position: absolute; left: 50px; top: 31px; display: block; font-family: 'Crimson Pro', serif; font-size: 27px; font-weight: 500; color: #2C2219; white-space: nowrap">Send the contractor the deposit</span>
+    </div>
+  </div>
+
+  <div aria-hidden="true" style="position: absolute; left: 0; top: 445px; width: 626px; height: 22px; background: linear-gradient(to bottom, rgba(31,42,43,.2), rgba(31,42,43,0))"></div>
+
+  <div style="position: absolute; left: 32px; top: 476px; width: 562px; display: flex; justify-content: space-between; align-items: center">
+    <span style="font-size: 13px; font-weight: 600; letter-spacing: 1.8px; color: #56625F">TO DO TODAY</span>
+    <div role="img" aria-label="1 of 4 done" style="position: relative; width: 60px; height: 60px">
+      <svg viewBox="0 0 56 56" width="60" height="60" aria-hidden="true" style="transform: rotate(-90deg)">
+        <circle cx="28" cy="28" r="23" fill="none" stroke="#E2DCCF" stroke-width="6"></circle>
+        <circle cx="28" cy="28" r="23" fill="none" stroke="#32664D" stroke-width="6" stroke-linecap="round" stroke-dasharray="36.1 144.5"></circle>
+      </svg>
+      <span style="position: absolute; left: 0; top: 19px; width: 60px; text-align: center; font-size: 16px; font-weight: 600">1/4</span>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 24px; top: 548px; width: 578px; display: flex; flex-direction: column; gap: 8px">
+    <sc-for list="{{ rows }}" as="row" hint-placeholder-count="3">
+      <button type="button" style="width: 578px; height: 72px; box-sizing: border-box; padding: 0 18px; display: flex; align-items: center; gap: 16px; background: #FFFFFF; border: 1px solid #E6E0D6; border-radius: 20px; text-align: left; font-family: inherit; cursor: pointer">
+        <span aria-hidden="true" style="flex: none; width: 34px; height: 34px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #857D72"></span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 22px; line-height: 27px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ row.title }}</span>
+          <sc-if value="{{ row.hasGoal }}" hint-placeholder-val="{{ true }}">
+            <span style="display: flex; align-items: center; gap: 6px; font-size: 15px; line-height: 19px; color: #4A5654">
+              <svg viewBox="0 0 12 14" width="12" height="14" aria-hidden="true"><path d="M2 1v12" stroke="#2C2219" stroke-width="1.4" stroke-linecap="round"></path><path d="M2.7 1.6h7.6l-2 2.6 2 2.6H2.7z" fill="#A8452C"></path></svg>
+              for <span style="font-family: 'Crimson Pro', serif; font-size: 18px; color: #32664D">{{ row.goal }}</span>
+            </span>
+          </sc-if>
+        </span>
+      </button>
+    </sc-for>
+  </div>
+
+  <span style="position: absolute; left: 34px; top: 776px; font-size: 14px; color: #56625F">1 done</span>
+  <div style="position: absolute; left: 24px; top: 808px; width: 578px; height: 58px; box-sizing: border-box; padding: 0 7px 0 24px; display: flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1.5px solid #CFC8BA; border-radius: 29px">
+    <input type="text" aria-label="Add to today" placeholder="Add to today" style="flex: 1; min-width: 0; height: 46px; padding: 0; border: none; outline: none; background: none; font-family: inherit; font-size: 20px; color: #1F2A2B">
+    <button type="button" aria-label="Speak it" style="flex: none; width: 44px; height: 44px; padding: 0; border: none; border-radius: 50%; background: radial-gradient(circle at 42% 36%, #FFFDF4 0%, #FFF0CC 38%, #F7CF83 72%, #E0A24A 100%); box-shadow: 0 0 0 1px rgba(185,118,40,.3); display: flex; align-items: center; justify-content: center; cursor: pointer">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#2C2219" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg>
+    </button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":626,"height":890}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { rows: [
+      { title: 'Send the contractor the deposit', goal: 'Finish the bathroom', hasGoal: true },
+      { title: 'Tour the gym on Main Street', goal: 'Feel strong again', hasGoal: true },
+      { title: 'Renew the passport', goal: '', hasGoal: false }
+    ] };
+  }
+}
+</script>
+</body>
+</html>

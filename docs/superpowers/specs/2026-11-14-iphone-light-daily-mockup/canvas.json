@@ -1,0 +1,41 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-14T08:10:00Z" },
+  "title": "Symphony light: Today, Week and the Duo",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Today, morning (press Play, type in the bar)", "is_interactive": true, "radius": 44 },
+    "TodaySpeak.dc.html": { "x": 470, "y": 0, "w": 390, "h": 844, "title": "Today, speaking something in", "radius": 44 },
+    "TodayDone.dc.html": { "x": 940, "y": 0, "w": 390, "h": 844, "title": "Today, all done", "radius": 44 },
+    "Signposts.dc.html": { "x": 1410, "y": 0, "w": 1250, "h": 844, "title": "The signposts: one at a time" },
+    "Handover.dc.html": { "x": 2740, "y": 0, "w": 1250, "h": 1010, "title": "The walk hands the light to the bar" },
+    "Week.dc.html": { "x": 0, "y": 1264, "w": 390, "h": 844, "title": "Week (press Play, tap a task)", "is_interactive": true, "radius": 44 },
+    "Month.dc.html": { "x": 470, "y": 1264, "w": 390, "h": 844, "title": "Month", "radius": 44 },
+    "Year.dc.html": { "x": 940, "y": 1264, "w": 390, "h": 844, "title": "Year", "radius": 44 },
+    "DuoOutside.dc.html": { "x": 0, "y": 2528, "w": 466, "h": 678, "title": "Duo, outside screen", "radius": 36 },
+    "DuoSpread.dc.html": { "x": 546, "y": 2528, "w": 890, "h": 626, "title": "Duo, opened flat: week and today", "radius": 30 },
+    "DuoTentLaptop.dc.html": { "x": 1516, "y": 2528, "w": 626, "h": 890, "title": "Duo, half open like a laptop", "radius": 30 },
+    "DuoTentBook.dc.html": { "x": 2222, "y": 2528, "w": 890, "h": 626, "title": "Duo, half open like a book", "radius": 30 }
+  },
+  "order": [
+    "Main.dc.html",
+    "TodaySpeak.dc.html",
+    "TodayDone.dc.html",
+    "Signposts.dc.html",
+    "Handover.dc.html",
+    "Week.dc.html",
+    "Month.dc.html",
+    "Year.dc.html",
+    "DuoOutside.dc.html",
+    "DuoSpread.dc.html",
+    "DuoTentLaptop.dc.html",
+    "DuoTentBook.dc.html"
+  ],
+  "notes": {
+    "t-today": { "x": 0, "y": -300, "text": "Today", "kind": "title1", "maxW": 3990 },
+    "t-above": { "x": 0, "y": 964, "text": "Week, Month and Year", "kind": "title1", "maxW": 1330 },
+    "t-duo": { "x": 0, "y": 2228, "text": "iPhone Duo", "kind": "title1", "maxW": 3112 }
+  },
+  "designSystems": []
+}

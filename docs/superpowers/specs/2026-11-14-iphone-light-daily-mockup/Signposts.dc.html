@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The signposts</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1250px; height: 844px; box-sizing: border-box; padding: 34px 0 0; background: #FBF8F2; font-family: 'DM Sans', system-ui, sans-serif; color: #1F2A2B; display: flex; flex-direction: column; gap: 22px">
+  <div style="padding: 0 4px; display: flex; flex-direction: column; gap: 6px">
+    <h1 style="margin: 0; font-family: 'Crimson Pro', serif; font-size: 34px; line-height: 40px; font-weight: 500">The day&#39;s signpost</h1>
+    <p style="margin: 0; max-width: 900px; font-size: 16px; line-height: 24px; color: #3F4B49">One sign at a time, at the top of Today. It points at your own plan, in your own words. Get there and it turns to the next place. Swipe it away and it stays away for the day. Listed in order: the first one that is true is the sign you see.</p>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px 40px">
+    <sc-for list="{{ signs }}" as="sign" hint-placeholder-count="6">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <div style="position: relative; width: 390px; height: 200px; overflow: hidden; border-radius: 22px; background: #00106E">
+          <img src="/_blob/74f18a7a69d11ab4ae0ee82ef04f5e82" alt="" style="position: absolute; left: {{ sign.imgLeft }}; top: {{ sign.imgTop }}; width: {{ sign.imgW }}; height: {{ sign.imgW }}">
+          <div aria-hidden="true" style="position: absolute; left: 52px; top: 62px; width: 7px; height: 150px; border-radius: 3px 3px 0 0; background: linear-gradient(90deg, #5A4735, #2C2219); transform: rotate({{ sign.lean }}); transform-origin: 50% 100%"></div>
+          <div style="position: absolute; left: 24px; top: 84px; width: 316px; height: 64px; box-sizing: border-box; border: 2px solid #2C2219; border-right: none; border-radius: 4px 0 0 4px; background: #F6DFA6; transform: rotate({{ sign.tilt }}); filter: drop-shadow(0 4px 5px rgba(0,14,70,.38))">
+            <span aria-hidden="true" style="position: absolute; right: -23px; top: 7.5px; width: 45px; height: 45px; box-sizing: border-box; background: #F6DFA6; border-top: 2px solid #2C2219; border-right: 2px solid #2C2219; transform: rotate(45deg)"></span>
+            <span aria-hidden="true" style="position: absolute; left: 26px; top: 0; bottom: 0; width: 7px; background: rgba(44,34,25,.14)"></span>
+            <span aria-hidden="true" style="position: absolute; left: 26px; top: 5px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; border: 1px solid #2C2219; background: radial-gradient(circle at 35% 30%, #EFE9DB, #8C8474 72%)"></span>
+            <span aria-hidden="true" style="position: absolute; left: 26px; bottom: 5px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; border: 1px solid #2C2219; background: radial-gradient(circle at 35% 30%, #EFE9DB, #8C8474 72%)"></span>
+            <span style="position: absolute; left: 44px; top: 10px; display: block; font-size: 10.5px; font-weight: 600; letter-spacing: 1.4px; color: #6B4A1F; white-space: nowrap">{{ sign.eyebrow }}</span>
+            <span style="position: absolute; left: 44px; top: 27px; display: block; font-family: 'Crimson Pro', serif; font-size: 18.5px; font-weight: 500; color: #2C2219; white-space: nowrap">{{ sign.title }}</span>
+          </div>
+        </div>
+        <div style="padding: 0 6px; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 10px; align-items: baseline; font-size: 14.5px; line-height: 21px">
+          <span style="font-size: 11px; font-weight: 600; letter-spacing: 1.3px; color: #56625F">WHEN</span>
+          <span>{{ sign.when }}</span>
+          <span style="font-size: 11px; font-weight: 600; letter-spacing: 1.3px; color: #56625F">A TAP</span>
+          <span style="color: #3F4B49">{{ sign.tap }}</span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1250,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const signs = [
+      { eyebrow: 'THAT’S THE DAY', title: 'Tomorrow: Choose the tile', when: 'Everything on today is done.', tap: 'Shows tomorrow.', imgW: '430px', imgLeft: '-20px', imgTop: '-150px', lean: '1deg', tilt: '-1.6deg' },
+      { eyebrow: 'FIRST, TODAY', title: 'Send the contractor the deposit', when: 'You have chosen a first thing for today.', tap: 'Lights that task in the list.', imgW: '430px', imgLeft: '-20px', imgTop: '-70px', lean: '-1.4deg', tilt: '1.1deg' },
+      { eyebrow: 'TODAY IS OPEN · WAITING IN THE WEEK', title: 'Measure the bathroom window', when: 'Nothing is on today, and the week holds a task with no day.', tap: 'Goes up to the week.', imgW: '620px', imgLeft: '-200px', imgTop: '-190px', lean: '0.6deg', tilt: '-0.8deg' },
+      { eyebrow: 'A NEW WEEK · WHAT MOVES THIS FORWARD?', title: 'Pick the tile and pay the deposit', when: 'The week has nothing planned yet.', tap: 'Asks the walk’s Week question about that goal.', imgW: '560px', imgLeft: '-10px', imgTop: '-230px', lean: '-0.8deg', tilt: '1.7deg' },
+      { eyebrow: 'NOVEMBER ENDS ON MONDAY', title: 'Look back before it turns', when: 'The last three days of a month, a season or the year.', tap: 'Goes up to the month.', imgW: '700px', imgLeft: '-300px', imgTop: '-150px', lean: '1.5deg', tilt: '-1.2deg' },
+      { eyebrow: 'NO PIECE THIS WINTER YET', title: 'More slow weekends together', when: 'A year goal has nothing under it this season.', tap: 'Walks that one goal down, like the first walk.', imgW: '520px', imgLeft: '-120px', imgTop: '-60px', lean: '-0.5deg', tilt: '0.7deg' }
+    ];
+    return { signs };
+  }
+}
+</script>
+</body>
+</html>

@@ -316,6 +316,94 @@ Scott's rule: when a UI preview is needed, show it before implementing.
 5. **Accessibility:** a VoiceOver / Switch Control path through the walk
    without gestures.
 
+## Mockup round 1 (2026-11-14): what Scott has decided so far
+
+Canvas: https://claude.ai/artifact/3wE5VWKAtbvDPHu5pXCqy7 (twelve boards: Today in three
+states, the six signposts, the walk's handover, Week, Month, Year, and four Duo layouts).
+**Approved for building by Scott on 2026-11-14** ("yes to all three, build it"), with one
+added requirement: "make sure the controls on the light walk are crystal clear and intuitive
+- people shouldn't have to guess what different things mean." Source of the approved boards
+(HTML prototypes, not app code): `docs/superpowers/specs/2026-11-14-iphone-light-daily-mockup/`
+(`Main` = Today; the picture they reference is the app's `WalkOverlook`).
+
+Decided by Scott:
+
+- **The light stays in the walk and nowhere else as the main control.** Day to day it was
+  "questionable" (an unlabeled circle; a tap opened a compass). Every everyday screen adds
+  with a plain bar at the foot of the page instead: a text field ("Add to today", "Add to
+  this week", "Add a goal for November") with the light, small, at its right end as the mic
+  button. Tap the field to type; tap the light to speak. No compass outside the walk. More
+  and Inbox are plain icons either side of the bar.
+- **The handover.** When the walk ends and Today rises, the light shrinks and travels down
+  into the bar's mic position, with one quiet line shown that once ("The light lives here
+  now. Type, or tap it to speak."). One control in two sizes, not two controls.
+- **Flags and posts must look hand-planted, not ruled** ("the flags looked unnaturally placed
+  in a perfect grid… build in some non-uniformity so it looks visually realistic, but keep
+  it organized"). This also binds the built walk (see the walk plan, ruling W43) and every
+  signpost.
+- **Signposts are fixed to their post with visible nails** (metal heads on the post line at
+  the plank's top and bottom edges). Dots beside the text read as bullets and were rejected.
+
+Proposed by Claude and approved by Scott on 2026-11-14:
+
+- Every page is a place on the mountain: a band of the scenery on top, the walk's paper
+  sheet below. A row of words (Year · Season · Month · Week · Today) is the visible way to
+  move between levels.
+- One signpost at the top of Today, in the person's own words, from six kinds in a fixed
+  order; it turns to the next place once you get there; swiped away, it stays away that day.
+- Month, Season and Year are the mountain itself with the person's flags and no list.
+  Tapping a flag offers "Walk it down", "Move to" and "Pull it up".
+- Tasks show "for <year goal>" with a small flag. Week moves a task with the walk's "Move to"
+  chips.
+- Half-open Duo: the time, the next calendar event and the signpost over the scenery on the
+  half you look at; today's to-dos and the bar on the half you touch.
+
+### What the boards cannot say (Claude's calls for the build; check these)
+
+- **Light households only.** Every screen above replaces what a light household sees. A full
+  household (Scott and Iris) keeps today's Today, Week, horizons, dock, Duo glance, journal
+  and half-open view exactly as they are, pixel for pixel. The walk's handover into the bar
+  happens only where the walk ends on the new Today (light); a full household replaying the
+  walk ends as it does now.
+- **The bar.** Typing and speaking both go through the existing on-phone path (`Dictation`,
+  then `CaptureParser`), never a server. On Today a new item lands on today unless a day is
+  said; on Week it lands on the week with the day said, or no day; on Month, Season and Year
+  it plants a goal on that level the way the walk does (same writer, same area-by-words rule).
+  After every add, a quiet "Undo" shows for about seven seconds, as in the walk.
+- **The signpost's six kinds, in order** (the first true one shows): everything on today is
+  done → "That's the day" + tomorrow's first task if there is one; a first thing is chosen
+  for today and not done → "First, today" + its title; nothing is on today and the week holds
+  a task with no day → "Today is open" + that task; the week has no tasks at all and a month
+  goal exists → "A new week. What moves this forward?" + that month goal; the last three days
+  of a month, season or year → "<Period> ends on <weekday>" + "Look back before it turns";
+  a year goal has nothing under it this season → "No piece this <season> yet" + that goal.
+  No kind true: no signpost (the scenery stands alone). It never invents words: every title on
+  it is the person's own. Swiping it away hides that kind until the next day. It is one
+  accessible button whose label reads the whole sign.
+- **Moving between levels.** The row of words replaces the light edition's Planner title menu.
+  Season is one of the five (it was left unlinked on the boards only because no Season board
+  was drawn; it looks and works like Month). "Look back up" on a sheet lowers it to show the
+  mountain with every level's flags, as the walk's ending does.
+- **Month, Season, Year** reuse the walk's scene, layout and writer with no question and no
+  light: the level's own flags are full, the levels above are small, lower levels are not
+  drawn. A tapped flag offers "Walk it down" (opens the walk at that goal's next level down,
+  as "Walk another one down" does), "Move to" (areas; Year, Season, Month) and "Pull it up".
+  A list for VoiceOver and Switch Control stands behind the scene (the flags in reading
+  order), as the walk already provides.
+- **Week.** Days run in the household's week (Sunday to Saturday here). Past days fold to one
+  line. A task's circle completes it; tapping its words selects it and offers the other days,
+  "Any day", and "Pull it up" (delete, with Undo). Calendar events are quiet lines; they
+  cannot be moved here.
+- **Inbox and More** keep their existing light-edition screens; only the way in changes (the
+  two icons beside the bar replace the dock). "Get early access to Plus" stays in More.
+- **Duo.** Outside screen: the Today layout at that size. Opened flat and sideways: the rest
+  of the week on the left page, Today on the right, one band of scenery across both, the bar
+  on the Today page. Inside screen upright (not drawn): the Today layout at that width.
+  Half-open: as drawn, for both the laptop and book postures; no dinner in light.
+- **Not designed, left as they are for now:** a regular iPhone held sideways (the existing
+  wide glance), Dynamic Type beyond what the layouts absorb by wrapping, and the "doorstep"
+  art. Each is listed in the plan's "Known gaps", not silently skipped.
+
 ## Order of work
 
 1. Foundations that don't depend on design (each needs Scott's approval
