@@ -721,10 +721,11 @@ struct WalkLayoutTests {
     /// the tap the scene would send for it, in every generated state.
     @Test func aBannerTakesATapExactlyWhenTheReducerActsOnIt() {
         let env = WalkEnv(periods: WalkPeriods.pick(now: today, weekStartsOn: 0), now: today)
-        var disagreements: [String] = []
-        for s in Generated.states() {
-            let layout = WalkLayout.make(s, today: today)
-            for post in layout.posts {
+        let states = Generated.all, layouts = Generated.naturalLayouts
+        let found: [[String]] = Generated.parallel(states.count) { i in
+            let s = states[i]
+            var disagreements: [String] = []
+            for post in layouts[i].posts {
                 for banner in post.banners {
                     guard let event = WalkLayout.tapEvent(banner, on: post) else {
                         if banner.taps { disagreements.append("\(Generated.describe(s)): \(banner.label) sends nothing") }
@@ -738,7 +739,9 @@ struct WalkLayoutTests {
                     }
                 }
             }
+            return disagreements
         }
+        let disagreements = found.flatMap { $0 }
         #expect(disagreements.isEmpty, "\(disagreements.count): \(Set(disagreements.map { $0.components(separatedBy: ": ").dropFirst().joined(separator: ": ") }).sorted().prefix(12))")
     }
 
@@ -805,10 +808,10 @@ struct WalkLayoutTests {
 
     /// The sweep, measured on what is drawn: the planted-by-hand layout (the app's) and the ruled one.
     @Test(arguments: [WalkFooting.natural, .level]) func nothingOverlaps(_ footing: WalkFooting) {
+        let states = Generated.all, layouts = Generated.layouts(footing)
+        let found = Generated.parallel(states.count) { Invariants.check(layouts[$0], states[$0]) }
         var checked = 0
-        for s in Generated.states() {
-            let layout = WalkLayout.make(s, today: today, footing: footing)
-            let problems = Invariants.check(layout, s)
+        for (s, problems) in zip(states, found) {
             #expect(problems.isEmpty, "\(footing) \(Generated.describe(s)): \(problems.prefix(3))")
             if !problems.isEmpty { return }
             checked += 1
@@ -826,9 +829,11 @@ struct WalkLayoutTests {
         let insetTop = art.stage.height - WalkLayout.homeIndicator
         let notes = [WalkCopy.nothingToPlant, WalkCopy.ridgeFull, WalkCopy.speechOff, WalkCopy.placed("People"),
                      WalkCopy.placed("A very long area of my own")]
-        var checked = 0
-        for base in Generated.states() where (0...5).contains(base.step) {
-            let layout = WalkLayout.make(base, today: today, footing: footing)
+        let periods = WalkPeriods.pick(now: today)
+        let states = Generated.all, layouts = Generated.layouts(footing)
+        let bases = states.indices.filter { (0...5).contains(states[$0].step) }
+        let swept: [[(WalkState, [String])]] = Generated.parallel(bases.count) { n in
+            let base = states[bases[n]], layout = layouts[bases[n]]
             let drawn = layout.posts.flatMap(\.banners).map(\.drawn) + layout.labels.map(\.frame)
             var variants = [base]
             var undo = base; undo.undo = [.plant(uid(1))]; undo.undoShowing = true; variants.append(undo)
@@ -837,7 +842,7 @@ struct WalkLayoutTests {
             var open = base; open.orb = .open; variants.append(open)
             var speaking = base; speaking.orb = .speaking(live: "x"); variants.append(speaking)
             var taught = base; taught.teaching = (1...5).contains(base.step) && !base.ground; variants.append(taught)
-            for v in variants {
+            return variants.map { v -> (WalkState, [String]) in
                 let frames = [("next", WalkLayout.nextFrame(v)), ("hint", WalkLayout.hintFrame(v)),
                               ("undo", WalkLayout.undoFrame(v)), ("lesson", WalkLayout.teachFrame(v)),
                               ("more", WalkLayout.moreFrame(v))]
@@ -854,20 +859,24 @@ struct WalkLayoutTests {
                 }
                 let hint = WalkCopy.hint(v)
                 if !hint.isEmpty, WalkLayout.hintLines(hint) != 1 { problems.append("“\(hint)” wraps") }
-                if (WalkLayout.nextFrame(v) != nil) != (WalkCopy.nextLine(v, WalkPeriods.pick(now: today)) != nil) {
+                if (WalkLayout.nextFrame(v) != nil) != (WalkCopy.nextLine(v, periods) != nil) {
                     problems.append("the Next line's frame and words disagree")
                 }
                 // "More" stays clear of the Next line's own words (estimated: 16 pt words and the arrow, centred).
                 if let more = WalkLayout.moreFrame(v), let next = WalkLayout.nextFrame(v),
-                   let line = WalkCopy.nextLine(v, WalkPeriods.pick(now: today)) {
+                   let line = WalkCopy.nextLine(v, periods) {
                     let words = CGFloat(line.text.count) * 8.2 + 26
                     if more.maxX > next.midX - min(words, next.width) / 2 { problems.append("More meets the Next line's words") }
                 }
                 if v.showsPoints { problems += Self.pointWordsProblems(v, hint: WalkLayout.hintFrame(v)) }
-                #expect(problems.isEmpty, "\(footing) \(Generated.describe(v)) orb \(v.orb): \(problems.prefix(3))")
-                if !problems.isEmpty { return }
-                checked += 1
+                return (v, problems)
             }
+        }
+        var checked = 0
+        for (v, problems) in swept.joined() {
+            #expect(problems.isEmpty, "\(footing) \(Generated.describe(v)) orb \(v.orb): \(problems.prefix(3))")
+            if !problems.isEmpty { return }
+            checked += 1
         }
         #expect(checked >= 20_000)
     }
@@ -956,8 +965,7 @@ struct WalkLayoutTests {
 
     /// A post's band point (its base less its footing) is on its band; the footing stays within its bound.
     @Test func postsStandOnTheirBand() {
-        for s in Generated.states() {
-            let layout = WalkLayout.make(s, today: today)
+        for (s, layout) in zip(Generated.all, Generated.naturalLayouts) {
             for post in layout.posts {
                 let worldY = (post.base.y - post.footing) / layout.camera.k + layout.camera.y
                 let fraction = (worldY - art.image.minY) / art.image.height
@@ -1005,6 +1013,42 @@ enum Generated {
             }
         }
         return out
+    }
+
+    /// The generated states, built once: `states()` is a fixed list, so every sweep reads the same one.
+    static let all: [WalkState] = states()
+
+    /// Each generated state's layout on each footing, at the state's index in `all`: built once, on
+    /// every core, and shared by every sweep that reads it (a layout is a pure function of its state).
+    static let naturalLayouts: [WalkLayout] = build(.natural)
+    static let levelLayouts: [WalkLayout] = build(.level)
+
+    static func layouts(_ footing: WalkFooting) -> [WalkLayout] { footing == .natural ? naturalLayouts : levelLayouts }
+
+    private static func build(_ footing: WalkFooting) -> [WalkLayout] {
+        let states = all
+        return parallel(states.count) { WalkLayout.make(states[$0], today: today, footing: footing) }
+    }
+
+    /// `body(i)` for every `i` in `0..<count`, worked out on every core, returned in index order.
+    /// Only pure work runs here: the sweeps assert on the results afterwards, on the test's own
+    /// thread, in the order they always did.
+    static func parallel<T>(_ count: Int, _ body: (Int) -> T) -> [T] {
+        guard count > 0 else { return [] }
+        return withoutActuallyEscaping(body) { body in
+            let work = Unshared(body)
+            return [T](unsafeUninitializedCapacity: count) { buffer, initialized in
+                let out = Unshared(buffer.baseAddress!)
+                DispatchQueue.concurrentPerform(iterations: count) { (out.value + $0).initialize(to: work.value($0)) }
+                initialized = count
+            }
+        }
+    }
+
+    /// What `parallel` hands its workers: each writes only its own slot, and the work is pure.
+    private struct Unshared<V>: @unchecked Sendable {
+        let value: V
+        init(_ value: V) { self.value = value }
     }
 
     /// The ground and Welcome: every count of kept labels, with old Year flags on some.
@@ -1160,6 +1204,18 @@ enum Generated {
 
 // MARK: - The invariants
 
+/// A banner with its drawn outline worked out once: a sweep reads a banner's outline for every
+/// pair it is in, and turning it afresh each time was most of the sweeps' cost. Everything else
+/// reads through to the banner.
+@dynamicMemberLookup
+struct Measured {
+    let banner: WalkLayout.Banner
+    let corners: [CGPoint]
+    let drawn: CGRect
+    init(_ banner: WalkLayout.Banner) { self.banner = banner; corners = banner.corners; drawn = banner.drawn }
+    subscript<T>(dynamicMember path: KeyPath<WalkLayout.Banner, T>) -> T { banner[keyPath: path] }
+}
+
 /// The layout's guarantees, measured on what is drawn: each banner's turned outline's bounding box
 /// (`drawn`); two banners on one post by their outlines themselves, as a stack turns as one.
 enum Invariants {
@@ -1190,9 +1246,9 @@ enum Invariants {
         var problems: [String] = []
         let cam = layout.camera
         let zoomed = cam != art.stops[s.step]
-        let banners = layout.posts.flatMap(\.banners)
+        let banners = layout.posts.flatMap(\.banners).map(Measured.init)
         let postOf = Dictionary(layout.posts.flatMap { post in post.banners.map { ($0.id, post.id) } }, uniquingKeysWith: { a, _ in a })
-        func meet(_ a: WalkLayout.Banner, _ b: WalkLayout.Banner) -> Bool {
+        func meet(_ a: Measured, _ b: Measured) -> Bool {
             postOf[a.id] == postOf[b.id] ? WalkTurn.meet(a.corners, b.corners) : overlap(a.drawn, b.drawn)
         }
 

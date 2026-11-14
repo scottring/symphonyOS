@@ -205,8 +205,10 @@ struct WalkFootingTests {
     /// squeezed, and the weaker thing that always holds is asserted: never within 3 pt of a neighbour. The one exception is five posts whose hands rank in one
     /// rising (or falling) run: ±10 cannot hold four 6 pt steps, so they stand 4.5 pt apart, evenly.
     @Test func neighboursStandApartWhateverTheirIds() {
+        // The 10,000 states first, drawing the ids in the order they always were; then their layouts,
+        // on every core; then every check, in the same order.
         var rng = SeededIds(seed: 0x5EED_F007)
-        var checked = 0, limited = 0
+        var cases: [(set: Int, step: Int, level: WalkLevel, count: Int, gap: Int?, state: WalkState)] = []
         for set in 0..<2000 {
             let count = 2 + set % 4
             let gap: Int? = set % 3 == 0 && count <= 4 ? 1 + Int(rng.next() % UInt64(count - 1)) : nil
@@ -224,26 +226,30 @@ struct WalkFootingTests {
                         s.items.append(WalkItem(id: rng.uuid(), level: WalkLevel(rawValue: raw)!, title: "Flag", areaId: a.id))
                     }
                 }
-                let layout = WalkLayout.make(s, today: today)
-                let posts = layout.posts.filter { $0.key.level == level }.sorted { $0.base.x < $1.base.x }
-                let what = "set \(set), \(level), \(count) posts, gap \(String(describing: gap)): \(posts.map { String(format: "%.2f", $0.footing) })"
-                #expect(posts.count == count, "\(what)")
-                #expect(posts.allSatisfy { abs($0.footing) <= WalkFooting.ground + 0.0001 }, "\(what)")
-                #expect(step >= 3 || posts.allSatisfy { !$0.squeezed }, "\(what)")
-                let steps = zip(posts, posts.dropFirst()).map { $1.footing - $0.footing }
-                let oneRun = count == 5 && (steps.allSatisfy { $0 > 0 } || steps.allSatisfy { $0 < 0 })
-                let runOfFour = steps.count >= 3 && (0...(steps.count - 3)).contains { i in
-                    (steps[i] > 0) == (steps[i + 1] > 0) && (steps[i + 1] > 0) == (steps[i + 2] > 0)
-                }
-                if step >= 3 && runOfFour {
-                    #expect(steps.allSatisfy { abs($0) >= 3 - 0.0001 }, "\(what)")
-                    limited += 1
-                    checked += 1
-                    continue
-                }
-                #expect(steps.allSatisfy { abs($0) >= (oneRun ? 4.5 : WalkFooting.apart) - 0.0001 }, "\(what)")
-                checked += 1
+                cases.append((set, step, level, count, gap, s))
             }
+        }
+        let layouts = Generated.parallel(cases.count) { WalkLayout.make(cases[$0].state, today: today) }
+        var checked = 0, limited = 0
+        for ((set, step, level, count, gap, _), layout) in zip(cases, layouts) {
+            let posts = layout.posts.filter { $0.key.level == level }.sorted { $0.base.x < $1.base.x }
+            let what = "set \(set), \(level), \(count) posts, gap \(String(describing: gap)): \(posts.map { String(format: "%.2f", $0.footing) })"
+            #expect(posts.count == count, "\(what)")
+            #expect(posts.allSatisfy { abs($0.footing) <= WalkFooting.ground + 0.0001 }, "\(what)")
+            #expect(step >= 3 || posts.allSatisfy { !$0.squeezed }, "\(what)")
+            let steps = zip(posts, posts.dropFirst()).map { $1.footing - $0.footing }
+            let oneRun = count == 5 && (steps.allSatisfy { $0 > 0 } || steps.allSatisfy { $0 < 0 })
+            let runOfFour = steps.count >= 3 && (0...(steps.count - 3)).contains { i in
+                (steps[i] > 0) == (steps[i + 1] > 0) && (steps[i + 1] > 0) == (steps[i + 2] > 0)
+            }
+            if step >= 3 && runOfFour {
+                #expect(steps.allSatisfy { abs($0) >= 3 - 0.0001 }, "\(what)")
+                limited += 1
+                checked += 1
+                continue
+            }
+            #expect(steps.allSatisfy { abs($0) >= (oneRun ? 4.5 : WalkFooting.apart) - 0.0001 }, "\(what)")
+            checked += 1
         }
         #expect(checked == 10_000)
         #expect(limited < 600, "\(limited) Month and Week levels with a run of four or more")
@@ -286,10 +292,10 @@ struct WalkFootingTests {
     /// settle would trip an `assertionFailure`, failing this run outright.)
     @Test func oneCrowdedPostNeverLevelsTheRest() {
         var flattened: [String] = []
-        for s in Generated.states() {
-            let natural = WalkLayout.make(s, today: today)
+        for (i, s) in Generated.all.enumerated() {
+            let natural = Generated.naturalLayouts[i]
             guard !natural.posts.isEmpty else { continue }
-            let level = WalkLayout.make(s, today: today, footing: .level)
+            let level = Generated.levelLayouts[i]
             let same = zip(natural.posts, level.posts).allSatisfy { $0.base == $1.base && $0.lean == 0 && $0.banners.map(\.frame) == $1.banners.map(\.frame) }
             #expect(!same || natural.posts.allSatisfy(\.squeezed), "\(Generated.describe(s))")
             if natural.posts.allSatisfy({ $0.lean == 0 && $0.footing == 0 }) { flattened.append(Generated.describe(s)) }
@@ -307,8 +313,8 @@ struct WalkFootingTests {
         #expect(values.filter { $0 < -0.5 }.count > 50 && values.filter { $0 > 0.5 }.count > 50)
         // Every post and banner of every generated state.
         var posts = 0, leaning = 0
-        for s in Generated.states() {
-            for p in WalkLayout.make(s, today: today).posts {
+        for layout in Generated.naturalLayouts {
+            for p in layout.posts {
                 posts += 1
                 if p.lean != 0 && p.footing != 0 { leaning += 1 }
                 #expect(abs(p.footing) <= WalkFooting.ground + 0.0001 && WalkFooting.pole.contains(p.pole)
@@ -390,8 +396,8 @@ struct WalkFootingTests {
     /// Folds, counts, words, sizes, which post is open and what a tap does are the ruled layout's:
     /// the hand only moves and turns what was stacked.
     @Test func theHandChangesNoFoldOrWord() {
-        for s in Generated.states() {
-            let natural = WalkLayout.make(s, today: today), level = WalkLayout.make(s, today: today, footing: .level)
+        for (i, s) in Generated.all.enumerated() {
+            let natural = Generated.naturalLayouts[i], level = Generated.levelLayouts[i]
             #expect(natural.posts.map(\.id) == level.posts.map(\.id) && natural.labels.map(\.id) == level.labels.map(\.id))
             for (n, l) in zip(natural.posts.flatMap(\.banners), level.posts.flatMap(\.banners)) {
                 guard n.id == l.id, n.kind == l.kind, n.itemId == l.itemId, n.lines == l.lines, n.more == l.more,
@@ -412,41 +418,54 @@ struct WalkFootingTests {
             let i = a.intersection(b)
             return i.isNull || !Invariants.overlap(a, b) ? 0 : i.width * i.height
         }
-        for s in Generated.states() {
-            let natural = WalkLayout.make(s, today: today), level = WalkLayout.make(s, today: today, footing: .level)
-            let drawn = natural.posts.flatMap { p in p.banners.map { (p.id, $0) } }
+        // Each state's first finding, worked out on every core; the first state with one is recorded.
+        let states = Generated.all
+        let found: [String?] = Generated.parallel(states.count) { n in
+            let s = states[n], natural = Generated.naturalLayouts[n], level = Generated.levelLayouts[n]
+            let drawn = natural.posts.flatMap { p in p.banners.map { (p.id, Measured($0)) } }
             let ruled = Dictionary(level.posts.flatMap(\.banners).map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
             for (i, a) in drawn.enumerated() { for b in drawn[(i + 1)...] where a.0 != b.0 && area(a.1.drawn, b.1.drawn) > 0 {
                 guard let ra = ruled[a.1.id], let rb = ruled[b.1.id], area(ra, rb) == 0 else { continue }
-                Issue.record("\(Generated.describe(s)): \(a.1.id) piled on \(b.1.id)")
-                return
+                return "\(Generated.describe(s)): \(a.1.id) piled on \(b.1.id)"
             } }
             for label in natural.labels {
                 guard let flat = level.labels.first(where: { $0.id == label.id }) else { continue }
                 for (_, b) in drawn where b.level != s.level && ruled[b.id].map({ area(label.frame, b.drawn) > area(flat.frame, $0) + 4 }) == true {
-                    Issue.record("\(Generated.describe(s)): \(b.id) covers label \(label.name)")
-                    return
+                    return "\(Generated.describe(s)): \(b.id) covers label \(label.name)"
                 }
             }
+            return nil
         }
+        if let first = found.compactMap({ $0 }).first { Issue.record("\(first)") }
     }
 
     /// Steps 1 to 5: no drawn cloth lies over another post's cloth on another level unless the ruled
     /// layout of the same state already lays that same pair over each other (a leaning flag never
     /// touches the small flags above it).
     @Test func aLeaningFlagNeverTouchesTheFlagsAbove() {
-        var pairs = 0
-        for s in Generated.states() where (1...5).contains(s.step) && !s.ground {
-            let natural = WalkLayout.make(s, today: today), level = WalkLayout.make(s, today: today, footing: .level)
+        // Each state's pairs and first finding, worked out on every core; then counted and recorded in order.
+        let states = Generated.all
+        let indices = states.indices.filter { (1...5).contains(states[$0].step) && !states[$0].ground }
+        let found: [(pairs: Int, issue: String?)] = Generated.parallel(indices.count) { n in
+            let s = states[indices[n]], natural = Generated.naturalLayouts[indices[n]], level = Generated.levelLayouts[indices[n]]
+            var pairs = 0
             let ruled = Dictionary(level.posts.flatMap(\.banners).map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
-            let drawn = natural.posts.flatMap { p in p.banners.map { (p.id, $0) } }
+            let drawn = natural.posts.flatMap { p in p.banners.map { (p.id, Measured($0)) } }
             for (i, a) in drawn.enumerated() { for b in drawn[(i + 1)...] where a.0 != b.0 && a.1.level != b.1.level {
                 pairs += 1
                 guard Invariants.overlap(a.1.drawn, b.1.drawn), let ra = ruled[a.1.id], let rb = ruled[b.1.id],
                       !Invariants.overlap(ra, rb) else { continue }
-                Issue.record("\(Generated.describe(s)): \(a.1.id) \(a.1.drawn) over \(b.1.id) \(b.1.drawn)")
-                return
+                return (pairs, "\(Generated.describe(s)): \(a.1.id) \(a.1.drawn) over \(b.1.id) \(b.1.drawn)")
             } }
+            return (pairs, nil)
+        }
+        var pairs = 0
+        for state in found {
+            pairs += state.pairs
+            if let issue = state.issue {
+                Issue.record("\(issue)")
+                return
+            }
         }
         #expect(pairs > 10_000)
     }
