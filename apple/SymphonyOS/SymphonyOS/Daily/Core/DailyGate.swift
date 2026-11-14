@@ -5,7 +5,7 @@ import Foundation
 /// screen it has today; a light household gets a light page only once it is built.
 enum DailyGate {
     /// Light pages that are built. Tasks 11 and 14 add theirs.
-    static let horizons: Set<Horizon> = [.today, .week]
+    static let horizons: Set<Horizon> = [.today, .week, .month, .season, .year]
     /// Window shapes the light pages are built for. Tasks 17 and 18 add theirs; never
     /// `.glanceWide`, where a phone on its side keeps the old screens.
     static let layouts: Set<TodayLayout> = [.oneColumn]
@@ -92,6 +92,17 @@ enum DailyGate {
         guard edition == .light else { return nil }
         if walkIsWaiting(position) { return .waiting }
         return walkIsOffered(position, goalCount: goalCount, edition: edition) ? .whenReady : nil
+    }
+
+    /// The mountain pages: Month, Season and Year are the walk's own mountain at that level
+    /// (`MountainPageView`); Week and Today are not.
+    static func mountain(_ horizon: Horizon) -> WalkLevel? {
+        switch horizon {
+        case .year: .year
+        case .season: .season
+        case .month: .month
+        case .week, .today: nil
+        }
     }
 }
 

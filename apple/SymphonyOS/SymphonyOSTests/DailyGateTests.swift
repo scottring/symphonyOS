@@ -89,11 +89,26 @@ struct DailyGateTests {
     }
 
     @Test func todayAndWeekAreLightPagesBuilt() {
-        #expect(DailyGate.horizons.isSuperset(of: [.today, .week]))
+        #expect(DailyGate.horizons == [.today, .week, .month, .season, .year])
         #expect(DailyGate.shows(.today, edition: .light, layout: .oneColumn))
         #expect(!DailyGate.shows(.today, edition: .full, layout: .oneColumn))
         #expect(DailyGate.shows(.week, edition: .light, layout: .oneColumn))
         #expect(!DailyGate.shows(.week, edition: .full, layout: .oneColumn))
+    }
+
+    /// Month, Season and Year are the mountain at their own level, in a light household only;
+    /// Week and Today are not mountain pages.
+    @Test func theMountainPagesAreBuiltForLightOnly() {
+        for h in [Horizon.month, .season, .year] {
+            #expect(DailyGate.shows(h, edition: .light, layout: .oneColumn))
+            #expect(!DailyGate.shows(h, edition: .full, layout: .oneColumn))
+            #expect(!DailyGate.shows(h, edition: .light, layout: .glanceWide))
+        }
+        #expect(DailyGate.mountain(.year) == .year)
+        #expect(DailyGate.mountain(.season) == .season)
+        #expect(DailyGate.mountain(.month) == .month)
+        #expect(DailyGate.mountain(.week) == nil)
+        #expect(DailyGate.mountain(.today) == nil)
     }
 
     /// The bar is built: a light household's phone, upright, has the bar and no dock.

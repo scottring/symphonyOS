@@ -92,6 +92,7 @@
 		5B071DA5B5EE6E15078973ED /* DailyRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B0FDFB0075F54C25F0A9F7 /* DailyRows.swift */; };
 		5C17CC50C06C21FE279844E9 /* CalendarFeedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA3F6E2C9518EE578D16841 /* CalendarFeedTests.swift */; };
 		5E30F5EBF25CC8589EED80FF /* LightWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF9B40A2619B07F7F1703C8 /* LightWeekView.swift */; };
+		5FFA75E8DF88D1E5172D2A03 /* MountainPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5CD638485AFC575A7D097C4 /* MountainPageView.swift */; };
 		61710E3386CF139725EF739E /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 7E9B499A191F0220599C23CC /* Supabase */; };
 		61EBDB3A7C44135DE1B7F406 /* SymphonyList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EFF39D03A032DEB889523B4 /* SymphonyList.swift */; };
 		643E1691CD4A09CF3180B1D7 /* QuickCaptureBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */; };
@@ -456,6 +457,7 @@
 		A11B12B1E4BBF3F0C54E4A8D /* DailyDemoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDemoTests.swift; sourceTree = "<group>"; };
 		A1D31FA63E65DA22E03392AD /* PlannerComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerComponents.swift; sourceTree = "<group>"; };
 		A48DEE8D67C715E1A3A6D4F5 /* AccountDeletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionTests.swift; sourceTree = "<group>"; };
+		A5CD638485AFC575A7D097C4 /* MountainPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MountainPageView.swift; sourceTree = "<group>"; };
 		A932C77F9DCE9A3582897E6A /* GlanceToDoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceToDoTests.swift; sourceTree = "<group>"; };
 		A99D77B01B73C4E9753A3494 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedOverTests.swift; sourceTree = "<group>"; };
@@ -867,6 +869,7 @@
 				CE8500148F5BD97291AF8393 /* LightPlannerView.swift */,
 				0E00B6B122231FE56C3CC126 /* LightTodayView.swift */,
 				2EF9B40A2619B07F7F1703C8 /* LightWeekView.swift */,
+				A5CD638485AFC575A7D097C4 /* MountainPageView.swift */,
 				8EFF346033D25F30F5C9B784 /* SignpostView.swift */,
 			);
 			path = Views;
@@ -1472,6 +1475,7 @@
 				4AE3289D3236007A5F98C6C0 /* MainView.swift in Sources */,
 				ED73ECCD14D5BD8905977FBC /* MedTokenStore.swift in Sources */,
 				A9717E7380F94E0AF4B7DE0A /* MountainPage.swift in Sources */,
+				5FFA75E8DF88D1E5172D2A03 /* MountainPageView.swift in Sources */,
 				BF10BB1DF753FAED453DB947 /* NextUpActivity.swift in Sources */,
 				7DCE89EE7B3BC6737A9B3186 /* NextUpAttributes.swift in Sources */,
 				41AE4C762EAFD3902E7DF083 /* NextUpCard.swift in Sources */,

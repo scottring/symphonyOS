@@ -21,7 +21,8 @@ extension DemoMode {
     /// `-SymphonyDailyState a,b,…`: states a page is driven into once it is up
     /// (`point`: the sign's row lit; `waiting`: the waiting walk's line, as the demo keeps no stored walk;
     /// `speak` and `undo`: the bar, see `showDaily`; `hear`: the bar's stand-in listener, untapped; `more` and `inbox`: that sheet, `dailyPanel`;
-    /// on Week, `select`: a task chosen with its Move to panel up, see `weekChoice`; `unfold`: the fold open).
+    /// on Week, `select`: a task chosen with its Move to panel up, see `weekChoice`; `unfold`: the fold open;
+    /// `select`, `move` and `zoom` on a mountain page, see `showMountain`).
     static var dailyStates: [String] { dailyStates(in: ProcessInfo.processInfo.arguments) }
 
     static func dailySeed(in arguments: [String]) -> String {
@@ -93,6 +94,33 @@ extension DemoMode {
         return nil
     }
 
+    // MARK: The mountain pages
+
+    /// Drives a Month, Season or Year page into the states that need a touch, as a person's taps
+    /// would, through the page's own events: `zoom`: on Year a tap on the chosen flag's peak, on
+    /// Season and Month a tap on its parent (or the first flag one level up); `select`: a tap on
+    /// the first flag of the page's level whose panel has a line (nothing under it), else the
+    /// first; `move`: Move to. A bare page is left as it is.
+    static func showMountain(_ page: inout MountainPage, _ states: [String]) {
+        let own = page.items.filter { $0.level == page.level }
+        let bare = own.first { flag in
+            var trial = page
+            _ = trial.apply(.flag(flag.id))
+            return trial.panel?.line != nil
+        }
+        guard let chosen = bare ?? own.first else { return }
+        if states.contains("zoom") {
+            if page.level == .year {
+                if let area = chosen.areaId { _ = page.apply(.peak(area)) }
+            } else if let parent = chosen.parentId
+                        ?? page.items.first(where: { $0.level.rawValue == page.level.rawValue - 1 })?.id {
+                _ = page.apply(.flag(parent))
+            }
+        }
+        if states.contains("select") { _ = page.apply(.flag(chosen.id)) }
+        if states.contains("move") { _ = page.apply(.moveTapped) }
+    }
+
     private static func value(after flag: String, in arguments: [String]) -> String? {
         guard let i = arguments.firstIndex(of: flag), i + 1 < arguments.count else { return nil }
         return arguments[i + 1]
@@ -135,7 +163,12 @@ extension DemoMode {
         let weekends = plant(.year, "More slow weekends together", "People")
         let strength = plant(.season, "Strength twice a week", "Health", under: strong)
         let bathroomSeason = plant(.season, "Bathroom done by February", "Home", under: bathroom)
-        if seed == "quiet" { plant(.season, "A slow Sunday every month", "People", under: weekends) }
+        if seed == "quiet" {
+            // The long words as goals too, for the Month page's cloths.
+            let sundays = plant(.season, "A slow Sunday every month", "People", under: weekends)
+            plant(.month, longTitle, "People", under: sundays)
+            plant(.month, longWord, "People", under: sundays)
+        }
         let gym = plant(.month, "Find a gym that fits", "Health", under: strength)
         let tile = plant(.month, "Pick the tile and pay the deposit", "Home", under: bathroomSeason)
         plant(.month, "Clear out the old vanity", "Home", under: bathroomSeason)

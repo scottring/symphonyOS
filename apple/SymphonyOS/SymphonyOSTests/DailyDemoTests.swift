@@ -168,5 +168,59 @@ struct DailyDemoTests {
         #expect(refused.bar.note == WalkCopy.speechOff)
         #expect(refused.bar.fieldAsked == 1)
     }
+
+    // MARK: The mountain pages
+
+    /// A mountain page as `MountainPageView` builds it, on the page the row of words opens.
+    private func mountain(_ level: WalkLevel, seed: String = "morning", on today: Date = day(2026, 11, 10)) throws -> MountainPage {
+        let ctx = try seeded(seed, on: today)
+        let areas = MountainPage.areas((try? ctx.fetch(FetchDescriptor<GoalArea>())) ?? [], me: me, saved: [])
+        let horizon: Horizon = level == .year ? .year : level == .season ? .season : .month
+        let flags = MountainPage.flags(level: level, goals: (try? ctx.fetch(FetchDescriptor<Goal>())) ?? [],
+                                       tasks: (try? ctx.fetch(FetchDescriptor<SymphonyTask>())) ?? [],
+                                       selected: WalkPeriods.pick(now: today).pageDate(for: horizon), today: today,
+                                       seasons: nil, me: me, areas: areas)
+        return MountainPage(level: level, flags: flags, areas: areas, saved: [])
+    }
+
+    private func chosen(_ page: MountainPage) -> String? { page.items.first { $0.id == page.selected }?.title }
+
+    /// `-SymphonyDailyState select`: the first flag of the page's level with nothing under it
+    /// (else the first) is chosen, so the panel shows its line; `move` opens Move to; `zoom`
+    /// zooms that flag's peak on Year, or focuses its parent on Season and Month.
+    @Test func theMountainsDemoStates() throws {
+        var year = try mountain(.year)
+        DemoMode.showMountain(&year, ["select"])
+        #expect(chosen(year) == "More slow weekends together")
+        let periods = try #require(year.periods)
+        #expect(year.panel?.line == DailyCopy.nothingUnder(.year, periods: periods))
+        #expect(year.panel?.moveTo.isEmpty == true)
+
+        var moving = try mountain(.year)
+        DemoMode.showMountain(&moving, ["select", "move"])
+        let people = try #require(moving.items.first { $0.id == moving.selected }?.areaId)
+        #expect(moving.moving)
+        #expect(moving.panel?.moveTo.map(\.id) == moving.areas.map(\.id).filter { $0 != people })
+
+        var zoomed = try mountain(.year)
+        DemoMode.showMountain(&zoomed, ["zoom"])
+        // Each page is seeded afresh, with ids of its own.
+        #expect(zoomed.focusArea != nil)
+        #expect(zoomed.focusArea == zoomed.items.first { $0.title == "More slow weekends together" }?.areaId)
+        #expect(zoomed.selected == nil)
+
+        var month = try mountain(.month)
+        DemoMode.showMountain(&month, ["select", "zoom"])
+        #expect(chosen(month) == "Clear out the old vanity")
+        #expect(month.items.first { $0.id == month.focus }?.title == "Bathroom done by February")
+
+        // The quiet seed's long words stand as month goals too, for the Month page.
+        let quiet = try mountain(.month, seed: "quiet").items.filter { $0.level == .month }.map(\.title)
+        #expect(quiet.contains(DemoMode.longTitle) && quiet.contains(DemoMode.longWord))
+
+        var bare = try mountain(.month, seed: "empty")
+        DemoMode.showMountain(&bare, ["select", "move", "zoom"])
+        #expect(bare.selected == nil && bare.focus == nil && !bare.moving)
+    }
 }
 #endif

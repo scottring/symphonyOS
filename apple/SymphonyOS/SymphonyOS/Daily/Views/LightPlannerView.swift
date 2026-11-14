@@ -49,7 +49,15 @@ struct LightPlannerView<Full: View>: View {
 
     var body: some View {
         ZStack {
-            if covered { DailyPalette.sky.ignoresSafeArea() } else if showsLight { light } else { full() }
+            if covered {
+                DailyPalette.sky.ignoresSafeArea()
+            } else if showsLight, let level = DailyGate.mountain(appState.horizon) {
+                mountain(level)
+            } else if showsLight {
+                light
+            } else {
+                full()
+            }
         }
         .background {
             Color.clear
@@ -110,6 +118,24 @@ struct LightPlannerView<Full: View>: View {
             .ignoresSafeArea()
             .toolbar(.hidden, for: .navigationBar)
             .onDisappear { model.send(.left) }
+        } else {
+            DailyPalette.sky.ignoresSafeArea()
+        }
+    }
+
+    /// Month, Season and Year: the mountain at that level, a fresh page for each.
+    @ViewBuilder private func mountain(_ level: WalkLevel) -> some View {
+        if let model, let userId = auth.currentUser?.id {
+            GeometryReader { proxy in
+                let page = TodayView.pinnedSize ?? proxy.size
+                MountainPageView(level: level, model: model, userId: userId, size: page, safeTop: insets.top,
+                                 safeBottom: insets.bottom, layout: layout, go: go)
+                    .frame(width: page.width, height: page.height)
+            }
+            .ignoresSafeArea()
+            .toolbar(.hidden, for: .navigationBar)
+            .onDisappear { model.send(.left) }
+            .id(level)
         } else {
             DailyPalette.sky.ignoresSafeArea()
         }
