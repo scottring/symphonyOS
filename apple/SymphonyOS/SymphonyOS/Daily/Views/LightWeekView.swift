@@ -185,6 +185,17 @@ struct LightWeekView: View {
         let states = DemoMode.dailyStates
         if states.contains("unfold") { unfolded = true }
         if states.contains("lookback") { handleTapped() }
+        // `nextweek`: the page on next week, as the "Tomorrow" sign opens it on the week's last day;
+        // with `undo`, a moment later one task said there with no day (`DemoMode.showDaily`).
+        if states.contains("nextweek") {
+            appState.selectedDate = PlanCalendar.addDays(PlanCalendar.weekStart(model.today), 7)
+            if states.contains("undo") {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(800))
+                    DemoMode.showDaily(model, ["undo"])
+                }
+            }
+        }
         // A moment after the page is up, as a tap would come, so the list can scroll the row clear of the panel.
         if states.contains("select"), let pick = DemoMode.weekChoice(week) {
             Task { @MainActor in

@@ -147,7 +147,8 @@ enum Signpost {
         let dated = plan.lensTasks.filter { t in !t.isGoal && days.contains { plan.isDated(t, on: $0) } }
         let onTheWeek = Set(plan.weekList(ws).map(\.id)).union(dated.map(\.id))
 
-        let periods = WalkPeriods.pick(now: today, seasons: seasons)
+        // The current month, season and year first when they hold a goal of mine (`DailyPeriods.current`).
+        let periods = DailyPeriods.current(today: today, seasons: seasons, goals: goals, tasks: mine, me: me)
         let items = WalkLoad.items(goals: goals, tasks: mine, periods: periods, me: me, planted: [])
         let monthGoal = items.first { $0.level == .month && !$0.done }
         let noPiece = WalkEnding.nextToWalk(items)

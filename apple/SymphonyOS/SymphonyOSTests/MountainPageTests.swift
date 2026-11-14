@@ -557,7 +557,11 @@ struct MountainPageTests {
         let shown = Set(flags.items.map(\.id))
         for hidden in [winterGoal.id, theirs.id, work.id, family.id] { #expect(!shown.contains(hidden)) }
         #expect(flags.below.map(\.id) == [november.id])
-        #expect(flags.walk.contains { $0.id == winterGoal.id })
+        // Fall holds today while the walk has moved on to winter: Walk it down plans inside Fall (the
+        // owner's "where I am"), so the walk's flags here are Fall's, in November and this week.
+        #expect(!flags.walk.contains { $0.id == winterGoal.id })
+        #expect(flags.walk.contains { $0.id == bare.id })
+        #expect(flags.walkPeriods.season.name == "Fall" && flags.walkPeriods.monthName == "November")
 
         var page = MountainPage(level: .season, flags: flags, areas: ridge, saved: [])
         #expect(page.periods == flags.periods)
@@ -566,8 +570,8 @@ struct MountainPageTests {
         _ = page.apply(.flag(bare.id))
         #expect(page.panel?.line == DailyCopy.nothingUnder(.season, periods: flags.periods))
         #expect(flags.periods.monthName == "November")
-        // Fall is not the walk's season: nothing on it is walked down.
-        #expect(page.panel?.canWalkDown == false)
+        // Fall holds today: its own goals are walked down, into November.
+        #expect(page.panel?.canWalkDown == true)
         #expect(page.walkState.items.count == 5)
     }
 
@@ -584,16 +588,17 @@ struct MountainPageTests {
                                        selected: today, today: today, seasons: nil, me: me, areas: ridge)
         #expect(flags.own.map(\.id) == [gutters.id])
         #expect(flags.own.first?.parentId == fallGoal.id)      // a Fall parent stays a Fall parent
-        // Above: the year, then the walk's winter goal and the real Fall parent, each once.
-        #expect(flags.above.map(\.id) == [year.id, winterGoal.id, fallGoal.id])
-        #expect(flags.above.map(\.parentId) == [nil, year.id, year.id])
-        #expect(!flags.items.contains { $0.id == december.id })
+        // Above: the year, then Fall, the season that holds today (November's page is where the person is,
+        // so the upper flags to hang under are Fall's, not the walk's winter), each once.
+        #expect(flags.above.map(\.id) == [year.id, fallGoal.id])
+        #expect(flags.above.map(\.parentId) == [nil, year.id])
+        #expect(!flags.items.contains { $0.id == december.id || $0.id == winterGoal.id })
 
-        // A goal added with the winter flag focused files into November, under that flag.
+        // A goal added with the Fall flag focused files into November, under that flag.
         var page = MountainPage(level: .month, flags: flags, areas: ridge, saved: [])
-        _ = page.apply(.flag(winterGoal.id))
+        _ = page.apply(.flag(fallGoal.id))
         let hanging = try #require(page.hanging)
-        #expect(hanging.parent?.id == winterGoal.id)
+        #expect(hanging.parent?.id == fallGoal.id)
         #expect(hanging.periods.monthStart == day(2026, 11, 1))
         // The season handed over is one the writer accepts: it holds the month it files into.
         #expect(hanging.periods.season.start <= hanging.periods.monthStart
@@ -613,7 +618,7 @@ struct MountainPageTests {
         let written = try #require(try ctx.fetch(FetchDescriptor<SymphonyTask>()).first { $0.id == added.id })
         #expect(written.bucket == "month")
         #expect(PlanCalendar.sameDay(written.monthStart, day(2026, 11, 1)))
-        #expect(written.sourceId == winterGoal.id)
+        #expect(written.sourceId == fallGoal.id)
         #expect(written.goalId == year.id)
     }
 
@@ -734,9 +739,9 @@ struct MountainPageTests {
         #expect(down.position.areas == ridge)
         #expect(down.returnsTo.horizon == .year && PlanCalendar.sameDay(down.returnsTo.date, opened))
 
-        // A flag the page does not offer it on (another year's page) opens nothing.
-        let thisYear = day(periods.year - 1, 6, 1)
-        let old = goal("An old goal", year: periods.year - 1, in: "Fun")
+        // A flag the page does not offer it on (a year neither holding today nor the walk's) opens nothing.
+        let thisYear = day(periods.year - 2, 6, 1)
+        let old = goal("An old goal", year: periods.year - 2, in: "Fun")
         var earlier = MountainPage(level: .year,
                                    flags: MountainPage.flags(level: .year, goals: [old], tasks: [], selected: thisYear,
                                                              today: today, seasons: nil, me: me, areas: ridge),

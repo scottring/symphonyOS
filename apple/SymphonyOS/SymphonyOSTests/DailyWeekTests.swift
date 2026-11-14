@@ -443,13 +443,25 @@ struct DailyWeekTests {
         #expect(band.map(\.title) == ["Book the plumber", "Clear the garage"])
     }
 
-    @Test func theBandReadsTheWalksMonthNotTheCalendars() {
+    /// The owner's "where I am, if it has goals" (addendum): late in a season the walk plans the next
+    /// month, but the band reads the current month first, while it holds a goal of mine.
+    @Test func theBandReadsTheCurrentMonthFirst() {
         let late = day(2026, 11, 14)
         let periods = WalkPeriods.pick(now: late)
         #expect(!PlanCalendar.sameDay(periods.monthStart, PlanCalendar.monthStart(late)))   // the walk is on December
         let november = monthGoal("Finish the bathroom tiles", WalkPeriods.pick(now: today), order: 0)
         let december = monthGoal("Book the holiday ferry", periods, order: 1)
         let band = DailyWeek.bandGoals(tasks: [november, december], goals: [], commitments: [], focus: [],
+                                       weekStart: sunday, today: late, me: me)
+        #expect(band.map(\.title) == ["Finish the bathroom tiles"])
+    }
+
+    /// With nothing of mine in the current month (everything planned ahead), the walk's month.
+    @Test func theBandReadsTheWalksMonthWhenTheCurrentOneIsEmpty() {
+        let late = day(2026, 11, 14)
+        let december = monthGoal("Book the holiday ferry", WalkPeriods.pick(now: late), order: 1)
+        let theirs = monthGoal("Their November goal", WalkPeriods.pick(now: today), order: 0, user: other)
+        let band = DailyWeek.bandGoals(tasks: [theirs, december], goals: [], commitments: [], focus: [],
                                        weekStart: sunday, today: late, me: me)
         #expect(band.map(\.title) == ["Book the holiday ferry"])
     }

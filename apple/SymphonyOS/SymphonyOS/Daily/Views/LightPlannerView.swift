@@ -217,12 +217,20 @@ struct LightPlannerView<Full: View>: View {
         if covered { model?.cover() }
     }
 
-    /// A word in the row of words: the date the walk's period for it opens on, then the page.
+    /// A word in the row of words: the date the page opens on, then the page. Month, Season and Year
+    /// open by the owner's rule (`DailyPeriods.opening`: where you are, if it has goals); Today and Week
+    /// on the walk's date for them, as before. The word of the page on screen leaves the date alone.
     private func go(_ horizon: Horizon) {
         // Opened flat, "Week and today" brings the selected date back to today (`DailySpread.navDate`).
         if let today = DailySpread.navDate(horizon, on: layout, today: DailyClock.now()) { return open(horizon, today) }
-        if let date = WalkPeriods.switcherDate(for: horizon, viewing: appState.horizon, edition: appState.edition,
-                                               now: DailyClock.now(), seasons: seasons) {
+        if let level = DailyGate.mountain(horizon), horizon != appState.horizon, let userId = auth.currentUser?.id {
+            let hidden = model?.pulledUp
+            let goals = ((try? modelContext.fetch(FetchDescriptor<Goal>())) ?? []).filter { $0.id != hidden }
+            let tasks = ((try? modelContext.fetch(FetchDescriptor<SymphonyTask>())) ?? []).filter { $0.id != hidden }
+            appState.selectedDate = DailyPeriods.opening(level, today: model?.today ?? DailyClock.now(), seasons: seasons,
+                                                         goals: goals, tasks: tasks, me: userId).opens
+        } else if let date = WalkPeriods.switcherDate(for: horizon, viewing: appState.horizon, edition: appState.edition,
+                                                      now: DailyClock.now(), seasons: seasons) {
             appState.selectedDate = date
         }
         appState.horizon = horizon

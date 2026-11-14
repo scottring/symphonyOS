@@ -155,8 +155,8 @@ enum DailyWeek {
 
     // MARK: The band
 
-    /// Two at most of the walk's open month goals (`WalkLoad.items` over
-    /// `WalkPeriods.pick(now: today)`, so late in a season they can be next month's): those
+    /// Two at most of the open month goals of the month the pages read (`DailyPeriods.current`: this
+    /// month when it holds a goal of mine, else the walk's, which late in a season is the next): those
     /// this week's tasks serve most first, then the walk's own order. A week's task is one on
     /// its list or dated in it, done or not; it serves the goal it links up to directly. A task
     /// being pulled up (`pulledUp`, its Undo still open) counts for nothing.
@@ -178,7 +178,8 @@ enum DailyWeek {
         }
         let served = Dictionary(grouping: onTheWeek.compactMap(link), by: { $0 }).mapValues(\.count)
 
-        let periods = WalkPeriods.pick(now: today, seasons: seasons)
+        // The current month's goals first; the walk's month only when the current one has none (`DailyPeriods.current`).
+        let periods = DailyPeriods.current(today: today, seasons: seasons, goals: goals, tasks: mine, me: me)
         let month = WalkLoad.items(goals: goals, tasks: mine, periods: periods, me: me, planted: [])
             .filter { $0.level == .month && !$0.done }
         return month.enumerated()

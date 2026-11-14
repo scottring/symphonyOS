@@ -26,8 +26,11 @@ struct MountainPage: Equatable {
     var expanded: WalkPostKey?; var moving = false
     /// The page's own periods (`periods(level:selected:today:seasons:)`), used by `panel` and `hanging`.
     var periods: WalkPeriods?
-    /// The flags of the walk's own periods (`WalkPeriods.pick`), the only ones "Walk it down" opens.
+    /// The flags of the periods "Walk it down" plans in (`DailyPeriods.walking`), the only ones it opens.
     var walkItems: [WalkItem] = []
+    /// Those periods: the walk's own, or, on a page showing the period that holds today when the walk
+    /// has moved on, the periods that hold today.
+    var walkPeriods: WalkPeriods?
 
     init(level: WalkLevel, items: [WalkItem], areas: [WalkArea], saved: [UUID], savedAreas: [WalkArea] = []) {
         self.level = level
@@ -64,6 +67,7 @@ struct MountainPage: Equatable {
         read(items: flags.items, areas: areas, saved: saved, savedAreas: savedAreas)
         walkItems = flags.walk
         periods = flags.periods
+        walkPeriods = flags.walkPeriods
     }
 
     /// After the flags change: kept areas again, and nothing left pointing at what has gone.
@@ -123,8 +127,11 @@ struct MountainPage: Equatable {
         var own: [WalkItem]
         /// Every row one level down that links to an own flag, in any period.
         var below: [WalkItem]
-        /// The walk's current periods (`WalkLoad.items` for `WalkPeriods.pick`): what Walk it down opens.
+        /// The flags of `walkPeriods`: what Walk it down opens, and the upper flags to hang a goal under.
         var walk: [WalkItem]
+        /// The periods Walk it down plans in (`DailyPeriods.walking`): the walk's own, or on a page
+        /// showing the period that holds today, while the walk has moved on, the periods that hold today.
+        var walkPeriods: WalkPeriods
 
         var items: [WalkItem] { above + own + below }
     }
@@ -139,7 +146,7 @@ struct MountainPage: Equatable {
     static func flags(level: WalkLevel, goals: [Goal], tasks: [SymphonyTask], selected: Date, today: Date,
                       seasons: [SeasonBoundary]?, me: UUID, areas: [WalkArea]) -> Flags {
         let page = periods(level: level, selected: selected, today: today, seasons: seasons)
-        let walkPeriods = WalkPeriods.pick(now: today, seasons: seasons)
+        let walkPeriods = DailyPeriods.walking(level, shown: selected, today: today, seasons: seasons)
         func load(_ p: WalkPeriods, goalsOnly: Bool = false) -> [WalkItem] {
             WalkLoad.items(goals: goals, tasks: goalsOnly ? [] : tasks, periods: p, me: me, planted: [], areas: areas)
         }
@@ -209,7 +216,8 @@ struct MountainPage: Equatable {
             .map { item($0, parent: link($0)) }
         // Year first, then season: the walk's flags of a level before those found by link.
         let ordered = above.enumerated().sorted { ($0.element.level.rawValue, $0.offset) < ($1.element.level.rawValue, $1.offset) }
-        return Flags(periods: page, above: ordered.map { hung($0.element) }, own: own.map(hung), below: below, walk: walk)
+        return Flags(periods: page, above: ordered.map { hung($0.element) }, own: own.map(hung), below: below, walk: walk,
+                     walkPeriods: walkPeriods)
     }
 
     /// The ridge as the walk reads it (`WalkLoad.areas`), with ids that hold from one read to

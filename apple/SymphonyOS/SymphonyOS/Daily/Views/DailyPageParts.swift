@@ -267,8 +267,10 @@ struct DailyWalkLine: View {
         case .walkDown:
             // The walk opens one level below the goal the sign names, and comes back to Today;
             // the bar lets go first. A sign that could not open it is not put away.
+            // In the periods the sign read (`DailyPeriods.current`), so the goal it names is found there.
+            let read = DailyPeriods.current(today: model.today, seasons: seasons, goals: goals, tasks: tasks, me: userId)
             let down = DailyWalkDown.sign(sign.target, goals: goals, tasks: tasks, areaRows: goalAreas,
-                                          saved: walkPosition, periods: model.periods, now: model.today,
+                                          saved: walkPosition, periods: read, now: model.today,
                                           seasons: seasons, me: userId)
             for event in down?.bar ?? [] { model.send(event) }
             appState.walkDown = down

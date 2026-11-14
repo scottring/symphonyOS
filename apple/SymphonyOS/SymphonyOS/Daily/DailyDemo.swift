@@ -10,9 +10,9 @@ extension DemoMode {
     /// `-SymphonyDaily`: the light pages' demo seed and events.
     static var isDaily: Bool { ProcessInfo.processInfo.arguments.contains("-SymphonyDaily") }
 
-    static let dailySeeds = ["morning", "done", "open", "newweek", "quiet", "nopiece", "empty"]
+    static let dailySeeds = ["morning", "done", "open", "newweek", "quiet", "nopiece", "empty", "both"]
 
-    /// `-SymphonyDailySeed morning|done|open|newweek|quiet|nopiece|empty`; `morning` otherwise.
+    /// `-SymphonyDailySeed morning|done|open|newweek|quiet|nopiece|empty|both`; `morning` otherwise.
     static var dailySeed: String { dailySeed(in: ProcessInfo.processInfo.arguments) }
 
     /// `-SymphonyDailyPage today|week|month|season|year`: the page the demo opens on.
@@ -201,6 +201,24 @@ extension DemoMode {
                 let area = areas.first { $0.name == "People" }
                 let item = WalkItem(id: UUID(), level: .month, title: title, areaId: area?.id, parentId: sundays.id)
                 thisMonth.create(item, parent: sundays)
+            }
+        }
+        if seed == "both" {
+            // Goals in the calendar's own month as well as the walk's (late in a season they are two):
+            // Month opens on the current one, and its heading switches to the walk's (`DailyPeriods`).
+            let thisMonth = WalkWriter(context: ctx, userId: userId,
+                                       periods: MountainPage.periods(level: .month, selected: today, today: today, seasons: nil))
+            let area = areas.first { $0.name == "Home" }
+            let fallHome = WalkItem(id: UUID(), level: .season, title: "Get the house ready for winter", areaId: area?.id,
+                                    parentId: bathroom.id)
+            thisMonth.create(fallHome, parent: bathroom)
+            // A goal for the calendar's own year too, so Year opens on it and switches to the walk's.
+            let people = areas.first { $0.name == "People" }
+            thisMonth.create(WalkItem(id: UUID(), level: .year, title: "See the grandparents more", areaId: people?.id,
+                                      parentId: nil), parent: nil)
+            for title in ["Clear the gutters", "Sort the attic"] {
+                thisMonth.create(WalkItem(id: UUID(), level: .month, title: title, areaId: area?.id, parentId: fallHome.id),
+                                 parent: fallHome)
             }
         }
         let gym = plant(.month, "Find a gym that fits", "Health", under: strength)

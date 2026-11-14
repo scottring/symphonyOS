@@ -263,6 +263,15 @@ struct LightTodayView: View {
         DemoMode.showDaily(model, DemoMode.dailyStates)
         if let panel = DemoMode.dailyPanel { appState.dailyPanel = panel }
         if DemoMode.dailyStates.contains("lookback") { handleTapped() }
+        // `details` (with `speak`): a moment later the first row's Details opens, as its menu would,
+        // the bar letting go first (`sheetOpening`).
+        if DemoMode.dailyStates.contains("details"), let row = page.rows.first {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(1200))
+                model.sheetOpening()
+                opened = DailyTodayList.details(row)
+            }
+        }
         switch DemoMode.handoverHold {
         case .settled?:
             model.handoverArrived()

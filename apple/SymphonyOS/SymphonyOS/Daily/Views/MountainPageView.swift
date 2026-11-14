@@ -105,6 +105,7 @@ struct MountainPageView: View {
     @State private var origin: CGPoint = .zero
     #if DEBUG
     @State private var demoStatesApplied = false
+    @State private var switchedForDemo = false
     #endif
 
     private var seasons: [SeasonBoundary]? { households.first?.seasons }
@@ -221,6 +222,14 @@ struct MountainPageView: View {
         model.page = .goal(level)
         hang()
         #if DEBUG
+        // `switch`: the heading tapped once, the page on the other period (`DailyPeriods.other`).
+        if DemoMode.isOn, DemoMode.dailyStates.contains("switch"), !switchedForDemo,
+           let other = DailyPeriods.other(level, shown: appState.selectedDate, today: model.today, seasons: seasons) {
+            switchedForDemo = true
+            appState.selectedDate = other
+        }
+        #endif
+        #if DEBUG
         if walkDownNow { apply(.walkDown) }
         #endif
     }
@@ -268,7 +277,7 @@ struct MountainPageView: View {
                 // The walk opens one level down, about this flag, and comes back to this page.
                 guard let page else { continue }
                 let down = DailyWalkDown.page(page, flag: id, from: horizon, date: appState.selectedDate,
-                                              periods: model.periods, now: model.today, seasons: seasons,
+                                              periods: page.walkPeriods ?? model.periods, now: model.today, seasons: seasons,
                                               userId: userId)
                 for event in down?.bar ?? [] { model.send(event) }     // the bar lets go first
                 appState.walkDown = down
@@ -313,15 +322,28 @@ struct MountainPageView: View {
     }
 
     /// "November" over "to Monday the 30th", centred under the row of words.
+    /// The heading. When the period that holds today and the walk's are two (near a season's end, or
+    /// the year ahead), it is a button that switches the page between them (`DailyPeriods.other`), with
+    /// a quiet line naming where a tap goes; the choice lasts this visit (it is the selected date).
     private func heading(_ periods: WalkPeriods, _ m: DailyMetrics) -> some View {
         let words = DailyCopy.heading(level, periods: periods, today: model.today)
-        return VStack(spacing: 2) {
+        let other = DailyPeriods.other(level, shown: appState.selectedDate, today: model.today, seasons: seasons)
+        let otherName = other.map { date in
+            DailyCopy.heading(level, periods: MountainPage.periods(level: level, selected: date, today: model.today,
+                                                                   seasons: seasons), today: model.today).title
+        }
+        let stack = VStack(spacing: 2) {
             Text(words.title)
                 .font(DailyPalette.crimson(40))
                 .frame(minHeight: 46)
             Text(words.sub)
                 .font(DailyPalette.sans(14.5))
                 .opacity(0.9)
+            if let otherName {
+                Text(DailyCopy.switchesTo(otherName))
+                    .font(DailyPalette.sansMedium(13))
+                    .opacity(0.75)
+            }
         }
         .foregroundStyle(.white)
         .multilineTextAlignment(.center)
@@ -329,11 +351,22 @@ struct MountainPageView: View {
         .minimumScaleFactor(0.7)
         .shadow(color: DailyPalette.navy.opacity(0.6), radius: 5, x: 0, y: 2)
         .padding(.horizontal, 16)
+        return Group {
+            if let other, let otherName {
+                Button { appState.selectedDate = other } label: { stack.contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(DailyCopy.switchLabel(words.title, other: otherName))
+                    .accessibilityIdentifier("daily.mountain.heading")
+            } else {
+                stack
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("daily.mountain.heading")
+            }
+        }
+        .accessibilityAddTraits(.isHeader)
         .frame(width: size.width)
         .offset(y: m.navTop + Self.headingTop)
-        .allowsHitTesting(false)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
     }
 
     /// The navy scrim at the foot, under the hint and the bar.

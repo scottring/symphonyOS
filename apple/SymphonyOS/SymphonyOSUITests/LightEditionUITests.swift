@@ -357,6 +357,37 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertFalse(any[page].exists, "\(start) is still up", file: file, line: line)
     }
 
+    /// The owner's "where I am, if it has goals": on 28 November the walk plans December, but with goals
+    /// in November too, Month opens on November; its heading's tap shows December and its flags, and a
+    /// second tap comes back. Taps only.
+    @MainActor func testMonthOpensWhereYouAreAndItsHeadingSwitches() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-28",
+                               "-SymphonyDailySeed", "both", "-SymphonyDailyPage", "month"]
+        app.launchDemo()
+        let any = app.descendants(matching: .any)
+        XCTAssertTrue(any["daily.mountain.month"].waitForExistence(timeout: 60), "never reached Month")
+        let heading = any["daily.mountain.heading"]
+        XCTAssertTrue(heading.waitForExistence(timeout: 15))
+        XCTAssertTrue(heading.label.hasPrefix("November"), "Month did not open on November: \(heading.label)")
+        XCTAssertTrue(heading.label.contains("December"), "the heading does not offer December: \(heading.label)")
+        let november = any.matching(NSPredicate(format: "label CONTAINS %@", "Clear the gutters")).firstMatch
+        XCTAssertTrue(november.waitForExistence(timeout: 10), "November's goal is not on November's page")
+
+        heading.tap()
+        let onDecember = NSPredicate(format: "label BEGINSWITH %@", "December")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: onDecember, evaluatedWith: heading)], timeout: 10), .completed,
+                       "the heading's tap did not show December")
+        let december = any.matching(NSPredicate(format: "label CONTAINS %@", "Find a gym that fits")).firstMatch
+        XCTAssertTrue(december.waitForExistence(timeout: 10), "December's goal is not on December's page")
+        XCTAssertFalse(november.exists, "November's goal is still shown on December's page")
+
+        heading.tap()
+        let onNovember = NSPredicate(format: "label BEGINSWITH %@", "November")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: onNovember, evaluatedWith: heading)], timeout: 10), .completed,
+                       "a second tap did not come back to November")
+    }
+
     /// The light page's controls under the display.
     private let pageControls = ["daily.bar.light", "daily.bar.inbox", "daily.bar.more", "daily.lookBack", "daily.nav.week"]
 

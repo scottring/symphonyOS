@@ -79,13 +79,15 @@ extension Dictation: WalkListening {}
     }
 
     init(context: ModelContext, userId: UUID, entry: WalkEntry, position: WalkPosition?, edition: Edition,
-         now: Date = .now, seasons: [SeasonBoundary]? = nil, store: WalkPositionStore? = WalkPositionStore(),
+         now: Date = .now, seasons: [SeasonBoundary]? = nil, periods chosen: WalkPeriods? = nil,
+         store: WalkPositionStore? = WalkPositionStore(),
          scheduler: WalkScheduling? = nil, listener: WalkListening? = nil, sound: WalkSoundPlaying? = nil,
          calendarAccess: @escaping @MainActor () -> AppleCalendarAccess = { AppleCalendarService.shared.access },
          requestCalendar: @escaping @MainActor () async -> Void = { await AppleCalendarService.shared.requestAccess() },
          calendarEvents: @escaping @MainActor (Date) -> [TimelineItem]? = { CalendarFeed.shared.items(for: $0) },
          clock: @escaping @MainActor () -> Date = { .now }) {
-        let periods = WalkPeriods.pick(now: now, seasons: seasons)
+        // The walk's own periods; a walk-down from a light page may name others (`DailyWalkDown.periods`).
+        let periods = chosen ?? WalkPeriods.pick(now: now, seasons: seasons)
         let resuming = entry == .resume ? position : nil
         let planted = Set(resuming?.planted ?? [])
 

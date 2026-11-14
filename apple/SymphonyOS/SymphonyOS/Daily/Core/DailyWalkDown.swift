@@ -19,6 +19,9 @@ struct DailyWalkDown: Equatable {
     let date: Date
     /// The household's season boundaries, which the walk reads its periods with.
     let seasons: [SeasonBoundary]?
+    /// The periods it plans in: the walk's own (nil), or those the flag's own period asks for
+    /// (`DailyPeriods.walking`: a goal of the period that holds today walks down into today's).
+    var periods: WalkPeriods? = nil
 
     /// Where the person is once it is over, however it ends: the page it was started from, on its
     /// date. A walk-down from a sign on Today returns to the day it was asked on (`sign(...)`'s
@@ -45,7 +48,8 @@ struct DailyWalkDown: Equatable {
               MountainPage.canWalkDown(item, in: page.walkItems) else { return nil }
         let position = MountainPage.walkDown(item, items: page.walkItems, areas: page.areas, kept: page.saved,
                                              periods: periods, now: now)
-        return DailyWalkDown(userId: userId, position: position, from: horizon, date: date, seasons: seasons)
+        return DailyWalkDown(userId: userId, position: position, from: horizon, date: date, seasons: seasons,
+                             periods: periods)
     }
 
     /// From a sign on Today (`Signpost.Target.walkDown`): the goal it names among the walk's own
@@ -64,7 +68,7 @@ struct DailyWalkDown: Equatable {
         let kept = MountainPage.kept(items: [], areas: areas, saved: saved?.kept ?? [], savedAreas: saved?.areas ?? [])
         let position = MountainPage.walkDown(item, items: items, areas: areas, kept: kept, periods: periods, now: now)
         return DailyWalkDown(userId: me, position: position, from: .today, date: PlanCalendar.day(now),
-                             seasons: seasons)
+                             seasons: seasons, periods: periods)
     }
 
     /// Whether following `sign` puts it away for the day: as `putAwayWhenFollowed` says, except
@@ -100,7 +104,7 @@ extension DailyWalkDown {
     @MainActor func model(context: ModelContext, now: Date = .now, scheduler: WalkScheduling? = nil,
                           listener: WalkListening? = nil, sound: WalkSoundPlaying? = nil) -> WalkModel {
         WalkModel(context: context, userId: userId, entry: .resume, position: position, edition: .light, now: now,
-                  seasons: seasons, store: nil, scheduler: scheduler, listener: listener, sound: sound)
+                  seasons: seasons, periods: periods, store: nil, scheduler: scheduler, listener: listener, sound: sound)
     }
 }
 #endif

@@ -201,6 +201,13 @@ enum DailyCopy {
         }
     }
 
+    /// Under a mountain page's heading when the period that holds today and the walk's differ: where a
+    /// tap on the heading goes ("December ›" under "November").
+    static func switchesTo(_ other: String) -> String { "\(other) ›" }
+
+    /// The heading's VoiceOver label then: "November. Shows December next."
+    static func switchLabel(_ title: String, other: String) -> String { "\(title). Shows \(other) next." }
+
     /// The chosen flag's panel line when nothing hangs under it one level down.
     static func nothingUnder(_ level: WalkLevel, periods: WalkPeriods) -> String {
         switch level {
