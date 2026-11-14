@@ -268,7 +268,7 @@ private struct Builder {
     /// turned as one piece (`plant`). Every post or label whose drawing then breaks one of the
     /// layout's guarantees, or meets a flag or label the ruled layout keeps it clear of, keeps
     /// less of its hand (all, half, a quarter, none) and is planted again: order first, charm
-    /// second. If that does not settle it, the ruled layout, which keeps them all.
+    /// second. It always settles: every round takes a step of hand from at least one key.
     func layout() -> WalkLayout {
         // Top down, so a level knows the flags risen above it and every frame above it.
         var stacked: [L.Post] = []
@@ -307,17 +307,20 @@ private struct Builder {
         // so the rounds end within three per key; only the keys in conflict ever lose any.
         let keys = Set(stacked.map(\.key)).union(columns.map { WalkPostKey(level: .year, column: $0.id) })
         var builder = self
+        var made = planted(builder)
         for _ in 0...(3 * keys.count) {
-            let made = planted(builder)
             let found = builder.conflicts(made, ruled: ruled)
             if found.isEmpty { return made }
             let squeeze = found.filter { builder.sigma($0) > 0 }
             // Unreachable: a conflict with no hand left in it is one the ruled layout has itself.
             guard !squeeze.isEmpty else { break }
             for key in squeeze { builder.damp[key] = builder.sigma(key) > 0.5 ? 0.5 : (builder.sigma(key) > 0.25 ? 0.25 : 0) }
+            made = planted(builder)
         }
+        // Not reached (asserted in DEBUG). If it ever is, the conflicting posts already have no hand
+        // left, so the layout is returned as it stands: levelling every other post would gain nothing.
         assertionFailure("the hand did not settle: a conflict the ruled layout has itself")
-        return ruled
+        return made
     }
 
     /// Steps 1 to 5 draw their level and the ones above; Look back up draws all; Welcome none.
@@ -393,22 +396,27 @@ private struct Builder {
     /// Each column's footing on a level before damping, by column index, within
     /// ±`WalkFooting.ground` × the level's scale.
     ///
-    /// Room first, from where the column stands alone (never from a neighbour's footing): on Year
-    /// its label keeps clear of the light and the question; where staggered labels overlap across,
-    /// the upper row may sink and the lower rise only half the gap between the rows each; and where
-    /// peaks take taps on a crowded ridge, a lower-row post's stub and the upper neighbour's label
-    /// split their 1.5 pt likewise. So any two footings inside their rooms keep labels clear.
+    /// Who stands lower: the posts drawn on the level are the neighbours (`drawn`; a column with
+    /// no post is skipped). Of two neighbours the one whose hand ranks higher stands lower, except
+    /// where the peak labels stand in two staggered rows (Year, four or more columns): there a
+    /// lower-row post stands lower than an upper-row neighbour, so a lower label never rises into
+    /// the upper one.
     ///
-    /// Then a band, so neighbours stand apart without either looking further than next door. The
-    /// neighbours are the posts drawn on the level (`drawn`; a column with no post is skipped).
-    /// A post whose hand ranks above every neighbour's sinks (+7…+10 × scale), one below every
-    /// neighbour's rises (−10…−7), any other stands near the line (−1…+1): every two neighbours
-    /// so differ by at least `WalkFooting.apart` but two in a row of rising ranks, which can only
-    /// be told apart by looking further. Where peak labels stand in two staggered rows, the row is
-    /// the band instead (upper −10…−6, lower 0…+10). Its own hand places a post inside its band;
-    /// a post with no neighbour uses the whole range. So a footing depends on its own post and its
-    /// nearest drawn neighbours only: an arriving post moves no one else. Where two neighbours
-    /// still stand within `apart` (a rising row, or a room too narrow), both report `apart` false.
+    /// Where they stand: the drawn posts split into maximal monotone runs between local extremes.
+    /// An extreme stands at its own hand's place in ±(m…10), m set by the longest run it closes
+    /// (3 for a run of two, 7.5 for three, 9 for four or more; at least 6 with label rows). Inside
+    /// a run the posts stand evenly between ∓9: a run of three at 0 (±1.5 by its own hand), of four
+    /// at ∓3. Every two neighbours so differ by at least `WalkFooting.apart` × scale, for any ids,
+    /// except inside a run of five (only five posts in one rising order, about 1 in 60): ±10 cannot
+    /// hold four 6 pt steps, so they stand 4.5 apart, evenly, and are not called squeezed. A run of
+    /// six or more (six or more posts) is spaced the same way and reported `apart` false.
+    ///
+    /// A footing so depends only on the ranks within its own monotone run (an extreme: the two it
+    /// closes), never on posts beyond it. A label with no post here stands near the line, within
+    /// what its drawn neighbours' labels leave it. Room, from where a column stands alone: on Year
+    /// a label keeps clear of the light and the question; where peaks take taps on a crowded ridge,
+    /// a lower-row post's stub and the upper neighbour's label split their 1.5 pt (a real lack of
+    /// room, reported `apart` false where it squeezes two neighbours together).
     func footings(_ lvl: WalkLevel, drawn: Set<UUID?>) -> [(value: CGFloat, apart: Bool)] {
         let k = drawnScale(lvl)
         let reach = WalkFooting.ground * k, gapY = WalkFooting.apart * k
@@ -422,15 +430,11 @@ private struct Builder {
             hi[i] = min(hi[i], max(0, orbRoom(mine.frame)))
             lo[i] = max(lo[i], min(0, L.question - mine.frame.minY))
             for j in [i - 1, i + 1] where (0..<n).contains(j) {
-                guard let other = slots[j], other.row != mine.row else { continue }
-                let (upper, lower) = mine.row == 0 ? (mine, other) : (other, mine)
-                if upper.frame.maxX > lower.frame.minX, lower.frame.maxX > upper.frame.minX {
-                    let half = max(0, (lower.frame.minY - upper.frame.maxY - 0.5) / 2)
-                    if mine.row == 0 { hi[i] = min(hi[i], half) } else { lo[i] = max(lo[i], -half) }
-                }
+                guard stubsBesideLabels, let other = slots[j], other.row != mine.row else { continue }
+                let upper = mine.row == 0 ? mine : other
                 let lowerColumn = mine.row == 1 ? i : j
                 let lowerX = stageX(columns[lowerColumn].worldX)
-                if stubsBesideLabels, drawn.contains(columns[lowerColumn].id),
+                if drawn.contains(columns[lowerColumn].id),
                    lowerX + 13 * k + margin > upper.frame.minX, lowerX - 13 * k - margin < upper.frame.maxX {
                     let half = max(0, (upper.frame.minY - stageY(.year) - margin) / 2)
                     if mine.row == 1 { hi[i] = min(hi[i], half) } else { lo[i] = max(lo[i], -half) }
@@ -438,36 +442,89 @@ private struct Builder {
             }
             if lo[i] > hi[i] { lo[i] = (lo[i] + hi[i]) / 2; hi[i] = lo[i] }
         }
+        // Staggered labels that overlap across: an upper label may sink only as far as the lower one
+        // beside it can, plus the gap between the rows (the lower one may be held up by the light).
+        if !slots.isEmpty && n > 3 {
+            let alone = hi
+            for i in 0..<n {
+                guard let mine = slots[i], mine.row == 0 else { continue }
+                for j in [i - 1, i + 1] where (0..<n).contains(j) {
+                    guard let other = slots[j], other.row == 1,
+                          mine.frame.maxX > other.frame.minX, other.frame.maxX > mine.frame.minX else { continue }
+                    hi[i] = max(lo[i], min(hi[i], alone[j] + other.frame.minY - mine.frame.maxY - 0.5))
+                }
+            }
+        }
         let clamp = { (i: Int, v: CGFloat) in min(hi[i], max(lo[i], v)) }
         let id = { (i: Int) in self.postId(WalkPostKey(level: lvl, column: self.columns[i].id)) }
         let rank = (0..<n).map { WalkFooting.hand(id($0), "rank") }
-        let order = (0..<n).filter { drawn.contains(columns[$0].id) }
+        let own = (0..<n).map { CGFloat(WalkFooting.hand(id($0), "footing") + 1) / 2 }      // 0…1, the post's own
         let rows = !slots.isEmpty && n > 3
-        var out: [(value: CGFloat, apart: Bool)] = []
-        for i in 0..<n {
-            let u = CGFloat(WalkFooting.hand(id(i), "footing") + 1) / 2         // 0…1, the post's own
-            let band: ClosedRange<CGFloat>
-            if rows, let slot = slots[i] {
-                band = slot.row == 0 ? -reach...(-gapY) : 0...reach
-            } else if let t = order.firstIndex(of: i) {
-                let neighbours = [t - 1, t + 1].filter(order.indices.contains).map { rank[order[$0]] }
-                if neighbours.isEmpty {
-                    band = -reach...reach
-                } else if neighbours.allSatisfy({ $0 < rank[i] }) {
-                    band = (reach - 3 * k)...reach
-                } else if neighbours.allSatisfy({ $0 > rank[i] }) {
-                    band = -reach...(-reach + 3 * k)
-                } else {
-                    band = (-1 * k)...(1 * k)
-                }
-            } else {
-                band = -reach...reach                                       // a label with no post here
-            }
-            out.append((clamp(i, band.lowerBound + (band.upperBound - band.lowerBound) * u), true))
+        /// Whether column `a` stands lower than its drawn neighbour `b`.
+        func lower(_ a: Int, _ b: Int) -> Bool {
+            if rows, let sa = slots[a], let sb = slots[b], sa.row != sb.row { return sa.row == 1 }
+            return rank[a] != rank[b] ? rank[a] > rank[b] : id(a) > id(b)
         }
+        let order = (0..<n).filter { drawn.contains(columns[$0].id) }
+        let m = order.count
+        var value = (0..<n).map { (-1.5 + 3 * own[$0]) * k }                // a label with no post: near the line
+        var apart = [Bool](repeating: true, count: n)
+        if m == 1 {
+            value[order[0]] = (-reach + 2 * reach * own[order[0]])
+        } else if m > 1 {
+            // down[t]: order[t + 1] stands lower than order[t].
+            let down = (0..<(m - 1)).map { lower(order[$0 + 1], order[$0]) }
+            var ends = [0]
+            for t in 1..<(m - 1) where down[t - 1] != down[t] { ends.append(t) }
+            ends.append(m - 1)
+            var longest = [Int](repeating: 2, count: m)
+            for (a, b) in zip(ends, ends.dropFirst()) {
+                let length = b - a + 1
+                longest[a] = max(longest[a], length)
+                longest[b] = max(longest[b], length)
+                guard length > 2 else { continue }
+                // The run's ends stand at least `least` from the line (less only where their room holds them).
+                let least: CGFloat = (length >= 4 ? 9 : 7.5) * k
+                let (raised, sunk) = down[a] ? (order[a], order[b]) : (order[b], order[a])
+                let top = clamp(raised, -least), bottom = clamp(sunk, least)
+                for t in (a + 1)..<b {
+                    let j = CGFloat(down[a] ? t - a : b - t)                // steps from the raised end
+                    if length == 3 {
+                        // Anywhere at least 6 from both ends, by its own hand: about 0 ± 1.5.
+                        let from = top + gapY, to = bottom - gapY
+                        value[order[t]] = from <= to ? from + (to - from) * own[order[t]] : (from + to) / 2
+                    } else {
+                        value[order[t]] = top + (bottom - top) * j / CGFloat(length - 1)
+                    }
+                    if length >= 6 { apart[order[t]] = false }
+                }
+            }
+            for t in ends {
+                let sinks = t == 0 ? !down[0] : down[t - 1]
+                let least: CGFloat = max(rows ? 6 : 0, longest[t] >= 4 ? 9 : (longest[t] == 3 ? 7.5 : 3))
+                let magnitude = least + (10 - least) * own[order[t]]
+                value[order[t]] = (sinks ? magnitude : -magnitude) * k
+            }
+        }
+        // A label with no post: within what its drawn neighbours' labels in the other row leave it.
+        if rows {
+            for i in 0..<n where !drawn.contains(columns[i].id) {
+                guard let mine = slots[i] else { continue }
+                var low = -reach, high = reach
+                for j in [i - 1, i + 1] where (0..<n).contains(j) && drawn.contains(columns[j].id) {
+                    guard let other = slots[j], other.row != mine.row else { continue }
+                    let (upper, lowerSlot) = mine.row == 0 ? (mine, other) : (other, mine)
+                    guard upper.frame.maxX > lowerSlot.frame.minX, lowerSlot.frame.maxX > upper.frame.minX else { continue }
+                    let room = lowerSlot.frame.minY - upper.frame.maxY - 0.5
+                    if mine.row == 1 { low = max(low, value[j] - room) } else { high = min(high, value[j] + room) }
+                }
+                value[i] = low > high ? (low + high) / 2 : min(high, max(low, value[i]))
+            }
+        }
+        var out = (0..<n).map { (value: clamp($0, value[$0]), apart: apart[$0]) }
         for (a, b) in zip(order, order.dropFirst()) where abs(out[a].value - out[b].value) < gapY - 0.0001 {
-            out[a].apart = false
-            out[b].apart = false
+            let inFive = m == 5 && abs(out[a].value - out[b].value) >= 4.5 * k - 0.0001
+            if !inFive { out[a].apart = false; out[b].apart = false }
         }
         return out
     }
@@ -772,7 +829,7 @@ private struct Builder {
     /// the question (but the step's own newest alone) or a stub above its ceiling. (Whether an
     /// example shows is the stacking's, which the hand never changes.) And, measured against
     /// `ruled` (the hand never piles one thing onto another):
-    /// two posts' flags meet that it keeps apart, or a flag (not the step's own) covers more of a label than it does.
+    /// two posts' flags of one level meet that it keeps apart, or a flag (not the step's own) covers more of a label than it does.
     ///
     /// Both posts (or post and label) of a conflicting pair are returned, so both are damped: the
     /// layout cannot tell which one's hand caused it, and damping both always ends it, since with
@@ -819,9 +876,9 @@ private struct Builder {
                 } else {
                     meet = false
                 }
-                // Whatever the rules allow, the hand does not make two posts' flags meet that the ruled layout keeps apart.
-                // Flags the ruled layout keeps apart stay apart (where it already lets one pass in front of another, it may).
-                let piled = !meet && a.post.id != b.post.id && overlap(a.drawn, b.drawn)
+                // Whatever the rules allow, the hand does not make two posts' flags of one level meet that the ruled
+                // layout keeps apart. (A step's own flags may pass in front of the small flags above, as ruled ones do.)
+                let piled = !meet && a.post.id != b.post.id && a.banner.level == b.banner.level && overlap(a.drawn, b.drawn)
                     && ruledFrames[a.banner.id].map { r in ruledFrames[b.banner.id].map { !overlap(r, $0) } ?? false } == true
                 if meet || piled { bad.insert(a.post.key); bad.insert(b.post.key) }
             }
