@@ -29,6 +29,9 @@ enum DemoMode {
         return args[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
     }
 
+    /// `-SymphonyWalkExamples`: the demo walk opens with the example flags on for its step.
+    static var walkExamples: Bool { ProcessInfo.processInfo.arguments.contains("-SymphonyWalkExamples") }
+
     static let userId = UUID(uuidString: "00000000-0000-4000-8000-00000000D3E0")!
 
     static var user: User? {
@@ -162,7 +165,9 @@ enum DemoMode {
     /// - `type`: the Type it point: the one-line field, empty.
     /// - `select`: a tap on the newest flag the walk planted on this step (Today: the first thing).
     /// - `undo`: a flag typed and planted, so the Undo pill shows.
+    /// With `-SymphonyWalkExamples` the Examples point is chosen first, so the step's example flags show.
     @MainActor static func showWalk(_ model: WalkModel, _ steps: [String]) {
+        if walkExamples { model.choose(.examples) }
         for step in steps {
             switch step {
             case "ground":

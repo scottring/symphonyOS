@@ -75,8 +75,9 @@ struct WalkState: Equatable {
             undoShowing = false             // only the pill goes: the stack stays
             return []
         case .rowToggled(let taskId): return toggleRow(taskId)
-        // The calendar and the ending (Tasks 17 and 20).
-        case .calendarAnswered, .sheetHandle, .walkAnother, .goToToday:
+        case .walkAnother: return walkAnother()
+        // The calendar and the ending (Task 20).
+        case .calendarAnswered, .sheetHandle, .goToToday:
             return []
         }
     }

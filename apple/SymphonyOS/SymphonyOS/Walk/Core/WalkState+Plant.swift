@@ -300,6 +300,29 @@ extension WalkState {
         if let f = focusArea, f == id || !kept.contains(f) { focusArea = nil }
     }
 
+    // MARK: The ending
+
+    /// "Walk another one down": back to Season in a quick walk, focused on the
+    /// first year goal with nothing under it yet. The focus left on the steps
+    /// below belonged to the chain just walked, so it goes: walking on picks up
+    /// the flag planted last, as on a first visit. With every goal walked, nothing.
+    mutating func walkAnother() -> [WalkEffect] {
+        guard step == 6, let next = WalkEnding.nextToWalk(items) else { return [] }
+        depth = .quick
+        step = 2
+        ground = false
+        focusArea = nil
+        tour = []
+        focus = [.season: next.id]
+        selected = nil
+        expanded = nil
+        undoShowing = false
+        typing = nil
+        orb = .idle
+        sheetOpen = false
+        return [.save]
+    }
+
     // MARK: The ending's rows
 
     /// Ticks any of today's tasks, planted by the walk or not; the writer decides whose rows it may touch.
