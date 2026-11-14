@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "overlookhalfopenbook.jpg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
