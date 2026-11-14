@@ -39,6 +39,16 @@ struct LightPlannerView<Full: View>: View {
         TodayLayout.decide(width: size.width, height: size.height, sideBars: appState.dockLayout.edge != .bottom)
     }
 
+    /// The window's insets as the light pages take them (Debug: a pinned window opened flat takes the
+    /// spread board's, `PinnedFit.insets`).
+    private var pageInsets: UIEdgeInsets {
+        #if DEBUG
+        return PinnedFit.insets(insets, on: layout)
+        #else
+        return insets
+        #endif
+    }
+
     private var showsLight: Bool { DailyGate.shows(appState.horizon, edition: appState.edition, layout: layout) }
 
     /// The dock gives way to the bar on this window and this page (`DailyGate.hidesDock`).
@@ -55,7 +65,7 @@ struct LightPlannerView<Full: View>: View {
             if DailyGate.dropsPage(covered: covered, lightPage: showsLight) {
                 DailyPalette.sky.ignoresSafeArea()
             } else if showsLight {
-                light(DailyGate.page(appState.horizon))
+                light(DailyGate.page(appState.horizon, layout: layout))
             } else {
                 full()
             }
@@ -120,19 +130,25 @@ struct LightPlannerView<Full: View>: View {
             GeometryReader { proxy in
                 let size = TodayView.pinnedSize ?? proxy.size
                 switch page {
+                case .spread:
+                    // Opened flat (Task 18): Today and Week are one spread, the rest of the week beside today.
+                    LightSpreadView(model: model, userId: userId, seasons: seasons, size: size,
+                                    safeTop: pageInsets.top, safeBottom: pageInsets.bottom, layout: layout,
+                                    go: go, open: open)
+                        .frame(width: size.width, height: size.height)
                 case .today:
                     LightTodayView(model: model, userId: userId, seasons: seasons, size: size,
-                                   safeTop: insets.top, safeBottom: insets.bottom, layout: layout,
+                                   safeTop: pageInsets.top, safeBottom: pageInsets.bottom, layout: layout,
                                    handoverFrom: DailyHandover.start(page: size, left: insets.left, right: insets.right),
                                    go: go, open: open)
                         .frame(width: size.width, height: size.height)
                 case .week:
                     LightWeekView(model: model, userId: userId, seasons: seasons, size: size,
-                                  safeTop: insets.top, safeBottom: insets.bottom, layout: layout, go: go)
+                                  safeTop: pageInsets.top, safeBottom: pageInsets.bottom, layout: layout, go: go)
                         .frame(width: size.width, height: size.height)
                 case .mountain(let level):
-                    MountainPageView(level: level, model: model, userId: userId, size: size, safeTop: insets.top,
-                                     safeBottom: insets.bottom, layout: layout, go: go)
+                    MountainPageView(level: level, model: model, userId: userId, size: size, safeTop: pageInsets.top,
+                                     safeBottom: pageInsets.bottom, layout: layout, go: go)
                         .frame(width: size.width, height: size.height)
                 }
             }
@@ -212,6 +228,14 @@ private struct LightPageFrame: ViewModifier {
 /// iPhone 17): the page is scaled down to the room there is, so it can be seen whole, as the
 /// half-open display does. Nothing changes with no size pinned, or room enough.
 private struct PinnedFit: ViewModifier {
+    /// A window pinned opened flat (`.journal`) on a phone simulator takes the spread board's insets
+    /// (its row of words at y 10, nothing at the foot), since the phone's own belong to an upright
+    /// phone, not to the Duo held sideways; so the shot is the board. Any other window keeps its own.
+    static func insets(_ insets: UIEdgeInsets, on layout: TodayLayout) -> UIEdgeInsets {
+        guard TodayView.pinnedSize != nil, layout == .journal else { return insets }
+        return UIEdgeInsets(top: 10, left: 0, bottom: 0, right: 0)
+    }
+
     func body(content: Content) -> some View {
         if let pinned = TodayView.pinnedSize, pinned.width > 0, pinned.height > 0 {
             GeometryReader { room in

@@ -117,17 +117,19 @@ struct MountainPageView: View {
             stage
                 .accessibilitySortPriority(4)
             scrim(m)
-            DailyNavRow(current: horizon, gap: m.navGap, go: go)
+            // Opened flat, the spread's four words, so the last ("Week and today") leads back to it.
+            DailyNavRow(current: horizon, gap: m.navGap, words: DailySpread.navWords(on: layout),
+                        label: DailySpread.navLabel(on: layout), go: go)
                 .frame(width: size.width)
                 .offset(y: m.navTop)
                 .accessibilitySortPriority(6)
             heading(flags.periods, m)
                 .accessibilitySortPriority(5)
             if let panel = page?.panel, !keyboardUp {
-                MountainPanel(panel: panel, moving: page?.moving == true, send: apply)
-                    .frame(width: size.width - 2 * Self.panelInset, height: max(0, m.bar.line - Self.panelAbove),
-                           alignment: .bottom)
-                    .offset(x: Self.panelInset)
+                let place = DailyMetrics.mountainPanel(size: size, line: m.bar.line, layout: layout)
+                MountainPanel(panel: panel, moving: page?.moving == true, wraps: place.beside, send: apply)
+                    .frame(width: place.frame.width, height: place.frame.height, alignment: .bottom)
+                    .offset(x: place.frame.minX)
                     .accessibilitySortPriority(3)
             }
             MountainHint(model: model, words: DailyCopy.hint(level), bar: m.bar)
@@ -162,11 +164,6 @@ struct MountainPageView: View {
 
     // MARK: Numbers
 
-    /// The panel stands 20 in from each side (the board's (20, 590) 350 wide) …
-    private static let panelInset: CGFloat = 20
-    /// … with its foot this far above the bar's line, where the board's stands (673 over 724),
-    /// so it grows upward and never reaches the hint or the bar.
-    private static let panelAbove: CGFloat = 51
     /// The heading's top under the row of words (the board's 102 under 44).
     private static let headingTop: CGFloat = 58
     /// The navy scrim starts this far above the bar's field (the board's 650 over 754).
@@ -373,6 +370,8 @@ private struct MountainHint: View {
 private struct MountainPanel: View {
     let panel: (line: String?, canWalkDown: Bool, moveTo: [WalkArea])
     let moving: Bool
+    /// Beside the stage (opened flat, `DailyMetrics.mountainPanel`) the chips wrap onto more lines.
+    var wraps = false
     let send: (MountainPage.Event) -> Void
 
     var body: some View {
@@ -383,13 +382,17 @@ private struct MountainPanel: View {
                     .foregroundStyle(DailyPalette.soft)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            // One row that scrolls sideways when the areas do not fit, so the panel keeps its
-            // height and never rises over the peaks' labels.
-            ScrollView(.horizontal) {
-                HStack(spacing: 6) { chips }
+            if wraps {
+                DailyChipFlow(spacing: 6, lineSpacing: 0) { chips }
+            } else {
+                // One row that scrolls sideways when the areas do not fit, so the panel keeps its
+                // height and never rises over the peaks' labels.
+                ScrollView(.horizontal) {
+                    HStack(spacing: 6) { chips }
+                }
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         }
         .padding(EdgeInsets(top: 10, leading: 12, bottom: 8, trailing: 12))
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -35,8 +35,6 @@ struct LightTodayView: View {
     @State private var walkPosition: WalkPosition?
     /// A row's Details, open in the task's own screen.
     @State private var opened: TimelineItem?
-    /// Where the rows stand, so the row an Undo would change is kept clear of it.
-    @State private var frames = DailyRowFrames()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The sheet lowered by its handle over the whole plan, or not.
     @State private var lookBack = DailyLookBack()
@@ -171,93 +169,18 @@ struct LightTodayView: View {
                 .offset(x: m.card.minX, y: m.card.minY)
         }
         let top = page.next == nil ? m.rowsTopNoCard : m.rowsTop
-        if page.rows.isEmpty {
-            Text(WalkCopy.nothingToday)
-                .font(DailyPalette.crimson(19))
-                .foregroundStyle(DailyPalette.soft)
-                .frame(width: size.width - 2 * m.inset - 12, alignment: .leading)
-                .offset(x: m.inset + 6, y: top + 6)
-        } else {
-            rows(page, m, top: top)
-        }
+        DailyTodayList(model: model, page: page, frame: CGRect(x: 0, y: top, width: size.width, height: size.height - top),
+                       inset: m.inset, rowHeight: m.row, rowGap: m.rowGap, clearOf: m.bar.fade.minY,
+                       details: { opened = DailyTodayList.details($0) })
     }
 
     private func header(_ page: DailyTodayPage, _ m: DailyMetrics, at frame: CGRect) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(DailyCopy.today.uppercased())
-                    .font(DailyPalette.sansMedium(11))
-                    .tracking(1.5)
-                    .foregroundStyle(DailyPalette.muted)
-                Text(DailyCopy.date(model.today))
-                    .font(DailyPalette.crimson(27))
-                    .foregroundStyle(DailyPalette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(minHeight: 32)
-                    .accessibilityAddTraits(.isHeader)
-            }
-            Spacer(minLength: 0)
-            if let ring = page.ring { DailyRing(done: ring.done, total: ring.total, diameter: m.ring) }
-        }
-        .frame(width: frame.width, height: frame.height)
-        .offset(x: frame.minX, y: frame.minY)
-    }
-
-    /// The rows scroll in their own space from their top to the page's foot, and can be
-    /// scrolled clear of the fade; the 4 points above leave room for a lit row's halo. A row
-    /// added with Undo showing is scrolled clear of the fade and the Undo, if they cover it.
-    private func rows(_ page: DailyTodayPage, _ m: DailyMetrics, top: CGFloat) -> some View {
-        let halo: CGFloat = 4
-        let scroll = CGRect(x: 0, y: top - halo, width: size.width, height: size.height - top + halo)
-        return ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: m.rowGap) {
-                    ForEach(page.rows) { row in
-                        DailyRow(row: row, height: m.row, lit: model.lit == row.id,
-                                 toggle: { model.toggle(row) },
-                                 setFirst: {
-                                     let mark = page.firstMark(toggling: row)
-                                     model.setFirst(mark.id, previous: mark.previous)
-                                 },
-                                 details: { opened = details(row) },
-                                 pullUp: { model.pullUp(row.id, level: .week) })
-                            .dailyRowFrame(row.id, in: frames)
-                    }
-                }
-                .padding(.horizontal, m.inset)
-                .padding(.top, halo)
-                .padding(.bottom, size.height - m.bar.fade.minY + halo)
-            }
-            .dailyListFrame(frames)
-            .onChange(of: model.reveal) { _, reveal in
-                guard let reveal else { return }
-                frames.keepInSight(reveal.id, above: m.bar.fade.minY, proxy: proxy, animated: !reduceMotion)
-            }
-        }
-        .frame(width: scroll.width, height: scroll.height)
-        .offset(y: scroll.minY)
+        DailyPageHeader(eyebrow: DailyCopy.today, title: DailyCopy.date(model.today),
+                        ring: page.ring.map { ($0.done, $0.total) }, ringDiameter: m.ring, frame: frame)
     }
 
     private func walkButton(_ line: DailyGate.WalkLine, _ frame: CGRect) -> some View {
-        let words = line == .waiting ? DailyCopy.walkWaiting : DailyCopy.walkWhenReady
-        return Button {
-            switch line {
-            case .waiting: appState.resumeWalk()                    // Settings' "Pick the walk back up"
-            case .whenReady: appState.walkReplayRequested = true    // from the top
-            }
-        } label: {
-            Text(words)
-                .font(DailyPalette.sansMedium(13))
-                .foregroundStyle(DailyPalette.deepGreen)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(width: frame.width, height: frame.height)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .offset(x: frame.minX, y: frame.minY)
-        .accessibilityIdentifier("daily.walkWaiting")
+        DailyWalkLine(line: line, frame: frame)
     }
 
     // MARK: Touches
@@ -265,25 +188,8 @@ struct LightTodayView: View {
     /// A tap follows the sign. A sign that takes you somewhere is put away for the day
     /// (`putAwayWhenFollowed`); "First, today" only lights its row.
     private func follow(_ sign: Signpost.Sign) {
-        switch sign.target {
-        case .light(let id):
-            model.light(id)
-        case .week(let day):
-            open(.week, day)
-        case .page(let horizon, let day):
-            open(horizon, day)
-        case .walkDown:
-            // The walk opens one level below the goal the sign names, and comes back to Today;
-            // the bar lets go first. A sign that could not open it is not put away.
-            let down = DailyWalkDown.sign(sign.target, goals: goals, tasks: tasks, areaRows: goalAreas,
-                                          saved: walkPosition, periods: model.periods, now: model.today,
-                                          seasons: seasons, me: userId)
-            for event in down?.bar ?? [] { model.send(event) }
-            appState.walkDown = down
-            if DailyWalkDown.putsAway(sign, walkDown: down) { model.dismiss(sign.kind) }
-            return
-        }
-        if sign.putAwayWhenFollowed { model.dismiss(sign.kind) }
+        DailySignFollower(model: model, appState: appState, goals: goals, tasks: tasks, goalAreas: goalAreas,
+                          walkPosition: walkPosition, seasons: seasons, userId: userId, open: open).follow(sign)
     }
 
     /// The handle lowers the sheet over the whole plan, reading the ridge as it goes, or raises it.
@@ -372,11 +278,6 @@ struct LightTodayView: View {
         // With the whole plan showing, the sheet rises first, so the bar that answers is there.
         lookBack.tellArrives(asked: appState.tellRequested, walkShowing: appState.walkShowing, covered: model.covered)
         if model.answerTell(appState) { opened = nil }
-    }
-
-    private func details(_ row: DailyDay.Row) -> TimelineItem {
-        TimelineItem(id: "task-\(row.id.uuidString)", type: .task, title: row.title, startTime: nil, isAllDay: true,
-                     completed: row.done, context: "personal", entityId: row.id)
     }
 
     #if DEBUG

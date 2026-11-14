@@ -152,8 +152,9 @@ struct DailyGateTests {
 
     /// The dock is judged by the page on screen, not by Today being built: with all five pages
     /// built it gives way on every one of them, and only on a light window. A page this window
-    /// does not draw light (the spread until Task 18, a phone or the outside screen on its side)
-    /// keeps the dock, and so does a page the gate does not list, even while Today is built.
+    /// does not draw light (a phone or the outside screen on its side) keeps the dock, and so does a
+    /// page the gate does not list, even while Today is built. The spread (Task 18) is drawn light
+    /// on every horizon (`theSpreadIsBuilt`).
     @Test func theDockGivesWayOnEveryLightPageAndOnNoOther() {
         let shapes: [TodayLayout] = [.oneColumn, .glance, .glanceWide, .dayPage, .journal]
         for h in Horizon.allCases {
@@ -163,7 +164,7 @@ struct DailyGateTests {
                         == DailyGate.shows(h, edition: .light, layout: l), "\(h) \(l)")
                 #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l), "\(h) \(l)")
             }
-            for l in [TodayLayout.journal, .glanceWide] {
+            for l in [TodayLayout.glanceWide] {
                 #expect(!DailyGate.hidesDock(on: h, edition: .light, layout: l), "\(h) \(l)")
             }
         }
@@ -219,7 +220,7 @@ struct DailyGateTests {
     @Test func theOutsideAndUprightInsideAreBuilt() {
         #expect(DailyGate.shows(.today, edition: .light, layout: .glance))
         #expect(DailyGate.shows(.today, edition: .light, layout: .dayPage))
-        #expect(!DailyGate.shows(.today, edition: .light, layout: .journal))
+        #expect(DailyGate.shows(.today, edition: .light, layout: .journal))     // the spread, Task 18
         #expect(!DailyGate.shows(.today, edition: .light, layout: .glanceWide))
         for l in [TodayLayout.oneColumn, .glance, .glanceWide, .dayPage, .journal] {
             #expect(!DailyGate.shows(.today, edition: .full, layout: l), "\(l)")
@@ -233,6 +234,7 @@ struct DailyGateTests {
         .oneColumn: (CGSize(width: 390, height: 844), 44, 34),
         .glance: (CGSize(width: 382, height: 678), 0, 34),
         .dayPage: (CGSize(width: 626, height: 890), 44, 34),
+        .journal: (CGSize(width: 890, height: 626), 10, 0),     // the spread board's insets
     ]
 
     /// A guard against the gate and the Planner disagreeing: every page the gate lists, on every
@@ -251,32 +253,42 @@ struct DailyGateTests {
                 #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l), "\(h) \(l)")
                 #expect(!DailyGate.dropsPage(covered: true, lightPage: DailyGate.shows(h, edition: .light, layout: l)))
 
-                let page = DailyGate.page(h)
+                let page = DailyGate.page(h, layout: l)
                 let shape = DailyMetrics.shape(for: l, height: w.size.height, safeTop: w.top, safeBottom: w.bottom,
                                                waiting: false)
-                let m: DailyMetrics
+                let targets: [CGRect]
                 switch page {
                 case .today:
                     #expect(h == .today)
-                    m = DailyMetrics.today(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape)
+                    let m = DailyMetrics.today(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape)
                     #expect(m.rowsTop + 3 * m.row + 2 * m.rowGap <= m.bar.fade.minY, "\(h) \(l)")
+                    targets = m.touchTargets
                 case .week:
                     #expect(h == .week)
-                    m = DailyMetrics.week(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape)
+                    let m = DailyMetrics.week(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape)
                     #expect(m.rowsTop + DailyMetrics.weekDayTop + 3 * m.row + 2 * m.rowGap <= m.bar.fade.minY, "\(h) \(l)")
+                    targets = m.touchTargets
+                case .spread:
+                    #expect(l == .journal && (h == .today || h == .week), "\(h) \(l)")
+                    let s = DailyMetrics.spread(size: w.size, safeTop: w.top, safeBottom: w.bottom, fold: nil)
+                    #expect(s.rowsTop + 3 * s.row + 2 * s.rowGap <= s.bar.fade.minY, "\(h) \(l)")
+                    #expect(s.weekList.minY + 3 * s.weekRow <= s.bar.fade.minY, "\(h) \(l)")
+                    targets = s.touchTargets
                 case .mountain(let level):
                     #expect(DailyGate.mountain(h) == level)
-                    m = DailyMetrics.today(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape)
+                    targets = DailyMetrics.today(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape).touchTargets
                 }
                 let window = CGRect(x: 0, y: w.top, width: w.size.width, height: w.size.height - w.top - w.bottom)
-                for r in m.touchTargets { #expect(window.contains(r), "\(h) \(l): \(r) off the window's safe part") }
+                for r in targets { #expect(window.contains(r), "\(h) \(l): \(r) off the window's safe part") }
             }
         }
         // Every horizon has a light page; the gate's own mountain rule agrees with it.
         for h in Horizon.allCases {
-            switch DailyGate.page(h) {
-            case .mountain(let level): #expect(DailyGate.mountain(h) == level)
-            case .today, .week: #expect(DailyGate.mountain(h) == nil)
+            for l in DailyGate.layouts {
+                switch DailyGate.page(h, layout: l) {
+                case .mountain(let level): #expect(DailyGate.mountain(h) == level)
+                case .today, .week, .spread: #expect(DailyGate.mountain(h) == nil)
+                }
             }
         }
     }
@@ -284,11 +296,13 @@ struct DailyGateTests {
     /// One page frame for Today and Week (moving between them keeps the bar's Undo, as before); each
     /// mountain level is a fresh page of its own.
     @Test func todayAndWeekShareAFrameAndEachMountainIsItsOwn() {
-        #expect(DailyGate.page(.today).identity == nil)
-        #expect(DailyGate.page(.week).identity == nil)
-        #expect(DailyGate.page(.month).identity == .month)
-        #expect(DailyGate.page(.season).identity == .season)
-        #expect(DailyGate.page(.year).identity == .year)
+        for l in DailyGate.layouts {
+            #expect(DailyGate.page(.today, layout: l).identity == nil)
+            #expect(DailyGate.page(.week, layout: l).identity == nil)
+            #expect(DailyGate.page(.month, layout: l).identity == .month)
+            #expect(DailyGate.page(.season, layout: l).identity == .season)
+            #expect(DailyGate.page(.year, layout: l).identity == .year)
+        }
     }
 
     /// Ruling D14 leftover (a): a row's Details over a light page closes when the half-open display

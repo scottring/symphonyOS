@@ -276,15 +276,28 @@ struct DailyHandoverTests {
 
     // MARK: The Duo (Task 17)
 
-    /// Light Today is the page on the outside screen and on the inside screen held upright, so a walk
-    /// finished there hands its light over; on the spread (until Task 18) it does not.
+    /// Light Today is the page on the outside screen, on the inside screen held upright and on the
+    /// spread (Task 18), so a walk finished there hands its light over. One function decides, per
+    /// window, whether the light travels or only the halo and the line show (`travels(on:)`): it
+    /// travels on the phone, the outside screen (page 382 beside the system's column) and the inside
+    /// screen upright; opened flat it does not.
     @Test func theOutsideAndUprightInsideScreensHandOver() {
-        for l in [TodayLayout.glance, .dayPage] {
+        for l in [TodayLayout.glance, .dayPage, .journal] {
             #expect(DailyHandover.plays(.walk, status: .finished, edition: .light,
                                         lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: l)), "\(l)")
         }
-        #expect(DailyHandover.plays(.walk, status: .finished, edition: .light,
-                                    lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: .journal)) == false)
+        let windows: [(size: CGSize, sideBars: Bool, travels: Bool)] = [
+            (CGSize(width: 390, height: 844), false, true),
+            (CGSize(width: 382, height: 678), true, true),      // the outside screen's page, 466 less the column
+            (CGSize(width: 626, height: 890), false, true),
+            (CGSize(width: 890, height: 626), false, false),
+        ]
+        for w in windows {
+            let l = TodayLayout.decide(width: w.size.width, height: w.size.height, sideBars: w.sideBars)
+            #expect(DailyHandover.travels(on: l) == w.travels, "\(w.size)")
+            #expect(DailyHandover.play(lowered: false, sheetOver: false, reduceMotion: false,
+                                       travels: DailyHandover.travels(on: l)) == (w.travels ? .travel : .still), "\(w.size)")
+        }
     }
 
     /// The outside screen: the walk fills the whole 466 × 678 window, its stage letterboxed there,

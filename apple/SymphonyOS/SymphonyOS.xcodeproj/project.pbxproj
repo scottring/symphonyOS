@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		004F69B33C0308438B36A360 /* HandoverLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D4A57FB94C4F9D058A7654B /* HandoverLight.swift */; };
 		00C9BECD6FC4AD842F6FFDB5 /* DailyWeekTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4FEA0962AF770E825ED7D9 /* DailyWeekTests.swift */; };
+		01C7262023C53C9A670B5FC3 /* DailyPageParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 598430A0891D9F26C9AEE919 /* DailyPageParts.swift */; };
 		02E7F7BF8E5CF9DB0592F619 /* SyncSerializationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91980E464779ADF9B4FE89A3 /* SyncSerializationTests.swift */; };
 		036A12CB91E3E25D518E3684 /* walk-tick.PLACEHOLDER.wav in Resources */ = {isa = PBXBuildFile; fileRef = 47467C50B3938A1EF1D27023 /* walk-tick.PLACEHOLDER.wav */; };
 		03A332C11095EAD4D374B404 /* PageParseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B66CBCA35142878EF0695A6 /* PageParseTests.swift */; };
@@ -101,6 +102,7 @@
 		643E1691CD4A09CF3180B1D7 /* QuickCaptureBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */; };
 		64B72D487929953D9BF0468B /* RowMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C9315FE094AD463C763A78 /* RowMapper.swift */; };
 		65EA5B62549061DEBD864484 /* DailyBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 744676EA073E9F932BF2B720 /* DailyBarView.swift */; };
+		67BBDDC49B57D7FDA1725D3E /* LightSpreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 854A97E9B569147F4EF492D6 /* LightSpreadView.swift */; };
 		686DD09EC59D0AA6FA73BAA0 /* TimelineRevision.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5F58C1D241835418FB0DB47 /* TimelineRevision.swift */; };
 		69089DEA64956955F94A7A21 /* WalkFootingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C417A13E7A5753F0A7280A58 /* WalkFootingTests.swift */; };
 		69C0D3EC970FE467BCEB47DC /* NordicColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3550614A2441567DA7ED9B00 /* NordicColors.swift */; };
@@ -132,6 +134,7 @@
 		83E6A0E1DACEF68A62C34134 /* CarriedRoutinesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32F0BBA293AAE16EF7CCA0C /* CarriedRoutinesTests.swift */; };
 		85A5B920DCEB705D40F84D50 /* DeleteAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79154EC8C219862BC8DE0004 /* DeleteAccountView.swift */; };
 		85FD64FFD573B054E19A391F /* DailyBand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB13AFD951099CA1FB80FD2 /* DailyBand.swift */; };
+		8A250C2DDE172B6ACFADEED0 /* DailyWeekList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91E7DB757E79521EF9D28609 /* DailyWeekList.swift */; };
 		8ADA67E84654AEB3019FB812 /* WalkModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E346776783AE17D6B32B20FE /* WalkModelTests.swift */; };
 		8B9B944F2BE32DF4693C843E /* DailyWeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = E761E8D1CDB2AB178606E6EF /* DailyWeek.swift */; };
 		8C98360DEAF146AE5D93DC8C /* UnfinishedSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C187119C5CCA41423F1F668C /* UnfinishedSheet.swift */; };
@@ -165,6 +168,7 @@
 		A7809E3241758A15BF8843C1 /* DMSans-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 51E807DEDAD9A55C7D33504B /* DMSans-Medium.ttf */; };
 		A7ABA23EF22EC5A279C4FF3C /* PaperFoldTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C9A6ACB7B9E46F44B52B56F /* PaperFoldTests.swift */; };
 		A7F04047BD0C22C56A11120D /* WalkLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E218D4C9E8496B79A7A214 /* WalkLayoutTests.swift */; };
+		A824C05CC14DF053BFD3B2EB /* DailyMetrics+Spread.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F62D85CF9F3A2DB79F1E336 /* DailyMetrics+Spread.swift */; };
 		A936C12D2B64DE7CFB1471C6 /* SlideRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09BD930B3AFC90435DE5E822 /* SlideRow.swift */; };
 		A9717E7380F94E0AF4B7DE0A /* MountainPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54257F64F2AB9F0D4C966D50 /* MountainPage.swift */; };
 		A9CBDFDF613331A67E7947A2 /* WalkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4E6B5AB5FB68D06D3D308B /* WalkUITests.swift */; };
@@ -184,6 +188,7 @@
 		B801C725F4C1032E966C76B6 /* WalkWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 810A53A98309C06B117920DC /* WalkWriterTests.swift */; };
 		B820B5F6590A811B1B4343E6 /* CookSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886E6A44F4EAF512A2F1DC39 /* CookSession.swift */; };
 		B84B580A2ED0E7D542A6CABE /* DailyMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53A425F590C6C0947C2B2BC6 /* DailyMetrics.swift */; };
+		B86949FAEE65C6C28EC7496D /* DailySpreadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27A510C4A1FB18237DE193C1 /* DailySpreadTests.swift */; };
 		B8FCCA25AA5225D0C499716B /* CookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D6F0507BFAF3A740903CCB /* CookView.swift */; };
 		BA95289A567417D281DD5EB7 /* WalkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F965A54FF53FA305FCD38C0B /* WalkView.swift */; };
 		BAC9271B1175D9367F5C5D30 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD1BE1E7E379CBBA6DD1A49 /* AuthView.swift */; };
@@ -341,6 +346,7 @@
 		24C040B5436200C01B873086 /* WalkFooting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkFooting.swift; sourceTree = "<group>"; };
 		27058614DEA3A0A75E46BF59 /* DomainFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainFilter.swift; sourceTree = "<group>"; };
 		27771913B0E4539345E8EC18 /* SignpostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignpostTests.swift; sourceTree = "<group>"; };
+		27A510C4A1FB18237DE193C1 /* DailySpreadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailySpreadTests.swift; sourceTree = "<group>"; };
 		280D6248D6B7D7FAC51B6710 /* DailyClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyClock.swift; sourceTree = "<group>"; };
 		28540258912D55610F1131C4 /* WalkLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkLayout.swift; sourceTree = "<group>"; };
 		29510C99D64F28DB39EC4658 /* CalendarFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarFeed.swift; sourceTree = "<group>"; };
@@ -391,6 +397,7 @@
 		54257F64F2AB9F0D4C966D50 /* MountainPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MountainPage.swift; sourceTree = "<group>"; };
 		5446B4F26A3BBFDB7B254A4E /* SignUpCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpCopyTests.swift; sourceTree = "<group>"; };
 		5618B899980DE85C6DE0BA61 /* OutsideGlance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutsideGlance.swift; sourceTree = "<group>"; };
+		598430A0891D9F26C9AEE919 /* DailyPageParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyPageParts.swift; sourceTree = "<group>"; };
 		59CAABF7AEBA957458A46CA3 /* DailyTodayPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyTodayPageTests.swift; sourceTree = "<group>"; };
 		5A49D0D02CF868490292308C /* CameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPicker.swift; sourceTree = "<group>"; };
 		5D4179C34EBA0E91CD8EE164 /* LogMedicationIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogMedicationIntent.swift; sourceTree = "<group>"; };
@@ -412,6 +419,7 @@
 		6E0C9C5D59DC16582C09AD07 /* Edition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Edition.swift; sourceTree = "<group>"; };
 		6E12BCB3F98A56A73FBB104A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6F4404B5A49F9ACA4F69DEFA /* SkinScreenshotsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkinScreenshotsUITests.swift; sourceTree = "<group>"; };
+		6F62D85CF9F3A2DB79F1E336 /* DailyMetrics+Spread.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyMetrics+Spread.swift"; sourceTree = "<group>"; };
 		7090D3ED9CC051D67543EED2 /* WalkPeriods.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkPeriods.swift; sourceTree = "<group>"; };
 		70C0823D3F322CA3D99EC0A4 /* WeeklyTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTemplate.swift; sourceTree = "<group>"; };
 		718E56D8B02093D599728E35 /* SymphonyOSUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyOSUITests.swift; sourceTree = "<group>"; };
@@ -434,6 +442,7 @@
 		81E58F1162C67DF3D96052F8 /* Date+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Extensions.swift"; sourceTree = "<group>"; };
 		84512ED370ABA35079B88461 /* DailyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyModel.swift; sourceTree = "<group>"; };
 		84A599D6B5D4173901A63E21 /* AppleCalendarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleCalendarTests.swift; sourceTree = "<group>"; };
+		854A97E9B569147F4EF492D6 /* LightSpreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightSpreadView.swift; sourceTree = "<group>"; };
 		886E6A44F4EAF512A2F1DC39 /* CookSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookSession.swift; sourceTree = "<group>"; };
 		88E6C889C84E9A5D285AB75E /* OpenedItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenedItemSheet.swift; sourceTree = "<group>"; };
 		891666939A8FC92F36CE9644 /* WalkPeriodsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkPeriodsTests.swift; sourceTree = "<group>"; };
@@ -446,6 +455,7 @@
 		8F969B799D302BBB50A132BE /* StepFoldTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepFoldTests.swift; sourceTree = "<group>"; };
 		9031A67BD188FEA2743DE71D /* TaskViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskViewModel.swift; sourceTree = "<group>"; };
 		91980E464779ADF9B4FE89A3 /* SyncSerializationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSerializationTests.swift; sourceTree = "<group>"; };
+		91E7DB757E79521EF9D28609 /* DailyWeekList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyWeekList.swift; sourceTree = "<group>"; };
 		929BC589EEE02B0452BF408A /* walk-bag.PLACEHOLDER.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "walk-bag.PLACEHOLDER.wav"; sourceTree = "<group>"; };
 		936EBEFDA2D82A91BDC6877A /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		93D83DAC938B3E5C5B0328E6 /* StillToDo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StillToDo.swift; sourceTree = "<group>"; };
@@ -636,6 +646,7 @@
 				1AF866B31454818D1326657C /* DailyLookBack.swift */,
 				53A425F590C6C0947C2B2BC6 /* DailyMetrics.swift */,
 				8A44F96DA8E4B4374F071779 /* DailyMetrics+Duo.swift */,
+				6F62D85CF9F3A2DB79F1E336 /* DailyMetrics+Spread.swift */,
 				8F5475BF2B0C49BF9B4D88F3 /* DailyMetrics+Tent.swift */,
 				23357705E5BD395EF5894F9F /* DailyTentPage.swift */,
 				AD4E2B82F5C8BDD8FA342452 /* DailyTodayPage.swift */,
@@ -880,12 +891,15 @@
 				6DB13AFD951099CA1FB80FD2 /* DailyBand.swift */,
 				744676EA073E9F932BF2B720 /* DailyBarView.swift */,
 				0682017A511AD69FB19A969B /* DailyNavRow.swift */,
+				598430A0891D9F26C9AEE919 /* DailyPageParts.swift */,
 				721AEC455BE4ADC539A2F13C /* DailyPalette.swift */,
 				30B0FDFB0075F54C25F0A9F7 /* DailyRows.swift */,
 				51C827470C2D3F7299DD2706 /* DailySheet.swift */,
+				91E7DB757E79521EF9D28609 /* DailyWeekList.swift */,
 				9D4A57FB94C4F9D058A7654B /* HandoverLight.swift */,
 				BE72A0AF34318CB9DD73D915 /* LightHalfOpenView.swift */,
 				CE8500148F5BD97291AF8393 /* LightPlannerView.swift */,
+				854A97E9B569147F4EF492D6 /* LightSpreadView.swift */,
 				0E00B6B122231FE56C3CC126 /* LightTodayView.swift */,
 				2EF9B40A2619B07F7F1703C8 /* LightWeekView.swift */,
 				A5CD638485AFC575A7D097C4 /* MountainPageView.swift */,
@@ -1003,6 +1017,7 @@
 				47C53670A5CE6F1FEB0B691E /* DailyHandoverTests.swift */,
 				B48B65A2B89E7F5FF5873825 /* DailyMetricsTests.swift */,
 				3EEAD798BB3703D90FF1A7FF /* DailyModelTests.swift */,
+				27A510C4A1FB18237DE193C1 /* DailySpreadTests.swift */,
 				59CAABF7AEBA957458A46CA3 /* DailyTodayPageTests.swift */,
 				1E8C3E7D473B66DC775E14E6 /* DailyWalkDownTests.swift */,
 				5E4FEA0962AF770E825ED7D9 /* DailyWeekTests.swift */,
@@ -1362,6 +1377,7 @@
 				E277EAFC489C2030937E9E4B /* DailyHandoverTests.swift in Sources */,
 				A9D7B01B1354B2F2F7531ED1 /* DailyMetricsTests.swift in Sources */,
 				37D5E7D0D96BDC30C23984C2 /* DailyModelTests.swift in Sources */,
+				B86949FAEE65C6C28EC7496D /* DailySpreadTests.swift in Sources */,
 				38B53295B65516538175CC02 /* DailyTodayPageTests.swift in Sources */,
 				5697E0ACB705445FB5F13BB1 /* DailyWalkDownTests.swift in Sources */,
 				00C9BECD6FC4AD842F6FFDB5 /* DailyWeekTests.swift in Sources */,
@@ -1454,10 +1470,12 @@
 				A77EE112A22F4E464F39730B /* DailyHandover.swift in Sources */,
 				FD5F9DB17E725D148CB374DF /* DailyLookBack.swift in Sources */,
 				C3ACBBC96DAE99805BC01266 /* DailyMetrics+Duo.swift in Sources */,
+				A824C05CC14DF053BFD3B2EB /* DailyMetrics+Spread.swift in Sources */,
 				AC12E66743A4E713474768C8 /* DailyMetrics+Tent.swift in Sources */,
 				B84B580A2ED0E7D542A6CABE /* DailyMetrics.swift in Sources */,
 				7B28BA87945803F09D0E83CA /* DailyModel.swift in Sources */,
 				DE263911995624CC151A0039 /* DailyNavRow.swift in Sources */,
+				01C7262023C53C9A670B5FC3 /* DailyPageParts.swift in Sources */,
 				E39B1F05A5721F697FC92147 /* DailyPalette.swift in Sources */,
 				5B071DA5B5EE6E15078973ED /* DailyRows.swift in Sources */,
 				D4C14729B9966599A6A23CC1 /* DailySheet.swift in Sources */,
@@ -1465,6 +1483,7 @@
 				9DB8451476C58CE43F275F05 /* DailyTodayPage.swift in Sources */,
 				5C6FD5D0A1E5526059625ACA /* DailyWalkDown.swift in Sources */,
 				8B9B944F2BE32DF4693C843E /* DailyWeek.swift in Sources */,
+				8A250C2DDE172B6ACFADEED0 /* DailyWeekList.swift in Sources */,
 				BDFDF4A88723C140479BD494 /* DailyWriter.swift in Sources */,
 				1A4329534E810EBF6BF16103 /* Date+Extensions.swift in Sources */,
 				53CDAD91081EB2442A2A0010 /* DateNavigator.swift in Sources */,
@@ -1496,6 +1515,7 @@
 				B6A3F79EF2C00858CB49FA78 /* KeyboardShortcuts.swift in Sources */,
 				DC508038463D97A603EAE64A /* LightHalfOpenView.swift in Sources */,
 				3360A1E6621562988155AD32 /* LightPlannerView.swift in Sources */,
+				67BBDDC49B57D7FDA1725D3E /* LightSpreadView.swift in Sources */,
 				CACC740DB2C1ADF10C1EDF3E /* LightTodayView.swift in Sources */,
 				5E30F5EBF25CC8589EED80FF /* LightWeekView.swift in Sources */,
 				E63350EC1724E4A07675CEDE /* ListsView.swift in Sources */,

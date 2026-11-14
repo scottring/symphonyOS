@@ -352,8 +352,10 @@ struct DailyMetrics: Equatable {
     /// near `navTop + 146` and `navTop + 136`, each moved up to ±6 by its goal's hand (two feet
     /// always at least `flagsApart` apart); each pole leans up to ±1.8° and its cloth tilts
     /// 0.9…1.3° the other way. The same goals give the same frames on every call.
-    static func bandFlags(_ goals: [Signpost.Named], width: CGFloat, navTop: CGFloat) -> [BandFlag] {
-        let slots: [(x: CGFloat, foot: CGFloat, length: CGFloat)] = [(0.244, 146, 62), (0.741, 136, 68)]
+    /// (`slots`: the spread's, over its left page, `spreadFlagSlots`.)
+    static func bandFlags(_ goals: [Signpost.Named], width: CGFloat, navTop: CGFloat,
+                          slots: [FlagSlot] = [FlagSlot(x: 0.244, foot: 146, length: 62),
+                                               FlagSlot(x: 0.741, foot: 136, length: 68)]) -> [BandFlag] {
         let picked = Array(goals.prefix(slots.count))
 
         var feet = picked.enumerated().map { i, goal in

@@ -59,9 +59,18 @@ enum DailyHandover {
 
     /// `sheetOver`: anything over the page that hides the bar (Inbox, More, a row's details, the
     /// half-open display). Asked again as the light lands: with the bar gone by then, nothing arrives.
-    static func play(lowered: Bool, sheetOver: Bool, reduceMotion: Bool, slotTaken: Bool = false) -> Play {
+    /// `travels`: whether the light travels on this window at all (`travels(on:)`).
+    static func play(lowered: Bool, sheetOver: Bool, reduceMotion: Bool, slotTaken: Bool = false,
+                     travels: Bool = true) -> Play {
         guard !lowered, !sheetOver else { return .skip }
-        return reduceMotion || slotTaken ? .still : .travel
+        return reduceMotion || slotTaken || !travels ? .still : .travel
+    }
+
+    /// Opened flat (`.journal`) the light does not travel: the walk stands letterboxed across the
+    /// fold there and the spread's sheet does not rise, so the bar's light on the right page simply
+    /// wears the halo, with the once-only line (`.still`). Every other window's Today travels.
+    static func travels(on layout: TodayLayout) -> Bool {
+        layout != .journal
     }
 
     /// What can happen while the light travels: a touch on the bar (its light or its field), the

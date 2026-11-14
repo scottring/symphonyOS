@@ -8,7 +8,7 @@ enum DailyGate {
     static let horizons: Set<Horizon> = [.today, .week, .month, .season, .year]
     /// Window shapes the light pages are built for. Tasks 17 and 18 add theirs; never
     /// `.glanceWide`, where a phone on its side keeps the old screens.
-    static let layouts: Set<TodayLayout> = [.oneColumn, .glance, .dayPage]
+    static let layouts: Set<TodayLayout> = [.oneColumn, .glance, .dayPage, .journal]
     /// The add bar is built (Task 9).
     static let barBuilt = true
     /// The light half-open display is built (Task 19).
@@ -121,19 +121,22 @@ enum DailyGate {
 
     /// What the light Planner draws for a page the gate shows. Every horizon has one, so a page
     /// the gate lists is never the full Planner under a hidden dock (`LightPlannerView` switches on
-    /// this, with no other case).
+    /// this, with no other case). Opened flat (`.journal`), Today and Week are one page, the spread
+    /// (`LightSpreadView`): the rest of the week on the left, Today on the right; Month, Season and
+    /// Year stay the mountain there too.
     enum Page: Equatable {
-        case today, week, mountain(WalkLevel)
+        case today, week, spread, mountain(WalkLevel)
 
-        /// Which page frame it is drawn in: Today and Week share one (moving between them keeps the
-        /// bar's Undo); each mountain level is a fresh page of its own.
+        /// Which page frame it is drawn in: Today, Week and the spread share one (moving between them
+        /// keeps the bar's Undo); each mountain level is a fresh page of its own.
         var identity: WalkLevel? {
             if case .mountain(let level) = self { level } else { nil }
         }
     }
 
-    static func page(_ horizon: Horizon) -> Page {
+    static func page(_ horizon: Horizon, layout: TodayLayout) -> Page {
         switch horizon {
+        case .today where layout == .journal, .week where layout == .journal: .spread
         case .today: .today
         case .week: .week
         case .month: .mountain(.month)
