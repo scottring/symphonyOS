@@ -1046,8 +1046,8 @@ into it, heard it with VoiceOver or held a real Duo: the hand walk below is stil
 - **A mountain page is built from the person's rows by their links** (D9): its own level by the page's
   period, above it each flag's real parent whatever its period plus the walk's current upper flags.
   It replaces the call "the levels above it are the walk's".
-- **The take-out-of-plan action reads "Remove"** (`WalkCopy.pullUp`), not the boards' "Pull it up"
-  (the owner's word). It is written only once its Undo can no longer be used (D7), and Undo puts back
+- **The take-out-of-plan action reads "Remove"** (`WalkCopy.pullUp`; the owner chose the word), not the
+  boards' "Pull it up". It is written only once its Undo can no longer be used (D7), and Undo puts back
   exactly what a move made (D8).
 - **Moves on a light page never add to `deferCount`** and write the page's own week (D13).
 - **Today's top line has two cases** (D3), and **a followed sign is put away for the day** (D5).
@@ -1056,7 +1056,8 @@ into it, heard it with VoiceOver or held a real Duo: the hand walk below is stil
   taken away; a tick on the display offers Undo (D15).
 - **Light pages are for phones only** (D17); a light household on an iPad keeps the old pages, and its
   Tell stays on the device (D19).
-- **The day turning mends the selected date** (D18), so Week and the spread's left page never strand
+- **The day turning mends the selected date** (D18), only where light pages live (a light household on a
+  phone: a full household's and an iPad's date are never touched), so Week and the spread's left page never strand
   someone on a "tomorrow" that has passed.
 - **The real Duo outside screen is not the board's window** (Task 17): no top inset, a 34-point foot and
   the system's 84-point column on the right; the page stands 382 wide inside it, and a placeholder too
@@ -1082,7 +1083,15 @@ into it, heard it with VoiceOver or held a real Duo: the hand walk below is stil
 - **Dynamic Type (Task 21):** more stops growing at extra large than the plan named: the sheet's handle
   and header, the next event, the ring, Week's band flags, day labels and Move to panel, as well as the row
   of words, the signpost, the bar and the mountain pages. They stand in the boards' fixed frames; the
-  rows grow instead.
+  rows grow instead, titles wrapping to three lines, and Week's fold, an event and a "for" line to two.
+- **VoiceOver announcements (Task 21 fix round 1):** a note, Undo (a second add's too) and the handover's
+  line are announced; the listening line is not, since the microphone is open then and could take the
+  announcement down as words. The light's label and value ("Listening") carry that state. This replaces
+  the brief's "the listening line is announced".
+- **The dock on light's old pages** (flagged at Task 9 as "must not ship as is", to verify here): checked.
+  `DailyGate.hidesDock(on:)` takes the page on screen, so the dock gives way only on a light page
+  (`DailyGateTests.theDockGivesWayOnEveryLightPageAndOnNoOther`,
+  `LightEditionUITests.testEveryWordAndWeeksFlagsOpenLightPagesWithNoDock`).
 - **The painting (Tasks A1, A2).** The owner supplied a tall painting, summit to ledge, and chose
   "Scroll it behind the walk" (fallback, if it looks wrong: a new sharp square picture for the walk).
   The walk's layout is unchanged in the square print's world; the painting is drawn behind it by a
@@ -1127,8 +1136,10 @@ The 17 consistency amendments of the pre-flight scan were adopted as written.
 - The everyday control is a plain bar whose microphone is the small light; the walk keeps the big light.
 - "Remove" is the word for taking something out of the plan.
 - The handover stays as built: no trail, the bar not dimmed.
-- Speech stays on the phone in a light household, everywhere (the App Store listing will say so); the walk is silent while you speak; the 1 s wait for the last words stays; "Leave for now" stays.
-- Tent mode (the Duo standing like a tent, its outside screen showing) is not built: parked until after this work, to be raised again with one board.
+- In a light household Symphony's own speaking features (the walk's light, the bar's light, Tell Symphony) recognise speech on the phone only, and the App Store listing will say so. The keyboard's dictation key is Apple's, outside the app's control, and follows the phone's own settings, so the listing must speak of the app's speaking features, not of all speech (ledger, Task 9).
+- The walk is silent while you speak; the 1 s wait for the last words stays; "Leave for now" stays.
+- Tent mode is not built: the owner parked it until after this work. His words were "~1/4 open resting on the surface like a tent"; reading that as the Duo standing hinge up with its outside screen showing is the controller's, unconfirmed, and raising it again with one board is the controller's plan, not the owner's decision. (`DailyTentPage` and `DailyMetrics+Tent` are the boards' word for the laptop and book half-open display, which is built and is not the owner's tent mode.)
+- A handover line shown even for a second counts as seen (recorded for the owner at Task 16).
 - The tall painting goes on the everyday bands and is scrolled behind the walk (lane A); the fallback, if it looks wrong, is a new sharp square picture for the walk.
 - Two build lanes at once; the owner waits for a real-phone build rather than a simulator preview.
 
@@ -1150,7 +1161,9 @@ Each is in the ledger (`.superpowers/sdd/2026-11-14-iphone-light-daily/progress.
 - When email confirmation is required, sign-up ends silently (release checklist).
 - The demo's walk mints new ids each launch, so footing differs between demo shots; make them fixed before App Store screenshots.
 - The launch helper's relaunch path has never run against a real bad launch.
-- VoiceOver's reading order is set by sort priority and read from the code; nobody has listened to it. The listening line is announced as the bar starts listening; whether the microphone hears VoiceOver saying it has not been tried.
+- Open question: whether the writer's periods follow the week being viewed or the clock's (it matters only for a task with no day added while another week is on screen; Task 11, still open).
+- iOS's "Open in Symphony?" prompt, from a `symphony://tell` test, is still up on the Duo simulator's outside home screen: one click on Cancel in the Simulator window clears it.
+- VoiceOver's reading order is set by sort priority and read from the code; nobody has listened to it.
 - The Mac destination did not build at Task 1 (`DinnerCard.swift`, outside this plan); not re-checked here.
 
 ### What only a real phone can show (the owner's hand walk)
@@ -1163,7 +1176,7 @@ Each is in the ledger (`.superpowers/sdd/2026-11-14-iphone-light-daily/progress.
 
 - **Speech:** tap the bar's light and say a task with a day; refuse the microphone once; a phone with no on-device speech for its language types, with nothing sent to Apple.
 - **Sounds:** the walk's five recorded sounds are still synthesized placeholders.
-- **VoiceOver, once through:** Today, Week, Month and the bar; the listening line not heard into the field; and under the half-open display, that VoiceOver skips the kept page (XCUITest lists it whatever is hidden).
+- **VoiceOver, once through:** Today, Week, Month and the bar; with VoiceOver on, speak a task into the bar: nothing VoiceOver says ends up in the field; and under the half-open display, that VoiceOver skips the kept page (XCUITest lists it whatever is hidden).
 - **A real iPhone Duo:** the fold's real position in both half-open postures, from across a desk; the side insets opened flat; Inbox, More and Details against the outside screen's system column; the inside screen (the simulator stays folded); the dark disc seen in that column on Month and Year.
 - **The handover** on a real phone: the light's travel and speed.
 - A demo on a real phone must be started from the Mac with its launch arguments; a tap on the icon opens the real sign-in.

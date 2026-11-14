@@ -15,7 +15,7 @@ struct DailyCopyTests {
             DailyCopy.weekAndToday, DailyCopy.navLabel, DailyCopy.today, DailyCopy.showMyWeek, DailyCopy.next,
             DailyCopy.open, DailyCopy.walkWaiting, DailyCopy.walkWhenReady, DailyCopy.restOfWeek, DailyCopy.toDoToday,
             DailyCopy.moveTo, DailyCopy.anyDay, DailyCopy.firstToday, DailyCopy.notFirst, DailyCopy.details,
-            DailyCopy.speakIt, DailyCopy.stopListening, DailyCopy.addWhatYouSaid, DailyCopy.typeIt, DailyCopy.inbox, DailyCopy.more, DailyCopy.handover,
+            DailyCopy.speakIt, DailyCopy.stopListening, DailyCopy.addWhatYouSaid, DailyCopy.typeIt, DailyCopy.listeningNow, DailyCopy.inbox, DailyCopy.more, DailyCopy.handover,
             DailyCopy.walkItDown, DailyCopy.lookBackBeforeItTurns, DailyCopy.dayDone, DailyCopy.firstTodaySign,
             DailyCopy.todayOpen, DailyCopy.newWeek, DailyCopy.putSignAway,
         ]

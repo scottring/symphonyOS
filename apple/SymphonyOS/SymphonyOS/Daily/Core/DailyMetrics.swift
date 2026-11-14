@@ -118,6 +118,9 @@ struct DailyMetrics: Equatable {
     /// How many lines a row's title may take: one, as the boards draw it, and three at the
     /// accessibility text sizes, where the row grows in height to hold them.
     static func titleLines(accessibilitySize: Bool) -> Int { accessibilitySize ? 3 : 1 }
+    /// How many lines a quieter line may take (Week's fold, an event, a row's "for" line): one, and
+    /// two at the accessibility text sizes, so it wraps rather than cuts short.
+    static func quietLines(accessibilitySize: Bool) -> Int { accessibilitySize ? 2 : 1 }
     /// A window under this height takes the short shape.
     static let shortHeight: CGFloat = 760
     /// A nail head stands this far in from the plank's top and bottom edges.

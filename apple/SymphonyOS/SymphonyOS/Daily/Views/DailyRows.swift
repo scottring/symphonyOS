@@ -86,7 +86,7 @@ struct DailyRow: View {
             DailyFlag(colour: DailyPalette.lineageFlag, poleWidth: 1.4)
                 .frame(width: 10, height: 12)
             Text(Self.forLine(goal))
-                .lineLimit(1)
+                .lineLimit(DailyMetrics.quietLines(accessibilitySize: typeSize.isAccessibilitySize))
                 .truncationMode(.tail)
         }
         .frame(minHeight: 16)

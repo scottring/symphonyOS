@@ -26,6 +26,13 @@ struct DailyMetricsTests {
         #expect(DailyMetrics.titleLines(accessibilitySize: true) == 3)
     }
 
+    /// The quieter lines (Week's fold, an event, a row's "for" line) stand on one line, and wrap to
+    /// two at the accessibility text sizes rather than cut short.
+    @Test func aQuietLineWrapsToTwoOnlyAtTheAccessibilitySizes() {
+        #expect(DailyMetrics.quietLines(accessibilitySize: false) == 1)
+        #expect(DailyMetrics.quietLines(accessibilitySize: true) == 2)
+    }
+
     @Test func theTodayBoard() {
         let m = DailyMetrics.today(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34)
         #expect(m.band == CGRect(x: 0, y: 0, width: 390, height: 340));       #expect(m.picture == CGRect(x: -20, y: 0, width: 430, height: 430))

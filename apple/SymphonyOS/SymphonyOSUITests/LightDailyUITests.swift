@@ -70,15 +70,27 @@ final class LightDailyUITests: XCTestCase {
 
     // MARK: What VoiceOver is given
 
-    /// The bar's field is always read by its whole sentence, even where the field shows fewer words.
+    /// The bar's field is always read by its whole sentence, even where the field shows fewer words:
+    /// on the real Duo outside screen the page is 382 wide (the 466-point window less the system's
+    /// 84-point column, Task 17), where Month's field shows "Add a goal" (`-TodaySize 382x678`; at the
+    /// board's own 466 the field is wide enough for the whole sentence); and the phone's own window at
+    /// two text sizes.
     @MainActor func testTheFieldIsReadByItsWholeSentence() throws {
-        for size in ["UICTContentSizeCategoryL", "UICTContentSizeCategoryAccessibilityXXXL"] {
+        let launches: [[String]] = [["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"],
+                                    ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"],
+                                    ["-TodaySize", "382x678"]]
+        for extra in launches {
+            let size = extra.joined(separator: " ")
             let (app, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
-                                     "-SymphonyDailyPage", "month", "-UIPreferredContentSizeCategoryName", size])
+                                     "-SymphonyDailyPage", "month"] + extra)
             XCTAssertTrue(any["daily.mountain.month"].waitForExistence(timeout: 60), "never reached Month")
             let field = any["daily.bar.field"]
             XCTAssertTrue(field.waitForExistence(timeout: 15), "no field")
             XCTAssertEqual(field.label, "Add a goal for November", "at \(size)")
+            if extra.first == "-TodaySize" {
+                // The narrow field shows the short form: the label above is not just what is shown.
+                XCTAssertEqual(field.placeholderValue, "Add a goal", "the narrow field does not show the short form")
+            }
             app.terminate()
         }
     }

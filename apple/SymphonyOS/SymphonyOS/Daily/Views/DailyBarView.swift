@@ -87,10 +87,11 @@ struct DailyBarView: View {
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { pageTop = $0 }
         .onChange(of: bar.fieldAsked) { _, _ in typing = true }
         .onChange(of: typing) { _, on in if on { touched() } }
-        // Each line in the slot (listening, a note, a refused microphone's, Undo, the handover's) is
-        // heard once, as it appears (`DailyBar.announcement`), never again as the page redraws.
-        .onChange(of: bar.slot) { old, new in
-            if let words = DailyBar.announcement(from: old, to: new, listening: listening) {
+        // A note (a refused microphone's among them), Undo and the handover's line are heard as each is
+        // put in the slot (`DailyBar.announcement`), never again as the page redraws; the listening
+        // line never, since the microphone is open then (the light's label and value say it).
+        .onChange(of: model.bar) { old, new in
+            if let words = DailyBar.announcement(from: old, to: new) {
                 AccessibilityNotification.Announcement(words).post()
             }
         }
@@ -177,6 +178,7 @@ struct DailyBarView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(bar.lightLabel)
+        .accessibilityValue(bar.lightValue)
         .accessibilityIdentifier("daily.bar.light")
         .background { haloMarker }
     }

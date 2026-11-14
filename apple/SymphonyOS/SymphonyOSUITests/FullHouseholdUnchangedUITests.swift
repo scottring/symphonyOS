@@ -43,11 +43,18 @@ final class FullHouseholdUnchangedUITests: XCTestCase {
         assertNoLightPage(any, "466 × 678")
     }
 
-    /// Set down half open: the old display, with Tell Symphony.
+    /// Set down half open: the old display, with Tell Symphony. Anchored on what only the old
+    /// half-open display draws (`HalfOpenView`, which carries no identifier and must not change): its
+    /// dinner card's "Tonight" heading together with its Cook (or Recipe) button; the old Today's dinner
+    /// reads "Dinner tonight" and has neither.
     @MainActor func testHalfOpenKeepsTheOldDisplay() throws {
-        let (_, any) = launch(["-HalfOpen", "laptop", "-TodaySize", "626x890"])
+        let (app, any) = launch(["-HalfOpen", "laptop", "-TodaySize", "626x890"])
+        let tonight = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "Tonight")).firstMatch
+        XCTAssertTrue(tonight.waitForExistence(timeout: 60), "the old display's dinner heading is not there")
+        let cook = app.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "Cook", "Recipe")).firstMatch
+        XCTAssertTrue(cook.exists, "the old display's Cook button is not there")
         let tell = any.matching(NSPredicate(format: "label CONTAINS %@", "Tell Symphony")).firstMatch
-        XCTAssertTrue(tell.waitForExistence(timeout: 60), "no Tell Symphony on the old display")
+        XCTAssertTrue(tell.exists, "no Tell Symphony on the old display")
         XCTAssertFalse(any["daily.halfOpen"].exists, "the light display in a full household")
         assertNoLightPage(any, "half open")
     }

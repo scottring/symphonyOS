@@ -129,7 +129,9 @@ Not designed yet:
 The pages the walk leads to, for a light household: Today with its signpost, rows, ring and add bar;
 Week; Month, Season and Year as the walk's own mountain; the walk's light handed over to the bar; and the
 iPhone Duo's windows. A pure core (`Daily/Core`, Mac-safe, unit-tested), one writer (`Daily/Data/DailyWriter`),
-one observable model (`Daily/DailyModel`), and views that only draw. Plan:
+one observable model (`Daily/DailyModel`), and views that draw. The rules live in the core, with known
+exceptions the ledger keeps as deferred (for one, the bar's keyboard-rise condition is decided in
+`DailyBarView`). Plan:
 `docs/superpowers/plans/2026-11-14-iphone-light-daily.md` (its "As built" records every ruling).
 
 **The gate.** `DailyGate.shows` is the one test: a light household (`Edition.light`), on a phone (ruling
@@ -139,7 +141,16 @@ a phone on its side, which keeps the old wide glance and the dock). `LightPlanne
 `DailyGate.page` names, or the full Planner where the gate says no; `hidesDock` takes the dock away only on
 a light page. A full household, and a mixed or unknown one (which `Edition.resolve` makes full), keeps
 every screen it had: Today, Week, the horizons, the dock, the Duo glance and journal, the half-open
-display, Inbox (`FullHouseholdUnchangedUITests`). Off light (an invite accepted) `AppState.leaveDaily()`
+display, Inbox. What covers that: `DailyGateTests.fullIsNeverReplaced` and `mixedOrUnknownEditionsAreFull`
+(for a full household no horizon, from Year down to Today, is light on any window shape, the journal
+included, and the dock never gives way); `FullHouseholdUnchangedUITests` (the app
+itself: the old Today and its dock on the phone and at the outside screen's size, the old half-open
+display, a walk ending on the old Today; it does not open Week, the horizons, the journal or Inbox); and
+the plan's "must not change" files (the old Today, glance, journal, Week, period pages, half-open display
+and Inbox), which have no diff over the whole plan. The dock on light's old pages, flagged once as "must
+not ship as is", was checked: `DailyGate.hidesDock(on:)` takes the page on screen, so the dock gives way
+only on a light page (`DailyGateTests.theDockGivesWayOnEveryLightPageAndOnNoOther`,
+`LightEditionUITests.testEveryWordAndWeeksFlagsOpenLightPagesWithNoDock`). Off light (an invite accepted) `AppState.leaveDaily()`
 brings the dock back and leaves nothing light open or waiting.
 
 **What each page reads and writes.**
@@ -167,10 +178,13 @@ goes somewhere puts it away too, so the next true kind shows on coming back. Wha
 person per day in `UserDefaults` (`daily.signpost.<user id>`, `SignpostMemory`); another day reads as
 nothing put away.
 
-**Speech.** In a light household the bar, and Tell Symphony wherever a light household can still open it
-(the Lock Screen control, a `symphony://tell` link, the old Tell sheet on an iPad), listen on the phone
-only (`DailyGate.speechOnPhoneOnly`, `Dictation.onDeviceOnly`); with no on-device recogniser they type. On
-a light page a Tell makes the bar listen, never the sheet. A full household's Tell is unchanged.
+**Speech.** In a light household Symphony's own speaking features (the walk's light, the bar's light, and
+Tell Symphony wherever a light household can still open it: the Lock Screen control, a `symphony://tell`
+link, the old Tell sheet on an iPad) recognise speech on the phone only (`DailyGate.speechOnPhoneOnly`,
+`Dictation.onDeviceOnly`); with no on-device recogniser they type. The keyboard's own dictation key is
+Apple's, outside the app's control, and follows the phone's own settings, so an App Store line must speak
+of the app's speaking features, not of all speech. On a light page a Tell makes the bar listen, never the
+sheet. A full household's Tell is unchanged.
 
 **The waiting walk's line.** One quiet line under the sheet's handle (`DailyGate.walkLine`): a walk left
 with Leave for now reads "Your walk is waiting. Pick it back up." and resumes it; a walk declined at
@@ -187,7 +201,7 @@ done ("3 done"), never what was missed.
 
 **The handover, and the art.** An ordinary walk that finishes onto light Today hands its light down to the
 bar (`DailyHandover.plays`); its line shows once per person per phone (`HandoverMemory`,
-`daily.handover.seen.<user id>`). The bands' picture: see The art.
+`daily.handover.seen.<user id>`), and a line shown even for a second counts as seen. The bands' picture: see The art.
 
 **Accessibility.** Every gesture has a button or a VoiceOver action. Reading order on Today: the row of
 words (a container, "Where you are"; the current word selected), the signpost (one button, its label the
@@ -200,14 +214,17 @@ first, then the band's flags, the fold (its state as the value), each day by its
 Tuesday, 10 November"), each task one element with an action per Move to chip and Remove; an event and
 "open" read as text. The mountain pages: flags carry Walk it down, Move to ‹area› and Remove. Lowered,
 the sheet is one button and the whole plan behind it is read. The half-open display reads the time, the
-next event, the sign (without what a tap would do), then To do today. The line above the bar (listening,
-a note, a refused microphone, Undo, the handover's line) is announced once as it appears
-(`DailyBar.announcement`). Decorative pictures are hidden from VoiceOver. With Reduce Motion nothing
+next event, the sign (without what a tap would do), then To do today. A note (a refused microphone's
+among them), Undo and the handover's line are announced each time one is put in the line above the bar,
+a second add's Undo too (`DailyBar.announcement`). The listening line is never announced: the microphone
+is open then and could take the announcement down as words; the light's label ("Add what you said") and
+value ("Listening") say it instead. Decorative pictures are hidden from VoiceOver. With Reduce Motion nothing
 slides or travels: the handover's light does not travel, the ring does not sweep, and the Move to panel
 cross-fades in 0.25 s. Text: the row of words, the signpost, the bar, the sheet's handle and header, the
 next event, the ring, Week's band flags, its day labels and its Move to panel, and the mountain pages stop
 growing at extra large (`DailyPalette.largestChrome`); the rows grow on, their titles wrapping to three lines
-at the accessibility sizes (`DailyMetrics.titleLines`).
+at the accessibility sizes (`DailyMetrics.titleLines`), and Week's fold, an event and a row's "for" line to
+two (`DailyMetrics.quietLines`).
 
 **Behaviour a change must keep:**
 - A full household never sees a light page, on any window, and keeps its dock (`DailyGateTests.fullIsNeverReplaced`, `FullHouseholdUnchangedUITests`).
@@ -216,8 +233,9 @@ at the accessibility sizes (`DailyMetrics.titleLines`).
 - A move on a light page never adds to `deferCount`, and writes the page's own week, never the wall clock's (D13).
 - A light page under the light half-open display stays in the tree, inert (no touch) and silent (its bar cannot listen and takes no Tell); only the display's bar can (D14).
 - A tick on the half-open display offers Undo (D15).
-- A selected date that was today or later when the day turned, and is now past, becomes today; a past date the person went to is left alone (D18).
-- A light household's speech stays on the phone everywhere, Tell on an iPad included (D19).
+- A selected date that was today or later when the day turned, and is now past, becomes today; a past date the person went to is left alone (D18). The step runs only where light pages live, a light household on a phone (`DailyGate.dayTurn`, `DailySpreadTests`): a full household's and an iPad's selected date are never touched.
+- In a light household Symphony's own speaking features recognise speech on the phone only, Tell on an iPad included (D19); the keyboard's dictation key is Apple's.
+- The listening line is never announced to VoiceOver (the microphone is open); the light's label and value carry the state.
 - A walk-down is never stored, never becomes a waiting walk, and returns to the page it started from (D2).
 - Only an ordinary walk finishing hands the light over, never behind the half-open display, and the light travels only on windows where `DailyHandover.travels` says so (not on the spread).
 - A Tell never makes a bar listen where it cannot be seen: during a walk it waits, while the whole plan shows the sheet rises first, under the half-open display only the display's bar takes it.
@@ -238,8 +256,11 @@ at the accessibility sizes (`DailyMetrics.titleLines`).
 **Not designed:** a phone or the Duo's outside screen held sideways (the old wide glance); a way to step
 to another week, month, season or year (only the "‹Month› ends" sign opens a past one); a task's time
 (stored, not shown); opening or ticking a calendar event from Week; Month, Season, Year and the walk
-letterboxed on the Duo; tent mode (the Duo standing like a tent, its outside screen showing), parked by
-the owner until after this work; an iPad.
+letterboxed on the Duo; an iPad; and tent mode. The owner's words for tent mode were "~1/4 open resting on
+the surface like a tent"; reading it as the Duo standing hinge up with its outside screen facing the
+person is the controller's, unconfirmed. The owner parked it until after this work. (`DailyTentPage` and
+`DailyMetrics+Tent` are the boards' word for the laptop and book half-open display, which is built and is
+not the owner's tent mode.)
 
 ## Reviewing on the simulator
 

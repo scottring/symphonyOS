@@ -168,6 +168,19 @@ struct DailyBarTests {
         #expect(bar.lightLabel == DailyCopy.typeIt)
     }
 
+    /// The light's state is in its value, so VoiceOver tells a listening light from a resting one
+    /// without any announcement (the microphone would hear it).
+    @Test func theLightsValueSaysItIsListening() {
+        var bar = DailyBar()
+        #expect(bar.lightValue == "")
+        _ = bar.apply(.micTapped)
+        #expect(bar.lightValue == DailyCopy.listeningNow)
+        _ = bar.apply(.micTapped)                       // waiting for the last words: still listening
+        #expect(bar.lightValue == DailyCopy.listeningNow)
+        _ = bar.apply(.listenEnded)
+        #expect(bar.lightValue == "")
+    }
+
     /// "Calls made in this plan": the listening line, a note and Undo share one line slot above
     /// the bar. While the light listens (or waits for the last words) the slot says so and the
     /// field spans the width; otherwise the note, Undo beside it, either alone, or nothing.
@@ -200,31 +213,48 @@ struct DailyBarTests {
         #expect(quiet.slot == .empty)
     }
 
-    /// What VoiceOver hears as the line slot changes: the listening line, a note, Undo, a refused
-    /// microphone and the handover's line, each once as it appears; nothing as a line goes, and
-    /// nothing again for what was already there.
+    /// What VoiceOver hears as the line slot changes: a note, Undo, a refused microphone and the
+    /// handover's line, each once as it appears, a second of the same shape too (a second add inside
+    /// the Undo window); nothing as a line goes; and never the listening line, which would be said
+    /// while the microphone is open (the light's label and value carry that state instead).
     @Test func eachLineIsHeardOnceAsItAppears() {
-        let listening = DailyCopy.listening(.today)
         let said = "It’s on Friday the 20th."
-        func heard(_ old: DailyBar.Slot, _ new: DailyBar.Slot) -> String? {
-            DailyBar.announcement(from: old, to: new, listening: listening)
+        func step(_ bar: inout DailyBar, _ event: DailyBar.Event) -> String? {
+            let old = bar
+            _ = bar.apply(event)
+            return DailyBar.announcement(from: old, to: bar)
         }
-        #expect(heard(.empty, .listening) == listening)
-        #expect(heard(.say(note: nil, undo: true), .listening) == listening)
-        #expect(heard(.listening, .listening) == nil)
-        #expect(heard(.empty, .say(note: nil, undo: true)) == WalkCopy.undo)
-        #expect(heard(.listening, .say(note: said, undo: true)) == "\(said) \(WalkCopy.undo)")
-        #expect(heard(.say(note: nil, undo: true), .say(note: said, undo: true)) == said)
-        #expect(heard(.say(note: said, undo: true), .say(note: nil, undo: true)) == nil)    // the note going
-        #expect(heard(.say(note: said, undo: true), .say(note: said, undo: false)) == nil)  // Undo going
-        #expect(heard(.say(note: said, undo: false), .empty) == nil)
-        #expect(heard(.empty, .handover) == DailyCopy.handover)
-        #expect(heard(.handover, .empty) == nil)
+        var bar = DailyBar()
+        #expect(step(&bar, .micTapped) == nil)                          // listening: never announced
+        #expect(bar.slot == .listening)
+        #expect(step(&bar, .heard("Call the plumber")) == nil)
+        #expect(step(&bar, .micTapped) == nil)
+        #expect(step(&bar, .listenEnded) == nil)                        // the add itself is the model's
+        #expect(step(&bar, .did(note: nil)) == WalkCopy.undo)           // a change offers Undo
+        #expect(step(&bar, .did(note: nil)) == WalkCopy.undo)           // a second change: heard again
+        #expect(step(&bar, .did(note: said)) == "\(said) \(WalkCopy.undo)")
+        #expect(step(&bar, .did(note: said)) == "\(said) \(WalkCopy.undo)")   // the same note twice: twice
+        #expect(step(&bar, .noteExpired) == nil)                        // the note going
+        #expect(step(&bar, .typed("Dentist")) == nil)                   // typing says nothing
+        #expect(step(&bar, .micTapped) == nil)                          // listening hides the Undo
+        #expect(step(&bar, .left) == nil)                               // the old Undo again: not new
+        #expect(step(&bar, .undoExpired) == nil)                        // Undo going
 
-        // A refused microphone, as the bar reaches it: listening, then the line that it types.
-        var bar = self.listening()
-        let before = bar.slot
-        _ = bar.apply(.speechUnavailable)
-        #expect(heard(before, bar.slot) == WalkCopy.speechOff)
+        // A refused microphone: listening, then the line that it types, once.
+        var refused = DailyBar()
+        _ = refused.apply(.micTapped)
+        #expect(step(&refused, .speechUnavailable) == WalkCopy.speechOff)
+        #expect(step(&refused, .noteExpired) == nil)
+
+        // Nothing heard: the note, once the light has stopped.
+        var quiet = DailyBar()
+        _ = quiet.apply(.micTapped)
+        _ = quiet.apply(.micTapped)
+        #expect(step(&quiet, .listenEnded) == WalkCopy.nothingHeard)
+
+        // The handover's line, once.
+        var handover = DailyBar()
+        #expect(step(&handover, .handoverLine) == DailyCopy.handover)
+        #expect(step(&handover, .handoverExpired) == nil)
     }
 }

@@ -40,6 +40,8 @@ enum DailyCopy {
     static let speakIt = "Speak it", stopListening = "Stop listening", inbox = "Inbox", more = "More"
     /// The light's VoiceOver label while it listens (a second tap adds what was heard), and with speech off (a tap types).
     static let addWhatYouSaid = "Add what you said", typeIt = "Type it"
+    /// The light's VoiceOver value while it listens (never announced: the microphone is open).
+    static let listeningNow = "Listening"
     static let handover = "The light lives here now. Type, or tap it to speak."
 
     // MARK: The mountain pages and the signs

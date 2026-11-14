@@ -172,7 +172,7 @@ struct DailyWeekList: View {
             }
             .font(DailyPalette.sans(13, relativeTo: .footnote))
             .foregroundStyle(DailyPalette.muted)
-            .lineLimit(1)
+            .lineLimit(DailyMetrics.quietLines(accessibilitySize: typeSize.isAccessibilitySize))
             .padding(.horizontal, look.labelInset)
             .frame(maxWidth: .infinity, minHeight: DailyMetrics.minTouch)
             .overlay(alignment: look.foldFirst ? .bottom : .top) {
@@ -257,7 +257,7 @@ struct DailyWeekList: View {
                 Text(title)
                     .font(DailyPalette.sans(14.5, relativeTo: .callout))
                     .foregroundStyle(DailyPalette.soft)
-                    .lineLimit(1)
+                    .lineLimit(DailyMetrics.quietLines(accessibilitySize: typeSize.isAccessibilitySize))
                     .truncationMode(.tail)
             }
             .padding(.leading, 10)
@@ -355,7 +355,7 @@ struct DailyWeekList: View {
             DailyFlag(colour: DailyPalette.lineageFlag, poleWidth: 1.4)
                 .frame(width: 9, height: 11)
             Text(text)
-                .lineLimit(1)
+                .lineLimit(DailyMetrics.quietLines(accessibilitySize: typeSize.isAccessibilitySize))
                 .truncationMode(.tail)
         }
         .frame(minHeight: 15)

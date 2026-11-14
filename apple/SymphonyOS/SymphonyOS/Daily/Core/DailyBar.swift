@@ -21,6 +21,10 @@ struct DailyBar: Equatable {
     var handoverLine = false
     /// Bumped when the field should take the keyboard.
     var fieldAsked = 0
+    /// Bumped each time a note is put in the slot, and each time a change offers Undo, so a second
+    /// line of the same shape (the same note twice, a new Undo over a live one) is still news to VoiceOver.
+    var notesSaid = 0
+    var undosOffered = 0
 
     /// Listening, or waiting for the last words (which looks the same): the field spans the
     /// width, More and Inbox give way, and the field shows what is heard but takes no typing.
@@ -33,6 +37,11 @@ struct DailyBar: Equatable {
         return speechOff ? DailyCopy.typeIt : DailyCopy.speakIt
     }
 
+    /// The light's state for VoiceOver: "Listening" while it listens (or waits for the last words),
+    /// else nothing. With the label, it is how VoiceOver learns the microphone is open: nothing is
+    /// announced then, since the microphone would hear it.
+    var lightValue: String { isListening ? DailyCopy.listeningNow : "" }
+
     /// The one line slot above the bar, in this order of need: the listening line while the light
     /// listens; otherwise the note, Undo beside it when both show, either alone; otherwise the
     /// handover's line; or nothing.
@@ -44,21 +53,21 @@ struct DailyBar: Equatable {
         return handoverLine ? .handover : .empty
     }
 
-    /// What VoiceOver is told as the slot changes from `old` to `new`: each line once, as it
-    /// appears (the listening line, as the page words it; a note, with a refused microphone's among
-    /// them; Undo; the handover's line), and nothing as a line goes or for what was already there.
-    static func announcement(from old: Slot, to new: Slot, listening: String) -> String? {
-        switch new {
-        case .empty:
+    /// What VoiceOver is told as the bar changes from `old` to `new`: a note (a refused microphone's
+    /// and "nothing came through" among them) and Undo, each time one is newly put in the slot, and the
+    /// handover's line as it appears; nothing as a line goes or comes back into sight. Never the
+    /// listening line: it would be said while the microphone is open, and the phone could take it
+    /// down as words. A note is only ever in the slot with the microphone stopped (`slot` puts
+    /// listening first, and every way out of listening stops the listener in the same step).
+    static func announcement(from old: DailyBar, to new: DailyBar) -> String? {
+        switch new.slot {
+        case .empty, .listening:
             return nil
-        case .listening:
-            return old == .listening ? nil : listening
         case .handover:
-            return old == .handover ? nil : DailyCopy.handover
+            return old.slot == .handover ? nil : DailyCopy.handover
         case .say(let note, let undo):
-            var before: (note: String?, undo: Bool) = (nil, false)
-            if case .say(let n, let u) = old { before = (n, u) }
-            let parts = [note != before.note ? note : nil, undo && !before.undo ? WalkCopy.undo : nil].compactMap { $0 }
+            let parts = [new.notesSaid != old.notesSaid ? note : nil,
+                         undo && new.undosOffered != old.undosOffered ? WalkCopy.undo : nil].compactMap { $0 }
             return parts.isEmpty ? nil : parts.joined(separator: " ")
         }
     }
@@ -156,7 +165,9 @@ struct DailyBar: Equatable {
 
         case .did(let note):
             undoShowing = true
+            undosOffered += 1
             self.note = note
+            if note != nil { notesSaid += 1 }
             return [.timer(.undo, ms: WalkState.undoMs), .timer(.note, ms: note == nil ? nil : WalkState.noteMs)]
 
         case .undoTapped:
@@ -200,6 +211,7 @@ struct DailyBar: Equatable {
     /// One plain line, and the field takes the keyboard.
     private mutating func say(_ line: String) -> [Effect] {
         note = line
+        notesSaid += 1
         fieldAsked += 1
         return [.timer(.note, ms: WalkState.noteMs)]
     }
