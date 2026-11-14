@@ -68,7 +68,7 @@ struct DailyWeekTests {
         let monday = make([], weekStart: day(2026, 11, 9))
         #expect(monday.days.map(\.label) == ["TUE", "WED", "THU", "FRI", "SAT", "SUN"])
         #expect(monday.days.last?.number == "15")
-        #expect(monday.past?.label == "Monday")
+        #expect(monday.past == nil)                                    // nothing behind it: no fold
     }
 
     @Test func pastDaysFoldToOneLine() {
@@ -81,6 +81,7 @@ struct DailyWeekTests {
 
         #expect(week.past?.label == "Sunday and Monday")
         #expect(week.past?.done == 3)
+        #expect(week.past?.doneLine == DailyCopy.done(3))
         #expect(week.past?.days.map(\.label) == ["SUN", "MON"])
         #expect(titles(week.past?.days.last) == ["Book the plumber", "Measure the window", "Call the tiler"])
         // A day still open this week sits in its own day, not among the earlier rows.
@@ -115,6 +116,7 @@ struct DailyWeekTests {
         #expect(first.past?.label == "Earlier")
         #expect(first.past?.days.isEmpty == true)
         #expect(first.past?.done == 0)
+        #expect(first.past?.doneLine == nil)
         #expect(Set(first.past?.earlier.map(\.title) ?? []) == ["Send the deposit", "Measure the bathroom window"])
         #expect(first.days.first?.isToday == true)
         #expect(first.days.first?.label == "SUN")
@@ -246,7 +248,7 @@ struct DailyWeekTests {
                         commitments: [held(familyLoose, on: sunday), held(theirs, on: sunday)])
         #expect(titles(on(week, wed)) == ["Call the tiler"])
         #expect(week.days.allSatisfy { $0.date != nil })
-        #expect(week.past?.earlier.isEmpty == true)
+        #expect((week.past?.earlier ?? []).isEmpty)
         let shown = week.days.flatMap(titles) + (week.past?.days.flatMap(titles) ?? [])
         #expect(Set(shown).subtracting(["open"]) == ["Call the tiler", "Paint the hall"])
     }
@@ -266,6 +268,65 @@ struct DailyWeekTests {
         let week = make([loose, t], commitments: [held(loose, on: sunday)])
         #expect(Set(week.days.map(\.id)).count == week.days.count)
         for d in week.days { #expect(Set(d.lines.map(\.id)).count == d.lines.count) }
+    }
+
+
+    @Test func theFoldSaysWhatWasDoneOrNothing() {
+        let monday = day(2026, 11, 9)
+        let wed = task("Call the tiler", on: day(2026, 11, 11))
+
+        // Monday, with nothing behind but an event: no fold at all.
+        let quiet = make([wed], events: { d in
+            PlanCalendar.sameDay(d, self.sunday) ? [self.event("Brunch", at: self.sunday)] : []
+        }, today: monday)
+        #expect(quiet.past == nil)
+
+        // Monday, with Sunday's task still open and nothing done: the fold keeps it, with no count.
+        let sunOpen = task("Return the library books", on: sunday)
+        let kept = make([wed, sunOpen], today: monday)
+        #expect(kept.past?.doneLine == nil)
+        #expect(titles(kept.past?.days.first) == ["Return the library books"])
+
+        // Nothing done and one earlier task open: the fold is there for it, with no count.
+        let friday = task("Send the deposit", on: day(2026, 11, 6))
+        let earlier = make([wed, friday], today: monday)
+        #expect(earlier.past?.earlier.map(\.title) == ["Send the deposit"])
+        #expect(earlier.past?.doneLine == nil)
+
+        // Two done: the line says so.
+        let a = task("Book the plumber", on: sunday, done: true)
+        let b = task("Measure the window", on: sunday, done: true)
+        let two = make([wed, a, b], today: monday)
+        #expect(two.past?.doneLine == DailyCopy.done(2))
+    }
+
+    @Test func aTaskOnTheWeeksLastDayStandsOnce() {
+        let saturday = task("Paint the fence", on: day(2026, 11, 14))
+        let sundayWeek = make([saturday], commitments: [held(saturday, on: sunday)])
+        let shown = sundayWeek.days.flatMap(titles) + (sundayWeek.past?.days.flatMap(titles) ?? [])
+        #expect(shown.filter { $0 == "Paint the fence" }.count == 1)
+        #expect(titles(sundayWeek.days.last) == ["Paint the fence"])
+
+        let mondayStart = day(2026, 11, 9)
+        let lastSunday = task("Wash the car", on: day(2026, 11, 15))
+        let mondayWeek = make([lastSunday], commitments: [held(lastSunday, on: mondayStart)], weekStart: mondayStart)
+        let shownM = mondayWeek.days.flatMap(titles) + (mondayWeek.past?.days.flatMap(titles) ?? [])
+        #expect(shownM.filter { $0 == "Wash the car" }.count == 1)
+        #expect(mondayWeek.days.last?.label == "SUN")
+        #expect(titles(mondayWeek.days.last) == ["Wash the car"])
+    }
+
+    @Test func onlyThisWeeksEventsFromTodayOnShow() {
+        // The feed answers for any day; a past day's events and other weeks' never show.
+        let week = make([], events: { d in [self.event("Event \(PlanCalendar.ymd(d))", at: d)] })
+        let shown = (week.days + (week.past?.days ?? [])).flatMap(titles).filter { $0.hasPrefix("event:") }
+        let expected = (10...14).map { "event:Event \(PlanCalendar.ymd(day(2026, 11, $0)))" }
+        #expect(shown == expected)
+        #expect(week.past == nil)                                       // past days with only events fold to nothing
+
+        let sunTask = task("Return the library books", on: sunday, done: true)
+        let withPast = make([sunTask], events: { d in [self.event("Event \(PlanCalendar.ymd(d))", at: d)] })
+        #expect(withPast.past?.days.flatMap(titles).contains { $0.hasPrefix("event:") } == false)
     }
 
     // MARK: The band's month goals
@@ -300,6 +361,18 @@ struct DailyWeekTests {
                                        weekStart: sunday, today: today, me: me)
         #expect(busy.map(\.title) == ["Clear the garage", "Book the plumber"])
         #expect(busy.first?.id == c.id)
+    }
+
+    @Test func theBandBreaksATieInTheWalksOrder() {
+        let periods = WalkPeriods.pick(now: today)
+        let a = monthGoal("Pick the tile and pay the deposit", periods, order: 0)
+        let b = monthGoal("Book the plumber", periods, order: 1)
+        let c = monthGoal("Clear the garage", periods, order: 2)
+        let tied = [serving(c, "Empty the shelves", on: day(2026, 11, 11)),
+                    serving(b, "Call two plumbers", on: day(2026, 11, 12))]
+        let band = DailyWeek.bandGoals(tasks: [c, b, a] + tied, goals: [], commitments: [], focus: [],
+                                       weekStart: sunday, today: today, me: me)
+        #expect(band.map(\.title) == ["Book the plumber", "Clear the garage"])
     }
 
     @Test func theBandReadsTheWalksMonthNotTheCalendars() {

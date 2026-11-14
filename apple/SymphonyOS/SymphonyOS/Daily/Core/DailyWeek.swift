@@ -33,9 +33,14 @@ enum DailyWeek {
         let label: String
         /// Tasks done on the folded days. The earlier rows are never counted.
         let done: Int
+        /// The days behind today, their tasks only: a past day's calendar events are not shown.
         let days: [Day]
         /// Still open from before this week: dated before it, or left on an earlier week with no day.
         let earlier: [DailyDay.Row]
+
+        /// The fold's count, the only one it draws: "3 done", or nothing when nothing was done,
+        /// so it never reads as a tally of what was missed.
+        var doneLine: String? { done > 0 ? DailyCopy.done(done) : nil }
     }
 
     struct Week: Equatable {
@@ -59,7 +64,8 @@ enum DailyWeek {
     /// Days come from `PlanCalendar.weekDays(weekStart)` as given, so a Monday start runs to
     /// Sunday. A day holds its events by start time, then the tasks dated on it (`isDated`) in
     /// the list's own order, done ones in place; with neither it is `.open`. Any day is the
-    /// week's list (`weekList`) with no day, done ones in place.
+    /// week's list (`weekList`) with no day, done ones in place. A folded past day holds its
+    /// tasks only; events are read only for today onward.
     static func make(tasks: [SymphonyTask], goals: [Goal], commitments: [TaskCommitment], focus: [TaskFocus],
                      events: (Date) -> [TimelineItem], weekStart: Date, today: Date, me: UUID) -> Week {
         let mine = DailyDay.mine(tasks, me: me)
@@ -75,8 +81,8 @@ enum DailyWeek {
             DailyDay.Row(id: t.id, title: t.title, forGoal: WalkEnding.forGoal(t, tasks: mine, goals: goals),
                          done: t.completed, first: t.id == first)
         }
-        func lines(on date: Date) -> [Line] {
-            let timed = events(date)
+        func lines(on date: Date, withEvents: Bool) -> [Line] {
+            let timed = (withEvents ? events(date) : [])
                 .filter { $0.type == .event }
                 .sorted { ($0.startTime ?? .distantPast, $0.isAllDay ? 0 : 1) < ($1.startTime ?? .distantPast, $1.isAllDay ? 0 : 1) }
                 .map { Line.event(id: $0.id, time: $0.isAllDay ? "" : $0.startTime.map(DailyCopy.clock) ?? "",
@@ -88,14 +94,14 @@ enum DailyWeek {
             let all = timed + dated
             return all.isEmpty ? [.open] : all
         }
-        func day(_ date: Date) -> Day {
+        func day(_ date: Date, withEvents: Bool = true) -> Day {
             let words = DailyCopy.dayLabel(date)
             return Day(date: date, label: words.label, number: words.number,
-                       isToday: PlanCalendar.sameDay(date, today), lines: lines(on: date))
+                       isToday: PlanCalendar.sameDay(date, today), lines: lines(on: date, withEvents: withEvents))
         }
 
         let holdsToday = dates.contains { PlanCalendar.sameDay($0, today) }
-        var days = (holdsToday ? dates.filter { $0 >= today } : dates).map(day)
+        var days = (holdsToday ? dates.filter { $0 >= today } : dates).map { day($0) }
         let anyDay = plan.weekList(start)
             .filter { $0.scheduledFor == nil }
             .sorted(by: PlanSnapshot.inManualOrder)
@@ -104,13 +110,17 @@ enum DailyWeek {
                             isToday: false, lines: anyDay.map { .task(row($0)) }))
         }
 
+        // The fold exists only for something done or something still open behind today:
+        // days that held neither leave no line at all.
         var past: Past?
         if holdsToday {
             let behind = dates.filter { $0 < today }
             let earlier = earlierOpen(plan, work: work, before: start).map(row)
-            if !behind.isEmpty || !earlier.isEmpty {
-                let done = work.filter { t in t.completed && behind.contains { plan.isDated(t, on: $0) } }.count
-                past = Past(label: DailyCopy.pastDays(behind), done: done, days: behind.map(day), earlier: earlier)
+            let doneBehind = work.filter { t in t.completed && behind.contains { plan.isDated(t, on: $0) } }.count
+            let openBehind = work.contains { t in !t.completed && behind.contains { plan.isDated(t, on: $0) } }
+            if doneBehind > 0 || openBehind || !earlier.isEmpty {
+                past = Past(label: DailyCopy.pastDays(behind), done: doneBehind, days: behind.map { day($0, withEvents: false) },
+                            earlier: earlier)
             }
         }
 
